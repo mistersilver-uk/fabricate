@@ -501,11 +501,7 @@ export class CraftingEngine {
     await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
     // Create the result item(s)
-    const {
-      items: resultItems,
-      rollTableMeta,
-      resolutionMeta,
-    } = await this._createResultItems(
+    const { items: resultItems, resolutionMeta } = await this._createResultItems(
       craftingActor,
       executionRecipe,
       step,
@@ -563,7 +559,6 @@ export class CraftingEngine {
         tools: toolValidation.tools,
         createdResults: [],
         failureReason: message,
-        rollTableMeta,
       });
       return {
         success: false,
@@ -632,7 +627,6 @@ export class CraftingEngine {
       consumedIngredients: consumedItems,
       tools: toolValidation.tools,
       createdResults: resultItems,
-      rollTableMeta,
     });
 
     return {
@@ -1091,38 +1085,6 @@ export class CraftingEngine {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
 
-    // Pre-resolve rollTableOutcome before calling resolveResultGroups.
-    // @deprecated rollTableOutcome is a legacy routed provider slated for removal
-    // in favour of `check`; this pre-resolution branch goes with it (tracked in #424).
-    let rollTableResult = null;
-    if (recipe?.resultSelection?.provider === 'rollTableOutcome' && resolutionService) {
-      const allGroups =
-        Array.isArray(step?.resultGroups) && step.resultGroups.length > 0
-          ? step.resultGroups
-          : Array.isArray(recipe?.resultGroups)
-            ? recipe.resultGroups
-            : [];
-      rollTableResult = await resolutionService.resolveByRollTable(recipe, step, allGroups);
-      if (rollTableResult.meta?.error && !rollTableResult.meta?.disposition) {
-        console.error(`Fabricate | rollTableOutcome error: ${rollTableResult.meta.error}`);
-        return {
-          items: [],
-          rollTableMeta: { error: rollTableResult.meta.error, disposition: 'error' },
-          resolutionMeta: { error: rollTableResult.meta.error, disposition: 'error' },
-        };
-      }
-      if (rollTableResult.meta?.disposition === 'misconfiguration') {
-        console.error(
-          `Fabricate | rollTableOutcome misconfiguration: ${rollTableResult.meta.error}`
-        );
-        return {
-          items: [],
-          rollTableMeta: { error: rollTableResult.meta.error, disposition: 'misconfiguration' },
-          resolutionMeta: { error: rollTableResult.meta.error, disposition: 'misconfiguration' },
-        };
-      }
-    }
-
     const resolved = resolutionService
       ? resolutionService.resolveResultGroups({
           recipe,
@@ -1130,7 +1092,6 @@ export class CraftingEngine {
           ingredientSet,
           checkResult,
           selectedResultGroupId,
-          rollTableResult,
         })
       : {
           groups: Array.isArray(step?.resultGroups) ? step.resultGroups : [],
@@ -1163,7 +1124,6 @@ export class CraftingEngine {
 
     return {
       items: createdItems,
-      rollTableMeta: rollTableResult?.meta || null,
       resolutionMeta: resolved?.meta || null,
     };
   }
@@ -1429,13 +1389,14 @@ export class CraftingEngine {
    * A check is REQUIRED (run even when the system has crafting checks disabled)
    * when the recipe needs a check outcome to select its result:
    *  - `progressive` mode, or
-   *  - `routed` mode with the `check` provider (or the legacy `macroOutcome`).
+   *  - `routed` mode with the `check` provider.
    *
-   * The other routed providers do not need a check outcome to route:
-   * `ingredientSet` selects by the chosen ingredient set, and `rollTableOutcome`
-   * selects by a drawn roll-table entry. For those, and for `simple`/`alchemy`,
-   * the check only runs when the system enables crafting checks. There is no
-   * legacy `tiered` branch — `tiered` is gone, replaced by `routed` + provider.
+   * The other routed provider does not need a check outcome to route:
+   * `ingredientSet` selects by the chosen ingredient set. For it, and for
+   * `simple`/`alchemy`, the check only runs when the system enables crafting
+   * checks (alchemy additionally always runs its simple pass/fail check when a
+   * roll formula is configured — see `useSimpleCheck` below). There is no legacy
+   * `tiered` branch — `tiered` is gone, replaced by `routed` + provider.
    *
    * @private
    * @returns {Promise<{success: boolean, outcome: ?string, value?: *, data: object}>}
@@ -1463,8 +1424,7 @@ export class CraftingEngine {
     const selection =
       resolutionService?.getResultSelection?.(recipe, step) || recipe?.resultSelection || null;
     const checkRequired =
-      mode === 'progressive' ||
-      (mode === 'routed' && ['check', 'macroOutcome'].includes(selection?.provider));
+      mode === 'progressive' || (mode === 'routed' && selection?.provider === 'check');
     const features = system.features || {};
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;
@@ -1741,7 +1701,6 @@ export class CraftingEngine {
     tools,
     createdResults,
     failureReason,
-    rollTableMeta = null,
   }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
@@ -1755,12 +1714,6 @@ export class CraftingEngine {
         `<h3>${loc('FABRICATE.Chat.CraftSuccess')}: ${recipe.name}</h3>`,
         `<p><strong>${loc('FABRICATE.Chat.Actor')}:</strong> ${craftingActor?.name || ''}</p>`,
       ];
-
-      if (rollTableMeta?.drawnName) {
-        lines.push(
-          `<p><strong>${loc('FABRICATE.Chat.RollTableResult') || 'Roll Table Result'}:</strong> ${rollTableMeta.drawnName}</p>`
-        );
-      }
 
       if (createdResults && createdResults.length > 0) {
         lines.push(`<p><strong>${loc('FABRICATE.Chat.Results')}</strong></p><ul>`);

@@ -44,8 +44,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the check outcome or provider. No other result groups are awarded.**
 - Supported providers:
   - `ingredientSet`
-  - `macroOutcome`
-  - `rollTableOutcome`
+  - `check`
 
 ### Provider: `ingredientSet`
 
@@ -53,28 +52,23 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - If there is only one result group, explicit mapping may be omitted.
 - If there are multiple result groups, every satisfiable ingredient set must resolve to exactly one group.
 
-### Provider: `macroOutcome`
+### Provider: `check`
 
-- A crafting check macro is required (`Recipe.resultSelection.macroUuid` or system fallback).
-- Macro return contract is object-based: `{ success, outcome, description? }`.
+- The system-level crafting-check outcome name routes to the `ResultGroup` of the same name.
+- Crafting checks must be enabled on the system; the outcome is produced by the configured check source (macro, built-in adapter, or simple/routed roll formula).
 - `outcome` is trim-normalized and case-insensitive.
 - Resolution rules:
-  1. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes failure path.
-  2. Otherwise, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
-  3. If no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
-
-### Provider: `rollTableOutcome`
-
-- `Recipe.resultSelection.rollTableUuid` is required.
-- Engine draws exactly once per attempt.
-- Drawn result `name` is trim-normalized and case-insensitive, then interpreted with the same reserved-keyword and result-group-name rules as `macroOutcome`.
-- If no result-group name matches and no reserved keyword applies, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
+  1. Explicit tier assignment wins: when the outcome resolves to a routed-check outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
+  2. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes the failure path.
+  3. Otherwise, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
+  4. If no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
 
 ### Validation
 
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
-- `resultSelection.provider` must be one of the three supported values.
+- `resultSelection.provider` must be one of the two supported values (`ingredientSet`, `check`).
+- The `check` provider requires crafting checks enabled on the system.
 - Provider-specific required fields must be present.
 - `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison.
 - `ResultGroup.name` may not be any reserved failure keyword.
@@ -122,7 +116,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 - Player submits ingredient combinations directly instead of selecting a visible recipe.
 - Recipes remain hidden by default for non-GM users (see `006` for `learnOnCraft` semantics).
-- Result-group selection uses recipe-level providers (`ingredientSet`, `macroOutcome`, `rollTableOutcome`) with the same provider contracts as routed mode.
+- Result-group selection uses recipe-level providers (`ingredientSet`, `check`) with the same provider contracts as routed mode.
 - Multi-step recipes are not supported.
 - `consumeOnFail` defaults to true for failed attempts.
 
@@ -184,7 +178,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 ## Testing Requirements
 
 - Unit tests per mode for cardinality and routing validation.
-- Unit tests for provider-specific routed behavior (`ingredientSet`, `macroOutcome`, `rollTableOutcome`).
+- Unit tests for provider-specific routed behavior (`ingredientSet`, `check`).
 - Unit tests for reserved failure keyword handling and result-group name matching normalization.
 - Unit tests for progressive award modes (`partial`, `equal`, `exceed`).
 - Integration tests validating mode-specific behavior in full crafting flow.

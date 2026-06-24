@@ -584,7 +584,6 @@
       "Results": "Created",
       "FailureReason": "Reason",
       "ConsumedOnFailure": "Consumed on Failure",
-      "RollTableResult": "Roll Table Result",
       "GatherSuccess": "Gathering Successful",
       "GatherFailure": "Gathering Failed",
       "GatherActor": "Gatherer",

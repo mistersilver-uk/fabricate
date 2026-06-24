@@ -63,7 +63,7 @@ A crafting system defines:
 - failure/success hooks
 - requirement providers (time/currency)
 - recipe visibility mode
-- recipe-level routed result selection providers (`ingredientSet`, `macroOutcome`, `rollTableOutcome`) when mode is `routed` or `alchemy`
+- recipe-level routed result selection providers (`ingredientSet`, `check`) when mode is `routed` or `alchemy`
 
 Changing resolution mode is destructive and governed by `007-destructive-changes-and-migrations.md`.
 

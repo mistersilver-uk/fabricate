@@ -105,12 +105,12 @@ describe('routed recipe resolution', () => {
 
   it('Recipe preserves step.resultSelection through normalization and toJSON', () => {
     const activeStep = step({
-      resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.step' },
+      resultSelection: { provider: 'check', macroUuid: 'Macro.step' },
     });
     const recipe = recipeWithStep(activeStep);
 
-    assert.equal(recipe.steps[0].resultSelection.provider, 'macroOutcome');
-    assert.equal(recipe.toJSON().steps[0].resultSelection.provider, 'macroOutcome');
+    assert.equal(recipe.steps[0].resultSelection.provider, 'check');
+    assert.equal(recipe.toJSON().steps[0].resultSelection.provider, 'check');
     assert.equal(recipe.toJSON().steps[0].resultSelection.macroUuid, 'Macro.step');
   });
 
@@ -127,8 +127,8 @@ describe('routed recipe resolution', () => {
     assert.equal(result.valid, true, result.errors.join(', '));
   });
 
-  it('step.resultSelection overrides recipe-level resultSelection for macroOutcome routing', () => {
-    const activeStep = step({ resultSelection: { provider: 'macroOutcome' } });
+  it('step.resultSelection overrides recipe-level resultSelection for check routing', () => {
+    const activeStep = step({ resultSelection: { provider: 'check' } });
     const recipe = recipeWithStep(activeStep);
     const service = buildService();
 
@@ -177,7 +177,7 @@ describe('routed recipe resolution', () => {
     assert.equal(
       success.groups[0].name,
       'Mythic',
-      'check routes by outcome name like macroOutcome'
+      'check routes by the crafting-check outcome name'
     );
 
     const failed = service.resolveResultGroups({
@@ -317,8 +317,8 @@ describe('routed recipe resolution', () => {
     assert.equal(result.groups[0].name, 'Mythic');
   });
 
-  it('routed macroOutcome returns no output for fail keywords', () => {
-    const activeStep = step({ resultSelection: { provider: 'macroOutcome' } });
+  it('routed check returns no output for fail keywords', () => {
+    const activeStep = step({ resultSelection: { provider: 'check' } });
     const recipe = recipeWithStep(activeStep);
     const service = buildService();
 
@@ -333,23 +333,17 @@ describe('routed recipe resolution', () => {
     assert.deepEqual(result.groups, []);
   });
 
-  it('routed rollTableOutcome resolves a drawn group name', async () => {
-    const activeStep = step({
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'RollTable.quality' },
+  // The legacy `macroOutcome` / `rollTableOutcome` providers were removed in 1.6.0
+  // (issue 424). They no longer normalize onto a recipe, so a recipe authored with
+  // one carries no `resultSelection` and falls through to the first-group fallback.
+  for (const legacy of ['macroOutcome', 'rollTableOutcome']) {
+    it(`removed legacy provider ${legacy} does not normalize onto the recipe`, () => {
+      const activeStep = step({ resultSelection: { provider: legacy } });
+      const recipe = recipeWithStep(activeStep);
+
+      assert.equal(recipe.steps[0].resultSelection, null);
     });
-    const recipe = recipeWithStep(activeStep);
-    const service = buildService();
-    mockFromUuidResult = { draw: async () => ({ results: [{ text: 'Mythic' }] }) };
-
-    const rollTableResult = await service.resolveByRollTable(
-      recipe,
-      recipe.steps[0],
-      recipe.steps[0].resultGroups
-    );
-
-    assert.equal(rollTableResult.meta.disposition, 'success');
-    assert.equal(rollTableResult.groups[0].name, 'Mythic');
-  });
+  }
 
   // Back-compat regression guard: legacy persisted `mapped`/`tiered` data still
   // resolves correctly AFTER the canonical pipeline (manager token-normalizer +
@@ -402,7 +396,7 @@ describe('routed recipe resolution', () => {
     const recipe = recipeWithStep(
       step({
         resultGroups: migratedRecipe.resultGroups,
-        resultSelection: { provider: 'macroOutcome' },
+        resultSelection: { provider: 'check' },
       })
     );
     const tiered = service.resolveResultGroups({

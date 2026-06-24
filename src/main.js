@@ -216,15 +216,11 @@ function createGatheringResultResolver(resolutionModeService) {
         }
       }
 
-      if (provider === 'rollTableOutcome') {
-        const tableResult = await resolutionModeService.resolveByRollTable(
-          { resultSelection },
-          null,
-          resultGroups
-        );
-        return normalizeGatheringRollTableOutcome(tableResult);
-      }
-
+      // The recipe-side roll-table draw mechanism was removed in 1.6.0 (issue 424),
+      // so a gathering `rollTableOutcome` provider can no longer resolve. This whole
+      // resolver — including the now-orphaned `normalizeGatheringRollTableOutcome`
+      // helper below — is replaced by the system-check-formula path in PR-3 (when
+      // gathering routed tasks are rewired off per-task providers entirely).
       return {
         status: 'misconfigured',
         diagnostics: [{ code: 'UNSUPPORTED_RESULT_PROVIDER', message: `Unsupported gathering result provider "${provider}"` }]

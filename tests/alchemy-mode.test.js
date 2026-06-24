@@ -295,18 +295,60 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with invalid provider
   assert.ok(result.errors.some(e => e.includes('provider')));
 });
 
-test('ResolutionModeService.validateRecipe: alchemy recipe with rollTableOutcome but no UUID is invalid', () => {
-  const system = buildAlchemySystem();
+// The legacy `macroOutcome` / `rollTableOutcome` providers were removed in 1.6.0
+// (issue 424); they are no longer valid provider VALUES under alchemy validation.
+for (const legacy of ['macroOutcome', 'rollTableOutcome']) {
+  test(`ResolutionModeService.validateRecipe: alchemy recipe with removed ${legacy} provider is invalid`, () => {
+    const system = buildAlchemySystem();
+    const service = buildResolutionService(system);
+    const recipe = buildRecipe(
+      'r1',
+      [buildIngredientSet([buildIngredientGroup('c1')])],
+      [{ id: 'rg1', name: 'group1', results: [] }],
+      { resultSelection: { provider: legacy } }
+    );
+    const result = service.validateRecipe(recipe);
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.errors.some(e => /Invalid result selection provider/i.test(e)),
+      `expected invalid-provider error for ${legacy}, got: ${JSON.stringify(result.errors)}`
+    );
+  });
+}
+
+test('ResolutionModeService.validateRecipe: alchemy recipe with check provider is valid when checks enabled', () => {
+  const system = buildAlchemySystem({
+    craftingCheck: { enabled: true, macroUuid: null, outcomes: ['success', 'fail'] }
+  });
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
     [buildIngredientSet([buildIngredientGroup('c1')])],
     [{ id: 'rg1', name: 'group1', results: [] }],
-    { resultSelection: { provider: 'rollTableOutcome' } }
+    { resultSelection: { provider: 'check' } }
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, true, result.errors.join(', '));
+  assert.equal(result.errors.length, 0);
+});
+
+test('ResolutionModeService.validateRecipe: alchemy recipe with check provider requires checks enabled', () => {
+  const system = buildAlchemySystem({
+    craftingCheck: { enabled: false, macroUuid: null, outcomes: [] }
+  });
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')])],
+    [{ id: 'rg1', name: 'group1', results: [] }],
+    { resultSelection: { provider: 'check' } }
   );
   const result = service.validateRecipe(recipe);
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('UUID')));
+  assert.ok(
+    result.errors.some(e => /check provider requires crafting checks enabled/i.test(e)),
+    `expected check-requires-checks error, got: ${JSON.stringify(result.errors)}`
+  );
 });
 
 test('ResolutionModeService.validateRecipe: valid alchemy recipe with ingredientSet provider passes', () => {
@@ -377,26 +419,27 @@ test('resolveResultGroups: alchemy + ingredientSet provider falls back to first 
   assert.equal(result.groups[0].id, 'rg1');
 });
 
-test('resolveResultGroups: alchemy + macroOutcome provider returns matched group', () => {
+test('resolveResultGroups: alchemy + check provider returns matched group', () => {
   const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [
     { id: 'rg1', name: 'success', results: [] },
     { id: 'rg2', name: 'partial', results: [] }
   ];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'check' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'success' }, ingredientSet: {} });
   assert.equal(result.groups.length, 1);
   assert.equal(result.groups[0].id, 'rg1');
+  assert.equal(result.meta.disposition, 'success');
 });
 
-test('resolveResultGroups: alchemy + macroOutcome returns empty groups on fail keyword', () => {
+test('resolveResultGroups: alchemy + check returns empty groups on fail keyword', () => {
   const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'check' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'fail' }, ingredientSet: {} });
@@ -404,11 +447,11 @@ test('resolveResultGroups: alchemy + macroOutcome returns empty groups on fail k
   assert.equal(result.meta.disposition, 'fail');
 });
 
-test('resolveResultGroups: alchemy + macroOutcome returns empty groups on miss keyword', () => {
+test('resolveResultGroups: alchemy + check returns empty groups on miss keyword', () => {
   const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'check' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'miss' }, ingredientSet: {} });
@@ -416,11 +459,11 @@ test('resolveResultGroups: alchemy + macroOutcome returns empty groups on miss k
   assert.equal(result.meta.disposition, 'miss');
 });
 
-test('resolveResultGroups: alchemy + macroOutcome returns misconfiguration on no match', () => {
+test('resolveResultGroups: alchemy + check returns misconfiguration on no match', () => {
   const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'check' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'nonexistent' }, ingredientSet: {} });

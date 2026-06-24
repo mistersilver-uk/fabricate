@@ -93,7 +93,6 @@ const RESOLUTION_MODE_LABEL_KEYS = {
 const BASE_TABS = new Set(['systems', 'items', 'recipes', 'rules', 'graph']);
 const ENVIRONMENTS_TAB = 'environments';
 const TASK_RESOLUTION_MODES = new Set(['routed', 'progressive']);
-const TASK_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
 const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
 const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
@@ -1286,12 +1285,6 @@ function _inferEnvironmentValidationTarget(
 
   if (/routed resolution requires resultselection|resultselection\.provider/.test(lower)) {
     return { taskId: task.id, path: `${prefix}.resultSelection.provider` };
-  }
-  if (/macrooutcome provider requires macrouuid/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.resultSelection.macroUuid` };
-  }
-  if (/rolltableoutcome provider requires rolltableuuid/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.resultSelection.rollTableUuid` };
   }
 
   if (/visibility gate requires formula and threshold/.test(lower)) {

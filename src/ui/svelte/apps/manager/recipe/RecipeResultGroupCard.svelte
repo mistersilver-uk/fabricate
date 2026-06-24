@@ -43,12 +43,10 @@
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
 
-  // Mirror RecipeItemInspector: 'ingredientSet' is Ingredient routing; the
-  // @deprecated macroOutcome/rollTableOutcome providers read back as Check.
+  // Mirror RecipeItemInspector: 'ingredientSet' is Ingredient routing; 'check'
+  // routes by the system crafting-check outcome.
   const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
-  const isCheckRouting = $derived(
-    ['check', 'macroOutcome', 'rollTableOutcome'].includes(routingProvider)
-  );
+  const isCheckRouting = $derived(routingProvider === 'check');
   const checkOutcomeIds = $derived(
     Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : []
   );

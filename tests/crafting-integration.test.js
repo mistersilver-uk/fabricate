@@ -8,7 +8,7 @@
  * Groups:
  *   1. Simple mode  — validate + consume + create result (AC1)
  *   2. Multistep    — start run, advance 2 steps, complete (AC2)
- *   3. Routed macroOutcome — outcome routed to a name-matched result group (AC3)
+ *   3. Routed check — outcome routed to a name-matched result group (AC3)
  *   4. Progressive  — value-based awarding by difficulty (AC4)
  */
 import test from 'node:test';
@@ -534,7 +534,7 @@ test('multistep: step failure records failure and stops run', async () => {
 // Group 3: Legacy tiered compatibility mode integration (AC3)
 // ===========================================================================
 
-// Canonical routed + macroOutcome fixture (the shape the 1.4.0 migration produces
+// Canonical routed + check fixture (the shape the 1.4.0 migration produces
 // from a former-tiered system): groups are matched by name. The migration renames
 // the group routed from `pass` to "pass"; the `fail` outcome is a RESERVED failure
 // keyword, so it takes the failure path and never names a group (its former target
@@ -564,20 +564,20 @@ function buildLegacyOutcomeRoutingFixture() {
       { id: 'rg-pass', name: 'pass', results: [{ id: 'r-pass', componentId: 'good-potion', quantity: 1 }] },
       { id: 'rg-fail', name: 'Weak Brew', results: [{ id: 'r-fail', componentId: 'weak-potion', quantity: 1 }] }
     ],
-    resultSelection: { provider: 'macroOutcome' },
+    resultSelection: { provider: 'check' },
     toolIds: [], timeRequirement: null
   };
 
   const recipe = buildRecipe({
     craftingSystemId: 'sys-legacy-routing',
-    resultSelection: { provider: 'macroOutcome' },
+    resultSelection: { provider: 'check' },
     steps: [step]
   });
 
   return { system, herb, ingredientSet, step, recipe };
 }
 
-test("routed macroOutcome: 'pass' outcome routes craft to the pass-named result group", async () => {
+test("routed check: 'pass' outcome routes craft to the pass-named result group", async () => {
   const { system, herb, ingredientSet, recipe } = buildLegacyOutcomeRoutingFixture();
   setupGame(system);
 
@@ -603,12 +603,12 @@ test("routed macroOutcome: 'pass' outcome routes craft to the pass-named result 
 
   const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(craftResult.success, true, 'routed macroOutcome craft should succeed with "pass" outcome');
+  assert.equal(craftResult.success, true, 'routed check craft should succeed with "pass" outcome');
   assert.equal(craftResult.results.length, 1, 'exactly one result item should be returned');
   assert.equal(craftResult.results[0].name, 'Good Potion', '"pass" outcome should yield Good Potion from the pass-named group');
 });
 
-test("routed macroOutcome: reserved 'fail' outcome takes the failure path (no group awarded)", async () => {
+test("routed check: reserved 'fail' outcome takes the failure path (no group awarded)", async () => {
   const { system, herb, ingredientSet, recipe } = buildLegacyOutcomeRoutingFixture();
   setupGame(system);
 
@@ -639,7 +639,7 @@ test("routed macroOutcome: reserved 'fail' outcome takes the failure path (no gr
 
   const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  // `fail` is a reserved failure keyword under canonical macroOutcome: it routes
+  // `fail` is a reserved failure keyword under canonical check: it routes
   // to the failure path and awards no result group (unlike legacy tiered, which
   // routed `fail` to an explicit group).
   assert.equal(craftResult.results.length, 0, 'reserved fail outcome awards no result group');

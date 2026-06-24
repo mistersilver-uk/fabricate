@@ -2397,14 +2397,14 @@ describe('RecipeEditView (mounted)', () => {
 
   it('preserves a group id AND name when editing a recipe that carries outcomeRouting/resultSelection', async () => {
     // Routing references the group by id (outcomeRouting/resultMapping) and by
-    // name (roll-table resultSelection, case-insensitive), so the first edit must
-    // not drop either.
+    // name (check-routed resultSelection, case-insensitive), so the first edit
+    // must not drop either.
     const { target, patches } = await mountResultGroups(
       [{ id: 'grp-1', name: 'Primary', results: [{ componentId: 'cmp-herb', quantity: 1 }] }],
       {
         recipe: {
           outcomeRouting: { success: 'grp-1' },
-          resultSelection: { mode: 'rollTable', rollTableOutcome: { Primary: 'grp-1' } },
+          resultSelection: { provider: 'check' },
         },
       }
     );
@@ -2910,23 +2910,6 @@ describe('RecipeItemInspector (mounted)', () => {
       calls,
       ['ingredientSet', 'check'],
       'clicking Check requests the check provider'
-    );
-    inspectorHarness.remount();
-  });
-
-  it('reads a legacy macroOutcome provider back as Check routing', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        routed: true,
-        complex: true,
-        routingProvider: 'macroOutcome',
-      })
-    );
-    assert.ok(
-      target
-        .querySelector('[data-recipe-routing-option="check"]')
-        .classList.contains('is-selected'),
-      'the legacy macroOutcome provider still reads as Check'
     );
     inspectorHarness.remount();
   });

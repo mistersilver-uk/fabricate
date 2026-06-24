@@ -308,14 +308,9 @@ export class Recipe {
   /**
    * Validate a routed `resultSelection` and its `ResultGroup` names.
    *
-   * Applies to the routed providers `ingredientSet` and `check` (and, until they
-   * are removed, the @deprecated legacy `macroOutcome`/`rollTableOutcome`); a
-   * recipe with no `resultSelection` (simple/progressive/legacy) is unaffected.
-   * `rollTableOutcome` additionally requires a roll-table UUID.
-   *
-   * @deprecated The `macroOutcome` and `rollTableOutcome` providers are legacy and
-   *   slated for removal; `check` (system crafting-check outcome) supersedes them.
-   *   Removal is tracked in #424.
+   * Applies to the routed providers `ingredientSet` and `check`; a recipe with no
+   * `resultSelection` (simple/progressive/legacy) is unaffected. `check` routes by
+   * the system crafting-check outcome.
    *
    * Under EVERY routed provider, `ResultGroup.name` must be unique under
    * trim+lowercase comparison and must not collide with a reserved routing
@@ -323,21 +318,16 @@ export class Recipe {
    * shared keyword set keeps this in lockstep with the runtime resolution path in
    * `ResolutionModeService`.
    *
-   * @param {{provider?: string, rollTableUuid?: string}} resultSelection
+   * @param {{provider?: string}} resultSelection
    * @param {Array<{id?: string, name?: string}>} resultGroups
    * @param {string[]} errors push-target for validation messages
    */
   _validateRoutedResultSelection(resultSelection, resultGroups, errors) {
     const provider = resultSelection?.provider;
-    // Only routed providers route by ResultGroup.name / draw; a recipe with no
+    // Only routed providers route by ResultGroup.name; a recipe with no
     // resultSelection (simple/progressive/legacy) is unaffected. `check` routes by
-    // the system crafting-check outcome (canonical successor to the legacy
-    // `macroOutcome`/`rollTableOutcome` providers, whose removal is tracked in #424).
-    if (!['ingredientSet', 'check', 'macroOutcome', 'rollTableOutcome'].includes(provider)) return;
-
-    if (provider === 'rollTableOutcome' && !resultSelection.rollTableUuid) {
-      errors.push('rollTableOutcome provider requires a roll table UUID');
-    }
+    // the system crafting-check outcome.
+    if (!['ingredientSet', 'check'].includes(provider)) return;
 
     // Reserved + unique ResultGroup.name rules apply under EVERY routed provider
     // (spec 004 §Validation lines 79-80), using the shared keyword set so the
@@ -476,16 +466,15 @@ export class Recipe {
 
   _normalizeResultSelection(resultSelection) {
     if (!resultSelection || typeof resultSelection !== 'object') return null;
-    // `ingredientSet` and `check` are the canonical providers; `macroOutcome` and
-    // `rollTableOutcome` are @deprecated legacy providers kept only until a
-    // migration moves existing recipes onto `check` (tracked in #424).
-    const VALID_PROVIDERS = ['ingredientSet', 'check', 'macroOutcome', 'rollTableOutcome'];
+    // `ingredientSet` and `check` are the canonical routed providers. The legacy
+    // `macroOutcome`/`rollTableOutcome` providers were removed in 1.6.0; persisted
+    // recipes are migrated onto `check` by `migrateRemoveResultSelectionProviders`.
+    const VALID_PROVIDERS = ['ingredientSet', 'check'];
     const provider = String(resultSelection.provider || '').trim();
     if (!VALID_PROVIDERS.includes(provider)) return null;
     return {
       provider,
       macroUuid: resultSelection.macroUuid || null,
-      rollTableUuid: resultSelection.rollTableUuid || null,
     };
   }
 

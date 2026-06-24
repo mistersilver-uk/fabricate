@@ -70,9 +70,7 @@
 
   // Check-mode routed recipes route by the crafting-check outcome, so ingredient
   // sets are nameless there; ingredient mode and non-routed systems keep names.
-  const showSetName = $derived(
-    !['check', 'macroOutcome', 'rollTableOutcome'].includes(routingProvider)
-  );
+  const showSetName = $derived(routingProvider !== 'check');
 
   function stepById(stepId) {
     return steps.find(step => step.id === stepId) || null;
