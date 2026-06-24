@@ -9,6 +9,7 @@ import {
   itemMatchesComponentSource,
 } from '../utils/sourceUuid.js';
 
+import { runFormulaPassFail, runFormulaProgressive } from './checkRoll.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import {
   buildCurrencyAffordProbe,
@@ -1640,7 +1641,6 @@ export class CraftingEngine {
    */
   async _runSimpleCheck(system, recipe, ingredientSet, craftingActor) {
     const simple = system?.craftingCheck?.simple || {};
-    const formula = String(simple.rollFormula || '').trim();
     const dc = await this._resolveSimpleCheckDc(
       system,
       simple,
@@ -1648,65 +1648,14 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
-
-    let total = 0;
-    let diceGroups = [];
-    if (formula) {
-      if (typeof globalThis.Roll !== 'function') {
-        // No dice engine available (headless/non-Foundry): cannot evaluate, so do
-        // not block the craft.
-        return {
-          success: true,
-          outcome: 'pass',
-          value: null,
-          data: { dc, formula },
-          message: null,
-        };
-      }
-      try {
-        const rollData = craftingActor?.getRollData?.() ?? craftingActor?.system ?? {};
-        const roll = await new globalThis.Roll(formula, rollData).evaluate();
-        const rolledTotal = Number(roll?.total);
-        total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
-        diceGroups = this._rolledDiceGroups(roll);
-      } catch (error) {
-        console.error(`Fabricate | Simple crafting check roll failed (${formula})`, error);
-        return {
-          success: false,
-          outcome: 'fail',
-          value: null,
-          data: { dc, formula },
-          message: `Crafting check roll failed: ${error.message}`,
-        };
-      }
-    }
-
-    const crit = this._resolveSimpleCheckCrit(simple.diceCrits, diceGroups);
-    const comparison = simple.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-    let success;
-    if (crit) {
-      success = crit.success;
-    } else if (comparison === 'exceed') {
-      success = total > dc;
-    } else {
-      success = total >= dc;
-    }
-    const breakTools = crit ? crit.breakTools === true : false;
-
-    return {
-      success,
-      outcome: success ? 'pass' : 'fail',
-      value: total,
-      data: {
-        dc,
-        formula,
-        total,
-        comparison,
-        crit: crit ? { success: crit.success, breakTools } : null,
-        breakTools,
-      },
-      message: success ? null : 'Crafting check failed',
-    };
+    return runFormulaPassFail({
+      formula: simple.rollFormula,
+      dc,
+      thresholdMode: simple.thresholdMode,
+      diceCrits: simple.diceCrits,
+      actor: craftingActor,
+      label: 'Crafting',
+    });
   }
 
   /**
@@ -1718,62 +1667,17 @@ export class CraftingEngine {
    *
    * Per-die crits (shared shape with the simple check) force the award: a matched
    * SUCCESS crit awards everything (`value = MAX_SAFE_INTEGER`), a matched FAILURE
-   * crit awards nothing (`value = 0`), and either may break tools. Forced failure
-   * wins (handled by {@link _resolveSimpleCheckCrit}).
+   * crit awards nothing (`value = 0`), and either may break tools (forced failure
+   * wins). Delegates to the shared {@link runFormulaProgressive}.
    */
   async _runProgressiveCheck(system, recipe, craftingActor) {
     const progressive = system?.craftingCheck?.progressive || {};
-    const formula = String(progressive.rollFormula || '').trim();
-
-    let total = 0;
-    let diceGroups = [];
-    if (formula) {
-      if (typeof globalThis.Roll !== 'function') {
-        // No dice engine available (headless/non-Foundry): cannot evaluate. The
-        // craft still proceeds (progressive never blocks); a 0 value awards
-        // nothing — a finite value so progressive result-awarding accepts it,
-        // unlike the pass/fail simple check which can leave value null.
-        return { success: true, outcome: null, value: 0, data: { formula, total: 0, value: 0 } };
-      }
-      try {
-        const rollData = craftingActor?.getRollData?.() ?? craftingActor?.system ?? {};
-        const roll = await new globalThis.Roll(formula, rollData).evaluate();
-        const rolledTotal = Number(roll?.total);
-        total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
-        diceGroups = this._rolledDiceGroups(roll);
-      } catch (error) {
-        console.error(`Fabricate | Progressive crafting check roll failed (${formula})`, error);
-        return {
-          success: false,
-          outcome: null,
-          value: null,
-          data: { formula },
-          message: `Crafting check roll failed: ${error.message}`,
-        };
-      }
-    }
-
-    const crit = this._resolveSimpleCheckCrit(progressive.diceCrits, diceGroups);
-    let value;
-    if (crit) {
-      value = crit.success ? Number.MAX_SAFE_INTEGER : 0;
-    } else {
-      value = total;
-    }
-    const breakTools = crit ? crit.breakTools === true : false;
-
-    return {
-      success: true,
-      outcome: null,
-      value,
-      data: {
-        formula,
-        total,
-        value,
-        crit: crit ? { success: crit.success, breakTools } : null,
-        breakTools,
-      },
-    };
+    return runFormulaProgressive({
+      formula: progressive.rollFormula,
+      diceCrits: progressive.diceCrits,
+      actor: craftingActor,
+      label: 'Crafting',
+    });
   }
 
   /**
@@ -1810,64 +1714,6 @@ export class CraftingEngine {
       if (tier && Number.isFinite(tierDc)) return Math.trunc(tierDc);
     }
     return fallback;
-  }
-
-  /**
-   * Summarise an evaluated Roll's dice as `{ group: "NdS", sum }` entries, where
-   * `sum` is the die term total — the value compared against a critical raw roll.
-   *
-   * `sum` is the DiceTerm#total, which is the POST-MODIFIER, active-only sum: a
-   * keep/drop/explode pool (e.g. `2d20kh1`) reports its modified total, not the
-   * raw per-die faces. Per-die crits therefore match the die-term total, so
-   * dice-pool modifiers are out of scope for crit matching (see
-   * {@link _resolveSimpleCheckCrit}).
-   */
-  _rolledDiceGroups(roll) {
-    const dice = Array.isArray(roll?.dice) ? roll.dice : [];
-    return dice.map((die) => {
-      const count = Number(die?.number);
-      const faces = Number(die?.faces);
-      const dieTotal = Number(die?.total);
-      let sum;
-      if (Number.isFinite(dieTotal)) {
-        sum = dieTotal;
-      } else {
-        const results = Array.isArray(die?.results) ? die.results : [];
-        sum = results.reduce((acc, entry) => acc + (Number(entry?.result) || 0), 0);
-      }
-      return {
-        group: `${Number.isFinite(count) ? count : 0}d${Number.isFinite(faces) ? faces : 0}`,
-        sum,
-      };
-    });
-  }
-
-  /**
-   * Resolve any forced outcome from the configured per-die critical raw rolls.
-   * Each crit forces success or failure (and may break tools) when its die's
-   * rolled total matches its raw value. A matching forced FAILURE takes
-   * precedence over a forced success. Returns the matched crit
-   * `{ success, breakTools }`, or null when none match.
-   *
-   * Matching compares `crit.raw` against the die-term POST-MODIFIER total
-   * (`group.sum`, the DiceTerm#total surfaced by {@link _rolledDiceGroups}), so
-   * keep/drop/explode dice-pool modifiers (e.g. `2d20kh1`) are out of scope for
-   * per-die crits — a crit sees the modified total, not the individual faces.
-   */
-  _resolveSimpleCheckCrit(diceCrits, diceGroups) {
-    const crits = Array.isArray(diceCrits) ? diceCrits : [];
-    let triggered = null;
-    for (const crit of crits) {
-      if (!crit || typeof crit !== 'object' || !crit.die) continue;
-      const matches = diceGroups.some(
-        (group) => group.group === crit.die && group.sum === Number(crit.raw)
-      );
-      if (!matches) continue;
-      const resolved = { success: crit.success === true, breakTools: crit.breakTools === true };
-      if (!resolved.success) return resolved; // forced failure wins
-      triggered = resolved;
-    }
-    return triggered;
   }
 
   /**
@@ -2695,128 +2541,33 @@ export class CraftingEngine {
   }
 
   /**
-   * Evaluate a check roll formula, returning the total + dice-group summaries.
-   * Mirrors the simple/progressive crafting check roll (same `globalThis.Roll`
-   * usage), shared by the salvage formula checks. Throws on a bad formula (the
-   * caller wraps it). Returns `{ engine:false }` when no dice engine is available.
-   */
-  async _evaluateCheckRoll(formula, actor) {
-    if (typeof globalThis.Roll !== 'function') return { engine: false, total: 0, diceGroups: [] };
-    const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-    const roll = await new globalThis.Roll(formula, rollData).evaluate();
-    const total = Number.isFinite(Number(roll?.total)) ? Number(roll.total) : 0;
-    return { engine: true, total, diceGroups: this._rolledDiceGroups(roll) };
-  }
-
-  /**
-   * Salvage simple pass/fail check: roll the formula, compare the total against the
-   * resolved DC (per-component override ?? default), honouring per-die crits. Mirrors
-   * the crafting `_runSimpleCheck` minus the recipe-tier/dynamic-DC resolution.
+   * Salvage simple pass/fail check: compare the rolled total against the resolved DC
+   * (per-component override ?? default), honouring per-die crits. Delegates the roll
+   * to the shared {@link runFormulaPassFail}.
    */
   async _runSalvageSimpleCheck(simple, component, actor) {
-    const formula = String(simple.rollFormula || '').trim();
-    const dc = this._resolveSalvageDc(simple, component);
-    let total = 0;
-    let diceGroups = [];
-    if (formula) {
-      let rolled;
-      try {
-        rolled = await this._evaluateCheckRoll(formula, actor);
-      } catch (error) {
-        console.error(`Fabricate | Salvage simple check roll failed (${formula})`, error);
-        return {
-          success: false,
-          outcome: 'fail',
-          value: null,
-          data: { dc, formula },
-          message: `Salvage check roll failed: ${error.message}`,
-        };
-      }
-      if (!rolled.engine) {
-        return { success: true, outcome: 'pass', value: null, data: { dc, formula } };
-      }
-      total = rolled.total;
-      diceGroups = rolled.diceGroups;
-    }
-
-    const crit = this._resolveSimpleCheckCrit(simple.diceCrits, diceGroups);
-    const comparison = simple.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-    let success;
-    if (crit) {
-      success = crit.success;
-    } else if (comparison === 'exceed') {
-      success = total > dc;
-    } else {
-      success = total >= dc;
-    }
-    const breakTools = crit ? crit.breakTools === true : false;
-    return {
-      success,
-      outcome: success ? 'pass' : 'fail',
-      value: total,
-      data: {
-        dc,
-        formula,
-        total,
-        comparison,
-        crit: crit ? { success: crit.success, breakTools } : null,
-        breakTools,
-      },
-      message: success ? null : 'Salvage check failed',
-    };
+    return runFormulaPassFail({
+      formula: simple.rollFormula,
+      dc: this._resolveSalvageDc(simple, component),
+      thresholdMode: simple.thresholdMode,
+      diceCrits: simple.diceCrits,
+      actor,
+      label: 'Salvage',
+    });
   }
 
   /**
-   * Salvage progressive check: roll the formula and return its total as the numeric
-   * `value` the progressive salvage awarding spends against result difficulties. A
-   * matched success crit awards everything (MAX_SAFE_INTEGER), a failure crit awards
-   * nothing (0). Mirrors the crafting `_runProgressiveCheck`.
+   * Salvage progressive check: the rolled total becomes the numeric `value` the
+   * progressive salvage awarding spends against result difficulties. Delegates to the
+   * shared {@link runFormulaProgressive}.
    */
   async _runSalvageProgressiveCheck(progressive, actor) {
-    const formula = String(progressive.rollFormula || '').trim();
-    let total = 0;
-    let diceGroups = [];
-    if (formula) {
-      let rolled;
-      try {
-        rolled = await this._evaluateCheckRoll(formula, actor);
-      } catch (error) {
-        console.error(`Fabricate | Salvage progressive check roll failed (${formula})`, error);
-        return {
-          success: false,
-          outcome: null,
-          value: null,
-          data: { formula },
-          message: `Salvage check roll failed: ${error.message}`,
-        };
-      }
-      if (!rolled.engine) {
-        return { success: true, outcome: null, value: 0, data: { formula, total: 0, value: 0 } };
-      }
-      total = rolled.total;
-      diceGroups = rolled.diceGroups;
-    }
-
-    const crit = this._resolveSimpleCheckCrit(progressive.diceCrits, diceGroups);
-    let value;
-    if (crit) {
-      value = crit.success ? Number.MAX_SAFE_INTEGER : 0;
-    } else {
-      value = total;
-    }
-    const breakTools = crit ? crit.breakTools === true : false;
-    return {
-      success: true,
-      outcome: null,
-      value,
-      data: {
-        formula,
-        total,
-        value,
-        crit: crit ? { success: crit.success, breakTools } : null,
-        breakTools,
-      },
-    };
+    return runFormulaProgressive({
+      formula: progressive.rollFormula,
+      diceCrits: progressive.diceCrits,
+      actor,
+      label: 'Salvage',
+    });
   }
 
   /**
