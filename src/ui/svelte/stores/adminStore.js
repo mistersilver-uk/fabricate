@@ -1863,6 +1863,18 @@ function _buildSelectedSystemViewData(
         ? _clonePlain(selectedSystem.salvageCraftingCheck.progressive)
         : null,
     },
+    // System-level gathering check. The gathering editor reads these back per
+    // resolution mode (d100 has no editable config, so only progressive/routed
+    // are surfaced alongside the active flag).
+    gatheringCraftingCheck: {
+      enabled: selectedSystem.gatheringCraftingCheck?.enabled === true,
+      progressive: selectedSystem.gatheringCraftingCheck?.progressive
+        ? _clonePlain(selectedSystem.gatheringCraftingCheck.progressive)
+        : null,
+      routed: selectedSystem.gatheringCraftingCheck?.routed
+        ? _clonePlain(selectedSystem.gatheringCraftingCheck.routed)
+        : null,
+    },
 
     alchemy:
       selectedSystem.resolutionMode === 'alchemy'
@@ -6323,6 +6335,28 @@ export function createAdminStore(services) {
   const saveSalvageCheckSimple = (simple) => _saveSalvageCheckPatch({ simple });
   const saveSalvageCheckRouted = (routed) => _saveSalvageCheckPatch({ routed });
 
+  // Shallow-merge a patch into the selected system's gatheringCraftingCheck and
+  // persist (the manager normalizes the whole check on write). Shared by every
+  // gathering check saver below so the boilerplate lives in one place. The
+  // gathering check is system-level (not per task); d100 mode has no editable
+  // config, so only enabled/progressive/routed are surfaced here.
+  async function _saveGatheringCheckPatch(patch) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.gatheringCraftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      gatheringCraftingCheck: { ...existing, ...patch },
+    });
+    await refresh();
+  }
+
+  const saveGatheringCheckActive = (enabled) => _saveGatheringCheckPatch({ enabled: enabled === true });
+  const saveGatheringCheckProgressive = (progressive) => _saveGatheringCheckPatch({ progressive });
+  const saveGatheringCheckRouted = (routed) => _saveGatheringCheckPatch({ routed });
+
   async function _updateCurrencyConfig(systemId, mutate) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = systemId || get(selectedSystemId);
@@ -7017,6 +7051,9 @@ export function createAdminStore(services) {
     saveSalvageCheckProgressive,
     saveSalvageCheckSimple,
     saveSalvageCheckRouted,
+    saveGatheringCheckActive,
+    saveGatheringCheckProgressive,
+    saveGatheringCheckRouted,
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,
