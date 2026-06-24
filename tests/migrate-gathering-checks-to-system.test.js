@@ -105,6 +105,48 @@ test('tolerates non-array / nullish input', () => {
   assert.deepEqual(migrateGatheringChecksToSystem(undefined, undefined).systems, []);
 });
 
+test('seeds only the systems that have a defining task (multi-system)', () => {
+  const systems = [{ id: 'sys-1' }, { id: 'sys-2' }];
+  const config = {
+    systems: {
+      'sys-1': { tasks: [{ id: 't1', check: { formula: '1d20' } }] },
+      'sys-2': { tasks: [{ id: 't2', check: { formula: '' } }] },
+    },
+  };
+
+  const result = migrateGatheringChecksToSystem(systems, config);
+
+  assert.equal(result.seededCount, 1);
+  assert.equal(result.systems[0].gatheringCraftingCheck.progressive.rollFormula, '1d20');
+  assert.equal(result.systems[1].gatheringCraftingCheck, undefined, 'a system with no defining task is left alone');
+});
+
+test('preserves an existing (not-yet-enabled) sibling check config when seeding', () => {
+  const systems = [
+    {
+      id: 'sys-1',
+      gatheringCraftingCheck: {
+        enabled: false,
+        progressive: { allowPlayerReorder: true, rollFormula: '' },
+        routed: { rollFormula: '1d20', relativeOutcomes: [{ id: 'o', name: 'Find', success: true, dc: 0 }] },
+      },
+    },
+  ];
+  const config = configWith('sys-1', [
+    { id: 't1', check: { formula: '2d6' }, progressive: { awardMode: 'partial' } },
+  ]);
+
+  const result = migrateGatheringChecksToSystem(systems, config);
+
+  assert.equal(result.seededCount, 1);
+  const check = result.systems[0].gatheringCraftingCheck;
+  assert.equal(check.enabled, true);
+  assert.equal(check.progressive.rollFormula, '2d6');
+  assert.equal(check.progressive.awardMode, 'partial');
+  assert.equal(check.progressive.allowPlayerReorder, true, 'pre-existing progressive field preserved');
+  assert.equal(check.routed.relativeOutcomes[0].name, 'Find', 'pre-existing routed sibling preserved');
+});
+
 // ---------------------------------------------------------------------------
 // MigrationRunner integration
 // ---------------------------------------------------------------------------
