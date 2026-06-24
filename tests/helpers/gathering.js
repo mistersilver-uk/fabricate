@@ -143,6 +143,58 @@ export function makeEngine({ richState, env = environment(), calls = {}, runMana
 }
 
 /**
+ * Build a system-level routed gathering check (issue 424). Routed gathering
+ * resolves through this check's roll formula rather than a per-task provider: the
+ * single success tier (named `tierName`) routes to the result group whose name
+ * matches it. Pair with {@link routedRoll}/{@link stubRoll} to drive the roll.
+ *
+ * @param {object} [options]
+ * @param {string} [options.tierName] Name of the lone success tier (matches the
+ *   result group it should route to). Defaults to `'Iron'`.
+ * @param {number} [options.dc] Base difficulty class. Defaults to `15`.
+ * @returns {{ routed: object }} A `gatheringCraftingCheck` fragment.
+ */
+export function routedSystemCheck({ tierName = 'Iron', dc = 15 } = {}) {
+  return {
+    routed: {
+      rollFormula: '1d20',
+      dc,
+      type: 'relative',
+      thresholdMode: 'meet',
+      relativeOutcomes: [{ id: `tier-${tierName}`, name: tierName, success: true, dc: 0 }]
+    }
+  };
+}
+
+/**
+ * Stub `globalThis.Roll` so `evaluate()` resolves to a fixed `total` plus the
+ * supplied `dice` groups (default none). Tests must `delete globalThis.Roll`
+ * afterwards (try/finally).
+ *
+ * @param {number} total The roll total the stubbed engine returns.
+ * @param {Array<object>} [dice] Dice-group metadata (e.g. crit detection).
+ */
+export function stubRoll(total, dice = []) {
+  globalThis.Roll = class {
+    async evaluate() {
+      return { total, dice };
+    }
+  };
+}
+
+/**
+ * Stub a routed-check roll that passes (`18`, a pass at the default dc 15) or
+ * misses (`5`) the success tier — the convenience pair for {@link routedSystemCheck}.
+ * Includes a single d20 dice group so crit detection sees a real roll.
+ *
+ * @param {boolean} [success] Whether the roll should clear the dc. Defaults to `true`.
+ */
+export function routedRoll(success = true) {
+  const total = success ? 18 : 5;
+  stubRoll(total, [{ number: 1, faces: 20, total }]);
+}
+
+/**
  * Build a per-system character modifier library descriptor that the test rich
  * state can absorb directly via `makeRichState({ config })`.
  *

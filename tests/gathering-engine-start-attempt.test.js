@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
 
 const viewer = { id: 'user-1', isGM: false };
 const gmViewer = { id: 'gm-1', isGM: true };
@@ -12,38 +13,10 @@ const actor = {
   items: []
 };
 
-// Routed gathering resolves through the system-level routed gathering check
-// formula (issue 424). The single success tier is named 'Iron' so a passing roll
-// routes to the same-named result group; `routedRoll` controls the roll's total.
-function routedSystemCheck() {
-  return {
-    routed: {
-      rollFormula: '1d20',
-      dc: 15,
-      type: 'relative',
-      thresholdMode: 'meet',
-      relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
-    }
-  };
-}
-
 // A gathering system with no routed roll formula: routed tasks under it are
 // misconfigured (validation requires the system-level gathering check formula).
 function systemWithoutRoutedCheck() {
   return { id: 'system-a', enabled: true, features: { gathering: true }, components: [] };
-}
-
-function stubRoll(total, dice = []) {
-  globalThis.Roll = class {
-    async evaluate() {
-      return { total, dice };
-    }
-  };
-}
-
-function routedRoll(success = true) {
-  const total = success ? 18 : 5;
-  stubRoll(total, [{ number: 1, faces: 20, total }]);
 }
 
 function makeEngine({

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
+import { routedRoll, routedSystemCheck, stubRoll } from './helpers/gathering.js';
 
 const viewer = { id: 'user-1', isGM: false };
 const gmViewer = { id: 'gm-1', isGM: true };
@@ -45,7 +46,9 @@ function makeEngine({
   // check (or `gatheringCraftingCheck: false` to assert the no-formula path).
   const effectiveCheck =
     gatheringCraftingCheck === undefined || gatheringCraftingCheck === null
-      ? (task?.resolutionMode === 'routed' ? routedSystemCheck(task) : null)
+      ? (task?.resolutionMode === 'routed'
+          ? routedSystemCheck({ tierName: task?.resultGroups?.[0]?.name })
+          : null)
       : gatheringCraftingCheck || null;
 
   return new GatheringEngine({
@@ -166,30 +169,6 @@ function routedTask(overrides = {}) {
     }],
     ...overrides
   };
-}
-
-// Routed gathering resolves through the system-level gathering check formula
-// (issue 424): build a routed system check whose single success tier is named
-// after the routed task's first result group, so a passing roll routes to it by
-// name. `stubRoll`/`routedRoll` control whether the formula passes the DC.
-function routedSystemCheck(task, { dc = 15 } = {}) {
-  const tierName = task?.resultGroups?.[0]?.name ?? 'success';
-  return {
-    routed: {
-      rollFormula: '1d20',
-      dc,
-      type: 'relative',
-      thresholdMode: 'meet',
-      relativeOutcomes: [{ id: `tier-${tierName}`, name: tierName, success: true, dc: 0 }]
-    }
-  };
-}
-
-// Stub `globalThis.Roll` to a total of 18 (a pass at dc 15) for a routed success
-// or 5 (a miss) for a routed failure. The dice metadata mirrors a single d20.
-function routedRoll(success = true) {
-  const total = success ? 18 : 5;
-  stubRoll(total, [{ number: 1, faces: 20, total }]);
 }
 
 class FakeActor {
@@ -741,14 +720,6 @@ test('GM blind terminal response may include task and result details for inspect
 // retired; without a system roll formula progressive resolution is misconfigured.
 // ---------------------------------------------------------------------------
 
-function stubRoll(total, dice = []) {
-  globalThis.Roll = class {
-    async evaluate() {
-      return { total, dice };
-    }
-  };
-}
-
 test('progressive: system gathering check formula drives the numeric award value', async () => {
   const calls = {};
   const task = progressiveTask();
@@ -985,19 +956,9 @@ test('d100: a d100 task still resolves via the d100 path regardless of a system 
 // terminal failure; no system roll formula reports a misconfiguration diagnostic.
 // ---------------------------------------------------------------------------
 
-function routedFormulaCheck() {
-  return {
-    rollFormula: '1d20',
-    dc: 15,
-    type: 'relative',
-    thresholdMode: 'meet',
-    relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
-  };
-}
-
 test('_resolveRoutedFormulaOutcome: a passing tier routes to the same-named result group', async () => {
   const task = routedTask();
-  const routed = routedFormulaCheck();
+  const routed = routedSystemCheck().routed;
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
   try {
     const engine = makeEngine({ task });
@@ -1017,7 +978,7 @@ test('_resolveRoutedFormulaOutcome: a passing tier routes to the same-named resu
 
 test('_resolveRoutedFormulaOutcome: a failing tier resolves to a terminal failure', async () => {
   const task = routedTask();
-  const routed = routedFormulaCheck();
+  const routed = routedSystemCheck().routed;
   stubRoll(5, [{ number: 1, faces: 20, total: 5 }]); // misses dc 15
   try {
     const engine = makeEngine({ task });
@@ -1035,12 +996,12 @@ test('_resolveRoutedFormulaOutcome: a failing tier resolves to a terminal failur
   }
 });
 
-test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group fails terminally', async () => {
+test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group succeeds but awards nothing', async () => {
   // Tier 'Iron' wins but the only result group is named 'Copper'.
   const task = routedTask({
     resultGroups: [{ id: 'group-copper', name: 'Copper', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }] }]
   });
-  const routed = routedFormulaCheck();
+  const routed = routedSystemCheck().routed;
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
   try {
     const engine = makeEngine({ task });
