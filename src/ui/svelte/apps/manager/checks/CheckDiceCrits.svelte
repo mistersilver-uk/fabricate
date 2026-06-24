@@ -1,16 +1,28 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Shared per-die critical-rolls table for the crafting check editors (simple and
-  routed). One group per unique die in the roll formula; each group holds rows
-  keyed by id. A row is a raw die total that FORCES an outcome (success or failure)
-  and optionally breaks tools — there is no off state. Controlled: reads
-  `diceCrits` + `rollFormula` and emits the next `diceCrits` array via onChange.
+  Shared per-die critical-rolls table for the crafting check editors (simple,
+  routed, and progressive). One group per unique die in the roll formula; each
+  group holds rows keyed by id. A row is a raw die total that FORCES an extreme
+  (and optionally breaks tools) — there is no off state. What that extreme MEANS
+  is caller-supplied via `forceOnLabel`/`forceOffLabel`: pass/fail checks force
+  success/failure, while the progressive check forces award-all/award-none.
+  Controlled: reads `diceCrits` + `rollFormula` and emits the next `diceCrits`
+  array via onChange.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
 
-  let { rollFormula = '', diceCrits = [], onChange = () => {} } = $props();
+  // `forceOnLabel`/`forceOffLabel` override the Force Outcome pill text (already
+  // localized by the caller); when null the simple/routed success/failure labels
+  // are used.
+  let {
+    rollFormula = '',
+    diceCrits = [],
+    forceOnLabel = null,
+    forceOffLabel = null,
+    onChange = () => {}
+  } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -40,8 +52,12 @@
     }, [])
   );
 
-  const successOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success'));
-  const successOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure'));
+  const successOnLabel = $derived(
+    forceOnLabel ?? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success')
+  );
+  const successOffLabel = $derived(
+    forceOffLabel ?? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure')
+  );
   const breakOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break'));
   const breakOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break"));
 

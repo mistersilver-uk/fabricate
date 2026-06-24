@@ -305,12 +305,7 @@ export class CraftingSystemManager {
         consumeIngredientsOnFail: check?.consumption?.consumeIngredientsOnFail !== false,
         consumeCatalystsOnFail: check?.consumption?.consumeCatalystsOnFail === true,
       },
-      progressive: {
-        awardMode: ['partial', 'equal', 'exceed'].includes(check?.progressive?.awardMode)
-          ? check.progressive.awardMode
-          : 'equal',
-        allowPlayerReorder: check?.progressive?.allowPlayerReorder === true,
-      },
+      progressive: this._normalizeProgressiveCraftingCheck(check?.progressive),
       outcomes:
         normalizedOutcomes.length > 0
           ? [...new Set(normalizedOutcomes)]
@@ -340,6 +335,25 @@ export class CraftingSystemManager {
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
       macroUuid: source.macroUuid || null,
+      diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
+    };
+  }
+
+  // Progressive crafting check (progressive resolution mode): a roll formula whose
+  // total is the numeric value progressive result-awarding spends against result
+  // difficulties — no DC, no comparison, no recipe tiers. Per-die critical raw
+  // rolls force award-all/award-none (and may break tools). The `awardMode` and
+  // `allowPlayerReorder` award settings live on this same object (read by the
+  // ResolutionModeService progressive branch) and are preserved here.
+  _normalizeProgressiveCraftingCheck(progressive = {}) {
+    const source = !progressive || typeof progressive !== 'object' ? {} : progressive;
+    const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
+    return {
+      awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
+        ? source.awardMode
+        : 'equal',
+      allowPlayerReorder: source.allowPlayerReorder === true,
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
       diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
     };
   }

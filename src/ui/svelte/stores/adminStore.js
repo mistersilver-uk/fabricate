@@ -6246,6 +6246,23 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Persist the progressive crafting check (roll formula + crit table) authored for
+  // progressive resolution mode, preserving the rest of the craftingCheck config.
+  // The progressive payload also carries the award settings; the manager normalizes
+  // it on write.
+  async function saveCraftingCheckProgressive(progressive) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.craftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      craftingCheck: { ...existing, progressive },
+    });
+    await refresh();
+  }
+
   // Enable/disable a system-level check (the right-menu "Active" toggle, shown
   // only when the resolution mode makes the check optional).
   async function saveCraftingCheckActive(enabled) {
@@ -6270,6 +6287,22 @@ export function createAdminStore(services) {
     const existing = system.salvageCraftingCheck || {};
     await systemManager.updateSystem(sysId, {
       salvageCraftingCheck: { ...existing, enabled: enabled === true },
+    });
+    await refresh();
+  }
+
+  // Persist the salvage progressive check's award settings, preserving the rest of
+  // the salvageCraftingCheck config. The manager normalizes the progressive payload
+  // on write.
+  async function saveSalvageCheckProgressive(progressive) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.salvageCraftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      salvageCraftingCheck: { ...existing, progressive },
     });
     await refresh();
   }
@@ -6962,8 +6995,10 @@ export function createAdminStore(services) {
     saveCraftingCheckConfig,
     saveCraftingCheckRouted,
     saveCraftingCheckSimple,
+    saveCraftingCheckProgressive,
     saveCraftingCheckActive,
     saveSalvageCheckActive,
+    saveSalvageCheckProgressive,
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,

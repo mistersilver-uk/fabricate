@@ -149,6 +149,64 @@
   const checkSimpleDirty = $derived(
     JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
   );
+
+  // Progressive crafting check draft — same staged pattern, used for progressive
+  // resolution mode. Only the roll formula and crit table are edited here; the
+  // award settings (awardMode/allowPlayerReorder) are carried through untouched so
+  // a save never drops them.
+  function cloneProgressiveCheck(progressive) {
+    const source = progressive && typeof progressive === 'object' ? progressive : {};
+    return {
+      awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
+        ? source.awardMode
+        : 'equal',
+      allowPlayerReorder: source.allowPlayerReorder === true,
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      diceCrits: Array.isArray(source.diceCrits)
+        ? source.diceCrits.map((crit) => ({ ...crit }))
+        : []
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkProgressiveDraft = $state(
+    cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
+  );
+  // svelte-ignore state_referenced_locally
+  let checkProgressiveBaseline = $state(
+    cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
+  );
+  let checkProgressiveSaving = $state(false);
+  const checkProgressiveDirty = $derived(
+    JSON.stringify(checkProgressiveDraft) !== JSON.stringify(checkProgressiveBaseline)
+  );
+
+  // Salvage progressive check draft — only the award mode is authored here (the
+  // salvage check is otherwise macro-driven). Same staged pattern; allowPlayerReorder
+  // is carried through so a save never drops it.
+  function cloneSalvageProgressiveCheck(progressive) {
+    const source = progressive && typeof progressive === 'object' ? progressive : {};
+    return {
+      awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
+        ? source.awardMode
+        : 'equal',
+      allowPlayerReorder: source.allowPlayerReorder === true
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let salvageProgressiveDraft = $state(
+    cloneSalvageProgressiveCheck($viewState.selectedSystem?.salvageCraftingCheck?.progressive)
+  );
+  // svelte-ignore state_referenced_locally
+  let salvageProgressiveBaseline = $state(
+    cloneSalvageProgressiveCheck($viewState.selectedSystem?.salvageCraftingCheck?.progressive)
+  );
+  let salvageProgressiveSaving = $state(false);
+  const salvageProgressiveDirty = $derived(
+    JSON.stringify(salvageProgressiveDraft) !== JSON.stringify(salvageProgressiveBaseline)
+  );
+  // Which Checks sub-tab is active (crafting | salvage | gathering | validation),
+  // so the shared header Save persists the right draft.
+  let checksActiveTab = $state('crafting');
   const placeholderViews = [
     { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
@@ -191,13 +249,33 @@
   // Which crafting check editor is active for the selected system, and whether it
   // has unsaved staged edits — drives the single top-right Save button.
   const craftingCheckMode = $derived(
-    recipeRouted ? 'routed' : ['simple', 'alchemy'].includes(selectedSystem?.resolutionMode || 'simple') ? 'simple' : null
+    (function _craftingCheckMode(resolution) {
+      if (recipeRouted) return 'routed';
+      if (resolution === 'progressive') return 'progressive';
+      if (['simple', 'alchemy'].includes(resolution)) return 'simple';
+      return null;
+    })(selectedSystem?.resolutionMode || 'simple')
   );
   const craftingCheckDirty = $derived(
     (craftingCheckMode === 'routed' && checkRoutedDirty) ||
-      (craftingCheckMode === 'simple' && checkSimpleDirty)
+      (craftingCheckMode === 'simple' && checkSimpleDirty) ||
+      (craftingCheckMode === 'progressive' && checkProgressiveDirty)
   );
-  const craftingCheckSaving = $derived(checkRoutedSaving || checkSimpleSaving);
+  const craftingCheckSaving = $derived(
+    checkRoutedSaving || checkSimpleSaving || checkProgressiveSaving
+  );
+
+  // The salvage tab currently authors only the progressive award mode.
+  const salvageResolutionMode = $derived(selectedSystem?.salvageResolutionMode || 'simple');
+
+  // Tab-aware Checks dirty/saving/save: the single header Save button persists
+  // whichever check sub-tab is active.
+  const checksDirty = $derived(
+    checksActiveTab === 'salvage' ? salvageProgressiveDirty : craftingCheckDirty
+  );
+  const checksSaving = $derived(
+    checksActiveTab === 'salvage' ? salvageProgressiveSaving : craftingCheckSaving
+  );
 
   // Static recipe tiers offered to the recipe editor's tier dropdown. Only when the
   // system uses a simple static check that actually defines tiers.
@@ -230,6 +308,14 @@
     checkRoutedBaseline = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
     checkSimpleDraft = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
     checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
+    checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
+    checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
+    salvageProgressiveDraft = cloneSalvageProgressiveCheck(
+      selectedSystem?.salvageCraftingCheck?.progressive
+    );
+    salvageProgressiveBaseline = cloneSalvageProgressiveCheck(
+      selectedSystem?.salvageCraftingCheck?.progressive
+    );
   });
 
   function onUpdateCraftingCheck(next) {
@@ -238,6 +324,14 @@
 
   function onUpdateCraftingCheckSimple(next) {
     checkSimpleDraft = next;
+  }
+
+  function onUpdateCraftingCheckProgressive(next) {
+    checkProgressiveDraft = next;
+  }
+
+  function onUpdateSalvageCheckProgressive(next) {
+    salvageProgressiveDraft = next;
   }
 
   async function saveCraftingCheck() {
@@ -258,7 +352,32 @@
       } finally {
         checkSimpleSaving = false;
       }
+    } else if (craftingCheckMode === 'progressive') {
+      checkProgressiveSaving = true;
+      try {
+        await store?.saveCraftingCheckProgressive?.(checkProgressiveDraft);
+        checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
+      } finally {
+        checkProgressiveSaving = false;
+      }
     }
+  }
+
+  async function saveSalvageCheck() {
+    if (!selectedSystemId || salvageProgressiveSaving || !salvageProgressiveDirty) return;
+    salvageProgressiveSaving = true;
+    try {
+      await store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft);
+      salvageProgressiveBaseline = cloneSalvageProgressiveCheck(salvageProgressiveDraft);
+    } finally {
+      salvageProgressiveSaving = false;
+    }
+  }
+
+  // The shared Checks header Save persists whichever sub-tab is active.
+  async function saveChecks() {
+    if (checksActiveTab === 'salvage') return saveSalvageCheck();
+    return saveCraftingCheck();
   }
 
   function onToggleCheckActive(kind, enabled) {
@@ -3496,10 +3615,10 @@
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
-        {#if craftingCheckDirty || craftingCheckSaving}
+        {#if checksDirty || checksSaving}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
-          <button type="button" class="manager-button is-primary" data-checks-save onclick={saveCraftingCheck} disabled={!craftingCheckDirty || craftingCheckSaving}>
-            <i class={craftingCheckSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <button type="button" class="manager-button is-primary" data-checks-save onclick={saveChecks} disabled={!checksDirty || checksSaving}>
+            <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
           </button>
         {/if}
@@ -3898,9 +4017,15 @@
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
+            craftingCheckProgressive={checkProgressiveDraft}
+            {salvageResolutionMode}
+            salvageCheckProgressive={salvageProgressiveDraft}
             activation={checkActivation}
             {onUpdateCraftingCheck}
             {onUpdateCraftingCheckSimple}
+            {onUpdateCraftingCheckProgressive}
+            {onUpdateSalvageCheckProgressive}
+            onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}
           />
         </section>

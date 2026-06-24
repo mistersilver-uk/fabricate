@@ -140,6 +140,51 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
   });
 });
 
+test('_normalizeCraftingCheck defaults the progressive check when absent', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({});
+  assert.deepEqual(result.progressive, {
+    awardMode: 'equal',
+    allowPlayerReorder: false,
+    rollFormula: '',
+    diceCrits: [],
+  });
+});
+
+test('_normalizeCraftingCheck normalizes the progressive check (formula, crits, award settings)', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    progressive: {
+      awardMode: 'partial',
+      allowPlayerReorder: true,
+      rollFormula: '2d6+@abilities.int.mod',
+      diceCrits: [
+        { id: 'c1', die: '2d6', raw: '12', success: true, breakTools: true },
+        { die: '2d6', raw: 2, success: false },
+        { die: '', raw: 3, success: false },
+        'not-an-object',
+      ],
+    },
+  });
+  assert.equal(result.progressive.awardMode, 'partial', 'award settings are preserved');
+  assert.equal(result.progressive.allowPlayerReorder, true);
+  assert.equal(result.progressive.rollFormula, '2d6+@abilities.int.mod');
+  // Crits share the simple-check shape; only die-less / non-object entries are dropped.
+  assert.equal(result.progressive.diceCrits.length, 2);
+  assert.equal(result.progressive.diceCrits[0].id, 'c1');
+  assert.equal(result.progressive.diceCrits[0].raw, 12, 'raw is truncated to an integer');
+  assert.equal(result.progressive.diceCrits[0].success, true);
+  assert.equal(result.progressive.diceCrits[0].breakTools, true);
+  assert.equal(result.progressive.diceCrits[1].success, false);
+  assert.equal(result.progressive.diceCrits[1].breakTools, false);
+});
+
+test('_normalizeCraftingCheck coerces an invalid progressive awardMode to equal', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({ progressive: { awardMode: 'bogus' } });
+  assert.equal(result.progressive.awardMode, 'equal');
+});
+
 test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dice crits)', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
