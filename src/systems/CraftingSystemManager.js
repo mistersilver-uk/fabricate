@@ -120,6 +120,7 @@ export class CraftingSystemManager {
         return ['simple', 'routed', 'progressive'].includes(raw) ? raw : 'simple';
       })(system.salvageResolutionMode),
       salvageCraftingCheck: this._normalizeSalvageCraftingCheck(system.salvageCraftingCheck),
+      gatheringCraftingCheck: this._normalizeGatheringCraftingCheck(system.gatheringCraftingCheck),
       alchemy: this._normalizeAlchemyConfig(
         system.alchemy ?? system.cauldron,
         system.resolutionMode
@@ -500,13 +501,28 @@ export class CraftingSystemManager {
         consumeComponentOnFail: normalizedCheck.consumption?.consumeComponentOnFail !== false,
         consumeCatalystsOnFail: normalizedCheck.consumption?.consumeCatalystsOnFail === true,
       },
-      progressive: {
-        awardMode: ['partial', 'equal', 'exceed'].includes(normalizedCheck.progressive?.awardMode)
-          ? normalizedCheck.progressive.awardMode
-          : 'equal',
-        allowPlayerReorder: normalizedCheck.progressive?.allowPlayerReorder === true,
-      },
+      // Salvage reuses the crafting check sub-object shapes so the Checks-tab
+      // editors are shared. The simple/routed default DC is the sub-object's `dc`;
+      // a per-component override lives on `component.salvage.dcOverride`. Tiers and
+      // the dynamic-DC macro are stored but hidden by the salvage editors (salvage
+      // has no recipes to pick a tier from).
+      simple: this._normalizeSimpleCraftingCheck(normalizedCheck.simple),
+      routed: this._normalizeRoutedCraftingCheck(normalizedCheck.routed),
+      progressive: this._normalizeProgressiveCraftingCheck(normalizedCheck.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
+    };
+  }
+
+  // System-level gathering check (gathering resolution modes d100/progressive/
+  // routed). d100 needs no editable config (the fixed d100 roll), so only the
+  // progressive and routed sub-objects are authored, reusing the crafting shapes.
+  // A per-task DC override lives on the gathering task (`task.dcOverride`).
+  _normalizeGatheringCraftingCheck(check = {}) {
+    const source = !check || typeof check !== 'object' ? {} : check;
+    return {
+      enabled: source.enabled === true,
+      progressive: this._normalizeProgressiveCraftingCheck(source.progressive),
+      routed: this._normalizeRoutedCraftingCheck(source.routed),
     };
   }
 
@@ -921,15 +937,28 @@ export class CraftingSystemManager {
         ingredientQuantity: 1,
         toolIds: [],
         resultGroups: [],
+        dcOverride: null,
       };
     }
 
     const rawQty = Number(salvage.ingredientQuantity);
     const ingredientQuantity = Number.isFinite(rawQty) && rawQty >= 1 ? Math.floor(rawQty) : 1;
 
+    // Optional per-component salvage DC override: when set it replaces the
+    // system-level salvage check default DC at salvage time. null = use the default.
+    // Guard null/''/undefined explicitly so re-normalizing a null stays null
+    // (Number(null) is 0, which would otherwise become a spurious 0 override).
+    const dcOverride = (() => {
+      const raw = salvage.dcOverride;
+      if ([null, undefined, ''].includes(raw)) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    })();
+
     return {
       enabled: salvage.enabled === true,
       ingredientQuantity,
+      dcOverride,
       // Preserve migrated salvage tool references so they are not orphaned on the
       // next system save. Coerced to trimmed, non-empty, deduped id strings.
       toolIds: this._normalizeToolIds(salvage.toolIds),

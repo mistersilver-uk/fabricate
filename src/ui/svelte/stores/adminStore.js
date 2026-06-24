@@ -865,6 +865,16 @@ function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
     // so authoring it on a task survives the save (the runtime reads it back to
     // seed per-env pools; canvas tokens snapshot it for per-token depletion).
     ...(normalizeNodeConfig(task.nodes) ? { nodes: normalizeNodeConfig(task.nodes) } : {}),
+    // Optional per-task gathering DC override: when set it replaces the
+    // system-level gathering check default DC at gather time. null = use default.
+    // Guard null/''/undefined explicitly so re-normalizing a null stays null
+    // (Number(null) is 0, which would otherwise become a spurious 0 override).
+    dcOverride: (() => {
+      const raw = task.dcOverride;
+      if ([null, undefined, ''].includes(raw)) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    })(),
   };
 }
 

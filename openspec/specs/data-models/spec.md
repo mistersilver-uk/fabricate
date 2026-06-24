@@ -59,10 +59,34 @@ CraftingSystem = {
       consumeCatalystsOnFail: boolean,  // default false; LEGACY-NAMED key — now governs TOOL usage/breakage on fail (see note below)
     },
     outcomes?: string[],               // routed mode
-    progressive?: {
+    // Salvage reuses the crafting check sub-object shapes (so the GM Checks-tab
+    // editors are shared); the active one is selected by salvageResolutionMode. The
+    // simple/routed default DC is the sub-object's `dc`; a per-component override
+    // lives on Component.salvage.dcOverride. Salvage has no recipes, so the simple
+    // `tiers`/`dcMode`/`macroUuid` and routed `tiers` are persisted but not authored.
+    simple: SimpleCheck,               // { rollFormula, dc, thresholdMode, dcMode, tiers, macroUuid, diceCrits }
+    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, tiers, diceCrits, relativeOutcomes, fixedOutcomes }
+    progressive: {
       awardMode: "partial" | "equal" | "exceed",
       allowPlayerReorder: boolean,
+      rollFormula: string,             // default ""; total drives progressive awarding
+      diceCrits: DiceCrit[],           // per-die award-all/award-none crits
     },
+  },
+
+  // Present only when features.gathering is true. System-level gathering check
+  // (gathering resolution modes d100/progressive/routed). d100 is the fixed d100
+  // roll and needs no editable config, so only progressive and routed are authored.
+  // A per-task DC override lives on the gathering task (task.dcOverride).
+  gatheringCraftingCheck: {
+    enabled: boolean,                  // default false
+    progressive: {
+      awardMode: "partial" | "equal" | "exceed",
+      allowPlayerReorder: boolean,
+      rollFormula: string,
+      diceCrits: DiceCrit[],
+    },
+    routed: RoutedCheck,
   },
 
   craftingCheck: {
@@ -79,12 +103,41 @@ CraftingSystem = {
     // Routed mode (macroOutcome provider may return one of these, optional)
     outcomes?: string[],
 
-    // Progressive mode
-    progressive?: {
+    // Per-resolution-mode check sub-objects authored in the GM Checks tab; the
+    // active one is selected by resolutionMode. (Shapes: SimpleCheck / RoutedCheck /
+    // DiceCrit defined below.)
+    simple: SimpleCheck,
+    routed: RoutedCheck,
+    progressive: {
       awardMode: "partial" | "equal" | "exceed",
       allowPlayerReorder: boolean, // default false
+      rollFormula: string,         // default ""; total drives progressive awarding
+      diceCrits: DiceCrit[],
     },
   },
+
+  // Shared check sub-object shapes, reused by craftingCheck / salvageCraftingCheck /
+  // gatheringCraftingCheck so the GM Checks-tab editors are common across activities.
+  //   SimpleCheck = {
+  //     rollFormula: string,                       // default ""
+  //     dc: number,                                // default 15; the default DC
+  //     thresholdMode: "meet" | "exceed",          // default "meet"
+  //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
+  //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
+  //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
+  //     diceCrits: DiceCrit[],
+  //   }
+  //   RoutedCheck = {
+  //     type: "relative" | "fixed",                // default "relative"
+  //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
+  //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
+  //     diceCrits: DiceCrit[],
+  //     relativeOutcomes: { id, name, success, breakTools, dc }[],
+  //     fixedOutcomes: { id, name, success, breakTools, start, end }[],
+  //   }
+  //   DiceCrit = { id, die, raw, success: boolean, breakTools: boolean }
+  //     // `raw` is clamped to the die's producible range; a matched success crit
+  //     // forces pass / award-all, a failure crit forces fail / award-none.
 
   recipeVisibility: {
     listMode: "global" | "player" | "knowledge",  // default "global"
@@ -285,6 +338,7 @@ Represent one curated item entry available to recipes and salvage operations.
     ingredientQuantity: number,    // default 1
     toolIds: string[],             // references to per-system library Tools
     resultGroups: ResultGroup[],
+    dcOverride: number | null,     // default null; per-component salvage check DC override (replaces salvageCraftingCheck.simple/routed.dc at salvage time)
     outcomeRouting?: { [outcome: string]: string },  // routed only
     timeRequirement?: TimeRequirement,
     currencyRequirement?: CurrencyRequirement,
