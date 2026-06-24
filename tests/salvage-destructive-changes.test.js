@@ -241,7 +241,7 @@ test('GM notification sent when components are disabled by mode change', async (
 // Group 2: Feature disable cleans up salvage runs
 // ---------------------------------------------------------------------------
 
-test('Setting features.salvage to false removes salvage run history for that system', async () => {
+test('Salvage is always on: attempting to disable it keeps it enabled and preserves run history', async () => {
   const systemId = 'sys-cleanup';
   const runForThisSystem = { id: 'run-1', craftingSystemId: systemId, componentId: 'comp-1', status: 'succeeded' };
   const actor = makeActor('actor-1', [runForThisSystem]);
@@ -263,13 +263,16 @@ test('Setting features.salvage to false removes salvage run history for that sys
   });
   mgr.systems.set(normalized.id, normalized);
 
-  await mgr.updateSystem(systemId, { features: { salvage: false } });
+  // Salvage is always on, so an attempt to disable it is a no-op: the feature
+  // stays true and no salvage-run cleanup is triggered.
+  const updated = await mgr.updateSystem(systemId, { features: { salvage: false } });
+  assert.equal(updated.features.salvage, true, 'salvage cannot be disabled');
 
   const stored = actor.getFlag('fabricate', 'fabricate.salvageRuns');
   assert.ok(stored, 'salvageRuns flag should be present');
   const history = stored.history || [];
   const remaining = history.filter(r => r.craftingSystemId === systemId);
-  assert.equal(remaining.length, 0, 'History entries for the disabled system should be removed');
+  assert.equal(remaining.length, 1, 'Run history is preserved because salvage stays enabled');
 });
 
 test('Setting features.salvage to false does not remove runs from other systems', async () => {

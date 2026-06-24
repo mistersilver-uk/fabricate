@@ -273,7 +273,10 @@ export class CraftingSystemManager {
       outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false,
       effectTransfer: has('effectTransfer') ? features.effectTransfer === true : false,
       gathering: has('gathering') ? features.gathering === true : false,
-      salvage: has('salvage') ? features.salvage === true : false,
+      // Salvage is always on: every crafting system can author component salvage.
+      // (Whether a component is actually salvageable is per-component, via its
+      // own salvage config and the system salvage resolution mode.)
+      salvage: true,
       chatOutput: has('chatOutput') ? features.chatOutput === true : true,
       itemPiles: has('itemPiles') ? features.itemPiles === true : false,
     };

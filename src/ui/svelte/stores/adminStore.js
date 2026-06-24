@@ -1804,6 +1804,8 @@ function _buildSelectedSystemViewData(
       outcomeRouting: selectedSystem.features?.outcomeRouting === true,
       effectTransfer: selectedSystem.features?.effectTransfer === true,
       gathering: selectedSystem.features?.gathering === true,
+      // Salvage is always on (every system can author component salvage).
+      salvage: true,
     },
 
     categories: selectedSystem.categories || [],
@@ -1848,6 +1850,18 @@ function _buildSelectedSystemViewData(
     salvageResolutionMode: selectedSystem.salvageResolutionMode || 'simple',
     salvageCraftingCheck: {
       enabled: selectedSystem.salvageCraftingCheck?.enabled === true,
+      // Surface the structured per-mode configs so the salvage Checks editors and
+      // the per-component outcome-routing names can read back what was persisted
+      // (otherwise they seed empty and edits look like they never saved).
+      simple: selectedSystem.salvageCraftingCheck?.simple
+        ? _clonePlain(selectedSystem.salvageCraftingCheck.simple)
+        : null,
+      routed: selectedSystem.salvageCraftingCheck?.routed
+        ? _clonePlain(selectedSystem.salvageCraftingCheck.routed)
+        : null,
+      progressive: selectedSystem.salvageCraftingCheck?.progressive
+        ? _clonePlain(selectedSystem.salvageCraftingCheck.progressive)
+        : null,
     },
 
     alchemy:
