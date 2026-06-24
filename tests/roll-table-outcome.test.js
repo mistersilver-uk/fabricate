@@ -22,12 +22,12 @@ let mockFromUuidResult = null;
 
 globalThis.foundry = {
   utils: {
-    randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`
-  }
+    randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`,
+  },
 };
 
 globalThis.game = {
-  user: { name: 'Test User' }
+  user: { name: 'Test User' },
 };
 
 globalThis.fromUuid = async (uuid) => {
@@ -52,15 +52,17 @@ function makeResultGroups(names) {
   return names.map((name, i) => ({
     id: `group-${i + 1}`,
     name,
-    results: [{ id: `result-${i + 1}`, componentId: `item-${i + 1}`, quantity: 1 }]
+    results: [{ id: `result-${i + 1}`, componentId: `item-${i + 1}`, quantity: 1 }],
   }));
 }
 
 function makeRollTable(drawnText, { draw = null } = {}) {
   return {
-    draw: draw || (async () => ({
-      results: [{ text: drawnText }]
-    }))
+    draw:
+      draw ||
+      (async () => ({
+        results: [{ text: drawnText }],
+      })),
   };
 }
 
@@ -69,22 +71,26 @@ function makeRecipeData(overrides = {}) {
     id: 'recipe-1',
     name: 'Test Recipe',
     craftingSystemId: 'sys-1',
-    ingredientSets: [{
-      id: 'set-1',
-      ingredientGroups: [{
-        id: 'group-1',
-        options: [{ componentId: 'item-1', quantity: 1 }]
-      }]
-    }],
+    ingredientSets: [
+      {
+        id: 'set-1',
+        ingredientGroups: [
+          {
+            id: 'group-1',
+            options: [{ componentId: 'item-1', quantity: 1 }],
+          },
+        ],
+      },
+    ],
     resultGroups: makeResultGroups(['Sword', 'Shield']),
-    ...overrides
+    ...overrides,
   };
 }
 
 function makeService(systemOverrides = {}) {
   const system = {
     resolutionMode: 'mapped',
-    ...systemOverrides
+    ...systemOverrides,
   };
   const mgr = { getSystem: () => system };
   return new ResolutionModeService(mgr);
@@ -182,7 +188,9 @@ describe('ResolutionModeService.resolveByRollTable', () => {
 
   it('5. table not found (invalid UUID) returns error', async () => {
     const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'invalid-uuid' } };
+    const recipe = {
+      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'invalid-uuid' },
+    };
     mockFromUuidResult = null;
 
     const result = await service.resolveByRollTable(recipe, null, groups);
@@ -201,7 +209,9 @@ describe('ResolutionModeService.resolveByRollTable', () => {
 
   it('7. uses text field from drawn result', async () => {
     const groups = makeResultGroups(['Elixir']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
+    const recipe = {
+      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
+    };
     mockFromUuidResult = { draw: async () => ({ results: [{ text: 'Elixir' }] }) };
 
     const result = await service.resolveByRollTable(recipe, null, groups);
@@ -212,7 +222,9 @@ describe('ResolutionModeService.resolveByRollTable', () => {
 
   it('8. draw returns no results returns error', async () => {
     const groups = makeResultGroups(['Sword']);
-    const recipe = { resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' } };
+    const recipe = {
+      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
+    };
     mockFromUuidResult = { draw: async () => ({ results: [] }) };
 
     const result = await service.resolveByRollTable(recipe, null, groups);
@@ -282,21 +294,25 @@ describe('ResolutionModeService name helpers', () => {
 
 describe('Recipe.resultSelection field', () => {
   it('accepts rollTableOutcome provider', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-123' }
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-123' },
+      })
+    );
 
     assert.deepEqual(recipe.resultSelection, {
       provider: 'rollTableOutcome',
       rollTableUuid: 'table-uuid-123',
-      macroUuid: null
+      macroUuid: null,
     });
   });
 
   it('accepts ingredientSet provider', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'ingredientSet' }
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'ingredientSet' },
+      })
+    );
 
     assert.equal(recipe.resultSelection.provider, 'ingredientSet');
     assert.equal(recipe.resultSelection.rollTableUuid, null);
@@ -304,9 +320,11 @@ describe('Recipe.resultSelection field', () => {
   });
 
   it('accepts macroOutcome provider with macroUuid', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'macroOutcome', macroUuid: 'macro-uuid-123' }
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'macroOutcome', macroUuid: 'macro-uuid-123' },
+      })
+    );
 
     assert.equal(recipe.resultSelection.provider, 'macroOutcome');
     assert.equal(recipe.resultSelection.macroUuid, 'macro-uuid-123');
@@ -318,21 +336,25 @@ describe('Recipe.resultSelection field', () => {
   });
 
   it('ignores unknown provider values', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'unknownProvider' }
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'unknownProvider' },
+      })
+    );
     assert.equal(recipe.resultSelection, null);
   });
 
   it('includes resultSelection in toJSON()', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' }
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
+      })
+    );
     const json = recipe.toJSON();
     assert.deepEqual(json.resultSelection, {
       provider: 'rollTableOutcome',
       rollTableUuid: 'table-uuid-1',
-      macroUuid: null
+      macroUuid: null,
     });
   });
 
@@ -340,6 +362,16 @@ describe('Recipe.resultSelection field', () => {
     const recipe = new Recipe(makeRecipeData());
     const json = recipe.toJSON();
     assert.equal(json.resultSelection, null);
+  });
+
+  it('round-trips the simple-check tier reference (checkTierId)', () => {
+    const withTier = new Recipe(makeRecipeData({ checkTierId: '  tier-1  ' }));
+    assert.equal(withTier.checkTierId, 'tier-1', 'trimmed to a string');
+    assert.equal(withTier.toJSON().checkTierId, 'tier-1');
+
+    const withoutTier = new Recipe(makeRecipeData());
+    assert.equal(withoutTier.checkTierId, null);
+    assert.equal(withoutTier.toJSON().checkTierId, null);
   });
 });
 
@@ -349,51 +381,61 @@ describe('Recipe.resultSelection field', () => {
 
 describe('Recipe.validate() for rollTableOutcome', () => {
   it('fails if rollTableOutcome provider has no rollTableUuid', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: null }
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'rollTableOutcome', rollTableUuid: null },
+      })
+    );
     const { valid, errors } = recipe.validate();
     assert.ok(!valid);
-    assert.ok(errors.some(e => e.includes('rollTableUuid') || e.includes('roll table UUID')));
+    assert.ok(errors.some((e) => e.includes('rollTableUuid') || e.includes('roll table UUID')));
   });
 
   it('fails if rollTableOutcome has duplicate result group names (case-insensitive)', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
-      resultGroups: [
-        resultGroupLiteral('g1', 'Sword', 'r1', 'item-1'),
-        resultGroupLiteral('g2', 'SWORD', 'r2', 'item-2')
-      ]
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
+        resultGroups: [
+          resultGroupLiteral('g1', 'Sword', 'r1', 'item-1'),
+          resultGroupLiteral('g2', 'SWORD', 'r2', 'item-2'),
+        ],
+      })
+    );
     const { valid, errors } = recipe.validate();
     assert.ok(!valid);
-    assert.ok(errors.some(e => e.includes('uplicate') || e.includes('name')));
+    assert.ok(errors.some((e) => e.includes('uplicate') || e.includes('name')));
   });
 
   it('fails if rollTableOutcome result group name is a reserved fail keyword', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
-      resultGroups: [resultGroupLiteral('g1', 'fail', 'r1', 'item-1')]
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
+        resultGroups: [resultGroupLiteral('g1', 'fail', 'r1', 'item-1')],
+      })
+    );
     const { valid, errors } = recipe.validate();
     assert.ok(!valid);
-    assert.ok(errors.some(e => e.includes('reserved') || e.includes('keyword')));
+    assert.ok(errors.some((e) => e.includes('reserved') || e.includes('keyword')));
   });
 
   it('fails if rollTableOutcome result group name is a reserved miss keyword', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
-      resultGroups: [resultGroupLiteral('g1', 'nothing', 'r1', 'item-1')]
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
+        resultGroups: [resultGroupLiteral('g1', 'nothing', 'r1', 'item-1')],
+      })
+    );
     const { valid, errors } = recipe.validate();
     assert.ok(!valid);
-    assert.ok(errors.some(e => e.includes('reserved') || e.includes('keyword')));
+    assert.ok(errors.some((e) => e.includes('reserved') || e.includes('keyword')));
   });
 
   it('passes with valid rollTableOutcome configuration', () => {
-    const recipe = new Recipe(makeRecipeData({
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' }
-    }));
+    const recipe = new Recipe(
+      makeRecipeData({
+        resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'table-uuid-1' },
+      })
+    );
     const { valid } = recipe.validate();
     assert.ok(valid);
   });
@@ -416,7 +458,12 @@ describe('Regression: existing resolution modes unaffected', () => {
     const recipe = { craftingSystemId: 'sys-1', resultGroups: groups };
     const step = { resultGroups: groups };
 
-    const result = service.resolveResultGroups({ recipe, step, ingredientSet: null, checkResult: null });
+    const result = service.resolveResultGroups({
+      recipe,
+      step,
+      ingredientSet: null,
+      checkResult: null,
+    });
 
     assert.equal(result.groups.length, 1);
     assert.equal(result.groups[0].name, 'Sword');
@@ -428,7 +475,7 @@ describe('Regression: existing resolution modes unaffected', () => {
     const recipe = {
       craftingSystemId: 'sys-1',
       resultGroups: groups,
-      resultSelection: { provider: 'ingredientSet' }
+      resultSelection: { provider: 'ingredientSet' },
     };
     const step = { resultGroups: groups };
     const ingredientSet = { resultGroupId: 'group-2' };
@@ -445,7 +492,12 @@ describe('Regression: existing resolution modes unaffected', () => {
     const recipe = { craftingSystemId: 'sys-1', resultGroups: groups };
     const step = { resultGroups: groups };
 
-    const result = service.resolveResultGroups({ recipe, step, ingredientSet: null, checkResult: null });
+    const result = service.resolveResultGroups({
+      recipe,
+      step,
+      ingredientSet: null,
+      checkResult: null,
+    });
 
     assert.deepEqual(result.groups, []);
     assert.equal(result.meta.disposition, 'error');
@@ -461,7 +513,7 @@ describe('Regression: existing resolution modes unaffected', () => {
     const recipe = {
       craftingSystemId: 'sys-1',
       resultGroups: groups,
-      resultSelection: { provider: 'macroOutcome' }
+      resultSelection: { provider: 'macroOutcome' },
     };
     const step = { resultGroups: groups };
     const checkResult = { outcome: 'success' };
@@ -480,7 +532,11 @@ describe('Regression: existing resolution modes unaffected', () => {
     const rollTableResult = { groups: [groups[1]], meta: { disposition: 'success' } };
 
     const result = service.resolveResultGroups({
-      recipe, step, ingredientSet: null, checkResult: null, rollTableResult
+      recipe,
+      step,
+      ingredientSet: null,
+      checkResult: null,
+      rollTableResult,
     });
 
     assert.equal(result.groups.length, 1);

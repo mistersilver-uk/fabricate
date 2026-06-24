@@ -2543,7 +2543,7 @@ async function main() {
         if (navLabels.at(0) !== 'System settings') {
           throw new Error(`Manager selected nav should keep System settings first. Saw: ${navLabels.join(', ')}`);
         }
-        for (const expected of ['System settings', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']) {
+        for (const expected of ['System settings', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
           if (!navLabels.includes(expected)) {
             throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }

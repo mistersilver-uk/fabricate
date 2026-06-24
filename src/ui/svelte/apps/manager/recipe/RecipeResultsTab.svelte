@@ -23,6 +23,12 @@
     complex = true,
     isMultiStep = false,
     componentOptions = [],
+    // Result routing (routed systems). Provider + the system's outcome tiers feed
+    // the per-result-set assignment controls; ingredient-mode assignment writes
+    // back through onAssignIngredientSet(stepId, groupId, setId, assigned).
+    routingProvider = null,
+    outcomeTierOptions = [],
+    onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {}
   } = $props();
@@ -33,10 +39,15 @@
   }
 
   const resultGroups = $derived(Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []);
+  const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
   function stepResultGroups(step) {
     return Array.isArray(step?.resultGroups) ? step.resultGroups : [];
+  }
+
+  function stepIngredientSets(step) {
+    return Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
   }
 </script>
 
@@ -52,6 +63,11 @@
             resultGroups={stepResultGroups(step)}
             {complex}
             {componentOptions}
+            {routingProvider}
+            ingredientSets={stepIngredientSets(step)}
+            {outcomeTierOptions}
+            onAssignIngredientSet={(groupId, setId, assigned) =>
+              onAssignIngredientSet(step.id, groupId, setId, assigned)}
             onChange={(nextGroups) => onUpdateResultGroups(step.id, nextGroups)}
           />
         {/snippet}
@@ -62,6 +78,11 @@
       {resultGroups}
       {complex}
       {componentOptions}
+      {routingProvider}
+      {ingredientSets}
+      {outcomeTierOptions}
+      onAssignIngredientSet={(groupId, setId, assigned) =>
+        onAssignIngredientSet(null, groupId, setId, assigned)}
       onChange={(nextGroups) => onUpdateResultGroups(null, nextGroups)}
     />
   {/if}

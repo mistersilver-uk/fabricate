@@ -66,6 +66,13 @@ export class Recipe {
         ? { ...data.outcomeRouting }
         : null;
     this.resultSelection = this._normalizeResultSelection(data.resultSelection);
+    // Optional reference to a simple-check recipe tier (its id). When set, the
+    // recipe uses that tier's DC instead of the system default; null/unknown ids
+    // fall back to the default at resolution time.
+    this.checkTierId =
+      typeof data.checkTierId === 'string' && data.checkTierId.trim()
+        ? data.checkTierId.trim()
+        : null;
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
 
@@ -373,6 +380,7 @@ export class Recipe {
         resultGroups: (step.resultGroups || []).map((group) => ({
           id: group.id,
           name: group.name,
+          checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
           results: (group.results || []).map((result) =>
             result.toJSON ? result.toJSON() : result
           ),
@@ -383,6 +391,7 @@ export class Recipe {
       resultGroups: this.resultGroups.map((group) => ({
         id: group.id,
         name: group.name,
+        checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
         results: group.results.map((r) => r.toJSON()),
       })),
       toolIds: [...this.toolIds],
@@ -393,6 +402,7 @@ export class Recipe {
       transferEffects: this.transferEffects,
       outcomeRouting: this.outcomeRouting,
       resultSelection: this.resultSelection,
+      checkTierId: this.checkTierId,
       currencyCost: this.currencyCost,
       teaser: this.teaser,
       metadata: this.metadata,
@@ -484,6 +494,9 @@ export class Recipe {
       return data.resultGroups.map((group, idx) => ({
         id: group?.id || foundry.utils.randomID(),
         name: group?.name || `Result Group ${idx + 1}`,
+        // Routed check-mode routing: ids of the system's routed-check outcome
+        // tiers that produce this group. Empty for ingredient-mode / non-routed.
+        checkOutcomeIds: this._normalizeIdList(group?.checkOutcomeIds),
         results: (group?.results || []).map((r) => (r instanceof Result ? r : Result.fromJSON(r))),
       }));
     }
@@ -494,9 +507,29 @@ export class Recipe {
       return {
         id: result.id || foundry.utils.randomID(),
         name: `Result Group ${idx + 1}`,
+        checkOutcomeIds: [],
         results: [result],
       };
     });
+  }
+
+  /**
+   * Coerce a value into a deduped array of trimmed, non-empty id strings.
+   * Tolerant of non-array / nullish input (returns []).
+   * @param {unknown} value
+   * @returns {string[]}
+   */
+  _normalizeIdList(value) {
+    if (!Array.isArray(value)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const raw of value) {
+      const id = String(raw ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+    return out;
   }
 
   _normalizeStep(step = {}, idx = 0) {

@@ -12,6 +12,7 @@
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentSourceInspector from './ComponentSourceInspector.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
+  import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
   import EnvironmentsBrowserView from './EnvironmentsBrowserView.svelte';
   import EssenceBrowserView from './EssenceBrowserView.svelte';
@@ -83,9 +84,73 @@
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
+
+  // Routed crafting check editor: a staged draft is seeded from the selected
+  // system's craftingCheck.routed and committed only via the top-right Save
+  // button (the same staged pattern the other editors use), so persistence is
+  // explicit and never raced by navigation.
+  function cloneRoutedCheck(routed) {
+    const source = routed && typeof routed === 'object' ? routed : {};
+    const dc = Number(source.dc);
+    const rollFormula =
+      typeof source.rollFormula === 'string'
+        ? source.rollFormula
+        : typeof source.rollExpression === 'string'
+          ? source.rollExpression
+          : '';
+    return {
+      type: source.type === 'fixed' ? 'fixed' : 'relative',
+      rollFormula,
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
+      diceCrits: Array.isArray(source.diceCrits)
+        ? source.diceCrits.map((crit) => ({ ...crit }))
+        : [],
+      relativeOutcomes: Array.isArray(source.relativeOutcomes)
+        ? source.relativeOutcomes.map((outcome) => ({ ...outcome }))
+        : [],
+      fixedOutcomes: Array.isArray(source.fixedOutcomes)
+        ? source.fixedOutcomes.map((outcome) => ({ ...outcome }))
+        : []
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkRoutedDraft = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
+  // svelte-ignore state_referenced_locally
+  let checkRoutedBaseline = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
+  // svelte-ignore state_referenced_locally
+  let lastChecksSystemId = $viewState.selectedSystem?.id || '';
+  let checkRoutedSaving = $state(false);
+  const checkRoutedDirty = $derived(
+    JSON.stringify(checkRoutedDraft) !== JSON.stringify(checkRoutedBaseline)
+  );
+
+  // Simple (pass/fail) crafting check draft — same staged pattern, used for simple
+  // and alchemy resolution modes.
+  function cloneSimpleCheck(simple) {
+    const source = simple && typeof simple === 'object' ? simple : {};
+    const dc = Number(source.dc);
+    return {
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
+      tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
+      macroUuid: source.macroUuid || null,
+      diceCrits: Array.isArray(source.diceCrits) ? source.diceCrits.map((crit) => ({ ...crit })) : []
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkSimpleDraft = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
+  // svelte-ignore state_referenced_locally
+  let checkSimpleBaseline = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
+  let checkSimpleSaving = $state(false);
+  const checkSimpleDirty = $derived(
+    JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
+  );
   const placeholderViews = [
     { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
-    { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.Manager.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
   ];
 
@@ -104,6 +169,102 @@
   const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences, recipesRouteEnabled));
+
+  // Per-check activation state for the right-menu "Active" card. A check is only
+  // toggleable when its resolution mode makes it optional (Simple); otherwise the
+  // mode requires it and the card explains that.
+  const checkActivation = $derived({
+    crafting: {
+      mode: selectedSystem?.resolutionMode || 'simple',
+      optional: (selectedSystem?.resolutionMode || 'simple') === 'simple',
+      enabled: selectedSystem?.craftingCheck?.enabled === true
+    },
+    salvage: {
+      mode: selectedSystem?.salvageResolutionMode || 'simple',
+      optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
+      enabled: selectedSystem?.salvageCraftingCheck?.enabled === true
+    },
+    // Gathering checks are authored per task, not as a single system-level switch.
+    gathering: { mode: 'perTask', optional: false, enabled: false }
+  });
+
+  // Which crafting check editor is active for the selected system, and whether it
+  // has unsaved staged edits — drives the single top-right Save button.
+  const craftingCheckMode = $derived(
+    recipeRouted ? 'routed' : ['simple', 'alchemy'].includes(selectedSystem?.resolutionMode || 'simple') ? 'simple' : null
+  );
+  const craftingCheckDirty = $derived(
+    (craftingCheckMode === 'routed' && checkRoutedDirty) ||
+      (craftingCheckMode === 'simple' && checkSimpleDirty)
+  );
+  const craftingCheckSaving = $derived(checkRoutedSaving || checkSimpleSaving);
+
+  // Static recipe tiers offered to the recipe editor's tier dropdown. Only when the
+  // system uses a simple static check that actually defines tiers.
+  const recipeCheckTierOptions = $derived(
+    craftingCheckMode === 'simple' &&
+      (selectedSystem?.craftingCheck?.simple?.dcMode || 'static') === 'static'
+      ? selectedSystem?.craftingCheck?.simple?.tiers || []
+      : []
+  );
+
+  // Routed-check outcome tiers (active type) offered to the recipe editor's
+  // check-mode result-set assignment control as {id, name}. Failure tiers are
+  // excluded — a failed check produces no result set to route to.
+  const recipeRoutedOutcomeTierOptions = $derived.by(() => {
+    const routed = selectedSystem?.craftingCheck?.routed;
+    if (!routed) return [];
+    const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+    return (Array.isArray(tiers) ? tiers : [])
+      .filter((tier) => tier && tier.id && tier.success === true)
+      .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
+  });
+
+  // Reseed the routed + simple check drafts and baselines when the selected system
+  // changes (not on every refresh of the same system, so a save never clobbers an
+  // open draft).
+  $effect(() => {
+    if (selectedSystemId === lastChecksSystemId) return;
+    lastChecksSystemId = selectedSystemId;
+    checkRoutedDraft = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
+    checkRoutedBaseline = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
+    checkSimpleDraft = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
+    checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
+  });
+
+  function onUpdateCraftingCheck(next) {
+    checkRoutedDraft = next;
+  }
+
+  function onUpdateCraftingCheckSimple(next) {
+    checkSimpleDraft = next;
+  }
+
+  async function saveCraftingCheck() {
+    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return;
+    if (craftingCheckMode === 'routed') {
+      checkRoutedSaving = true;
+      try {
+        await store?.saveCraftingCheckRouted?.(checkRoutedDraft);
+        checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
+      } finally {
+        checkRoutedSaving = false;
+      }
+    } else if (craftingCheckMode === 'simple') {
+      checkSimpleSaving = true;
+      try {
+        await store?.saveCraftingCheckSimple?.(checkSimpleDraft);
+        checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
+      } finally {
+        checkSimpleSaving = false;
+      }
+    }
+  }
+
+  function onToggleCheckActive(kind, enabled) {
+    if (kind === 'crafting') store?.saveCraftingCheckActive?.(enabled);
+    else if (kind === 'salvage') store?.saveSalvageCheckActive?.(enabled);
+  }
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
     recipes: $viewState.recipes?.length || 0,
@@ -1085,6 +1246,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle', 'Travel and parties');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
+    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Title', 'Checks');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
@@ -1108,6 +1270,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Travel.Subtitle', 'Manage Fabricate parties and set the current realm for the selected crafting system.');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
+    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Subtitle', 'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
@@ -1149,6 +1312,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions', 'Travel and party actions');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
+    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
     return text('FABRICATE.Admin.Manager.SystemActions', 'System actions');
@@ -1386,7 +1550,7 @@
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools') && !selectedSystem) return;
+    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'checks') && !selectedSystem) return;
     if (view === 'recipes' && !recipesRouteEnabled) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
@@ -3267,6 +3431,10 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
         {/if}
+        {#if currentView === 'checks'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
+        {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.SystemEdit.Breadcrumb', 'System settings')}</span>
@@ -3327,6 +3495,14 @@
         </button>
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
+      {:else if currentView === 'checks'}
+        {#if craftingCheckDirty || craftingCheckSaving}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
+          <button type="button" class="manager-button is-primary" data-checks-save onclick={saveCraftingCheck} disabled={!craftingCheckDirty || craftingCheckSaving}>
+            <i class={craftingCheckSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
+          </button>
+        {/if}
       {:else if currentView === 'essences'}
         <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -3538,6 +3714,10 @@
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
             <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
+          <button type="button" class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`} aria-current={currentView === 'checks' ? 'page' : undefined} onclick={() => setView('checks')}>
+            <i class="fas fa-dice-d20" aria-hidden="true"></i>
+            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
+          </button>
           {#if canShowEnvironments}
             <div class={`manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
               <button
@@ -3711,6 +3891,20 @@
           />
         </section>
       </main>
+    {:else if currentView === 'checks' && selectedSystem}
+      <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}>
+        <section class="manager-environment-editor-shell">
+          <ChecksView
+            resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+            craftingCheck={checkRoutedDraft}
+            craftingCheckSimple={checkSimpleDraft}
+            activation={checkActivation}
+            {onUpdateCraftingCheck}
+            {onUpdateCraftingCheckSimple}
+            {onToggleCheckActive}
+          />
+        </section>
+      </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
         task={editingGatheringTask}
@@ -3849,6 +4043,9 @@
         componentTagOptions={selectedSystem?.componentTagOptions || []}
         essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
         itemTags={selectedSystem?.itemTags || []}
+        checkTierOptions={recipeCheckTierOptions}
+        routingProvider={recipeRoutingProvider}
+        routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
         onAddStep={handleAddStep}
@@ -3917,7 +4114,7 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">

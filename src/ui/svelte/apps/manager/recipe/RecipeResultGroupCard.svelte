@@ -15,12 +15,23 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeResultItemRow from './RecipeResultItemRow.svelte';
+  import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
 
   let {
     group = {},
     chromeless = false,
     componentOptions = [],
+    // Routed result routing (non-chromeless only): in 'ingredientSet' mode the
+    // result set is assigned ingredient sets (via onAssignIngredientSet, written
+    // to ingredientSet.resultGroupId); in 'check' mode it is assigned the system's
+    // routed-check outcome tiers (written to group.checkOutcomeIds). Otherwise a
+    // free-text result-set name is shown.
+    routingProvider = null,
+    ingredientSetOptions = [],
+    assignedIngredientSetIds = [],
+    outcomeTierOptions = [],
+    onAssignIngredientSet = () => {},
     onChange = () => {},
     onRemove = () => {}
   } = $props();
@@ -32,9 +43,33 @@
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
 
+  // Mirror RecipeItemInspector: 'ingredientSet' is Ingredient routing; the
+  // @deprecated macroOutcome/rollTableOutcome providers read back as Check.
+  const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
+  const isCheckRouting = $derived(
+    ['check', 'macroOutcome', 'rollTableOutcome'].includes(routingProvider)
+  );
+  const checkOutcomeIds = $derived(
+    Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : []
+  );
+
+  function addOutcomeTier(id) {
+    if (checkOutcomeIds.includes(id)) return;
+    onChange({ ...group, checkOutcomeIds: [...checkOutcomeIds, id] });
+  }
+
+  function removeOutcomeTier(id) {
+    onChange({ ...group, checkOutcomeIds: checkOutcomeIds.filter((tierId) => tierId !== id) });
+  }
+
   const componentPickerOptions = $derived(
     (componentOptions || []).map(option => ({ id: option.id, label: option.name, img: option.img }))
   );
+
+  function newId() {
+    const random = globalThis.foundry?.utils?.randomID;
+    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
+  }
 
   // Spread the existing group so its id/name (referenced by routing) survive.
   function setName(name) {
@@ -63,22 +98,46 @@
       });
       return;
     }
-    onChange({ ...group, results: [...results, { componentId: id, quantity: 1 }] });
+    onChange({ ...group, results: [...results, { id: newId(), componentId: id, quantity: 1 }] });
   }
 </script>
 
 <div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`} data-recipe-set data-recipe-result-set-id={group?.id || ''}>
   {#if !chromeless}
     <div class="manager-recipe-ingredient-set-head">
-      <input
-        type="text"
-        class="manager-recipe-ingredient-set-name"
-        data-recipe-result-set-field="name"
-        placeholder={text('FABRICATE.Admin.Manager.Recipe.ResultSetNamePlaceholder', 'Result set name')}
-        value={group?.name || ''}
-        onchange={(e) => setName(e.target.value)}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
-      />
+      {#if isIngredientRouting}
+        <RecipeRoutingAssignment
+          options={ingredientSetOptions}
+          selectedIds={assignedIngredientSetIds}
+          label={text('FABRICATE.Admin.Manager.Recipe.RoutingIngredientSets', 'Produced by')}
+          addLabel={text('FABRICATE.Admin.Manager.Recipe.RoutingAddIngredientSet', 'Add ingredient set')}
+          placeholder={text('FABRICATE.Admin.Manager.Recipe.RoutingSearchIngredientSets', 'Search ingredient sets...')}
+          emptyHint={text('FABRICATE.Admin.Manager.Recipe.RoutingNoIngredientSets', 'Add a named ingredient set first.')}
+          onAdd={(id) => onAssignIngredientSet(id, true)}
+          onRemove={(id) => onAssignIngredientSet(id, false)}
+        />
+      {:else if isCheckRouting}
+        <RecipeRoutingAssignment
+          options={outcomeTierOptions}
+          selectedIds={checkOutcomeIds}
+          label={text('FABRICATE.Admin.Manager.Recipe.RoutingOutcomeTiers', 'Produced on outcome')}
+          addLabel={text('FABRICATE.Admin.Manager.Recipe.RoutingAddOutcomeTier', 'Add outcome')}
+          placeholder={text('FABRICATE.Admin.Manager.Recipe.RoutingSearchOutcomeTiers', 'Search outcomes...')}
+          emptyHint={text('FABRICATE.Admin.Manager.Recipe.RoutingNoOutcomeTiers', 'Define outcome tiers in the routed crafting check first.')}
+          onAdd={(id) => addOutcomeTier(id)}
+          onRemove={(id) => removeOutcomeTier(id)}
+        />
+      {:else}
+        <input
+          type="text"
+          class="manager-recipe-ingredient-set-name"
+          data-recipe-result-set-field="name"
+          placeholder={text('FABRICATE.Admin.Manager.Recipe.ResultSetNamePlaceholder', 'Result set name')}
+          value={group?.name || ''}
+          onchange={(e) => setName(e.target.value)}
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
+        />
+      {/if}
       <button
         type="button"
         class="manager-icon-button is-danger"

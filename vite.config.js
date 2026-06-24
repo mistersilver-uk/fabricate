@@ -14,12 +14,14 @@ function stripGlobalCss() {
     },
     load(id) {
       if (id === NOOP_ID) return '';
-    }
+    },
   };
 }
 
 export default defineConfig(({ command }) => {
-  const plugins = [svelte({ compilerOptions: { css: 'injected' } })];
+  // Compiler options (css: 'injected') live in svelte.config.js so the plugin
+  // finds a config file and stops logging "no Svelte config found" each build.
+  const plugins = [svelte()];
   if (command === 'serve') plugins.push(fabricateDevProxy());
   if (command === 'build') plugins.push(stripGlobalCss());
 
@@ -31,9 +33,9 @@ export default defineConfig(({ command }) => {
         strictPort: true,
         hmr: { port: 5174 },
         proxy: {
-          '/socket.io': { target: 'http://localhost:30000', ws: true }
-        }
-      }
+          '/socket.io': { target: 'http://localhost:30000', ws: true },
+        },
+      },
     };
   }
 
@@ -48,7 +50,7 @@ export default defineConfig(({ command }) => {
       lib: {
         entry: resolve(import.meta.dirname, 'src/main.js'),
         formats: ['es'],
-        fileName: 'main'
+        fileName: 'main',
       },
       rollupOptions: {
         external: [],
@@ -63,14 +65,14 @@ export default defineConfig(({ command }) => {
           minify: {
             compress: {
               treeshake: {
-                manualPureFunctions: ['console.log', 'console.debug', 'console.info']
-              }
+                manualPureFunctions: ['console.log', 'console.debug', 'console.info'],
+              },
             },
             mangle: true,
-            codegen: false
-          }
-        }
-      }
-    }
+            codegen: false,
+          },
+        },
+      },
+    },
   };
 });

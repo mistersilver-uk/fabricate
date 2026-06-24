@@ -22,6 +22,7 @@
     essenceOptions = [],
     itemTags = [],
     currencyUnits = [],
+    showSetName = true,
     onChange = () => {},
     idPrefix = ''
   } = $props();
@@ -29,6 +30,20 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  // Generate an id eagerly at add time (rather than at save normalization) so a
+  // new set is immediately routable in the Results tab.
+  function newId() {
+    const random = globalThis.foundry?.utils?.randomID;
+    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
+  }
+
+  // The default display name for an unnamed set ("Set 1", "Set 2", …) — shown in
+  // the editable name field (so usable unnamed sets are not hidden behind a
+  // placeholder) and read-only in check mode.
+  function defaultSetName(index) {
+    return `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
   }
 
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
@@ -53,7 +68,7 @@
   }
 
   function addSet() {
-    onChange([...sets, { name: '', ingredientGroups: [] }]);
+    onChange([...sets, { id: newId(), name: '', ingredientGroups: [] }]);
   }
 
   function removeSet(index) {
@@ -103,6 +118,8 @@
             {essenceOptions}
             {itemTags}
             {currencyUnits}
+            {showSetName}
+            defaultName={defaultSetName(index)}
             onChange={(nextSet) => updateSet(index, nextSet)}
             onRemove={() => removeSet(index)}
           />

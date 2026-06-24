@@ -431,6 +431,31 @@ export class ResolutionModeService {
     };
   }
 
+  /**
+   * Resolve a crafting-check outcome name to the id of the matching routed-check
+   * outcome tier on the system (active type's tier list), or null when there is
+   * no routed config or no name match. Used to route by explicit tier→result-set
+   * assignments (`ResultGroup.checkOutcomeIds`).
+   *
+   * Only `success === true` tiers route via the assignment: a `success: false`
+   * tier must never produce a `disposition: 'success'` result, so it returns
+   * null here and falls through to the fail/keyword/name handling below.
+   * @param {object} system
+   * @param {string|null} outcome
+   * @returns {string|null}
+   */
+  _resolveRoutedTierId(system, outcome) {
+    const routed = system?.craftingCheck?.routed;
+    if (!routed || outcome == null) return null;
+    const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+    if (!Array.isArray(tiers)) return null;
+    const normalized = this._normalizeName(outcome);
+    const tier = tiers.find(
+      (entry) => entry?.success === true && this._normalizeName(entry?.name) === normalized
+    );
+    return tier?.id || null;
+  }
+
   resolveResultGroups({
     recipe,
     step,
@@ -478,9 +503,23 @@ export class ResolutionModeService {
         return { groups: allGroups.slice(0, 1), meta: {} };
       }
       // `check` is the canonical successor to `macroOutcome`: both route by the
-      // crafting-check outcome name to the ResultGroup of that name.
+      // crafting-check outcome to a result group.
       if (provider === 'macroOutcome' || provider === 'check') {
         const normalized = this._normalizeName(outcome);
+        // Explicit tier→result-set assignment (authored in the recipe editor)
+        // wins: resolve the outcome to a routed-check tier id, then route to the
+        // result group that lists it in `checkOutcomeIds`.
+        const tierId = this._resolveRoutedTierId(system, outcome);
+        if (tierId) {
+          const assigned = allGroups.filter(
+            (group) =>
+              Array.isArray(group.checkOutcomeIds) && group.checkOutcomeIds.includes(tierId)
+          );
+          if (assigned.length > 0)
+            return { groups: assigned.slice(0, 1), meta: { outcome, disposition: 'success' } };
+        }
+        // Fallback for un-migrated recipes: fail/miss keywords, then match the
+        // outcome name to a result group of that name.
         if (this._isFailKeyword(normalized))
           return { groups: [], meta: { outcome, disposition: 'fail' } };
         if (this._isMissKeyword(normalized))

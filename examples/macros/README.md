@@ -80,18 +80,6 @@ Import recipes from JSON.
 
 ---
 
-### 09-seed-test-systems.js
-Seeds a minimal but complete set of crafting systems (one per resolution mode:
-simple, routed, progressive, alchemy) plus the supporting world Items, a test
-Actor with inventory, Macros, a RollTable and Scenes needed to explore **every**
-Fabricate mode and feature by hand. Re-running it completely resets everything it
-created first, so nothing accumulates. Every image uses a valid Foundry core icon.
-
-**Usage:** Run as a GM. Then open the Crafting System Manager to find the four
-`FabSeed:` systems, and select the `FabSeed Test Crafter` actor to craft/gather.
-
----
-
 ## Tips
 
 - **Console:** Press F12 to open the browser console for detailed output

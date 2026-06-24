@@ -36,6 +36,12 @@
     componentTagOptions = [],
     essenceOptions = [],
     itemTags = [],
+    checkTierOptions = [],
+    // Result routing (routed systems): the per-recipe routing mode (provider) and
+    // the system's routed-check outcome tiers {id,name} for the result-set
+    // assignment controls.
+    routingProvider = null,
+    routedOutcomeTierOptions = [],
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
     onAddStep = () => {},
@@ -62,8 +68,27 @@
   // toggle controls entering/leaving the mode).
   const isMultiStep = $derived(steps.length >= 1);
 
+  // Check-mode routed recipes route by the crafting-check outcome, so ingredient
+  // sets are nameless there; ingredient mode and non-routed systems keep names.
+  const showSetName = $derived(
+    !['check', 'macroOutcome', 'rollTableOutcome'].includes(routingProvider)
+  );
+
   function stepById(stepId) {
     return steps.find(step => step.id === stepId) || null;
+  }
+
+  // Ingredient-mode result routing: assigning an ingredient set to a result group
+  // writes the canonical `resultGroupId` on that set (consumed at craft time).
+  // A set routes to at most one group, so assigning replaces any prior target;
+  // unassigning clears it. Ignores assigning to a not-yet-saved (id-less) group.
+  function assignIngredientSet(stepId, groupId, setId, assigned) {
+    if (!setId || (assigned && !groupId)) return;
+    const scopeSets = stepId == null ? ingredientSets : stepById(stepId)?.ingredientSets || [];
+    const nextSets = scopeSets.map((set) =>
+      set.id === setId ? { ...set, resultGroupId: assigned ? groupId : null } : set
+    );
+    updateIngredientSets(stepId, nextSets);
   }
   function stepToolIds(step) {
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
@@ -197,6 +222,7 @@
             {onToggleEnabled}
             onChooseImage={chooseImage}
             {isMultiStep}
+            {checkTierOptions}
             {onUpdateRecipe}
             {onAddStep}
             {onReorderSteps}
@@ -212,6 +238,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {showSetName}
             onUpdateIngredientSets={updateIngredientSets}
             onDeleteStep={deleteStepFrom('ingredients')}
           />
@@ -221,6 +248,9 @@
             {complex}
             {isMultiStep}
             {componentOptions}
+            {routingProvider}
+            outcomeTierOptions={routedOutcomeTierOptions}
+            onAssignIngredientSet={assignIngredientSet}
             onUpdateResultGroups={updateResultGroups}
             onDeleteStep={deleteStepFrom('results')}
           />

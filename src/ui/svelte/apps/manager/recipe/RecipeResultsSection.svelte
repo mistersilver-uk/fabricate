@@ -28,6 +28,14 @@
     resultGroups = [],
     complex = true,
     componentOptions = [],
+    // Result routing (routed systems only). `ingredientSets` is this scope's set
+    // list (read to build per-result-set options + current assignments);
+    // `outcomeTierOptions` is the system's routed-check tiers. Ingredient-mode
+    // assignment is written via onAssignIngredientSet(groupId, setId, assigned).
+    routingProvider = null,
+    ingredientSets = [],
+    outcomeTierOptions = [],
+    onAssignIngredientSet = () => {},
     onChange = () => {},
     idPrefix = ''
   } = $props();
@@ -37,7 +45,50 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // Generate an id eagerly at add time (rather than relying on the store's
+  // normalization at save) so a brand-new result set is immediately routable.
+  function newId() {
+    const random = globalThis.foundry?.utils?.randomID;
+    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
+  }
+
   const groups = $derived(Array.isArray(resultGroups) ? resultGroups : []);
+  const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
+  const tierOptions = $derived(Array.isArray(outcomeTierOptions) ? outcomeTierOptions : []);
+
+  function setDisplayName(set, index) {
+    const name = String(set?.name || '').trim();
+    return name || `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
+  }
+
+  // Ingredient-set options for one result group: a set already routed to another
+  // group is disabled (a set routes to at most one result group).
+  function ingredientOptionsFor(group) {
+    return sets.map((set, index) => ({
+      id: set.id,
+      name: setDisplayName(set, index),
+      disabled: !!set.resultGroupId && set.resultGroupId !== group.id
+    }));
+  }
+
+  function assignedSetIdsFor(group) {
+    return sets.filter((set) => set.resultGroupId === group.id).map((set) => set.id);
+  }
+
+  // Outcome-tier options for one result group: a tier assigned to another group
+  // (by index, robust for not-yet-saved id-less groups) is disabled.
+  function tierOptionsFor(index) {
+    const elsewhere = new Set(
+      groups
+        .filter((_, i) => i !== index)
+        .flatMap((group) => (Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : []))
+    );
+    return tierOptions.map((tier) => ({
+      id: tier.id,
+      name: tier.name,
+      disabled: elsewhere.has(tier.id)
+    }));
+  }
 
   // Defensive: never let the simple (chromeless, single-group) render hide extra
   // groups. Trimming to one group is the confirmed store path; if a recipe is
@@ -65,7 +116,7 @@
   }
 
   function addGroup() {
-    onChange([...groups, { name: '', results: [] }]);
+    onChange([...groups, { id: newId(), name: '', checkOutcomeIds: [], results: [] }]);
   }
 
   function removeGroup(index) {
@@ -110,6 +161,12 @@
           <RecipeResultGroupCard
             {group}
             {componentOptions}
+            {routingProvider}
+            ingredientSetOptions={ingredientOptionsFor(group)}
+            assignedIngredientSetIds={assignedSetIdsFor(group)}
+            outcomeTierOptions={tierOptionsFor(index)}
+            onAssignIngredientSet={(setId, assigned) =>
+              onAssignIngredientSet(group?.id || null, setId, assigned)}
             onChange={(nextGroup) => updateGroup(index, nextGroup)}
             onRemove={() => removeGroup(index)}
           />

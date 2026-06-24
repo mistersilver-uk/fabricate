@@ -317,7 +317,137 @@ export class CraftingSystemManager {
           : mode === 'namedOutcomes'
             ? ['low', 'high']
             : ['fail', 'pass'],
+      routed: this._normalizeRoutedCraftingCheck(check?.routed),
+      simple: this._normalizeSimpleCraftingCheck(check?.simple),
     };
+  }
+
+  // Simple pass/fail crafting check authored in the Checks editor for simple and
+  // alchemy resolution modes: a roll formula and a DC (met or exceeded), whose
+  // value is polymorphic — either a static default with optional named recipe
+  // tiers, or a dynamic value computed by a dropped macro. Both the static and
+  // dynamic fields are kept so switching `dcMode` never destroys the other side's
+  // configuration. Per-die critical raw rolls auto-fail/auto-succeed.
+  _normalizeSimpleCraftingCheck(simple = {}) {
+    const source = !simple || typeof simple !== 'object' ? {} : simple;
+    const dc = Number(source.dc);
+    const tiers = Array.isArray(source.tiers) ? source.tiers : [];
+    const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
+    return {
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
+      tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
+      macroUuid: source.macroUuid || null,
+      diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
+    };
+  }
+
+  _normalizeSimpleTier(tier) {
+    if (!tier || typeof tier !== 'object') return null;
+    const dc = Number(tier.dc);
+    return {
+      id: tier.id || foundry.utils.randomID(),
+      name: String(tier.name || '').trim(),
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 0,
+    };
+  }
+
+  _normalizeSimpleDiceCrit(crit) {
+    if (!crit || typeof crit !== 'object') return null;
+    const die = String(crit.die || '').trim();
+    // A die may carry several crits (e.g. raw 1 forces failure, raw 20 forces
+    // success), so each is its own keyed row. A crit always forces an outcome —
+    // there is no off state — so only a missing die drops it.
+    if (!die) return null;
+    const raw = Number.isFinite(Number(crit.raw)) ? Math.trunc(Number(crit.raw)) : 0;
+    return {
+      id: crit.id || foundry.utils.randomID(),
+      die,
+      // Clamp `raw` to the die's producible range [N, N*S] parsed from the `NdS`
+      // die string (the crit matches the die-term total, so an out-of-range raw
+      // could never fire). If the die can't be parsed, leave `raw` as-is.
+      raw: this._clampCritRaw(die, raw),
+      success: crit.success === true,
+      breakTools: crit.breakTools === true,
+    };
+  }
+
+  /**
+   * Clamp a critical raw value to the producible total range of an `NdS` die
+   * term: minimum `N` (all dice show 1), maximum `N*S` (all dice show their max
+   * face). When the die string does not parse, the value is returned unchanged.
+   * @private
+   */
+  _clampCritRaw(die, raw) {
+    const match = /^(\d+)d(\d+)$/i.exec(String(die).trim());
+    if (!match) return raw;
+    const count = Number(match[1]);
+    const faces = Number(match[2]);
+    if (!Number.isFinite(count) || !Number.isFinite(faces) || count < 1 || faces < 1) return raw;
+    const min = count;
+    const max = count * faces;
+    return Math.min(Math.max(raw, min), max);
+  }
+
+  // Structured routed-mode crafting check authored in the Checks editor: a check
+  // type (relative DC offsets or fixed value ranges), a shared roll expression,
+  // and TWO independent outcome-tier lists — one per type — so editing or
+  // deleting a tier in one mode never affects the other. Kept alongside the
+  // legacy `outcomes` string list rather than replacing it, so the existing
+  // routing engine is untouched.
+  _normalizeRoutedCraftingCheck(routed = {}) {
+    const source = !routed || typeof routed !== 'object' ? {} : routed;
+    const relative = Array.isArray(source.relativeOutcomes) ? source.relativeOutcomes : [];
+    const fixed = Array.isArray(source.fixedOutcomes) ? source.fixedOutcomes : [];
+    const tiers = Array.isArray(source.tiers) ? source.tiers : [];
+    const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
+    const dc = Number(source.dc);
+    // The roll formula, default DC, comparison, per-die crits, and recipe tiers
+    // mirror the simple check (so the editors share components). `rollExpression`
+    // is the legacy field name, read for back-compat.
+    let rollFormula = '';
+    if (typeof source.rollFormula === 'string') {
+      rollFormula = source.rollFormula;
+    } else if (typeof source.rollExpression === 'string') {
+      rollFormula = source.rollExpression;
+    }
+    return {
+      type: source.type === 'fixed' ? 'fixed' : 'relative',
+      rollFormula,
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
+      diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
+      relativeOutcomes: relative
+        .map((outcome) => this._normalizeRoutedOutcome(outcome, 'relative'))
+        .filter(Boolean),
+      fixedOutcomes: fixed
+        .map((outcome) => this._normalizeRoutedOutcome(outcome, 'fixed'))
+        .filter(Boolean),
+    };
+  }
+
+  _normalizeRoutedOutcome(outcome, kind) {
+    if (!outcome || typeof outcome !== 'object') return null;
+    const base = {
+      id: outcome.id || foundry.utils.randomID(),
+      name: String(outcome.name || '').trim(),
+      success: outcome.success === true,
+      breakTools: outcome.breakTools === true,
+    };
+    if (kind === 'fixed') {
+      const start = Number(outcome.start);
+      const end = Number(outcome.end);
+      return {
+        ...base,
+        start: Number.isFinite(start) ? Math.trunc(start) : 0,
+        end: Number.isFinite(end) ? Math.trunc(end) : 0,
+      };
+    }
+    const dc = Number(outcome.dc);
+    return { ...base, dc: Number.isFinite(dc) ? Math.trunc(dc) : 0 };
   }
 
   _normalizeBuiltInCheck(config = {}) {

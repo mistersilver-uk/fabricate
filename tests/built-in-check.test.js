@@ -3,18 +3,19 @@ import assert from 'node:assert/strict';
 
 // Minimal FoundryVTT globals
 globalThis.foundry = {
-  utils: { randomID: () => Math.random().toString(36).slice(2) }
+  utils: { randomID: () => Math.random().toString(36).slice(2) },
 };
 globalThis.game = {
   user: { isGM: true },
   system: { id: 'dnd5e' },
   actors: [],
-  fabricate: null
+  fabricate: null,
 };
 globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
-const { CraftingCheckAdapter, Dnd5eCraftingCheckAdapter, CraftingCheckAdapterRegistry } = await import('../src/systems/CraftingCheckAdapter.js');
+const { CraftingCheckAdapter, Dnd5eCraftingCheckAdapter, CraftingCheckAdapterRegistry } =
+  await import('../src/systems/CraftingCheckAdapter.js');
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 
@@ -31,7 +32,7 @@ test('_normalizeCraftingCheck with checkSource: builtIn preserves builtIn config
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     checkSource: 'builtIn',
-    builtIn: { ability: 'INT', skill: 'arc', dc: 20, advantage: 'advantage' }
+    builtIn: { ability: 'INT', skill: 'arc', dc: 20, advantage: 'advantage' },
   });
   assert.equal(result.checkSource, 'builtIn');
   assert.equal(result.builtIn.ability, 'int');
@@ -44,6 +45,174 @@ test('_normalizeCraftingCheck with missing checkSource defaults to macro', () =>
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({ macroUuid: 'uuid-123' });
   assert.equal(result.checkSource, 'macro');
+});
+
+test('_normalizeCraftingCheck defaults the routed config when absent', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({});
+  assert.deepEqual(result.routed, {
+    type: 'relative',
+    rollFormula: '',
+    dc: 15,
+    thresholdMode: 'meet',
+    tiers: [],
+    diceCrits: [],
+    relativeOutcomes: [],
+    fixedOutcomes: [],
+  });
+});
+
+test('_normalizeCraftingCheck routed mirrors the simple formula/DC/tiers/crits', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    routed: {
+      rollExpression: '1d20', // legacy field still read for back-compat
+      dc: '12.7',
+      thresholdMode: 'exceed',
+      tiers: [{ name: ' Hard ', dc: '18' }],
+      diceCrits: [{ die: '1d20', raw: '20', success: true, breakTools: true }],
+    },
+  });
+  assert.equal(result.routed.rollFormula, '1d20', 'rollExpression migrates to rollFormula');
+  assert.equal(result.routed.dc, 12, 'dc is truncated');
+  assert.equal(result.routed.thresholdMode, 'exceed');
+  assert.equal(result.routed.tiers[0].name, 'Hard');
+  assert.equal(result.routed.tiers[0].dc, 18);
+  assert.ok(result.routed.tiers[0].id, 'a tier id is generated');
+  assert.deepEqual(
+    { ...result.routed.diceCrits[0], id: undefined },
+    { id: undefined, die: '1d20', raw: 20, success: true, breakTools: true }
+  );
+});
+
+test('_normalizeCraftingCheck normalizes relative and fixed tiers independently', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    routed: {
+      type: 'fixed',
+      rollExpression: '1d20+@attributes.con.mod',
+      relativeOutcomes: [
+        { name: '  Botch  ', success: false, breakTools: true, dc: -2.7, start: 99, end: 99 },
+        'not-an-object',
+      ],
+      fixedOutcomes: [
+        { id: 'keep', name: 'Hit', success: true, breakTools: false, dc: 9, start: '1', end: '20' },
+        null,
+      ],
+    },
+  });
+  assert.equal(result.routed.type, 'fixed');
+  assert.equal(result.routed.rollFormula, '1d20+@attributes.con.mod');
+
+  assert.equal(result.routed.relativeOutcomes.length, 1, 'non-object entries are dropped');
+  const relative = result.routed.relativeOutcomes[0];
+  assert.ok(relative.id, 'a missing id is generated');
+  assert.equal(relative.name, 'Botch');
+  assert.equal(relative.dc, -2, 'dc is truncated to an integer');
+  assert.equal(relative.start, undefined, 'relative tiers carry no range fields');
+  assert.equal(relative.end, undefined);
+
+  assert.equal(result.routed.fixedOutcomes.length, 1);
+  const fixed = result.routed.fixedOutcomes[0];
+  assert.equal(fixed.id, 'keep', 'an existing id is preserved');
+  assert.equal(fixed.start, 1);
+  assert.equal(fixed.end, 20);
+  assert.equal(fixed.dc, undefined, 'fixed tiers carry no dc field');
+});
+
+test('_normalizeCraftingCheck coerces an invalid routed type to relative', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({ routed: { type: 'bogus' } });
+  assert.equal(result.routed.type, 'relative');
+});
+
+test('_normalizeCraftingCheck defaults the simple config when absent', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({});
+  assert.deepEqual(result.simple, {
+    rollFormula: '',
+    dc: 15,
+    thresholdMode: 'meet',
+    dcMode: 'static',
+    tiers: [],
+    macroUuid: null,
+    diceCrits: [],
+  });
+});
+
+test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dice crits)', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    simple: {
+      rollFormula: '1d20+@abilities.int.mod',
+      dc: '18.6',
+      thresholdMode: 'exceed',
+      dcMode: 'dynamic',
+      macroUuid: 'Macro.abc',
+      tiers: [
+        { name: '  Hard  ', dc: '20' },
+        { id: 'keep', name: 'Easy', dc: 10.9 },
+        'not-an-object',
+        null,
+      ],
+      diceCrits: [
+        { id: 'c1', die: '1d20', raw: '20', success: true, breakTools: true },
+        { die: '1d20', raw: 1, success: false },
+        { die: '', raw: 3, success: false },
+        'not-an-object',
+      ],
+    },
+  });
+  assert.equal(result.simple.dcMode, 'dynamic');
+  assert.equal(result.simple.dc, 18, 'threshold is truncated to an integer');
+  assert.equal(result.simple.thresholdMode, 'exceed');
+  assert.equal(result.simple.macroUuid, 'Macro.abc');
+  assert.equal(result.simple.tiers.length, 2, 'non-object tiers are dropped');
+  assert.equal(result.simple.tiers[0].name, 'Hard');
+  assert.equal(result.simple.tiers[1].id, 'keep', 'an existing tier id is preserved');
+  assert.equal(result.simple.tiers[1].dc, 10, 'tier DC is truncated to an integer');
+  // Multiple crits per die persist; only die-less / non-object entries are dropped
+  // (a crit always forces an outcome — no off state).
+  assert.equal(result.simple.diceCrits.length, 2);
+  assert.equal(result.simple.diceCrits[0].id, 'c1', 'an existing crit id is preserved');
+  assert.equal(result.simple.diceCrits[0].raw, 20, 'raw is truncated to an integer');
+  assert.equal(result.simple.diceCrits[0].success, true);
+  assert.equal(result.simple.diceCrits[0].breakTools, true);
+  assert.ok(result.simple.diceCrits[1].id, 'a missing crit id is generated');
+  assert.equal(result.simple.diceCrits[1].success, false);
+  assert.equal(result.simple.diceCrits[1].breakTools, false, 'breakTools defaults to false');
+});
+
+test('_normalizeCraftingCheck clamps a crit raw to the die produceable range', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    simple: {
+      diceCrits: [
+        // Above max (1d20 max is 20) clamps down to 20.
+        { id: 'hi', die: '1d20', raw: 99, success: true },
+        // Below min (2d6 min is 2) clamps up to 2.
+        { id: 'lo', die: '2d6', raw: 1, success: false },
+        // In range is untouched.
+        { id: 'ok', die: '2d6', raw: 7, success: true },
+        // Unparseable die leaves raw as-is.
+        { id: 'weird', die: '2d20kh1', raw: 50, success: true },
+      ],
+    },
+  });
+  const byId = Object.fromEntries(result.simple.diceCrits.map((c) => [c.id, c]));
+  assert.equal(byId.hi.raw, 20, 'raw above N*S clamps to the max');
+  assert.equal(byId.lo.raw, 2, 'raw below N clamps to the min');
+  assert.equal(byId.ok.raw, 7, 'an in-range raw is unchanged');
+  assert.equal(byId.weird.raw, 50, 'an unparseable die leaves raw as-is');
+});
+
+test('_normalizeCraftingCheck coerces invalid simple dcMode/thresholdMode to defaults', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    simple: { dcMode: 'bogus', thresholdMode: 'nope' },
+  });
+  assert.equal(result.simple.dcMode, 'static');
+  assert.equal(result.simple.thresholdMode, 'meet');
 });
 
 test('_normalizeBuiltInCheck with invalid dc defaults to 15', () => {
@@ -89,7 +258,7 @@ test('Dnd5eCraftingCheckAdapter.getAbilities returns correct ability list', () =
   const adapter = new Dnd5eCraftingCheckAdapter();
   const abilities = adapter.getAbilities();
   assert.ok(Array.isArray(abilities));
-  const keys = abilities.map(a => a.key);
+  const keys = abilities.map((a) => a.key);
   assert.ok(keys.includes('str'));
   assert.ok(keys.includes('dex'));
   assert.ok(keys.includes('con'));
@@ -103,7 +272,7 @@ test('Dnd5eCraftingCheckAdapter.getSkills returns correct skill list', () => {
   const adapter = new Dnd5eCraftingCheckAdapter();
   const skills = adapter.getSkills();
   assert.ok(Array.isArray(skills));
-  const keys = skills.map(s => s.key);
+  const keys = skills.map((s) => s.key);
   assert.ok(keys.includes('arc'));
   assert.ok(keys.includes('nat'));
   assert.ok(keys.includes('med'));
@@ -113,7 +282,12 @@ test('Dnd5eCraftingCheckAdapter.getSkills returns correct skill list', () => {
 test('Dnd5eCraftingCheckAdapter.executeCheck returns pass when roll >= dc', async () => {
   const adapter = new Dnd5eCraftingCheckAdapter();
   const actor = { rollAbilityCheck: async () => ({ total: 18 }) };
-  const result = await adapter.executeCheck(actor, { ability: 'int', skill: '', dc: 15, advantage: 'normal' });
+  const result = await adapter.executeCheck(actor, {
+    ability: 'int',
+    skill: '',
+    dc: 15,
+    advantage: 'normal',
+  });
   assert.equal(result.success, true);
   assert.equal(result.value, 18);
   assert.equal(result.outcome, 'pass');
@@ -122,7 +296,12 @@ test('Dnd5eCraftingCheckAdapter.executeCheck returns pass when roll >= dc', asyn
 test('Dnd5eCraftingCheckAdapter.executeCheck returns fail when roll < dc', async () => {
   const adapter = new Dnd5eCraftingCheckAdapter();
   const actor = { rollAbilityCheck: async () => ({ total: 8 }) };
-  const result = await adapter.executeCheck(actor, { ability: 'str', skill: '', dc: 15, advantage: 'normal' });
+  const result = await adapter.executeCheck(actor, {
+    ability: 'str',
+    skill: '',
+    dc: 15,
+    advantage: 'normal',
+  });
   assert.equal(result.success, false);
   assert.equal(result.value, 8);
   assert.equal(result.outcome, 'fail');
@@ -144,15 +323,15 @@ function makeEngine(systemOverride = {}) {
       builtIn: { ability: 'int', skill: '', dc: 15, advantage: 'normal' },
       outcomes: ['low', 'high'],
       consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
-      progressive: { awardMode: 'equal', allowPlayerReorder: false }
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
     },
-    ...systemOverride
+    ...systemOverride,
   };
   const systemManager = {
-    getSystem: () => system
+    getSystem: () => system,
   };
   const resolutionService = {
-    getMode: () => system.resolutionMode
+    getMode: () => system.resolutionMode,
   };
   const recipeManager = {};
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
@@ -160,20 +339,24 @@ function makeEngine(systemOverride = {}) {
     ...globalThis.game,
     fabricate: {
       getCraftingSystemManager: () => systemManager,
-      getResolutionModeService: () => resolutionService
-    }
+      getResolutionModeService: () => resolutionService,
+    },
   };
   return { engine, system };
 }
 
 test('_runCraftingCheck with checkSource macro calls MacroExecutor', async () => {
-  const { engine } = makeEngine({ craftingCheck: {
-    enabled: true, checkSource: 'macro', macroUuid: 'macro-uuid-1',
-    builtIn: { ability: 'int', skill: '', dc: 15, advantage: 'normal' },
-    outcomes: ['fail', 'pass'],
-    consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
-    progressive: { awardMode: 'equal', allowPlayerReorder: false }
-  }});
+  const { engine } = makeEngine({
+    craftingCheck: {
+      enabled: true,
+      checkSource: 'macro',
+      macroUuid: 'macro-uuid-1',
+      builtIn: { ability: 'int', skill: '', dc: 15, advantage: 'normal' },
+      outcomes: ['fail', 'pass'],
+      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+    },
+  });
 
   // Temporarily override the module-level MacroExecutor via dynamic import is not easy,
   // so we test indirectly: with macroUuid set and checkSource=macro, the engine should try macro.
@@ -181,7 +364,10 @@ test('_runCraftingCheck with checkSource macro calls MacroExecutor', async () =>
   const { MacroExecutor } = await import('../src/utils/MacroExecutor.js');
   let called = false;
   const origRun = MacroExecutor.run;
-  MacroExecutor.run = async () => { called = true; return { success: true, outcome: 'pass', value: 18 }; };
+  MacroExecutor.run = async () => {
+    called = true;
+    return { success: true, outcome: 'pass', value: 18 };
+  };
 
   const recipe = { craftingSystemId: 'sys-1', getExecutionSteps: () => [] };
   const actor = { id: 'a1', name: 'Crafter', items: [] };
@@ -193,20 +379,27 @@ test('_runCraftingCheck with checkSource macro calls MacroExecutor', async () =>
 });
 
 test('_runCraftingCheck with checkSource builtIn calls adapter', async () => {
-  const { engine } = makeEngine({ craftingCheck: {
-    enabled: true, checkSource: 'builtIn', macroUuid: null,
-    builtIn: { ability: 'int', skill: '', dc: 10, advantage: 'normal' },
-    outcomes: ['fail', 'pass'],
-    consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
-    progressive: { awardMode: 'equal', allowPlayerReorder: false }
-  }});
+  const { engine } = makeEngine({
+    craftingCheck: {
+      enabled: true,
+      checkSource: 'builtIn',
+      macroUuid: null,
+      builtIn: { ability: 'int', skill: '', dc: 10, advantage: 'normal' },
+      outcomes: ['fail', 'pass'],
+      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+    },
+  });
 
   // Register a dnd5e adapter that returns a known result
-  CraftingCheckAdapterRegistry.register('dnd5e', class extends CraftingCheckAdapter {
-    async executeCheck(actor, config) {
-      return { success: true, outcome: 'pass', value: 15, data: {} };
+  CraftingCheckAdapterRegistry.register(
+    'dnd5e',
+    class extends CraftingCheckAdapter {
+      async executeCheck(actor, config) {
+        return { success: true, outcome: 'pass', value: 15, data: {} };
+      }
     }
-  });
+  );
   globalThis.game.system = { id: 'dnd5e' };
 
   const recipe = { craftingSystemId: 'sys-1', getExecutionSteps: () => [] };
@@ -219,13 +412,17 @@ test('_runCraftingCheck with checkSource builtIn calls adapter', async () => {
 });
 
 test('_runCraftingCheck with checkSource builtIn and no adapter returns error', async () => {
-  const { engine } = makeEngine({ craftingCheck: {
-    enabled: true, checkSource: 'builtIn', macroUuid: null,
-    builtIn: { ability: 'str', skill: '', dc: 15, advantage: 'normal' },
-    outcomes: ['fail', 'pass'],
-    consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
-    progressive: { awardMode: 'equal', allowPlayerReorder: false }
-  }});
+  const { engine } = makeEngine({
+    craftingCheck: {
+      enabled: true,
+      checkSource: 'builtIn',
+      macroUuid: null,
+      builtIn: { ability: 'str', skill: '', dc: 15, advantage: 'normal' },
+      outcomes: ['fail', 'pass'],
+      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+    },
+  });
 
   // Temporarily set game system to an unknown id
   const origSystem = globalThis.game.system;
@@ -241,17 +438,26 @@ test('_runCraftingCheck with checkSource builtIn and no adapter returns error', 
 });
 
 test('_runCraftingCheck with builtIn adapter error returns failure', async () => {
-  const { engine } = makeEngine({ craftingCheck: {
-    enabled: true, checkSource: 'builtIn', macroUuid: null,
-    builtIn: { ability: 'int', skill: '', dc: 15, advantage: 'normal' },
-    outcomes: ['fail', 'pass'],
-    consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
-    progressive: { awardMode: 'equal', allowPlayerReorder: false }
-  }});
-
-  CraftingCheckAdapterRegistry.register('dnd5e-err', class extends CraftingCheckAdapter {
-    async executeCheck() { throw new Error('roll dialog cancelled'); }
+  const { engine } = makeEngine({
+    craftingCheck: {
+      enabled: true,
+      checkSource: 'builtIn',
+      macroUuid: null,
+      builtIn: { ability: 'int', skill: '', dc: 15, advantage: 'normal' },
+      outcomes: ['fail', 'pass'],
+      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+    },
   });
+
+  CraftingCheckAdapterRegistry.register(
+    'dnd5e-err',
+    class extends CraftingCheckAdapter {
+      async executeCheck() {
+        throw new Error('roll dialog cancelled');
+      }
+    }
+  );
   globalThis.game.system = { id: 'dnd5e-err' };
 
   const recipe = { craftingSystemId: 'sys-1', getExecutionSteps: () => [] };
@@ -264,19 +470,25 @@ test('_runCraftingCheck with builtIn adapter error returns failure', async () =>
 });
 
 test('backward compat: system without checkSource uses macro path', async () => {
-  const { engine } = makeEngine({ craftingCheck: {
-    enabled: true, macroUuid: 'old-macro-uuid',
-    // no checkSource field -- should default to 'macro'
-    builtIn: { ability: '', skill: '', dc: 15, advantage: 'normal' },
-    outcomes: ['fail', 'pass'],
-    consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
-    progressive: { awardMode: 'equal', allowPlayerReorder: false }
-  }});
+  const { engine } = makeEngine({
+    craftingCheck: {
+      enabled: true,
+      macroUuid: 'old-macro-uuid',
+      // no checkSource field -- should default to 'macro'
+      builtIn: { ability: '', skill: '', dc: 15, advantage: 'normal' },
+      outcomes: ['fail', 'pass'],
+      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+    },
+  });
 
   const { MacroExecutor } = await import('../src/utils/MacroExecutor.js');
   let called = false;
   const origRun = MacroExecutor.run;
-  MacroExecutor.run = async () => { called = true; return { success: true }; };
+  MacroExecutor.run = async () => {
+    called = true;
+    return { success: true };
+  };
 
   const recipe = { craftingSystemId: 'sys-1', getExecutionSteps: () => [] };
   const actor = { id: 'a1', name: 'Crafter', items: [] };
@@ -298,9 +510,9 @@ function makeResolutionService(systemOverride = {}) {
       enabled: true,
       macroUuid: null,
       checkSource: 'builtIn',
-      outcomes: ['low', 'high']
+      outcomes: ['low', 'high'],
     },
-    ...systemOverride
+    ...systemOverride,
   };
   const systemManager = { getSystem: () => system };
   const service = new ResolutionModeService(systemManager);
@@ -311,28 +523,42 @@ test('validateRecipe accepts checkSource builtIn as valid for legacy tiered comp
   const service = makeResolutionService({ resolutionMode: 'tiered' });
   const recipe = {
     craftingSystemId: 'sys-res',
-    getExecutionSteps: () => [{
-      id: 'step-1', name: 'Step 1',
-      ingredientSets: [{ id: 'is1', ingredients: [], toolIds: [], resultGroupId: 'rg1' }],
-      resultGroups: [{ id: 'rg1', results: [] }]
-    }]
+    getExecutionSteps: () => [
+      {
+        id: 'step-1',
+        name: 'Step 1',
+        ingredientSets: [{ id: 'is1', ingredients: [], toolIds: [], resultGroupId: 'rg1' }],
+        resultGroups: [{ id: 'rg1', results: [] }],
+      },
+    ],
   };
   const result = service.validateRecipe(recipe);
-  const compatibilityErrors = result.errors.filter(e => e.includes('crafting checks'));
-  assert.equal(compatibilityErrors.length, 0, `Expected no check-enabled errors, got: ${compatibilityErrors.join(', ')}`);
+  const compatibilityErrors = result.errors.filter((e) => e.includes('crafting checks'));
+  assert.equal(
+    compatibilityErrors.length,
+    0,
+    `Expected no check-enabled errors, got: ${compatibilityErrors.join(', ')}`
+  );
 });
 
 test('validateRecipe accepts checkSource builtIn as valid for progressive mode', () => {
   const service = makeResolutionService({ resolutionMode: 'progressive' });
   const recipe = {
     craftingSystemId: 'sys-res',
-    getExecutionSteps: () => [{
-      id: 'step-1', name: 'Step 1',
-      ingredientSets: [{ id: 'is1', ingredients: [], toolIds: [] }],
-      resultGroups: [{ id: 'rg1', results: [] }]
-    }]
+    getExecutionSteps: () => [
+      {
+        id: 'step-1',
+        name: 'Step 1',
+        ingredientSets: [{ id: 'is1', ingredients: [], toolIds: [] }],
+        resultGroups: [{ id: 'rg1', results: [] }],
+      },
+    ],
   };
   const result = service.validateRecipe(recipe);
-  const checkErrors = result.errors.filter(e => e.includes('crafting checks'));
-  assert.equal(checkErrors.length, 0, `Expected no check-enabled errors, got: ${checkErrors.join(', ')}`);
+  const checkErrors = result.errors.filter((e) => e.includes('crafting checks'));
+  assert.equal(
+    checkErrors.length,
+    0,
+    `Expected no check-enabled errors, got: ${checkErrors.join(', ')}`
+  );
 });
