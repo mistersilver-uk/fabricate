@@ -193,6 +193,22 @@ test('salvage routed: the matched outcome name routes to a result group via outc
   assert.equal(groups[0].id, 'g-success', 'routed outcome name maps to its result group');
 });
 
+test('salvage routed: an outcome with no outcomeRouting entry yields no result groups', async () => {
+  const engine = makeEngine();
+  const component = {
+    salvage: {
+      resultGroups: [{ id: 'g-crit', results: [] }],
+      outcomeRouting: { Critical: 'g-crit' }, // "Success" is intentionally unrouted
+    },
+  };
+  const groups = engine._resolveSalvageResultGroups(
+    component,
+    { salvageResolutionMode: 'routed' },
+    { outcome: 'Success', value: 16 }
+  );
+  assert.deepEqual(groups, [], 'an unrouted outcome degrades to nothing, not a crash');
+});
+
 test('salvage routed: a per-component dcOverride shifts the relative thresholds', async () => {
   const engine = makeEngine();
   // total 16: with the default dc 15, "Success" (threshold 15) matches; with the
