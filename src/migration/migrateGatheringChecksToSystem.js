@@ -86,7 +86,7 @@ export function migrateGatheringChecksToSystem(systems, gatheringConfig) {
       : 'equal';
 
     system.gatheringCraftingCheck = {
-      ...(existing || {}),
+      ...existing,
       enabled: true,
       progressive: {
         ...(existing?.progressive && typeof existing.progressive === 'object'
