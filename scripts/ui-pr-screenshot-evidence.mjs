@@ -82,6 +82,15 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   },
   {
+    id: 'manager-checks-gathering',
+    label: 'Manager Checks tab — gathering check editor (routed)',
+    smokeLabels: ['manager-checks-gathering'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksRightMenu\.svelte$/,
+    ],
+  },
+  {
     id: 'manager-tags-categories',
     label: 'Manager tags and categories',
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],

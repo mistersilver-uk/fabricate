@@ -1967,6 +1967,23 @@ async function main() {
               ]
             }
           },
+          // System-level gathering check with named routed outcome tiers, so the
+          // Checks tab's gathering editor renders populated when the gathering
+          // economy is set to routed for the screenshot (#437).
+          gatheringCraftingCheck: {
+            enabled: true,
+            routed: {
+              type: 'relative',
+              rollFormula: '1d20',
+              dc: 12,
+              thresholdMode: 'meet',
+              relativeOutcomes: [
+                { id: 'gather-bountiful', name: 'Bountiful Harvest', success: true, breakTools: false, dc: 5 },
+                { id: 'gather-harvest', name: 'Harvest', success: true, breakTools: false, dc: 0 },
+                { id: 'gather-spoiled', name: 'Spoiled', success: false, breakTools: false, dc: -5 }
+              ]
+            }
+          },
           // Two currency units so the currency-cost requirement row can target a unit.
           itemTags: ['rare', 'reagent', 'metallic'],
           requirements: {
@@ -2967,6 +2984,45 @@ async function main() {
         process.stdout.write('  D0: component edit salvage screenshotted\n');
 
         // Return to the components browser for the remaining navigation.
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        // Checks → Gathering check editor (#437). The gathering check editor is
+        // keyed off the gathering ECONOMY resolution mode, so temporarily flip the
+        // economy to routed (the system carries a populated gatheringCraftingCheck.
+        // routed), capture the editor, then revert so downstream gathering captures
+        // keep the default d100 economy.
+        const prevGatheringMode = await page.evaluate(async (sysId) => {
+          const economy = game.fabricate.getGatheringEconomy?.({ systemId: sysId }) || {};
+          const prev = economy.resolutionMode || 'd100';
+          await game.fabricate.setGatheringEconomy?.({
+            systemId: sysId,
+            economy: { ...economy, resolutionMode: 'routed' }
+          });
+          return prev;
+        }, craftingSetup.systemId);
+        await page.evaluate(async () => {
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+        await page.locator('.fabricate-manager [data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-checks-tab-button="gathering"]').first().click();
+        await page.locator('.fabricate-manager [data-checks-panel="gathering"] [data-crafting-check-editor]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await assertManagerLayoutStable(page, 'checks gathering editor');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-checks-gathering');
+        process.stdout.write('  D0: checks gathering editor screenshotted\n');
+        await page.evaluate(async (args) => {
+          const economy = game.fabricate.getGatheringEconomy?.({ systemId: args.sysId }) || {};
+          await game.fabricate.setGatheringEconomy?.({
+            systemId: args.sysId,
+            economy: { ...economy, resolutionMode: args.prev }
+          });
+        }, { sysId: craftingSetup.systemId, prev: prevGatheringMode });
+        await page.evaluate(async () => {
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
