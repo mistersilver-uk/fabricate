@@ -2282,6 +2282,64 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.salvageCraftingCheck.enabled, false);
     });
 
+    it('viewState.selectedSystem.gatheringCraftingCheck surfaces the progressive and routed config so editors read it back', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) {
+        sys.gatheringCraftingCheck = {
+          enabled: true,
+          progressive: {
+            rollFormula: '1d20',
+            awardMode: 'equal',
+            diceCrits: [],
+          },
+          routed: {
+            type: 'relative',
+            rollFormula: '1d20',
+            relativeOutcomes: [{ id: 'g1', name: 'Rich Vein', success: true, dc: 5 }],
+          },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      const gathering = vs.selectedSystem?.gatheringCraftingCheck;
+      assert.ok(gathering?.progressive, 'progressive gathering config should be surfaced, not dropped');
+      assert.equal(gathering.progressive.awardMode, 'equal');
+      assert.ok(gathering?.routed, 'routed gathering config should be surfaced, not dropped');
+      assert.equal(gathering.routed.relativeOutcomes?.[0]?.name, 'Rich Vein');
+    });
+
+    it('saveGatheringCheckProgressive persists the progressive config and preserves other check fields', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.gatheringCraftingCheck = { enabled: true, routed: { type: 'fixed', fixedOutcomes: [] } };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const progressive = {
+        rollFormula: '2d6',
+        awardMode: 'partial',
+        diceCrits: [{ id: 'cr1', die: '1d6', raw: 6, success: true, breakTools: false }],
+      };
+      await store.saveGatheringCheckProgressive(progressive);
+      assert.ok(updateArgs !== null);
+      assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.progressive, progressive);
+      // existing fields are preserved by the shallow merge
+      assert.equal(updateArgs.updates.gatheringCraftingCheck.enabled, true);
+      assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.routed, { type: 'fixed', fixedOutcomes: [] });
+    });
+
     it('addCurrencyUnit and updateCurrencyUnit persist editable unit fields', async () => {
       const { store, currency, updateArgs } = await setupCurrencyStore();
       const created = await store.addCurrencyUnit('sys1', {

@@ -4,6 +4,7 @@ import {
   resolvePresentComponentIds,
 } from '../gatheringToolRuntime.js';
 
+import { runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
   actorMatchesId,
@@ -2272,6 +2273,16 @@ export class GatheringEngine {
   }
 
   async _resolveRoutedOutcome({ viewer, actor, system, environment, task }) {
+    // System-level gathering check (Checks editor) takes precedence when a routed
+    // roll formula is configured: roll the formula and map its total onto a named
+    // outcome tier, then route that tier name to a result group by name — the same
+    // name-matching the crafting/salvage routed paths use as their tier fallback.
+    const routed = system?.gatheringCraftingCheck?.routed;
+    const rollFormula = stringOrNull(routed?.rollFormula);
+    if (rollFormula) {
+      return this._resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task });
+    }
+
     if (typeof this.resultResolver?.resolveRouted !== 'function') {
       return misconfiguredOutcome({
         code: 'MISSING_RESULT_RESOLVER',
@@ -2291,6 +2302,67 @@ export class GatheringEngine {
       task,
     });
     return normalizeTerminalOutcome(raw);
+  }
+
+  /**
+   * Resolve a routed gathering outcome from the system-level routed roll formula.
+   * Rolls via the shared {@link runFormulaRouted}, with the base DC resolved as the
+   * per-task `dcOverride` (when finite) else the routed check's own `dc` (default
+   * 15) — mirroring salvage's `_resolveSalvageDc`. The matched tier NAME is routed
+   * to a result group whose name matches it (case-insensitive); a failing or
+   * unmatched tier produces a terminal failure. The tier name and disposition are
+   * surfaced on `checkResult` and the outcome flows through the same
+   * `normalizeTerminalOutcome` machinery the provider path uses.
+   * @private
+   */
+  async _resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task }) {
+    const rolled = await runFormulaRouted({
+      formula: rollFormula,
+      dc: this._resolveGatheringRoutedDc(routed, task),
+      thresholdMode: routed.thresholdMode,
+      type: routed.type,
+      relativeOutcomes: routed.relativeOutcomes,
+      fixedOutcomes: routed.fixedOutcomes,
+      diceCrits: routed.diceCrits,
+      actor,
+      label: 'Gathering',
+    });
+
+    const outcomeName = stringOrNull(rolled.outcome);
+    const checkResult = {
+      outcome: outcomeName,
+      value: rolled.value,
+      success: rolled.success === true,
+      data: rolled.data ?? {},
+    };
+
+    // A failing tier (or no tier match) routes to a terminal failure; a succeeding
+    // tier routes to the result group whose name matches the tier name.
+    if (rolled.success !== true || !outcomeName) {
+      return normalizeTerminalOutcome({ status: 'failed', outcome: outcomeName, checkResult });
+    }
+    const matched = normalizeList(task.resultGroups).filter(
+      (group) => normalizeOutcomeText(group?.name) === normalizeOutcomeText(outcomeName)
+    );
+    return normalizeTerminalOutcome({
+      status: 'succeeded',
+      outcome: outcomeName,
+      resultGroups: matched,
+      checkResult,
+    });
+  }
+
+  /**
+   * Resolve the routed gathering check base DC: the per-task `dcOverride` (when a
+   * finite number) else the routed check sub-object's `dc` (fallback 15). Mirrors
+   * the salvage `_resolveSalvageDc` resolution.
+   * @private
+   */
+  _resolveGatheringRoutedDc(routed, task) {
+    const override = task?.dcOverride;
+    if (Number.isFinite(override)) return Math.trunc(override);
+    const dc = Number(routed?.dc);
+    return Number.isFinite(dc) ? Math.trunc(dc) : 15;
   }
 
   async _resolveD100Outcome({ viewer, actor, system, environment, task }) {
@@ -2406,6 +2478,33 @@ export class GatheringEngine {
   }
 
   async _evaluateGatheringCheck({ actor, viewer, system, environment, task }) {
+    // System-level gathering check (Checks editor) takes precedence when a
+    // progressive roll formula is configured: roll the formula and map its
+    // numeric total onto the check-result shape the progressive resolver expects
+    // (`{ success, status, value }`). Progressive has no DC, so `task.dcOverride`
+    // never applies here. Falls back to the legacy per-task `task.check`
+    // expression-evaluator path when no system formula is set.
+    const progressive = system?.gatheringCraftingCheck?.progressive;
+    const rollFormula = stringOrNull(progressive?.rollFormula);
+    if (rollFormula) {
+      const rolled = await runFormulaProgressive({
+        formula: rollFormula,
+        diceCrits: progressive.diceCrits,
+        actor,
+        label: 'Gathering',
+      });
+      // Progressive is value-driven, not pass/fail: leave `status` null so the
+      // award logic (in `resolveProgressiveAward`) decides succeeded/failed from
+      // the numeric `value`. A roll-evaluation error surfaces `success: false`,
+      // which the resolver short-circuits to a terminal failure.
+      return {
+        success: rolled.success === false ? false : null,
+        status: null,
+        value: rolled.value,
+        data: rolled.data ?? {},
+      };
+    }
+
     if (typeof this.evaluator?.evaluateCheck !== 'function') {
       return {
         success: null,
@@ -3169,8 +3268,14 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     });
   }
 
-  const awardMode = ['partial', 'equal', 'exceed'].includes(task?.progressive?.awardMode)
-    ? task.progressive.awardMode
+  // Prefer the system-level gathering check award mode; fall back to the legacy
+  // per-task award mode, then to 'equal'.
+  const requestedAwardMode =
+    system?.gatheringCraftingCheck?.progressive?.awardMode ??
+    task?.progressive?.awardMode ??
+    'equal';
+  const awardMode = ['partial', 'equal', 'exceed'].includes(requestedAwardMode)
+    ? requestedAwardMode
     : 'equal';
   const awarded = [];
   let remaining = Math.max(0, value);

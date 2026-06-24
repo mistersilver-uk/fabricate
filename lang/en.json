@@ -2281,7 +2281,11 @@
             "UnknownModifierShort": "Unknown",
             "AddSearchPlaceholder": "Search character modifiers...",
             "AddSearchLabel": "Search character modifiers to add"
-          }
+          },
+          "TaskDcOverrideTitle": "Check DC override",
+          "TaskDcOverrideHint": "Override the system gathering check DC for this task. Leave blank to use the system default.",
+          "TaskDcOverride": "DC",
+          "TaskDcOverridePlaceholder": "System default"
         },
         "CurrencyUnits": {
           "Title": "Currency units",
@@ -2676,7 +2680,7 @@
             "Title": "Active",
             "OptionalHint": "Turn this check on to require a roll for the activity, or off to resolve it without one.",
             "RequiredHint": "The current resolution mode requires this check, so it cannot be turned off here.",
-            "GatheringHint": "Gathering checks are configured per task, not as one system-wide switch."
+            "GatheringHint": "In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here."
           },
           "Crafting": {
             "PageTitle": "Crafting check",
@@ -2767,9 +2771,12 @@
             "PageTitle": "Gathering check",
             "PageLead": "A system has a single gathering check. In d100 mode it is the fixed d100 roll and is not editable; progressive and routed modes let you define it. Per-task tuning adjusts the difficulty, not the roll.",
             "ConfigHint": "Roll, difficulty, and outcome settings for the gathering check will appear here.",
+            "D100Title": "Fixed d100 roll",
+            "D100Lead": "In d100 mode the gathering check is a fixed d100 roll against each drop's chance. There is nothing to configure here.",
+            "D100Hint": "Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.",
             "HelpKicker": "Gathering checks",
             "HelpTitle": "About gathering checks",
-            "HelpDesc": "The gathering check is shaped by the task resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.",
+            "HelpDesc": "The gathering check is shaped by the gathering resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.",
             "Docs": "Gathering docs"
           },
           "Validation": {

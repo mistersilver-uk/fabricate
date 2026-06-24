@@ -335,6 +335,7 @@ function createStore(calls = [], options = {}) {
       craftingCheck: options.craftingCheck,
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
       salvageCraftingCheck: options.salvageCraftingCheck,
+      gatheringCraftingCheck: options.gatheringCraftingCheck,
       features: selectedFeatures,
       managedItemOptions: alchemyManagedItemOptions,
       // Tools are system-owned: the manager reads the library from
@@ -861,6 +862,9 @@ function createStore(calls = [], options = {}) {
             eventLimit: 1,
             eventPolicy: 'successWithEvent',
           },
+          // The gathering economy's resolution mode selects the Checks gathering
+          // editor (d100 → read-only card; progressive/routed → an editor).
+          economy: { resolutionMode: options.gatheringResolutionMode || 'd100' },
           tasks: options.emptyGatheringTasks
             ? []
             : [
@@ -1132,6 +1136,15 @@ function createStore(calls = [], options = {}) {
     },
     saveSalvageCheckActive: (enabled) => {
       calls.push(['saveSalvageCheckActive', enabled]);
+    },
+    saveGatheringCheckProgressive: (progressive) => {
+      calls.push(['saveGatheringCheckProgressive', progressive]);
+    },
+    saveGatheringCheckRouted: (routed) => {
+      calls.push(['saveGatheringCheckRouted', routed]);
+    },
+    saveGatheringCheckActive: (enabled) => {
+      calls.push(['saveGatheringCheckActive', enabled]);
     },
     updateEnvironmentDraft: (updates) => {
       calls.push(['updateEnvironmentDraft', updates]);
@@ -1648,14 +1661,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       'salvage help card links to the salvage docs page'
     );
 
-    // Gathering page reflects the d100-is-the-roll framing and links to its docs.
+    // Gathering page (default fixture economy is d100) renders the read-only card
+    // reflecting the d100-is-the-roll framing and links to its docs.
     target.querySelector('[data-checks-tab-button="gathering"]').click();
     await tick();
     flushSync();
     const gatheringPanel = target.querySelector('[data-checks-panel="gathering"]');
+    assert.ok(
+      gatheringPanel.hasAttribute('data-gathering-d100-readonly'),
+      'd100 gathering renders the read-only card, not an editor'
+    );
     assert.equal(
       gatheringPanel.querySelector('.manager-card-title').textContent.trim(),
-      'Gathering check'
+      'Fixed d100 roll'
     );
     assert.ok(
       gatheringPanel.textContent.includes('d100'),
@@ -1880,6 +1898,176 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'saving clears the unsaved state'
     );
+  });
+
+  it('Checks Gathering tab in d100 economy mode renders the read-only card and no editor', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { gatheringResolutionMode: 'd100' }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-checks-tab-button="gathering"]').click();
+    await tick();
+    flushSync();
+
+    const panel = target.querySelector('[data-checks-panel="gathering"]');
+    assert.ok(
+      panel.hasAttribute('data-gathering-d100-readonly'),
+      'd100 mode renders the read-only card'
+    );
+    assert.equal(
+      panel.querySelector('[data-progressive-check-editor]'),
+      null,
+      'd100 mode renders no progressive editor'
+    );
+    assert.equal(
+      panel.querySelector('[data-crafting-check-editor]'),
+      null,
+      'd100 mode renders no routed editor'
+    );
+    // d100 is the fixed roll: the Active card shows the read-only note, no toggle.
+    assert.ok(
+      target.querySelector('[data-checks-active="gathering"] [data-checks-active-required]'),
+      'd100 gathering shows the read-only required hint'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-active="gathering"] [data-checks-active-toggle]'),
+      null,
+      'd100 gathering offers no Active toggle'
+    );
+  });
+
+  it('Checks Gathering tab in progressive economy mode renders the progressive editor and saves', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringResolutionMode: 'progressive',
+          gatheringCraftingCheck: {
+            enabled: true,
+            progressive: { awardMode: 'equal', allowPlayerReorder: true },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-checks-tab-button="gathering"]').click();
+    await tick();
+    flushSync();
+
+    const panel = target.querySelector('[data-checks-panel="gathering"]');
+    assert.ok(
+      panel.hasAttribute('data-gathering-d100-readonly') === false,
+      'progressive mode is not the read-only card'
+    );
+    const editor = panel.querySelector('[data-progressive-check-editor]');
+    assert.ok(editor, 'progressive gathering shows the progressive editor');
+    assert.ok(
+      editor.querySelector('[data-award-mode-option="equal"]').classList.contains('is-active'),
+      'the editor is seeded from the persisted award mode'
+    );
+
+    // No Save button until an edit stages a change.
+    assert.equal(target.querySelector('[data-checks-save]'), null);
+
+    editor.querySelector('[data-award-mode-option="exceed"] input').click();
+    await tick();
+    flushSync();
+    const saveButton = target.querySelector('[data-checks-save]');
+    assert.ok(saveButton, 'editing the gathering award mode reveals the Save button');
+
+    saveButton.click();
+    await tick();
+    await Promise.resolve();
+    flushSync();
+
+    const saved = calls.find((call) => call[0] === 'saveGatheringCheckProgressive');
+    assert.ok(saved, 'Save persists the gathering progressive config through the store');
+    assert.equal(saved[1].awardMode, 'exceed', 'the new award mode is sent');
+    assert.equal(saved[1].allowPlayerReorder, true, 'allowPlayerReorder is preserved');
+    assert.equal(
+      calls.find((call) => call[0] === 'saveSalvageCheckProgressive'),
+      undefined,
+      'the gathering tab does not call the salvage save seam'
+    );
+  });
+
+  it('Checks Gathering tab in routed economy mode renders the routed editor without recipe tiers', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringResolutionMode: 'routed',
+          gatheringCraftingCheck: {
+            enabled: true,
+            routed: {
+              type: 'relative',
+              rollFormula: '2d6',
+              relativeOutcomes: [
+                { id: 'seed1', name: 'Rich Vein', success: true, breakTools: false, dc: 5 },
+              ],
+              fixedOutcomes: [],
+            },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-checks-tab-button="gathering"]').click();
+    await tick();
+    flushSync();
+
+    const panel = target.querySelector('[data-checks-panel="gathering"]');
+    const editor = panel.querySelector('[data-crafting-check-editor]');
+    assert.ok(editor, 'routed gathering shows the crafting check editor');
+    // Routed gathering reuses the crafting editor with recipe tiers hidden
+    // (showTiers={false}), like routed salvage.
+    assert.equal(
+      editor.querySelector('[data-routed-tiers]'),
+      null,
+      'routed gathering hides the recipe tiers card'
+    );
+    assert.equal(panel.querySelector('[data-check-roll-formula]').value, '2d6');
+
+    // Editing stages a change that persists via the gathering routed seam.
+    const formula = panel.querySelector('[data-check-roll-formula]');
+    formula.value = '2d6+1d4';
+    formula.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('[data-checks-save]').click();
+    await tick();
+    await Promise.resolve();
+    flushSync();
+    const saved = calls.find((call) => call[0] === 'saveGatheringCheckRouted');
+    assert.ok(saved, 'Save persists the gathering routed config through the store');
+    assert.equal(saved[1].rollFormula, '2d6+1d4');
   });
 
   it('offers an Active on/off toggle for the crafting check when resolution is simple', async () => {

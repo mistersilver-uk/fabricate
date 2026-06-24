@@ -208,6 +208,27 @@
   const salvageProgressiveDirty = $derived(
     JSON.stringify(salvageProgressiveDraft) !== JSON.stringify(salvageProgressiveBaseline)
   );
+
+  // Gathering check drafts — the system-level gathering check mirrors the
+  // crafting/salvage progressive + routed shapes (d100 has no editable config),
+  // so the crafting clone helpers are reused. Same staged pattern as salvage.
+  const sysGathering = $viewState.selectedSystem?.gatheringCraftingCheck;
+  // svelte-ignore state_referenced_locally
+  let gatheringProgressiveDraft = $state(cloneProgressiveCheck(sysGathering?.progressive));
+  // svelte-ignore state_referenced_locally
+  let gatheringProgressiveBaseline = $state(cloneProgressiveCheck(sysGathering?.progressive));
+  // svelte-ignore state_referenced_locally
+  let gatheringRoutedDraft = $state(cloneRoutedCheck(sysGathering?.routed));
+  // svelte-ignore state_referenced_locally
+  let gatheringRoutedBaseline = $state(cloneRoutedCheck(sysGathering?.routed));
+  let gatheringProgressiveSaving = $state(false);
+  let gatheringRoutedSaving = $state(false);
+  const gatheringProgressiveDirty = $derived(
+    JSON.stringify(gatheringProgressiveDraft) !== JSON.stringify(gatheringProgressiveBaseline)
+  );
+  const gatheringRoutedDirty = $derived(
+    JSON.stringify(gatheringRoutedDraft) !== JSON.stringify(gatheringRoutedBaseline)
+  );
   // Which Checks sub-tab is active (crafting | salvage | gathering | validation),
   // so the shared header Save persists the right draft.
   let checksActiveTab = $state('crafting');
@@ -246,8 +267,14 @@
       optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
       enabled: selectedSystem?.salvageCraftingCheck?.enabled === true
     },
-    // Gathering checks are authored per task, not as a single system-level switch.
-    gathering: { mode: 'perTask', optional: false, enabled: false }
+    // The system-level gathering check's shape is the gathering economy's
+    // resolution mode. d100 is the fixed roll (optional/no enable toggle);
+    // progressive/routed are editable checks with an Active toggle.
+    gathering: {
+      mode: gatheringResolutionMode,
+      optional: gatheringResolutionMode === 'd100',
+      enabled: selectedSystem?.gatheringCraftingCheck?.enabled === true
+    }
   });
 
   // Which crafting check editor is active for the selected system, and whether it
@@ -280,13 +307,31 @@
     salvageSimpleSaving || salvageRoutedSaving || salvageProgressiveSaving
   );
 
+  // The gathering check editor shown is selected by the gathering economy's
+  // resolution mode; d100 has no editable draft, so it is never dirty/saving.
+  const gatheringCheckDirty = $derived(
+    (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) ||
+      (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty)
+  );
+  const gatheringCheckSaving = $derived(
+    gatheringProgressiveSaving || gatheringRoutedSaving
+  );
+
   // Tab-aware Checks dirty/saving/save: the single header Save button persists
   // whichever check sub-tab is active.
   const checksDirty = $derived(
-    checksActiveTab === 'salvage' ? salvageCheckDirty : craftingCheckDirty
+    checksActiveTab === 'salvage'
+      ? salvageCheckDirty
+      : checksActiveTab === 'gathering'
+        ? gatheringCheckDirty
+        : craftingCheckDirty
   );
   const checksSaving = $derived(
-    checksActiveTab === 'salvage' ? salvageCheckSaving : craftingCheckSaving
+    checksActiveTab === 'salvage'
+      ? salvageCheckSaving
+      : checksActiveTab === 'gathering'
+        ? gatheringCheckSaving
+        : craftingCheckSaving
   );
 
   // Static recipe tiers offered to the recipe editor's tier dropdown. Only when the
@@ -346,6 +391,11 @@
     salvageRoutedBaseline = cloneRoutedCheck(nextSalvage?.routed);
     salvageProgressiveDraft = cloneProgressiveCheck(nextSalvage?.progressive);
     salvageProgressiveBaseline = cloneProgressiveCheck(nextSalvage?.progressive);
+    const nextGathering = selectedSystem?.gatheringCraftingCheck;
+    gatheringProgressiveDraft = cloneProgressiveCheck(nextGathering?.progressive);
+    gatheringProgressiveBaseline = cloneProgressiveCheck(nextGathering?.progressive);
+    gatheringRoutedDraft = cloneRoutedCheck(nextGathering?.routed);
+    gatheringRoutedBaseline = cloneRoutedCheck(nextGathering?.routed);
   });
 
   function onUpdateCraftingCheck(next) {
@@ -370,6 +420,14 @@
 
   function onUpdateSalvageCheckProgressive(next) {
     salvageProgressiveDraft = next;
+  }
+
+  function onUpdateGatheringCheckProgressive(next) {
+    gatheringProgressiveDraft = next;
+  }
+
+  function onUpdateGatheringCheckRouted(next) {
+    gatheringRoutedDraft = next;
   }
 
   async function saveCraftingCheck() {
@@ -430,15 +488,39 @@
     }
   }
 
+  async function saveGatheringCheck() {
+    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return;
+    if (gatheringResolutionMode === 'routed') {
+      gatheringRoutedSaving = true;
+      try {
+        await store?.saveGatheringCheckRouted?.(gatheringRoutedDraft);
+        gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
+      } finally {
+        gatheringRoutedSaving = false;
+      }
+    } else if (gatheringResolutionMode === 'progressive') {
+      gatheringProgressiveSaving = true;
+      try {
+        await store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft);
+        gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
+      } finally {
+        gatheringProgressiveSaving = false;
+      }
+    }
+    // d100 mode has no editable config — nothing to persist.
+  }
+
   // The shared Checks header Save persists whichever sub-tab is active.
   async function saveChecks() {
     if (checksActiveTab === 'salvage') return saveSalvageCheck();
+    if (checksActiveTab === 'gathering') return saveGatheringCheck();
     return saveCraftingCheck();
   }
 
   function onToggleCheckActive(kind, enabled) {
     if (kind === 'crafting') store?.saveCraftingCheckActive?.(enabled);
     else if (kind === 'salvage') store?.saveSalvageCheckActive?.(enabled);
+    else if (kind === 'gathering') store?.saveGatheringCheckActive?.(enabled);
   }
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
@@ -989,6 +1071,9 @@
   // `enabled` flag wins over a stale legacy `mode` (mirrors the service / GM
   // economy-view read-compat mapping) so a disabled limit can't be resurrected.
   const selectedGatheringEconomy = $derived(selectedGatheringSystemConfig.economy || {});
+  // The gathering check editor shown is selected by the gathering economy's
+  // resolution mode (d100 → fixed, not editable; progressive/routed → editable).
+  const gatheringResolutionMode = $derived(selectedGatheringEconomy.resolutionMode || 'd100');
   const selectedGatheringTaskStaminaEnabled = $derived(
     selectedGatheringEconomy.stamina != null && Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.stamina, 'enabled')
       ? selectedGatheringEconomy.stamina.enabled === true
@@ -4078,6 +4163,9 @@
             salvageCheckSimple={salvageSimpleDraft}
             salvageCheckRouted={salvageRoutedDraft}
             salvageCheckProgressive={salvageProgressiveDraft}
+            {gatheringResolutionMode}
+            gatheringCheckProgressive={gatheringProgressiveDraft}
+            gatheringCheckRouted={gatheringRoutedDraft}
             activation={checkActivation}
             {onUpdateCraftingCheck}
             {onUpdateCraftingCheckSimple}
@@ -4085,6 +4173,8 @@
             {onUpdateSalvageCheckSimple}
             {onUpdateSalvageCheckRouted}
             {onUpdateSalvageCheckProgressive}
+            {onUpdateGatheringCheckProgressive}
+            {onUpdateGatheringCheckRouted}
             onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}
           />
@@ -4095,6 +4185,7 @@
         task={editingGatheringTask}
         staminaEnabled={selectedGatheringTaskStaminaEnabled}
         nodesEnabled={selectedGatheringTaskNodesEnabled}
+        resolutionMode={gatheringResolutionMode}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}

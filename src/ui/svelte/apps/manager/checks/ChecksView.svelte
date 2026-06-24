@@ -41,6 +41,9 @@
     salvageCheckSimple = null,
     salvageCheckRouted = null,
     salvageCheckProgressive = null,
+    gatheringResolutionMode = 'd100',
+    gatheringCheckProgressive = null,
+    gatheringCheckRouted = null,
     activation = {},
     onUpdateCraftingCheck = () => {},
     onUpdateCraftingCheckSimple = () => {},
@@ -48,6 +51,8 @@
     onUpdateSalvageCheckSimple = () => {},
     onUpdateSalvageCheckRouted = () => {},
     onUpdateSalvageCheckProgressive = () => {},
+    onUpdateGatheringCheckProgressive = () => {},
+    onUpdateGatheringCheckRouted = () => {},
     onTabChange = () => {},
     onToggleCheckActive = () => {}
   } = $props();
@@ -67,6 +72,11 @@
   const salvageSimple = $derived(
     salvageResolutionMode === 'simple' || salvageResolutionMode === 'alchemy'
   );
+  // The gathering check's shape is the gathering economy's resolution mode. d100
+  // is the fixed roll (read-only, no editor); progressive/routed are editable.
+  const gatheringD100 = $derived(gatheringResolutionMode === 'd100');
+  const gatheringProgressive = $derived(gatheringResolutionMode === 'progressive');
+  const gatheringRouted = $derived(gatheringResolutionMode === 'routed');
 
   const PAGES = {
     crafting: {
@@ -159,6 +169,38 @@
       {:else if activeTab === 'salvage' && salvageSimple}
         <div data-checks-panel="salvage">
           <SimpleCraftingCheckEditor value={salvageCheckSimple} showDcSource={false} onChange={onUpdateSalvageCheckSimple} />
+        </div>
+      {:else if activeTab === 'gathering' && gatheringD100}
+        <div class="manager-checks-page" data-checks-panel="gathering" data-gathering-d100-readonly>
+          <section class="manager-inspector-card">
+            <p class="manager-kicker">{pageKicker}</p>
+            <h2 class="manager-card-title">
+              {text('FABRICATE.Admin.Manager.Checks.Gathering.D100Title', 'Fixed d100 roll')}
+            </h2>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Gathering.D100Lead',
+                'In d100 mode the gathering check is a fixed d100 roll against each drop’s chance. There is nothing to configure here.'
+              )}
+            </p>
+          </section>
+          <section class="manager-inspector-card">
+            <h3 class="manager-card-title">{configTitle}</h3>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Gathering.D100Hint',
+                'Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.'
+              )}
+            </p>
+          </section>
+        </div>
+      {:else if activeTab === 'gathering' && gatheringProgressive}
+        <div data-checks-panel="gathering">
+          <ProgressiveCraftingCheckEditor value={gatheringCheckProgressive} onChange={onUpdateGatheringCheckProgressive} />
+        </div>
+      {:else if activeTab === 'gathering' && gatheringRouted}
+        <div data-checks-panel="gathering">
+          <CraftingCheckEditor value={gatheringCheckRouted} showTiers={false} onChange={onUpdateGatheringCheckRouted} />
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>

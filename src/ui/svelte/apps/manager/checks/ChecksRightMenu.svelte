@@ -28,11 +28,18 @@
     'FABRICATE.Admin.Manager.Checks.Active.OptionalHint',
     'Turn this check on to require a roll for the activity, or off to resolve it without one.'
   );
+  // The gathering check's active toggle is mode-aware and inverted from the
+  // generic `optional` flag: d100 is the fixed roll (read-only note, no toggle),
+  // while progressive/routed are editable checks that expose an Active toggle.
+  const gatheringD100 = $derived(activeTab === 'gathering' && activation?.mode === 'd100');
+  const showActiveToggle = $derived(
+    activeTab === 'gathering' ? !gatheringD100 : activation?.optional === true
+  );
   const requiredHint = $derived(
     activeTab === 'gathering'
       ? text(
           'FABRICATE.Admin.Manager.Checks.Active.GatheringHint',
-          'Gathering checks are configured per task, not as one system-wide switch.'
+          'In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.'
         )
       : text(
           'FABRICATE.Admin.Manager.Checks.Active.RequiredHint',
@@ -87,7 +94,7 @@
   {#if activation}
     <section class="manager-inspector-card" data-checks-active={activeTab}>
       <p class="manager-kicker">{activeTitle}</p>
-      {#if activation.optional}
+      {#if showActiveToggle}
         <button
           type="button"
           class={`manager-status-toggle ${activeOn ? 'is-on' : 'is-off'}`}
