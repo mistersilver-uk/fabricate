@@ -1,10 +1,11 @@
 /**
- * Evaluates gathering visibility gates and gathering task checks.
+ * Evaluates gathering visibility gates and tool requirements.
  *
  * System-native expression parsing is injected so this seam can stay
- * independent from Foundry globals. Gates, checks, and tool requirements are
- * formula-only: each carries a dice/roll `formula` (gates and checks also carry
- * a `threshold`) and there is no provider discriminator.
+ * independent from Foundry globals. Gates and tool requirements are
+ * formula-only: each carries a dice/roll `formula` (gates also carry a
+ * `threshold`) and there is no provider discriminator. The gathering check
+ * itself is now resolved at the system level by the engine, not here.
  */
 export class GatheringGateAndCheckEvaluator {
   constructor({ evaluateExpression = null } = {}) {
@@ -103,67 +104,6 @@ export class GatheringGateAndCheckEvaluator {
     }
   }
 
-  async evaluateCheck({ check = null, actor = null, environment = null, task = null } = {}) {
-    if (!check) {
-      return checkDiagnostic('Gathering check is not configured', 'MISCONFIGURED_PROVIDER');
-    }
-
-    if (!check?.formula) {
-      return checkDiagnostic('Gathering check requires formula', 'MISCONFIGURED_PROVIDER');
-    }
-    if (typeof this.evaluateExpression !== 'function') {
-      return checkDiagnostic(
-        'Expression evaluation dependency is not configured',
-        'MISCONFIGURED_PROVIDER'
-      );
-    }
-
-    try {
-      const context = { actor, environment, task };
-      const value = await this._resolveExpression(check.formula, {
-        ...context,
-        kind: 'checkFormula',
-      });
-      const numericValue = numericValueOf(value);
-      if (numericValue === null) {
-        return checkDiagnostic(
-          'Gathering check formula must resolve to a number',
-          'MALFORMED_RESULT'
-        );
-      }
-
-      if (!check.threshold) {
-        return checkResult({
-          success: null,
-          status: null,
-          value: numericValue,
-          reasonCode: 'CHECK_VALUE',
-        });
-      }
-
-      const threshold = await this._resolveExpression(check.threshold, {
-        ...context,
-        kind: 'checkThreshold',
-        formulaValue: numericValue,
-      });
-      const comparison = compareCheck(numericValue, threshold);
-      if (!comparison.valid) {
-        return checkDiagnostic(comparison.message, 'MALFORMED_RESULT', {
-          value: numericValue,
-        });
-      }
-
-      return checkResult({
-        success: comparison.success,
-        status: comparison.success ? 'success' : 'failure',
-        value: numericValue,
-        reasonCode: comparison.success ? 'CHECK_SUCCESS' : 'CHECK_FAILURE',
-      });
-    } catch (error) {
-      return checkDiagnostic(errorMessage(error, 'Gathering check failed'), 'PROVIDER_ERROR');
-    }
-  }
-
   async _resolveExpression(expression, context) {
     return this.evaluateExpression({
       expression,
@@ -207,49 +147,10 @@ function compareVisibility(value, threshold) {
   };
 }
 
-function compareCheck(value, threshold) {
-  if (typeof threshold === 'boolean') {
-    return { valid: true, success: threshold };
-  }
-
-  const numericThreshold = numericValueOf(threshold);
-  if (numericThreshold === null) {
-    return {
-      valid: false,
-      message: 'Gathering check threshold must resolve to a number or boolean',
-    };
-  }
-
-  return {
-    valid: true,
-    success: value >= numericThreshold,
-  };
-}
-
 function visibilityResult({ visible, description = '', reasonCode, diagnostic = null }) {
   return {
     visible: visible === true,
     description: stringOrEmpty(description),
-    reasonCode,
-    diagnostic,
-  };
-}
-
-function checkResult({
-  success = null,
-  status = null,
-  value = null,
-  description = '',
-  data = {},
-  reasonCode,
-  diagnostic = null,
-}) {
-  return {
-    success: success === null ? null : success === true,
-    status,
-    value,
-    description: stringOrEmpty(description),
-    data: plainObject(data),
     reasonCode,
     diagnostic,
   };
@@ -280,16 +181,6 @@ function visibilityDiagnostic(message, reasonCode = 'MISCONFIGURED_PROVIDER') {
   });
 }
 
-function checkDiagnostic(message, reasonCode, extra = {}) {
-  return checkResult({
-    success: null,
-    status: null,
-    value: Object.hasOwn(extra, 'value') ? extra.value : null,
-    reasonCode,
-    diagnostic: diagnostic(message),
-  });
-}
-
 function diagnostic(message) {
   return {
     provider: null,
@@ -304,11 +195,6 @@ function numericValueOf(value) {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
-}
-
-function plainObject(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return { ...value };
 }
 
 function stringOrEmpty(value) {
