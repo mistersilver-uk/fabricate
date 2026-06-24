@@ -1468,7 +1468,21 @@ const MythwrightDnd5eBootstrap = (() => {
         enabled: true,
         macroUuid: macroUuid || '',
         outcomes: ['pass', 'fail'],
-        consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+        consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
+        // Routed salvage rolls a formula and maps the total onto these named
+        // outcome tiers; each component routes the tier names to its result
+        // groups (see componentFromItem salvage below).
+        routed: {
+          type: 'relative',
+          rollFormula: '1d20',
+          dc: 12,
+          thresholdMode: 'meet',
+          relativeOutcomes: [
+            { id: 'salvage-clean', name: 'Clean Salvage', success: true, breakTools: false, dc: 6 },
+            { id: 'salvage-partial', name: 'Partial Salvage', success: true, breakTools: false, dc: 0 },
+            { id: 'salvage-botched', name: 'Botched', success: false, breakTools: true, dc: -6 }
+          ]
+        }
       },
       essenceDefinitions: ESSENCES.map(essence => ({
         id: essence.id,
@@ -1791,8 +1805,14 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
       salvage: {
         enabled: true,
         ingredientQuantity: 1,
-        resultGroups: [resultGroup('scrap', 'Scrap', id === 'dragon-scale' ? 'dragon' : 'raw-ore')],
-        outcomeRouting: { pass: 'scrap', fail: 'scrap' }
+        resultGroups: [
+          resultGroup('scrap', 'Scrap', id === 'dragon-scale' ? 'dragon' : 'raw-ore'),
+          resultGroup('intact', 'Intact Parts', id === 'dragon-scale' ? 'dragon' : 'raw-ore')
+        ],
+        // Route the routed salvage check's success tiers to result groups; the
+        // failing tier (Botched) is intentionally unrouted (failure -> nothing).
+        // The legacy pass/fail keys are kept for the macro salvage path.
+        outcomeRouting: { 'Clean Salvage': 'intact', 'Partial Salvage': 'scrap', pass: 'scrap', fail: 'scrap' }
       }
     }));
 

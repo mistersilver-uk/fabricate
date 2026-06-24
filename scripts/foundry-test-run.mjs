@@ -2920,6 +2920,21 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-component-edit-normal');
         process.stdout.write('  D0: component edit normal screenshotted\n');
+
+        // Component editor → salvage authoring section (per-component result
+        // groups, routed outcome routing, and DC override). The smoke system
+        // enables routed salvage on every component, so the section renders;
+        // scroll it into view so the capture frames it (#436).
+        const salvageSection = page
+          .locator('.fabricate-manager [data-component-edit-section="salvage"]')
+          .first();
+        await salvageSection.waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-salvage-routing]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await salvageSection.scrollIntoViewIfNeeded();
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-component-edit-salvage');
+        process.stdout.write('  D0: component edit salvage screenshotted\n');
+
         // Return to the components browser for the remaining navigation.
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
