@@ -532,6 +532,32 @@ test('edge case — no result groups → returns empty groups and zero remaining
   assert.equal(result.meta.remaining, 0);
 });
 
+test('edge case — a MAX_SAFE_INTEGER value (a forced-success crit) awards every result', () => {
+  // A progressive check's success crit forces value = Number.MAX_SAFE_INTEGER to
+  // mean "award everything"; the budget loop awards every result regardless of
+  // difficulty. Uses 'exceed' (the strictest mode) to prove the sentinel covers all.
+  const system = buildProgressiveSystem(
+    [{ id: 'item-A', difficulty: 100 }, { id: 'item-B', difficulty: 9999 }],
+    'exceed'
+  );
+  const service = buildService(system);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
+  const recipe = buildRecipe();
+
+  const result = service.resolveResultGroups({
+    recipe,
+    step,
+    ingredientSet: null,
+    checkResult: buildCheckResult(Number.MAX_SAFE_INTEGER),
+  });
+
+  assert.equal(result.groups[0].results.length, 2, 'every result is awarded');
+  assert.deepEqual(result.meta.awardedResultIds, ['result-A', 'result-B']);
+});
+
 test('edge case — result with missing componentId is skipped, valid results still awarded', () => {
   // Results with invalid difficulty (no matching managedItem) are skipped via `continue` (not `break`),
   // so subsequent valid results can still be awarded.

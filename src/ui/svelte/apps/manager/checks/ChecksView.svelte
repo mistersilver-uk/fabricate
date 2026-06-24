@@ -20,19 +20,23 @@
   import ChecksRightMenu from './ChecksRightMenu.svelte';
   import CraftingCheckEditor from './CraftingCheckEditor.svelte';
   import SimpleCraftingCheckEditor from './SimpleCraftingCheckEditor.svelte';
+  import ProgressiveCraftingCheckEditor from './ProgressiveCraftingCheckEditor.svelte';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
   // which crafting check editor renders: routed → the outcome-tier editor;
-  // simple/alchemy → the simple pass/fail editor; progressive → the placeholder.
-  // `craftingCheck` is the routed draft and `craftingCheckSimple` the simple
-  // draft (both owned/persisted by the manager root), with matching update callbacks.
+  // simple/alchemy → the simple pass/fail editor; progressive → the formula +
+  // crit editor (no DC). `craftingCheck` is the routed draft, `craftingCheckSimple`
+  // the simple draft, and `craftingCheckProgressive` the progressive draft (all
+  // owned/persisted by the manager root), each with a matching update callback.
   let {
     resolutionMode = 'simple',
     craftingCheck = null,
     craftingCheckSimple = null,
+    craftingCheckProgressive = null,
     activation = {},
     onUpdateCraftingCheck = () => {},
     onUpdateCraftingCheckSimple = () => {},
+    onUpdateCraftingCheckProgressive = () => {},
     onToggleCheckActive = () => {}
   } = $props();
 
@@ -45,6 +49,7 @@
 
   const craftingRouted = $derived(resolutionMode === 'routed');
   const craftingSimple = $derived(resolutionMode === 'simple' || resolutionMode === 'alchemy');
+  const craftingProgressive = $derived(resolutionMode === 'progressive');
 
   const PAGES = {
     crafting: {
@@ -121,6 +126,10 @@
       {:else if activeTab === 'crafting' && craftingSimple}
         <div data-checks-panel="crafting">
           <SimpleCraftingCheckEditor value={craftingCheckSimple} onChange={onUpdateCraftingCheckSimple} />
+        </div>
+      {:else if activeTab === 'crafting' && craftingProgressive}
+        <div data-checks-panel="crafting">
+          <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} onChange={onUpdateCraftingCheckProgressive} />
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>

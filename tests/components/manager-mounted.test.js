@@ -25,6 +25,7 @@ let EnvironmentEditViewComponent;
 let ChecksRightMenuComponent;
 let CraftingCheckEditorComponent;
 let SimpleCraftingCheckEditorComponent;
+let ProgressiveCraftingCheckEditorComponent;
 let RecipeOverviewTabComponent;
 let mounted;
 let target;
@@ -48,6 +49,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
@@ -1390,6 +1392,16 @@ describe('CraftingSystemManager mounted behavior', () => {
         )
       )
     ).default;
+    ProgressiveCraftingCheckEditorComponent = (
+      await import(
+        pathToFileURL(
+          join(
+            tempRoot,
+            'src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte.js'
+          )
+        )
+      )
+    ).default;
     RecipeOverviewTabComponent = (
       await import(
         pathToFileURL(
@@ -2070,6 +2082,44 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-tier-name]'), null, 'no tiers table in dynamic mode');
     // The threshold is shared, so it is shown in both modes.
     assert.ok(target.querySelector('[data-check-dc]'));
+  });
+
+  it('progressive check editor: formula + crit table only (no DC, comparison, tiers, or macro)', () => {
+    const emitted = [];
+    const value = {
+      awardMode: 'equal',
+      allowPlayerReorder: false,
+      rollFormula: '2d6',
+      diceCrits: [{ id: 'c1', die: '2d6', raw: 12, success: true, breakTools: false }],
+    };
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ProgressiveCraftingCheckEditorComponent, {
+      target,
+      props: { value, onChange: (next) => emitted.push(next) },
+    });
+    flushSync();
+
+    assert.ok(target.querySelector('[data-progressive-check-editor]'));
+    // Formula field is shared, but the DC + comparison are hidden (no threshold).
+    assert.ok(target.querySelector('[data-check-roll-formula]'), 'the formula field renders');
+    assert.equal(target.querySelector('[data-check-dc]'), null, 'no DC field');
+    assert.equal(target.querySelector('[data-threshold-mode]'), null, 'no comparison select');
+    // No DC-source radios, recipe tiers, or macro drop zone.
+    assert.equal(target.querySelector('[data-dc-mode-option]'), null);
+    assert.equal(target.querySelector('[data-tier-name]'), null);
+    assert.equal(target.querySelector('[data-check-macro-dropzone]'), null);
+
+    // The shared per-die crit table renders, with the Force Outcome + Break tools toggles.
+    const group = target.querySelector('[data-crit-group="2d6"]');
+    assert.ok(group, 'one crit group per die');
+    const force = group.querySelector('[data-crit-row="c1"] [data-crit-success]');
+    assert.ok(force.classList.contains('is-positive'), 'success crit shows the green pill');
+    // Editing preserves the award settings (carried, not edited, here).
+    force.click();
+    assert.equal(emitted.at(-1).diceCrits.find((c) => c.id === 'c1').success, false);
+    assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on edit');
+    assert.equal(emitted.at(-1).allowPlayerReorder, false);
   });
 
   for (const mode of ['simple', 'alchemy']) {

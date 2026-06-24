@@ -1482,12 +1482,24 @@ export class CraftingEngine {
       !!simpleConfig?.rollFormula &&
       (mode === 'alchemy' || checksEnabled);
 
-    if (!checksEnabled && !checkRequired && !useSimpleCheck) {
+    // Progressive check (Checks editor) for progressive mode: rolls a formula
+    // whose total becomes the numeric `value` the progressive result-awarding
+    // spends against result difficulties. Only takes over when a formula is
+    // configured; with no formula the legacy macro/builtIn path below still runs
+    // (so a macro-driven progressive system is unchanged).
+    const progressiveConfig = system?.craftingCheck?.progressive;
+    const useProgressiveCheck = mode === 'progressive' && !!progressiveConfig?.rollFormula;
+
+    if (!checksEnabled && !checkRequired && !useSimpleCheck && !useProgressiveCheck) {
       return { success: true, outcome: null, data: {} };
     }
 
     if (useSimpleCheck) {
       return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor);
+    }
+
+    if (useProgressiveCheck) {
+      return this._runProgressiveCheck(system, recipe, craftingActor);
     }
 
     const config = system.craftingCheck || {};
@@ -1694,6 +1706,73 @@ export class CraftingEngine {
         breakTools,
       },
       message: success ? null : 'Crafting check failed',
+    };
+  }
+
+  /**
+   * Run the progressive crafting check: roll the configured formula and return its
+   * total as the numeric `value` that the progressive result-awarding spends
+   * against result difficulties (see the `progressive` branch of
+   * {@link ResolutionModeService#resolveResultGroups}). There is no DC — the craft
+   * always proceeds; the value decides how many results are awarded.
+   *
+   * Per-die crits (shared shape with the simple check) force the award: a matched
+   * SUCCESS crit awards everything (`value = MAX_SAFE_INTEGER`), a matched FAILURE
+   * crit awards nothing (`value = 0`), and either may break tools. Forced failure
+   * wins (handled by {@link _resolveSimpleCheckCrit}).
+   */
+  async _runProgressiveCheck(system, recipe, craftingActor) {
+    const progressive = system?.craftingCheck?.progressive || {};
+    const formula = String(progressive.rollFormula || '').trim();
+
+    let total = 0;
+    let diceGroups = [];
+    if (formula) {
+      if (typeof globalThis.Roll !== 'function') {
+        // No dice engine available (headless/non-Foundry): cannot evaluate. The
+        // craft still proceeds (progressive never blocks); a 0 value awards
+        // nothing — a finite value so progressive result-awarding accepts it,
+        // unlike the pass/fail simple check which can leave value null.
+        return { success: true, outcome: null, value: 0, data: { formula, total: 0, value: 0 } };
+      }
+      try {
+        const rollData = craftingActor?.getRollData?.() ?? craftingActor?.system ?? {};
+        const roll = await new globalThis.Roll(formula, rollData).evaluate();
+        const rolledTotal = Number(roll?.total);
+        total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
+        diceGroups = this._rolledDiceGroups(roll);
+      } catch (error) {
+        console.error(`Fabricate | Progressive crafting check roll failed (${formula})`, error);
+        return {
+          success: false,
+          outcome: null,
+          value: null,
+          data: { formula },
+          message: `Crafting check roll failed: ${error.message}`,
+        };
+      }
+    }
+
+    const crit = this._resolveSimpleCheckCrit(progressive.diceCrits, diceGroups);
+    let value;
+    if (crit) {
+      value = crit.success ? Number.MAX_SAFE_INTEGER : 0;
+    } else {
+      value = total;
+    }
+    const breakTools = crit ? crit.breakTools === true : false;
+
+    return {
+      success: true,
+      outcome: null,
+      value,
+      data: {
+        formula,
+        total,
+        value,
+        crit: crit ? { success: crit.success, breakTools } : null,
+        breakTools,
+      },
     };
   }
 

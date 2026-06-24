@@ -149,6 +149,36 @@
   const checkSimpleDirty = $derived(
     JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
   );
+
+  // Progressive crafting check draft — same staged pattern, used for progressive
+  // resolution mode. Only the roll formula and crit table are edited here; the
+  // award settings (awardMode/allowPlayerReorder) are carried through untouched so
+  // a save never drops them.
+  function cloneProgressiveCheck(progressive) {
+    const source = progressive && typeof progressive === 'object' ? progressive : {};
+    return {
+      awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
+        ? source.awardMode
+        : 'equal',
+      allowPlayerReorder: source.allowPlayerReorder === true,
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      diceCrits: Array.isArray(source.diceCrits)
+        ? source.diceCrits.map((crit) => ({ ...crit }))
+        : []
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkProgressiveDraft = $state(
+    cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
+  );
+  // svelte-ignore state_referenced_locally
+  let checkProgressiveBaseline = $state(
+    cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
+  );
+  let checkProgressiveSaving = $state(false);
+  const checkProgressiveDirty = $derived(
+    JSON.stringify(checkProgressiveDraft) !== JSON.stringify(checkProgressiveBaseline)
+  );
   const placeholderViews = [
     { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
@@ -191,13 +221,21 @@
   // Which crafting check editor is active for the selected system, and whether it
   // has unsaved staged edits — drives the single top-right Save button.
   const craftingCheckMode = $derived(
-    recipeRouted ? 'routed' : ['simple', 'alchemy'].includes(selectedSystem?.resolutionMode || 'simple') ? 'simple' : null
+    (function _craftingCheckMode(resolution) {
+      if (recipeRouted) return 'routed';
+      if (resolution === 'progressive') return 'progressive';
+      if (['simple', 'alchemy'].includes(resolution)) return 'simple';
+      return null;
+    })(selectedSystem?.resolutionMode || 'simple')
   );
   const craftingCheckDirty = $derived(
     (craftingCheckMode === 'routed' && checkRoutedDirty) ||
-      (craftingCheckMode === 'simple' && checkSimpleDirty)
+      (craftingCheckMode === 'simple' && checkSimpleDirty) ||
+      (craftingCheckMode === 'progressive' && checkProgressiveDirty)
   );
-  const craftingCheckSaving = $derived(checkRoutedSaving || checkSimpleSaving);
+  const craftingCheckSaving = $derived(
+    checkRoutedSaving || checkSimpleSaving || checkProgressiveSaving
+  );
 
   // Static recipe tiers offered to the recipe editor's tier dropdown. Only when the
   // system uses a simple static check that actually defines tiers.
@@ -230,6 +268,8 @@
     checkRoutedBaseline = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
     checkSimpleDraft = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
     checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
+    checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
+    checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
   });
 
   function onUpdateCraftingCheck(next) {
@@ -238,6 +278,10 @@
 
   function onUpdateCraftingCheckSimple(next) {
     checkSimpleDraft = next;
+  }
+
+  function onUpdateCraftingCheckProgressive(next) {
+    checkProgressiveDraft = next;
   }
 
   async function saveCraftingCheck() {
@@ -257,6 +301,14 @@
         checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
       } finally {
         checkSimpleSaving = false;
+      }
+    } else if (craftingCheckMode === 'progressive') {
+      checkProgressiveSaving = true;
+      try {
+        await store?.saveCraftingCheckProgressive?.(checkProgressiveDraft);
+        checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
+      } finally {
+        checkProgressiveSaving = false;
       }
     }
   }
@@ -3898,9 +3950,11 @@
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
+            craftingCheckProgressive={checkProgressiveDraft}
             activation={checkActivation}
             {onUpdateCraftingCheck}
             {onUpdateCraftingCheckSimple}
+            {onUpdateCraftingCheckProgressive}
             {onToggleCheckActive}
           />
         </section>

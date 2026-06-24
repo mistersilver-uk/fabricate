@@ -2715,6 +2715,7 @@
             "RangeOverlap": "Some tier ranges overlap. Each value range must be unique.",
             "FormulaTitle": "Roll formula",
             "FormulaLabel": "Formula",
+            "ProgressiveLead": "Roll a formula; every result whose difficulty the total can afford is awarded. Per-die crits force award-all or award-none.",
             "Dc": "DC",
             "ThresholdComparison": "Comparison",
             "ThresholdMeet": "Meet or exceed",
