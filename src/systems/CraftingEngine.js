@@ -2622,7 +2622,19 @@ export class CraftingEngine {
    * @private
    */
   async _runSalvageCraftingCheck(component, system, actor, toolItems) {
-    const check = system?.salvageCraftingCheck;
+    const check = system?.salvageCraftingCheck || {};
+    const mode = system?.salvageResolutionMode || 'simple';
+
+    // Formula-based check (Checks editor) takes precedence when a roll formula is
+    // configured for the active salvage mode; otherwise fall back to the legacy
+    // macro path below. (Routed salvage evaluation is wired alongside gathering.)
+    if (mode === 'progressive' && check.progressive?.rollFormula) {
+      return this._runSalvageProgressiveCheck(check.progressive, actor);
+    }
+    if (mode === 'simple' && check.simple?.rollFormula) {
+      return this._runSalvageSimpleCheck(check.simple, component, actor);
+    }
+
     if (!check?.enabled && !check?.macroUuid) {
       return { success: true, outcome: null, value: null, data: {} };
     }
@@ -2668,6 +2680,142 @@ export class CraftingEngine {
       value,
       data: result.data || {},
       message: success ? null : result.message || 'Salvage check failed',
+    };
+  }
+
+  /**
+   * Resolve the salvage check DC: the per-component override when set, else the
+   * check sub-object's default DC (fallback 15).
+   */
+  _resolveSalvageDc(checkMode, component) {
+    const override = component?.salvage?.dcOverride;
+    if (Number.isFinite(override)) return Math.trunc(override);
+    const dc = Number(checkMode?.dc);
+    return Number.isFinite(dc) ? Math.trunc(dc) : 15;
+  }
+
+  /**
+   * Evaluate a check roll formula, returning the total + dice-group summaries.
+   * Mirrors the simple/progressive crafting check roll (same `globalThis.Roll`
+   * usage), shared by the salvage formula checks. Throws on a bad formula (the
+   * caller wraps it). Returns `{ engine:false }` when no dice engine is available.
+   */
+  async _evaluateCheckRoll(formula, actor) {
+    if (typeof globalThis.Roll !== 'function') return { engine: false, total: 0, diceGroups: [] };
+    const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+    const roll = await new globalThis.Roll(formula, rollData).evaluate();
+    const total = Number.isFinite(Number(roll?.total)) ? Number(roll.total) : 0;
+    return { engine: true, total, diceGroups: this._rolledDiceGroups(roll) };
+  }
+
+  /**
+   * Salvage simple pass/fail check: roll the formula, compare the total against the
+   * resolved DC (per-component override ?? default), honouring per-die crits. Mirrors
+   * the crafting `_runSimpleCheck` minus the recipe-tier/dynamic-DC resolution.
+   */
+  async _runSalvageSimpleCheck(simple, component, actor) {
+    const formula = String(simple.rollFormula || '').trim();
+    const dc = this._resolveSalvageDc(simple, component);
+    let total = 0;
+    let diceGroups = [];
+    if (formula) {
+      let rolled;
+      try {
+        rolled = await this._evaluateCheckRoll(formula, actor);
+      } catch (error) {
+        console.error(`Fabricate | Salvage simple check roll failed (${formula})`, error);
+        return {
+          success: false,
+          outcome: 'fail',
+          value: null,
+          data: { dc, formula },
+          message: `Salvage check roll failed: ${error.message}`,
+        };
+      }
+      if (!rolled.engine) {
+        return { success: true, outcome: 'pass', value: null, data: { dc, formula } };
+      }
+      total = rolled.total;
+      diceGroups = rolled.diceGroups;
+    }
+
+    const crit = this._resolveSimpleCheckCrit(simple.diceCrits, diceGroups);
+    const comparison = simple.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+    let success;
+    if (crit) {
+      success = crit.success;
+    } else if (comparison === 'exceed') {
+      success = total > dc;
+    } else {
+      success = total >= dc;
+    }
+    const breakTools = crit ? crit.breakTools === true : false;
+    return {
+      success,
+      outcome: success ? 'pass' : 'fail',
+      value: total,
+      data: {
+        dc,
+        formula,
+        total,
+        comparison,
+        crit: crit ? { success: crit.success, breakTools } : null,
+        breakTools,
+      },
+      message: success ? null : 'Salvage check failed',
+    };
+  }
+
+  /**
+   * Salvage progressive check: roll the formula and return its total as the numeric
+   * `value` the progressive salvage awarding spends against result difficulties. A
+   * matched success crit awards everything (MAX_SAFE_INTEGER), a failure crit awards
+   * nothing (0). Mirrors the crafting `_runProgressiveCheck`.
+   */
+  async _runSalvageProgressiveCheck(progressive, actor) {
+    const formula = String(progressive.rollFormula || '').trim();
+    let total = 0;
+    let diceGroups = [];
+    if (formula) {
+      let rolled;
+      try {
+        rolled = await this._evaluateCheckRoll(formula, actor);
+      } catch (error) {
+        console.error(`Fabricate | Salvage progressive check roll failed (${formula})`, error);
+        return {
+          success: false,
+          outcome: null,
+          value: null,
+          data: { formula },
+          message: `Salvage check roll failed: ${error.message}`,
+        };
+      }
+      if (!rolled.engine) {
+        return { success: true, outcome: null, value: 0, data: { formula, total: 0, value: 0 } };
+      }
+      total = rolled.total;
+      diceGroups = rolled.diceGroups;
+    }
+
+    const crit = this._resolveSimpleCheckCrit(progressive.diceCrits, diceGroups);
+    let value;
+    if (crit) {
+      value = crit.success ? Number.MAX_SAFE_INTEGER : 0;
+    } else {
+      value = total;
+    }
+    const breakTools = crit ? crit.breakTools === true : false;
+    return {
+      success: true,
+      outcome: null,
+      value,
+      data: {
+        formula,
+        total,
+        value,
+        crit: crit ? { success: crit.success, breakTools } : null,
+        breakTools,
+      },
     };
   }
 
