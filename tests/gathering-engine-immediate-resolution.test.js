@@ -871,6 +871,41 @@ test('routed: task.dcOverride shifts the base DC for the formula tier match', as
   }
 });
 
+test('routed: a winning tier whose name matches no result group awards nothing without crashing', async () => {
+  const calls = {};
+  // Roll 18 vs dc 15 wins the success tier "Iron" (delta 0 → threshold 15), but the
+  // task has no result group named "Iron" — so nothing routes and the attempt
+  // resolves safely (no provider call, no result items, no throw).
+  const task = routedTask({
+    failureOutcome: { mode: 'text', text: 'No useful finds.' },
+    resultGroups: [{ id: 'group-copper', name: 'Copper', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }] }]
+  });
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: {
+        routed: {
+          rollFormula: '1d20',
+          dc: 15,
+          type: 'relative',
+          thresholdMode: 'meet',
+          relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
+        }
+      },
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, true);
+    assert.deepEqual(calls.resolveRouted, []);
+    assert.deepEqual(calls.createResults, []);
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
 test('routed: with no system formula the provider resolveRouted path is unchanged', async () => {
   const calls = {};
   const task = routedTask();
