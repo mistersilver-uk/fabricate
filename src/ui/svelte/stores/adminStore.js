@@ -6317,6 +6317,34 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Persist the salvage simple / routed check sub-objects (formula + DC + crits +
+  // routed outcomes), preserving the rest of the salvageCraftingCheck config.
+  async function saveSalvageCheckSimple(simple) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.salvageCraftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      salvageCraftingCheck: { ...existing, simple },
+    });
+    await refresh();
+  }
+
+  async function saveSalvageCheckRouted(routed) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.salvageCraftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      salvageCraftingCheck: { ...existing, routed },
+    });
+    await refresh();
+  }
+
   async function _updateCurrencyConfig(systemId, mutate) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = systemId || get(selectedSystemId);
@@ -7009,6 +7037,8 @@ export function createAdminStore(services) {
     saveCraftingCheckActive,
     saveSalvageCheckActive,
     saveSalvageCheckProgressive,
+    saveSalvageCheckSimple,
+    saveSalvageCheckRouted,
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,

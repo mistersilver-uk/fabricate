@@ -180,27 +180,31 @@
     JSON.stringify(checkProgressiveDraft) !== JSON.stringify(checkProgressiveBaseline)
   );
 
-  // Salvage progressive check draft — only the award mode is authored here (the
-  // salvage check is otherwise macro-driven). Same staged pattern; allowPlayerReorder
-  // is carried through so a save never drops it.
-  function cloneSalvageProgressiveCheck(progressive) {
-    const source = progressive && typeof progressive === 'object' ? progressive : {};
-    return {
-      awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
-        ? source.awardMode
-        : 'equal',
-      allowPlayerReorder: source.allowPlayerReorder === true
-    };
-  }
+  // Salvage check drafts — the salvage check now mirrors the crafting check shapes
+  // (simple/routed/progressive), so the crafting clone helpers are reused. Same
+  // staged pattern: one draft per mode, committed via the tab-aware header Save.
+  const sysSalvage = $viewState.selectedSystem?.salvageCraftingCheck;
   // svelte-ignore state_referenced_locally
-  let salvageProgressiveDraft = $state(
-    cloneSalvageProgressiveCheck($viewState.selectedSystem?.salvageCraftingCheck?.progressive)
-  );
+  let salvageSimpleDraft = $state(cloneSimpleCheck(sysSalvage?.simple));
   // svelte-ignore state_referenced_locally
-  let salvageProgressiveBaseline = $state(
-    cloneSalvageProgressiveCheck($viewState.selectedSystem?.salvageCraftingCheck?.progressive)
-  );
+  let salvageSimpleBaseline = $state(cloneSimpleCheck(sysSalvage?.simple));
+  // svelte-ignore state_referenced_locally
+  let salvageRoutedDraft = $state(cloneRoutedCheck(sysSalvage?.routed));
+  // svelte-ignore state_referenced_locally
+  let salvageRoutedBaseline = $state(cloneRoutedCheck(sysSalvage?.routed));
+  // svelte-ignore state_referenced_locally
+  let salvageProgressiveDraft = $state(cloneProgressiveCheck(sysSalvage?.progressive));
+  // svelte-ignore state_referenced_locally
+  let salvageProgressiveBaseline = $state(cloneProgressiveCheck(sysSalvage?.progressive));
+  let salvageSimpleSaving = $state(false);
+  let salvageRoutedSaving = $state(false);
   let salvageProgressiveSaving = $state(false);
+  const salvageSimpleDirty = $derived(
+    JSON.stringify(salvageSimpleDraft) !== JSON.stringify(salvageSimpleBaseline)
+  );
+  const salvageRoutedDirty = $derived(
+    JSON.stringify(salvageRoutedDraft) !== JSON.stringify(salvageRoutedBaseline)
+  );
   const salvageProgressiveDirty = $derived(
     JSON.stringify(salvageProgressiveDraft) !== JSON.stringify(salvageProgressiveBaseline)
   );
@@ -265,16 +269,24 @@
     checkRoutedSaving || checkSimpleSaving || checkProgressiveSaving
   );
 
-  // The salvage tab currently authors only the progressive award mode.
+  // The salvage check editor shown is selected by the salvage resolution mode.
   const salvageResolutionMode = $derived(selectedSystem?.salvageResolutionMode || 'simple');
+  const salvageCheckDirty = $derived(
+    (salvageResolutionMode === 'routed' && salvageRoutedDirty) ||
+      (salvageResolutionMode === 'progressive' && salvageProgressiveDirty) ||
+      (salvageResolutionMode === 'simple' && salvageSimpleDirty)
+  );
+  const salvageCheckSaving = $derived(
+    salvageSimpleSaving || salvageRoutedSaving || salvageProgressiveSaving
+  );
 
   // Tab-aware Checks dirty/saving/save: the single header Save button persists
   // whichever check sub-tab is active.
   const checksDirty = $derived(
-    checksActiveTab === 'salvage' ? salvageProgressiveDirty : craftingCheckDirty
+    checksActiveTab === 'salvage' ? salvageCheckDirty : craftingCheckDirty
   );
   const checksSaving = $derived(
-    checksActiveTab === 'salvage' ? salvageProgressiveSaving : craftingCheckSaving
+    checksActiveTab === 'salvage' ? salvageCheckSaving : craftingCheckSaving
   );
 
   // Static recipe tiers offered to the recipe editor's tier dropdown. Only when the
@@ -310,12 +322,13 @@
     checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
     checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
     checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
-    salvageProgressiveDraft = cloneSalvageProgressiveCheck(
-      selectedSystem?.salvageCraftingCheck?.progressive
-    );
-    salvageProgressiveBaseline = cloneSalvageProgressiveCheck(
-      selectedSystem?.salvageCraftingCheck?.progressive
-    );
+    const nextSalvage = selectedSystem?.salvageCraftingCheck;
+    salvageSimpleDraft = cloneSimpleCheck(nextSalvage?.simple);
+    salvageSimpleBaseline = cloneSimpleCheck(nextSalvage?.simple);
+    salvageRoutedDraft = cloneRoutedCheck(nextSalvage?.routed);
+    salvageRoutedBaseline = cloneRoutedCheck(nextSalvage?.routed);
+    salvageProgressiveDraft = cloneProgressiveCheck(nextSalvage?.progressive);
+    salvageProgressiveBaseline = cloneProgressiveCheck(nextSalvage?.progressive);
   });
 
   function onUpdateCraftingCheck(next) {
@@ -328,6 +341,14 @@
 
   function onUpdateCraftingCheckProgressive(next) {
     checkProgressiveDraft = next;
+  }
+
+  function onUpdateSalvageCheckSimple(next) {
+    salvageSimpleDraft = next;
+  }
+
+  function onUpdateSalvageCheckRouted(next) {
+    salvageRoutedDraft = next;
   }
 
   function onUpdateSalvageCheckProgressive(next) {
@@ -364,13 +385,31 @@
   }
 
   async function saveSalvageCheck() {
-    if (!selectedSystemId || salvageProgressiveSaving || !salvageProgressiveDirty) return;
-    salvageProgressiveSaving = true;
-    try {
-      await store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft);
-      salvageProgressiveBaseline = cloneSalvageProgressiveCheck(salvageProgressiveDraft);
-    } finally {
-      salvageProgressiveSaving = false;
+    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return;
+    if (salvageResolutionMode === 'routed') {
+      salvageRoutedSaving = true;
+      try {
+        await store?.saveSalvageCheckRouted?.(salvageRoutedDraft);
+        salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
+      } finally {
+        salvageRoutedSaving = false;
+      }
+    } else if (salvageResolutionMode === 'progressive') {
+      salvageProgressiveSaving = true;
+      try {
+        await store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft);
+        salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
+      } finally {
+        salvageProgressiveSaving = false;
+      }
+    } else {
+      salvageSimpleSaving = true;
+      try {
+        await store?.saveSalvageCheckSimple?.(salvageSimpleDraft);
+        salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
+      } finally {
+        salvageSimpleSaving = false;
+      }
     }
   }
 
@@ -4019,11 +4058,15 @@
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
             {salvageResolutionMode}
+            salvageCheckSimple={salvageSimpleDraft}
+            salvageCheckRouted={salvageRoutedDraft}
             salvageCheckProgressive={salvageProgressiveDraft}
             activation={checkActivation}
             {onUpdateCraftingCheck}
             {onUpdateCraftingCheckSimple}
             {onUpdateCraftingCheckProgressive}
+            {onUpdateSalvageCheckSimple}
+            {onUpdateSalvageCheckRouted}
             {onUpdateSalvageCheckProgressive}
             onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}

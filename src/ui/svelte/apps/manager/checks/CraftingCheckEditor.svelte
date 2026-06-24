@@ -27,7 +27,10 @@
   import CheckDiceCrits from './CheckDiceCrits.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
 
-  let { value = null, onChange = () => {} } = $props();
+  // `showTiers` (default true) renders the per-recipe tier table (relative type
+  // only). Salvage/gathering reuse this editor with `showTiers={false}` — they have
+  // no recipes to pick a tier from; a per-entity DC override lives elsewhere.
+  let { value = null, showTiers = true, onChange = () => {} } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -171,7 +174,7 @@
     />
   </section>
 
-  {#if type === 'relative'}
+  {#if showTiers && type === 'relative'}
     <section class="manager-inspector-card" data-routed-tiers>
       <CheckRecipeTiers
         tiers={value?.tiers || []}

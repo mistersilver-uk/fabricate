@@ -12,6 +12,12 @@
   Per-die critical raw rolls force success or failure (and may break tools). The
   formula row, crit table, and recipe-tier table are shared with the routed editor.
 
+  `showDcSource` (default true) renders the DC-source section (static/dynamic
+  radios + the recipe-tier table + the dynamic-DC macro). Salvage and gathering
+  reuse this editor with `showDcSource={false}`: they have no recipes to pick a
+  tier from and no dynamic-DC macro, so they author just the default DC (on the
+  formula row) plus a per-entity DC override elsewhere.
+
   Controlled component: renders `value` and emits the next value via `onChange`.
 -->
 <script>
@@ -22,7 +28,7 @@
   import CheckDiceCrits from './CheckDiceCrits.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
 
-  let { value = null, onChange = () => {} } = $props();
+  let { value = null, showDcSource = true, onChange = () => {} } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -107,6 +113,7 @@
     />
   </section>
 
+  {#if showDcSource}
   <section class="manager-inspector-card">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}</h3>
     <div class="manager-checks-type-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}>
@@ -171,5 +178,6 @@
         {/if}
       </div>
     </section>
+  {/if}
   {/if}
 </div>
