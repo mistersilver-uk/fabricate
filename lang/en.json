@@ -2281,7 +2281,11 @@
             "UnknownModifierShort": "Unknown",
             "AddSearchPlaceholder": "Search character modifiers...",
             "AddSearchLabel": "Search character modifiers to add"
-          }
+          },
+          "TaskDcOverrideTitle": "Check DC override",
+          "TaskDcOverrideHint": "Override the system gathering check DC for this task. Leave blank to use the system default.",
+          "TaskDcOverride": "DC",
+          "TaskDcOverridePlaceholder": "System default"
         },
         "CurrencyUnits": {
           "Title": "Currency units",

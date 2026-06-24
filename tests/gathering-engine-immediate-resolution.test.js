@@ -24,6 +24,7 @@ function makeEngine({
   libraryTools = [],
   terminalRunError = null,
   runManager = null,
+  gatheringCraftingCheck = null,
   calls = {}
 } = {}) {
   calls.resolveRouted = [];
@@ -55,7 +56,8 @@ function makeEngine({
         { id: 'comp-a', difficulty: 3 },
         { id: 'comp-b', difficulty: 5 },
         { id: 'comp-c', difficulty: 7 }
-      ]
+      ],
+      ...(gatheringCraftingCheck ? { gatheringCraftingCheck } : {})
     }],
     getSelectableActors: () => [actingActor],
     isActorSelectable: ({ actor: candidate }) => candidate === actingActor || candidate?.id === actingActor.id,
@@ -708,4 +710,201 @@ test('GM blind terminal response may include task and result details for inspect
   assert.equal(result.accepted, true);
   assert.equal(result.taskId, 'secret-mooncap-task');
   assert.deepEqual(result.createdResults, createdResults);
+});
+
+// ---------------------------------------------------------------------------
+// System-level gathering check (Checks editor) formula consumption (issue 437):
+// the engine rolls the system `gatheringCraftingCheck` formula via the shared
+// checkRoll resolvers, with dual-read fallback to the legacy `task.check` path.
+// ---------------------------------------------------------------------------
+
+function stubRoll(total, dice = []) {
+  globalThis.Roll = class {
+    async evaluate() {
+      return { total, dice };
+    }
+  };
+}
+
+test('progressive: system gathering check formula drives the numeric award value (legacy task.check unused)', async () => {
+  const calls = {};
+  const task = progressiveTask();
+  stubRoll(8); // total 8 → awards comp-a (3) + comp-b (5), stops before comp-c (7)
+  try {
+    const engine = makeEngine({
+      task,
+      includeProgressiveResolver: false,
+      gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'equal' } },
+      createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, true);
+    assert.equal(result.state, 'succeeded');
+    // The legacy expression evaluator must NOT be consulted when the system formula is set.
+    assert.deepEqual(calls.evaluateCheck, []);
+    assert.deepEqual(
+      calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
+      ['result-a', 'result-b']
+    );
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('progressive: with no system formula the engine still uses the legacy task.check evaluator path', async () => {
+  const calls = {};
+  const task = progressiveTask();
+  const engine = makeEngine({
+    task,
+    checkResult: { success: null, status: null, value: 8, reasonCode: 'CHECK_VALUE' },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
+    calls
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, 'succeeded');
+  assert.equal(calls.evaluateCheck.length, 1);
+  assert.equal(calls.resolveProgressive[0].checkResult.value, 8);
+});
+
+test('progressive: system awardMode takes precedence over the per-task award mode', async () => {
+  const calls = {};
+  // value 4 covers comp-a (3) with 1 left over (< comp-b 5). 'equal' would stop
+  // after comp-a; 'partial' awards comp-b too with a remainder. The system mode
+  // ('partial') must win over the task mode ('equal').
+  const task = progressiveTask({ progressive: { awardMode: 'equal' } });
+  stubRoll(4);
+  try {
+    const engine = makeEngine({
+      task,
+      includeProgressiveResolver: false,
+      gatheringCraftingCheck: { progressive: { rollFormula: '1d8', awardMode: 'partial' } },
+      createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, true);
+    assert.deepEqual(
+      calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
+      ['result-a', 'result-b']
+    );
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('routed: system routed formula resolves a tier name and routes to the same-named result group', async () => {
+  const calls = {};
+  const task = routedTask({
+    resultGroups: [{ id: 'group-iron', name: 'Iron', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }] }]
+  });
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]); // 18 ≥ dc 15 → 'Iron' tier
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: {
+        routed: {
+          rollFormula: '1d20',
+          dc: 15,
+          type: 'relative',
+          thresholdMode: 'meet',
+          relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
+        }
+      },
+      createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, true);
+    assert.equal(result.state, 'succeeded');
+    // The provider resolver must NOT be consulted when the system formula is set.
+    assert.deepEqual(calls.resolveRouted, []);
+    assert.equal(calls.createTerminalRun[0][3].checkResult.outcome, 'Iron');
+    assert.deepEqual(calls.createResults[0].resultGroups[0].results.map(entry => entry.id), ['result-a']);
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('routed: task.dcOverride shifts the base DC for the formula tier match', async () => {
+  const calls = {};
+  // Roll 18 with a per-task dcOverride of 20 misses the success tier (delta 0 →
+  // threshold 20), so no group routes and the attempt fails.
+  const task = routedTask({
+    dcOverride: 20,
+    failureOutcome: { mode: 'text', text: 'No useful finds.' },
+    resultGroups: [{ id: 'group-iron', name: 'Iron', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }] }]
+  });
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: {
+        routed: {
+          rollFormula: '1d20',
+          dc: 15,
+          type: 'relative',
+          thresholdMode: 'meet',
+          relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
+        }
+      },
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, true);
+    assert.equal(result.state, 'failed');
+    assert.deepEqual(calls.resolveRouted, []);
+    assert.deepEqual(calls.createResults, []);
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('routed: with no system formula the provider resolveRouted path is unchanged', async () => {
+  const calls = {};
+  const task = routedTask();
+  const engine = makeEngine({ task, calls });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, 'succeeded');
+  assert.equal(calls.resolveRouted.length, 1);
+  assert.equal(calls.resolveRouted[0].provider, 'macroOutcome');
+});
+
+test('d100: a d100 task still resolves via the d100 path regardless of a system gathering check', async () => {
+  const calls = {};
+  const task = routedTask({
+    resolutionMode: 'd100',
+    resultSelection: null,
+    dropRows: [{ id: 'drop-a', componentId: 'comp-a', dropRate: 50, quantity: 1, enabled: true }]
+  });
+  const engine = makeEngine({
+    task,
+    gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'equal' }, routed: { rollFormula: '1d20', dc: 15 } },
+    calls
+  });
+
+  // No richState.resolveD100Attempt is wired in this harness, so the d100 path
+  // surfaces its own misconfigured outcome — proving dispatch stayed on d100 and
+  // never touched the progressive/routed formula resolvers.
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+  assert.equal(result.accepted, false);
+  assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+  assert.deepEqual(calls.resolveRouted, []);
+  assert.deepEqual(calls.resolveProgressive, []);
+  assert.deepEqual(calls.evaluateCheck, []);
 });

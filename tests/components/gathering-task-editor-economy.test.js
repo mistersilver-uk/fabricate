@@ -105,8 +105,8 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   it('gives both economy sections card chrome', () => {
     assert.match(
       editorSource,
-      /\.manager-task-stamina-card,\s*\.manager-task-nodes-card\s*\{[^}]*border:[^}]*background:[^}]*\}/,
-      'stamina and node sections share card chrome (border + background)'
+      /\.manager-task-stamina-card,\s*\.manager-task-nodes-card,\s*\.manager-task-dc-card\s*\{[^}]*border:[^}]*background:[^}]*\}/,
+      'stamina, node, and DC sections share card chrome (border + background)'
     );
   });
 
@@ -229,6 +229,36 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     assert.ok(canvas.EnvironmentAutoResolved.includes('{environment}'), 'the auto-resolve notification names the environment');
     assert.ok(typeof canvas.EnvironmentDialogTitle === 'string');
     assert.ok(typeof canvas.EnvironmentDialogConfirm === 'string');
+  });
+
+  it('shows the per-task DC override field only for routed resolution (hidden for d100 and progressive)', () => {
+    // The DC override gate is the resolutionMode prop: routed has an editable DC,
+    // d100 has no DC at all, and progressive has no DC (value-driven). So the card
+    // is gated on `dcOverrideEnabled`, which is true only for routed.
+    assert.match(editorSource, /resolutionMode\s*=\s*'d100'/, 'editor declares a resolutionMode prop defaulting to d100');
+    assert.match(editorSource, /dcOverrideEnabled\s*=\s*\$derived\(resolutionMode === 'routed'\)/, 'the DC field is enabled only for routed resolution');
+    const guardIdx = editorSource.indexOf('{#if dcOverrideEnabled}');
+    const dcCardIdx = editorSource.indexOf('data-gathering-task-dc');
+    const dcFieldIdx = editorSource.indexOf('data-gathering-task-dc-override');
+    assert.ok(guardIdx >= 0, 'the DC card is guarded by dcOverrideEnabled');
+    assert.ok(dcCardIdx > guardIdx, 'the DC card renders inside the dcOverrideEnabled guard');
+    assert.ok(dcFieldIdx > guardIdx, 'the numeric DC override input renders inside the guard');
+  });
+
+  it('persists the DC override through onUpdateTask: null when blank, truncated integer otherwise', () => {
+    assert.match(editorSource, /function updateDcOverride/, 'has a DC override setter');
+    assert.match(editorSource, /onUpdateTask\(\{ dcOverride: null \}\)/, 'a blank DC clears the override (null = system default)');
+    assert.match(editorSource, /dcOverride:\s*Number\.isFinite\(next\)\s*\?\s*Math\.trunc\(next\)\s*:\s*null/, 'a numeric DC is truncated to an integer');
+    // The parent threads the gathering resolution mode into the editor.
+    assert.match(rootSource, /resolutionMode=\{gatheringResolutionMode\}/, 'parent passes the gathering resolution mode to the task editor');
+  });
+
+  it('adds the per-task DC override i18n keys', () => {
+    const keys = lang.FABRICATE.Admin.Manager.Gathering;
+    assert.equal(keys.TaskDcOverrideTitle, 'Check DC override');
+    assert.equal(keys.TaskDcOverride, 'DC');
+    assert.ok(typeof keys.TaskDcOverrideHint === 'string' && keys.TaskDcOverrideHint.length > 0, 'the DC override hint exists');
+    assert.ok(typeof keys.TaskDcOverridePlaceholder === 'string' && keys.TaskDcOverridePlaceholder.length > 0, 'the DC override placeholder exists');
   });
 
   it('adds the node i18n keys', () => {
