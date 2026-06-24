@@ -2831,15 +2831,16 @@ describe('RecipeItemInspector (mounted)', () => {
     inspectorHarness.remount();
   });
 
-  it('shows the Check/Ingredient routing toggle only for routed systems', async () => {
+  it('shows the Check/Ingredient routing toggle only for routed, complex recipes', async () => {
     const routedTarget = await inspectorHarness.mount(
       inspectorProps({
         routed: true,
+        complex: true,
         routingProvider: 'ingredientSet',
       })
     );
     const card = routedTarget.querySelector('[data-recipe-section="recipe-routing"]');
-    assert.ok(card, 'routed systems show the result-routing toggle');
+    assert.ok(card, 'routed complex recipes show the result-routing toggle');
     assert.ok(card.querySelector('[data-recipe-routing-option="check"]'), 'a Check option renders');
     assert.ok(
       card
@@ -2849,11 +2850,25 @@ describe('RecipeItemInspector (mounted)', () => {
     );
     inspectorHarness.remount();
 
-    const simpleTarget = await inspectorHarness.mount(inspectorProps({ routed: false }));
+    const nonRoutedTarget = await inspectorHarness.mount(
+      inspectorProps({ routed: false, complex: true })
+    );
+    assert.equal(
+      nonRoutedTarget.querySelector('[data-recipe-section="recipe-routing"]'),
+      null,
+      'non-routed systems do not show the routing toggle'
+    );
+    inspectorHarness.remount();
+
+    // A Simple recipe crafts one set into one result, so there is no result
+    // group to route — the routing toggle is hidden even on a routed system.
+    const simpleTarget = await inspectorHarness.mount(
+      inspectorProps({ routed: true, complex: false, routingProvider: 'ingredientSet' })
+    );
     assert.equal(
       simpleTarget.querySelector('[data-recipe-section="recipe-routing"]'),
       null,
-      'non-routed systems do not show the routing toggle'
+      'a simple recipe hides the routing toggle even in a routed system'
     );
     inspectorHarness.remount();
   });
@@ -2863,6 +2878,7 @@ describe('RecipeItemInspector (mounted)', () => {
     const target = await inspectorHarness.mount(
       inspectorProps({
         routed: true,
+        complex: true,
         routingProvider: 'check',
         onSetRoutingProvider: (provider) => calls.push(provider),
       })
@@ -2884,6 +2900,7 @@ describe('RecipeItemInspector (mounted)', () => {
     const target2 = await inspectorHarness.mount(
       inspectorProps({
         routed: true,
+        complex: true,
         routingProvider: 'ingredientSet',
         onSetRoutingProvider: (provider) => calls.push(provider),
       })
@@ -2901,6 +2918,7 @@ describe('RecipeItemInspector (mounted)', () => {
     const target = await inspectorHarness.mount(
       inspectorProps({
         routed: true,
+        complex: true,
         routingProvider: 'macroOutcome',
       })
     );
