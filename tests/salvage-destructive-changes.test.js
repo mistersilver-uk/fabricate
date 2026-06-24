@@ -275,7 +275,7 @@ test('Salvage is always on: attempting to disable it keeps it enabled and preser
   assert.equal(remaining.length, 1, 'Run history is preserved because salvage stays enabled');
 });
 
-test('Setting features.salvage to false does not remove runs from other systems', async () => {
+test('Salvage is always on, so a feature update never removes runs from other systems', async () => {
   const systemId = 'sys-a';
   const otherSystemId = 'sys-b';
   const runForA = { id: 'run-a', craftingSystemId: systemId, componentId: 'comp-1', status: 'succeeded' };
@@ -303,7 +303,7 @@ test('Setting features.salvage to false does not remove runs from other systems'
   assert.equal(bRuns.length, 1, 'Runs for other systems should NOT be removed');
 });
 
-test('Setting features.salvage to false works when no actors exist', async () => {
+test('A salvage feature update is a safe no-op when no actors exist', async () => {
   const systemId = 'sys-empty';
   const mgr = makeManager();
   mgr._getResolutionModeService = () => null;
@@ -325,7 +325,7 @@ test('Setting features.salvage to false works when no actors exist', async () =>
   );
 });
 
-test('Setting features.salvage from false to false does not trigger flag writes', async () => {
+test('Salvage stays on, so a no-op feature update triggers no salvage-run flag writes', async () => {
   const systemId = 'sys-noop';
   const actor = makeActor('actor-1', []);
   actor._setFlagCalled = false;
@@ -337,7 +337,8 @@ test('Setting features.salvage from false to false does not trigger flag writes'
     actors: [actor]
   };
 
-  // System already has salvage disabled
+  // Salvage is always on; an explicit `false` normalizes back to true, so this
+  // update changes nothing salvage-related and writes no salvage-run flags.
   const normalized = mgr._normalizeSystem({
     id: systemId, name: 'Test', features: { salvage: false },
     salvageResolutionMode: 'simple', components: []
