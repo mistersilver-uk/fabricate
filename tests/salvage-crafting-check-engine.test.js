@@ -139,3 +139,34 @@ test('salvage progressive: no Roll engine awards nothing without blocking', asyn
   assert.equal(r.success, true);
   assert.equal(r.value, 0);
 });
+
+// ── Routed not yet engine-evaluated (authoring-only until gathering routed) ──
+
+test('salvage routed does not evaluate its formula yet (falls through to the macro path)', async () => {
+  const engine = makeEngine();
+  // Would throw if the routed formula were actually rolled.
+  stubThrowingRoll();
+  const r = await run(
+    engine,
+    sys({ routed: { type: 'relative', rollFormula: '1d20', dc: 12, relativeOutcomes: [] } }, 'routed')
+  );
+  // Routed salvage is dispatched to the (absent) macro path, not the formula check:
+  // success with no outcome and no value, and the throwing roll is never reached.
+  assert.equal(r.success, true);
+  assert.equal(r.outcome, null);
+  assert.equal(r.value, null);
+});
+
+// ── dcOverride = 0 edge (0 is a valid, finite DC) ───────────────────────────
+
+test('salvage simple: a dcOverride of 0 is honoured as a valid DC (not treated as unset)', async () => {
+  const engine = makeEngine();
+  stubRoll(0, [{ number: 1, faces: 20, total: 0 }]);
+  const r = await run(
+    engine,
+    sys({ simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet' } }, 'simple'),
+    { salvage: { dcOverride: 0 } }
+  );
+  assert.equal(r.data.dc, 0, '0 override replaces the default DC');
+  assert.equal(r.success, true, '0 >= 0 passes');
+});
