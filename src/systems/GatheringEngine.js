@@ -119,6 +119,11 @@ export class GatheringEngine {
     isGamePaused = null,
     sceneAccess = null,
     toolAvailability = null,
+    // Optional progressive-resolution seam (`resolveProgressive`). Routed
+    // resolution no longer uses a result resolver — it routes exclusively through
+    // the system-level gathering check formula (`_resolveRoutedFormulaOutcome`).
+    // Production wires nothing here, so progressive falls through to the built-in
+    // `resolveProgressiveAward`; tests inject a `resolveProgressive` stub.
     resultResolver = null,
     resultCreator = null,
     toolBreakage = null,
@@ -513,7 +518,7 @@ export class GatheringEngine {
       });
     }
 
-    const configuration = this._validateStartTask(task);
+    const configuration = this._validateStartTask(task, system);
     if (configuration.valid !== true) {
       return this._blockedStart({
         viewer,
@@ -563,7 +568,7 @@ export class GatheringEngine {
     }
 
     const { system, environment, task, interactableRef } = resolved;
-    const configuration = this._validateStartTask(task);
+    const configuration = this._validateStartTask(task, system);
     if (configuration.valid !== true) {
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -1805,8 +1810,8 @@ export class GatheringEngine {
     return weighted.at(-1).task;
   }
 
-  _validateStartTask(task) {
-    const errors = validateTaskConfiguration(task);
+  _validateStartTask(task, system = null) {
+    const errors = validateTaskConfiguration(task, system);
     return {
       valid: errors.length === 0,
       errors,
@@ -2272,36 +2277,22 @@ export class GatheringEngine {
     });
   }
 
-  async _resolveRoutedOutcome({ viewer, actor, system, environment, task }) {
-    // System-level gathering check (Checks editor) takes precedence when a routed
-    // roll formula is configured: roll the formula and map its total onto a named
-    // outcome tier, then route that tier name to a result group by name — the same
-    // name-matching the crafting/salvage routed paths use as their tier fallback.
+  async _resolveRoutedOutcome({ actor, system, task }) {
+    // Routed gathering resolves exclusively through the system-level gathering
+    // check (Checks editor): roll the configured routed formula and map its total
+    // onto a named outcome tier, then route that tier name to a result group by
+    // name — the same name-matching the crafting/salvage routed paths use as their
+    // tier fallback. With no system routed roll formula the task is misconfigured.
     const routed = system?.gatheringCraftingCheck?.routed;
     const rollFormula = stringOrNull(routed?.rollFormula);
-    if (rollFormula) {
-      return this._resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task });
-    }
-
-    if (typeof this.resultResolver?.resolveRouted !== 'function') {
+    if (!rollFormula) {
       return misconfiguredOutcome({
-        code: 'MISSING_RESULT_RESOLVER',
-        message: 'Routed gathering resolution requires a result resolver',
+        code: 'MISSING_ROUTED_CHECK',
+        message: 'Routed gathering resolution requires a system-level gathering check roll formula',
       });
     }
 
-    const provider = stringOrNull(task.resultSelection?.provider);
-    const raw = await this.resultResolver.resolveRouted({
-      provider,
-      resultSelection: task.resultSelection ?? null,
-      resultGroups: normalizeList(task.resultGroups),
-      actor,
-      viewer,
-      system,
-      environment,
-      task,
-    });
-    return normalizeTerminalOutcome(raw);
+    return this._resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task });
   }
 
   /**
@@ -3343,7 +3334,7 @@ function normalizeVisibilityResult(result) {
   };
 }
 
-function validateTaskConfiguration(task) {
+function validateTaskConfiguration(task, system = null) {
   const errors = [];
   const resolutionMode = stringOrNull(task?.resolutionMode);
   const resultGroups = normalizeList(task?.resultGroups);
@@ -3386,17 +3377,14 @@ function validateTaskConfiguration(task) {
     }
   }
 
-  if (resolutionMode === 'routed') {
-    const provider = stringOrNull(task?.resultSelection?.provider);
-    if (provider !== 'macroOutcome' && provider !== 'rollTableOutcome') {
-      errors.push('Routed gathering task requires a supported result selection provider');
-    }
-    if (provider === 'macroOutcome' && !stringOrNull(task?.resultSelection?.macroUuid)) {
-      errors.push('Routed macro outcome gathering task requires a macro UUID');
-    }
-    if (provider === 'rollTableOutcome' && !stringOrNull(task?.resultSelection?.rollTableUuid)) {
-      errors.push('Routed roll table outcome gathering task requires a roll table UUID');
-    }
+  // Routed gathering resolves through the system-level gathering check formula,
+  // not a per-task result-selection provider: require the configured routed roll
+  // formula. The result-group / group-name checks above still apply.
+  if (
+    resolutionMode === 'routed' &&
+    !stringOrNull(system?.gatheringCraftingCheck?.routed?.rollFormula)
+  ) {
+    errors.push('Routed gathering task requires a system-level gathering check roll formula');
   }
 
   if (resolutionMode === 'progressive') {

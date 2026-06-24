@@ -371,16 +371,44 @@ function timedEnvironment() {
         resultGroups: [
           { id: 'group-a', name: 'Iron', results: [{ id: 'r-a', componentId: 'comp-a', quantity: 2 }] },
         ],
-        resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.outcome' },
       },
     ],
+  };
+}
+
+// Routed gathering resolves through the system-level routed gathering check
+// formula (issue 424). The single success tier is named 'Iron' so a passing roll
+// routes to the same-named result group.
+function routedSystemCheck() {
+  return {
+    routed: {
+      rollFormula: '1d20',
+      dc: 15,
+      type: 'relative',
+      thresholdMode: 'meet',
+      relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }],
+    },
+  };
+}
+
+function stubRoll(total) {
+  globalThis.Roll = class {
+    async evaluate() {
+      return { total, dice: [{ number: 1, faces: 20, total }] };
+    }
   };
 }
 
 function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM }) {
   const environments = [timedEnvironment()];
   const systems = [
-    { id: 'system-a', enabled: true, features: { gathering: true }, components: [{ id: 'comp-a' }] },
+    {
+      id: 'system-a',
+      enabled: true,
+      features: { gathering: true },
+      components: [{ id: 'comp-a' }],
+      gatheringCraftingCheck: routedSystemCheck(),
+    },
   ];
   return new GatheringEngine({
     environmentStore: {
@@ -400,13 +428,6 @@ function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM })
     },
     sceneAccess: { canAttempt: () => ({ allowed: true }) },
     toolAvailability: { check: () => ({ available: true, missing: [], failedRequirements: [] }) },
-    resultResolver: {
-      resolveRouted: async (payload) => ({
-        status: 'succeeded',
-        resultGroups: [payload.task.resultGroups[0]],
-        checkResult: { outcome: payload.task.resultGroups[0].name, provider: payload.provider },
-      }),
-    },
     resultCreator: {
       plan: async () => [{ actorUuid: timedActor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
       create: async () => [{ actorUuid: timedActor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
@@ -443,8 +464,13 @@ async function runMaturedTimedAttempt({ isPrimaryGM }) {
     isPrimaryGM,
   });
 
-  const result = await engine.processWorldTime(state.worldTime);
-  return { hooks, result };
+  stubRoll(18); // pass the routed dc 15 → 'Iron' tier routes to the matching group
+  try {
+    const result = await engine.processWorldTime(state.worldTime);
+    return { hooks, result };
+  } finally {
+    delete globalThis.Roll;
+  }
 }
 
 test('processWorldTime publishes the completion hook with initiatedBy: timed on the primary GM', async () => {

@@ -15,6 +15,33 @@ import {
 } from '../src/gatheringToolRuntime.js';
 import { createToolBreakageRuntime } from '../src/toolBreakageRuntime.js';
 
+// Routed gathering resolves through the system-level routed gathering check
+// formula (issue 424). The single success tier is named 'Iron' so a passing roll
+// routes to the same-named result group; `routedRoll` controls the roll total.
+function routedSystemCheck() {
+  return {
+    routed: {
+      rollFormula: '1d20',
+      dc: 15,
+      type: 'relative',
+      thresholdMode: 'meet',
+      relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
+    }
+  };
+}
+
+function stubRoll(total) {
+  globalThis.Roll = class {
+    async evaluate() {
+      return { total, dice: [{ number: 1, faces: 20, total }] };
+    }
+  };
+}
+
+function routedRoll(success = true) {
+  stubRoll(success ? 18 : 5);
+}
+
 function makeRunManager() {
   let createdTerminal = null;
   return {
@@ -112,7 +139,7 @@ function makeSimpleEngine({
   toolBreakagePolicy = 'failureOnBreak',
   libraryTools = []
 }) {
-  const system = { id: 'system-a', enabled: true, features: { gathering: true } };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
     id: 'env-a',
     craftingSystemId: 'system-a',
@@ -139,14 +166,6 @@ function makeSimpleEngine({
     sceneAccess: { canAttempt: async () => ({ allowed: true }) },
     toolAvailability: makeAvailability({ missing: toolMissing, failedRequirements }),
     toolBreakage: breakage.impl,
-    resultResolver: {
-      async resolveRouted() {
-        return {
-          status: 'succeeded',
-          resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }]
-        };
-      }
-    },
     resultCreator: {
       async plan() { return []; },
       async create() { return []; }
@@ -163,7 +182,6 @@ function baseTask(overrides = {}) {
     enabled: true,
     resolutionMode: 'routed',
     tools: [],
-    resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.x' },
     resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }],
     ...overrides
   };
@@ -211,7 +229,13 @@ test('startAttempt succeeds with available tool and runs breakage plan/apply', a
     toolPlan: [{ componentId: 'comp-axe', mode: 'limitedUses', broken: false }],
     toolApply: [{ componentId: 'comp-axe', broken: false }]
   });
-  const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'succeeded');
   assert.equal(breakage.calls.plan, 1);
@@ -300,7 +324,7 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
     broken: false
   }];
   const task = baseTask({ toolIds: ['tool-axe'], timeRequirement: { minutes: 10 } });
-  const system = { id: 'system-a', enabled: true, features: { gathering: true } };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
     id: 'env-a',
     craftingSystemId: 'system-a',
@@ -338,14 +362,6 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
     getSystems: () => [system],
     getRunViewer: () => viewer,
     toolBreakage: breakage.impl,
-    resultResolver: {
-      async resolveRouted() {
-        return {
-          status: 'succeeded',
-          resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }]
-        };
-      }
-    },
     resultCreator: { plan: async () => [], create: async () => [] },
     failureFeedback: { apply: async () => null }
   });
@@ -384,7 +400,13 @@ test('successDespiteBreak policy preserves success even when a tool breaks', asy
     toolApply: [{ componentId: 'comp-axe', broken: true, onBreak: { action: 'flagged' } }],
     toolBreakagePolicy: 'successDespiteBreak'
   });
-  const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'succeeded');
   assert.equal(result.usedTools[0].broken, true);
@@ -405,7 +427,13 @@ test('multi-tool: any missing tool blocks the start', async () => {
 
 test('legacy task without tools is unaffected', async () => {
   const { engine, breakage } = makeSimpleEngine({ task: baseTask() });
-  const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'succeeded');
   assert.equal(breakage.calls.plan, 0, 'no tools means no breakage planning');
@@ -686,7 +714,7 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
   // virtual-present injection is exercised end to end (not via mocks).
   const tool = { componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
   const task = baseTask({ tools: [tool] });
-  const system = { id: 'system-a', enabled: true, features: { gathering: true } };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
     id: 'env-a', craftingSystemId: 'system-a', enabled: true, selectionMode: 'targeted', tasks: [task]
   };
@@ -713,11 +741,6 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
         matchGatheringTools({ actor, system: sys, task: t, tools, craftingSystemManager: matcher, presentTools }),
       buildItemRef: (_actor, item) => { buildRefs.push(item); return { actorUuid: null, itemUuid: item?.componentId ?? null, quantity: 1 }; }
     }),
-    resultResolver: {
-      async resolveRouted() {
-        return { status: 'succeeded', resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }] };
-      }
-    },
     resultCreator: { plan: async () => [], create: async () => [] },
     failureFeedback: { apply: async () => null }
   });
@@ -738,10 +761,16 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
 
   // WITH the active tool scoped to the matching system the attempt succeeds and
   // applies no usage/breakage.
-  const ok = await engine.startAttempt({
-    viewer, environmentId: 'env-a', taskId: 'task-a',
-    presentTools: { systemId: 'system-a', componentIds: ['comp-axe'] }
-  });
+  let ok;
+  routedRoll(true);
+  try {
+    ok = await engine.startAttempt({
+      viewer, environmentId: 'env-a', taskId: 'task-a',
+      presentTools: { systemId: 'system-a', componentIds: ['comp-axe'] }
+    });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(ok.accepted, true);
   assert.equal(ok.state, 'succeeded');
   assert.deepEqual(ok.usedTools, [], 'no usedTools evidence for the virtual canvas tool');

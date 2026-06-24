@@ -170,7 +170,6 @@ function createMockServices(overrides = {}) {
     getRecipeManager: () => mockRecipeManager,
     getScriptMacros: () => [],
     getSceneOptions: () => [],
-    getRollTableOptions: () => [],
     notify: {
       info: () => {},
       warn: () => {},
@@ -2887,7 +2886,6 @@ describe('createAdminStore', () => {
         'showEssences',
         'availableScriptMacros',
         'sceneOptions',
-        'rollTableOptions',
       ];
       for (const key of requiredKeys) {
         assert.ok(key in sys, `selectedSystem should have key: ${key}`);
@@ -5235,12 +5233,10 @@ describe('createAdminStore', () => {
       assert.deepEqual(vs.selectedSystem?.availableScriptMacros, macros);
     });
 
-    it('viewState.selectedSystem exposes injected scene and roll-table picker options', async () => {
+    it('viewState.selectedSystem exposes injected scene picker options', async () => {
       const sceneOptions = [{ uuid: 'Scene.forest', name: 'Forest', img: 'forest.webp' }];
-      const rollTableOptions = [{ uuid: 'RollTable.forage', name: 'Forage', img: 'table.svg' }];
       const services = createMockServices({
         getSceneOptions: () => sceneOptions,
-        getRollTableOptions: () => rollTableOptions,
       });
       const store = createAdminStore(services);
 
@@ -5248,7 +5244,6 @@ describe('createAdminStore', () => {
 
       const selectedSystem = get(store.viewState).selectedSystem;
       assert.deepEqual(selectedSystem?.sceneOptions, sceneOptions);
-      assert.deepEqual(selectedSystem?.rollTableOptions, rollTableOptions);
     });
 
     it('viewState.selectedSystem.showTags and showEssences are true when the essences feature is enabled', async () => {

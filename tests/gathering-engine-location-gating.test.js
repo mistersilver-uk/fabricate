@@ -51,7 +51,6 @@ function task(overrides = {}) {
     resolutionMode: 'routed',
     toolIds: [],
     resultGroups: [{ id: 'group-a', name: 'Herbs', results: [{ id: 'res', componentId: 'herb', quantity: 1 }] }],
-    resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.outcome' },
     ...overrides
   };
 }
@@ -78,9 +77,6 @@ function makeEngine({ environments = [environment()], parties = [], systems = [s
     evaluator: {
       evaluateVisibility: async () => ({ visible: true, reasonCode: 'VISIBLE', diagnostic: null }),
       evaluateCheck: async () => ({ success: true, value: 10 })
-    },
-    resultResolver: {
-      resolveRouted: async (payload) => ({ status: 'succeeded', resultGroups: [payload.task.resultGroups[0]], checkResult: { outcome: 'success' } })
     },
     resultCreator: { create: async () => [] },
     toolBreakage: { apply: async () => [] },

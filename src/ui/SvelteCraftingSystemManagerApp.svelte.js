@@ -224,15 +224,6 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter(actor => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
-      getRollTableOptions: () =>
-        Array.from(game.tables?.contents || [])
-          .map(table => ({
-            uuid: table.uuid,
-            name: table.name,
-            img: table.img || ''
-          }))
-          .filter(table => table.uuid && table.name)
-          .sort((a, b) => a.name.localeCompare(b.name)),
       pickImagePath: async (currentPath = '') => {
         const FilePickerClass = foundry?.applications?.apps?.FilePicker?.implementation
           || foundry?.applications?.apps?.FilePicker

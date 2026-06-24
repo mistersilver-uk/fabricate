@@ -1758,8 +1758,7 @@ function _buildSelectedSystemViewData(
   componentTagOptions,
   essenceDefinitions,
   availableScriptMacros,
-  sceneOptions,
-  rollTableOptions
+  sceneOptions
 ) {
   if (!selectedSystem) return null;
 
@@ -1885,7 +1884,6 @@ function _buildSelectedSystemViewData(
     showEssences,
     availableScriptMacros,
     sceneOptions,
-    rollTableOptions,
   };
 }
 
@@ -4075,7 +4073,6 @@ export function createAdminStore(services) {
 
     const availableScriptMacros = services.getScriptMacros?.() || [];
     const sceneOptions = services.getSceneOptions?.() || [];
-    const rollTableOptions = services.getRollTableOptions?.() || [];
 
     let selectedSystemData = null;
     let essenceCards = [];
@@ -4112,8 +4109,7 @@ export function createAdminStore(services) {
         componentTagOptions,
         essenceDefinitions,
         availableScriptMacros,
-        sceneOptions,
-        rollTableOptions
+        sceneOptions
       );
 
       recipeListData = _buildRecipeList(

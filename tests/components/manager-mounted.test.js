@@ -374,7 +374,6 @@ function createStore(calls = [], options = {}) {
         },
       ],
       availableScriptMacros: [],
-      rollTableOptions: [],
     },
     smithing: {
       id: 'smithing',

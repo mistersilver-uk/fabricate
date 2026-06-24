@@ -125,7 +125,6 @@ function createMockServices(overrides = {}) {
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
     getScriptMacros: () => [],
     getSceneOptions: () => [],
-    getRollTableOptions: () => [],
     notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
     localize: (key) => key,

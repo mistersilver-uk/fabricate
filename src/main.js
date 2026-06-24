@@ -201,34 +201,6 @@ function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression
   });
 }
 
-function createGatheringResultResolver(resolutionModeService) {
-  return {
-    async resolveRouted({ provider, resultSelection, resultGroups = [] } = {}) {
-      if (provider === 'macroOutcome') {
-        try {
-          return await runGatheringMacro(resultSelection?.macroUuid, { kind: 'gatheringOutcome', resultGroups });
-        } catch (err) {
-          console.error('Fabricate | Gathering routed-outcome macro failed:', err);
-          return {
-            status: 'misconfigured',
-            diagnostics: [{ code: 'MACRO_OUTCOME_THREW', message: err?.message || 'Gathering outcome macro threw' }]
-          };
-        }
-      }
-
-      // The recipe-side roll-table draw mechanism was removed in 1.6.0 (issue 424),
-      // so a gathering `rollTableOutcome` provider can no longer resolve. This whole
-      // resolver — including the now-orphaned `normalizeGatheringRollTableOutcome`
-      // helper below — is replaced by the system-check-formula path in PR-3 (when
-      // gathering routed tasks are rewired off per-task providers entirely).
-      return {
-        status: 'misconfigured',
-        diagnostics: [{ code: 'UNSUPPORTED_RESULT_PROVIDER', message: `Unsupported gathering result provider "${provider}"` }]
-      };
-    }
-  };
-}
-
 function createGatheringResultCreator(craftingSystemManager) {
   return {
     async plan({ actor, system, resultGroups = [] } = {}) {
@@ -367,20 +339,6 @@ async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
       }
     }
   });
-}
-
-function normalizeGatheringRollTableOutcome(tableResult) {
-  const disposition = tableResult?.meta?.disposition;
-  if (disposition === 'success') {
-    return { status: 'succeeded', resultGroups: tableResult.groups ?? [], checkResult: tableResult.meta };
-  }
-  if (disposition === 'fail' || disposition === 'miss') {
-    return { status: 'failed', resultGroups: [], checkResult: tableResult.meta };
-  }
-  return {
-    status: 'misconfigured',
-    diagnostics: [{ code: 'ROLL_TABLE_OUTCOME_FAILED', message: tableResult?.meta?.error || 'Gathering roll table did not resolve an outcome' }]
-  };
 }
 
 function flattenGatheringResults(resultGroups = []) {
@@ -645,7 +603,6 @@ class Fabricate {
         craftingSystemManager: this.craftingSystemManager,
         evaluator: this.gatheringGateAndCheckEvaluator
       }),
-      resultResolver: createGatheringResultResolver(this.resolutionModeService),
       resultCreator: createGatheringResultCreator(this.craftingSystemManager),
       toolBreakage: createGatheringToolBreakage({
         craftingSystemManager: this.craftingSystemManager,
