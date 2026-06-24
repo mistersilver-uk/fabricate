@@ -26,6 +26,7 @@ let ChecksRightMenuComponent;
 let CraftingCheckEditorComponent;
 let SimpleCraftingCheckEditorComponent;
 let ProgressiveCraftingCheckEditorComponent;
+let SalvageProgressiveCheckEditorComponent;
 let RecipeOverviewTabComponent;
 let mounted;
 let target;
@@ -47,9 +48,11 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDiceCrits.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckAwardMode.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/SalvageProgressiveCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
@@ -1402,6 +1405,16 @@ describe('CraftingSystemManager mounted behavior', () => {
         )
       )
     ).default;
+    SalvageProgressiveCheckEditorComponent = (
+      await import(
+        pathToFileURL(
+          join(
+            tempRoot,
+            'src/ui/svelte/apps/manager/checks/SalvageProgressiveCheckEditor.svelte.js'
+          )
+        )
+      )
+    ).default;
     RecipeOverviewTabComponent = (
       await import(
         pathToFileURL(
@@ -2090,7 +2103,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       awardMode: 'equal',
       allowPlayerReorder: false,
       rollFormula: '2d6',
-      diceCrits: [{ id: 'c1', die: '2d6', raw: 12, success: true, breakTools: false }],
+      diceCrits: [
+        { id: 'c1', die: '2d6', raw: 12, success: true, breakTools: false },
+        { id: 'c2', die: '2d6', raw: 2, success: false, breakTools: false },
+      ],
     };
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2115,11 +2131,55 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(group, 'one crit group per die');
     const force = group.querySelector('[data-crit-row="c1"] [data-crit-success]');
     assert.ok(force.classList.contains('is-positive'), 'success crit shows the green pill');
-    // Editing preserves the award settings (carried, not edited, here).
+    // In the progressive (numeric) context the Force Outcome pill is relabelled
+    // award-all/award-none rather than success/failure.
+    assert.ok(force.textContent.includes('Award all'), 'success crit reads "Award all"');
+    const failRow = group.querySelector('[data-crit-row="c2"] [data-crit-success]');
+    assert.ok(failRow.textContent.includes('Award none'), 'failure crit reads "Award none"');
+
+    // The award-mode selector renders, defaults to equal, and emits the chosen mode.
+    const awardCard = target.querySelector('[data-award-mode]');
+    assert.ok(awardCard, 'the award-mode card renders');
+    assert.ok(
+      awardCard.querySelector('[data-award-mode-option="equal"]').classList.contains('is-active'),
+      'equal is the default award mode'
+    );
+    awardCard.querySelector('[data-award-mode-option="partial"] input').click();
+    assert.equal(emitted.at(-1).awardMode, 'partial', 'selecting an award mode emits it');
+
+    // Editing the crit table preserves the carried award settings.
     force.click();
     assert.equal(emitted.at(-1).diceCrits.find((c) => c.id === 'c1').success, false);
-    assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on edit');
+    assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on a crit edit');
     assert.equal(emitted.at(-1).allowPlayerReorder, false);
+  });
+
+  it('salvage progressive check editor: award-mode selector only (no formula or crits)', () => {
+    const emitted = [];
+    const value = { awardMode: 'exceed', allowPlayerReorder: true };
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(SalvageProgressiveCheckEditorComponent, {
+      target,
+      props: { value, onChange: (next) => emitted.push(next) },
+    });
+    flushSync();
+
+    assert.ok(target.querySelector('[data-salvage-progressive-editor]'));
+    // Salvage is macro-driven: no formula field, no crit table.
+    assert.equal(target.querySelector('[data-check-roll-formula]'), null, 'no formula field');
+    assert.equal(target.querySelector('[data-crit-group]'), null, 'no crit table');
+
+    // The shared award-mode selector renders, reflects the stored mode, and emits.
+    const awardCard = target.querySelector('[data-award-mode]');
+    assert.ok(awardCard, 'the award-mode card renders');
+    assert.ok(
+      awardCard.querySelector('[data-award-mode-option="exceed"]').classList.contains('is-active'),
+      'reflects the stored award mode'
+    );
+    awardCard.querySelector('[data-award-mode-option="equal"] input').click();
+    assert.equal(emitted.at(-1).awardMode, 'equal', 'selecting a mode emits it');
+    assert.equal(emitted.at(-1).allowPlayerReorder, true, 'allowPlayerReorder is preserved');
   });
 
   for (const mode of ['simple', 'alchemy']) {

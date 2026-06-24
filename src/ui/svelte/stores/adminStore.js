@@ -6291,6 +6291,22 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Persist the salvage progressive check's award settings, preserving the rest of
+  // the salvageCraftingCheck config. The manager normalizes the progressive payload
+  // on write.
+  async function saveSalvageCheckProgressive(progressive) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.salvageCraftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      salvageCraftingCheck: { ...existing, progressive },
+    });
+    await refresh();
+  }
+
   async function _updateCurrencyConfig(systemId, mutate) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = systemId || get(selectedSystemId);
@@ -6982,6 +6998,7 @@ export function createAdminStore(services) {
     saveCraftingCheckProgressive,
     saveCraftingCheckActive,
     saveSalvageCheckActive,
+    saveSalvageCheckProgressive,
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,

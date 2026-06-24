@@ -1,9 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Shared roll formula + DC + comparison row for the crafting check editors (simple
-  and routed). The check succeeds when the roll total reaches the DC, met-or-
-  exceeded or strictly exceeded. Controlled: reads the discrete fields and emits a
-  partial patch via onChange (the parent merges it into the full check object).
+  Shared roll formula (+ optional DC + comparison) row for the crafting check
+  editors (simple, routed, and progressive). When the DC is shown the check
+  succeeds once the roll total reaches it, met-or-exceeded or strictly exceeded.
+  Controlled: reads the discrete fields and emits a partial patch via onChange
+  (the parent merges it into the full check object).
 
   `showDc` (default true) renders the DC + comparison fields. The progressive check
   has no DC — its total is a numeric value, not a pass/fail threshold — so it sets

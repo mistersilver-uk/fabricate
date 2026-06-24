@@ -21,6 +21,7 @@
   import CraftingCheckEditor from './CraftingCheckEditor.svelte';
   import SimpleCraftingCheckEditor from './SimpleCraftingCheckEditor.svelte';
   import ProgressiveCraftingCheckEditor from './ProgressiveCraftingCheckEditor.svelte';
+  import SalvageProgressiveCheckEditor from './SalvageProgressiveCheckEditor.svelte';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
   // which crafting check editor renders: routed → the outcome-tier editor;
@@ -28,15 +29,22 @@
   // crit editor (no DC). `craftingCheck` is the routed draft, `craftingCheckSimple`
   // the simple draft, and `craftingCheckProgressive` the progressive draft (all
   // owned/persisted by the manager root), each with a matching update callback.
+  // `salvageResolutionMode` + `salvageCheckProgressive` drive the Salvage tab's
+  // progressive award-mode editor. `onTabChange` notifies the root which check sub-
+  // tab is active so the shared header Save persists the right draft.
   let {
     resolutionMode = 'simple',
     craftingCheck = null,
     craftingCheckSimple = null,
     craftingCheckProgressive = null,
+    salvageResolutionMode = 'simple',
+    salvageCheckProgressive = null,
     activation = {},
     onUpdateCraftingCheck = () => {},
     onUpdateCraftingCheckSimple = () => {},
     onUpdateCraftingCheckProgressive = () => {},
+    onUpdateSalvageCheckProgressive = () => {},
+    onTabChange = () => {},
     onToggleCheckActive = () => {}
   } = $props();
 
@@ -50,6 +58,7 @@
   const craftingRouted = $derived(resolutionMode === 'routed');
   const craftingSimple = $derived(resolutionMode === 'simple' || resolutionMode === 'alchemy');
   const craftingProgressive = $derived(resolutionMode === 'progressive');
+  const salvageProgressive = $derived(salvageResolutionMode === 'progressive');
 
   const PAGES = {
     crafting: {
@@ -102,7 +111,7 @@
 </script>
 
 <div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
-  <ChecksEditorTabs {activeTab} onSelect={(tab) => { activeTab = tab; }} />
+  <ChecksEditorTabs {activeTab} onSelect={(tab) => { activeTab = tab; onTabChange(tab); }} />
 
   <div class="manager-environment-workspace" class:is-inspector-hidden={!hasMenu}>
     <div
@@ -130,6 +139,10 @@
       {:else if activeTab === 'crafting' && craftingProgressive}
         <div data-checks-panel="crafting">
           <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} onChange={onUpdateCraftingCheckProgressive} />
+        </div>
+      {:else if activeTab === 'salvage' && salvageProgressive}
+        <div data-checks-panel="salvage">
+          <SalvageProgressiveCheckEditor value={salvageCheckProgressive} onChange={onUpdateSalvageCheckProgressive} />
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>
