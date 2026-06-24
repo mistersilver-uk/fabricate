@@ -11,7 +11,7 @@ Routed mode lets one recipe produce different results, with the result chosen at
 Use it whenever a single crafting process can lead to more than one outcome.
 
 A routed recipe has one or more ingredient sets and one or more result groups.
-You pick how the result is selected in one of three ways.
+You pick how the result is selected in one of two ways.
 
 ---
 
@@ -33,28 +33,16 @@ A crafting check is required.
 Use this when the quality of the result should depend on a roll.
 For example, a forging recipe might give a Masterwork Longsword on a great roll, a plain Longsword on an average one, and a Bent Blade on a poor one.
 
-This feature is expected to be modified to add numerical ranges to the outcomes to allow a roll result to determine the outcome without a macro being required.
-
-### By roll table
-
-A Foundry roll table is drawn once per attempt, and the drawn entry decides the result, with no crafting check involved.
-
-Use this when the outcome should feel random and you want Foundry's own table weighting.
-For example, brewing an unstable potion might draw Healing, Fire Breath, or Invisibility from a table.
-To set it up, make a roll table whose entry names match your result names, then point the recipe at that table.
-
-This feature may be deprecated in favor of numerical range check outcome routing.
-
 ---
 
 ## How outcomes match results
 
-With the skill-check and roll-table options, the outcome name is matched to a result by name.
+With the skill-check option, the outcome name is matched to a result by name.
 Upper and lower case and surrounding spaces are ignored, so each result needs a name that is unique once case is ignored.
-This unique-name rule applies to all three selection methods, so no two results may share a name once case is ignored.
+This unique-name rule applies to both selection methods, so no two results may share a name once case is ignored.
 
 A few names are reserved so a recipe can fail or come up empty without a separate check.
-These reserved names cannot be used as a result name in any of the three selection methods.
+These reserved names cannot be used as a result name in either selection method.
 
 | Reserved name | What happens |
 |:--------------|:-------------|
@@ -72,7 +60,6 @@ In a multi-step recipe, each step can use its own selection method and falls bac
 
 Pick **ingredient choice** when the materials a player brings should determine the output, with no roll.
 Pick **skill-check outcome** when result quality should depend on a roll and you want distinct named outcomes rather than just pass or fail.
-Pick **roll table** when you want randomness and Foundry's table weighting without a player-facing check.
 
 Recipes can be authored through the API only today.
 See the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.

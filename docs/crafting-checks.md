@@ -9,7 +9,7 @@ nav_order: 3.1
 Crafting checks let you gate recipe outcomes on a player roll.
 Checks are currently only available through the API.
 
-When a crafting system uses the Routed resolution mode with the macro-outcome option, or the Progressive resolution mode, a check is required to determine which result the crafter receives.
+When a crafting system uses the Routed resolution mode with the skill-check outcome option, or the Progressive resolution mode, a check is required to determine which result the crafter receives.
 The check is configured at the system level.
 Each attempt runs the check automatically, before any materials are consumed.
 
