@@ -121,6 +121,8 @@ A built-in D&D 5e adapter (`Dnd5eCraftingCheckAdapter`) is registered automatica
 
 Custom adapters must implement three methods:
 
+{% raw %}
+
 ```javascript
 class MyCraftingCheckAdapter extends CraftingCheckAdapter {
   constructor() { super('my-system-id'); }
@@ -139,6 +141,8 @@ class MyCraftingCheckAdapter extends CraftingCheckAdapter {
   async executeCheck(actor, config) { /* ... */ }
 }
 ```
+
+{% endraw %}
 
 Register a custom adapter during module initialisation:
 
