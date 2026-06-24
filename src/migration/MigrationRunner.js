@@ -18,6 +18,7 @@ import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationT
 import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
+import { migrateRemoveResultSelectionProviders } from './migrateRemoveResultSelectionProviders.js';
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
@@ -53,6 +54,21 @@ function compareSemver(a, b) {
     if (na > nb) return 1;
   }
   return 0;
+}
+
+/**
+ * True when a value is the transient `_removedResultSelectionProviders` payload shape
+ * emitted by the 1.6.0 migration (an object carrying at least one of the two arrays).
+ * @param {*} value
+ * @returns {boolean}
+ */
+function _isRemovedProvidersPayload(value) {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (Array.isArray(value.droppedRollTableRecipes) || Array.isArray(value.strippedGatheringTasks))
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +208,19 @@ const MIGRATIONS = [
       return { systems, gatheringConfig };
     },
   },
+  {
+    version: '1.6.0',
+    label:
+      'Remove legacy routed result-selection providers (macroOutcome/rollTableOutcome → check); drop rollTableUuid; strip gathering-task result selections',
+    migrate(data) {
+      // Surfaces dropped roll-table recipes/steps + stripped gathering tasks via the
+      // transient `_removedResultSelectionProviders` field (consumed by the runner for
+      // a one-time GM recovery notice, then stripped — never persisted).
+      const { recipes, gatheringConfig, _removedResultSelectionProviders } =
+        migrateRemoveResultSelectionProviders(data);
+      return { recipes, gatheringConfig, _removedResultSelectionProviders };
+    },
+  },
   // Future migrations added here in version order
 ];
 
@@ -226,7 +255,7 @@ export class MigrationRunner {
    * Only persists data when changes are detected.
    * Updates migrationVersion to the highest migration version that ran.
    *
-   * @returns {Promise<{ ran: number, aborted: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
+   * @returns {Promise<{ ran: number, aborted: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], removedResultSelectionProviders: { droppedRollTableRecipes: object[], strippedGatheringTasks: object[] }, abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
    *   a summary of the run so the caller can fire one-time edge effects (e.g. the
    *   GM catalyst-migration and region-unification notices) or surface an aborted pass.
    */
@@ -238,7 +267,16 @@ export class MigrationRunner {
       .sort((a, b) => compareSemver(a.version, b.version));
 
     if (pending.length === 0) {
-      return { ran: 0, aborted: false, migratedCatalystCount: 0, unifiedRegionSystems: [] };
+      return {
+        ran: 0,
+        aborted: false,
+        migratedCatalystCount: 0,
+        unifiedRegionSystems: [],
+        removedResultSelectionProviders: {
+          droppedRollTableRecipes: [],
+          strippedGatheringTasks: [],
+        },
+      };
     }
 
     const rawRecipes = this._getSetting(SETTING_KEYS.RECIPES) ?? [];
@@ -263,6 +301,10 @@ export class MigrationRunner {
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
     let unifiedRegionSystems = [];
+    let removedResultSelectionProviders = {
+      droppedRollTableRecipes: [],
+      strippedGatheringTasks: [],
+    };
 
     for (const migration of pending) {
       // Capture the last known-good transformed payload BEFORE running this
@@ -308,6 +350,10 @@ export class MigrationRunner {
             failures,
             migratedCatalystCount: 0,
             unifiedRegionSystems: [],
+            removedResultSelectionProviders: {
+              droppedRollTableRecipes: [],
+              strippedGatheringTasks: [],
+            },
           };
         }
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
@@ -329,6 +375,20 @@ export class MigrationRunner {
       unifiedRegionSystems = data._unifiedRegionSystems.map(String);
     }
     delete data._unifiedRegionSystems;
+
+    // The 1.6.0 legacy-result-selection-provider migration reports the recipes/steps
+    // whose dropped `rollTableUuid` needs manual reconfiguration and the gathering
+    // tasks whose `resultSelection` was stripped (the GM must populate
+    // `gatheringCraftingCheck.routed.rollFormula`). Capture it for the GM notice and
+    // strip it so it is never persisted as part of any setting payload.
+    if (_isRemovedProvidersPayload(data._removedResultSelectionProviders)) {
+      removedResultSelectionProviders = {
+        droppedRollTableRecipes:
+          data._removedResultSelectionProviders.droppedRollTableRecipes ?? [],
+        strippedGatheringTasks: data._removedResultSelectionProviders.strippedGatheringTasks ?? [],
+      };
+    }
+    delete data._removedResultSelectionProviders;
 
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
@@ -358,7 +418,13 @@ export class MigrationRunner {
 
     console.log(`Fabricate | Migrations complete: ran ${pending.length} migration(s)`);
 
-    return { ran: pending.length, aborted: false, migratedCatalystCount, unifiedRegionSystems };
+    return {
+      ran: pending.length,
+      aborted: false,
+      migratedCatalystCount,
+      unifiedRegionSystems,
+      removedResultSelectionProviders,
+    };
   }
 
   /**

@@ -81,7 +81,7 @@ test('non-legacy systems and their recipes are left untouched', () => {
 // Tiered group-name reconciliation
 // ---------------------------------------------------------------------------
 
-test('tiered recipe → macroOutcome; routed groups renamed to outcome, outcomeRouting dropped', () => {
+test('tiered recipe → check; routed groups renamed to outcome, outcomeRouting dropped', () => {
   const recipes = [
     recipe('sys-tiered', {
       resultGroups: [group('g1', 'Old A'), group('g2', 'Old B')],
@@ -90,7 +90,7 @@ test('tiered recipe → macroOutcome; routed groups renamed to outcome, outcomeR
   ];
   const out = migrate([tieredSystem()], recipes);
   const r = out.recipes[0];
-  assert.equal(r.resultSelection.provider, 'macroOutcome');
+  assert.equal(r.resultSelection.provider, 'check');
   assert.equal('outcomeRouting' in r, false, 'outcomeRouting removed');
   const byId = Object.fromEntries(r.resultGroups.map((g) => [g.id, g.name]));
   assert.equal(byId.g1, 'success');
