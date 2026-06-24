@@ -4,8 +4,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { rolledDiceGroups, resolveCheckCrit, runFormulaPassFail, runFormulaProgressive } =
-  await import('../src/systems/checkRoll.js');
+const {
+  rolledDiceGroups,
+  resolveCheckCrit,
+  runFormulaPassFail,
+  runFormulaProgressive,
+  runFormulaRouted,
+} = await import('../src/systems/checkRoll.js');
 
 function stubRoll(total, dice = []) {
   globalThis.Roll = class {
@@ -130,4 +135,185 @@ test('runFormulaProgressive: no dice engine awards nothing (value 0) without blo
   const r = await runFormulaProgressive({ formula: '2d6', actor: ACTOR });
   assert.equal(r.success, true);
   assert.equal(r.value, 0);
+});
+
+// ── runFormulaRouted ────────────────────────────────────────────────────────
+
+// Relative tiers carry a DC delta; the effective threshold is base dc + outcome.dc.
+const RELATIVE = [
+  { id: 'crit', name: 'Critical Success', success: true, breakTools: false, dc: 10 },
+  { id: 'good', name: 'Success', success: true, breakTools: false, dc: 0 },
+  { id: 'bad', name: 'Failure', success: false, breakTools: false, dc: -5 },
+];
+const FIXED = [
+  { id: 'low', name: 'Fumble', success: false, breakTools: true, start: 1, end: 5 },
+  { id: 'mid', name: 'Partial', success: true, breakTools: false, start: 6, end: 14 },
+  { id: 'high', name: 'Clean', success: true, breakTools: false, start: 15, end: 20 },
+];
+
+test('runFormulaRouted relative: meet picks the highest matching effective threshold', async () => {
+  // base dc 15: thresholds are 25 (crit), 15 (good), 10 (bad). total 16 → 15 & 10 match.
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+  });
+  assert.equal(r.outcome, 'Success');
+  assert.equal(r.success, true);
+  assert.equal(r.value, 16);
+  assert.equal(r.data.outcomeId, 'good');
+});
+
+test('runFormulaRouted relative: exceed needs strictly greater than the threshold', async () => {
+  // total 15, threshold for "good" is exactly 15. exceed → does not match good; only "bad" (10).
+  stubRoll(15, [{ number: 1, faces: 20, total: 15 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'exceed',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+  });
+  assert.equal(r.outcome, 'Failure');
+  assert.equal(r.success, false);
+  assert.equal(r.data.comparison, 'exceed');
+});
+
+test('runFormulaRouted fixed: the total lands inside its [start, end] range', async () => {
+  stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+  });
+  assert.equal(r.outcome, 'Partial');
+  assert.equal(r.success, true);
+  assert.equal(r.data.outcomeId, 'mid');
+});
+
+test('runFormulaRouted: no tier matches → outcome null, success false', async () => {
+  // base dc 15: lowest threshold is "bad" at 10. total 4 matches nothing.
+  stubRoll(4, [{ number: 1, faces: 20, total: 4 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+  });
+  assert.equal(r.outcome, null);
+  assert.equal(r.success, false);
+  assert.equal(r.value, 4);
+});
+
+test('runFormulaRouted: a success crit forces the highest succeeding tier', async () => {
+  // total 4 would match nothing, but the success crit reroutes to the best success tier.
+  stubRoll(4, [{ number: 1, faces: 20, total: 20 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    diceCrits: [{ die: '1d20', raw: 20, success: true }],
+    actor: ACTOR,
+  });
+  assert.equal(r.outcome, 'Critical Success');
+  assert.equal(r.success, true);
+});
+
+test('runFormulaRouted: a failure crit forces the lowest failing tier', async () => {
+  // total 20 would match a success tier, but the failure crit reroutes to the worst failing tier.
+  stubRoll(20, [{ number: 1, faces: 20, total: 1 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    diceCrits: [{ die: '1d20', raw: 1, success: false }],
+    actor: ACTOR,
+  });
+  assert.equal(r.outcome, 'Failure');
+  assert.equal(r.success, false);
+});
+
+test('runFormulaRouted: a forced disposition with no matching tier leaves outcome null', async () => {
+  // Only a single success tier exists; a failure crit has nowhere to route.
+  stubRoll(12, [{ number: 1, faces: 20, total: 1 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    type: 'relative',
+    relativeOutcomes: [{ id: 'only', name: 'Win', success: true, dc: 0 }],
+    diceCrits: [{ die: '1d20', raw: 1, success: false }],
+    actor: ACTOR,
+  });
+  assert.equal(r.outcome, null);
+  assert.equal(r.success, false);
+});
+
+test('runFormulaRouted: a matched tier surfaces its breakTools; a crit breakTools takes precedence', async () => {
+  // Fixed "Fumble" range matches and carries breakTools: true.
+  stubRoll(3, [{ number: 1, faces: 20, total: 3 }]);
+  const tier = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+  });
+  assert.equal(tier.outcome, 'Fumble');
+  assert.equal(tier.data.breakTools, true);
+
+  // A crit with breakTools reroutes and surfaces its own breakTools.
+  stubRoll(8, [{ number: 1, faces: 20, total: 1 }]);
+  const crit = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    diceCrits: [{ die: '1d20', raw: 1, success: false, breakTools: true }],
+    actor: ACTOR,
+  });
+  assert.equal(crit.outcome, 'Fumble');
+  assert.equal(crit.data.breakTools, true);
+  assert.deepEqual(crit.data.crit, { success: false, breakTools: true });
+});
+
+test('runFormulaRouted: no dice engine does not block and does not fabricate a route', async () => {
+  delete globalThis.Roll;
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+  });
+  assert.equal(r.success, true);
+  assert.equal(r.outcome, null);
+  assert.equal(r.value, null);
+});
+
+test('runFormulaRouted: a throwing roll fails with a labelled message', async () => {
+  stubThrowingRoll();
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+    label: 'Salvage',
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.outcome, null);
+  assert.match(r.message, /Salvage check roll failed/);
 });

@@ -9,7 +9,7 @@ import {
   itemMatchesComponentSource,
 } from '../utils/sourceUuid.js';
 
-import { runFormulaPassFail, runFormulaProgressive } from './checkRoll.js';
+import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import {
   buildCurrencyAffordProbe,
@@ -2473,12 +2473,16 @@ export class CraftingEngine {
 
     // Formula-based check (Checks editor) takes precedence when a roll formula is
     // configured for the active salvage mode; otherwise fall back to the legacy
-    // macro path below. (Routed salvage evaluation is wired alongside gathering.)
+    // macro path below. Routed maps the rolled total onto a named outcome tier that
+    // `_resolveSalvageResultGroups` routes through `component.salvage.outcomeRouting`.
     if (mode === 'progressive' && check.progressive?.rollFormula) {
       return this._runSalvageProgressiveCheck(check.progressive, actor);
     }
     if (mode === 'simple' && check.simple?.rollFormula) {
       return this._runSalvageSimpleCheck(check.simple, component, actor);
+    }
+    if (mode === 'routed' && check.routed?.rollFormula) {
+      return this._runSalvageRoutedCheck(check.routed, component, actor);
     }
 
     if (!check?.enabled && !check?.macroUuid) {
@@ -2565,6 +2569,29 @@ export class CraftingEngine {
     return runFormulaProgressive({
       formula: progressive.rollFormula,
       diceCrits: progressive.diceCrits,
+      actor,
+      label: 'Salvage',
+    });
+  }
+
+  /**
+   * Salvage routed check: roll the routed formula and map its total onto one of the
+   * configured outcome tiers (relative DC deltas or fixed value ranges). The matched
+   * tier's NAME becomes the `outcome` that {@link _resolveSalvageResultGroups} feeds
+   * through `component.salvage.outcomeRouting` to pick a result group. The base DC is
+   * the resolved salvage DC (per-component override ?? routed default), so a per-
+   * component `dcOverride` shifts every relative threshold. Delegates to the shared
+   * {@link runFormulaRouted}.
+   */
+  async _runSalvageRoutedCheck(routed, component, actor) {
+    return runFormulaRouted({
+      formula: routed.rollFormula,
+      dc: this._resolveSalvageDc(routed, component),
+      thresholdMode: routed.thresholdMode,
+      type: routed.type,
+      relativeOutcomes: routed.relativeOutcomes,
+      fixedOutcomes: routed.fixedOutcomes,
+      diceCrits: routed.diceCrits,
       actor,
       label: 'Salvage',
     });
