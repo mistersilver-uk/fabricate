@@ -11,6 +11,7 @@ import { SETTING_KEYS } from '../config/settings.js';
 
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
+import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem.js';
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
@@ -178,6 +179,17 @@ const MIGRATIONS = [
       'Hard-migrate legacy mapped/tiered resolution modes to canonical routed + provider (ingredientSet/macroOutcome with tiered group-name reconciliation)',
     migrate(data) {
       return migrateLegacyResolutionModes(data);
+    },
+  },
+  {
+    version: '1.5.0',
+    label: 'Seed the system-level gathering check from per-task gathering check formulas',
+    migrate(data) {
+      const { systems, gatheringConfig } = migrateGatheringChecksToSystem(
+        data.systems,
+        data.gatheringConfig
+      );
+      return { systems, gatheringConfig };
     },
   },
   // Future migrations added here in version order
