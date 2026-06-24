@@ -75,3 +75,25 @@ export function isReservedRoutedName(name) {
   const normalized = normalizeRoutedName(name);
   return FAIL_SET.has(normalized) || MISS_SET.has(normalized) || HAZARD_SET.has(normalized);
 }
+
+/**
+ * Match result groups to a routed `outcome` by NORMALIZED name — the single
+ * shared sub-step of the three otherwise-distinct routing models (crafting's
+ * `check` provider, gathering's system-check tier). Only the name comparison and
+ * the first-vs-all selection are shared here; reserved-keyword handling,
+ * tier→result-set assignment, and per-system status shapes stay in the callers.
+ *
+ * @param {*} outcome the routed outcome/tier name (raw; normalized internally)
+ * @param {Array<{name?: *}>} groups candidate result groups
+ * @param {object} [options]
+ * @param {boolean} [options.firstOnly=false] keep only the first match (crafting
+ *   routes to a single group via `slice(0, 1)`); gathering keeps all matches.
+ * @returns {Array} the matching groups in order
+ */
+export function matchResultGroupsByName(outcome, groups, { firstOnly = false } = {}) {
+  const normalized = normalizeRoutedName(outcome);
+  const matched = (Array.isArray(groups) ? groups : []).filter(
+    (group) => normalizeRoutedName(group?.name) === normalized
+  );
+  return firstOnly ? matched.slice(0, 1) : matched;
+}
