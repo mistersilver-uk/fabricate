@@ -21,7 +21,6 @@
   import CraftingCheckEditor from './CraftingCheckEditor.svelte';
   import SimpleCraftingCheckEditor from './SimpleCraftingCheckEditor.svelte';
   import ProgressiveCraftingCheckEditor from './ProgressiveCraftingCheckEditor.svelte';
-  import SalvageProgressiveCheckEditor from './SalvageProgressiveCheckEditor.svelte';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
   // which crafting check editor renders: routed → the outcome-tier editor;
@@ -29,20 +28,25 @@
   // crit editor (no DC). `craftingCheck` is the routed draft, `craftingCheckSimple`
   // the simple draft, and `craftingCheckProgressive` the progressive draft (all
   // owned/persisted by the manager root), each with a matching update callback.
-  // `salvageResolutionMode` + `salvageCheckProgressive` drive the Salvage tab's
-  // progressive award-mode editor. `onTabChange` notifies the root which check sub-
-  // tab is active so the shared header Save persists the right draft.
+  // `salvageResolutionMode` + the salvage drafts drive the Salvage tab's editor
+  // (simple/routed reuse the crafting editors with recipe-specific bits hidden;
+  // progressive reuses the crafting progressive editor). `onTabChange` notifies the
+  // root which check sub-tab is active so the shared header Save persists the right draft.
   let {
     resolutionMode = 'simple',
     craftingCheck = null,
     craftingCheckSimple = null,
     craftingCheckProgressive = null,
     salvageResolutionMode = 'simple',
+    salvageCheckSimple = null,
+    salvageCheckRouted = null,
     salvageCheckProgressive = null,
     activation = {},
     onUpdateCraftingCheck = () => {},
     onUpdateCraftingCheckSimple = () => {},
     onUpdateCraftingCheckProgressive = () => {},
+    onUpdateSalvageCheckSimple = () => {},
+    onUpdateSalvageCheckRouted = () => {},
     onUpdateSalvageCheckProgressive = () => {},
     onTabChange = () => {},
     onToggleCheckActive = () => {}
@@ -58,7 +62,11 @@
   const craftingRouted = $derived(resolutionMode === 'routed');
   const craftingSimple = $derived(resolutionMode === 'simple' || resolutionMode === 'alchemy');
   const craftingProgressive = $derived(resolutionMode === 'progressive');
+  const salvageRouted = $derived(salvageResolutionMode === 'routed');
   const salvageProgressive = $derived(salvageResolutionMode === 'progressive');
+  const salvageSimple = $derived(
+    salvageResolutionMode === 'simple' || salvageResolutionMode === 'alchemy'
+  );
 
   const PAGES = {
     crafting: {
@@ -140,9 +148,17 @@
         <div data-checks-panel="crafting">
           <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} onChange={onUpdateCraftingCheckProgressive} />
         </div>
+      {:else if activeTab === 'salvage' && salvageRouted}
+        <div data-checks-panel="salvage">
+          <CraftingCheckEditor value={salvageCheckRouted} showTiers={false} onChange={onUpdateSalvageCheckRouted} />
+        </div>
       {:else if activeTab === 'salvage' && salvageProgressive}
         <div data-checks-panel="salvage">
-          <SalvageProgressiveCheckEditor value={salvageCheckProgressive} onChange={onUpdateSalvageCheckProgressive} />
+          <ProgressiveCraftingCheckEditor value={salvageCheckProgressive} onChange={onUpdateSalvageCheckProgressive} />
+        </div>
+      {:else if activeTab === 'salvage' && salvageSimple}
+        <div data-checks-panel="salvage">
+          <SimpleCraftingCheckEditor value={salvageCheckSimple} showDcSource={false} onChange={onUpdateSalvageCheckSimple} />
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>

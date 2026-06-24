@@ -6288,7 +6288,10 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  async function saveSalvageCheckActive(enabled) {
+  // Shallow-merge a patch into the selected system's salvageCraftingCheck and
+  // persist (the manager normalizes the whole check on write). Shared by every
+  // salvage check saver below so the boilerplate lives in one place.
+  async function _saveSalvageCheckPatch(patch) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
@@ -6296,26 +6299,15 @@ export function createAdminStore(services) {
     if (!system) return;
     const existing = system.salvageCraftingCheck || {};
     await systemManager.updateSystem(sysId, {
-      salvageCraftingCheck: { ...existing, enabled: enabled === true },
+      salvageCraftingCheck: { ...existing, ...patch },
     });
     await refresh();
   }
 
-  // Persist the salvage progressive check's award settings, preserving the rest of
-  // the salvageCraftingCheck config. The manager normalizes the progressive payload
-  // on write.
-  async function saveSalvageCheckProgressive(progressive) {
-    const systemManager = services.getCraftingSystemManager();
-    const sysId = get(selectedSystemId);
-    if (!sysId) return;
-    const system = systemManager.getSystem(sysId);
-    if (!system) return;
-    const existing = system.salvageCraftingCheck || {};
-    await systemManager.updateSystem(sysId, {
-      salvageCraftingCheck: { ...existing, progressive },
-    });
-    await refresh();
-  }
+  const saveSalvageCheckActive = (enabled) => _saveSalvageCheckPatch({ enabled: enabled === true });
+  const saveSalvageCheckProgressive = (progressive) => _saveSalvageCheckPatch({ progressive });
+  const saveSalvageCheckSimple = (simple) => _saveSalvageCheckPatch({ simple });
+  const saveSalvageCheckRouted = (routed) => _saveSalvageCheckPatch({ routed });
 
   async function _updateCurrencyConfig(systemId, mutate) {
     const systemManager = services.getCraftingSystemManager();
@@ -7009,6 +7001,8 @@ export function createAdminStore(services) {
     saveCraftingCheckActive,
     saveSalvageCheckActive,
     saveSalvageCheckProgressive,
+    saveSalvageCheckSimple,
+    saveSalvageCheckRouted,
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,
