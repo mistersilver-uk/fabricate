@@ -2245,6 +2245,31 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('crafting check editor: flags an unnamed outcome tier (cannot be routed by name)', () => {
+    const value = {
+      type: 'relative',
+      rollFormula: '1d20',
+      dc: 15,
+      relativeOutcomes: [
+        { id: 'id00000001', name: 'Success', success: true, breakTools: false, dc: 0 },
+        { id: 'id00000002', name: '   ', success: false, breakTools: false, dc: -5 },
+      ],
+      fixedOutcomes: [],
+    };
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(CraftingCheckEditorComponent, { target, props: { value, onChange: () => {} } });
+    flushSync();
+
+    const validation = target.querySelector('[data-checks-validation]');
+    assert.ok(validation, 'an unnamed (blank) outcome tier surfaces a validation message');
+    assert.match(
+      validation.textContent,
+      /unnamed tier cannot be routed|name every outcome tier/i,
+      'the message tells the GM to name the tier'
+    );
+  });
+
   it('simple check editor: threshold + comparison, crit table, tiers, and macro modes', () => {
     const emitted = [];
     const value = {

@@ -65,6 +65,11 @@
   const outcomesKey = $derived(type === 'fixed' ? 'fixedOutcomes' : 'relativeOutcomes');
   const outcomes = $derived(Array.isArray(value?.[outcomesKey]) ? value[outcomesKey] : []);
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
+  // Outcome routing is keyed by tier NAME (crafting/salvage map the name to a
+  // result group; gathering matches it to a same-named result group). An unnamed
+  // tier can never be routed, so a winning roll on it silently yields nothing —
+  // surface it here so the GM names every tier.
+  const hasUnnamedOutcome = $derived(outcomes.some((outcome) => !String(outcome?.name || '').trim()));
 
   const validationMessages = $derived(
     [
@@ -78,6 +83,12 @@
         ? text(
             'FABRICATE.Admin.Manager.Checks.Crafting.RangeOverlap',
             'Some tier ranges overlap. Each value range must be unique.'
+          )
+        : null,
+      hasUnnamedOutcome
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeUnnamed',
+            'Name every outcome tier — an unnamed tier cannot be routed to a result group.'
           )
         : null,
     ].filter(Boolean)
