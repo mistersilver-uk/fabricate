@@ -27,8 +27,18 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckDiceCrits from './CheckDiceCrits.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
+  import CheckBreakage from './CheckBreakage.svelte';
 
-  let { value = null, showDcSource = true, onChange = () => {} } = $props();
+  // `breakageAuthority` (issue 419): under `checkDriven` the CheckBreakage editor
+  // replaces the legacy per-die break-tools toggles for authoring tool breakage.
+  let {
+    value = null,
+    showDcSource = true,
+    breakageAuthority = 'toolSpecific',
+    onChange = () => {}
+  } = $props();
+
+  const checkDriven = $derived(breakageAuthority === 'checkDriven');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -109,9 +119,19 @@
     <CheckDiceCrits
       rollFormula={value?.rollFormula || ''}
       diceCrits={value?.diceCrits || []}
+      showBreakTools={!checkDriven}
       onChange={(diceCrits) => emit({ diceCrits })}
     />
   </section>
+
+  {#if checkDriven}
+    <CheckBreakage
+      value={value?.checkBreakage || null}
+      rollFormula={value?.rollFormula || ''}
+      kind="simple"
+      onChange={(checkBreakage) => emit({ checkBreakage })}
+    />
+  {/if}
 
   {#if showDcSource}
   <section class="manager-inspector-card">

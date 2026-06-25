@@ -19,11 +19,15 @@
   // `forceOnLabel`/`forceOffLabel` override the Force Outcome pill text (already
   // localized by the caller); when null the simple/routed success/failure labels
   // are used.
+  // `showBreakTools` (default true) renders the per-die break-tools toggle column.
+  // Under `checkDriven` tool-breakage authority the caller hides it (breakage is
+  // authored via CheckBreakage instead); the crit force-outcome column stays.
   let {
     rollFormula = '',
     diceCrits = [],
     forceOnLabel = null,
     forceOffLabel = null,
+    showBreakTools = true,
     onChange = () => {}
   } = $props();
 
@@ -171,11 +175,13 @@
         <p class="manager-muted manager-checks-crit-hint" data-crit-multi-hint>{multiDieHint(die)}</p>
       {/if}
       {#if rows.length > 0}
-        <div class="manager-checks-outcome-table is-crit" role="table" aria-label={`${die.raw} ${text('FABRICATE.Admin.Manager.Checks.Crafting.CritTitle', 'Critical rolls')}`}>
+        <div class={`manager-checks-outcome-table is-crit ${showBreakTools ? '' : 'is-crit-no-break'}`} role="table" aria-label={`${die.raw} ${text('FABRICATE.Admin.Manager.Checks.Crafting.CritTitle', 'Critical rolls')}`}>
           <div class="manager-checks-outcome-head" role="row">
             <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.CritRaw', 'Raw roll')}</span>
             <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.CritForce', 'Force Outcome')}</span>
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
+            {#if showBreakTools}
+              <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
+            {/if}
             <span role="columnheader" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}></span>
           </div>
           {#each rows as crit (crit.id)}
@@ -199,16 +205,18 @@
               >
                 {crit.success === true ? successOnLabel : successOffLabel}
               </button>
-              <button
-                type="button"
-                class={`manager-checks-state-pill ${crit.breakTools === true ? 'is-negative' : 'is-positive'}`}
-                data-crit-break
-                aria-pressed={crit.breakTools === true}
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
-                onclick={() => updateCrit(crit.id, { breakTools: !(crit.breakTools === true) })}
-              >
-                {crit.breakTools === true ? breakOnLabel : breakOffLabel}
-              </button>
+              {#if showBreakTools}
+                <button
+                  type="button"
+                  class={`manager-checks-state-pill ${crit.breakTools === true ? 'is-negative' : 'is-positive'}`}
+                  data-crit-break
+                  aria-pressed={crit.breakTools === true}
+                  aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
+                  onclick={() => updateCrit(crit.id, { breakTools: !(crit.breakTools === true) })}
+                >
+                  {crit.breakTools === true ? breakOnLabel : breakOffLabel}
+                </button>
+              {/if}
               <button
                 type="button"
                 class="manager-icon-button is-danger"

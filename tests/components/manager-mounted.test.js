@@ -26,6 +26,8 @@ let ChecksRightMenuComponent;
 let CraftingCheckEditorComponent;
 let SimpleCraftingCheckEditorComponent;
 let ProgressiveCraftingCheckEditorComponent;
+let ToolsBrowserViewComponent;
+let ChecksViewComponent;
 let RecipeOverviewTabComponent;
 let mounted;
 let target;
@@ -46,6 +48,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDiceCrits.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckBreakage.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckAwardMode.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
@@ -1464,6 +1467,16 @@ describe('CraftingSystemManager mounted behavior', () => {
         )
       )
     ).default;
+    ToolsBrowserViewComponent = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte.js'))
+      )
+    ).default;
+    ChecksViewComponent = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/checks/ChecksView.svelte.js'))
+      )
+    ).default;
   });
 
   afterEach(() => {
@@ -2478,6 +2491,275 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(emitted.at(-1).diceCrits.find((c) => c.id === 'c1').success, false);
     assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on a crit edit');
     assert.equal(emitted.at(-1).allowPlayerReorder, false);
+  });
+
+  // Tool-breakage authority UI (issue 419). Each editor accepts a `breakageAuthority`
+  // prop: under `toolSpecific` the legacy per-die/per-outcome break-tools toggles
+  // render and the CheckBreakage section is hidden; under `checkDriven` the toggles
+  // are hidden and the CheckBreakage trigger editor renders. Mount an editor with a
+  // given authority and return the target so each assertion stays DRY.
+  function mountCheckEditor(EditorComponent, value, breakageAuthority, extraProps = {}) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    const emitted = [];
+    mounted = mount(EditorComponent, {
+      target,
+      props: {
+        value,
+        breakageAuthority,
+        onChange: (next) => emitted.push(next),
+        ...extraProps,
+      },
+    });
+    flushSync();
+    return emitted;
+  }
+
+  const simpleBreakageValue = {
+    rollFormula: '1d20',
+    dc: 12,
+    thresholdMode: 'meet',
+    dcMode: 'static',
+    tiers: [],
+    macroUuid: null,
+    diceCrits: [{ id: 'c1', die: '1d20', raw: 1, success: false, breakTools: false }],
+  };
+  const progressiveBreakageValue = {
+    awardMode: 'equal',
+    allowPlayerReorder: false,
+    rollFormula: '2d6',
+    diceCrits: [{ id: 'c1', die: '2d6', raw: 2, success: false, breakTools: false }],
+  };
+  const routedBreakageValue = {
+    type: 'relative',
+    rollFormula: '1d20',
+    dc: 14,
+    thresholdMode: 'meet',
+    tiers: [],
+    diceCrits: [{ id: 'c1', die: '1d20', raw: 1, success: false, breakTools: false }],
+    relativeOutcomes: [{ id: 'o1', name: 'Success', success: true, breakTools: false, dc: 0 }],
+    fixedOutcomes: [],
+  };
+
+  // Criterion 13: CheckBreakage hidden under toolSpecific (legacy toggles shown),
+  // shown under checkDriven (legacy toggles hidden), across all three editors.
+  const breakageEditorCases = [
+    { name: 'simple', component: () => SimpleCraftingCheckEditorComponent, value: () => simpleBreakageValue },
+    {
+      name: 'progressive',
+      component: () => ProgressiveCraftingCheckEditorComponent,
+      value: () => progressiveBreakageValue,
+    },
+    { name: 'routed', component: () => CraftingCheckEditorComponent, value: () => routedBreakageValue },
+  ];
+  for (const editorCase of breakageEditorCases) {
+    it(`${editorCase.name} check editor: hides CheckBreakage and keeps break-tools toggles under toolSpecific`, () => {
+      mountCheckEditor(editorCase.component(), editorCase.value(), 'toolSpecific');
+      assert.equal(
+        target.querySelector('[data-check-breakage]'),
+        null,
+        'the CheckBreakage section is hidden under toolSpecific authority'
+      );
+      // The legacy per-die break-tools toggle stays under toolSpecific.
+      assert.ok(
+        target.querySelector('[data-crit-break]'),
+        'the per-die break-tools toggle renders under toolSpecific'
+      );
+    });
+
+    it(`${editorCase.name} check editor: shows CheckBreakage and hides break-tools toggles under checkDriven`, () => {
+      mountCheckEditor(editorCase.component(), editorCase.value(), 'checkDriven');
+      assert.ok(
+        target.querySelector('[data-check-breakage]'),
+        'the CheckBreakage section renders under checkDriven authority'
+      );
+      assert.equal(
+        target.querySelector('[data-crit-break]'),
+        null,
+        'the per-die break-tools toggle is hidden under checkDriven'
+      );
+    });
+  }
+
+  it('routed check editor: hides the per-outcome break-tools column under checkDriven', () => {
+    mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'toolSpecific');
+    assert.ok(
+      target.querySelector('[data-outcome-break]'),
+      'the per-outcome break-tools pill renders under toolSpecific'
+    );
+
+    if (mounted) unmount(mounted);
+    target.remove();
+    mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'checkDriven');
+    assert.equal(
+      target.querySelector('[data-outcome-break]'),
+      null,
+      'the per-outcome break-tools pill is hidden under checkDriven'
+    );
+  });
+
+  it('check breakage editor: seeds the natural-1 preset on first enable and lists its triggers', () => {
+    const emitted = mountCheckEditor(SimpleCraftingCheckEditorComponent, simpleBreakageValue, 'checkDriven');
+    // First enable seeds the default preset (the formula has a d20 group).
+    const toggle = target.querySelector('[data-check-breakage-toggle]');
+    assert.ok(toggle, 'the enable toggle renders');
+    toggle.click();
+    flushSync();
+    const breakage = emitted.at(-1).checkBreakage;
+    assert.equal(breakage.enabled, true, 'enabling sets enabled true');
+    assert.equal(breakage.triggers.length, 1, 'the default preset seeds exactly one trigger');
+    assert.deepEqual(
+      {
+        type: breakage.triggers[0].condition.type,
+        aggregate: breakage.triggers[0].condition.aggregate,
+        operator: breakage.triggers[0].condition.operator,
+        value: breakage.triggers[0].condition.value,
+      },
+      { type: 'diceGroup', aggregate: 'anyDie', operator: '==', value: 1 },
+      'the seeded preset is a diceGroup anyDie == 1 trigger'
+    );
+  });
+
+  it('check breakage editor: shows the no-d20 empty state when the formula has no d20 group', () => {
+    const noD20 = { ...progressiveBreakageValue, rollFormula: '2d6', checkBreakage: { enabled: true, triggers: [] } };
+    mountCheckEditor(ProgressiveCraftingCheckEditorComponent, noD20, 'checkDriven');
+    const empty = target.querySelector('[data-breakage-empty]');
+    assert.ok(empty, 'the empty state renders when enabled with no triggers');
+    assert.match(
+      empty.textContent,
+      /no d20 group|has no d20/i,
+      'the empty state explains the formula has no d20 group to seed the preset'
+    );
+  });
+
+  // Criterion 13 (disabled-subsystem hiding): ChecksView forces toolSpecific for a
+  // subsystem whose feature is off, so its editor never shows the CheckBreakage
+  // section even when the system authority is checkDriven. Mount ChecksView with the
+  // gathering feature off and the gathering tab active, and confirm no CheckBreakage.
+  function mountChecksView(props) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ChecksViewComponent, {
+      target,
+      props: { resolutionMode: 'simple', craftingCheckSimple: simpleBreakageValue, ...props },
+    });
+    flushSync();
+  }
+
+  it('checks view: a checkDriven crafting editor shows CheckBreakage; gathering hides it when its feature is off', () => {
+    mountChecksView({
+      breakageAuthority: 'checkDriven',
+      features: { gathering: false },
+      gatheringResolutionMode: 'routed',
+      gatheringCheckRouted: routedBreakageValue,
+    });
+    // Crafting (always on) honours the system authority and shows CheckBreakage.
+    assert.ok(
+      target.querySelector('[data-check-breakage]'),
+      'crafting editor renders CheckBreakage under checkDriven authority'
+    );
+
+    // Switch to the gathering tab: the disabled gathering subsystem forces
+    // toolSpecific, so its editor renders no CheckBreakage section.
+    const gatheringTab = target.querySelector('[data-checks-tab-button="gathering"]');
+    assert.ok(gatheringTab, 'the gathering tab renders');
+    gatheringTab.click();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-checks-panel="gathering"]'),
+      'the gathering panel is shown'
+    );
+    assert.equal(
+      target.querySelector('[data-check-breakage]'),
+      null,
+      'the disabled gathering subsystem shows no CheckBreakage section'
+    );
+  });
+
+  // Criterion 1/4 UI: the Tools page offers `immune` as a breakage mode, and
+  // selecting it hides the breakage-field inputs (it carries no fields).
+  it('tools browser: offers immune as a breakage mode and hides the breakage-field inputs', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    const emitted = [];
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        tools: [
+          { id: 't1', name: 'Hammer', componentId: 'c1', breakage: { mode: 'limitedUses', maxUses: 3 } },
+        ],
+        expandedToolId: 't1',
+        breakageAuthority: 'toolSpecific',
+        onUpdateTool: (id, patch) => emitted.push({ id, patch }),
+      },
+    });
+    flushSync();
+
+    // The immune radio is offered alongside the existing three modes.
+    const immuneRadio = target.querySelector('input[name="tool-t1-breakage-mode"][value="immune"]');
+    assert.ok(immuneRadio, 'the immune breakage mode radio renders');
+    // Under limitedUses, the max-uses field shows.
+    assert.ok(
+      target.querySelector('.manager-tools-max-uses-input'),
+      'the limited-uses field renders for a limitedUses tool'
+    );
+
+    // Selecting immune emits a fields-less breakage block.
+    immuneRadio.click();
+    flushSync();
+    assert.deepEqual(
+      emitted.at(-1),
+      { id: 't1', patch: { breakage: { mode: 'immune' } } },
+      'selecting immune emits a breakage block with no fields'
+    );
+  });
+
+  it('tools browser: an immune tool shows no breakage-field inputs', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        tools: [{ id: 't1', name: 'Anvil', componentId: 'c1', breakage: { mode: 'immune' } }],
+        expandedToolId: 't1',
+        breakageAuthority: 'toolSpecific',
+        onUpdateTool: () => {},
+      },
+    });
+    flushSync();
+    assert.equal(
+      target.querySelector('.manager-tools-max-uses-input'),
+      null,
+      'an immune tool shows no limited-uses field'
+    );
+    assert.equal(
+      target.querySelector('input[type="range"]'),
+      null,
+      'an immune tool shows no breakage-chance slider'
+    );
+    // The on-break action fieldset still renders (immune onBreak stays configurable).
+    assert.ok(
+      target.querySelector('input[name="tool-t1-on-break-mode"]'),
+      'the on-break action controls still render for an immune tool'
+    );
+  });
+
+  it('tools browser: surfaces the check-driven authority advisory', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: { tools: [], breakageAuthority: 'checkDriven', onSetBreakageAuthority: () => {} },
+    });
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-breakage-authority-advisory]'),
+      'the checkDriven advisory renders'
+    );
+    assert.ok(
+      target.querySelector('[data-breakage-authority="checkDriven"]'),
+      'the authority radio options render'
+    );
   });
 
   for (const mode of ['simple', 'alchemy']) {

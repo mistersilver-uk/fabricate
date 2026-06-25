@@ -1246,6 +1246,16 @@
   grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
 }
 
+/* checkDriven authority drops the per-outcome break-tools column (tool breakage is
+   authored via the CheckBreakage editor instead). */
+.fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
+  grid-template-columns: minmax(140px, 1fr) 84px 104px 40px;
+}
+
+.fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
+  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 40px;
+}
+
 /* Simple-check recipe tiers: Name + DC + remove. */
 .fabricate-manager .manager-checks-outcome-table.is-tier {
   grid-template-columns: minmax(140px, 1fr) 96px 40px;
@@ -1255,6 +1265,12 @@
    the auto-fail/auto-succeed pills on one line + remove. */
 .fabricate-manager .manager-checks-outcome-table.is-crit {
   grid-template-columns: 92px minmax(110px, 1fr) minmax(110px, 1fr) 40px;
+}
+
+/* Crit table with the break-tools column hidden (checkDriven authority): the
+   break column is dropped, so only Raw roll + Force Outcome + remove remain. */
+.fabricate-manager .manager-checks-outcome-table.is-crit-no-break {
+  grid-template-columns: 92px minmax(110px, 1fr) 40px;
 }
 
 .fabricate-manager .manager-checks-force-outcome {

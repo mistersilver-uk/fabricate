@@ -761,7 +761,12 @@ function _normalizeGatheringDropConditionModifierList(
     .filter(Boolean);
 }
 
-const GATHERING_TOOL_BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
+const GATHERING_TOOL_BREAKAGE_MODES = new Set([
+  'limitedUses',
+  'breakageChance',
+  'diceExpression',
+  'immune',
+]);
 const GATHERING_TOOL_ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
 function _normalizeToolRequirement(input) {
   if (input === null || input === undefined) return null;
@@ -779,6 +784,10 @@ function _normalizeToolBreakage(input) {
   if (mode === 'breakageChance') {
     const raw = Number(input?.breakageChance);
     return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
+  }
+  if (mode === 'immune') {
+    // An immune tool carries no breakage fields and never breaks (issue 419).
+    return { mode };
   }
   const threshold = Number(input?.threshold);
   return {
@@ -1830,6 +1839,19 @@ function _buildSelectedSystemViewData(
       simple: selectedSystem.craftingCheck?.simple
         ? _clonePlain(selectedSystem.craftingCheck.simple)
         : null,
+      // Surface the progressive config too (issue 419) so the progressive editor
+      // reads back its persisted checkBreakage (the deep _clonePlain preserves the
+      // nested block). Previously unsurfaced, so a progressive edit seeded empty.
+      progressive: selectedSystem.craftingCheck?.progressive
+        ? _clonePlain(selectedSystem.craftingCheck.progressive)
+        : null,
+    },
+    // Tool-breakage authority (issue 419): surfaced so the Tools page and the
+    // check editors can read it back (NOT projected before → invisible to the UI).
+    // The engine normalizer defaults unknown/missing to "toolSpecific".
+    toolBreakage: {
+      authority:
+        selectedSystem.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific',
     },
     salvageResolutionMode: selectedSystem.salvageResolutionMode || 'simple',
     salvageCraftingCheck: {
@@ -5098,6 +5120,20 @@ export function createAdminStore(services) {
     return true;
   }
 
+  // Tool-breakage authority (issue 419): "toolSpecific" (each tool's own mode +
+  // legacy breakTools) | "checkDriven" (the active check's checkBreakage decides
+  // breakage for all required tools). Persisted as a system-level field; the engine
+  // normalizer coerces unknown/missing to "toolSpecific".
+  async function setToolBreakageAuthority(authority) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return false;
+    const nextAuthority = authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    await systemManager.updateSystem(sysId, { toolBreakage: { authority: nextAuthority } });
+    await refresh();
+    return true;
+  }
+
   async function toggleRequirement(requirement, enabled) {
     if (!['time', 'currency'].includes(requirement)) return;
     const systemManager = services.getCraftingSystemManager();
@@ -7128,6 +7164,7 @@ export function createAdminStore(services) {
     toggleEnvironmentEnabled,
     setEnvironmentRealmMembership,
     toggleSystemEnabled,
+    setToolBreakageAuthority,
     toggleFeature,
     toggleRequirement,
     addCategory,

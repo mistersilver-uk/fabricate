@@ -17,14 +17,44 @@
     expandedToolId = '',
     dirtyToolIds = [],
     managedItemOptions = [],
+    breakageAuthority = 'toolSpecific',
     onSelectTool = () => {},
     onExpandTool = () => {},
     onToggleExpand = () => {},
     onAddTool = () => {},
     onAddToolDrop = () => {},
     onUpdateTool = () => {},
-    onDeleteTool = () => {}
+    onDeleteTool = () => {},
+    onSetBreakageAuthority = () => {}
   } = $props();
+
+  // Tool-breakage authority (issue 419): under "checkDriven" the active check's
+  // breakage triggers decide whether all required tools break, and a tool's own
+  // breakage mode is not evaluated (except "immune").
+  const isCheckDriven = $derived(breakageAuthority === 'checkDriven');
+  const BREAKAGE_AUTHORITY_OPTIONS = [
+    {
+      value: 'toolSpecific',
+      icon: 'fas fa-screwdriver-wrench',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific',
+      labelFallback: 'Tool-specific',
+      descKey: 'FABRICATE.Admin.Manager.Tools.AuthorityToolSpecificDesc',
+      descFallback: "Each tool's own breakage mode decides whether it breaks."
+    },
+    {
+      value: 'checkDriven',
+      icon: 'fas fa-dice',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven',
+      labelFallback: 'Check-driven',
+      descKey: 'FABRICATE.Admin.Manager.Tools.AuthorityCheckDrivenDesc',
+      descFallback: 'The active check decides whether all required tools break.'
+    }
+  ];
+
+  function setBreakageAuthority(authority) {
+    if (authority === breakageAuthority) return;
+    onSetBreakageAuthority?.(authority);
+  }
 
   function text(key, fallback = key) {
     const translated = localize(key);
@@ -75,7 +105,9 @@
   }
 
   function breakageChipClass(tool) {
-    return tool?.breakage?.mode === 'limitedUses' ? 'manager-chip is-neutral' : 'manager-chip is-warning';
+    const mode = tool?.breakage?.mode;
+    if (mode === 'immune') return 'manager-chip is-positive';
+    return mode === 'limitedUses' ? 'manager-chip is-neutral' : 'manager-chip is-warning';
   }
 
   function breakageChipLabel(tool) {
@@ -94,6 +126,9 @@
     if (mode === 'diceExpression') {
       return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryDice', 'Dice < {threshold}')
         .replace('{threshold}', String(tool?.breakage?.threshold ?? 0));
+    }
+    if (mode === 'immune') {
+      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryImmune', 'Never breaks');
     }
     return text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', 'Limited uses');
   }
@@ -182,6 +217,9 @@
       onUpdateTool?.(tool.id, { breakage: { mode, maxUses: null } });
     } else if (mode === 'breakageChance') {
       onUpdateTool?.(tool.id, { breakage: { mode, breakageChance: 0 } });
+    } else if (mode === 'immune') {
+      // Immune carries no breakage fields: the tool never breaks (issue 419).
+      onUpdateTool?.(tool.id, { breakage: { mode } });
     } else {
       onUpdateTool?.(tool.id, { breakage: { mode, formula: '', threshold: 0 } });
     }
@@ -272,6 +310,37 @@
     role="tabpanel"
     aria-labelledby="manager-gathering-nav-tools"
   >
+  <section class="manager-inspector-card manager-tools-card" data-manager-tools-authority>
+    <fieldset class="manager-radio-group manager-tools-section" role="radiogroup" aria-labelledby="manager-tools-authority-legend">
+      <legend id="manager-tools-authority-legend" class="manager-radio-group-legend">{text('FABRICATE.Admin.Manager.Tools.AuthorityTitle', 'Tool breakage source')}</legend>
+      <div class="manager-radio-options">
+        {#each BREAKAGE_AUTHORITY_OPTIONS as option (option.value)}
+          <label class={`manager-radio-option ${breakageAuthority === option.value ? 'is-selected' : ''}`}>
+            <input type="radio"
+              name="manager-tools-breakage-authority"
+              value={option.value}
+              data-breakage-authority={option.value}
+              checked={breakageAuthority === option.value}
+              onchange={() => setBreakageAuthority(option.value)} />
+            <i class={option.icon} aria-hidden="true"></i>
+            <span class="manager-radio-option-body">
+              <span class="manager-radio-option-name">{text(option.labelKey, option.labelFallback)}</span>
+              <span class="manager-radio-option-desc">{text(option.descKey, option.descFallback)}</span>
+            </span>
+          </label>
+        {/each}
+      </div>
+      {#if isCheckDriven}
+        <p class="manager-muted manager-tools-authority-advisory" data-breakage-authority-advisory>
+          {text(
+            'FABRICATE.Admin.Manager.Tools.AuthorityCheckDrivenAdvisory',
+            'Per-tool breakage modes are not evaluated (except Immune); the active check decides whether required tools break.'
+          )}
+        </p>
+      {/if}
+    </fieldset>
+  </section>
+
   <section class="manager-inspector-card manager-tools-card" data-manager-tools-browser>
     <div class="manager-tools-card-header">
       <div>
@@ -438,7 +507,8 @@
                     {#each [
                       { value: 'limitedUses', icon: 'fas fa-hashtag', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', labelFallback: 'Limited uses' },
                       { value: 'breakageChance', icon: 'fas fa-percent', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageChance', labelFallback: 'Breakage chance' },
-                      { value: 'diceExpression', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageDice', labelFallback: 'Dice expression' }
+                      { value: 'diceExpression', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageDice', labelFallback: 'Dice expression' },
+                      { value: 'immune', icon: 'fas fa-shield', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageImmune', labelFallback: 'Immune' }
                     ] as option (option.value)}
                       <label class={`manager-radio-option ${tool.breakage?.mode === option.value ? 'is-selected' : ''}`}>
                         <input type="radio"
