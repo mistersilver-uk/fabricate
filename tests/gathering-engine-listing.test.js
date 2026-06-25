@@ -1423,3 +1423,36 @@ test('getTaskDropBreakdown returns empty drops when richState has no previewDrop
   const result = await engine.getTaskDropBreakdown({ viewer, environmentId: 'env-a', taskId: 'task-a', rememberedActorId: 'actor-1' });
   assert.deepEqual(result.drops, []);
 });
+
+// ---------------------------------------------------------------------------
+// System-validity gate (issue 429): a system with a `blocks: 'system'`
+// validation issue exposes nothing to non-GM viewers, while a GM still sees it.
+// A multi-step-in-alchemy system is a structural blocker that needs no recipes.
+// ---------------------------------------------------------------------------
+
+const blockedGatheringSystem = {
+  id: 'system-a',
+  enabled: true,
+  features: { gathering: true, multiStepRecipes: true },
+  resolutionMode: 'alchemy',
+  components: []
+};
+
+test('listForActor hides a system-blocked system from a non-GM viewer', async () => {
+  const engine = makeEngine({ systems: [blockedGatheringSystem] });
+
+  const listing = await engine.listForActor({ viewer, actor });
+
+  assert.equal(listing.attemptable, false);
+  assert.deepEqual(reasonCodes(listing), ['NO_ENVIRONMENTS_CONFIGURED']);
+  assert.deepEqual(listing.environments, [], 'a system blocker drops its environments for a player');
+});
+
+test('listForActor still shows a system-blocked system to a GM (GM bypass)', async () => {
+  const engine = makeEngine({ systems: [blockedGatheringSystem] });
+
+  const listing = await engine.listForActor({ viewer: { id: 'gm-1', isGM: true }, actor });
+
+  assert.equal(listing.environments.length, 1, 'GM bypasses the system blocker');
+  assert.equal(listing.environments[0].id, 'env-a');
+});
