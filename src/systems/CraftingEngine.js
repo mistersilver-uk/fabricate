@@ -323,7 +323,7 @@ export class CraftingEngine {
         if (failurePolicy.breakToolsOnFail) {
           usedToolPairs = toolValidation.tools;
           // The single shared `evaluateCheckBreakage` seam decides forced breakage
-          // on the check-failure path too (gated by `consumeCatalystsOnFail`, as
+          // on the check-failure path too (gated by `breakToolsOnFail`, as
           // today). Under `toolSpecific` the legacy crit/tier `data.breakTools`
           // force-break applies; under `checkDriven` the active check's
           // `checkBreakage` triggers decide. A macro/builtIn check never force-breaks
@@ -522,7 +522,7 @@ export class CraftingEngine {
     // engine-evaluated crit/tier `breakTools` forces every matched tool to break (a
     // macro/builtIn `data.breakTools` does not); under `checkDriven` the active
     // check's `checkBreakage` triggers decide whether all required non-immune tools
-    // break. The SUCCESS path always applies breakage (no `consumeCatalystsOnFail`
+    // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
     // gate exists here).
     const successBreakDecision = this._resolveCraftingBreakageDecision(
       this._getRecipeSystem(executionRecipe),
@@ -2378,7 +2378,7 @@ export class CraftingEngine {
         if (failurePolicy.breakToolsOnFail) {
           usedToolPairs = toolValidation.tools;
           // Salvage parity (issue 419): the FAILURE path breaks required tools only
-          // when `consumeCatalystsOnFail === true` (this gate), matching crafting.
+          // when `breakToolsOnFail === true` (this gate), matching crafting.
           const salvageFailBreak = this._resolveSalvageBreakageDecision(system, checkResult);
           usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
             forceBreak: salvageFailBreak.forceBreak,
@@ -2436,7 +2436,7 @@ export class CraftingEngine {
       ingredientQuantity
     );
     // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
-    // `consumeCatalystsOnFail` gate exists here), via the shared seam.
+    // `breakToolsOnFail` gate exists here), via the shared seam.
     const salvageSuccessBreak = this._resolveSalvageBreakageDecision(system, checkResult);
     const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
       forceBreak: salvageSuccessBreak.forceBreak,
