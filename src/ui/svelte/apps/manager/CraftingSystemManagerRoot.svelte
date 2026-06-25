@@ -4419,6 +4419,8 @@
         onToggleEnabled={(id, enabled) => store.toggleRecipeEnabled?.(id, enabled)}
       />
     {:else if currentView === 'system-edit' && selectedSystem}
+      <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings')}>
+        <section class="manager-environment-editor-shell">
       <SystemEditView
         {selectedSystem}
         systemBlocked={systemBlocksSystem}
@@ -4456,6 +4458,8 @@
         onClearCurrencyMacro={onClearCurrencyMacro}
         onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
       />
+        </section>
+      </main>
     {:else}
       <SystemsBrowserView
         systems={$viewState.systems || []}
