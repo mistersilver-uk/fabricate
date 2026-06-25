@@ -18,6 +18,14 @@
  * Item-flag conventions:
  *   Item.flags.fabricate.toolUsage  = { timesUsed: number }   // limitedUses only
  *   Item.flags.fabricate.toolBroken = true                    // set by the flagBroken on-break action
+ *
+ * The flagBroken on-break action also appends a localized " (broken)" suffix to the
+ * owned item's display name. The append is idempotent: the suffix is never doubled, and it is
+ * never appended to an item that was already toolBroken-flagged before the action fired. The
+ * suffix is display-only. The toolBroken flag, not the name, remains the authoritative
+ * presence-gate disqualifier. Note: a component matched purely by name (no sourceUuid/fallback
+ * ids) stops matching its component once renamed, so a GM clearing the toolBroken flag must also
+ * restore the original name to regain damaged-tier recognition.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 
@@ -272,6 +280,13 @@ export class Tool {
   /**
    * Apply the configured on-break action to an owned tool item.
    *
+   * For the `flagBroken` action, in addition to setting the `toolBroken` flag, a localized
+   * " (broken)" suffix is appended to the item's display name. The append is idempotent: it is
+   * skipped when the item was already broken-flagged before this call or when the name already
+   * ends with the suffix. The suffix is display-only. The flag remains the authoritative
+   * presence-gate disqualifier. A component matched purely by name (no sourceUuid/fallback ids)
+   * stops matching its component once renamed, so a GM clearing the flag must also restore the name.
+   *
    * @param {object} params
    * @param {Item} params.item                                       - The owned Foundry Item to act on
    * @param {object} [params.actor]                                  - Actor that owned the item
@@ -288,7 +303,19 @@ export class Tool {
     }
 
     if (mode === 'flagBroken') {
+      const wasBroken = getFabricateFlag(item, 'toolBroken', false);
       await setFabricateFlag(item, 'toolBroken', true);
+      const suffix =
+        globalThis.game?.i18n?.localize?.('FABRICATE.Tool.BrokenNameSuffix') || ' (broken)';
+      if (
+        typeof item?.update === 'function' &&
+        typeof item?.name === 'string' &&
+        item.name &&
+        !wasBroken &&
+        !item.name.endsWith(suffix)
+      ) {
+        await item.update({ name: `${item.name}${suffix}` });
+      }
       return { action: 'flagged' };
     }
 

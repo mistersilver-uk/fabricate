@@ -3550,6 +3550,9 @@
       "SearchPlaceholder": "Search recipes...",
       "AllCategories": "All Categories",
       "ResetView": "Reset View"
+    },
+    "Tool": {
+      "BrokenNameSuffix": " (broken)"
     }
   }
 }

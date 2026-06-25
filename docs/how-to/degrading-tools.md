@@ -34,6 +34,7 @@ Author the tool once in the crafting system's **Tools** library with the **Limit
 The tool is removed from inventory when it breaks.
    - **Mark as broken**.
 The tool stays but is flagged as broken and cannot be used until a GM clears that mark.
+Fabricate also appends " (broken)" to the tool's name so it reads as broken at a glance, and clearing the mark does not remove that suffix, so the GM renames the tool back as well.
    - **Replace with...**.
 Swap the tool for a broken variant you can repair through a recipe.
 5. **Save**, then require the tool from the recipe (or from a step or ingredient set).
