@@ -12,4 +12,5 @@ Each skill directory follows the Agent Skills layout:
 
 ## Shared Repo Utilities
 
-- Latest module versions: use `node scripts/latest-module-versions.mjs --profile fabricate-beta` from the repo root to query the current latest beta manifests for Fabricate plus sibling premium modules; substitute another `--profile <name>` when needed. The script uses exact S3 manifest reads rather than bucket listing, and supports `--json`, repeated `--include <moduleId>`, `--channel <name>`, `--bucket <name>`, `--premium-config <path>`, and `--no-premium`.
+- Latest module versions: use `node scripts/latest-module-versions.mjs --profile fabricate-beta` from the repo root to query the current latest beta manifests for Fabricate plus sibling premium modules; substitute another `--profile <name>` when needed.
+The script uses exact S3 manifest reads rather than bucket listing, and supports `--json`, repeated `--include <moduleId>`, `--channel <name>`, `--bucket <name>`, `--premium-config <path>`, and `--no-premium`.

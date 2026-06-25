@@ -22,9 +22,11 @@ Token-driven realm sensing from the travel actor's placed token, and realm modif
 > Several Foundry scene regions can map onto one realm through the realm's scene mappings, so a single realm can span several drawn map areas.
 > A realm **never** decides which tasks or events belong to an environment (that is biome, plus danger for events).
 > It only decides location availability.
-> See [Composition](#composition-no-longer-uses-geography) below.
+> See [Concepts](#concepts) below.
 
 ## Concepts
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Concept | What it is |
 |:--------|:-----------|
@@ -32,6 +34,8 @@ Token-driven realm sensing from the travel actor's placed token, and realm modif
 | **Biome** | A descriptive terrain or ecology trait carried by a realm, such as forest, swamp, or coastal |
 | **Environment** | A reusable gathering place that can belong to one or more realms and declare location-availability rules |
 | **Party** | A world-level Fabricate record with actor members and exactly one travel actor |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Realms are geography, not environment containers.
 Environments declare which realms they belong to and keep owning their own availability rules.
@@ -66,6 +70,8 @@ Create realms here before assigning environments to them.
 
 Each realm belongs to one crafting system and stores:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
 | **Name** | Realm name shown to the GM, and to players once disclosed |
@@ -76,6 +82,8 @@ Each realm belongs to one crafting system and stores:
 | **Biomes** | Biome tags (from the system's biome list) used by environment biome availability rules |
 | **Scene mappings** | Links from the realm to one or more Foundry scene regions, reserved for the scene-automation phase |
 | **Modifiers** | Adjustments to event chance, drop rate, yield, difficulty, stamina cost, and attempt limit (plus custom adjustments) are stored and checked now, and applied to gathering calculations in a later phase |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ### Realms vs Foundry Regions
 
@@ -105,11 +113,15 @@ Each crafting system stores a few realm behavior settings.
 The **Enable Travel & Realms** toggle (off by default) is set from the Settings tab.
 The remaining settings are set through the API (see [API](#api)):
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Setting | Values | Effect |
 |:--------|:-------|:-------|
 | Travel & Realms | off (default), on | Gates the whole realm, travel, and availability subsystem for the system. Set from the Settings tab **Enable Travel & Realms** toggle (see [Enabling Travel & Realms](#enabling-travel--realms)) |
 | Reveal mode | manual (default), on party token entry, always visible | "Always visible" discloses realm names to players even when secret and undiscovered. "On party token entry" is reserved for the scene-automation phase |
 | Modifier visibility | visible (default), GM only | Default disclosure for realm modifiers once modifiers apply during play |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ## Parties
 
@@ -200,7 +212,8 @@ A stale listing (for example, an override cleared between listing and clicking *
 Location-gated environments stay listed but blocked, with a localized reason:
 
 - *"Not available in the party's current realm."* when the environment is excluded or no inclusion matches.
-- *"No party realm is set. Ask the GM to set the party's current realm."* when the environment requires a realm and none is resolved.
+- *"No party realm is set.
+Ask the GM to set the party's current realm."* when the environment requires a realm and none is resolved.
 
 Each listed environment also carries redaction-safe location information (whether it is gated, whether it is available, why, and disclosure-safe current-realm labels) and, on blocked rows, travel guidance.
 That guidance covers the destination realms the viewer is allowed to see (non-secret or already discovered), plus a count of secret undiscovered destinations.

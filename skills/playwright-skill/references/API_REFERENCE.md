@@ -1,6 +1,7 @@
 # Playwright Skill - Complete API Reference
 
-This document contains the comprehensive Playwright API reference and advanced patterns. For quick-start execution patterns, see [SKILL.md](SKILL.md).
+This document contains the comprehensive Playwright API reference and advanced patterns.
+For quick-start execution patterns, see [SKILL.md](SKILL.md).
 
 ## Table of Contents
 
@@ -12,7 +13,6 @@ This document contains the comprehensive Playwright API reference and advanced p
 - [Assertions](#assertions)
 - [Page Object Model](#page-object-model-pom)
 - [Network & API Testing](#network--api-testing)
-- [Authentication & Session Management](#authentication--session-management)
 - [Visual Testing](#visual-testing)
 - [Mobile Testing](#mobile-testing)
 - [Debugging](#debugging)
@@ -421,10 +421,12 @@ PW_EXTRA_HEADERS='{"X-Automated-By":"playwright-skill","X-Request-ID":"123"}'
 ```
 
 These headers are automatically applied to all requests when using:
+
 - `helpers.createContext(browser)` - headers merged automatically
 - `getContextOptionsWithHeaders(options)` - utility injected by run.js wrapper
 
 **Precedence (highest to lowest):**
+
 1. Headers passed directly in `options.extraHTTPHeaders`
 2. Environment variable headers
 3. Playwright defaults

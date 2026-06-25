@@ -41,7 +41,8 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
 - Multiple ingredient sets and result groups are allowed.
 - Result-group resolution is recipe-level via `Recipe.resultSelection.provider`.
-- **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the check outcome or provider. No other result groups are awarded.**
+- **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the check outcome or provider.
+No other result groups are awarded.**
 - Supported providers:
   - `ingredientSet`
   - `check`
@@ -82,7 +83,8 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - Each result references a `Component` with `difficulty >= 1`.
 - Check is mandatory and returns numeric `value`.
 - Awarding evaluates ordered results using `awardMode`.
-- **All result groups whose difficulty threshold is met or exceeded are awarded, not just the highest matching group. This is the key distinction from `routed` mode, which selects exactly one result group.**
+- **All result groups whose difficulty threshold is met or exceeded are awarded, not just the highest matching group.
+This is the key distinction from `routed` mode, which selects exactly one result group.**
 
 ### Award Modes
 

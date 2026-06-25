@@ -29,6 +29,9 @@ Developers configuring a custom check for a non-D&D-5e system should refer to th
 
 ## See Also
 
-- [Crafting Systems]({% link crafting-systems.md %}). Configure resolution mode, feature toggles, and system-level settings.
-- [Salvage]({% link salvage.md %}). Configure salvage checks, which use a separate check to gate salvage outcomes.
-- [Recipes]({% link recipes/index.md %}). Understand the Routed and Progressive resolution modes that require a crafting check.
+- [Crafting Systems]({% link crafting-systems.md %}).
+Configure resolution mode, feature toggles, and system-level settings.
+- [Salvage]({% link salvage.md %}).
+Configure salvage checks, which use a separate check to gate salvage outcomes.
+- [Recipes]({% link recipes/index.md %}).
+Understand the Routed and Progressive resolution modes that require a crafting check.

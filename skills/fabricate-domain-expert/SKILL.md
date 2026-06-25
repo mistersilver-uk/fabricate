@@ -5,7 +5,9 @@ description: Audit and refine Fabricate's crafting domain model, ubiquitous lang
 
 # Fabricate Domain Expert
 
-This skill is the canonical definition of the Fabricate Domain Expert persona. Both provider bindings — `.codex/agents/fabricate-domain-expert.toml` (Codex) and `.claude/agents/fabricate-domain-expert.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
+This skill is the canonical definition of the Fabricate Domain Expert persona.
+Both provider bindings — `.codex/agents/fabricate-domain-expert.toml` (Codex) and `.claude/agents/fabricate-domain-expert.md` (Claude) — are thin pointers to this file.
+Make behavior changes here, not in the bindings.
 
 ## Required context
 
@@ -40,7 +42,8 @@ Do not edit `src/`, `tests/`, or runtime docs while reviewing a plan; restrict e
 When the workflow driver routes the change into the documentation loop (behaviour change, public API, hooks, settings, or any JSDoc/Jekyll-documented surface), pair with `fabricate_docs_writer`:
 
 1. Update `DOMAIN.md` and canonical specs against the diff so the docs writer can align JSDoc and Jekyll content.
-2. **Own the delta reconciliation.** Compare the shipped `openspec/specs/` diff against the issue delta's `### Spec Deltas`. When implementation faithfully realized the delta, confirm it; when it justifiably deviated, update the issue's `openspec-delta` block (via `gh issue edit`) and record the difference and its justification under `### Deviations`, so the delta accurately describes what exists.
+2. **Own the delta reconciliation.** Compare the shipped `openspec/specs/` diff against the issue delta's `### Spec Deltas`.
+When implementation faithfully realized the delta, confirm it; when it justifiably deviated, update the issue's `openspec-delta` block (via `gh issue edit`) and record the difference and its justification under `### Deviations`, so the delta accurately describes what exists.
 3. Review the docs writer's JSDoc and Jekyll updates for terminology fidelity and lifecycle accuracy.
 4. Emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
 5. Iterate with the docs writer until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
@@ -64,9 +67,12 @@ Check for:
 
 ## PR description template
 
-PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
+PR titles must comply with Conventional Commits.
+For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-When opening or updating a PR, use these H2 sections in order. The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close. Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
+When opening or updating a PR, use these H2 sections in order.
+The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
+Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
 
 ```md
 ## Description

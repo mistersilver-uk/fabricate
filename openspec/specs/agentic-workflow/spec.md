@@ -18,7 +18,8 @@ The repository MUST treat files under `openspec/specs/*/spec.md` as the canonica
 
 ### Requirement: Per-change planning
 
-Non-trivial changes MUST be planned as an OpenSpec change delta in the work's GitHub issue before implementation starts. The delta is NOT versioned as files in the repository; it lives in a managed block (`openspec-delta:start` … `openspec-delta:end`) in the issue body and consolidates the proposal, design, tasks, any per-domain spec deltas, the resolved roster, and acceptance/verification.
+Non-trivial changes MUST be planned as an OpenSpec change delta in the work's GitHub issue before implementation starts.
+The delta is NOT versioned as files in the repository; it lives in a managed block (`openspec-delta:start` … `openspec-delta:end`) in the issue body and consolidates the proposal, design, tasks, any per-domain spec deltas, the resolved roster, and acceptance/verification.
 
 #### Scenario: planning issue work
 
@@ -80,7 +81,8 @@ Shared reusable skills MUST live under the repository `skills/` directory.
 
 ### Requirement: Role persona bindings
 
-Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`. Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.md` for Claude) MUST be thin bindings that point at the canonical skill and MUST NOT carry divergent persona behavior.
+Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`.
+Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.md` for Claude) MUST be thin bindings that point at the canonical skill and MUST NOT carry divergent persona behavior.
 
 #### Scenario: resolving a routing token
 

@@ -13,12 +13,14 @@ This spec does not redefine mode semantics; mode-specific resolution is defined 
 
 ### Multi-Step Recipe Field Precedence
 
-When `features.multiStepRecipes === true` and `recipe.steps.length > 0`, the recipe is an **explicit multi-step recipe**. The following rules apply:
+When `features.multiStepRecipes === true` and `recipe.steps.length > 0`, the recipe is an **explicit multi-step recipe**.
+The following rules apply:
 
 - Recipe-level `ingredientSets` and `resultGroups` MAY be empty arrays or absent entirely.
 - Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `toolIds`, and `timeRequirement`.
 - Recipe-level fields serve as fallback ONLY for implicit single-step recipes (where `steps` is empty and the recipe-level fields form one implicit step).
-- Step-level fields always take priority. Recipe-level fields are never merged into or combined with step-level fields.
+- Step-level fields always take priority.
+Recipe-level fields are never merged into or combined with step-level fields.
 - Recipe-level `toolIds` defined outside any step are additive: they apply to every step in addition to each step's own `toolIds`.
 
 ### Validation Contracts
@@ -26,11 +28,13 @@ When `features.multiStepRecipes === true` and `recipe.steps.length > 0`, the rec
 Validation rules differ between single-step and explicit multi-step recipes:
 
 **Single-step (implicit) contract** (`steps` is empty):
+
 - Recipe-level `ingredientSets` MUST have at least one entry.
 - Recipe-level `resultGroups` MUST have at least one entry.
 - Recipe-level fields define the single implicit step.
 
 **Explicit multi-step contract** (`steps.length > 0`):
+
 - `steps` array MUST have at least one entry.
 - Each step MUST have at least one `ingredientSet` with at least one `ingredientGroup`.
 - Each step MUST have at least one `resultGroup` with at least one result.
@@ -38,9 +42,12 @@ Validation rules differ between single-step and explicit multi-step recipes:
 - Recipe-level `resultGroups` requirement is waived when explicit steps are present.
 
 **Authoring incomplete-shell contract** (GM authoring path):
+
 - The single-step and multi-step completeness rules above (at least one ingredient set / result group / ordered result) are the *craftability* contract enforced by `Recipe.validate()`.
-- The GM authoring path MAY persist a structurally consistent recipe that does not yet satisfy completeness — an *incomplete shell* (e.g. created by "+ Create recipe" then edited for identity only). Persistence gates on structural validity (`Recipe.validateStructure()`) only; structural-integrity errors still block persistence.
-- A shell is NOT craftable: `CraftingEngine.craft()` rejects it with the completeness error from `Recipe.validate()` — the load-bearing gate for every incomplete shape, including a shell that has ingredient sets but no result groups. `RecipeManager.evaluateCraftability` additionally returns `canCraft: false` for shells with no ingredient sets (its empty-ingredient-set guard), but that guard alone does not catch a shell whose only gap is missing result groups; `craft()`'s `Recipe.validate()` does. Completing the recipe (adding the missing ingredient sets/result groups) is what makes it craftable.
+- The GM authoring path MAY persist a structurally consistent recipe that does not yet satisfy completeness — an *incomplete shell* (e.g. created by "+ Create recipe" then edited for identity only).
+Persistence gates on structural validity (`Recipe.validateStructure()`) only; structural-integrity errors still block persistence.
+- A shell is NOT craftable: `CraftingEngine.craft()` rejects it with the completeness error from `Recipe.validate()` — the load-bearing gate for every incomplete shape, including a shell that has ingredient sets but no result groups. `RecipeManager.evaluateCraftability` additionally returns `canCraft: false` for shells with no ingredient sets (its empty-ingredient-set guard), but that guard alone does not catch a shell whose only gap is missing result groups; `craft()`'s `Recipe.validate()` does.
+Completing the recipe (adding the missing ingredient sets/result groups) is what makes it craftable.
 - Incompleteness is *derived* from the recipe's structure, not stored: an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
 
 ## Step Structure
@@ -59,8 +66,11 @@ Each step can define:
 - AND-across-ingredient-sets is not supported.
 - OR groups are always enabled and are not feature-toggled.
 - Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are always supported, including simple recipes, when their tag IDs exist in the crafting system's `itemTags` list.
-- **Tools** are the required-but-not-always-consumed, potentially-breakable prerequisite primitive (replacing recipe-side catalysts). They are referenced by id at recipe level, step level, and ingredient-set level via `toolIds`; the applicable set for an ingredient set is the union of those ids resolved against the per-system Tools library (`RecipeManager.getToolsForSet`). Every applicable Tool must be present (matched via the shared tool matcher) and pass its optional `requirement` before the recipe is craftable; `RecipeManager.evaluateCraftability` returns `toolStates` and `missing.tools`.
-- `CraftingEngine` validates Tools (`_validateTools`) and, on a committed craft, applies tool usage/breakage through the shared breakage runtime (`src/toolBreakageRuntime.js`), recording `usedTools` evidence. Tool usage/breakage is tracked on owned item instances.
+- **Tools** are the required-but-not-always-consumed, potentially-breakable prerequisite primitive (replacing recipe-side catalysts).
+They are referenced by id at recipe level, step level, and ingredient-set level via `toolIds`; the applicable set for an ingredient set is the union of those ids resolved against the per-system Tools library (`RecipeManager.getToolsForSet`).
+Every applicable Tool must be present (matched via the shared tool matcher) and pass its optional `requirement` before the recipe is craftable; `RecipeManager.evaluateCraftability` returns `toolStates` and `missing.tools`.
+- `CraftingEngine` validates Tools (`_validateTools`) and, on a committed craft, applies tool usage/breakage through the shared breakage runtime (`src/toolBreakageRuntime.js`), recording `usedTools` evidence.
+Tool usage/breakage is tracked on owned item instances.
 - A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
 
 ## Execution Lifecycle
@@ -223,17 +233,20 @@ The actor-flag shape for `craftingRuns` and `salvageRuns` is defined in `002-dat
 
 ### Purpose
 
-Define the lifecycle and semantics for salvage operations — the inverse of crafting. Instead of combining ingredients into a result, salvage decomposes a single component into one or more results.
+Define the lifecycle and semantics for salvage operations — the inverse of crafting.
+Instead of combining ingredients into a result, salvage decomposes a single component into one or more results.
 
 ### Prerequisites
 
 - `CraftingSystem.features.salvage` must be true.
 - `Component.salvage.enabled` must be true.
-- `CraftingSystem.salvageResolutionMode` must be one of: `"simple"`, `"routed"`, `"progressive"`. Alchemy is not supported for salvage because salvage always operates on one known component, not blind ingredient submission.
+- `CraftingSystem.salvageResolutionMode` must be one of: `"simple"`, `"routed"`, `"progressive"`.
+Alchemy is not supported for salvage because salvage always operates on one known component, not blind ingredient submission.
 
 ### Implicit Ingredient
 
-Salvage has a single implicit ingredient: `N × this component`, where `N = Component.salvage.ingredientQuantity`. The actor must own at least `N` instances of the component's source item.
+Salvage has a single implicit ingredient: `N × this component`, where `N = Component.salvage.ingredientQuantity`.
+The actor must own at least `N` instances of the component's source item.
 
 ### Lifecycle
 
@@ -243,7 +256,9 @@ Salvage is a single-step operation (no multi-step salvage):
 2. **Time Gate** (if `Component.salvage.timeRequirement` is present): Create an active salvage run in `waitingTime` status and defer completion until the required world time has elapsed.
 3. **Check** (if `salvageCraftingCheck.enabled`): Execute the salvage crafting check macro.
 4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `004-resolution-modes.md`, but using salvage-specific settings).
-5. **Consume**: `ingredientQuantity` is always 1 for salvage. Remove that many instances of the component from the actor's inventory. Apply tool usage/breakage as applicable.
+5. **Consume**: `ingredientQuantity` is always 1 for salvage.
+Remove that many instances of the component from the actor's inventory.
+Apply tool usage/breakage as applicable.
 6. **Create**: Create result items on the actor.
 
 If `Component.salvage.timeRequirement` is absent, salvage resolves immediately.
@@ -251,7 +266,9 @@ If it is present, the run must resume automatically when world time reaches the 
 
 ### Resolution Mode Application
 
-- **Simple**: One result group. Optional pass/fail check. On success, produce the single result group.
+- **Simple**: One result group.
+Optional pass/fail check.
+On success, produce the single result group.
 - **Routed**: Check is mandatory.
   The engine-evaluated routed salvage check rolls the configured formula and maps the total onto
   an outcome tier whose NAME is the `outcome`
@@ -276,7 +293,8 @@ Success and failure macros follow the same contracts as crafting, substituting `
 ### Failure Consumption Policy
 
 - `salvageCraftingCheck.consumption.consumeComponentOnFail`: if true (default), the component is consumed even on failure.
-- `salvageCraftingCheck.consumption.consumeCatalystsOnFail`: a **legacy-named** key (retained to avoid a persisted-key migration); if false (default), Tools are not consumed/broken on failure. Read it as "consume/break tools on fail".
+- `salvageCraftingCheck.consumption.consumeCatalystsOnFail`: a **legacy-named** key (retained to avoid a persisted-key migration); if false (default), Tools are not consumed/broken on failure.
+Read it as "consume/break tools on fail".
 
 When `Component.salvage.timeRequirement` is present, these policies are evaluated when the timed salvage run completes, not when it is first started.
 
@@ -341,15 +359,18 @@ SalvageRun = {
 
 ### Destructive Change Rules
 
-- **Mode change** (`salvageResolutionMode`): Disables any `Component.salvage` definitions that are invalid under the new mode (e.g., switching from routed to simple invalidates salvage defs with outcome routing). Affected components have `salvage.enabled` set to false.
-- **Feature disable** (`features.salvage = false`): Cancels all active salvage runs. Salvage definitions on components are preserved but inert.
+- **Mode change** (`salvageResolutionMode`): Disables any `Component.salvage` definitions that are invalid under the new mode (e.g., switching from routed to simple invalidates salvage defs with outcome routing).
+Affected components have `salvage.enabled` set to false.
+- **Feature disable** (`features.salvage = false`): Cancels all active salvage runs.
+Salvage definitions on components are preserved but inert.
 - **Component deletion**: Cleans up any active salvage runs referencing the deleted component.
 
 ## UI Rendering for Multi-Step Recipes
 
 When recipe-level `ingredientSets` or `resultGroups` are empty:
 
-- The recipe detail/summary view MUST NOT render empty ingredient or result sections. If recipe-level sets are absent, display the active step's sets or a step overview instead.
+- The recipe detail/summary view MUST NOT render empty ingredient or result sections.
+If recipe-level sets are absent, display the active step's sets or a step overview instead.
 - Recipe list views SHOULD derive summary information (e.g., total ingredient count, result count) from the aggregate of all steps when recipe-level sets are empty.
 - The recipe editor for multi-step recipes MUST present step-level editing controls and MUST NOT require recipe-level `ingredientSets` or `resultGroups` to be populated.
 - Step navigation and status indicators MUST remain functional regardless of whether recipe-level sets are populated.

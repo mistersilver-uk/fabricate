@@ -33,18 +33,24 @@ Pick one of three breakage mechanics (limited uses, breakage chance, or dice exp
    - dnd5e: `@flags.dnd5e.proficient` (set on actors that have the relevant proficiency)
    - Any system: a macro that decides whether the character is allowed, with an optional explanation
 5. **Pick a breakage mechanic.** Each tool uses exactly one:
-   - **Limited uses**. The tool's **Max uses** counter ticks up each attempt.
+   - **Limited uses**.
+The tool's **Max uses** counter ticks up each attempt.
      The tool breaks when the counter reaches the limit.
      Leave the field blank for unlimited uses.
-   - **Breakage chance**. A flat 0 to 100 percent chance per attempt that the tool breaks.
+   - **Breakage chance**.
+A flat 0 to 100 percent chance per attempt that the tool breaks.
      100 always breaks, 0 never breaks.
-   - **Dice expression**. Author a Foundry roll formula (for example `1d20 + @abilities.str.mod`) and a numeric threshold.
+   - **Dice expression**.
+Author a Foundry roll formula (for example `1d20 + @abilities.str.mod`) and a numeric threshold.
      The tool breaks when the roll result is below the threshold.
 6. **Pick what happens when it breaks.** Each tool picks one:
-   - **Destroy item**. The owned tool is removed from the character's inventory.
-   - **Mark as broken**. The tool stays in inventory but is marked as broken.
+   - **Destroy item**.
+The owned tool is removed from the character's inventory.
+   - **Mark as broken**.
+The tool stays in inventory but is marked as broken.
      Broken tools block future attempts until a GM clears that mark.
-   - **Replace with...**. Pick a second managed component (the "broken" variant).
+   - **Replace with...**.
+Pick a second managed component (the "broken" variant).
      On break, the original is removed and the replacement is created on the character.
      The replacement is a normal component, so you can build a recipe that consumes it to produce the repaired tool.
      While the character holds the broken variant, the player Gathering app shows the required tool as **Broken** rather than **Missing**, signalling that it needs repair (the attempt stays blocked until the working tool is restored).
@@ -69,6 +75,9 @@ Pick one of three breakage mechanics (limited uses, breakage chance, or dice exp
 
 ## Learn more
 
-- [Tools]({% link tools.md %}). The full system-owned Tool model: requirement gate, breakage modes, and on-break actions.
-- [Degrading Tools]({% link how-to/degrading-tools.md %}). The recipe-side equivalent.
-- [Canvas Interactables]({% link canvas-interactables.md %}). Place a Tool station on the canvas so players can use a Tool without owning it.
+- [Tools]({% link tools.md %}).
+The full system-owned Tool model: requirement gate, breakage modes, and on-break actions.
+- [Degrading Tools]({% link how-to/degrading-tools.md %}).
+The recipe-side equivalent.
+- [Canvas Interactables]({% link canvas-interactables.md %}).
+Place a Tool station on the canvas so players can use a Tool without owning it.

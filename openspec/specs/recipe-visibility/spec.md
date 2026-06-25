@@ -31,20 +31,25 @@ From `002-data-models.md`:
 
 ## Source UUID Resolution
 
-Foundry v12 changed how the origin of a compendium-derived item is recorded. On v12 and later the canonical field is `_stats.compendiumSource`; on v11 and earlier it was `flags.core.sourceId`. Both fields serve the same purpose: they record the UUID of the compendium document from which a world or actor-owned copy was created.
+Foundry v12 changed how the origin of a compendium-derived item is recorded.
+On v12 and later the canonical field is `_stats.compendiumSource`; on v11 and earlier it was `flags.core.sourceId`.
+Both fields serve the same purpose: they record the UUID of the compendium document from which a world or actor-owned copy was created.
 
 **All matching logic in this spec that previously referred to `flags.core.sourceId` now uses a shared source-UUID resolver** defined as follows:
 
-```
+```text
 resolveSourceUuid(item):
   return item._stats?.compendiumSource
       ?? item.flags?.core?.sourceId
       ?? null
 ```
 
-The resolver reads `_stats.compendiumSource` first. If that field is absent or nullish, it falls back to `flags.core.sourceId`. If neither field is present, it returns `null`.
+The resolver reads `_stats.compendiumSource` first.
+If that field is absent or nullish, it falls back to `flags.core.sourceId`.
+If neither field is present, it returns `null`.
 
-Every matching rule in this spec that compares an item's source identity to a stored UUID must invoke the resolver rather than reading either field directly. This ensures consistent behaviour across Foundry versions.
+Every matching rule in this spec that compares an item's source identity to a stored UUID must invoke the resolver rather than reading either field directly.
+This ensures consistent behaviour across Foundry versions.
 
 ## Recipe Item Matching
 
@@ -53,9 +58,13 @@ A candidate owned item matches a recipe's selected recipe item definition when a
 1. `candidate.uuid === recipeItemDefinition.sourceItemUuid`
 2. `resolveSourceUuid(candidate) === recipeItemDefinition.sourceItemUuid`
 
-The second condition covers compendium-derived copies. On Foundry v12+, `_stats.compendiumSource` carries this value; on v11, `flags.core.sourceId` carries it. The resolver handles both transparently.
+The second condition covers compendium-derived copies.
+On Foundry v12+, `_stats.compendiumSource` carries this value; on v11, `flags.core.sourceId` carries it.
+The resolver handles both transparently.
 
-> Authoring note (no behavioural change): the GM recipe editor (Manager) authors `recipe.recipeItemId` directly — dropping a Foundry Item links or replaces it via `addRecipeItemFromUuid` (which synthesizes or dedups the `RecipeItemDefinition` and resolves its `sourceItemUuid`), and unlinking nulls `recipe.recipeItemId` without deleting the shared definition. When the linked definition's `sourceItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the link. The matching rules above are unchanged; UI rendering specifics defer to `ui-integration`.
+> Authoring note (no behavioural change): the GM recipe editor (Manager) authors `recipe.recipeItemId` directly — dropping a Foundry Item links or replaces it via `addRecipeItemFromUuid` (which synthesizes or dedups the `RecipeItemDefinition` and resolves its `sourceItemUuid`), and unlinking nulls `recipe.recipeItemId` without deleting the shared definition.
+When the linked definition's `sourceItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the link.
+The matching rules above are unchanged; UI rendering specifics defer to `ui-integration`.
 
 ## Visibility Evaluation
 
@@ -103,7 +112,8 @@ Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentS
    - Skip non-alchemy list-mode branches below.
 3. If `listMode === "global"`:
    - GM sees all recipes.
-   - Non-GM sees all enabled recipes. No restriction or knowledge filtering is applied.
+   - Non-GM sees all enabled recipes.
+No restriction or knowledge filtering is applied.
 4. If `listMode === "player"`:
    - GM sees all recipes, including restricted recipes with empty allow-lists.
    - Non-GM sees recipes where `visibility.restricted === false`, or where `allowedUserIds` includes the viewer's user ID.
@@ -138,9 +148,12 @@ Before starting/resuming a run and before each step:
    - non-GM users cannot bypass visibility by directly targeting hidden recipe IDs.
 2. Re-run listing visibility checks for the active mode.
 3. For non-GM users, reject locked recipes regardless of list mode.
-4. If `listMode === "global"`, no additional filtering beyond step 3. Non-GM users may craft any unlocked, enabled recipe.
-5. If `listMode === "player"`, re-run restricted visibility checks. Reject if the viewer is not in `allowedUserIds` for a restricted recipe.
-6. If `listMode === "knowledge"`, re-run knowledge access evaluation. Reject if knowledge access is denied.
+4. If `listMode === "global"`, no additional filtering beyond step 3.
+Non-GM users may craft any unlocked, enabled recipe.
+5. If `listMode === "player"`, re-run restricted visibility checks.
+Reject if the viewer is not in `allowedUserIds` for a restricted recipe.
+6. If `listMode === "knowledge"`, re-run knowledge access evaluation.
+Reject if knowledge access is denied.
 7. Reject execution when any guard fails.
 
 ## Alchemy Visibility and Learning
@@ -263,8 +276,8 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 }
 ```
 
-3. If `consumeOnLearn === true`, consume selected item.
-4. Return the updated access state.
+1. If `consumeOnLearn === true`, consume selected item.
+2. Return the updated access state.
 
 ### Drag-and-Drop Learn Configuration
 
@@ -282,7 +295,8 @@ Automatic learning from actor item drops may be implemented using:
 - `preCreateItem`
 - `dropActorSheetData`
 
-`createItem` is preferred because it runs against the created owned item instance and keeps consume-on-learn behaviour deterministic. Regardless of hook choice, runtime behaviour must match this specification.
+`createItem` is preferred because it runs against the created owned item instance and keeps consume-on-learn behaviour deterministic.
+Regardless of hook choice, runtime behaviour must match this specification.
 
 ### Drag-and-Drop Learn (When Enabled)
 
@@ -306,7 +320,9 @@ When `dragDropEnabled === true`, dropping a matched recipe item onto an actor mu
 - Learning-by-drop is only valid when `knowledge.mode` is `learned` or `itemOrLearned`.
 - Auto-learning eligibility is evaluated per matched recipe using that recipe's own `knowledge.learn.dragDropEnabled` setting.
 - Systems in `global` or `player` list mode are not evaluated for drag-and-drop learning.
-- In multi-system worlds, all eligible knowledge-mode recipes are considered. Recipes from systems where `dragDropEnabled !== true` are excluded from auto-learning even when the same owned item matches them. Matching is otherwise based solely on the resolved recipe item definition identity rules below.
+- In multi-system worlds, all eligible knowledge-mode recipes are considered.
+Recipes from systems where `dragDropEnabled !== true` are excluded from auto-learning even when the same owned item matches them.
+Matching is otherwise based solely on the resolved recipe item definition identity rules below.
 
 #### Matching Rules
 
@@ -315,24 +331,28 @@ A dropped item matches a recipe when any of the following is true:
 1. `droppedItem.uuid === recipeItemDefinition.sourceItemUuid`
 2. `resolveSourceUuid(droppedItem) === recipeItemDefinition.sourceItemUuid`
 
-`resolveSourceUuid` reads `_stats.compendiumSource` first (Foundry v12+), then falls back to `flags.core.sourceId` (Foundry v11 and earlier). A match on any condition is sufficient.
+`resolveSourceUuid` reads `_stats.compendiumSource` first (Foundry v12+), then falls back to `flags.core.sourceId` (Foundry v11 and earlier).
+A match on any condition is sufficient.
 
 #### Multi-Recipe Matching
 
-When a single dropped item matches multiple recipes, the actor learns all matched recipes in a single operation. A recipe item definition linked to multiple recipes functions as a "recipe book" -- one drop teaches every recipe it is linked to.
+When a single dropped item matches multiple recipes, the actor learns all matched recipes in a single operation.
+A recipe item definition linked to multiple recipes functions as a "recipe book" -- one drop teaches every recipe it is linked to.
 
 Learning is applied per matched recipe independently:
 
 - Already-learned recipes are skipped.
 - New learn entries are written only for recipes that pass preconditions.
-- `consumeOnLearn` is evaluated for each newly learned recipe. If any learned recipe requires consumption, the dropped owned item must be removed by the end of the operation.
+- `consumeOnLearn` is evaluated for each newly learned recipe.
+If any learned recipe requires consumption, the dropped owned item must be removed by the end of the operation.
 
 #### Notifications
 
 After a drag-and-drop learn operation completes, the module must provide user feedback:
 
 - **Success**: Display a notification listing the recipe(s) learned and the actor that learned them.
-- **Partial success**: When some recipes were already learned, notify only for newly learned recipes. If all matched recipes were already learned, notify the user that nothing new was learned.
+- **Partial success**: When some recipes were already learned, notify only for newly learned recipes.
+If all matched recipes were already learned, notify the user that nothing new was learned.
 - **No match**: When the dropped item does not match any recipe, no learn operation occurs and no notification is shown (the drop is silently ignored for learning purposes).
 - **Precondition failure**: When the knowledge mode does not support learning (i.e., mode is `item` only), no learn operation occurs and no notification is shown.
 
@@ -345,7 +365,8 @@ When `dragDropEnabled === false`:
 - The manual learning affordance is an item-sheet header learn icon/button, as specified in `003-ui-integration.md`.
 - Clicking the manual learn action prompts the user to confirm learning for the owning actor and, on confirmation, runs the same learning operation used by drag-and-drop.
 - The manual path must apply `consumeOnLearn` and remove the item when required.
-- Manual-learning eligibility is also evaluated per matched recipe using that recipe's own `knowledge.learn.dragDropEnabled` setting. In mixed-system worlds, the manual path only includes recipes from systems where `dragDropEnabled === false`.
+- Manual-learning eligibility is also evaluated per matched recipe using that recipe's own `knowledge.learn.dragDropEnabled` setting.
+In mixed-system worlds, the manual path only includes recipes from systems where `dragDropEnabled === false`.
 
 ## Edge Cases
 

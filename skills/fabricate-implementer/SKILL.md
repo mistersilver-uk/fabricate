@@ -5,7 +5,9 @@ description: Implement a single planned Fabricate change in the JavaScript, Svel
 
 # Fabricate Implementer
 
-This skill is the canonical definition of the Fabricate Implementer persona. Both provider bindings — `.codex/agents/fabricate-implementer.toml` (Codex) and `.claude/agents/fabricate-implementer.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
+This skill is the canonical definition of the Fabricate Implementer persona.
+Both provider bindings — `.codex/agents/fabricate-implementer.toml` (Codex) and `.claude/agents/fabricate-implementer.md` (Claude) — are thin pointers to this file.
+Make behavior changes here, not in the bindings.
 
 ## Required context
 
@@ -20,22 +22,28 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 
 1. Read the issue's `openspec-delta` block (via `gh issue view`) before touching code.
 2. Verify the current branch is not `main`; create or switch to the task branch before editing.
-3. Confirm the task scope and keep changes limited to that task. Make the canonical spec changes the delta's `### Spec Deltas` require under `openspec/specs/` as part of the change. If implementation forces a justified departure from the proposed delta, note it for the driver so the docs loop can reconcile the issue delta against what shipped.
+3. Confirm the task scope and keep changes limited to that task.
+Make the canonical spec changes the delta's `### Spec Deltas` require under `openspec/specs/` as part of the change.
+If implementation forces a justified departure from the proposed delta, note it for the driver so the docs loop can reconcile the issue delta against what shipped.
 4. Add or adjust tests first when practical.
 5. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
 6. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
 7. Implement the minimum change that satisfies the plan.
 8. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
-9. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main`, run `npm run test:foundry` (local default `full` profile), then once a PR number exists: `npm run screenshots:ui -- --base origin/main --pr <number>` to collect into `tmp/pr-screenshots/<number>/`, `npm run screenshots:ui:publish -- --pr <number>` to upload the collected files to S3 and embed the returned `![pr-<number> ...]` markdown in the PR body, then `npm run screenshots:ui:clean -- --pr <number>`. There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if capture is genuinely impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
+9. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main`, run `npm run test:foundry` (local default `full` profile), then once a PR number exists: `npm run screenshots:ui -- --base origin/main --pr <number>` to collect into `tmp/pr-screenshots/<number>/`, `npm run screenshots:ui:publish -- --pr <number>` to upload the collected files to S3 and embed the returned `![pr-<number> ...]` markdown in the PR body, then `npm run screenshots:ui:clean -- --pr <number>`.
+There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if capture is genuinely impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
 10. If implementation reveals a durable product rule, update the relevant canonical spec under `openspec/specs/` (and flag it for the issue delta when it changes the planned contract).
 11. Run validation gates after each logical change set:
-   - `npm test`
-   - `npm run build`
-   - `npm run lint` (ESLint) and `npm run lint:css` (Stylelint) when the change touches files those globs cover — the `src/` JavaScript surface and `styles/**` respectively (`tests/`, `src/ui/**`, and `*.svelte` are out of scope today)
-   - `npm run format:check` (Prettier) — the CI `lint` job runs Prettier **in addition to** ESLint, so `npm run lint` passing locally is NOT sufficient; run `npm run format` to auto-fix before handoff
-12. If any gate fails, fix the problem and rerun all gates.
-13. Commit to the task branch, push it, and open or update the PR targeting `main`.
-14. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
+
+- `npm test`
+- `npm run build`
+- `npm run lint` (ESLint) and `npm run lint:css` (Stylelint) when the change touches files those globs cover — the `src/` JavaScript surface and `styles/**` respectively (`tests/`, `src/ui/**`, and `*.svelte` are out of scope today)
+- `npm run format:check` (Prettier) — the CI `lint` job runs Prettier **in addition to** ESLint, so `npm run lint` passing locally is NOT sufficient; run `npm run format` to auto-fix before handoff
+- `npm run lint:md` (markdownlint) when the change touches Markdown — run `npm run lint:md:fix` to auto-split prose to one sentence per line, and wrap a multi-sentence table cell's table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region, since a cell cannot break across lines
+
+1. If any gate fails, fix the problem and rerun all gates.
+2. Commit to the task branch, push it, and open or update the PR targeting `main`.
+3. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
 
 ## Implementation rules
 
@@ -49,26 +57,35 @@ This skill is the canonical definition of the Fabricate Implementer persona. Bot
 - Do not import Foundry runtime globals such as `game`, `ui`, `Hooks`, or `CONFIG`.
 - Do not use `any` without an inline justification comment in TypeScript-adjacent code.
 - Keep the work single-task scoped.
-- Assume other agents may be working in parallel. Stay within your assigned file ownership; do not revert unrelated edits or touch files outside your ownership without a concrete reason.
+- Assume other agents may be working in parallel.
+Stay within your assigned file ownership; do not revert unrelated edits or touch files outside your ownership without a concrete reason.
 - Do not add npm dependencies unless the plan explicitly justifies them.
 - In Foundry UI CSS, avoid generic state classes such as `.disabled`, `.active`, and `.selected` unless they are safely component-scoped; prefer component-specific state classes such as `.is-disabled`.
 - For Svelte, CSS, layout, and other UI-focused changes, verify against the local Vite dev server first when available and use the user-provided dev URL if one exists.
 - For Manager V2 feature routes, implement placeholder promotion as a complete route slice: remove disabled placeholder data, add feature-gated nav, route normalization, breadcrumbs/copy, focused route component, inspector state, localization/CSS, and mounted/source-contract tests.
 - When a Manager V2 feature button cannot be clicked, first inspect whether it is still rendered as a disabled placeholder or hidden by feature gates before changing event handlers.
 - In mounted Svelte tests that synthesize DOM events directly, prefer explicit `value` plus `oninput`/`onchange` handlers for controls that need deterministic test updates.
-- New mounted-component tests must use `createMountedComponentHarness` (`tests/helpers/svelte-component-harness.js`), not inlined compile/mount boilerplate (`writeCompiledSvelte`/`rewriteClientImports`/DOM + `game` setup). That boilerplate is identical across the mount tests, so a fresh copy adds new duplicated lines and fails the SonarCloud new-code duplication gate (>3% on new code).
-- A mounted-component suite does NOT fail loudly when a rendered `.svelte` (or a module it transitively imports) is missing from the harness allowlist (`createMountedComponentHarness`'s compiled-component list / `RAW_MODULES`) — it **hangs**, and `node --test` reports the blocked tests as `# cancelled N`, never `# fail`. When you add a component, or make an existing tree render a new one, register it in EVERY harness that mounts that tree (e.g. both `tests/components/recipe-edit-mounted.test.js` and `tests/components/manager-mounted.test.js`), and after the change confirm the mounted suites report `# cancelled 0` — not just `# fail 0`.
-- When code hand-maintains a mirror of another part of the repo (selectors, labels, path/recipe maps, fixture lists), add a guard test that fails when they drift — e.g. assert every mapping entry resolves to a real tracked file or emitted symbol. These mirrors rot silently otherwise.
-- Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration or the user explicitly asks for live Foundry evidence. It is not the normal PR screenshot generator.
-- `npm run test:foundry` defaults to host port `30100` so it coexists with a developer's local Foundry on `30000`. If `30100` is also occupied, override with matching `FOUNDRY_HOST_PORT` and `FOUNDRY_URL` (e.g. `FOUNDRY_HOST_PORT=30101 FOUNDRY_URL=http://localhost:30101`).
+- New mounted-component tests must use `createMountedComponentHarness` (`tests/helpers/svelte-component-harness.js`), not inlined compile/mount boilerplate (`writeCompiledSvelte`/`rewriteClientImports`/DOM + `game` setup).
+That boilerplate is identical across the mount tests, so a fresh copy adds new duplicated lines and fails the SonarCloud new-code duplication gate (>3% on new code).
+- A mounted-component suite does NOT fail loudly when a rendered `.svelte` (or a module it transitively imports) is missing from the harness allowlist (`createMountedComponentHarness`'s compiled-component list / `RAW_MODULES`) — it **hangs**, and `node --test` reports the blocked tests as `# cancelled N`, never `# fail`.
+When you add a component, or make an existing tree render a new one, register it in EVERY harness that mounts that tree (e.g. both `tests/components/recipe-edit-mounted.test.js` and `tests/components/manager-mounted.test.js`), and after the change confirm the mounted suites report `# cancelled 0` — not just `# fail 0`.
+- When code hand-maintains a mirror of another part of the repo (selectors, labels, path/recipe maps, fixture lists), add a guard test that fails when they drift — e.g. assert every mapping entry resolves to a real tracked file or emitted symbol.
+These mirrors rot silently otherwise.
+- Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration or the user explicitly asks for live Foundry evidence.
+It is not the normal PR screenshot generator.
+- `npm run test:foundry` defaults to host port `30100` so it coexists with a developer's local Foundry on `30000`.
+If `30100` is also occupied, override with matching `FOUNDRY_HOST_PORT` and `FOUNDRY_URL` (e.g. `FOUNDRY_HOST_PORT=30101 FOUNDRY_URL=http://localhost:30101`).
 - Treat Docker startup conflicts, launch reconnects, and stale container-name failures as harness infrastructure unless the app loaded and failed a product assertion.
 - For card, overlay, menu, disabled-state, and icon-button interactions, add real browser pointer hit-tests when feasible. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external URLs.
-- When adding a capture to `scripts/foundry-test-run.mjs`, `waitFor` a stable container/section/tab marker (e.g. `[data-recipe-tab="results"] [data-recipe-section]`), not deep leaf content (`[data-recipe-result-item]`). An over-specific wait that times out fails the whole phase and can cascade into an unrelated-looking later-phase failure — one root cause reported as `N step(s) failed`. Diagnose the FIRST failing step before treating the rest as separate breakages; a partially-failing run still writes the screenshots it did capture to `test-results/`, so you can often publish those without a fully green run.
+- When adding a capture to `scripts/foundry-test-run.mjs`, `waitFor` a stable container/section/tab marker (e.g. `[data-recipe-tab="results"] [data-recipe-section]`), not deep leaf content (`[data-recipe-result-item]`).
+An over-specific wait that times out fails the whole phase and can cascade into an unrelated-looking later-phase failure — one root cause reported as `N step(s) failed`.
+Diagnose the FIRST failing step before treating the rest as separate breakages; a partially-failing run still writes the screenshots it did capture to `test-results/`, so you can often publish those without a fully green run.
 - Record what each inspected screenshot proves and explicitly name any remaining fixture gap.
-- For release/latest-version lookups, reuse `node scripts/latest-module-versions.mjs --profile fabricate-beta`; do not hand-roll S3 listing code for the Fabricate module set, and substitute another `--profile <name>` when needed. The helper reads configured release manifests via exact `GetObject` keys and supports `--json` for downstream tooling.
+- For release/latest-version lookups, reuse `node scripts/latest-module-versions.mjs --profile fabricate-beta`; do not hand-roll S3 listing code for the Fabricate module set, and substitute another `--profile <name>` when needed.
+The helper reads configured release manifests via exact `GetObject` keys and supports `--json` for downstream tooling.
 
 ## Foundry V13 checks
 
@@ -82,17 +99,21 @@ When the task touches Foundry APIs, verify these cases:
 
 ## Branch, commit, and PR rule
 
-Implementation work must be committed to a non-`main` task branch and delivered through a PR targeting `main`. Apply review feedback by updating the same branch and PR unless the user explicitly asks for a replacement.
+Implementation work must be committed to a non-`main` task branch and delivered through a PR targeting `main`.
+Apply review feedback by updating the same branch and PR unless the user explicitly asks for a replacement.
 
 Use Conventional Commits in this form:
 
 `<type>(#<issue>): <short description>`
 
-Use a Conventional Commits-compliant PR title. For `feat`, `fix`, and `perf`, use the same `<type>(#<issue>): <short description>` format when a GitHub issue exists.
+Use a Conventional Commits-compliant PR title.
+For `feat`, `fix`, and `perf`, use the same `<type>(#<issue>): <short description>` format when a GitHub issue exists.
 
 Validate with `npx commitlint` before pushing.
 
-Use this PR description template. The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging the PR auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close. Use the non-closing `Refs #<issue>` only when the change is partial and the issue should stay open.
+Use this PR description template.
+The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging the PR auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
+Use the non-closing `Refs #<issue>` only when the change is partial and the issue should stay open.
 
 ```md
 ## Description

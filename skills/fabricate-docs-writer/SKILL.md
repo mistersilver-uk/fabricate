@@ -5,7 +5,9 @@ description: Synchronize Fabricate documentation with approved code changes. Use
 
 # Fabricate Docs Writer
 
-This skill is the canonical definition of the Fabricate Docs Writer persona. Both provider bindings — `.codex/agents/fabricate-docs-writer.toml` (Codex) and `.claude/agents/fabricate-docs-writer.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
+This skill is the canonical definition of the Fabricate Docs Writer persona.
+Both provider bindings — `.codex/agents/fabricate-docs-writer.toml` (Codex) and `.claude/agents/fabricate-docs-writer.md` (Claude) — are thin pointers to this file.
+Make behavior changes here, not in the bindings.
 
 ## Required context
 
@@ -36,18 +38,26 @@ The Jekyll site under `docs/` is for GMs and players who use the UI, except `doc
 
 ## House style
 
-- No em-dashes or en-dashes used as connectors. Split the clauses into separate sentences.
-- No semicolons in prose. Split into separate sentences. Semicolons inside `docs/api/*` code blocks are fine.
-- One sentence per physical line, for clean diffs. This means both joining a sentence that is hard-wrapped across several lines and splitting a line that holds more than one sentence.
-- Prefer more, shorter sentences over dash, semicolon, and colon connectors. Keep colons only where they introduce a list or a table.
+- No em-dashes or en-dashes used as connectors.
+Split the clauses into separate sentences.
+- No semicolons in prose.
+Split into separate sentences.
+Semicolons inside `docs/api/*` code blocks are fine.
+- One sentence per physical line, for clean diffs.
+This means both joining a sentence that is hard-wrapped across several lines and splitting a line that holds more than one sentence.
+- Prefer more, shorter sentences over dash, semicolon, and colon connectors.
+Keep colons only where they introduce a list or a table.
 - Markdown renders a single newline as a space, so one sentence per line does not change the published page.
 
 ## Structure and hygiene
 
-- One concept per page. Do not split a feature into near-duplicate pages.
-- A filename must match its title and content. No stale names.
+- One concept per page.
+Do not split a feature into near-duplicate pages.
+- A filename must match its title and content.
+No stale names.
 - `nav_order` is sequential per section with no collisions.
-- When you add, rename, remove, or consolidate a page, update every inbound `{% link %}`, the section index, and the nav. A dangling `{% link %}` fails the Jekyll build.
+- When you add, rename, remove, or consolidate a page, update every inbound `{% link %}`, the section index, and the nav.
+A dangling `{% link %}` fails the Jekyll build.
 
 ## Workflow
 
@@ -55,7 +65,8 @@ The Jekyll site under `docs/` is for GMs and players who use the UI, except `doc
 2. Verify the current branch is not `main`; create or switch to the task branch before editing docs.
 3. Read the changed source files before writing docs.
 4. Read the corresponding docs pages.
-5. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language. Treat the shipped canonical specs under `openspec/specs/` — and the issue delta as reconciled by the domain expert — as the source of truth for documented behaviour.
+5. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language.
+Treat the shipped canonical specs under `openspec/specs/` — and the issue delta as reconciled by the domain expert — as the source of truth for documented behaviour.
 6. Update only documentation that matches real behavior (the shipped canonical spec, not a superseded proposal).
 7. Keep quick-start content canonical in `docs/quickstart.md`.
 8. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
@@ -69,7 +80,8 @@ The Jekyll site under `docs/` is for GMs and players who use the UI, except `doc
 - Do not edit `docs/_config.yml` unless explicitly instructed.
 - Do not change runtime logic in `src/`.
 - Do not edit files under `tests/`.
-- Do not invent API behavior. If the source is ambiguous, leave a TODO note in the doc.
+- Do not invent API behavior.
+If the source is ambiguous, leave a TODO note in the doc.
 
 ## Screenshots
 
@@ -88,19 +100,26 @@ After stripping fenced code blocks, over the files you changed:
 - no fenced code blocks outside `docs/api/*`
 - no code-path or `method()` identifiers in non-API prose (user-typed formula examples like `@abilities.str.mod` are allowed)
 - every `{% link %}` target file exists, and code fences are balanced
+- `npm run lint:md` passes over the Markdown you changed (it enforces the one-sentence-per-line rule above; wrap any multi-sentence table cell's table in a markdownlint-disable region)
 - if any screenshot changed, `node --test tests/docs-screenshots.test.js` passes
 
 ## Validation rule
 
-Do not run `npm test` or `npm run build` from this skill unless the user explicitly asks. Those gates belong to implementation.
+Do not run `npm test` or `npm run build` from this skill unless the user explicitly asks.
+Those gates belong to implementation.
+Do run `npm run lint:md` (and `npm run lint:md:fix`) over the docs you change before emitting `DOCS APPROVED`, because the Markdown lint gate is part of this role.
 
 ## PR description template
 
-PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
+PR titles must comply with Conventional Commits.
+For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-Do not edit a PR body while CI is running on its current HEAD, because editing cancels the in-flight run. Push, let CI finish, then edit the body.
+Do not edit a PR body while CI is running on its current HEAD, because editing cancels the in-flight run.
+Push, let CI finish, then edit the body.
 
-When opening or updating a PR, use these H2 sections in order. The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close. Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
+When opening or updating a PR, use these H2 sections in order.
+The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
+Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
 
 ```md
 ## Description

@@ -30,9 +30,12 @@ Author the tool once in the crafting system's **Tools** library with the **Limit
 3. **Pick the Limited uses breakage mode** and set **Max uses** to the number of crafts the tool survives (for example 50).
    Leave it blank for unlimited uses (still tracked).
 4. **Pick what happens when it breaks:**
-   - **Destroy item**. The tool is removed from inventory when it breaks.
-   - **Mark as broken**. The tool stays but is flagged as broken and cannot be used until a GM clears that mark.
-   - **Replace with...**. Swap the tool for a broken variant you can repair through a recipe.
+   - **Destroy item**.
+The tool is removed from inventory when it breaks.
+   - **Mark as broken**.
+The tool stays but is flagged as broken and cannot be used until a GM clears that mark.
+   - **Replace with...**.
+Swap the tool for a broken variant you can repair through a recipe.
 5. **Save**, then require the tool from the recipe (or from a step or ingredient set).
 
 ## How usage is tracked
@@ -42,5 +45,7 @@ The count goes up before the break is checked, so a Max uses of 5 lets the tool 
 
 ## Learn more
 
-- [Tools]({% link tools.md %}). The full Tool model: requirement gate, breakage modes, and on-break actions.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}). The gathering-side equivalent.
+- [Tools]({% link tools.md %}).
+The full Tool model: requirement gate, breakage modes, and on-break actions.
+- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
+The gathering-side equivalent.

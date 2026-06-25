@@ -72,10 +72,14 @@ Analogous to `validateRecipe` but operates on salvage-specific data shapes.
 Returns early as valid when the component has no `salvage` data or when `system` is `null`.
 Rejects "mapped" mode immediately, as mapped mode is not supported for salvage.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
 | `component` | `object` | Yes | The component whose salvage configuration to validate. Must have a `salvage.resultGroups` array for validation to proceed. |
 | `system` | `object` | Yes | The crafting system that owns the component. Supplies `salvageResolutionMode` and `salvageCraftingCheck`. Pass `null` to skip validation entirely. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Returns:** `{ valid: boolean, errors: string[] }`
 

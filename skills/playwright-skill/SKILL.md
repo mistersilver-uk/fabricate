@@ -4,7 +4,9 @@ description: Complete browser automation with Playwright. Auto-detects dev serve
 ---
 
 **IMPORTANT - Path Resolution:**
-This skill can be installed in different locations (plugin system, manual installation, global, or project-specific). Before executing any commands, determine the skill directory based on where you loaded this SKILL.md file, and use that path in all commands below. Replace `$SKILL_DIR` with the actual discovered path.
+This skill can be installed in different locations (plugin system, manual installation, global, or project-specific).
+Before executing any commands, determine the skill directory based on where you loaded this SKILL.md file, and use that path in all commands below.
+Replace `$SKILL_DIR` with the actual discovered path.
 
 Common installation paths:
 
@@ -15,7 +17,8 @@ Common installation paths:
 
 # Playwright Browser Automation
 
-General-purpose browser automation skill. I'll write custom Playwright code for any automation task you request and execute it via the universal executor.
+General-purpose browser automation skill.
+I'll write custom Playwright code for any automation task you request and execute it via the universal executor.
 
 **CRITICAL WORKFLOW - Follow these steps in order:**
 
@@ -51,17 +54,18 @@ cd $SKILL_DIR
 npm run setup
 ```
 
-This installs Playwright and Chromium browser. Only needed once.
+This installs Playwright and Chromium browser.
+Only needed once.
 
 ## Execution Pattern
 
-**Step 1: Detect dev servers (for localhost testing)**
+### Step 1: Detect dev servers (for localhost testing)
 
 ```bash
 cd $SKILL_DIR && node -e "require('./scripts/lib/helpers').detectDevServers().then(s => console.log(JSON.stringify(s)))"
 ```
 
-**Step 2: Write test script to /tmp with URL parameter**
+### Step 2: Write test script to /tmp with URL parameter
 
 ```javascript
 // /tmp/playwright-test-page.js
@@ -84,7 +88,7 @@ const TARGET_URL = 'http://localhost:3001'; // <-- Auto-detected or from user
 })();
 ```
 
-**Step 3: Execute from skill directory**
+### Step 3: Execute from skill directory
 
 ```bash
 cd $SKILL_DIR && node scripts/run.js /tmp/playwright-test-page.js
@@ -279,7 +283,8 @@ const TARGET_URL = 'http://localhost:3001'; // Auto-detected
 
 ### Verify Real Pointer Targets
 
-Use browser hit-testing when CSS overlays, disabled styles, fixed headers, menus, or icon buttons could intercept clicks. DOM presence is not enough for these cases.
+Use browser hit-testing when CSS overlays, disabled styles, fixed headers, menus, or icon buttons could intercept clicks.
+DOM presence is not enough for these cases.
 
 ```javascript
 async function assertPointerTarget(page, locator, targetSelector, label) {
@@ -366,7 +371,8 @@ See `lib/helpers.js` for full list.
 
 ## Custom HTTP Headers
 
-Configure custom headers for all HTTP requests via environment variables. Useful for:
+Configure custom headers for all HTTP requests via environment variables.
+Useful for:
 
 - Identifying automated traffic to your backend
 - Getting LLM-optimized responses (e.g., plain text errors instead of styled HTML)
@@ -451,7 +457,7 @@ Add wait: `await page.waitForSelector('.element', { timeout: 10000 })`
 
 ## Example Usage
 
-```
+```text
 User: "Test if the marketing page looks good"
 
 Claude: I'll test the marketing page across multiple viewports. Let me first detect running servers...
@@ -464,7 +470,7 @@ I found your dev server running on http://localhost:3001
 [Shows results with screenshots from /tmp/]
 ```
 
-```
+```text
 User: "Check if login redirects correctly"
 
 Claude: I'll test the login flow. First, let me check for running servers...

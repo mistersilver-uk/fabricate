@@ -108,7 +108,8 @@ When a player drags an item out of a compendium onto a sheet, Foundry makes a fr
 Fabricate recognises both the original item and any copy made from it, across all supported Foundry versions.
 This means recipe scrolls work whether a player picks up the item directly or copies it out of a compendium.
 
-> **Tip:** If a player owns a recipe scroll that was copied from a compendium but the recipe still shows as unknown, the copy may have lost track of the item it came from. Re-importing the recipe item from the compendium restores the link.
+> **Tip:** If a player owns a recipe scroll that was copied from a compendium but the recipe still shows as unknown, the copy may have lost track of the item it came from.
+Re-importing the recipe item from the compendium restores the link.
 
 ### Limited Uses
 
@@ -197,6 +198,8 @@ After clicking **Learn Recipe**, Fabricate asks for confirmation and then applie
 
 After a drag-and-drop learn attempt, Fabricate shows notifications for successful outcomes and stays silent for ignored outcomes:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Outcome | Notification shown |
 |:--------|:-------------------|
 | **Success** | Lists each recipe learned and the actor that learned them. |
@@ -204,10 +207,13 @@ After a drag-and-drop learn attempt, Fabricate shows notifications for successfu
 | **No match** | The drop is silently ignored for learning purposes. No notification is shown. The item is still added to the actor's inventory as normal. |
 | **Precondition failure** | When the system's knowledge mode does not support learning (for example, when access comes only from owning the item), nothing is learned and no notification is shown. |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 ## Locked Recipes
 
 Any recipe can be locked, regardless of visibility mode.
 Locked recipes:
+
 - Are visible to all players, so they know the recipe exists
 - Cannot be crafted by anyone other than the GM
 - Are reported as locked to the rest of Fabricate (the planned "Locked" badge is noted above)
@@ -215,6 +221,7 @@ Locked recipes:
 ## Crafting Guards
 
 Before starting, resuming, or advancing a crafting run, Fabricate re-evaluates:
+
 1. Is the recipe still visible to this user?
 2. Is the recipe locked? (non-GM blocked)
 3. Does the user still have knowledge access? (if applicable)
@@ -231,7 +238,11 @@ See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [R
 
 ## See Also
 
-- [Teaser Mode]({% link visibility-teaser.md %}). Reveal recipes gradually with fragment-based or threshold-based discovery.
-- [Recipes overview]({% link recipes/index.md %}). Create and edit recipes, including visibility configuration in the recipe editor.
-- [Crafting Systems]({% link crafting-systems.md %}). Configure system-level visibility settings and feature toggles.
-- [Recipe Visibility Service API]({% link api/visibility-service.md %}). Automate visibility and knowledge workflows programmatically.
+- [Teaser Mode]({% link visibility-teaser.md %}).
+Reveal recipes gradually with fragment-based or threshold-based discovery.
+- [Recipes overview]({% link recipes/index.md %}).
+Create and edit recipes, including visibility configuration in the recipe editor.
+- [Crafting Systems]({% link crafting-systems.md %}).
+Configure system-level visibility settings and feature toggles.
+- [Recipe Visibility Service API]({% link api/visibility-service.md %}).
+Automate visibility and knowledge workflows programmatically.
