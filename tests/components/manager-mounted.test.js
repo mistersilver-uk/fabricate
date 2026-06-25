@@ -110,6 +110,7 @@ function compileManagerRoot() {
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
   for (const environmentComponent of [
@@ -1477,6 +1478,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         'System settings',
+        'Overview',
         'Components',
         'Tags & Categories',
         'Essences',
@@ -2802,7 +2804,16 @@ describe('CraftingSystemManager mounted behavior', () => {
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
         label.textContent.trim()
       ),
-      ['System settings', 'Components', 'Tags & Categories', 'Tools', 'Checks', 'Recipes', 'Graph']
+      [
+        'System settings',
+        'Overview',
+        'Components',
+        'Tags & Categories',
+        'Tools',
+        'Checks',
+        'Recipes',
+        'Graph',
+      ]
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
@@ -2903,6 +2914,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         'System settings',
+        'Overview',
         'Recipes',
         'Components',
         'Tags & Categories',

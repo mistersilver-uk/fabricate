@@ -233,6 +233,45 @@ Recipe item definitions are distinct from components:
 When `listMode === "global"`, no per-recipe player allow-list controls are shown.
 Visibility and learning semantics are defined in `006`.
 
+### System Overview
+
+The manager exposes a GM-only **System overview** view as the second navigation-rail item,
+immediately after `System settings` and before `Components`.
+It is an always-available implemented route for any selected system —
+not an experimental-gated feature and not a disabled placeholder.
+The whole crafting-manager admin is GM-scoped, so the overview and its banner are GM-only by construction.
+
+The overview renders the derived system-validation report
+(`evaluateSystemValidation`, defined in `data-models`) for the selected system.
+The report is a computed view assembled by the admin store from the system's recipes, environments, and components;
+nothing is persisted on the `CraftingSystem`.
+
+Issues are grouped by their `kind` —
+`system` (system blockers), `recipe`, `environment`, `task`, `event`, and `salvage` —
+with the `system` blockers surfaced first.
+Each issue renders one row carrying a severity chip
+(`.manager-chip.is-danger` for `critical`, `.manager-chip.is-warning` for `warning`, `.manager-chip.is-neutral` for `info`),
+the offending entity's name, and the issue message.
+
+Every non-`system` row deep-links to the editor that owns the entity,
+reusing the manager's existing selection helpers
+(recipe issues open the recipe editor, environment/task/event issues open the environment editor,
+and salvage issues open the component editor).
+The `system` kind is the overview itself and carries no deep-link button.
+When there are no issues, the overview shows an empty "ready to use" state.
+A rail count badge SHALL surface the number of open critical-plus-warning issues when greater than zero.
+
+When the report's `blocksSystem` is true,
+the overview renders a full-width `role="note"` callout explaining that players cannot see or use any of the system's recipes until the blocker is resolved.
+
+#### System-Blocker Banner
+
+When the selected system's report has `blocksSystem === true`,
+the `System settings` view SHALL render a full-width `role="note"` callout
+(reusing the `manager-environment-comp-callout` treatment) above the identity card.
+The banner is GM-only, explains that the system is blocked from player visibility, and links to the System overview.
+It is not shown when `blocksSystem` is false.
+
 ### Item Sheets
 
 For actor-owned items, Fabricate may add item sheet header controls tied to recipe learning.

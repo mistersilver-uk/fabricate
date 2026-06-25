@@ -1388,6 +1388,7 @@ const cleanup = {
   userIds: [],
   sceneIds: [],
   systemId: null,
+  blockedSystemId: null,
   recipeIds: []
 };
 
@@ -2487,8 +2488,43 @@ async function main() {
           behavior => behavior?.type === 'fabricate.interactable'
         ) ?? null;
 
+        // A dedicated system seeded into a deliberately BROKEN state so the GM
+        // system-overview view renders populated rows and the system-blocker
+        // banner shows (issue 429 PR-2). It carries BOTH:
+        //   - a live system-blocker: progressive resolution mode with no
+        //     progressive crafting check configured (blocks:'system'); and
+        //   - an entity-level issue: an incomplete recipe with no result group
+        //     (a recipe readiness issue that surfaces in the overview).
+        const blockedSystem = await csm.createSystem({
+          name: 'Broken Workshop',
+          description: 'A system left in a broken state to demonstrate the system overview and the system-blocker banner.'
+        });
+        const blockedSystemId = blockedSystem.id;
+        // Register one managed component (without a usable difficulty) so the
+        // progressive checks have something to evaluate against.
+        const blockedWorldItem = game.items.contents[0];
+        if (blockedWorldItem) {
+          await csm.addItemFromUuid(blockedSystemId, blockedWorldItem.uuid);
+        }
+        // Progressive mode with NO progressive crafting check → blocks:'system'.
+        await csm.updateSystem(blockedSystemId, { resolutionMode: 'progressive' });
+        // An incomplete recipe (no result group) → a recipe readiness issue.
+        // allowIncomplete lets it persist as a disabled draft (it is structurally
+        // valid but not craftable), which is exactly the overview-row state.
+        const blockedRecipe = await rm.createRecipe(
+          {
+            craftingSystemId: blockedSystemId,
+            name: 'Unfinished Draught',
+            ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
+            resultGroups: []
+          },
+          { allowIncomplete: true, notify: false }
+        );
+
         return {
           systemId,
+          blockedSystemId,
+          blockedRecipeId: blockedRecipe?.id ?? null,
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id],
           healingPotionRecipeId: recipe2.id,
@@ -2509,6 +2545,7 @@ async function main() {
       });
 
       cleanup.systemId = craftingSetup.systemId;
+      cleanup.blockedSystemId = craftingSetup.blockedSystemId;
       cleanup.recipeIds = craftingSetup.recipeIds;
       cleanup.sceneIds = craftingSetup.sceneIds;
       // The interactable Region is embedded in azureGroveScene, so it is cleaned
@@ -3361,6 +3398,62 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-tools-normal');
 
+        // ── System overview + system-blocker banner (issue 429 PR-2) ───────────
+        // Select the deliberately-broken "Broken Workshop" system (progressive
+        // mode with no progressive check + an incomplete recipe) and capture:
+        //   (a) the System overview rail item showing the kind-grouped issue rows
+        //       and the system-blocker callout; and
+        //   (b) System settings showing the system-blocker banner above identity.
+        // Guarded so a failure records a failed step without aborting the phase.
+        // Returns to the smoke system's library afterwards so it does not leak the
+        // selected system into later phases.
+        try {
+          await setManagerWindowSize(page, { width: 1280, height: 900 });
+          // Return to the system library, then select the broken system.
+          await page.locator('.fabricate-manager .manager-scope-return').first().click();
+          await page.waitForTimeout(400);
+          await page.locator(`${managerSystemRowSelector(craftingSetup.blockedSystemId)} .manager-system-identity`)
+            .first().waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator(`${managerSystemRowSelector(craftingSetup.blockedSystemId)} .manager-system-identity`)
+            .first().click();
+          await page.waitForTimeout(500);
+
+          // (a) System overview — wait on the grouped issue rows, not deep leaf content.
+          await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-overview]').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="system-overview"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-system-overview] [data-overview-issue]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          if (await page.locator('.fabricate-manager [data-system-overview-blocker]').count() === 0) {
+            throw new Error('System overview did not render the system-blocker callout for the broken system.');
+          }
+          await assertManagerLayoutStable(page, 'system overview');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-system-overview');
+
+          // (b) System settings — wait on the blocker banner above the identity card.
+          await page.locator('.fabricate-manager .manager-nav-button:has-text("System settings")').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-system-edit-blocker]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertManagerLayoutStable(page, 'system edit blocked');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-system-edit-blocked');
+
+          results.steps.push({ step: 'system-overview-and-banner', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'system-overview-and-banner', passed: false, error: err.message });
+          process.stderr.write(`System overview capture failed: ${err.message}\n`);
+        } finally {
+          // Return to the smoke system so later phases see the expected selection.
+          await page.locator('.fabricate-manager .manager-scope-return').first().click().catch(() => {});
+          await page.waitForTimeout(300);
+          await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`)
+            .first().click().catch(() => {});
+          await page.waitForTimeout(400);
+        }
+
         // ── Canvas interactable config panel (#302) ────────────────────────────
         // Open the GM config panel for the seeded `fabricate.interactable` Region
         // behaviour and capture its node section in both states: linked (shares the
@@ -4125,6 +4218,14 @@ async function main() {
           const csm = game.fabricate?.getCraftingSystemManager?.();
           if (csm) {
             try { await csm.deleteSystem(cleanupData.systemId); } catch { /* already deleted */ }
+          }
+        }
+
+        // Delete the dedicated broken system seeded for the overview/banner captures.
+        if (cleanupData.blockedSystemId) {
+          const csm = game.fabricate?.getCraftingSystemManager?.();
+          if (csm) {
+            try { await csm.deleteSystem(cleanupData.blockedSystemId); } catch { /* already deleted */ }
           }
         }
 

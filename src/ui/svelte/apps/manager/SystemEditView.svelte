@@ -8,6 +8,12 @@
 
   let {
     selectedSystem = null,
+    // True when the system carries a `blocks:'system'` validation issue. Drives a
+    // GM-only full-width callout above the identity card that links to the system
+    // overview. The whole crafting manager admin is GM-scoped, so this is GM-only
+    // by construction.
+    systemBlocked = false,
+    onShowSystemOverview = () => {},
     onSaveDetails = () => {},
     onSetResolutionMode = async () => true,
     onSetSalvageResolutionMode = async () => true,
@@ -361,6 +367,18 @@
     </section>
 
     <form class="manager-system-edit-form" onsubmit={handleSubmit}>
+      {#if systemBlocked}
+        <div class="manager-environment-comp-callout manager-system-edit-blocker" role="note" data-system-edit-blocker>
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          <div class="manager-system-edit-blocker-copy">
+            <strong>{text('FABRICATE.Admin.Manager.SystemEdit.BlockerTitle', 'This system has a blocker')}</strong>
+            <span>{text('FABRICATE.Admin.Manager.SystemEdit.BlockerBody', 'Players cannot see or use any of this system\'s recipes until the blocker is resolved. Open the system overview to review and fix it.')}</span>
+          </div>
+          <button type="button" class="manager-button manager-system-edit-blocker-link" data-system-edit-blocker-link onclick={onShowSystemOverview}>
+            {text('FABRICATE.Admin.Manager.SystemEdit.BlockerLink', 'Open system overview')}
+          </button>
+        </div>
+      {/if}
       <section class="manager-edit-card">
         <div class="manager-edit-card-heading">
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Identity', 'Identity')}</h3>

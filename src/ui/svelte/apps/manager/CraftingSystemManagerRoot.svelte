@@ -28,6 +28,7 @@
   import RecipeEditView from './RecipeEditView.svelte';
   import RecipeItemInspector from './RecipeItemInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
+  import SystemOverviewView from './SystemOverviewView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
 
@@ -253,6 +254,17 @@
   const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences, recipesRouteEnabled));
+
+  // The pure `evaluateSystemValidation` report, computed in the admin store from
+  // the selected system's recipes/environments/components. Drives the GM system
+  // overview view, its rail count badge, and the system-blocker banner.
+  const systemValidationReport = $derived(
+    $viewState.systemValidation || { issues: [], counts: { critical: 0, warning: 0, info: 0, blockers: 0 }, blocksSystem: false }
+  );
+  const systemBlocksSystem = $derived(systemValidationReport.blocksSystem === true);
+  const systemOverviewCount = $derived(
+    (systemValidationReport.counts?.critical || 0) + (systemValidationReport.counts?.warning || 0)
+  );
 
   // Per-check activation state for the right-menu "Active" card. A check is only
   // toggleable when its resolution mode makes it optional (Simple); otherwise the
@@ -1462,6 +1474,8 @@
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable, recipesAvailable) {
+    // A stale `system-overview` (no system selected) falls through to the
+    // `systems` library here; with a system it is an always-available route.
     if (!system) return 'systems';
     if ((view === 'recipes' || view === 'recipe-edit') && !recipesAvailable) return 'system-edit';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
@@ -1508,6 +1522,7 @@
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings');
+    if (currentView === 'system-overview') return text('FABRICATE.Admin.Manager.SystemOverview.Title', 'System overview');
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
 
@@ -1532,6 +1547,7 @@
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected event.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system.');
+    if (currentView === 'system-overview') return text('FABRICATE.Admin.Manager.SystemOverview.Subtitle', 'Review every validation issue across this crafting system and jump straight to the editor that owns each one.');
     return text('FABRICATE.Admin.Manager.Subtitle', 'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.');
   }
 
@@ -1571,6 +1587,7 @@
     if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
+    if (currentView === 'system-overview') return text('FABRICATE.Admin.Manager.SystemOverview.Actions', 'System overview actions');
     return text('FABRICATE.Admin.Manager.SystemActions', 'System actions');
   }
 
@@ -1806,7 +1823,7 @@
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'checks') && !selectedSystem) return;
+    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'system-overview' || view === 'tools' || view === 'checks') && !selectedSystem) return;
     if (view === 'recipes' && !recipesRouteEnabled) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
@@ -1838,6 +1855,31 @@
   function editSystem(systemId) {
     if (!systemId) return;
     afterTruthyResult(selectSystem(systemId, 'system-edit'), () => { activeView = 'system-edit'; });
+  }
+
+  function showSystemOverview() {
+    if (!selectedSystem) return;
+    afterTruthyResult(confirmRouteExit('system-overview'), () => { activeView = 'system-overview'; });
+  }
+
+  // Maps a system-validation issue `kind` to the manager's deep-link selection
+  // helper + the view it routes to. This is the single source of truth the
+  // overview deep-links and the deep-link drift test both read, so an issue
+  // `nav.view`/`kind` the aggregator can emit always resolves to a real view
+  // token (the `system` kind is the overview itself and carries no deep link).
+  const OVERVIEW_DEEP_LINKS = {
+    recipe: { view: 'recipe-edit', open: (id) => editRecipe(id) },
+    environment: { view: 'environment-edit', open: (id) => editEnvironment(id) },
+    task: { view: 'environment-edit', open: (id) => editEnvironment(id) },
+    event: { view: 'environment-edit', open: (id) => editEnvironment(id) },
+    salvage: { view: 'component-edit', open: (id) => editComponent(id) }
+  };
+
+  function selectOverviewIssue(issue) {
+    if (!issue) return;
+    const target = OVERVIEW_DEEP_LINKS[issue.kind];
+    if (!target || !issue.entityId) return;
+    target.open(issue.entityId);
   }
 
   function backToSystemsBrowser() {
@@ -3695,6 +3737,10 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.SystemEdit.Breadcrumb', 'System settings')}</span>
         {/if}
+        {#if currentView === 'system-overview'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.SystemOverview.Breadcrumb', 'System overview')}</span>
+        {/if}
       </nav>
       <h1 class="manager-title">{viewTitle()}</h1>
       <p class="manager-subtitle">{viewSubtitle()}</p>
@@ -3880,6 +3926,11 @@
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span>
         </button>
+      {:else if currentView === 'system-overview'}
+        <button type="button" class="manager-button" onclick={backToSystemsBrowser}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span>
+        </button>
       {:else}
         <button type="button" class="manager-button" onclick={importSystem}>
           <i class="fas fa-file-import" aria-hidden="true"></i>
@@ -3940,6 +3991,13 @@
           <button type="button" class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`} aria-current={currentView === 'system-edit' ? 'page' : undefined} onclick={() => editSystem(selectedSystem.id)}>
             <i class="fas fa-cog" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System settings')}</span>
+          </button>
+          <button type="button" class={`manager-nav-button ${currentView === 'system-overview' ? 'is-active' : ''}`} aria-current={currentView === 'system-overview' ? 'page' : undefined} data-nav-system-overview onclick={showSystemOverview}>
+            <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemOverview.Nav', 'Overview')}</span>
+            {#if systemOverviewCount > 0}
+              <span class="manager-nav-count" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
+            {/if}
           </button>
           {#if recipesRouteEnabled}
             <button type="button" class={`manager-nav-button ${currentView === 'recipes' || currentView === 'recipe-edit' ? 'is-active' : ''}`} aria-current={currentView === 'recipes' || currentView === 'recipe-edit' ? 'page' : undefined} onclick={() => setView('recipes')}>
@@ -4344,9 +4402,16 @@
         onDeleteRecipe={(id) => deleteRecipe(id)}
         onToggleEnabled={(id, enabled) => store.toggleRecipeEnabled?.(id, enabled)}
       />
+    {:else if currentView === 'system-overview' && selectedSystem}
+      <SystemOverviewView
+        report={systemValidationReport}
+        onSelectIssue={(issue) => selectOverviewIssue(issue)}
+      />
     {:else if currentView === 'system-edit' && selectedSystem}
       <SystemEditView
         {selectedSystem}
+        systemBlocked={systemBlocksSystem}
+        onShowSystemOverview={showSystemOverview}
         onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
         onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
         onSetSalvageResolutionMode={(nextMode) => store.setSalvageResolutionMode?.(nextMode)}
@@ -4390,7 +4455,7 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-overview' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">
