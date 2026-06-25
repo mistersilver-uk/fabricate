@@ -2744,7 +2744,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('tools browser: surfaces the check-driven authority advisory', () => {
+  it('tools browser: renders the breakage-source card header and self-describing options', () => {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(ToolsBrowserViewComponent, {
@@ -2752,13 +2752,33 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: { tools: [], breakageAuthority: 'checkDriven', onSetBreakageAuthority: () => {} },
     });
     flushSync();
+    const authoritySection = target.querySelector('[data-manager-tools-authority]');
+    assert.ok(authoritySection, 'the authority section renders');
     assert.ok(
-      target.querySelector('[data-breakage-authority-advisory]'),
-      'the checkDriven advisory renders'
+      authoritySection.querySelector('.manager-card-title'),
+      'the breakage-source card has a header title'
+    );
+    assert.ok(
+      authoritySection.querySelector('p.manager-muted'),
+      'the breakage-source card has descriptive hint text'
     );
     assert.ok(
       target.querySelector('[data-breakage-authority="checkDriven"]'),
       'the authority radio options render'
+    );
+    // The separate advisory line was removed; the check-driven option description
+    // now carries the "except Immune" guidance instead.
+    assert.equal(
+      target.querySelector('[data-breakage-authority-advisory]'),
+      null,
+      'the standalone advisory line is gone'
+    );
+    const checkDrivenDesc = target.querySelector(
+      '[data-breakage-authority="checkDriven"]'
+    )?.parentElement?.querySelector('.manager-radio-option-desc');
+    assert.ok(
+      checkDrivenDesc && /immune/i.test(checkDrivenDesc.textContent),
+      'the check-driven option description surfaces the immune exception'
     );
   });
 

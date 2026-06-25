@@ -30,8 +30,8 @@
 
   // Tool-breakage authority (issue 419): under "checkDriven" the active check's
   // breakage triggers decide whether all required tools break, and a tool's own
-  // breakage mode is not evaluated (except "immune").
-  const isCheckDriven = $derived(breakageAuthority === 'checkDriven');
+  // breakage mode is not evaluated (except "immune"). Each option's description
+  // carries that detail, so there is no separate advisory line.
   const BREAKAGE_AUTHORITY_OPTIONS = [
     {
       value: 'toolSpecific',
@@ -47,7 +47,8 @@
       labelKey: 'FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven',
       labelFallback: 'Check-driven',
       descKey: 'FABRICATE.Admin.Manager.Tools.AuthorityCheckDrivenDesc',
-      descFallback: 'The active check decides whether all required tools break.'
+      descFallback:
+        'Per-tool breakage modes are not evaluated (except Immune); the active check decides whether all required tools break.'
     }
   ];
 
@@ -311,8 +312,13 @@
     aria-labelledby="manager-gathering-nav-tools"
   >
   <section class="manager-inspector-card manager-tools-card" data-manager-tools-authority>
-    <fieldset class="manager-radio-group manager-tools-section" role="radiogroup" aria-labelledby="manager-tools-authority-legend">
-      <legend id="manager-tools-authority-legend" class="manager-radio-group-legend">{text('FABRICATE.Admin.Manager.Tools.AuthorityTitle', 'Tool breakage source')}</legend>
+    <div class="manager-tools-card-header">
+      <div>
+        <h3 class="manager-card-title" id="manager-tools-authority-title">{text('FABRICATE.Admin.Manager.Tools.AuthorityTitle', 'Tool breakage source')}</h3>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.AuthorityHint', 'Choose what decides whether a required tool breaks during an attempt.')}</p>
+      </div>
+    </div>
+    <fieldset class="manager-radio-group manager-tools-section" role="radiogroup" aria-labelledby="manager-tools-authority-title">
       <div class="manager-radio-options">
         {#each BREAKAGE_AUTHORITY_OPTIONS as option (option.value)}
           <label class={`manager-radio-option ${breakageAuthority === option.value ? 'is-selected' : ''}`}>
@@ -330,14 +336,6 @@
           </label>
         {/each}
       </div>
-      {#if isCheckDriven}
-        <p class="manager-muted manager-tools-authority-advisory" role="status" data-breakage-authority-advisory>
-          {text(
-            'FABRICATE.Admin.Manager.Tools.AuthorityCheckDrivenAdvisory',
-            'Per-tool breakage modes are not evaluated (except Immune); the active check decides whether required tools break.'
-          )}
-        </p>
-      {/if}
     </fieldset>
   </section>
 

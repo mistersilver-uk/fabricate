@@ -9657,10 +9657,29 @@
   padding: 0 var(--fab-space-1);
 }
 
-/* checkDriven authority advisory (issue 419): sits below the authority radios with
-   a little breathing room. */
-.fabricate-manager .manager-tools-authority-advisory {
-  margin-top: var(--fab-space-2);
+/* Tool breakage authority radios (issue 419): the option name is a distinct,
+   bold line above its muted description so the two never run together. The icon
+   aligns to the top of the two-line body (scoped here so single-line radios
+   elsewhere keep their centered alignment). */
+.fabricate-manager [data-manager-tools-authority] .manager-radio-option {
+  align-items: flex-start;
+}
+
+.fabricate-manager .manager-radio-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-radio-option-name {
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-radio-option-desc {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--fab-mv2-text-muted);
 }
 
 .fabricate-manager .manager-tools-inline-field {
