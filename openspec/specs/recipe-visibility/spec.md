@@ -59,10 +59,41 @@ The second condition covers compendium-derived copies. On Foundry v12+, `_stats.
 
 ## Visibility Evaluation
 
+### System-Validity Gate
+
+A crafting system is evaluated for system-level validity by the derived
+system-validation report (see `data-models`).
+A report whose `blocksSystem === true` means the system is structurally unusable
+(for example a routed check-mode system with no crafting check, a progressive
+system with no progressive check, multi-step recipes left on in alchemy mode, or
+an alchemy ingredient-signature collision).
+
+The gate is two-tier and computed — it never mutates any entity's stored
+`enabled` flag, so it auto-restores the moment the underlying gap is fixed:
+
+1. **System tier.** If the report's `blocksSystem === true`, the system exposes
+   NO recipes to non-GM users in any list mode, and the crafting guard rejects
+   every craft against the system.
+2. **Entity tier.** Otherwise, exclude only the individual entities the report
+   marks with `blocks: 'visibility'` (or an `enable`-disabled entity); the rest of
+   the system stays listed and craftable.
+
+**GM bypass.** A GM bypasses both tiers — a GM always sees and can reach a broken
+system and its entities so they can fix it.
+The gate is evaluated against `game.user?.isGM`.
+
+The system-blocker decision is computed at most once per listing call (cached per
+system), not rebuilt per entity, because listing is a synchronous per-render read.
+
 ### Listing Algorithm
 
 Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentSourceActors`:
 
+0. Apply the System-Validity Gate above.
+   If `blocksSystem === true` and the viewer is not a GM, return no recipe
+   listings for `craftingSystem`.
+   Otherwise drop entities marked `blocks: 'visibility'` for non-GM viewers before
+   continuing.
 1. Collect recipes in `craftingSystem`.
 2. If `craftingSystem.resolutionMode === "alchemy"`:
    - GM sees all recipes.
@@ -96,6 +127,11 @@ Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentS
 
 Before starting/resuming a run and before each step:
 
+0. Apply the System-Validity Gate.
+   For a non-GM viewer, reject execution when the system's validation report has
+   `blocksSystem === true`, or when the targeted entity is marked
+   `blocks: 'visibility'`.
+   A GM bypasses this step.
 1. If `craftingSystem.resolutionMode === "alchemy"`:
    - attempts are validated by submitted ingredients, not by selecting from listed recipes.
    - no-signature attempts are treated as failed attempts with specific failure feedback and ingredient consumption.

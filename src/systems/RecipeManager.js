@@ -8,6 +8,7 @@ import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
 
 import { buildCurrencyAffordProbe } from './currencyAffordance.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
@@ -268,13 +269,56 @@ export class RecipeManager {
     const recipes = this.getRecipes({ enabled: true });
     const available = [];
 
+    // System-validity gate: a system with a `blocks: 'system'` issue exposes NO
+    // recipes to non-GM users (the crafting guard then has nothing to start). GMs
+    // bypass the gate so they can still reach a broken system to fix it. The
+    // per-system blocker decision is computed at most once per listing call
+    // (cached by system id), NOT a full overview rebuild — this is a synchronous
+    // per-render read.
+    const isGM = game.user?.isGM === true;
+    const blockedSystemCache = new Map();
+
     for (const recipe of recipes) {
+      if (!isGM && this._isSystemBlockedForRecipes(recipe.craftingSystemId, blockedSystemCache)) {
+        continue;
+      }
       if (this.canCraft(sourceActors, recipe).canCraft) {
         available.push(recipe);
       }
     }
 
     return available;
+  }
+
+  /**
+   * Whether a system is hidden by a `blocks: 'system'` validation issue. Cached
+   * per listing call so a multi-recipe system is evaluated once. Returns false
+   * (fail-open) when the system or validation collaborators are unavailable, so a
+   * missing manager never blanks a player's recipe list. GM bypass is the
+   * caller's concern.
+   *
+   * @param {string|null|undefined} systemId
+   * @param {Map<string, boolean>} cache Per-call blocker cache, keyed by system id.
+   * @returns {boolean}
+   * @private
+   */
+  _isSystemBlockedForRecipes(systemId, cache) {
+    if (!systemId) return false;
+    if (cache.has(systemId)) return cache.get(systemId);
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem?.(systemId);
+    if (!system) {
+      cache.set(systemId, false);
+      return false;
+    }
+
+    const { blocksSystem } = computeSystemVisibility(system, {
+      recipes: this.getRecipes({ craftingSystemId: systemId }),
+      components: system.components || [],
+    });
+    cache.set(systemId, blocksSystem === true);
+    return blocksSystem === true;
   }
 
   /**

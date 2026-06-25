@@ -36,6 +36,7 @@ import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
 import { isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
+import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
@@ -361,6 +362,19 @@ export class GatheringEngine {
     }
 
     if (system.enabled === false || system.features?.gathering !== true) {
+      return this._blockedStart({
+        viewer,
+        actor: selectedActor,
+        environment,
+        task,
+        reason: this._blockedReason('SYSTEM_DISABLED'),
+      });
+    }
+
+    // System-validity gate: a system with a `blocks: 'system'` validation issue
+    // is unusable, so a non-GM attempt is rejected (mirrors the listing gate that
+    // hides it). GMs bypass so they can still attempt/diagnose a broken system.
+    if (viewer?.isGM !== true && this._isSystemBlockedForGathering(system, new Map())) {
       return this._blockedStart({
         viewer,
         actor: selectedActor,
@@ -910,16 +924,55 @@ export class GatheringEngine {
     );
   }
 
-  _playerCandidateEnvironments(systems, _viewer) {
+  _playerCandidateEnvironments(systems, viewer) {
     const environments = normalizeList(this.environmentStore?.list?.());
+    // System-validity gate: a system with a `blocks: 'system'` issue exposes
+    // nothing to non-GM viewers (its environments are dropped before any task
+    // gating). GMs bypass so they still reach a broken system to fix it. Computed
+    // at most once per system per listing call, NOT a full overview rebuild.
+    const isGM = viewer?.isGM === true;
+    const blockedCache = new Map();
     return environments
       .filter((environment) => {
         if (!systems.has(environment?.craftingSystemId)) return false;
+        if (
+          !isGM &&
+          this._isSystemBlockedForGathering(systems.get(environment.craftingSystemId), blockedCache)
+        ) {
+          return false;
+        }
         return true;
       })
       .map((environment) =>
         this._composeEnvironment(environment, systems.get(environment.craftingSystemId))
       );
+  }
+
+  /**
+   * Whether a gathering system is hidden by a `blocks: 'system'` validation
+   * issue. Cached per listing call (keyed by system id) so a multi-environment
+   * system is evaluated once. Fail-open (false) when the system or recipe manager
+   * is unavailable so a missing collaborator never blanks a player's gathering
+   * listing. GM bypass is the caller's concern.
+   *
+   * @param {object|null|undefined} system
+   * @param {Map<string, boolean>} cache Per-call blocker cache, keyed by system id.
+   * @returns {boolean}
+   * @private
+   */
+  _isSystemBlockedForGathering(system, cache) {
+    const systemId = system?.id;
+    if (!systemId) return false;
+    if (cache.has(systemId)) return cache.get(systemId);
+
+    const recipeManager = globalThis.game?.fabricate?.getRecipeManager?.();
+    const recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
+    const { blocksSystem } = computeSystemVisibility(system, {
+      recipes,
+      components: system.components || [],
+    });
+    cache.set(systemId, blocksSystem === true);
+    return blocksSystem === true;
   }
 
   _composeEnvironment(environment, system = null) {

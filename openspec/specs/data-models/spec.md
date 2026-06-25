@@ -221,6 +221,57 @@ It is GM configuration and is not part of the player gathering listing payload.
     - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
 20. `providerId` is a trimmed string (default `""`) and `macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`). Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set. Absent fields back-compat default to `""`/empty macros with no migration. The retired `inventoryMode` field is never emitted.
 
+### System Validation Report
+
+The **system-validation report** is a derived, computed view over a crafting
+system and its entities — recipes, gathering environments (with their tasks and
+events), components (salvage), and the system's own fields.
+It is NOT persisted: there is no new field on `CraftingSystem`.
+It is recomputed on demand from the live system, recipes, environments, and
+components, so it always reflects the current configuration and auto-clears when a
+gap is fixed.
+
+The report has the shape:
+
+```
+SystemValidationReport = {
+  issues: SystemValidationIssue[],
+  counts: { critical, warning, info, blockers },  // integer counts
+  blocksSystem: boolean,                           // true iff any issue blocks: 'system'
+}
+
+SystemValidationIssue = {
+  kind: 'recipe' | 'environment' | 'task' | 'event' | 'salvage' | 'system',
+  entityId: string | null,        // the offending entity, or null for system-wide
+  entityName: string,             // display label for the entity
+  severity: 'critical' | 'warning' | 'info',
+  blocks: 'enable' | 'visibility' | 'system' | undefined,
+  code: string,                   // stable machine code; the UI maps it to copy
+  message: string,                // default human-readable message
+  nav: { view: string, tab?: string },  // deep-link target for the GM overview
+}
+```
+
+Requirements:
+
+1. The report composes the existing per-entity readiness evaluators (recipe,
+   environment, salvage, ingredient-signature) and re-tags each composed issue
+   with its `kind`, `entityId`, and `nav`.
+2. The report adds NEW system-level checks keyed on the system's own fields,
+   each `blocks: 'system'` (a routed check-mode system with no usable crafting
+   check; a progressive system with no progressive check or no component with a
+   difficulty of 1 or more; multi-step recipes left on in alchemy mode; an
+   alchemy ingredient-signature collision).
+   These are distinct from the per-recipe routed-authoring warnings, which stay
+   `severity: 'warning'` with no `blocks`.
+3. `blocks` carries the visibility contract consumed by `recipe-visibility`:
+   `'system'` hides the whole system for non-GM users; `'visibility'` hides one
+   entity; `'enable'` marks an entity that cannot be enabled until its gap is
+   fixed.
+4. The report computation is pure — no Foundry runtime globals, store reads, or
+   I/O — so it is unit-testable and reusable from both the synchronous visibility
+   hot-path and the GM overview view.
+
 ## CurrencyUnit
 
 ### Purpose
