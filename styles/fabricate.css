@@ -3765,13 +3765,22 @@
 }
 
 /* The System Overview page mirrors the environment editor's full-width tabbed
-   shell: a fixed tab bar above a bounded, scrollable workspace. */
+   shell: a fixed tab bar above a bounded, scrollable workspace. The environment
+   editor wraps its edit-view in a `.manager-environment-editor-shell`
+   (`padding: var(--fab-space-3)`); the system page renders SystemEditView
+   directly under `.manager-main`, so this view absorbs that same shell padding
+   to keep the tab bar and workspace from sitting flush against the panel edges.
+   Combined with the shared `.manager-environment-tab-panel` right-edge buffer it
+   matches the environment editor's surrounding spacing exactly. `box-sizing:
+   border-box` (`.fabricate-manager *`) keeps the bounded `minmax(0, 1fr)` row
+   correct with the padding applied. */
 .fabricate-manager .manager-system-edit-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environment-details-band,
