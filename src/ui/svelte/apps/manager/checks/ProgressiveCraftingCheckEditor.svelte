@@ -21,8 +21,11 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckDiceCrits from './CheckDiceCrits.svelte';
   import CheckAwardMode from './CheckAwardMode.svelte';
+  import CheckBreakage from './CheckBreakage.svelte';
 
-  let { value = null, onChange = () => {} } = $props();
+  let { value = null, breakageAuthority = 'toolSpecific', onChange = () => {} } = $props();
+
+  const checkDriven = $derived(breakageAuthority === 'checkDriven');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -58,9 +61,19 @@
       diceCrits={value?.diceCrits || []}
       forceOnLabel={awardAllLabel}
       forceOffLabel={awardNoneLabel}
+      showBreakTools={!checkDriven}
       onChange={(diceCrits) => emit({ diceCrits })}
     />
   </section>
+
+  {#if checkDriven}
+    <CheckBreakage
+      value={value?.checkBreakage || null}
+      rollFormula={value?.rollFormula || ''}
+      kind="progressive"
+      onChange={(checkBreakage) => emit({ checkBreakage })}
+    />
+  {/if}
 
   <section class="manager-inspector-card" data-award-mode>
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}</h3>

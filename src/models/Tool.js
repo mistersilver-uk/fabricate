@@ -10,6 +10,11 @@
  *     mode === 'limitedUses':     maxUses:        number | null     (null = unlimited; usage tracked on the item)
  *     mode === 'breakageChance':  breakageChance: number (integer 0..100)
  *     mode === 'diceExpression':  formula:        string (Foundry roll), threshold: number
+ *     mode === 'immune':          (no fields)     never breaks under either breakage authority;
+ *                                                 still recorded as used (no toolUsage flag is written,
+ *                                                 because that flag is limitedUses-only); under
+ *                                                 checkDriven authority it is filtered out of the
+ *                                                 force-break set.
  *   onBreak:           { mode, ...mode-specific fields }
  *     mode === 'destroy':       (no fields)
  *     mode === 'flagBroken':    (no fields)
@@ -29,7 +34,7 @@
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 
-const BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
+const BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression', 'immune']);
 const ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
 
 function coerceMaxUses(value) {
@@ -153,10 +158,16 @@ export class Tool {
 
           break;
         }
+        case 'immune': {
+          // No fields are required or permitted: an immune tool never breaks.
+          break;
+        }
         // No default
       }
     } else {
-      errors.push('breakage.mode must be one of limitedUses, breakageChance, or diceExpression');
+      errors.push(
+        'breakage.mode must be one of limitedUses, breakageChance, diceExpression, or immune'
+      );
     }
 
     if (!ON_BREAK_MODES.has(this.onBreak.mode)) {
@@ -211,6 +222,11 @@ export class Tool {
    */
   async evaluateBreakage({ actor, item, evaluateExpression, random } = {}) {
     const mode = this.breakage.mode;
+
+    if (mode === 'immune') {
+      // An immune tool never breaks under either authority.
+      return { broken: false, mode, evidence: {} };
+    }
 
     if (mode === 'limitedUses') {
       // Prefer the authoritative `toolUsage` flag; fall back to the legacy catalyst usage

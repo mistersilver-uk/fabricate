@@ -26,11 +26,26 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckDiceCrits from './CheckDiceCrits.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
+  import CheckBreakage from './CheckBreakage.svelte';
 
   // `showTiers` (default true) renders the per-recipe tier table (relative type
   // only). Salvage/gathering reuse this editor with `showTiers={false}` — they have
   // no recipes to pick a tier from; a per-entity DC override lives elsewhere.
-  let { value = null, showTiers = true, onChange = () => {} } = $props();
+  // `breakageAuthority` (issue 419): under `checkDriven` the per-outcome break-tools
+  // pills are hidden and tool breakage is authored via the CheckBreakage editor.
+  let {
+    value = null,
+    showTiers = true,
+    breakageAuthority = 'toolSpecific',
+    onChange = () => {}
+  } = $props();
+
+  const checkDriven = $derived(breakageAuthority === 'checkDriven');
+  // Outcome options for the CheckBreakage outcomeTier condition — both tier lists
+  // carry an id + name; the active list is the one the editor is showing.
+  const breakageOutcomeOptions = $derived(
+    outcomes.map((outcome) => ({ id: outcome.id, name: outcome.name }))
+  );
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -181,9 +196,20 @@
     <CheckDiceCrits
       rollFormula={value?.rollFormula || ''}
       diceCrits={value?.diceCrits || []}
+      showBreakTools={!checkDriven}
       onChange={(diceCrits) => emit({ diceCrits })}
     />
   </section>
+
+  {#if checkDriven}
+    <CheckBreakage
+      value={value?.checkBreakage || null}
+      rollFormula={value?.rollFormula || ''}
+      kind="routed"
+      outcomeOptions={breakageOutcomeOptions}
+      onChange={(checkBreakage) => emit({ checkBreakage })}
+    />
+  {/if}
 
   {#if showTiers && type === 'relative'}
     <section class="manager-inspector-card" data-routed-tiers>
@@ -207,7 +233,7 @@
     {#if outcomes.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes', 'No outcome tiers yet. Add the tiers this check routes results into.')}</p>
     {:else}
-      <div class={`manager-checks-outcome-table ${type === 'fixed' ? 'is-fixed' : 'is-relative'}`} role="table" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}>
+      <div class={`manager-checks-outcome-table ${type === 'fixed' ? 'is-fixed' : 'is-relative'} ${checkDriven ? 'is-no-break' : ''}`} role="table" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}>
         <div class="manager-checks-outcome-head" role="row">
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span>
           {#if type === 'relative'}
@@ -217,7 +243,9 @@
             <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}</span>
           {/if}
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeColumn', 'Outcome')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
+          {#if !checkDriven}
+            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
+          {/if}
           <span role="columnheader" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}></span>
         </div>
 
@@ -271,16 +299,18 @@
               {outcome.success === true ? successOnLabel : successOffLabel}
             </button>
 
-            <button
-              type="button"
-              class={`manager-checks-state-pill ${outcome.breakTools === true ? 'is-negative' : 'is-positive'}`}
-              data-outcome-break
-              aria-pressed={outcome.breakTools === true}
-              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
-              onclick={() => updateOutcome(outcome.id, { breakTools: !(outcome.breakTools === true) })}
-            >
-              {outcome.breakTools === true ? breakOnLabel : breakOffLabel}
-            </button>
+            {#if !checkDriven}
+              <button
+                type="button"
+                class={`manager-checks-state-pill ${outcome.breakTools === true ? 'is-negative' : 'is-positive'}`}
+                data-outcome-break
+                aria-pressed={outcome.breakTools === true}
+                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
+                onclick={() => updateOutcome(outcome.id, { breakTools: !(outcome.breakTools === true) })}
+              >
+                {outcome.breakTools === true ? breakOnLabel : breakOffLabel}
+              </button>
+            {/if}
 
             <button
               type="button"

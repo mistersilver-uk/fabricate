@@ -309,6 +309,66 @@ describe('createAdminStore', () => {
       await store.refresh();
     });
 
+    it('projects toolBreakage.authority and preserves per-check checkBreakage blocks (issue 419)', async () => {
+      const services = createMockServices();
+      // Seed the selected system with checkDriven authority and a checkBreakage
+      // block on every per-mode check sub-object the projection clones.
+      const checkBreakage = {
+        enabled: true,
+        triggers: [
+          {
+            id: 'trg1',
+            label: 'Natural 1',
+            condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+          },
+        ],
+      };
+      const systems = services._getSystemsMutable();
+      const sys = systems.find((s) => s.id === 'sys1');
+      sys.toolBreakage = { authority: 'checkDriven' };
+      sys.craftingCheck = {
+        mode: 'passFail',
+        simple: { rollFormula: '1d20', checkBreakage },
+        routed: { type: 'relative', rollFormula: '1d20', checkBreakage },
+        progressive: { rollFormula: '2d6', checkBreakage },
+      };
+
+      const store = createAdminStore(services);
+      await store.refresh();
+      const selected = get(store.viewState).selectedSystem;
+
+      // Authority is now visible in the projection (was previously unprojected).
+      assert.deepEqual(selected.toolBreakage, { authority: 'checkDriven' });
+
+      // The checkBreakage block survives the _clonePlain projection for every mode.
+      for (const mode of ['simple', 'routed', 'progressive']) {
+        assert.deepEqual(
+          selected.craftingCheck[mode].checkBreakage,
+          checkBreakage,
+          `craftingCheck.${mode}.checkBreakage survives the projection clone`
+        );
+        // It is a deep clone, not the same reference (the projection must not leak
+        // the live persisted object into the view state).
+        assert.notEqual(
+          selected.craftingCheck[mode].checkBreakage,
+          checkBreakage,
+          `craftingCheck.${mode}.checkBreakage is cloned, not shared`
+        );
+      }
+    });
+
+    it('projects toolBreakage.authority as toolSpecific when the system has none (issue 419)', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.refresh();
+      const selected = get(store.viewState).selectedSystem;
+      assert.deepEqual(
+        selected.toolBreakage,
+        { authority: 'toolSpecific' },
+        'a system with no toolBreakage projects the toolSpecific default'
+      );
+    });
+
     it('publishes loading instead of a true empty state while managers are uninitialized', () => {
       let readyCallback = null;
       const services = createMockServices({

@@ -33,6 +33,7 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
     tiers: [],
     macroUuid: null,
     diceCrits: [],
+    checkBreakage: { enabled: false, triggers: [] },
   });
   assert.equal(check.routed.type, 'relative');
   assert.equal(check.routed.dc, 15);
@@ -41,6 +42,7 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
     allowPlayerReorder: false,
     rollFormula: '',
     diceCrits: [],
+    checkBreakage: { enabled: false, triggers: [] },
   });
 });
 
@@ -73,6 +75,7 @@ test('_normalizeGatheringCraftingCheck defaults to disabled with progressive/rou
     allowPlayerReorder: false,
     rollFormula: '',
     diceCrits: [],
+    checkBreakage: { enabled: false, triggers: [] },
   });
   assert.equal(check.routed.type, 'relative');
   // d100 needs no editable config — there is no `simple` sub-object.

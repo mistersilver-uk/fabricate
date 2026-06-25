@@ -1246,6 +1246,16 @@
   grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
 }
 
+/* checkDriven authority drops the per-outcome break-tools column (tool breakage is
+   authored via the CheckBreakage editor instead). */
+.fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
+  grid-template-columns: minmax(140px, 1fr) 84px 104px 40px;
+}
+
+.fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
+  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 40px;
+}
+
 /* Simple-check recipe tiers: Name + DC + remove. */
 .fabricate-manager .manager-checks-outcome-table.is-tier {
   grid-template-columns: minmax(140px, 1fr) 96px 40px;
@@ -1255,6 +1265,48 @@
    the auto-fail/auto-succeed pills on one line + remove. */
 .fabricate-manager .manager-checks-outcome-table.is-crit {
   grid-template-columns: 92px minmax(110px, 1fr) minmax(110px, 1fr) 40px;
+}
+
+/* Crit table with the break-tools column hidden (checkDriven authority): the
+   break column is dropped, so only Raw roll + Force Outcome + remove remain. */
+.fabricate-manager .manager-checks-outcome-table.is-crit-no-break {
+  grid-template-columns: 92px minmax(110px, 1fr) 40px;
+}
+
+/* Per-check tool-breakage trigger editor (issue 419). Each trigger is a bordered,
+   padded card; its condition controls (When / Group / Measure / Is / Value) sit on
+   one wrapping row instead of stacking, since `.manager-field` is column-flex. */
+.fabricate-manager .manager-checks-breakage-trigger {
+  display: grid;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-checks-breakage-trigger-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-breakage-trigger-head .manager-checks-breakage-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-breakage-condition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-breakage-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-checks-force-outcome {
@@ -9603,6 +9655,39 @@
   text-transform: uppercase;
   color: var(--fab-mv2-text-muted);
   padding: 0 var(--fab-space-1);
+}
+
+/* Tool breakage authority radios (issue 419): the option name is a distinct,
+   bold line above its muted description so the two never run together. The icon
+   aligns to the top of the two-line body (scoped here so single-line radios
+   elsewhere keep their centered alignment). The card header already frames this
+   group, so drop the fieldset's own bordered box (kept for the per-tool
+   fieldsets that still carry a visible legend). */
+.fabricate-manager [data-manager-tools-authority] .manager-tools-section {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.fabricate-manager [data-manager-tools-authority] .manager-radio-option {
+  align-items: flex-start;
+}
+
+.fabricate-manager .manager-radio-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-radio-option-name {
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-radio-option-desc {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--fab-mv2-text-muted);
 }
 
 .fabricate-manager .manager-tools-inline-field {

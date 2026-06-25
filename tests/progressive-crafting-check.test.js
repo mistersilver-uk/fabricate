@@ -198,3 +198,44 @@ test('a formula-less progressive check with no macro requires one (fails)', asyn
   assert.equal(result.success, false, 'progressive mode requires a check when no formula is set');
   assert.match(result.message, /requires a crafting check macro/i);
 });
+
+// ── checkBreakage / value-vs-total distinction (issue 419) ───────────────────
+
+test('progressive surfaces value (awarding) and data.total (raw roll) distinctly under a success crit', async () => {
+  const { engine } = makeEngine({
+    progressive: defaultProgressive({
+      rollFormula: '1d20',
+      diceCrits: [{ id: 'c', die: '1d20', raw: 1, success: true }],
+    }),
+  });
+  // Natural 1 forces a success crit: value → MAX_SAFE_INTEGER, data.total keeps raw 1.
+  stubRoll(1, [{ number: 1, faces: 20, total: 1, results: [{ result: 1, active: true }] }]);
+  const r = await run(engine);
+  assert.equal(r.value, Number.MAX_SAFE_INTEGER, 'awarding value is the crit award');
+  assert.equal(r.data.total, 1, 'data.total keeps the raw roll');
+});
+
+test('checkDriven progressive: a progressiveValue trigger fires while a rollTotal trigger does not (distinct sources)', async () => {
+  const progressive = defaultProgressive({
+    rollFormula: '1d20',
+    diceCrits: [{ id: 'c', die: '1d20', raw: 1, success: true }],
+  });
+  const { engine, system } = makeEngine({ progressive });
+  system.toolBreakage = { authority: 'checkDriven' };
+  stubRoll(1, [{ number: 1, faces: 20, total: 1, results: [{ result: 1, active: true }] }]);
+  const r = await run(engine);
+  // progressiveValue targets the awarded MAX; rollTotal targets the raw 1.
+  const progTrigger = { enabled: true, triggers: [{ id: 'pv', label: 'Big award', condition: { type: 'progressiveValue', operator: '>=', value: 1000 } }] };
+  const rollTrigger = { enabled: true, triggers: [{ id: 'rt', label: 'High roll', condition: { type: 'rollTotal', operator: '>=', value: 1000 } }] };
+  const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: progTrigger, checkResult: r }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage: rollTrigger, checkResult: r }).forceBreak, false);
+});
+
+test('checkDriven progressive: surfaces data.diceGroups for the DSL', async () => {
+  const { engine, system } = makeEngine({ progressive: defaultProgressive({ rollFormula: '2d6' }) });
+  system.toolBreakage = { authority: 'checkDriven' };
+  stubRoll(7, [{ number: 2, faces: 6, total: 7, results: [{ result: 3, active: true }, { result: 4, active: true }] }]);
+  const r = await run(engine);
+  assert.deepEqual(r.data.diceGroups, [{ groupId: 0, group: '2d6', sum: 7, results: [3, 4] }]);
+});

@@ -61,12 +61,45 @@ Each Tool picks exactly one breakage mechanic:
 | Limited uses | A usage counter ticks up each attempt. The Tool breaks when the counter reaches the chosen maximum. Leave the maximum unset for unlimited use, in which case usage is still tracked. |
 | A chance each use | A flat percent chance per attempt that the Tool breaks. Set it to 100 to always break and to 0 to never break. |
 | A dice roll | A dice roll is compared against a numeric threshold. The Tool breaks when the roll comes in below the threshold. |
+| Immune | The Tool never breaks. It is still recorded as used, but it carries no breakage settings and no on-break action ever runs. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+Which of these you can choose for a Tool depends on the **Tool breakage source** described below.
+Under **Tool-specific** you pick one of the first three mechanics and configure its settings.
+Under **Check-driven** the per-Tool choice is simply **Breakable** or **Immune**, with no extra settings, because the check decides whether breakable Tools break.
+A **Breakable** Tool keeps whatever mechanic it had under Tool-specific, so switching the source back restores it.
+An immune Tool is the clean way to model a piece of equipment that is always present but never wears out.
+
 {: .note }
 > Only limited-uses Tools track how many times each item has been used.
-The other two modes never record a per-item usage count.
+The other modes never record a per-item usage count.
+
+## Tool breakage source
+
+By default each Tool decides for itself whether it breaks, using the breakage mode you picked above.
+You can instead hand that decision to the check the attempt rolls, so the same roll that decides the result also decides whether the required Tools break.
+
+You choose between these two on the system's **Tools** page, in the **Tool breakage source** setting:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Source | Behaviour |
+|:-------|:----------|
+| Tool-specific | The default. Each Tool's own breakage mode decides whether it breaks. |
+| Check-driven | The active check decides whether all of the required Tools break for the attempt. Each Tool's own breakage mode is ignored, with one exception. An Immune Tool still never breaks. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The setting applies to the whole crafting system.
+It covers crafting, salvage, and gathering together.
+
+When the source is **Check-driven**, the option explains that per-Tool breakage modes are no longer evaluated, except Immune, and each Tool's breakage control becomes a simple Breakable or Immune choice.
+Immune is how you exempt a single Tool from check-driven breakage.
+Set that Tool to Immune and it will never break, even when the check breaks every other required Tool.
+
+You decide exactly when a check-driven check breaks Tools on the check editor itself.
+See [Tool breakage triggers]({% link crafting-checks.md %}#tool-breakage-triggers).
 
 ## On-break actions
 
@@ -92,7 +125,7 @@ In Manager V2:
 2. **Open the system's Tools page.** With a crafting system selected, click the top-level **Tools** entry in the Manager navigation (it sits alongside Components, Essences, and the Gathering group, and it is not nested under Gathering, because Tools belong to the system).
    Click *Add tool*, pick the Tool component (drag-drop from the Items directory or use the dropdown), and optionally set a display label.
 3. **(Optional) Add a requirement**, a condition checked against the acting character (see [The requirement gate](#the-requirement-gate)).
-4. **Pick a breakage mode**: limited uses, a chance each use, or a dice roll (see [Breakage modes](#breakage-modes)).
+4. **Pick a breakage mode**: under the Tool-specific source, limited uses, a chance each use, or a dice roll; under the Check-driven source, simply Breakable or Immune (see [Breakage modes](#breakage-modes)).
 5. **Pick an on-break action**: destroy it, flag it as broken, or replace it with a broken variant (see [On-break actions](#on-break-actions)).
 6. **Save**, then reference the saved Tool from the recipes, steps, ingredient sets, gathering tasks, or salvage configurations that require it.
 
@@ -107,7 +140,14 @@ You can separately choose to apply Tool breakage on a failed salvage check.
 {: .note }
 > See [Consumption on Failure]({% link crafting-checks.md %}#consumption-on-failure) for where these options live.
 
+This applies to check-driven breakage too.
+On a failed attempt, a check that would break the required Tools only does so when you have allowed breakage on failure for that activity.
+On a successful attempt the Tools always break when the check says they do.
+
 For gathering, the system-level **Tool breakage outcome** setting (Manager V2 → System Settings → Gathering Rules) decides whether a broken Tool fails the whole attempt (the default) or whether drops are still awarded with the breakage reported alongside.
+That setting is separate from the **Tool breakage source** above.
+The source decides whether a Tool breaks.
+The outcome setting decides what a broken Tool does to the gather.
 
 ## What the results show
 
@@ -136,7 +176,8 @@ The conversion preserves behaviour:
 
 {: .note }
 > The present-only row is a deliberate, behaviour-preserving choice.
-A Tool with a zero breakage chance never wears out and never records usage, exactly matching the old never-consumed behaviour.
+A Tool with a zero breakage chance never wears out, matching the old never-consumed behaviour.
+For new Tools you author by hand, the Immune mode is the clearer way to say "this never breaks".
 
 Identical catalysts are combined into a single shared library Tool.
 Catalysts that differ in meaning are kept separate.

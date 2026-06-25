@@ -34,19 +34,34 @@ export const evaluateArgs = [];
 
 /**
  * Stub Foundry's `Roll`: `evaluate()` resolves to a fixed total and dice terms,
- * each `{ number, faces, total }` (mirroring an evaluated DiceTerm). Mirrors the
- * stub used by the simple/salvage suites. Records each `evaluate()` argument in
- * {@link evaluateArgs} so the non-interactive contract can be asserted.
+ * each `{ number, faces, total, results }` (mirroring an evaluated DiceTerm).
+ * Mirrors the stub used by the simple/salvage suites. Records each `evaluate()`
+ * argument in {@link evaluateArgs} so the non-interactive contract can be asserted.
+ *
+ * Per-die `results[]` (issue 419): each dice term may carry an explicit
+ * `results: [{ result, active? }]` so the `checkBreakage` `diceGroup` per-die
+ * aggregates (`anyDie`/`allDice`/`lowestDie`/`highestDie`) have raw faces to read.
+ * When a term omits `results` and its `total` divides evenly across a single die
+ * (`number: 1`), a `[{ result: total }]` is synthesised so the natural-1 default
+ * still fires without each suite re-stating the faces. Multi-die terms with no
+ * `results` are left as-is (the aggregates fail open, by design).
  */
 export function stubRoll(total, dice = []) {
   evaluateArgs.length = 0;
+  const withResults = dice.map((die) => {
+    if (Array.isArray(die.results)) return die;
+    if (Number(die.number) === 1 && Number.isFinite(Number(die.total))) {
+      return { ...die, results: [{ result: Number(die.total), active: true }] };
+    }
+    return die;
+  });
   globalThis.Roll = class {
     constructor(formula) {
       this.formula = formula;
     }
     async evaluate(options) {
       evaluateArgs.push(options);
-      return { total, dice };
+      return { total, dice: withResults };
     }
   };
 }

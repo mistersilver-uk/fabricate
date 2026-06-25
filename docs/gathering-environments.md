@@ -193,7 +193,7 @@ Each library tool carries:
 | **Component** | The managed component the tool refers to (required) |
 | **Display label** | Optional. Falls back to the component name |
 | **Tool requirement** | Optional formula checked against the character's roll data. See [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
-| **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), or **Dice expression** (a formula compared against a threshold) |
+| **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), **Dice expression** (a formula compared against a threshold), or **Immune** (never breaks) |
 | **On-break action** | One of **Destroy item**, **Mark as broken**, or **Replace with item** (the replacement must differ from the original) |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -471,7 +471,7 @@ A library tool carries:
 |:------|:------------|
 | Component | The managed component the tool is, taken from the system's component library (required) |
 | Requirement | Optional. A roll expression that must hold true for the character to use the tool |
-| Breakage mechanic | One of limited uses, breakage chance, or a dice expression |
+| Breakage mechanic | One of limited uses, breakage chance, a dice expression, or immune (never breaks) |
 | Maximum uses | For limited uses: a positive number, or blank for unlimited |
 | Breakage chance | For breakage chance: a whole percent from 0 to 100 |
 | Dice expression and threshold | For a dice expression: a roll formula and a number it must reach to avoid breaking |
@@ -484,6 +484,16 @@ The system-level Gathering Rules setting **Tool breakage outcome** controls what
 By default a break makes the attempt fail and clears its drops.
 You can instead let the attempt keep its success.
 Either way, the on-break action always happens.
+
+Whether a tool breaks in the first place follows the system's **Tool breakage source** setting on the [Tools]({% link tools.md %}#tool-breakage-source) page.
+With the default **Tool-specific** source, each tool's own breakage mechanic decides.
+With the **Check-driven** source, the gathering check decides whether all required tools break, the same way it does for crafting and salvage, and per-tool mechanics are ignored except for immune tools.
+This takes effect once the Progressive and Routed by check gathering modes ship.
+The only gathering mode available today, d100, has no check for triggers to read, so check-driven breakage cannot fire for a d100 attempt.
+Until then, gathering tool breakage uses the Tool-specific source regardless of this setting.
+This is separate from the **Tool breakage outcome** setting above.
+The source decides whether a tool breaks.
+The outcome setting decides what a broken tool does to the gather.
 
 A missing or disabled library tool blocks the attempt, as does a tool the character does not own, a tool the character owns that is broken, and a failed tool requirement.
 

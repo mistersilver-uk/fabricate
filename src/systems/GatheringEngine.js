@@ -2380,6 +2380,10 @@ export class GatheringEngine {
       value: rolled.value,
       success: rolled.success === true,
       data: rolled.data ?? {},
+      // Engine-evaluated (issue 419): the shared `evaluateCheckBreakage` seam honours
+      // the legacy `data.breakTools` and `checkBreakage` triggers only for
+      // engine-evaluated checks (a macro check never force-breaks tools).
+      engineEvaluated: true,
     };
 
     // A failing tier (or no tier match) routes to a terminal failure; a succeeding
@@ -2548,6 +2552,8 @@ export class GatheringEngine {
         status: null,
         value: rolled.value,
         data: rolled.data ?? {},
+        // Engine-evaluated (issue 419): see _resolveRoutedFormulaOutcome.
+        engineEvaluated: true,
       };
     }
 
@@ -2641,6 +2647,9 @@ export class GatheringEngine {
         presentTools,
         outcomeStatus: outcome.status,
         checkResult: checkResult ?? outcome.checkResult ?? null,
+        // Active gathering check's checkBreakage (issue 419) so the shared runtime's
+        // checkDriven override can fire, reaching crafting/salvage parity.
+        checkBreakage: this._resolveGatheringCheckBreakage(system, task),
       });
       return Array.isArray(planned) ? planned : [];
     } catch (error) {
@@ -2675,7 +2684,23 @@ export class GatheringEngine {
       presentTools,
       outcomeStatus: outcome.status,
       checkResult: outcome.checkResult ?? null,
+      // Active gathering check's checkBreakage (issue 419) — see _planTerminalTools.
+      checkBreakage: this._resolveGatheringCheckBreakage(system, task),
     });
+  }
+
+  /**
+   * Resolve the active gathering check's `checkBreakage` block for the task's
+   * resolution mode (issue 419). Routed gathering authors on the routed check,
+   * progressive on the progressive check; d100 has no check sub-object so it carries
+   * no checkBreakage. Returns null when none is configured.
+   * @private
+   */
+  _resolveGatheringCheckBreakage(system, task) {
+    const check = system?.gatheringCraftingCheck || {};
+    if (task?.resolutionMode === 'routed') return check.routed?.checkBreakage ?? null;
+    if (task?.resolutionMode === 'progressive') return check.progressive?.checkBreakage ?? null;
+    return null;
   }
 
   async _applyFailureFeedback({ viewer, actor, system, environment, task, outcome, checkResult }) {
@@ -3246,6 +3271,9 @@ function normalizeCheckResult(raw) {
     data: plainObjectOrNull(raw.data) ?? {},
     reasonCode: stringOrNull(raw.reasonCode),
     diagnostic: raw.diagnostic ?? null,
+    // Preserve the engine-evaluated flag (issue 419) so the shared breakage seam
+    // can honour `data.breakTools` / `checkBreakage` triggers under checkDriven.
+    ...(raw.engineEvaluated === true ? { engineEvaluated: true } : {}),
   };
 }
 

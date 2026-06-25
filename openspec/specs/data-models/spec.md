@@ -26,6 +26,16 @@ CraftingSystem = {
   // Mode semantics and validation are defined in 004.
   resolutionMode: "simple" | "routed" | "progressive" | "alchemy",
 
+  // Tool-breakage authority for the whole system.
+  // "toolSpecific" (default): each Tool's own breakage.mode decides whether it
+  // breaks, plus the legacy per-crit/per-tier breakTools force-break on top.
+  // "checkDriven": the active check's checkBreakage triggers decide whether ALL
+  // required tools break; each Tool's own mode is ignored except "immune".
+  // Normalized on read (no versioned migration): unknown/missing -> "toolSpecific".
+  toolBreakage: {
+    authority: "toolSpecific" | "checkDriven", // default "toolSpecific"
+  },
+
   features: {
     recipeCategories: true, // compatibility alias; always enabled
     itemTags: true, // compatibility alias; always enabled
@@ -126,6 +136,7 @@ CraftingSystem = {
   //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
   //     diceCrits: DiceCrit[],
+  //     checkBreakage: CheckBreakage,              // per-check tool-breakage triggers (checkDriven only)
   //   }
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
@@ -134,7 +145,9 @@ CraftingSystem = {
   //     diceCrits: DiceCrit[],
   //     relativeOutcomes: { id, name, success, breakTools, dc }[],
   //     fixedOutcomes: { id, name, success, breakTools, start, end }[],
+  //     checkBreakage: CheckBreakage,              // per-check tool-breakage triggers (checkDriven only)
   //   }
+  //   // (The progressive check sub-object likewise carries a checkBreakage block.)
   //   DiceCrit = { id, die, raw, success: boolean, breakTools: boolean }
   //     // `die` is a canonical plain (unmodified) NdS term (bare dN === 1dN).
   //     // `raw` is matched against the die-term GROUP TOTAL and clamped to the
@@ -145,6 +158,28 @@ CraftingSystem = {
   //     // leaves the plain-eligible set (a modifier is added, or the die leaves
   //     // the formula) its crits are eagerly purged from the editor draft and
   //     // staged data, and dropped by normalization on save as a backstop.
+  //     // `breakTools` is NOT a separate mechanism: it is equivalent to a
+  //     // checkBreakage diceGroup trigger on that die (aggregate "total", operator
+  //     // "==", value crit.raw) and is honoured by the shared evaluator as an
+  //     // implicit always-on trigger. A routed outcome's `breakTools` is likewise
+  //     // equivalent to an outcomeTier trigger naming that tier's id. The checkBreakage
+  //     // model is the single generalization of these flags, not a parallel path.
+  //
+  //   CheckBreakage = {
+  //     enabled: boolean,                          // default false
+  //     triggers: CheckBreakageTrigger[],          // ORed; any match breaks all required tools
+  //   }
+  //   CheckBreakageTrigger = { id: string, label: string, condition: CheckBreakageCondition }
+  //   CheckBreakageCondition =
+  //     | { type: "rollTotal",        operator: "==" | "<=" | ">=" | "<" | ">", value: number }   // raw roll total (data.total)
+  //     | { type: "progressiveValue", operator: "==" | "<=" | ">=" | "<" | ">", value: number }   // awarding value (absent on non-progressive -> never matches)
+  //     | { type: "outcomeTier",      tierIds?: string[], outcomeKeys?: string[] }                // resolved tier id / outcome key in the set
+  //     | { type: "diceGroup",        groupId: number,                                            // index into the evaluated roll.dice term order
+  //         aggregate: "total" | "anyDie" | "allDice" | "lowestDie" | "highestDie",
+  //         operator: "==" | "<=" | ">=" | "<" | ">", value: number }
+  //     // `groupId` is the evaluated-term index (NOT re-parsed from the formula), so
+  //     // duplicate `NdS` groups (1d20 + 1d20) are disambiguated 0/1. Per-die aggregates
+  //     // read the active-only raw faces; with no per-die data they fail open (no break).
 
   recipeVisibility: {
     listMode: "global" | "player" | "knowledge",  // default "global"
@@ -260,6 +295,25 @@ The macro strategy is GM-only config with no separate feature flag (matching suc
 Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
 Absent fields back-compat default to `""`/empty macros with no migration.
 The retired `inventoryMode` field is never emitted.
+21. **Tool-breakage authority** (`toolBreakage.authority`) is a per-system switch, normalized on read (no versioned migration): unknown or missing normalizes to `"toolSpecific"`, mirroring the inline `resolutionMode`/`salvageResolutionMode` defaulters.
+A system with no persisted `toolBreakage` reads as `{ authority: "toolSpecific" }` and behaves exactly as before, including the legacy per-crit/per-tier `breakTools` force-break.
+The governing rule: authority decides WHETHER a tool breaks; `checkBreakage` triggers decide WHEN, under `checkDriven`; the Tool's `onBreak` decides what happens; an `immune` Tool never breaks under either authority.
+22. Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, AND the legacy `data.breakTools` force-break (per-die `DiceCrit.breakTools`, routed per-tier `outcome.breakTools`) still applies on top.
+This is a strict superset of pre-419 behaviour.
+An `immune` Tool never breaks even under a legacy force-break.
+23. Under `"checkDriven"` authority, the active check's `checkBreakage` triggers decide whether **all required tools** break for the attempt; each Tool's own `breakage.mode` is **not** evaluated, except `immune`, which is always honoured (filtered out of the force-break set and recorded as skipped-immune evidence).
+The decision is made by a single shared evaluator (`evaluateCheckBreakage`) that crafting, salvage, and gathering all route through, so the decision cannot drift between surfaces.
+The evaluator additionally reads the legacy `data.breakTools` as an implicit always-on trigger, so the two seed presets need no separate persistence, and never force-breaks for a macro/built-in check (`engineEvaluated !== true`).
+24. `checkBreakage` triggers always target **all required tools** for the attempt (never a single check-selected tool in v1).
+The `rollTotal` condition targets the raw roll total (`data.total`); `progressiveValue` targets the awarding `value` and is meaningful only on progressive checks (absent → never matches); these are distinct sources because a progressive crit can overwrite `value` while `data.total` keeps the raw roll.
+The `diceGroup` `groupId` is the index into the evaluated `roll.dice` term order (not re-parsed from the formula string), so duplicate `NdS` groups are disambiguated deterministically; per-die aggregates read active-only raw faces and fail open (no break) when no per-die data is available.
+The `outcomeTier` condition matches when the resolved tier/outcome is in `tierIds[]` or `outcomeKeys[]`; both are honoured by the engine and the normalizer, but the editor UI authors only `tierIds[]` in v1 (`outcomeKeys[]` is an engine-level capability with no editor surface) — **acknowledged limit (issue 419)**.
+25. **`consumeCatalystsOnFail` interaction on the failure path** (issue 419): breakage on a FAILED attempt runs only when `consumption.consumeCatalystsOnFail === true` — identical to how the legacy `breakTools` force-break is gated today.
+A matched `checkDriven` trigger on a failed attempt therefore breaks tools only when `consumeCatalystsOnFail === true`.
+On the SUCCESS path breakage always applies (no such gate exists there).
+
+**Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
+The two are unrelated and independently applied.
 
 ### System Validation Report
 
@@ -782,11 +836,14 @@ Tool = {
     formula: string,
   },
   breakage: {
-    mode: "limitedUses" | "breakageChance" | "diceExpression",
+    mode: "limitedUses" | "breakageChance" | "diceExpression" | "immune",
     maxUses?: number | null,         // limitedUses; null means unlimited
     breakageChance?: number,         // breakageChance; integer 0..100
     formula?: string,                // diceExpression
     threshold?: number,              // diceExpression; broken when result < threshold
+    // "immune" carries no additional fields; the tool never breaks under EITHER
+    // breakage authority and is still recorded as used (no toolUsage flag, which is
+    // limitedUses-only). Under checkDriven authority it is the per-tool opt-out.
   },
   onBreak: {
     mode: "destroy" | "flagBroken" | "replaceWith",
@@ -816,6 +873,9 @@ The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
 The tool breaks when `Math.random() * 100 < breakageChance` (so `0` never breaks and `100` always breaks).
    - `diceExpression`: `formula` is a non-empty Foundry roll formula evaluated against the actor's roll data; `threshold` is a finite number.
 The tool breaks when the numeric result is `< threshold`.
+   - `immune`: carries no breakage fields and never breaks under either authority.
+It is still recorded as used (no `toolUsage` flag is written, because that flag is `limitedUses`-only), and under `checkDriven` authority it is filtered out of the force-break set.
+`onBreak` stays configurable but is inert while immune.
 6. Exactly one `onBreak.mode` is configured per tool. `replaceWith` requires `replacementComponentId !== componentId`.
 7. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
 8. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
@@ -831,6 +891,7 @@ The match fires only when the evaluated recipe/task's own crafting system equals
 | `breakage.breakageChance.breakageChance` | integer `0..100`                                 | non-integer, out of range |
 | `breakage.diceExpression.formula`      | non-empty string                                   | empty                     |
 | `breakage.diceExpression.threshold`    | finite number                                      | non-finite                |
+| `breakage.immune`                      | no breakage fields required or permitted           | —                         |
 | `onBreak.replaceWith.replacementComponentId` | non-empty, must differ from `componentId`    | empty, equal to `componentId` |
 
 ## Gathering Drop Reference

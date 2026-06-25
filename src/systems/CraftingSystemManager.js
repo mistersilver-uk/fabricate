@@ -121,6 +121,18 @@ export class CraftingSystemManager {
         if (raw === 'tiered') return 'routed'; // legacy alias
         return ['simple', 'routed', 'progressive'].includes(raw) ? raw : 'simple';
       })(system.salvageResolutionMode),
+      // Tool-breakage authority (issue 419): `toolSpecific` (default, today's
+      // behaviour — each Tool's own mode decides, plus the legacy per-crit/per-tier
+      // `breakTools` force-break) | `checkDriven` (the active check's `checkBreakage`
+      // triggers decide whether ALL required tools break; per-tool modes are ignored
+      // except `immune`). Normalized on read (no versioned migration): unknown /
+      // missing → `toolSpecific`, mirroring the inline resolutionMode defaulters above.
+      toolBreakage: (function _normalizeToolBreakageAuthority(raw) {
+        const authority = ['toolSpecific', 'checkDriven'].includes(raw?.authority)
+          ? raw.authority
+          : 'toolSpecific';
+        return { authority };
+      })(system.toolBreakage),
       salvageCraftingCheck: this._normalizeSalvageCraftingCheck(system.salvageCraftingCheck),
       gatheringCraftingCheck: this._normalizeGatheringCraftingCheck(system.gatheringCraftingCheck),
       alchemy: this._normalizeAlchemyConfig(
@@ -230,6 +242,10 @@ export class CraftingSystemManager {
     if (mode === 'breakageChance') {
       const raw = Number(input?.breakageChance);
       return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
+    }
+    if (mode === 'immune') {
+      // An immune tool carries no breakage fields and never breaks.
+      return { mode };
     }
     const threshold = Number(input?.threshold);
     return {
@@ -348,6 +364,7 @@ export class CraftingSystemManager {
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
       macroUuid: source.macroUuid || null,
       diceCrits: this._normalizeDiceCrits(diceCrits, rollFormula),
+      checkBreakage: this._normalizeCheckBreakage(source.checkBreakage),
     };
   }
 
@@ -370,6 +387,7 @@ export class CraftingSystemManager {
         diceCrits,
         typeof source.rollFormula === 'string' ? source.rollFormula : ''
       ),
+      checkBreakage: this._normalizeCheckBreakage(source.checkBreakage),
     };
   }
 
@@ -496,6 +514,7 @@ export class CraftingSystemManager {
       fixedOutcomes: fixed
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'fixed'))
         .filter(Boolean),
+      checkBreakage: this._normalizeCheckBreakage(source.checkBreakage),
     };
   }
 
@@ -518,6 +537,86 @@ export class CraftingSystemManager {
     }
     const dc = Number(outcome.dc);
     return { ...base, dc: Number.isFinite(dc) ? Math.trunc(dc) : 0 };
+  }
+
+  /**
+   * Normalize the optional per-check `checkBreakage` block (issue 419) carried by
+   * each crafting/salvage/gathering check sub-object (simple/routed/progressive).
+   * Shape: `{ enabled: boolean, triggers: CheckBreakageTrigger[] }`. Triggers are
+   * ORed; any match breaks every required tool under `checkDriven` authority.
+   * Malformed triggers (unknown condition type, missing operands) are dropped so a
+   * bad authoring payload can never throw at runtime.
+   *
+   * `rollFormula` is accepted for parity with the editor (group enumeration) but is
+   * not persisted here — `diceGroup` triggers carry their own `groupId`.
+   *
+   * @param {object} [input] Raw `checkBreakage` block.
+   * @returns {{ enabled: boolean, triggers: Array<object> }}
+   * @private
+   */
+  _normalizeCheckBreakage(input) {
+    const source = !input || typeof input !== 'object' ? {} : input;
+    const rawTriggers = Array.isArray(source.triggers) ? source.triggers : [];
+    const triggers = rawTriggers
+      .map((trigger) => this._normalizeCheckBreakageTrigger(trigger))
+      .filter(Boolean);
+    return { enabled: source.enabled === true, triggers };
+  }
+
+  /**
+   * Normalize a single `checkBreakage` trigger `{ id, label, condition }`, dropping
+   * it (returning null) when its condition shape is malformed.
+   * @private
+   */
+  _normalizeCheckBreakageTrigger(trigger) {
+    if (!trigger || typeof trigger !== 'object') return null;
+    const condition = this._normalizeCheckBreakageCondition(trigger.condition);
+    if (!condition) return null;
+    return {
+      id: String(trigger.id || foundry.utils.randomID()),
+      label: typeof trigger.label === 'string' ? trigger.label : '',
+      condition,
+    };
+  }
+
+  /** @private */
+  _normalizeCheckBreakageCondition(condition) {
+    if (!condition || typeof condition !== 'object') return null;
+    const OPERATORS = new Set(['==', '<=', '>=', '<', '>']);
+    const type = condition.type;
+    if (type === 'rollTotal' || type === 'progressiveValue') {
+      if (!OPERATORS.has(condition.operator)) return null;
+      const value = Number(condition.value);
+      if (!Number.isFinite(value)) return null;
+      return { type, operator: condition.operator, value };
+    }
+    if (type === 'outcomeTier') {
+      const tierIds = Array.isArray(condition.tierIds)
+        ? condition.tierIds.map(String).filter(Boolean)
+        : [];
+      const outcomeKeys = Array.isArray(condition.outcomeKeys)
+        ? condition.outcomeKeys.map((key) => String(key).trim().toLowerCase()).filter(Boolean)
+        : [];
+      if (tierIds.length === 0 && outcomeKeys.length === 0) return null;
+      return { type, tierIds, outcomeKeys };
+    }
+    if (type === 'diceGroup') {
+      const AGGREGATES = new Set(['total', 'anyDie', 'allDice', 'lowestDie', 'highestDie']);
+      if (!AGGREGATES.has(condition.aggregate)) return null;
+      if (!OPERATORS.has(condition.operator)) return null;
+      const groupId = Number(condition.groupId);
+      const value = Number(condition.value);
+      if (!Number.isInteger(groupId) || groupId < 0) return null;
+      if (!Number.isFinite(value)) return null;
+      return {
+        type,
+        groupId,
+        aggregate: condition.aggregate,
+        operator: condition.operator,
+        value,
+      };
+    }
+    return null;
   }
 
   _normalizeBuiltInCheck(config = {}) {
