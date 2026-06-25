@@ -34,7 +34,7 @@ globalThis.foundry = {
 };
 globalThis.game = { user: { isGM: true, name: 'Test' }, fabricate: null };
 
-const { HANDLERS, getMatchHandler, normalizeMatch } = await import(
+const { HANDLERS, getMatchHandler, getIngredientComponentId, normalizeMatch } = await import(
   '../src/models/match/matchTypes.js'
 );
 const { Ingredient } = await import('../src/models/Ingredient.js');
@@ -313,6 +313,62 @@ test('plan-review 2: currency terminal matchesItem is always false; tags with en
     HANDLERS.tags.matchesItem({ type: 'tags', tags: ['metal'] }, fakeItem({ tags: ['metal'] }), { features: { enableTags: false } }),
     false
   );
+});
+
+// ---------------------------------------------------------------------------
+// isTerminalInventoryMatch — handler-declared terminality (Seam 1)
+// ---------------------------------------------------------------------------
+test('isTerminalInventoryMatch: tags and currency are terminal', () => {
+  assert.equal(HANDLERS.tags.isTerminalInventoryMatch, true);
+  assert.equal(HANDLERS.currency.isTerminalInventoryMatch, true);
+});
+
+test('isTerminalInventoryMatch: component and the null/unknown fallback are non-terminal', () => {
+  assert.equal(HANDLERS.component.isTerminalInventoryMatch, false);
+  // The fallback handler (null / unrecognized type) must be non-terminal so the
+  // null/unknown path stays an explicit fall-through.
+  assert.equal(getMatchHandler(null).isTerminalInventoryMatch, false);
+  assert.equal(getMatchHandler({ type: 'bogus' }).isTerminalInventoryMatch, false);
+});
+
+// ---------------------------------------------------------------------------
+// getIngredientComponentId — shared ref → component-id resolver (Seam 2)
+// ---------------------------------------------------------------------------
+test('getIngredientComponentId: resolves a structured component match via the handler', () => {
+  assert.equal(
+    getIngredientComponentId({ match: { type: 'component', componentId: 'cmp-iron' } }),
+    'cmp-iron'
+  );
+});
+
+test('getIngredientComponentId: resolves the legacy systemItem/systemItemId alias match', () => {
+  assert.equal(
+    getIngredientComponentId({ match: { type: 'systemItem', systemItemId: 'cmp-iron' } }),
+    'cmp-iron'
+  );
+});
+
+test('getIngredientComponentId: falls back to bare componentId/systemItemId fields', () => {
+  assert.equal(getIngredientComponentId({ componentId: 'cmp-bare' }), 'cmp-bare');
+  assert.equal(getIngredientComponentId({ systemItemId: 'cmp-legacy' }), 'cmp-legacy');
+});
+
+test('getIngredientComponentId: a tags match resolves to null', () => {
+  assert.equal(getIngredientComponentId({ match: { type: 'tags', tags: ['metal'] } }), null);
+});
+
+test('getIngredientComponentId: a currency match resolves to null', () => {
+  assert.equal(
+    getIngredientComponentId({ match: { type: 'currency', unit: 'gp', amount: 100 } }),
+    null
+  );
+});
+
+test('getIngredientComponentId: null, undefined, and unknown refs/matches resolve to null', () => {
+  assert.equal(getIngredientComponentId(null), null);
+  assert.equal(getIngredientComponentId(undefined), null);
+  assert.equal(getIngredientComponentId({}), null);
+  assert.equal(getIngredientComponentId({ match: { type: 'bogus' } }), null);
 });
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@
  *
  * @typedef {object} MatchHandler
  * @property {string} type
+ * @property {boolean} isTerminalInventoryMatch
  * @property {(data: object) => object|null} normalize
  * @property {(match: object) => boolean} isComplete
  * @property {(match: object, options: {requireComplete?: boolean}) => string[]} validate
@@ -34,6 +35,11 @@ function trimmed(value) {
 /** @type {MatchHandler} */
 const componentHandler = {
   type: 'component',
+
+  // A component (or legacy systemItem) match is NOT terminal for inventory
+  // matching: its id is resolved upstream against managed components, so
+  // `_matchesIngredient` falls through to the bare-field / alternatives paths.
+  isTerminalInventoryMatch: false,
 
   normalize(data = {}) {
     const raw = data.match && typeof data.match === 'object' ? data.match : null;
@@ -100,6 +106,10 @@ const componentHandler = {
 /** @type {MatchHandler} */
 const tagsHandler = {
   type: 'tags',
+
+  // A tags match is terminal for inventory matching: `matchesItem` fully decides
+  // the result off the match object, so `_matchesIngredient` dispatches to it.
+  isTerminalInventoryMatch: true,
 
   normalize(data = {}) {
     const raw = data.match && typeof data.match === 'object' ? data.match : null;
@@ -181,6 +191,11 @@ const tagsHandler = {
 /** @type {MatchHandler} */
 const currencyHandler = {
   type: 'currency',
+
+  // A currency match is terminal for inventory matching: it matches no inventory
+  // item (satisfied by affordance, not item matching), so `matchesItem` returns
+  // false and `_matchesIngredient` dispatches to it rather than falling through.
+  isTerminalInventoryMatch: true,
 
   normalize(data = {}) {
     const raw = data.match && typeof data.match === 'object' ? data.match : null;
@@ -266,6 +281,9 @@ const currencyHandler = {
  */
 const unknownHandler = {
   type: 'unknown',
+  // A null/unrecognized match is NOT terminal: `_matchesIngredient` falls through
+  // to the bare-field `ingredient.tag` block and the `alternatives` recursion.
+  isTerminalInventoryMatch: false,
   normalize() {
     return null;
   },
@@ -321,6 +339,27 @@ export const HANDLERS = {
 export function getMatchHandler(match) {
   const type = match?.type === 'systemItem' ? 'component' : match?.type;
   return HANDLERS[type] || unknownHandler;
+}
+
+/**
+ * Resolve the managed-component id an ingredient/result reference points at, or
+ * `null`. Takes the REF (ingredient or result), not a bare match, because the
+ * non-component branch reads the legacy bare top-level `ref.componentId` /
+ * `ref.systemItemId`. A `component` (or aliased `systemItem`) match resolves its
+ * id through the handler; every other type (tags/currency/null/unknown) resolves
+ * `null` from the handler and falls back to the bare fields. The trailing
+ * `|| null` normalises `undefined`/`''` to `null` uniformly.
+ *
+ * @param {object|null|undefined} ref
+ * @returns {string|null}
+ */
+export function getIngredientComponentId(ref) {
+  const handler = getMatchHandler(ref?.match);
+  const id =
+    handler.type === 'component'
+      ? handler.getComponentId(ref.match)
+      : ref?.componentId || ref?.systemItemId;
+  return id || null;
 }
 
 /**
