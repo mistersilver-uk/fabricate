@@ -147,7 +147,7 @@ Pull requests that change UI files MUST include smoke-run screenshot evidence fo
 
 #### Scenario: UI files changed
 
-- **WHEN** a PR changes files under `src/ui/`, `styles/`, `lang/`, or files ending in `.svelte` or `.css`
+- **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
 - **THEN** the agent runs the Foundry smoke harness locally (the `full` profile via `npm run test:foundry`) and collects the relevant smoke screenshots for the changed views
 - **AND** the full smoke profile is not run on a GitHub Actions runner
 - **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence

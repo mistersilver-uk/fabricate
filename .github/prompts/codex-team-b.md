@@ -77,7 +77,8 @@ The delta lives in the issue, not in versioned files, so it persists even when t
 
 1. Screenshots (UI changes only)
 
-- If you changed any files matching `src/ui/**`, `styles/**`, `lang/**`, `*.svelte`, or `*.css`, you MUST produce real smoke-run screenshots for the changed views.
+- If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`, or `*.css`, you MUST produce real smoke-run screenshots for the changed views.
+A `lang/**` change requires screenshots only when the same PR also changes one of those render files.
 - Run `npm run screenshots:ui:plan -- --base origin/main` to list expected screenshot views.
 - Run `npm run test:foundry` (the local default `full` profile) to produce real Foundry smoke screenshots under `test-results/`.
 Do NOT add a full smoke run to GitHub Actions.
