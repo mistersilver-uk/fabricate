@@ -47,11 +47,25 @@ const populatedReport = {
     {
       kind: 'environment',
       entityId: 'e1',
+      environmentId: 'e1',
       entityName: 'Forest',
       severity: 'warning',
       blocks: undefined,
       code: 'noScene',
       message: 'Environment has no linked scene.',
+      nav: { view: 'environment-edit' }
+    },
+    {
+      // A task-kind issue: `entityId` is the task RECORD id; the deep-link must
+      // resolve via the OWNING environment id (`environmentId`).
+      kind: 'task',
+      entityId: 'task-7',
+      environmentId: 'e1',
+      entityName: 'Forage Berries',
+      severity: 'warning',
+      blocks: undefined,
+      code: 'taskNoDescription',
+      message: 'A gathering task has no description.',
       nav: { view: 'environment-edit' }
     },
     {
@@ -65,7 +79,7 @@ const populatedReport = {
       nav: { view: 'items' }
     }
   ],
-  counts: { critical: 3, warning: 1, info: 0, blockers: 1 },
+  counts: { critical: 3, warning: 2, info: 0, blockers: 1 },
   blocksSystem: true
 };
 
@@ -84,10 +98,12 @@ describe('SystemOverviewView (mounted)', () => {
     const systemGroup = target.querySelector('[data-system-overview-group="system"]');
     const recipeGroup = target.querySelector('[data-system-overview-group="recipe"]');
     const environmentGroup = target.querySelector('[data-system-overview-group="environment"]');
+    const taskGroup = target.querySelector('[data-system-overview-group="task"]');
     const salvageGroup = target.querySelector('[data-system-overview-group="salvage"]');
     assert.ok(systemGroup, 'system blocker group renders');
     assert.ok(recipeGroup, 'recipe group renders');
     assert.ok(environmentGroup, 'environment group renders');
+    assert.ok(taskGroup, 'task group renders');
     assert.ok(salvageGroup, 'salvage group renders');
 
     const recipeRow = recipeGroup.querySelector('[data-overview-issue="noResultGroup"]');
@@ -125,6 +141,55 @@ describe('SystemOverviewView (mounted)', () => {
     assert.equal(selected[0].kind, 'recipe');
     assert.equal(selected[0].entityId, 'r1', 'deep link forwards the recipe entity id');
 
+    harness.remount();
+  });
+
+  it('forwards the owning environmentId for a task/event deep-link', async () => {
+    const selected = [];
+    const target = await harness.mount({
+      report: populatedReport,
+      onSelectIssue: (issue) => selected.push(issue)
+    });
+
+    const taskLink = target.querySelector('[data-overview-issue="taskNoDescription"] [data-overview-link="task"]');
+    assert.ok(taskLink, 'a deep-link button renders on the task row');
+    taskLink.click();
+    await flushRender();
+
+    assert.equal(selected.length, 1, 'one issue forwarded');
+    assert.equal(selected[0].kind, 'task');
+    // The deep link must carry the OWNING environment id (which selectEnvironment
+    // resolves) — the record id `task-7` would never resolve.
+    assert.equal(selected[0].environmentId, 'e1', 'task deep link forwards the owning environment id');
+
+    harness.remount();
+  });
+
+  it('hides the deep-link button on an environment-derived issue with no environmentId', async () => {
+    // A task issue missing `environmentId` cannot resolve a selectable environment,
+    // so the row must not render a no-op deep-link button.
+    const target = await harness.mount({
+      report: {
+        issues: [
+          {
+            kind: 'task',
+            entityId: 'task-9',
+            environmentId: null,
+            entityName: 'Orphan Task',
+            severity: 'warning',
+            blocks: undefined,
+            code: 'taskNoDescription',
+            message: 'A gathering task has no description.',
+            nav: { view: 'environment-edit' }
+          }
+        ],
+        counts: { critical: 0, warning: 1, info: 0, blockers: 0 },
+        blocksSystem: false
+      }
+    });
+    const row = target.querySelector('[data-overview-issue="taskNoDescription"]');
+    assert.ok(row, 'the task row still renders');
+    assert.equal(row.querySelector('[data-overview-link]'), null, 'no deep-link button without an environmentId');
     harness.remount();
   });
 

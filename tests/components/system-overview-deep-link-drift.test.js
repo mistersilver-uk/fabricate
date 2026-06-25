@@ -101,4 +101,40 @@ describe('System overview deep-link drift guard', () => {
       'the salvage kind (aggregator nav.view "items") must resolve to the component-edit view'
     );
   });
+
+  // Regression guard for the UX defect: task/event issues carry the task/event
+  // RECORD id as `entityId`, but the environment editor selects by ENVIRONMENT
+  // id. The aggregator must therefore carry `environmentId`, and the root's
+  // environment/task/event deep-links must resolve through it — otherwise the
+  // "Open gathering task/event" buttons silently no-op.
+  it('carries environmentId for environment-derived issues so the deep-link resolves', () => {
+    // The aggregator's environment-issue tagger must include an `environmentId`.
+    assert.match(
+      aggregatorSource,
+      /environmentId,/,
+      'tagEnvironmentIssue must carry environmentId on environment-derived issues'
+    );
+
+    // The root's environment/task/event deep-links must select by environmentId,
+    // not by the record/entity id (which selectEnvironment cannot resolve).
+    const tableMatch = rootSource.match(/const OVERVIEW_DEEP_LINKS = \{([\s\S]*?)\n  \};/);
+    assert.ok(tableMatch, 'OVERVIEW_DEEP_LINKS table found in the root component');
+    const table = tableMatch[1];
+    const targetIds = new Map(
+      [...table.matchAll(/(\w+):\s*\{\s*view:\s*'[\w-]+',\s*targetId:\s*\(issue\)\s*=>\s*issue\.(\w+)/g)].map(
+        (match) => [match[1], match[2]]
+      )
+    );
+
+    for (const kind of ['environment', 'task', 'event']) {
+      assert.equal(
+        targetIds.get(kind),
+        'environmentId',
+        `the "${kind}" deep-link must resolve through issue.environmentId (the owning environment), not the record id`
+      );
+    }
+    // Recipe/salvage still resolve through their own entity id.
+    assert.equal(targetIds.get('recipe'), 'entityId', 'recipe deep-link resolves via entityId');
+    assert.equal(targetIds.get('salvage'), 'entityId', 'salvage deep-link resolves via entityId');
+  });
 });

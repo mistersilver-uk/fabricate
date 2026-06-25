@@ -2507,7 +2507,12 @@ async function main() {
           await csm.addItemFromUuid(blockedSystemId, blockedWorldItem.uuid);
         }
         // Progressive mode with NO progressive crafting check → blocks:'system'.
-        await csm.updateSystem(blockedSystemId, { resolutionMode: 'progressive' });
+        // Gathering is enabled so the broken system also carries a TASK-kind issue
+        // (below) that deep-links to its owning environment.
+        await csm.updateSystem(blockedSystemId, {
+          resolutionMode: 'progressive',
+          features: { gathering: true }
+        });
         // An incomplete recipe (no result group) → a recipe readiness issue.
         // allowIncomplete lets it persist as a disabled draft (it is structurally
         // valid but not craftable), which is exactly the overview-row state.
@@ -2521,10 +2526,46 @@ async function main() {
           { allowIncomplete: true, notify: false }
         );
 
+        // Seed a gathering library task that will NOT match the environment's
+        // conditions/biome, then create a MANUAL environment that explicitly
+        // includes it. A manually-included-but-non-matching task is classified
+        // `includedButUnavailable`, which surfaces a `staleIncluded` TASK-kind
+        // issue in the overview — exercising the task/event deep-link (which must
+        // resolve to the OWNING environment id, not the task record id).
+        const blockedConfig = game.settings.get('fabricate', 'gatheringConfig') || {};
+        await game.settings.set('fabricate', 'gatheringConfig', {
+          ...blockedConfig,
+          systems: {
+            ...(blockedConfig.systems || {}),
+            [blockedSystemId]: {
+              tasks: [{
+                id: 'broken-stale-task',
+                name: 'Phantom Harvest',
+                description: 'A task that no longer matches its environment.',
+                enabled: true,
+                biomes: ['tundra'],
+                dropRows: []
+              }],
+              events: [],
+              tools: []
+            }
+          }
+        });
+        const blockedEnvironment = await environmentStore.create({
+          craftingSystemId: blockedSystemId,
+          name: 'Forsaken Hollow',
+          description: 'An environment whose only included task no longer matches it.',
+          enabled: true,
+          compositionMode: 'manual',
+          biomes: ['forest'],
+          enabledTaskIds: ['broken-stale-task']
+        });
+
         return {
           systemId,
           blockedSystemId,
           blockedRecipeId: blockedRecipe?.id ?? null,
+          blockedEnvironmentId: blockedEnvironment?.id ?? null,
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id],
           healingPotionRecipeId: recipe2.id,
@@ -3427,6 +3468,13 @@ async function main() {
           if (await page.locator('.fabricate-manager [data-system-overview-blocker]').count() === 0) {
             throw new Error('System overview did not render the system-blocker callout for the broken system.');
           }
+          // The seeded stale-task fixture must surface a TASK-kind row whose
+          // deep-link button resolves to the owning environment (the UX-defect fix).
+          const taskRow = page.locator('.fabricate-manager [data-system-overview] [data-overview-kind="task"]').first();
+          await taskRow.waitFor({ state: 'visible', timeout: 5_000 });
+          if (await taskRow.locator('[data-overview-link="task"]').count() === 0) {
+            throw new Error('System overview task row is missing its environment deep-link button.');
+          }
           await assertManagerLayoutStable(page, 'system overview');
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-system-overview');
@@ -4221,8 +4269,12 @@ async function main() {
           }
         }
 
-        // Delete the dedicated broken system seeded for the overview/banner captures.
+        // Delete the dedicated broken system seeded for the overview/banner captures
+        // (and its gathering environment via the environment store).
         if (cleanupData.blockedSystemId) {
+          const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
+          try { await environmentStore?.cleanupByCraftingSystem?.(cleanupData.blockedSystemId); } catch { /* ok */ }
+
           const csm = game.fabricate?.getCraftingSystemManager?.();
           if (csm) {
             try { await csm.deleteSystem(cleanupData.blockedSystemId); } catch { /* already deleted */ }

@@ -43,6 +43,7 @@
  * @typedef {{
  *   kind: IssueKind,
  *   entityId: string|null,
+ *   environmentId?: string|null,
  *   entityName: string,
  *   severity: 'critical'|'warning'|'info',
  *   blocks: IssueBlocks,
@@ -50,6 +51,11 @@
  *   message: string,
  *   nav: IssueNav,
  * }} SystemValidationIssue
+ *
+ * `environmentId` is the owning gathering environment's id, present on
+ * environment-derived issues (`environment`/`task`/`event`). The GM overview's
+ * deep-link selects the environment by this id because the environment editor
+ * cannot deep-target an individual task/event row.
  * @typedef {{
  *   issues: SystemValidationIssue[],
  *   counts: { critical: number, warning: number, info: number, blockers: number },
@@ -189,8 +195,13 @@ function tagRecipeIssue(issue, recipe) {
 
 /**
  * Re-tag an environment readiness issue. Issues bound to a task/event record
- * (`recordKind`) are kinded `task`/`event` and deep-link there; the rest are
- * environment-level and deep-link to the environment editor.
+ * (`recordKind`) are kinded `task`/`event`; the rest are environment-level. All
+ * three deep-link to the environment editor, which selects an environment by id
+ * — so every environment-derived issue carries `environmentId` (the owning
+ * environment) for the deep-link, while `entityId` stays the record's own id
+ * (task/event record id, or the environment id) for display/identity. The
+ * environment editor cannot deep-target an individual task/event row, so
+ * selecting the owning environment is the resolvable deep-link target.
  *
  * @param {object} issue Issue from `evaluateEnvironmentReadiness`.
  * @param {object} environment The environment.
@@ -200,13 +211,15 @@ function tagEnvironmentIssue(issue, environment) {
   const recordKind =
     issue.recordKind === 'task' || issue.recordKind === 'event' ? issue.recordKind : null;
   const kind = recordKind || 'environment';
-  const entityId = recordKind ? (issue.recordId ?? null) : (environment?.id ?? null);
+  const environmentId = environment?.id ?? null;
+  const entityId = recordKind ? (issue.recordId ?? null) : environmentId;
   const entityName = recordKind
     ? trimmed(issue.recordName) || issue.recordId || recordKind
     : trimmed(environment?.name) || environment?.id || 'environment';
   return {
     kind,
     entityId,
+    environmentId,
     entityName,
     severity: issue.severity,
     blocks: issue.blocks === 'enable' ? 'enable' : undefined,

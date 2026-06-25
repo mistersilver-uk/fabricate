@@ -109,9 +109,16 @@
     return text(`FABRICATE.Admin.Manager.SystemOverview.Severity.${severity}`, severity);
   }
 
-  // The system kind is the overview itself, so no per-row deep link.
+  // Environment-derived issues (environment/task/event) deep-link by selecting
+  // the OWNING environment, so they need an `environmentId` to resolve; recipe
+  // and salvage issues resolve via their own `entityId`. The `system` kind is
+  // the overview itself, so it has no per-row deep link.
+  const ENVIRONMENT_KINDS = new Set(['environment', 'task', 'event']);
+
   function canDeepLink(issue) {
-    return issue.kind !== 'system' && Boolean(issue.entityId) && Boolean(KIND_LINK_LABELS[issue.kind]);
+    if (issue.kind === 'system' || !KIND_LINK_LABELS[issue.kind]) return false;
+    if (ENVIRONMENT_KINDS.has(issue.kind)) return Boolean(issue.environmentId);
+    return Boolean(issue.entityId);
   }
 </script>
 
@@ -146,7 +153,7 @@
         <h3 class="manager-card-title">{groupLabel(group.kind)} <span class="manager-chip is-neutral">{group.issues.length}</span></h3>
         <ul class="manager-system-overview-list">
           {#each group.issues as issue, index (issue.code + ':' + (issue.entityId ?? '') + ':' + index)}
-            <li class="manager-row manager-system-overview-row" data-overview-issue={issue.code} data-overview-kind={issue.kind}>
+            <li class="manager-system-overview-row" data-overview-issue={issue.code} data-overview-kind={issue.kind}>
               <span class={`manager-chip ${severityClass(issue.severity)}`} data-overview-severity={issue.severity}>{severityLabel(issue.severity)}</span>
               <span class="manager-system-overview-entity">{issue.entityName}</span>
               <span class="manager-system-overview-message">{issueMessage(issue)}</span>

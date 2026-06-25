@@ -1867,19 +1867,27 @@
   // overview deep-links and the deep-link drift test both read, so an issue
   // `nav.view`/`kind` the aggregator can emit always resolves to a real view
   // token (the `system` kind is the overview itself and carries no deep link).
+  //
+  // `targetId(issue)` picks the id the selection helper can actually resolve:
+  // recipe/salvage use the entity's own id, but the environment editor selects
+  // by ENVIRONMENT id, so environment/task/event deep-links use the issue's
+  // `environmentId` (the task/event record id never resolves through
+  // `selectEnvironment`).
   const OVERVIEW_DEEP_LINKS = {
-    recipe: { view: 'recipe-edit', open: (id) => editRecipe(id) },
-    environment: { view: 'environment-edit', open: (id) => editEnvironment(id) },
-    task: { view: 'environment-edit', open: (id) => editEnvironment(id) },
-    event: { view: 'environment-edit', open: (id) => editEnvironment(id) },
-    salvage: { view: 'component-edit', open: (id) => editComponent(id) }
+    recipe: { view: 'recipe-edit', targetId: (issue) => issue.entityId, open: (id) => editRecipe(id) },
+    environment: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
+    task: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
+    event: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
+    salvage: { view: 'component-edit', targetId: (issue) => issue.entityId, open: (id) => editComponent(id) }
   };
 
   function selectOverviewIssue(issue) {
     if (!issue) return;
     const target = OVERVIEW_DEEP_LINKS[issue.kind];
-    if (!target || !issue.entityId) return;
-    target.open(issue.entityId);
+    if (!target) return;
+    const id = target.targetId(issue);
+    if (!id) return;
+    target.open(id);
   }
 
   function backToSystemsBrowser() {
