@@ -59,6 +59,7 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     diceCrits: [],
     relativeOutcomes: [],
     fixedOutcomes: [],
+    checkBreakage: { enabled: false, triggers: [] },
   });
 });
 
@@ -137,6 +138,7 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
     tiers: [],
     macroUuid: null,
     diceCrits: [],
+    checkBreakage: { enabled: false, triggers: [] },
   });
 });
 
@@ -148,6 +150,7 @@ test('_normalizeCraftingCheck defaults the progressive check when absent', () =>
     allowPlayerReorder: false,
     rollFormula: '',
     diceCrits: [],
+    checkBreakage: { enabled: false, triggers: [] },
   });
 });
 

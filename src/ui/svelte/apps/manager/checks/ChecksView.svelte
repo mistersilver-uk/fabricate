@@ -44,6 +44,12 @@
     gatheringResolutionMode = 'd100',
     gatheringCheckProgressive = null,
     gatheringCheckRouted = null,
+    // Tool-breakage authority (issue 419): under `checkDriven` each editor shows the
+    // CheckBreakage trigger editor and hides the legacy break-tools toggles.
+    breakageAuthority = 'toolSpecific',
+    // Feature flags gate which subsystem check-breakage controls are reachable:
+    // salvage is always on; gathering only when features.gathering === true.
+    features = {},
     activation = {},
     onUpdateCraftingCheck = () => {},
     onUpdateCraftingCheckSimple = () => {},
@@ -77,6 +83,15 @@
   const gatheringD100 = $derived(gatheringResolutionMode === 'd100');
   const gatheringProgressive = $derived(gatheringResolutionMode === 'progressive');
   const gatheringRouted = $derived(gatheringResolutionMode === 'routed');
+
+  // Subsystem-gated breakage authority. Crafting + salvage (salvage always on) honour
+  // the system authority; gathering only shows check-breakage controls when the
+  // gathering feature is enabled — otherwise it stays toolSpecific (CheckBreakage hidden).
+  const craftingBreakageAuthority = $derived(breakageAuthority);
+  const salvageBreakageAuthority = $derived(features?.salvage === false ? 'toolSpecific' : breakageAuthority);
+  const gatheringBreakageAuthority = $derived(
+    features?.gathering === true ? breakageAuthority : 'toolSpecific'
+  );
 
   const PAGES = {
     crafting: {
@@ -148,27 +163,27 @@
         </div>
       {:else if activeTab === 'crafting' && craftingRouted}
         <div data-checks-panel="crafting">
-          <CraftingCheckEditor value={craftingCheck} onChange={onUpdateCraftingCheck} />
+          <CraftingCheckEditor value={craftingCheck} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
         </div>
       {:else if activeTab === 'crafting' && craftingSimple}
         <div data-checks-panel="crafting">
-          <SimpleCraftingCheckEditor value={craftingCheckSimple} onChange={onUpdateCraftingCheckSimple} />
+          <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
         </div>
       {:else if activeTab === 'crafting' && craftingProgressive}
         <div data-checks-panel="crafting">
-          <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} onChange={onUpdateCraftingCheckProgressive} />
+          <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckProgressive} />
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
         <div data-checks-panel="salvage">
-          <CraftingCheckEditor value={salvageCheckRouted} showTiers={false} onChange={onUpdateSalvageCheckRouted} />
+          <CraftingCheckEditor value={salvageCheckRouted} showTiers={false} breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckRouted} />
         </div>
       {:else if activeTab === 'salvage' && salvageProgressive}
         <div data-checks-panel="salvage">
-          <ProgressiveCraftingCheckEditor value={salvageCheckProgressive} onChange={onUpdateSalvageCheckProgressive} />
+          <ProgressiveCraftingCheckEditor value={salvageCheckProgressive} breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckProgressive} />
         </div>
       {:else if activeTab === 'salvage' && salvageSimple}
         <div data-checks-panel="salvage">
-          <SimpleCraftingCheckEditor value={salvageCheckSimple} showDcSource={false} onChange={onUpdateSalvageCheckSimple} />
+          <SimpleCraftingCheckEditor value={salvageCheckSimple} showDcSource={false} breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckSimple} />
         </div>
       {:else if activeTab === 'gathering' && gatheringD100}
         <div class="manager-checks-page" data-checks-panel="gathering" data-gathering-d100-readonly>
@@ -196,11 +211,11 @@
         </div>
       {:else if activeTab === 'gathering' && gatheringProgressive}
         <div data-checks-panel="gathering">
-          <ProgressiveCraftingCheckEditor value={gatheringCheckProgressive} onChange={onUpdateGatheringCheckProgressive} />
+          <ProgressiveCraftingCheckEditor value={gatheringCheckProgressive} breakageAuthority={gatheringBreakageAuthority} onChange={onUpdateGatheringCheckProgressive} />
         </div>
       {:else if activeTab === 'gathering' && gatheringRouted}
         <div data-checks-panel="gathering">
-          <CraftingCheckEditor value={gatheringCheckRouted} showTiers={false} onChange={onUpdateGatheringCheckRouted} />
+          <CraftingCheckEditor value={gatheringCheckRouted} showTiers={false} breakageAuthority={gatheringBreakageAuthority} onChange={onUpdateGatheringCheckRouted} />
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>

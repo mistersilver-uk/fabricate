@@ -489,3 +489,39 @@ test('a non-crit success path does not surface breakTools', async () => {
   assert.equal(result.data.crit, null);
   assert.equal(result.data.breakTools, false);
 });
+
+// ── checkBreakage / diceGroups surfacing (issue 419) ─────────────────────────
+
+test('simple check surfaces data.diceGroups with groupId + per-die results', async () => {
+  const { engine } = makeEngine({ simple: defaultSimple({ dc: 10 }) });
+  stubRoll(13, [{ number: 1, faces: 20, total: 13, results: [{ result: 13, active: true }] }]);
+  const r = await run(engine);
+  assert.deepEqual(r.data.diceGroups, [{ groupId: 0, group: '1d20', sum: 13, results: [13] }]);
+});
+
+test('checkDriven simple: a diceGroup anyDie==1 trigger forces breakage on the success path', async () => {
+  const simple = defaultSimple({
+    dc: 1,
+    checkBreakage: {
+      enabled: true,
+      triggers: [{ id: 'nat1', label: 'Nat 1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+    },
+  });
+  const { engine, system } = makeEngine({ simple });
+  system.toolBreakage = { authority: 'checkDriven' };
+  stubRoll(1, [{ number: 1, faces: 20, total: 1, results: [{ result: 1, active: true }] }]);
+  const r = await run(engine);
+  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, r);
+  assert.equal(decision.authority, 'checkDriven');
+  assert.equal(decision.forceBreak, true);
+  assert.equal(decision.triggerId, 'nat1');
+});
+
+test('toolSpecific simple: no checkBreakage trigger and no crit → no forced break', async () => {
+  const { engine, system } = makeEngine({ simple: defaultSimple({ dc: 1 }) });
+  stubRoll(20, [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }]);
+  const r = await run(engine);
+  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, r);
+  assert.equal(decision.authority, 'toolSpecific');
+  assert.equal(decision.forceBreak, false);
+});

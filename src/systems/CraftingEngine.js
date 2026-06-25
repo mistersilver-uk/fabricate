@@ -1,6 +1,6 @@
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { Tool } from '../models/Tool.js';
-import { applyToolUsageAndBreakage } from '../toolBreakageRuntime.js';
+import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakageRuntime.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
@@ -322,13 +322,22 @@ export class CraftingEngine {
         }
         if (failurePolicy.consumeCatalystsOnFail) {
           usedToolPairs = toolValidation.tools;
-          // An engine-evaluated check (simple/routed/progressive) crit/tier with
-          // `breakTools` forces breakage on the check-failure path too. A macro /
-          // builtIn check is NOT honoured here: `breakTools` is an authored-crit
-          // concept absent from the macro contract, and macro `data` is passed
-          // through verbatim, so it must not force breakage by passthrough.
+          // The single shared `evaluateCheckBreakage` seam decides forced breakage
+          // on the check-failure path too (gated by `consumeCatalystsOnFail`, as
+          // today). Under `toolSpecific` the legacy crit/tier `data.breakTools`
+          // force-break applies; under `checkDriven` the active check's
+          // `checkBreakage` triggers decide. A macro/builtIn check never force-breaks
+          // (the `engineEvaluated` guard lives inside the seam).
+          const breakDecision = this._resolveCraftingBreakageDecision(
+            this._getRecipeSystem(executionRecipe),
+            executionRecipe,
+            checkResult
+          );
           usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
-            forceBreak: this._checkForcesToolBreak(checkResult),
+            forceBreak: breakDecision.forceBreak,
+            authority: breakDecision.authority,
+            reason: breakDecision.reason,
+            triggerId: breakDecision.triggerId,
           });
         }
       } catch (consumptionError) {
@@ -406,9 +415,23 @@ export class CraftingEngine {
         }
         if (validationFailurePolicy.consumeCatalystsOnFail) {
           usedToolPairsOnValidationFail = toolValidation.tools;
+          // Resolution-mode validation failure: route through the shared seam so the
+          // breakage authority (and immune handling) stay consistent. The check
+          // itself succeeded, so a checkDriven trigger may still force breakage.
+          const validationBreakDecision = this._resolveCraftingBreakageDecision(
+            this._getRecipeSystem(executionRecipe),
+            executionRecipe,
+            checkResult
+          );
           usedToolsOnValidationFail = await this._applyToolBreakage(
             executionRecipe,
-            toolValidation.tools
+            toolValidation.tools,
+            {
+              forceBreak: validationBreakDecision.forceBreak,
+              authority: validationBreakDecision.authority,
+              reason: validationBreakDecision.reason,
+              triggerId: validationBreakDecision.triggerId,
+            }
           );
         }
       } catch (consumptionError) {
@@ -494,11 +517,23 @@ export class CraftingEngine {
     // like the Item-Piles deduct error below — not refunded.
     await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
 
-    // Apply tool usage/breakage for the recipe's resolved library Tools. An
-    // engine-evaluated check (simple/routed/progressive) crit/tier with `breakTools`
-    // forces every matched tool to break; a macro/builtIn `data.breakTools` does not.
+    // Apply tool usage/breakage for the recipe's resolved library Tools via the
+    // single shared `evaluateCheckBreakage` seam. Under `toolSpecific` an
+    // engine-evaluated crit/tier `breakTools` forces every matched tool to break (a
+    // macro/builtIn `data.breakTools` does not); under `checkDriven` the active
+    // check's `checkBreakage` triggers decide whether all required non-immune tools
+    // break. The SUCCESS path always applies breakage (no `consumeCatalystsOnFail`
+    // gate exists here).
+    const successBreakDecision = this._resolveCraftingBreakageDecision(
+      this._getRecipeSystem(executionRecipe),
+      executionRecipe,
+      checkResult
+    );
     const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
-      forceBreak: this._checkForcesToolBreak(checkResult),
+      forceBreak: successBreakDecision.forceBreak,
+      authority: successBreakDecision.authority,
+      reason: successBreakDecision.reason,
+      triggerId: successBreakDecision.triggerId,
     });
 
     // Deduct Item Piles currency cost after ingredients are consumed to avoid
@@ -993,31 +1028,91 @@ export class CraftingEngine {
    * gathering tool breakage uses). Returns `usedTools` evidence in the
    * run-record item-ref shape.
    *
-   * When `forceBreak` is true (a simple-check crit with `breakTools`), every
-   * matched tool is broken regardless of its own per-tool breakage chance: a
-   * `planned: { mode: 'forced', broken: true, evidence: {} }` override is passed
-   * to {@link applyToolUsageAndBreakage}, which uses it verbatim instead of
+   * When `forceBreak` is true, every matched tool is broken regardless of its own
+   * per-tool breakage chance: a `planned: { mode: 'forced', broken: true }` override
+   * is passed to {@link applyToolUsageAndBreakage}, which uses it verbatim instead of
    * evaluating the tool's own breakage.
+   *
+   * Authority (issue 419): under `checkDriven` authority an `immune` tool is filtered
+   * OUT of the forced set (it never breaks) and recorded as `skippedImmune` evidence;
+   * virtual-present tools are recorded as skipped evidence (not mutated); a forced
+   * break attaches the `authority`/`reason`/`triggerId` decision to each entry. Under
+   * `toolSpecific` (default) behaviour is unchanged: each tool's own mode decides and
+   * a legacy `breakTools` force-break still applies on top.
    *
    * @private
    * @param {Recipe} recipe
    * @param {Array<{tool: object, item: Item}>} toolItems
-   * @param {{ forceBreak?: boolean }} [options]
+   * @param {{ forceBreak?: boolean, authority?: string, reason?: string|null, triggerId?: string|null, checkId?: string|null }} [options]
    * @returns {Promise<Array<{ actorUuid: string|null, itemUuid: string|null, quantity: number, componentId: string|null, broken: boolean }>>}
    */
-  async _applyToolBreakage(recipe, toolItems = [], { forceBreak = false } = {}) {
+  async _applyToolBreakage(
+    recipe,
+    toolItems = [],
+    {
+      forceBreak = false,
+      authority = 'toolSpecific',
+      reason = null,
+      triggerId = null,
+      checkId = null,
+    } = {}
+  ) {
+    const checkDriven = authority === 'checkDriven';
     const evidence = [];
     for (const { tool: toolData, item, virtual } of toolItems) {
-      // Virtual-present (canvas-tool) matches have no owned item to use/break,
-      // and must not produce a consuming usedTools run-record entry.
-      if (virtual || !item) continue;
       const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
+      // Virtual-present (canvas-tool) matches have no owned item to use/break.
+      // Under checkDriven they are recorded as skipped evidence (not mutated);
+      // under toolSpecific they are silent (today's behaviour).
+      if (virtual || !item) {
+        if (checkDriven) {
+          evidence.push({
+            actorUuid: null,
+            itemUuid: null,
+            quantity: 1,
+            componentId: tool.componentId ?? null,
+            broken: false,
+            authority,
+            virtual: true,
+          });
+        }
+        continue;
+      }
       const actor = item?.parent ?? null;
+      const isImmune = tool.breakage?.mode === 'immune';
+      // checkDriven: immune tools are filtered out of the forced set (never break);
+      // every other required tool breaks when forceBreak. toolSpecific: the legacy
+      // forceBreak override applies, else the tool's own mode decides.
+      let planned;
+      const extra = {};
+      if (checkDriven) {
+        if (isImmune) {
+          planned = { mode: 'immune', broken: false, evidence: { authority } };
+          extra.authority = authority;
+          extra.skippedImmune = true;
+        } else if (forceBreak) {
+          planned = { mode: 'forced', broken: true, evidence: { authority } };
+          extra.authority = authority;
+          extra.reason = reason;
+          extra.triggerId = triggerId;
+          extra.checkId = checkId;
+        } else {
+          planned = { mode: 'forced', broken: false, evidence: { authority } };
+          extra.authority = authority;
+        }
+      } else if (isImmune) {
+        // An immune tool never breaks under EITHER authority — a legacy crit/tier
+        // forceBreak must not break it either. Defer to the tool's own (never-break)
+        // evaluation rather than forcing it.
+        planned = undefined;
+      } else {
+        planned = forceBreak ? { mode: 'forced', broken: true, evidence: {} } : undefined;
+      }
       const entry = await applyToolUsageAndBreakage({
         tool,
         actor,
         item,
-        planned: forceBreak ? { mode: 'forced', broken: true, evidence: {} } : undefined,
+        planned,
         buildItemRef: (_actor, breakItem) => ({
           actorUuid: breakItem?.parent?.uuid || null,
           itemUuid: breakItem?.uuid || null,
@@ -1031,6 +1126,7 @@ export class CraftingEngine {
         quantity: entry.itemRef?.quantity ?? 1,
         componentId: entry.componentId ?? null,
         broken: entry.broken === true,
+        ...extra,
       });
     }
     return evidence;
@@ -1720,14 +1816,75 @@ export class CraftingEngine {
   }
 
   /**
-   * Decide whether a check result forces tool breakage. Only engine-evaluated
-   * checks (simple/routed/progressive — tagged by {@link _markEngineEvaluated})
-   * carry an authored-crit / authored-tier `breakTools` flag; macro/builtIn results
-   * pass `data` through verbatim, so their `breakTools` is NOT honoured here.
+   * Resolve the active crafting check's `checkBreakage` block for the system's
+   * resolution mode (issue 419). The simple/alchemy modes author on the simple
+   * check, routed on the routed check, progressive on the progressive check.
    * @private
    */
-  _checkForcesToolBreak(checkResult) {
-    return checkResult?.engineEvaluated === true && checkResult?.data?.breakTools === true;
+  _resolveCraftingCheckBreakage(system, recipe) {
+    const resolutionService =
+      this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+    const mode = resolutionService?.getMode?.(recipe) || system?.resolutionMode || 'simple';
+    const check = system?.craftingCheck || {};
+    if (mode === 'routed') return check.routed?.checkBreakage ?? null;
+    if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
+    return check.simple?.checkBreakage ?? null;
+  }
+
+  /**
+   * Resolve the active salvage check's `checkBreakage` block for the system's
+   * salvage resolution mode (issue 419).
+   * @private
+   */
+  _resolveSalvageCheckBreakage(system) {
+    const mode = system?.salvageResolutionMode || 'simple';
+    const check = system?.salvageCraftingCheck || {};
+    if (mode === 'routed') return check.routed?.checkBreakage ?? null;
+    if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
+    return check.simple?.checkBreakage ?? null;
+  }
+
+  /**
+   * Resolve the salvage breakage decision via the shared {@link evaluateCheckBreakage}
+   * seam, bringing salvage to parity with crafting (issue 419). Returns
+   * `{ forceBreak, triggerId, reason, authority }`.
+   * @private
+   */
+  _resolveSalvageBreakageDecision(system, checkResult) {
+    const authority =
+      system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    const checkBreakage = this._resolveSalvageCheckBreakage(system);
+    const decision = evaluateCheckBreakage({ checkBreakage, checkResult });
+    return { ...decision, authority };
+  }
+
+  /**
+   * Resolve the breakage decision for a crafting attempt via the single shared
+   * {@link evaluateCheckBreakage} seam (issue 419). Returns the `{ forceBreak,
+   * triggerId, reason }` decision plus the system's breakage `authority`. Subsumes
+   * the former `_checkForcesToolBreak`: under `toolSpecific` the legacy
+   * `data.breakTools` force-break still applies (each Tool's own mode otherwise
+   * decides); under `checkDriven` the active check's `checkBreakage` triggers (and
+   * the implicit legacy `data.breakTools`) decide whether all required tools break.
+   * Macro/builtIn checks never force-break (the legacy `engineEvaluated` guard is
+   * preserved inside `evaluateCheckBreakage`).
+   * @private
+   */
+  _resolveCraftingBreakageDecision(system, recipe, checkResult) {
+    const authority =
+      system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    const checkBreakage = this._resolveCraftingCheckBreakage(system, recipe);
+    const decision = evaluateCheckBreakage({ checkBreakage, checkResult });
+    return { ...decision, authority };
+  }
+
+  /**
+   * Resolve the system for a recipe (or salvage synthetic recipe) from the manager.
+   * @private
+   */
+  _getRecipeSystem(recipe) {
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    return systemManager?.getSystem(recipe?.craftingSystemId) ?? null;
   }
 
   /**
@@ -2217,7 +2374,15 @@ export class CraftingEngine {
         }
         if (failurePolicy.consumeCatalystsOnFail) {
           usedToolPairs = toolValidation.tools;
-          usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools);
+          // Salvage parity (issue 419): the FAILURE path breaks required tools only
+          // when `consumeCatalystsOnFail === true` (this gate), matching crafting.
+          const salvageFailBreak = this._resolveSalvageBreakageDecision(system, checkResult);
+          usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
+            forceBreak: salvageFailBreak.forceBreak,
+            authority: salvageFailBreak.authority,
+            reason: salvageFailBreak.reason,
+            triggerId: salvageFailBreak.triggerId,
+          });
         }
       } catch (error) {
         console.error('Fabricate | Error during salvage failure-path consumption:', error);
@@ -2267,7 +2432,15 @@ export class CraftingEngine {
       componentItems,
       ingredientQuantity
     );
-    const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools);
+    // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
+    // `consumeCatalystsOnFail` gate exists here), via the shared seam.
+    const salvageSuccessBreak = this._resolveSalvageBreakageDecision(system, checkResult);
+    const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
+      forceBreak: salvageSuccessBreak.forceBreak,
+      authority: salvageSuccessBreak.authority,
+      reason: salvageSuccessBreak.reason,
+      triggerId: salvageSuccessBreak.triggerId,
+    });
 
     const salvageRecipeView = this._buildSalvageRecipeView(component, system);
     const resultItems = [];
@@ -2576,7 +2749,7 @@ export class CraftingEngine {
    * to the shared {@link runFormulaPassFail}.
    */
   async _runSalvageSimpleCheck(simple, component, actor) {
-    return runFormulaPassFail({
+    const result = await runFormulaPassFail({
       formula: simple.rollFormula,
       dc: this._resolveSalvageDc(simple, component),
       thresholdMode: simple.thresholdMode,
@@ -2584,6 +2757,7 @@ export class CraftingEngine {
       actor,
       label: 'Salvage',
     });
+    return this._markEngineEvaluated(result);
   }
 
   /**
@@ -2592,12 +2766,13 @@ export class CraftingEngine {
    * shared {@link runFormulaProgressive}.
    */
   async _runSalvageProgressiveCheck(progressive, actor) {
-    return runFormulaProgressive({
+    const result = await runFormulaProgressive({
       formula: progressive.rollFormula,
       diceCrits: progressive.diceCrits,
       actor,
       label: 'Salvage',
     });
+    return this._markEngineEvaluated(result);
   }
 
   /**
@@ -2610,7 +2785,7 @@ export class CraftingEngine {
    * {@link runFormulaRouted}.
    */
   async _runSalvageRoutedCheck(routed, component, actor) {
-    return runFormulaRouted({
+    const result = await runFormulaRouted({
       formula: routed.rollFormula,
       dc: this._resolveSalvageDc(routed, component),
       thresholdMode: routed.thresholdMode,
@@ -2621,6 +2796,7 @@ export class CraftingEngine {
       actor,
       label: 'Salvage',
     });
+    return this._markEngineEvaluated(result);
   }
 
   /**

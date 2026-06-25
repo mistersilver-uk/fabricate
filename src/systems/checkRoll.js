@@ -9,37 +9,51 @@
  */
 
 /**
- * Summarise an evaluated Roll's dice as `{ group: "NdS", sum }` entries, where
- * `sum` is the DiceTerm#total — the GROUP TOTAL over the plain producible range
- * `[N, N*S]`. The `group` key (`NdS`) carries no modifiers, so a modified pool
- * (keep/drop/explode/reroll, e.g. `2d20kh1`) reports its modified total under
- * the plain `2d20` key — a total that need not be in `[N, N*S]`. Per-die crits
- * are authored only against PLAIN die terms and matched against this group total
- * (see {@link resolveCheckCrit}); the editor + normalizer make modified pools
- * crit-ineligible, so a clamped crit can never collide with a modified total.
+ * Summarise an evaluated Roll's dice as
+ * `{ groupId, group: "NdS", sum, results: number[] }` entries.
+ *
+ * - `groupId` is the index into the evaluated `roll.dice` term order (NOT re-parsed
+ *   from the formula string), so duplicate `NdS` groups (`1d20 + 1d20` → groupId 0
+ *   and 1) are disambiguated deterministically. The `checkBreakage` `diceGroup`
+ *   trigger DSL targets a group by this index.
+ * - `sum` is the DiceTerm#total — the GROUP TOTAL (POST-MODIFIER, active-only). The
+ *   `group` key (`NdS`) carries no modifiers, so a modified pool (keep/drop/explode/
+ *   reroll, e.g. `2d20kh1`) reports its modified total under the plain `2d20` key — a
+ *   total that need not be in `[N, N*S]`. Per-die crits are authored only against
+ *   PLAIN die terms and matched against this group total (see {@link resolveCheckCrit});
+ *   the editor + normalizer make modified pools crit-ineligible, so a clamped crit can
+ *   never collide with a modified total. When the die has no finite total (an
+ *   unevaluated/headless die) the active-only raw faces are summed as a fallback,
+ *   matching Foundry's own modified total.
+ * - `results` are the ACTIVE-only raw faces: `die.results[].result` (raw face),
+ *   filtering `entry.active !== false` (keeps present-true AND absent — Foundry omits
+ *   `active` on a kept result — and excludes only an explicit `false`; per AGENTS.md
+ *   `DiceTerm#total` is post-modifier, raw faces come from `results[].result`). The
+ *   `anyDie`/`allDice`/`lowestDie`/`highestDie` aggregates derive from this; with no
+ *   per-die `results` (headless/stub) those aggregates fail open (no break).
  */
 export function rolledDiceGroups(roll) {
   const dice = Array.isArray(roll?.dice) ? roll.dice : [];
-  return dice.map((die) => {
+  return dice.map((die, groupId) => {
     const count = Number(die?.number);
     const faces = Number(die?.faces);
     const dieTotal = Number(die?.total);
-    let sum;
-    if (Number.isFinite(dieTotal)) {
-      sum = dieTotal;
-    } else {
-      // Fallback for an unevaluated/headless die with no finite total: sum the
-      // ACTIVE results only. `active !== false` keeps present-true AND absent
-      // (Foundry omits `active` on a kept result) and excludes only an explicit
-      // `false` (a dropped/discarded die), matching Foundry's own modified total.
-      const results = Array.isArray(die?.results) ? die.results : [];
-      sum = results
-        .filter((entry) => entry?.active !== false)
-        .reduce((acc, entry) => acc + (Number(entry?.result) || 0), 0);
-    }
+    // Active-only raw faces (#419): `active !== false` keeps present-true AND absent
+    // (Foundry omits `active` on a kept result) and excludes only an explicit `false`
+    // (a dropped/discarded die), matching Foundry's own modified total.
+    const rawResults = Array.isArray(die?.results) ? die.results : [];
+    const results = rawResults
+      .filter((entry) => entry?.active !== false)
+      .map((entry) => Number(entry?.result))
+      .filter((face) => Number.isFinite(face));
+    // `sum` is the post-modifier die total; fall back to the active-only raw-face sum
+    // for an unevaluated/headless die with no finite total (#443).
+    const sum = Number.isFinite(dieTotal) ? dieTotal : results.reduce((acc, face) => acc + face, 0);
     return {
+      groupId,
       group: `${Number.isFinite(count) ? count : 0}d${Number.isFinite(faces) ? faces : 0}`,
       sum,
+      results,
     };
   });
 }
@@ -147,6 +161,7 @@ export async function runFormulaPassFail({
       comparison,
       crit: crit ? { success: crit.success, breakTools } : null,
       breakTools,
+      diceGroups,
     },
     message: success ? null : `${label} check failed`,
   };
@@ -201,6 +216,10 @@ export async function runFormulaProgressive({
   return {
     success: true,
     outcome: null,
+    // `value` is the AWARDING value (a crit can overwrite it to MAX_SAFE_INTEGER/0),
+    // while `data.total` keeps the RAW roll total. A `progressiveValue` trigger
+    // targets `value`; a `rollTotal` trigger targets `data.total` — so the two can
+    // resolve differently on the same roll.
     value,
     data: {
       formula,
@@ -208,6 +227,7 @@ export async function runFormulaProgressive({
       value,
       crit: crit ? { success: crit.success, breakTools } : null,
       breakTools,
+      diceGroups,
     },
   };
 }
@@ -397,6 +417,7 @@ export async function runFormulaRouted({
       success,
       breakTools,
       crit: crit ? { success: crit.success, breakTools: crit.breakTools === true } : null,
+      diceGroups,
     },
     message: success ? null : `${label} check failed`,
   };

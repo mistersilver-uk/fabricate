@@ -92,6 +92,27 @@
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
 
+  // Per-check tool-breakage trigger block (issue 419), carried on every check
+  // draft so authoring it under checkDriven authority persists. Deep-clone the
+  // persisted block (matching the engine's `{ enabled, triggers[] }` shape) or
+  // seed the empty default; triggers carry `{ id, label, condition }`.
+  function cloneCheckBreakage(checkBreakage) {
+    const source = checkBreakage && typeof checkBreakage === 'object' ? checkBreakage : {};
+    return {
+      enabled: source.enabled === true,
+      triggers: Array.isArray(source.triggers)
+        ? source.triggers.map((trigger) => ({
+            id: trigger?.id,
+            label: typeof trigger?.label === 'string' ? trigger.label : '',
+            condition:
+              trigger?.condition && typeof trigger.condition === 'object'
+                ? { ...trigger.condition }
+                : null
+          }))
+        : []
+    };
+  }
+
   // Routed crafting check editor: a staged draft is seeded from the selected
   // system's craftingCheck.routed and committed only via the top-right Save
   // button (the same staged pattern the other editors use), so persistence is
@@ -119,7 +140,8 @@
         : [],
       fixedOutcomes: Array.isArray(source.fixedOutcomes)
         ? source.fixedOutcomes.map((outcome) => ({ ...outcome }))
-        : []
+        : [],
+      checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
   // svelte-ignore state_referenced_locally
@@ -145,7 +167,8 @@
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
       tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
       macroUuid: source.macroUuid || null,
-      diceCrits: Array.isArray(source.diceCrits) ? source.diceCrits.map((crit) => ({ ...crit })) : []
+      diceCrits: Array.isArray(source.diceCrits) ? source.diceCrits.map((crit) => ({ ...crit })) : [],
+      checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
   // svelte-ignore state_referenced_locally
@@ -171,7 +194,8 @@
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
       diceCrits: Array.isArray(source.diceCrits)
         ? source.diceCrits.map((crit) => ({ ...crit }))
-        : []
+        : [],
+      checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
   // svelte-ignore state_referenced_locally
@@ -4236,6 +4260,8 @@
             {gatheringResolutionMode}
             gatheringCheckProgressive={gatheringProgressiveDraft}
             gatheringCheckRouted={gatheringRoutedDraft}
+            breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+            features={selectedSystem?.features || {}}
             activation={checkActivation}
             {onUpdateCraftingCheck}
             {onUpdateCraftingCheckSimple}
@@ -4295,6 +4321,7 @@
         expandedToolId={$viewState.toolsDraftExpandedToolId || ''}
         dirtyToolIds={dirtyToolIds}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
+        breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         onSelectTool={(id) => store.selectDraftTool?.(id)}
         onExpandTool={(id) => store.setExpandedDraftTool?.(id)}
         onToggleExpand={(id) => store.setExpandedDraftTool?.(id === $viewState.toolsDraftExpandedToolId ? '' : id)}
@@ -4302,6 +4329,7 @@
         onAddToolDrop={addToolFromDrop}
         onUpdateTool={(id, patch) => store.updateToolInDraft?.(id, patch)}
         onDeleteTool={(id) => store.deleteToolFromDraft?.(id)}
+        onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView

@@ -478,3 +478,43 @@ test('applyBreakage replaceWith - deletes original and invokes createReplacement
   assert.equal(result.action, 'replaced');
   assert.deepEqual(calls, [{ actor: { id: 'actor-1' }, componentId: 'comp-axe-broken' }]);
 });
+
+// ---------------------------------------------------------------------------
+// immune breakage mode (issue 419)
+// ---------------------------------------------------------------------------
+
+test('immune: normalizes to { mode: "immune" } with no breakage fields', () => {
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune', maxUses: 5, breakageChance: 9 } });
+  assert.deepEqual(tool.breakage, { mode: 'immune' });
+});
+
+test('immune: validates with no breakage field checks', () => {
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
+  const { valid, errors } = tool.validate();
+  assert.equal(valid, true, errors.join(', '));
+});
+
+test('immune: evaluateBreakage never breaks', async () => {
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
+  const result = await tool.evaluateBreakage({ item: new FakeItem({}) });
+  assert.deepEqual(result, { broken: false, mode: 'immune', evidence: {} });
+});
+
+test('immune: applyUsage writes no toolUsage flag (limitedUses-only)', async () => {
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
+  const item = new FakeItem({});
+  await tool.applyUsage(item);
+  assert.equal(item._flags.fabricate.fabricate, undefined, 'no usage flag for immune tool');
+});
+
+test('validate: unknown mode error string lists immune', () => {
+  // normalizeBreakage coerces an unknown mode to limitedUses, so reach the
+  // validation else-branch by mutating the normalized mode to an invalid value.
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: null } });
+  tool.breakage.mode = 'bogus';
+  const { errors } = tool.validate();
+  assert.ok(
+    errors.some((e) => /immune/.test(e)),
+    'the breakage.mode error enumerates immune'
+  );
+});

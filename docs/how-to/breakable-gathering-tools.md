@@ -43,6 +43,9 @@ A flat 0 to 100 percent chance per attempt that the tool breaks.
    - **Dice expression**.
 Author a Foundry roll formula (for example `1d20 + @abilities.str.mod`) and a numeric threshold.
      The tool breaks when the roll result is below the threshold.
+   - **Immune**.
+The tool never breaks.
+     It is still recorded as used, and it has no breakage settings to fill in.
 6. **Pick what happens when it breaks.** Each tool picks one:
    - **Destroy item**.
 The owned tool is removed from the character's inventory.

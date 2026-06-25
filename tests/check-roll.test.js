@@ -46,30 +46,65 @@ const ACTOR = { getRollData: () => ({}) };
 
 // ── rolledDiceGroups ────────────────────────────────────────────────────────
 
-test('rolledDiceGroups summarises dice as { group, sum } using the die-term total', () => {
+test('rolledDiceGroups summarises dice as { groupId, group, sum, results } using the die-term total', () => {
   const groups = rolledDiceGroups({
     dice: [
-      { number: 2, faces: 6, total: 9 },
-      { number: 1, faces: 20, total: 18 },
+      { number: 2, faces: 6, total: 9, results: [{ result: 4 }, { result: 5 }] },
+      { number: 1, faces: 20, total: 18, results: [{ result: 18 }] },
     ],
   });
   assert.deepEqual(groups, [
-    { group: '2d6', sum: 9 },
-    { group: '1d20', sum: 18 },
+    { groupId: 0, group: '2d6', sum: 9, results: [4, 5] },
+    { groupId: 1, group: '1d20', sum: 18, results: [18] },
   ]);
+});
+
+test('rolledDiceGroups assigns groupId by evaluated-term order, disambiguating duplicate NdS', () => {
+  // 1d20 + 1d20 → two distinct groups keyed by index, not by the NdS label.
+  const groups = rolledDiceGroups({
+    dice: [
+      { number: 1, faces: 20, total: 3, results: [{ result: 3 }] },
+      { number: 1, faces: 20, total: 17, results: [{ result: 17 }] },
+    ],
+  });
+  assert.equal(groups[0].groupId, 0);
+  assert.equal(groups[1].groupId, 1);
+  assert.equal(groups[0].group, '1d20');
+  assert.equal(groups[1].group, '1d20');
+});
+
+test('rolledDiceGroups results are active-only raw faces (drops dropped dice)', () => {
+  // 2d20kh1: the dropped (active:false) die is excluded from results; sum keeps the
+  // post-modifier die-term total.
+  const groups = rolledDiceGroups({
+    dice: [
+      {
+        number: 2,
+        faces: 20,
+        total: 18,
+        results: [
+          { result: 18, active: true },
+          { result: 3, active: false },
+        ],
+      },
+    ],
+  });
+  assert.deepEqual(groups[0].results, [18], 'dropped die excluded from raw faces');
+  assert.equal(groups[0].sum, 18, 'sum is the post-modifier die-term total');
 });
 
 test('rolledDiceGroups falls back to summing per-die results when total is absent', () => {
   const groups = rolledDiceGroups({ dice: [{ number: 2, faces: 6, results: [{ result: 3 }, { result: 4 }] }] });
-  assert.deepEqual(groups, [{ group: '2d6', sum: 7 }]);
+  assert.deepEqual(groups, [{ groupId: 0, group: '2d6', sum: 7, results: [3, 4] }]);
 });
 
 test('rolledDiceGroups fallback sums only active results: false excluded, absent included', () => {
   const groups = rolledDiceGroups({
     dice: [{ number: 3, faces: 6, results: MIXED_ACTIVE_RESULTS }],
   });
-  // 3 (active:true) + 6 (active absent) — 5 (active:false) is dropped.
-  assert.deepEqual(groups, [{ group: '3d6', sum: 9 }]);
+  // 3 (active:true) + 6 (active absent) — 5 (active:false) is dropped. The entry
+  // carries the #419 groupId + active-only raw faces alongside the #443 fallback sum.
+  assert.deepEqual(groups, [{ groupId: 0, group: '3d6', sum: 9, results: [3, 6] }]);
 });
 
 // ── evaluateCheckRoll: non-interactive option (defect 3) ────────────────────
