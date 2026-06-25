@@ -10,10 +10,13 @@
 
 /**
  * Summarise an evaluated Roll's dice as `{ group: "NdS", sum }` entries, where
- * `sum` is the DiceTerm#total (POST-MODIFIER, active-only sum): a keep/drop/explode
- * pool (e.g. `2d20kh1`) reports its modified total, not the raw per-die faces. Per-
- * die crits therefore match the die-term total, so dice-pool modifiers are out of
- * scope for crit matching (see {@link resolveCheckCrit}).
+ * `sum` is the DiceTerm#total — the GROUP TOTAL over the plain producible range
+ * `[N, N*S]`. The `group` key (`NdS`) carries no modifiers, so a modified pool
+ * (keep/drop/explode/reroll, e.g. `2d20kh1`) reports its modified total under
+ * the plain `2d20` key — a total that need not be in `[N, N*S]`. Per-die crits
+ * are authored only against PLAIN die terms and matched against this group total
+ * (see {@link resolveCheckCrit}); the editor + normalizer make modified pools
+ * crit-ineligible, so a clamped crit can never collide with a modified total.
  */
 export function rolledDiceGroups(roll) {
   const dice = Array.isArray(roll?.dice) ? roll.dice : [];
@@ -25,8 +28,14 @@ export function rolledDiceGroups(roll) {
     if (Number.isFinite(dieTotal)) {
       sum = dieTotal;
     } else {
+      // Fallback for an unevaluated/headless die with no finite total: sum the
+      // ACTIVE results only. `active !== false` keeps present-true AND absent
+      // (Foundry omits `active` on a kept result) and excludes only an explicit
+      // `false` (a dropped/discarded die), matching Foundry's own modified total.
       const results = Array.isArray(die?.results) ? die.results : [];
-      sum = results.reduce((acc, entry) => acc + (Number(entry?.result) || 0), 0);
+      sum = results
+        .filter((entry) => entry?.active !== false)
+        .reduce((acc, entry) => acc + (Number(entry?.result) || 0), 0);
     }
     return {
       group: `${Number.isFinite(count) ? count : 0}d${Number.isFinite(faces) ? faces : 0}`,
@@ -40,8 +49,10 @@ export function rolledDiceGroups(roll) {
  * crit forces success or failure (and may break tools) when its die's rolled total
  * matches its raw value. A matching forced FAILURE takes precedence over a forced
  * success. Returns the matched crit `{ success, breakTools }`, or null when none
- * match. Matching compares `crit.raw` against the die-term POST-MODIFIER total
- * (`group.sum`), so keep/drop/explode modifiers are out of scope for per-die crits.
+ * match. Matching compares `crit.raw` against the die-term GROUP TOTAL
+ * (`group.sum`) for a plain `NdS` term; modified pools (keep/drop/explode/reroll)
+ * are not crit-eligible (no crit is authored against them — the editor and the
+ * normalizer drop such crits), so they never match here.
  */
 export function resolveCheckCrit(diceCrits, diceGroups) {
   const crits = Array.isArray(diceCrits) ? diceCrits : [];
@@ -67,7 +78,10 @@ export function resolveCheckCrit(diceCrits, diceGroups) {
 export async function evaluateCheckRoll(formula, actor) {
   if (typeof globalThis.Roll !== 'function') return { engine: false, total: 0, diceGroups: [] };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  const roll = await new globalThis.Roll(formula, rollData).evaluate();
+  // Automated check roll: never surface a manual roll-fulfilment dialog mid-craft
+  // on a client configured for manual fulfilment (mirrors Roll.simulate's V13
+  // behaviour). `allowInteractive: false` suppresses that resolver.
+  const roll = await new globalThis.Roll(formula, rollData).evaluate({ allowInteractive: false });
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
   return { engine: true, total, diceGroups: rolledDiceGroups(roll) };

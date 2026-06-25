@@ -7,14 +7,30 @@ import assert from 'node:assert/strict';
 const {
   rolledDiceGroups,
   resolveCheckCrit,
+  evaluateCheckRoll,
   runFormulaPassFail,
   runFormulaProgressive,
   runFormulaRouted,
 } = await import('../src/systems/checkRoll.js');
 
+// Mixed-activity results for the non-finite-total fallback (defect 2): a kept
+// (active:true), a dropped (active:false), and a kept-without-the-flag result —
+// Foundry omits `active` on a result it keeps. Active-only sum is 3 + 6 = 9.
+const MIXED_ACTIVE_RESULTS = Object.freeze([
+  Object.freeze({ result: 3, active: true }),
+  Object.freeze({ result: 5, active: false }),
+  Object.freeze({ result: 6 }),
+]);
+
+// Captures the first argument every `evaluate()` call receives, so the
+// non-interactive option (defect 3) can be asserted. Reset per test via
+// `evaluateArgs.length = 0`.
+const evaluateArgs = [];
 function stubRoll(total, dice = []) {
+  evaluateArgs.length = 0;
   globalThis.Roll = class {
-    async evaluate() {
+    async evaluate(options) {
+      evaluateArgs.push(options);
       return { total, dice };
     }
   };
@@ -46,6 +62,44 @@ test('rolledDiceGroups summarises dice as { group, sum } using the die-term tota
 test('rolledDiceGroups falls back to summing per-die results when total is absent', () => {
   const groups = rolledDiceGroups({ dice: [{ number: 2, faces: 6, results: [{ result: 3 }, { result: 4 }] }] });
   assert.deepEqual(groups, [{ group: '2d6', sum: 7 }]);
+});
+
+test('rolledDiceGroups fallback sums only active results: false excluded, absent included', () => {
+  const groups = rolledDiceGroups({
+    dice: [{ number: 3, faces: 6, results: MIXED_ACTIVE_RESULTS }],
+  });
+  // 3 (active:true) + 6 (active absent) — 5 (active:false) is dropped.
+  assert.deepEqual(groups, [{ group: '3d6', sum: 9 }]);
+});
+
+// ── evaluateCheckRoll: non-interactive option (defect 3) ────────────────────
+
+test('evaluateCheckRoll evaluates with { allowInteractive: false } (no fulfilment dialog)', async () => {
+  stubRoll(12, [{ number: 1, faces: 20, total: 12 }]);
+  await evaluateCheckRoll('1d20', ACTOR);
+  assert.equal(evaluateArgs.length, 1);
+  assert.deepEqual(evaluateArgs[0], { allowInteractive: false });
+});
+
+test('runFormula* paths evaluate with { allowInteractive: false }', async () => {
+  stubRoll(15, [{ number: 1, faces: 20, total: 15 }]);
+  await runFormulaPassFail({ formula: '1d20', dc: 10, thresholdMode: 'meet', actor: ACTOR });
+  assert.deepEqual(evaluateArgs.at(-1), { allowInteractive: false });
+
+  stubRoll(8, [{ number: 2, faces: 6, total: 8 }]);
+  await runFormulaProgressive({ formula: '2d6', actor: ACTOR });
+  assert.deepEqual(evaluateArgs.at(-1), { allowInteractive: false });
+
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+  });
+  assert.deepEqual(evaluateArgs.at(-1), { allowInteractive: false });
 });
 
 // ── resolveCheckCrit ────────────────────────────────────────────────────────

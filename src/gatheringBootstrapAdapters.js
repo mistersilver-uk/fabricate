@@ -82,6 +82,10 @@ export function createGatheringSceneAccess({ getCurrentScene } = {}) {
  * are supplied by their actor roll data and the active Foundry Roll
  * implementation.
  *
+ * Rolls evaluate non-interactively (`allowInteractive: false`): an automated
+ * gathering roll never surfaces a manual roll-fulfilment dialog, even on a
+ * client configured for manual fulfilment (mirrors the crafting/salvage check).
+ *
  * Callsites:
  *  - `kind: 'check'` — gathering check evaluation.
  *  - `kind: 'gate'` — visibility/attempt gates.
@@ -109,7 +113,9 @@ export async function evaluateGatheringExpression(payload = {}) {
     // Evaluate asynchronously — evaluateSync() rejects dice (and parenthetical
     // dice counts like "(@abilities.con.mod)d6"). This seam is already async and
     // every caller awaits it, so async evaluate() is safe and rolls dice.
-    const evaluated = await roll.evaluate();
+    // `allowInteractive: false` keeps an automated gathering roll from surfacing a
+    // manual roll-fulfilment dialog (same footgun as the crafting/salvage check).
+    const evaluated = await roll.evaluate({ allowInteractive: false });
     return evaluated?.total ?? evaluated?.result ?? null;
   }
 

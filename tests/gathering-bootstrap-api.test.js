@@ -213,7 +213,9 @@ test('expression adapter accepts evaluator payload shape and uses actor roll dat
     assert.equal(result.reasonCode, 'VISIBLE');
     assert.deepEqual(rollCalls.map(call => call.formula), ['@skills.sur.mod + 10', '12']);
     assert.deepEqual(rollCalls[0].data, { skills: { sur: { mod: 5 } } });
-    assert.equal(rollCalls[0].options, undefined); // async evaluate(), not evaluateSync()
+    // async evaluate() (not evaluateSync()), with the non-interactive option so a
+    // manual roll-fulfilment dialog can never surface mid-gather (defect 3).
+    assert.deepEqual(rollCalls[0].options, { allowInteractive: false });
   } finally {
     if (previousRoll === undefined) {
       delete globalThis.Roll;

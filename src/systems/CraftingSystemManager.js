@@ -14,6 +14,7 @@ import {
   TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
   TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST,
 } from '../models/Tool.js';
+import { parsePlainDiceGroups } from '../utils/craftingCheckExpression.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
   getSourceUuid,
@@ -333,14 +334,15 @@ export class CraftingSystemManager {
     const dc = Number(source.dc);
     const tiers = Array.isArray(source.tiers) ? source.tiers : [];
     const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
+    const rollFormula = typeof source.rollFormula === 'string' ? source.rollFormula : '';
     return {
-      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
       macroUuid: source.macroUuid || null,
-      diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
+      diceCrits: this._normalizeDiceCrits(diceCrits, rollFormula),
     };
   }
 
@@ -359,7 +361,10 @@ export class CraftingSystemManager {
         : 'equal',
       allowPlayerReorder: source.allowPlayerReorder === true,
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
-      diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
+      diceCrits: this._normalizeDiceCrits(
+        diceCrits,
+        typeof source.rollFormula === 'string' ? source.rollFormula : ''
+      ),
     };
   }
 
@@ -373,13 +378,36 @@ export class CraftingSystemManager {
     };
   }
 
-  _normalizeSimpleDiceCrit(crit) {
+  /**
+   * Normalize a check's per-die crit list against its roll formula. Crits are
+   * matched against the GROUP TOTAL of a plain, unmodified `NdS` die term, so a
+   * crit is kept only when its (canonicalized) die appears as a plain die group
+   * in the formula. Crits authored against a modified pool (keep/drop/explode/
+   * reroll, e.g. `2d20kh1`) — which `parseDiceGroups` historically stored under
+   * the stripped key `2d20` — are crit-ineligible and dropped here (the editor
+   * surfaces them under a removal notice before this drop). The classifier
+   * ({@link parsePlainDiceGroups}) is shared with the editor so UI eligibility
+   * and persistence cannot drift, including the bare `dN` ≡ `1dN`
+   * canonicalization.
+   * @private
+   */
+  _normalizeDiceCrits(crits, rollFormula) {
+    const list = Array.isArray(crits) ? crits : [];
+    const plainDice = new Set(parsePlainDiceGroups(rollFormula).map((group) => group.raw));
+    return list.map((crit) => this._normalizeSimpleDiceCrit(crit, plainDice)).filter(Boolean);
+  }
+
+  _normalizeSimpleDiceCrit(crit, plainDice) {
     if (!crit || typeof crit !== 'object') return null;
-    const die = String(crit.die || '').trim();
+    // Canonicalize the die key (bare `dN` ≡ `1dN`) so it agrees with the shared
+    // classifier and the formula's plain die groups.
+    const die = this._canonicalDie(crit.die);
     // A die may carry several crits (e.g. raw 1 forces failure, raw 20 forces
     // success), so each is its own keyed row. A crit always forces an outcome —
-    // there is no off state — so only a missing die drops it.
+    // there is no off state. Drop a crit with no die, or one keyed to a die that
+    // is not a plain `NdS` group in the formula (modified pools / orphaned keys).
     if (!die) return null;
+    if (plainDice instanceof Set && !plainDice.has(die)) return null;
     const raw = Number.isFinite(Number(crit.raw)) ? Math.trunc(Number(crit.raw)) : 0;
     return {
       id: crit.id || foundry.utils.randomID(),
@@ -393,6 +421,18 @@ export class CraftingSystemManager {
       success: crit.success === true,
       breakTools: crit.breakTools === true,
     };
+  }
+
+  /**
+   * Canonical plain `NdS` form of a stored crit die key, via the shared
+   * classifier (bare `dN` ≡ `1dN`). Returns '' when the key is not a plain,
+   * unmodified die term (e.g. a modified pool such as `2d20kh1`), so such crits
+   * are dropped by {@link _normalizeSimpleDiceCrit}.
+   * @private
+   */
+  _canonicalDie(die) {
+    const plain = parsePlainDiceGroups(String(die ?? ''));
+    return plain.length === 1 ? plain[0].raw : '';
   }
 
   /**
@@ -444,7 +484,7 @@ export class CraftingSystemManager {
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
-      diceCrits: diceCrits.map((crit) => this._normalizeSimpleDiceCrit(crit)).filter(Boolean),
+      diceCrits: this._normalizeDiceCrits(diceCrits, rollFormula),
       relativeOutcomes: relative
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'relative'))
         .filter(Boolean),

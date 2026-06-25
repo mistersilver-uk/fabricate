@@ -11,7 +11,10 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
+  import {
+    parseDiceGroups,
+    parsePlainDiceGroups
+  } from '../../../../../utils/craftingCheckExpression.js';
 
   // `forceOnLabel`/`forceOffLabel` override the Force Outcome pill text (already
   // localized by the caller); when null the simple/routed success/failure labels
@@ -29,6 +32,15 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // Interpolating variant for hint copy with `{die}`/`{min}`/`{max}` placeholders.
+  // Falls back to a locally-interpolated default when the key is unresolved so a
+  // missing key never leaves a raw placeholder on screen.
+  function formatText(key, data, fallback) {
+    const translated = localize(key, data);
+    if (translated && translated !== key) return translated;
+    return fallback.replace(/\{(\w+)\}/g, (_, name) => String(data[name] ?? ''));
+  }
+
   function newId() {
     const random = globalThis.foundry?.utils?.randomID;
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
@@ -41,16 +53,44 @@
   }
 
   const crits = $derived(Array.isArray(diceCrits) ? diceCrits : []);
-  // One row per unique die in the formula, carrying its producible range so the
-  // raw-roll input can be clamped to it.
+  // One row per unique PLAIN die in the formula, carrying its producible range
+  // (the group-total range [N, N*S]) so the raw-roll input can be clamped to it.
+  // Only plain, unmodified `NdS` terms are crit-eligible — crits match a die's
+  // group total, which modified pools (keep/drop/explode/reroll) don't expose.
   const uniqueDice = $derived(
-    parseDiceGroups(rollFormula).reduce((list, group) => {
+    parsePlainDiceGroups(rollFormula).reduce((list, group) => {
       if (!list.some((die) => die.raw === group.raw)) {
-        list.push({ raw: group.raw, min: group.count, max: group.count * group.sides });
+        list.push({
+          raw: group.raw,
+          count: group.count,
+          min: group.count,
+          max: group.count * group.sides
+        });
       }
       return list;
     }, [])
   );
+  // The set of plain (crit-eligible) die keys.
+  const plainDiceKeys = $derived(new Set(uniqueDice.map((die) => die.raw)));
+  // Modified pools in the formula (e.g. `2d20kh1` → stripped key `2d20`) that are
+  // NOT plain: crit-ineligible. Listed so the editor can show the modified-pool
+  // hint (no crit rows, no Add control).
+  const modifiedPoolKeys = $derived(
+    parseDiceGroups(rollFormula).reduce((list, group) => {
+      if (!plainDiceKeys.has(group.raw) && !list.includes(group.raw)) list.push(group.raw);
+      return list;
+    }, [])
+  );
+  // A crit can only match a plain die group present in the formula. When the
+  // formula changes so a die group is no longer crit-eligible (a modifier was
+  // added, or the die left the formula), eagerly drop its crits from the staged
+  // data — and so from the UI — rather than leaving stale rows behind. The
+  // save-time normalizer drops any that slip through (e.g. imported data) as a
+  // backstop.
+  $effect(() => {
+    const pruned = crits.filter((crit) => plainDiceKeys.has(crit.die));
+    if (pruned.length !== crits.length) onChange(pruned);
+  });
 
   const successOnLabel = $derived(
     forceOnLabel ?? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success')
@@ -60,7 +100,12 @@
   );
   const breakOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break'));
   const breakOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break"));
-
+  const modifiedPoolHint = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Checks.Crafting.CritModifiedPoolHint',
+      "Critical rolls match a die's total. They aren't available for pools that keep, drop, explode, or reroll dice (e.g. 2d20kh1)."
+    )
+  );
   function critsForDie(die) {
     return crits.filter((crit) => crit.die === die);
   }
@@ -80,13 +125,37 @@
   function setCritRaw(id, min, max, rawValue) {
     updateCrit(id, { raw: Math.max(min, Math.min(max, numeric(rawValue))) });
   }
+
+  // For a multi-die group (N>1) the crit value is the dice TOTAL over [N, N*S],
+  // not a single die face. Surface that in a per-group hint line.
+  function multiDieHint(die) {
+    return formatText(
+      'FABRICATE.Admin.Manager.Checks.Crafting.CritMultiDieHint',
+      { die: die.raw, min: die.min, max: die.max },
+      'The value is the {die} total, from {min} to {max}.'
+    );
+  }
+
+  // The raw-roll input's accessible name. For a multi-die group it encodes the die
+  // and its total range (e.g. "Total for 2d6 (2 to 12)") since the visible "Raw
+  // roll" header alone doesn't convey that the value is a group total.
+  function critRawAriaLabel(die) {
+    if (die.count > 1) {
+      return formatText(
+        'FABRICATE.Admin.Manager.Checks.Crafting.CritRawMultiAria',
+        { die: die.raw, min: die.min, max: die.max },
+        'Total for {die} ({min} to {max})'
+      );
+    }
+    return text('FABRICATE.Admin.Manager.Checks.Crafting.CritRaw', 'Raw roll');
+  }
 </script>
 
 <div class="manager-checks-card-head">
   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.CritTitle', 'Critical rolls')}</h3>
 </div>
-{#if uniqueDice.length === 0}
-  <p class="manager-muted" data-dice-empty>{text('FABRICATE.Admin.Manager.Checks.Crafting.NoDice', 'No dice detected in this formula.')}</p>
+{#if uniqueDice.length === 0 && modifiedPoolKeys.length === 0}
+  <p class="manager-muted" data-dice-empty>{text('FABRICATE.Admin.Manager.Checks.Crafting.NoDice', 'No dice detected in this expression.')}</p>
 {:else}
   {#each uniqueDice as die (die.raw)}
     {@const rows = critsForDie(die.raw)}
@@ -98,6 +167,9 @@
           <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddCrit', 'Add critical')}</span>
         </button>
       </div>
+      {#if die.count > 1}
+        <p class="manager-muted manager-checks-crit-hint" data-crit-multi-hint>{multiDieHint(die)}</p>
+      {/if}
       {#if rows.length > 0}
         <div class="manager-checks-outcome-table is-crit" role="table" aria-label={`${die.raw} ${text('FABRICATE.Admin.Manager.Checks.Crafting.CritTitle', 'Critical rolls')}`}>
           <div class="manager-checks-outcome-head" role="row">
@@ -113,7 +185,7 @@
                 data-crit-raw
                 min={die.min}
                 max={die.max}
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.CritRaw', 'Raw roll')}
+                aria-label={critRawAriaLabel(die)}
                 value={crit.raw ?? die.max}
                 oninput={(event) => setCritRaw(crit.id, die.min, die.max, event.currentTarget.value)}
               />
@@ -150,6 +222,14 @@
           {/each}
         </div>
       {/if}
+    </div>
+  {/each}
+  {#each modifiedPoolKeys as poolKey (poolKey)}
+    <div class="manager-checks-crit-group" data-crit-modified-pool={poolKey}>
+      <div class="manager-checks-card-head manager-checks-crit-group-head">
+        <span class="manager-checks-crit-die" data-crit-die={poolKey}>{poolKey}</span>
+      </div>
+      <p class="manager-muted manager-checks-crit-hint" data-crit-modified-pool-hint>{modifiedPoolHint}</p>
     </div>
   {/each}
 {/if}

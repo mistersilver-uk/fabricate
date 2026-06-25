@@ -1281,6 +1281,13 @@
   font-weight: 700;
 }
 
+/* Per-group hint copy: the multi-die group-total explainer and the modified-pool
+   crit-ineligibility hint (see issue 443). Reuses the muted-copy treatment so it
+   wraps cleanly at narrow widths. */
+.fabricate-manager .manager-checks-crit-hint {
+  color: var(--fab-mv2-text-muted);
+}
+
 /* Formula + success threshold + comparison on one line. */
 .fabricate-manager .manager-checks-formula-row {
   display: flex;
