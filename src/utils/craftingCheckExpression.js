@@ -70,28 +70,23 @@ export function isPlainDieTerm(term) {
  * is not the plain `[N, N*S]` sum a crit is matched against, so they are not
  * crit-eligible. Flat modifiers, operators, and actor references are ignored.
  *
- * A die term's start is the `NdS` core; the term is plain only when the very
- * next character is not part of the modifier grammar (modifiers attach directly
- * after the sides as letters/comparisons, e.g. `kh`, `dl`, `x`, `r`, `min`,
- * `cs>`). Flavor in `[...]`, whitespace, operators, parens, and end-of-string
- * all terminate a plain term.
+ * A term is plain only when its whole token is the `NdS` core (bare `dN` ≡
+ * `1dN`). The expression is split on whitespace, operators, parens, and flavor
+ * brackets, and each resulting token is classified by {@link parsePlainTerm}.
+ * Modifiers attach directly to the core (e.g. `kh`, `dl`, `x`, `r`, `min`,
+ * `cs>`), so a modified pool never tokenizes to a bare `NdS` and is excluded.
  * @param {string} expression
  * @returns {{ raw: string, count: number, sides: number }[]}
  */
 export function parsePlainDiceGroups(expression) {
   const groups = [];
-  const scanner = /(\d*)d(\d+)/gi;
-  const text = String(expression ?? '');
-  let match;
-  while ((match = scanner.exec(text)) !== null) {
-    const plain = parsePlainTerm(`${match[1]}d${match[2]}`);
-    if (!plain) continue;
-    // A modifier attaches directly after the sides digits. Anything other than
-    // whitespace, an operator/paren/bracket, or end-of-string makes this a
-    // modified pool (crit-ineligible). `[` opens flavor, which is allowed.
-    const nextChar = text.charAt(scanner.lastIndex);
-    if (nextChar !== '' && !/[\s+\-*/%(),[\]]/.test(nextChar)) continue;
-    groups.push(plain);
+  // Split on whitespace, operators, parens, and flavor brackets so each token is
+  // a single term, then keep only the ones that are a whole plain `NdS` die. A
+  // modified pool (`2d20kh1`, `4d6dl1`, …) keeps its modifier in-token, so the
+  // anchored parse in parsePlainTerm rejects it — no backtracking scanner needed.
+  for (const token of String(expression ?? '').split(/[\s+\-*/%(),[\]]+/)) {
+    const plain = token ? parsePlainTerm(token) : null;
+    if (plain) groups.push(plain);
   }
   return groups;
 }
