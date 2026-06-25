@@ -2513,18 +2513,12 @@ async function main() {
           resolutionMode: 'progressive',
           features: { gathering: true }
         });
-        // An incomplete recipe (no result group) → a recipe readiness issue.
-        // allowIncomplete lets it persist as a disabled draft (it is structurally
-        // valid but not craftable), which is exactly the overview-row state.
-        const blockedRecipe = await rm.createRecipe(
-          {
-            craftingSystemId: blockedSystemId,
-            name: 'Unfinished Draught',
-            ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
-            resultGroups: []
-          },
-          { allowIncomplete: true, notify: false }
-        );
+        // NOTE: progressive mode with no crafting check rejects recipe creation
+        // ("Progressive mode requires crafting checks enabled"), and a recipe created
+        // before the mode switch would be deleted by the (pre-migration-first)
+        // updateSystem. So the broken system carries no recipe; its overview rows are
+        // the system-level blocker (above) plus the stale gathering task (below) — which
+        // is exactly the populated state both captures need.
 
         // Seed a gathering library task that will NOT match the environment's
         // conditions/biome, then create a MANUAL environment that explicitly
@@ -2564,7 +2558,6 @@ async function main() {
         return {
           systemId,
           blockedSystemId,
-          blockedRecipeId: blockedRecipe?.id ?? null,
           blockedEnvironmentId: blockedEnvironment?.id ?? null,
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id],
