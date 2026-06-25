@@ -232,6 +232,9 @@ test('_normalizeCraftingCheck clamps a crit raw to the die produceable range', (
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     simple: {
+      // The formula must carry each crit-eligible die: crits are kept only when
+      // their die is a plain group in the formula.
+      rollFormula: '1d20+2d6',
       diceCrits: [
         // Above max (1d20 max is 20) clamps down to 20.
         { id: 'hi', die: '1d20', raw: 99, success: true },
@@ -239,8 +242,6 @@ test('_normalizeCraftingCheck clamps a crit raw to the die produceable range', (
         { id: 'lo', die: '2d6', raw: 1, success: false },
         // In range is untouched.
         { id: 'ok', die: '2d6', raw: 7, success: true },
-        // Unparseable die leaves raw as-is.
-        { id: 'weird', die: '2d20kh1', raw: 50, success: true },
       ],
     },
   });
@@ -248,7 +249,38 @@ test('_normalizeCraftingCheck clamps a crit raw to the die produceable range', (
   assert.equal(byId.hi.raw, 20, 'raw above N*S clamps to the max');
   assert.equal(byId.lo.raw, 2, 'raw below N clamps to the min');
   assert.equal(byId.ok.raw, 7, 'an in-range raw is unchanged');
-  assert.equal(byId.weird.raw, 50, 'an unparseable die leaves raw as-is');
+});
+
+test('_normalizeCraftingCheck canonicalizes a bare dN crit die to 1dN (matches the formula)', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    simple: {
+      rollFormula: 'd20+5',
+      diceCrits: [{ id: 'bare', die: 'd20', raw: 20, success: true }],
+    },
+  });
+  assert.equal(result.simple.diceCrits.length, 1, 'a bare dN crit is kept');
+  assert.equal(result.simple.diceCrits[0].die, '1d20', 'die is canonicalized to 1dN');
+});
+
+test('_normalizeCraftingCheck drops a crit authored against a modified pool, across simple/progressive/routed', () => {
+  const mgr = makeManager();
+  // `2d20kh1` is a modified pool: `parseDiceGroups` historically stored the crit
+  // under the stripped key `2d20`, but the pool exposes no plain group total, so
+  // the crit is crit-ineligible and dropped on normalization in every check shape.
+  const orphanedCrit = { id: 'orphan', die: '2d20', raw: 20, success: true };
+  const simple = mgr._normalizeCraftingCheck({
+    simple: { rollFormula: '2d20kh1', diceCrits: [orphanedCrit] },
+  });
+  const progressive = mgr._normalizeCraftingCheck({
+    progressive: { rollFormula: '2d20kh1', diceCrits: [orphanedCrit] },
+  });
+  const routed = mgr._normalizeCraftingCheck({
+    routed: { rollFormula: '2d20kh1', diceCrits: [orphanedCrit] },
+  });
+  assert.deepEqual(simple.simple.diceCrits, [], 'simple drops the modified-pool crit');
+  assert.deepEqual(progressive.progressive.diceCrits, [], 'progressive drops the modified-pool crit');
+  assert.deepEqual(routed.routed.diceCrits, [], 'routed drops the modified-pool crit');
 });
 
 test('_normalizeCraftingCheck coerces invalid simple dcMode/thresholdMode to defaults', () => {

@@ -26,6 +26,72 @@ export function parseDiceGroups(expression) {
 }
 
 /**
+ * Canonical plain `NdS` form for a die term: bare `dN` ≡ `1dN`. Returns null
+ * when the term is not a plain `NdS` die core (count and sides both >= 1).
+ * @param {string} term A single die term (already isolated, e.g. `2d6`, `d20`).
+ * @returns {{ raw: string, count: number, sides: number } | null}
+ */
+function parsePlainTerm(term) {
+  const match = /^(\d*)d(\d+)$/i.exec(String(term ?? '').trim());
+  if (!match) return null;
+  const count = match[1] === '' ? 1 : Number(match[1]);
+  const sides = Number(match[2]);
+  if (count < 1 || sides < 1) return null;
+  return { raw: `${count}d${sides}`, count, sides };
+}
+
+/**
+ * Whether a die term is a PLAIN, unmodified `NdS` die (crit-eligible). Plain
+ * means the `NdS` core is the whole term: bare `dN` is treated as `1dN`. A term
+ * is crit-INELIGIBLE when anything other than the canonical core is present —
+ * i.e. any keep/drop/explode/reroll/min/max/count modifier (e.g. `2d20kh1`,
+ * `4d6dl1`, `1d6x`, `2d10r1`, `2d6min2`). Classification is by modifier
+ * PRESENCE, not a token blocklist, so future Foundry modifiers cannot slip
+ * through: only a string that parses cleanly as `NdS` (optionally bare `dN`) is
+ * plain. Bracketed flavor and surrounding operators are handled by
+ * {@link parsePlainDiceGroups}, which isolates each term before classifying.
+ * @param {string} term
+ * @returns {boolean}
+ */
+export function isPlainDieTerm(term) {
+  return parsePlainTerm(term) !== null;
+}
+
+/**
+ * Extract the PLAIN (crit-eligible), unmodified dice groups from a roll
+ * expression, in order of appearance, in canonical `NdS` form (bare `dN` ≡
+ * `1dN`). Modified pools (keep/drop/explode/reroll/min/max/count, e.g.
+ * `2d20kh1`, `4d6dl1`, `1d6x`, `2d10r1`) are EXCLUDED: their per-die-total range
+ * is not the plain `[N, N*S]` sum a crit is matched against, so they are not
+ * crit-eligible. Flat modifiers, operators, and actor references are ignored.
+ *
+ * A die term's start is the `NdS` core; the term is plain only when the very
+ * next character is not part of the modifier grammar (modifiers attach directly
+ * after the sides as letters/comparisons, e.g. `kh`, `dl`, `x`, `r`, `min`,
+ * `cs>`). Flavor in `[...]`, whitespace, operators, parens, and end-of-string
+ * all terminate a plain term.
+ * @param {string} expression
+ * @returns {{ raw: string, count: number, sides: number }[]}
+ */
+export function parsePlainDiceGroups(expression) {
+  const groups = [];
+  const scanner = /(\d*)d(\d+)/gi;
+  const text = String(expression ?? '');
+  let match;
+  while ((match = scanner.exec(text)) !== null) {
+    const plain = parsePlainTerm(`${match[1]}d${match[2]}`);
+    if (!plain) continue;
+    // A modifier attaches directly after the sides digits. Anything other than
+    // whitespace, an operator/paren/bracket, or end-of-string makes this a
+    // modified pool (crit-ineligible). `[` opens flavor, which is allowed.
+    const nextChar = text.charAt(scanner.lastIndex);
+    if (nextChar !== '' && !/[\s+\-*/%(),[\]]/.test(nextChar)) continue;
+    groups.push(plain);
+  }
+  return groups;
+}
+
+/**
  * Whether two inclusive integer ranges intersect.
  * @param {{ start: number, end: number }} a
  * @param {{ start: number, end: number }} b

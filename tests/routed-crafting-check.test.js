@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 const {
   installRoutedCheckEnv,
   stubRoll,
+  evaluateArgs,
   clearRollEngine,
   defaultRouted,
   makeRoutedEngine,
@@ -26,6 +27,17 @@ const RELATIVE_TIERS = [
   { id: 't-myth', name: 'Mythic', success: true, breakTools: false, dc: 5 }, // threshold 20
   { id: 't-botch', name: 'Botch', success: false, breakTools: true, dc: -10 }, // threshold 5
 ];
+
+// ── Non-interactive evaluate (defect 3) ──────────────────────────────────────
+
+test('routed: the roll evaluates with { allowInteractive: false } (no fulfilment dialog)', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15 }),
+  });
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  await runRoutedCheck(engine);
+  assert.deepEqual(evaluateArgs.at(-1), { allowInteractive: false });
+});
 
 // ── Relative tiers: threshold mapping ────────────────────────────────────────
 

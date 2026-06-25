@@ -26,16 +26,26 @@ export function installRoutedCheckEnv() {
 }
 
 /**
+ * The first argument captured from every `evaluate()` call on the routed stub,
+ * so suites can assert the non-interactive option `{ allowInteractive: false }`.
+ * Cleared by `stubRoll`.
+ */
+export const evaluateArgs = [];
+
+/**
  * Stub Foundry's `Roll`: `evaluate()` resolves to a fixed total and dice terms,
  * each `{ number, faces, total }` (mirroring an evaluated DiceTerm). Mirrors the
- * stub used by the simple/salvage suites.
+ * stub used by the simple/salvage suites. Records each `evaluate()` argument in
+ * {@link evaluateArgs} so the non-interactive contract can be asserted.
  */
 export function stubRoll(total, dice = []) {
+  evaluateArgs.length = 0;
   globalThis.Roll = class {
     constructor(formula) {
       this.formula = formula;
     }
-    async evaluate() {
+    async evaluate(options) {
+      evaluateArgs.push(options);
       return { total, dice };
     }
   };
