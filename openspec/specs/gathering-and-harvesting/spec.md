@@ -1338,6 +1338,8 @@ Tool usage/breakage semantics for terminal gathering attempts:
 - Under `CraftingSystem.toolBreakage.authority === "checkDriven"`, the active gathering check's `checkBreakage` triggers decide whether **all required tools** break for the attempt via the single shared evaluator (`evaluateCheckBreakage`), reaching parity with crafting and salvage; each Tool's own `breakage.mode` is ignored except `immune`.
 This is orthogonal to the realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`), which still governs whether a broken tool fails the gather outcome and is applied independently.
 Crafting and gathering route the same trigger + roll through the same evaluator, so the break decision cannot drift between surfaces.
+- **Acknowledged limit (issue 419):** `d100` gathering resolution has no check sub-object, so `checkDriven` `checkBreakage` triggers cannot fire for `d100` gathering attempts; only `progressive`/`routed` gathering checks (which run through the shared Check engine) carry a `checkBreakage` block.
+A `d100` task's required tools therefore never force-break under `checkDriven`, and because each tool's own mode is also bypassed under that authority, no per-attempt force-break occurs.
 
 ## Gathering Task Tools
 

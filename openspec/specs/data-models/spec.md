@@ -306,6 +306,7 @@ The evaluator additionally reads the legacy `data.breakTools` as an implicit alw
 24. `checkBreakage` triggers always target **all required tools** for the attempt (never a single check-selected tool in v1).
 The `rollTotal` condition targets the raw roll total (`data.total`); `progressiveValue` targets the awarding `value` and is meaningful only on progressive checks (absent → never matches); these are distinct sources because a progressive crit can overwrite `value` while `data.total` keeps the raw roll.
 The `diceGroup` `groupId` is the index into the evaluated `roll.dice` term order (not re-parsed from the formula string), so duplicate `NdS` groups are disambiguated deterministically; per-die aggregates read active-only raw faces and fail open (no break) when no per-die data is available.
+The `outcomeTier` condition matches when the resolved tier/outcome is in `tierIds[]` or `outcomeKeys[]`; both are honoured by the engine and the normalizer, but the editor UI authors only `tierIds[]` in v1 (`outcomeKeys[]` is an engine-level capability with no editor surface) — **acknowledged limit (issue 419)**.
 25. **`consumeCatalystsOnFail` interaction on the failure path** (issue 419): breakage on a FAILED attempt runs only when `consumption.consumeCatalystsOnFail === true` — identical to how the legacy `breakTools` force-break is gated today.
 A matched `checkDriven` trigger on a failed attempt therefore breaks tools only when `consumeCatalystsOnFail === true`.
 On the SUCCESS path breakage always applies (no such gate exists there).

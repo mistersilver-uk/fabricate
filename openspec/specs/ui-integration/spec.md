@@ -221,6 +221,17 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 
 Mode semantics are defined in `004`.
 
+##### Check Tool-Breakage Controls
+
+Tool-breakage authoring on a check is governed by the system's `toolBreakage.authority` (issue 419); the two authorities never expose their authoring surfaces at the same time.
+
+- Under `toolSpecific` authority: the existing per-die `DiceCrit.breakTools` toggle (in the dice-crits sub-component) and the routed per-tier `outcome.breakTools` pills render as the breakage-authoring surface, and the shared `CheckBreakage` section is hidden.
+- Under `checkDriven` authority: the per-die/per-tier `breakTools` toggles are hidden and a shared `CheckBreakage` section renders in all three check editors (simple, routed, and progressive).
+The `CheckBreakage` section offers an enable toggle, a default preset (break all required tools when the first d20 dice group rolls any die equal to 1; no trigger seeded when the formula has no d20 term), and add/remove of triggers — `rollTotal`, `progressiveValue` (progressive editors only), `diceGroup` aggregate, and `outcomeTier` (routed editors only).
+Dice groups are labelled from the formula, with duplicate `NdS` groups disambiguated (`#1` / `#2`).
+- This authority gate applies per subsystem: crafting and salvage (salvage is always on) honour the system authority; gathering exposes its check-breakage controls only when `features.gathering === true`.
+A disabled subsystem renders no breakage controls.
+
 #### Requirements Controls
 
 - Time toggle
@@ -379,6 +390,23 @@ The source component may in turn expose a source item UUID.
 - Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
 - Manager prevents essence deletion while one or more managed components reference that essence with a positive quantity.
 - Manager source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.
+
+### Tools Tab
+
+The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering` (see Manager Shell).
+It manages the system's single canonical Tool library (`system.tools`).
+
+Tool-breakage authority (issue 419):
+
+- The Tools page carries a system-level **tool-breakage authority** control: a radio group offering `toolSpecific` (default) and `checkDriven`.
+- `toolSpecific` means each Tool's own breakage mode decides whether it breaks (plus the legacy per-crit/per-tier `breakTools` force-break); `checkDriven` means the active check's `checkBreakage` triggers decide whether all required tools break and each Tool's own mode is ignored except `immune`.
+- When authority is `checkDriven`, the page shows an advisory communicating that per-tool breakage modes are not evaluated (except `Immune`) and the active check decides whether required tools break.
+
+Per-tool breakage editing:
+
+- The per-tool breakage mode offers four options: `Limited uses`, `Break chance`, `Dice expression`, and **`Immune`**.
+- Selecting `Immune` hides the breakage-specific field inputs (max uses, break chance, dice formula/threshold) and keeps the `onBreak` configuration.
+- An `Immune` tool never breaks under either authority and is still recorded as used; the browse-row breakage chip reads as a never-breaks state.
 
 ### Recipes Tab
 
