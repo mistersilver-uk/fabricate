@@ -9,7 +9,35 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
 - `CraftingSystem.resolutionMode` is system-wide.
 - Recipes cannot mix resolution modes inside one crafting system.
-- Mode changes are destructive and governed by `007-destructive-changes-and-migrations.md`.
+- Mode changes are **migration-first** and governed by
+  `007-destructive-changes-and-migrations.md`:
+  recipes are migrated to fit the new mode wherever possible and a recipe is
+  deleted only when a per-recipe *structural* constraint of the target mode cannot
+  be satisfied by seeding a result-selection provider or clearing the routed
+  selection.
+  System-level gaps (a target mode that needs a check the system has not
+  configured, an alchemy signature collision, ...) never delete a recipe; they are
+  surfaced as system-validation issues that gate visibility, not deletion.
+- **Migratability matrix (normative).**
+  The columns are the *target* mode and the rows the *source* mode.
+  "seed" seeds the recipe-level `resultSelection.provider`
+  (`check` when the system has a usable crafting check, otherwise `ingredientSet`);
+  "clear" sets `resultSelection` to `null`;
+  "carry" keeps the recipe (and its routing provider) verbatim;
+  "1×1" means the recipe has exactly one ingredient set and one result group.
+
+  | From \ To     | `simple`                       | `routed` | `progressive`                  | `alchemy`                            |
+  |---------------|--------------------------------|----------|--------------------------------|--------------------------------------|
+  | `simple`      | —                              | seed     | clear                          | seed                                 |
+  | `routed`      | clear if 1×1 else **delete**   | —        | clear if 1×1 else **delete**   | carry if single-step else **delete** |
+  | `progressive` | clear                          | seed     | —                              | seed                                 |
+  | `alchemy`     | clear if 1×1 else **delete**   | carry    | clear if 1×1 else **delete**   | —                                    |
+
+  The only structural delete causes are: narrowing into `simple`/`progressive`
+  (which require 1×1) from a recipe with more than one ingredient set or result
+  group, and moving a multi-step recipe into `alchemy` (which has no multi-step
+  support).
+  Re-running a `lossless`/`carry` migration is a no-op (idempotent).
 - Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks (routed invalid/missing provider, routed invalid `resultGroupId` for the `ingredientSet` provider, routed reserved/duplicate `ResultGroup.name`) always apply. (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `007-destructive-changes-and-migrations.md §Resolution-Model Migration`, which hard-migrates them to `routed`.)
 
 ## Mode Matrix

@@ -14,13 +14,20 @@ Define destructive operations, required confirmations, clean-up behaviour, and m
 
 ### Change Crafting System Resolution Mode
 
+A resolution-mode change is **migration-first**, not delete-all.
 When `CraftingSystem.resolutionMode` changes:
 
 1. Require explicit GM confirmation.
-2. Delete all recipes in that crafting system.
-3. Delete all in-progress runs referencing deleted recipes.
-4. Remove learned recipe entries referencing deleted recipes.
-5. Clear per-user progressive ordering preferences referencing deleted recipes.
+   The confirmation reports accurate counts from a dry run: how many recipes will be migrated to the new mode and, only when any cannot be migrated, how many will be deleted and their names.
+   When no recipe will be deleted the confirmation must not mention deletion.
+2. Persist the merged system (with its new mode) before migrating recipes, so recipe migration and validation read the new mode.
+3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `004-resolution-modes.md § Mode Invariant` (seed a result-selection provider, clear the routed selection, or carry it verbatim).
+   Migrated recipes are persisted on structural validity alone.
+4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met by seed/clear: narrowing into `simple`/`progressive` from a recipe that is not 1×1, or moving a multi-step recipe into `alchemy`.
+5. System-level gaps (a target mode whose required check is unconfigured, an alchemy signature collision, ...) never delete or disable a recipe here; they are surfaced as system-validation issues that gate visibility (see `recipe-visibility`), not deletions.
+6. Apply the standard clean-up for any recipes that were deleted: remove in-progress runs, learned-recipe entries, and per-user progressive ordering preferences referencing them.
+7. When the new mode is `alchemy`, re-run the alchemy signature reconciliation (also re-run it on alchemy component-list edits) so signature collisions are surfaced rather than silently broken.
+8. Emit aggregated notifications: one summary of migrated recipes, one warning listing deleted recipes only when any were deleted, and a single `recipesChanged` emission for the whole pass (never one notification per recipe).
 
 ### Delete Crafting System
 

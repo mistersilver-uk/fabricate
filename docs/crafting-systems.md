@@ -57,10 +57,26 @@ Most optional features are off by default and must be explicitly enabled by a GM
 Toggle optional features in the **Features** card on the System tab of the Crafting Admin panel.
 Each toggle takes effect immediately for all future crafting attempts in that system.
 
-{: .warning }
-> Changing the **recipe resolution mode** is a destructive operation.
-All recipes in the system will be deleted because they may be invalid under the new mode.
-You will be asked to confirm.
+Changing the **recipe resolution mode** migrates your recipes to the new mode wherever it can, instead of deleting them all.
+Fabricate reshapes each recipe so it fits the new mode, and only removes a recipe when its structure cannot be made to fit.
+You will be asked to confirm before anything changes.
+
+{: .note }
+> The confirmation runs a dry run first and reports accurate counts: how many recipes will be migrated to the new mode and, only when some cannot be migrated, how many will be deleted and their names.
+When no recipe needs deleting, the confirmation does not mention deletion at all.
+
+A recipe is only deleted when its shape cannot fit the new mode.
+This happens in two cases: narrowing into Simple or Progressive mode (which each expect exactly one ingredient set and one result group) from a recipe that has more than one of either, and moving a multi-step recipe into Alchemy mode (which does not support multi-step recipes).
+Every other recipe is kept and adjusted to suit the new mode.
+
+A missing setup at the system level never deletes a recipe.
+For example, switching to Progressive mode without a progressive crafting check, or to a check-routed mode without a roll formula, does not remove recipes.
+Those gaps are reported in the System Overview instead, and they hide recipes from players until you fix them rather than deleting anything.
+See [System Overview](#system-overview).
+
+When the new mode is Alchemy, Fabricate also re-checks recipe ingredient signatures so any overlap that would make alchemy attempts ambiguous is surfaced rather than silently broken.
+
+After the change, Fabricate shows a summary of how many recipes were migrated, and a separate warning listing any recipes it had to delete.
 
 Changing the **salvage resolution mode** is not destructive.
 No recipes or runs are deleted.
@@ -128,6 +144,67 @@ Macros and integrations can submit selected items to the alchemy engine.
 Fabricate matches the combination against known recipe signatures.
 Set the resolution mode of a system to Alchemy to enable this.
 See [Alchemy Mode]({% link recipes/alchemy.md %}) for current usage, configuration, signature matching, consume-on-fail, and learn-on-craft options.
+
+---
+
+## System Overview
+
+{: .gm }
+> The System Overview is GM-only.
+> The whole crafting manager is GM-scoped.
+
+The **Overview** is a single place to see every validation issue across a crafting system and jump straight to whatever owns each one.
+Open it from the **Overview** button in the manager rail when a system is selected.
+The button shows a count badge of the open critical and warning issues, so you can tell at a glance whether a system needs attention.
+
+The Overview lists each issue with a severity chip (critical, warning, or note), the name of the thing it affects, and a short description of the problem.
+Issues are grouped by what they affect:
+
+- **System blockers** are problems that make the whole system unusable.
+  They have no deep-link of their own because the Overview is where you resolve them.
+- **Recipes** lists per-recipe problems, such as a recipe with no name or a result set that is not assigned to any check outcome.
+- **Gathering environments**, **Gathering tasks**, and **Gathering events** list problems with your gathering setup.
+- **Component salvage** lists components whose salvage setup is invalid for the current salvage mode.
+
+Each issue that affects an editable thing has an **Open** button (such as **Open recipe**, **Open environment**, or **Open component**) that takes you straight to that editor, with the right tab selected, so you can fix the problem without hunting for it.
+
+When a system has no issues, the Overview says everything is ready to use.
+
+### System Blockers
+
+A **system blocker** is a problem serious enough to make the entire system unusable until you fix it.
+Examples include:
+
+- Routed check-mode recipes are configured but the system has no routed crafting check.
+- Progressive mode with no progressive crafting check, or no component with a difficulty of 1 or more.
+- Multi-step recipes are still enabled while the system is in Alchemy mode.
+- Two recipes share an ingredient signature in Alchemy mode, so attempts are ambiguous.
+
+When a system has a blocker, the System Overview shows a banner at the top.
+The **System settings** page shows a matching banner with an **Open system overview** link, so you are warned wherever you are working.
+
+While a blocker is present, players cannot see or use any of the system's recipes.
+See [How Players See a Broken System](#how-players-see-a-broken-system).
+
+Blockers are worked out live and are never stored.
+The moment you fix the underlying gap, the blocker clears and the system becomes usable again on its own.
+You never have to re-enable recipes by hand.
+
+### How Players See a Broken System
+
+Fabricate keeps players from running into broken setups, while still letting GMs see everything so they can fix them.
+
+- **A system blocker hides the whole system.**
+  While a system has a blocker, players see none of its recipes or gathering, and any attempt to craft in it is refused.
+  GMs still see the system and all of its recipes.
+- **A per-entity problem hides only that entity.**
+  When a single recipe or component is broken but the system as a whole is fine, only that one recipe or component is hidden from players.
+  The rest of the system stays visible and usable.
+- **GMs always see everything.**
+  A GM is never hidden from a broken system or a broken recipe, so you can always reach what needs fixing.
+
+Because these checks run live, hidden recipes reappear for players the moment you resolve the problem.
+Nothing is permanently disabled behind the scenes.
 
 ---
 

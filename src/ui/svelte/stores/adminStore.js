@@ -63,6 +63,7 @@ import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js'
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { Tool } from '../../../models/Tool.js';
+import { classifyModeChange } from '../../../migration/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
@@ -4344,20 +4345,42 @@ export function createAdminStore(services) {
     const currentMode = system.resolutionMode || 'simple';
     if (nextMode === currentMode) return true;
 
-    const recipeCount = recipeManager?.getRecipes?.({ craftingSystemId: sysId })?.length || 0;
+    // Dry-run the migration so the GM sees accurate migrate/delete counts before
+    // committing. Migration-first: recipes are migrated to the new mode wherever
+    // possible and only the structurally un-migratable ones are deleted.
+    const affectedRecipes = recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || [];
+    const deletedNames = [];
+    let migrateCount = 0;
+    for (const recipe of affectedRecipes) {
+      const recipeJSON = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
+      const { outcome } = classifyModeChange(recipeJSON, currentMode, nextMode, system);
+      if (outcome === 'delete') {
+        deletedNames.push(recipe.name || recipe.id);
+      } else {
+        migrateCount += 1;
+      }
+    }
+
     const localizeFn = services.localize;
+    const modeLabel = _resolutionModeLabel(nextMode, localizeFn);
+    const content =
+      deletedNames.length > 0
+        ? localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeContentDelete', {
+            count: migrateCount,
+            deleteCount: deletedNames.length,
+            names: deletedNames.join(', '),
+            mode: modeLabel,
+          }) ||
+          `${migrateCount} recipe(s) will be migrated to ${modeLabel}; ${deletedNames.length} cannot be migrated and will be deleted: ${deletedNames.join(', ')}.`
+        : localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeContent', {
+            count: migrateCount,
+            mode: modeLabel,
+          }) || `${migrateCount} recipe(s) will be migrated to ${modeLabel}.`;
     const confirmed = await services.confirmDialog({
       title:
         localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle') ||
         'Change Resolution Mode?',
-      content: `<p>${
-        localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeContent', {
-          count: recipeCount,
-          name: system.name,
-          mode: _resolutionModeLabel(nextMode, localizeFn),
-        }) ||
-        `Changing resolution mode to ${_resolutionModeLabel(nextMode, localizeFn)} will delete ${recipeCount} recipe(s) in this crafting system and clean up related runs and learned recipes.`
-      }</p>`,
+      content: `<p>${content}</p>`,
       yes: () => true,
       no: () => false,
     });
