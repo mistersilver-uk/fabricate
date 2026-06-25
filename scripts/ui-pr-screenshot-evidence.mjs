@@ -295,9 +295,15 @@ export function normalizePath(filePath) {
 
 export function isUiFile(filePath) {
   const normalized = normalizePath(filePath);
+  // `lang/` is deliberately excluded: a localization file is not itself a UI
+  // render target. No view recipe matches a `lang/` path, so a lang change only
+  // ever contributed UI status via the generic `theme-or-global-ui` fallback.
+  // By dropping `lang/` here we get co-occurrence semantics for free: a lang-only
+  // PR is not UI, while a lang change shipped alongside a render file
+  // (`src/ui/`, `styles/`, `*.svelte`, `*.css`) is still UI because that render
+  // file independently trips the gate and drives the recipe mapping.
   return normalized.startsWith('src/ui/')
     || normalized.startsWith('styles/')
-    || normalized.startsWith('lang/')
     || normalized.endsWith('.svelte')
     || normalized.endsWith('.css');
 }

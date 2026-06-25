@@ -542,7 +542,8 @@ The smoke-harness/S3 workflow below is the recommended way to produce real scree
 
 ### When it applies
 
-The rule applies when a PR changes any file under `src/ui/`, `styles/`, `lang/` (visible UI text), any `*.svelte` file, or any `*.css` file.
+The rule applies when a PR changes any file under `src/ui/`, `styles/`, any `*.svelte` file, or any `*.css` file.
+A `lang/` change (visible UI text) requires screenshots only when the same PR also changes one of those render files.
 
 ### Prerequisites
 
