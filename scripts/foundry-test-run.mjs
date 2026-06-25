@@ -1967,6 +1967,25 @@ async function main() {
               ]
             }
           },
+          // Crafting check with routed outcome tiers, so a check-routed recipe's
+          // result groups can be assigned outcome tiers (`checkOutcomeIds`). The
+          // success-filtered tiers ('Masterwork', 'Standard') feed the recipe
+          // editor's result-routing control AND the Validation tab's routed
+          // readiness warnings (issue 431 PR-2).
+          craftingCheck: {
+            enabled: true,
+            routed: {
+              type: 'relative',
+              rollFormula: '1d20',
+              dc: 12,
+              thresholdMode: 'meet',
+              relativeOutcomes: [
+                { id: 'craft-masterwork', name: 'Masterwork', success: true, breakTools: false, dc: 5 },
+                { id: 'craft-standard', name: 'Standard', success: true, breakTools: false, dc: 0 },
+                { id: 'craft-ruined', name: 'Ruined', success: false, breakTools: true, dc: -5 }
+              ]
+            }
+          },
           // System-level gathering check with named routed outcome tiers, so the
           // Checks tab's gathering editor renders populated when the gathering
           // economy is set to routed for the screenshot (#437).
@@ -2253,6 +2272,46 @@ async function main() {
           ]
         }, { allowIncomplete: true });
 
+        // Check-routed recipe deliberately authored with two routed-readiness gaps so
+        // the Validation tab shows BOTH new warnings (issue 431 PR-2):
+        //  - 'Reject Pile' carries no assigned outcome tier (empty checkOutcomeIds) →
+        //    `unroutedResultGroup` (a result set the check can never route to);
+        //  - the system's 'Masterwork' success tier is produced by no group →
+        //    `unproducedOutcomeTier` (a check outcome that yields nothing).
+        // resultSelection.provider:'check' is what gates the routed warnings on
+        // (routingProvider === 'check'); allowIncomplete keeps the gappy draft savable.
+        const routedReadinessRecipe = await rm.createRecipe({
+          name: 'Routed Check Readiness',
+          description: 'A check-routed recipe with an unrouted result set and an unproduced outcome tier.',
+          craftingSystemId: systemId,
+          img: 'icons/skills/trades/smithing-anvil-silver-red.webp',
+          complex: true,
+          resultSelection: { provider: 'check' },
+          ingredientSets: [{
+            name: 'Stock',
+            ingredientGroups: [{
+              name: 'Iron Ore',
+              options: [{
+                quantity: 1,
+                match: { type: 'component', componentId: componentMap['Iron Ore'] }
+              }]
+            }]
+          }],
+          resultGroups: [
+            {
+              name: 'Standard Output',
+              checkOutcomeIds: ['craft-standard'],
+              results: [{ componentId: componentMap['Iron Sword'], quantity: 1 }]
+            },
+            {
+              // No assigned outcome tier → fires the unroutedResultGroup warning.
+              name: 'Reject Pile',
+              checkOutcomeIds: [],
+              results: [{ componentId: componentMap['Iron Ore'], quantity: 1 }]
+            }
+          ]
+        }, { allowIncomplete: true });
+
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
@@ -2431,7 +2490,7 @@ async function main() {
         return {
           systemId,
           componentMap,
-          recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id],
+          recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id],
           healingPotionRecipeId: recipe2.id,
           sceneIds: [azureGroveScene.id],
           gatheringEnvironmentId: gatheringEnvironment.id,
@@ -2919,9 +2978,22 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-ingredients');
 
-        // Same recipe → Validation tab: capture the validation summary panel.
+        // Return to the recipes browser, then open the check-routed recipe whose
+        // Validation tab carries both routed readiness warnings (issue 431 PR-2). The
+        // Ingredients capture stays on Showcase Requirements above; only this
+        // validation capture is repointed at the check-routed fixture so the published
+        // frame shows the unroutedResultGroup + unproducedOutcomeTier warning chips.
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        // Routed Check Readiness → Validation tab: both new routed warnings render.
+        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Routed Check Readiness") button:has(i.fa-edit)').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-recipe-tab-button="validation"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="validation"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        // Wait on both warning chips so the capture proves the new readiness signals.
+        await page.locator('.fabricate-manager [data-issue="unroutedResultGroup"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-issue="unproducedOutcomeTier"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await assertManagerLayoutStable(page, 'recipe edit validation');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-validation');
