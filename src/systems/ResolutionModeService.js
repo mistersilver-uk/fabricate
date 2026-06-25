@@ -168,11 +168,11 @@ export class ResolutionModeService {
         } else if (!['ingredientSet', 'check'].includes(provider)) {
           errors.push('Invalid result selection provider: ' + provider);
         }
-        // `check` routes by the system crafting-check outcome and therefore
-        // requires crafting checks enabled.
-        if (provider === 'check' && !checkEnabled) {
-          errors.push('check provider requires crafting checks enabled');
-        }
+        // A recipe that routes by the `check` provider is structurally valid
+        // regardless of the system's check configuration. Whether the system has
+        // a usable routed crafting check (a configured `routed.rollFormula`) is a
+        // SYSTEM-level concern surfaced by `systemValidation`, not a per-recipe
+        // validation error.
         if (provider === 'ingredientSet') {
           // Reference integrity: an ingredientSet resultGroupId must point at a
           // real group in the step (the former `mapped` invariant, now canonical).
@@ -248,11 +248,9 @@ export class ResolutionModeService {
       } else if (!['ingredientSet', 'check'].includes(provider)) {
         errors.push('Invalid result selection provider: ' + provider);
       }
-      // `check` routes by the system crafting-check outcome and requires crafting
-      // checks enabled.
-      if (provider === 'check' && !checkEnabled) {
-        errors.push('check provider requires crafting checks enabled');
-      }
+      // The `check` provider is structurally valid regardless of the system's
+      // check configuration; a usable routed crafting check is a system-level
+      // concern surfaced by `systemValidation`, not a per-recipe error.
     }
 
     return {

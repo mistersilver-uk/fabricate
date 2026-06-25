@@ -1388,6 +1388,7 @@ const cleanup = {
   userIds: [],
   sceneIds: [],
   systemId: null,
+  blockedSystemId: null,
   recipeIds: []
 };
 
@@ -1976,7 +1977,13 @@ async function main() {
             enabled: true,
             routed: {
               type: 'relative',
-              rollFormula: '1d20',
+              // `1d20 + 20` (total 21-40) always meets the Masterwork threshold, so the
+              // Phase-E Brew Healing Potion craft deterministically succeeds. Before #431
+              // the routed check was authored-only (never rolled); now that it is engine-
+              // evaluated a bare `1d20` vs dc 12 would fail the craft ~55% of the time
+              // (flaky smoke). The named tiers below are unchanged so the routed-check and
+              // validation-tab captures still render their authored outcomes.
+              rollFormula: '1d20 + 20',
               dc: 12,
               thresholdMode: 'meet',
               relativeOutcomes: [
@@ -2487,8 +2494,84 @@ async function main() {
           behavior => behavior?.type === 'fabricate.interactable'
         ) ?? null;
 
+        // A dedicated system seeded into a deliberately BROKEN state so the GM
+        // system-overview view renders populated rows and the system-blocker
+        // banner shows (issue 429 PR-2). It carries BOTH:
+        //   - a live system-blocker: progressive resolution mode with no
+        //     progressive crafting check configured (blocks:'system'); and
+        //   - an entity-level issue: an incomplete recipe with no result group
+        //     (a recipe readiness issue that surfaces in the overview).
+        const blockedSystem = await csm.createSystem({
+          name: 'Broken Workshop',
+          description: 'A system left in a broken state to demonstrate the system overview and the system-blocker banner.'
+        });
+        const blockedSystemId = blockedSystem.id;
+        // Register one managed component (without a usable difficulty) so the
+        // progressive checks have something to evaluate against.
+        const blockedWorldItem = game.items.contents[0];
+        if (blockedWorldItem) {
+          await csm.addItemFromUuid(blockedSystemId, blockedWorldItem.uuid);
+        }
+        // Progressive mode with NO progressive crafting check → blocks:'system'.
+        // The aggregator's `progressiveNoCheck` blocker only fires when
+        // `checksEnabled` is false, i.e. neither `features.craftingChecks` nor
+        // `craftingCheck.enabled` is set. A freshly-created system normalizes both
+        // to false, but disable the crafting check EXPLICITLY here so the blocker
+        // is guaranteed regardless of any future default change. Gathering is
+        // enabled so the broken system also carries a TASK-kind issue (below) that
+        // deep-links to its owning environment.
+        await csm.updateSystem(blockedSystemId, {
+          resolutionMode: 'progressive',
+          features: { gathering: true, craftingChecks: false },
+          craftingCheck: { enabled: false }
+        });
+        // NOTE: progressive mode with no crafting check rejects recipe creation
+        // ("Progressive mode requires crafting checks enabled"), and a recipe created
+        // before the mode switch would be deleted by the (pre-migration-first)
+        // updateSystem. So the broken system carries no recipe; its overview rows are
+        // the system-level blocker (above) plus the stale gathering task (below) — which
+        // is exactly the populated state both captures need.
+
+        // Seed a gathering library task that will NOT match the environment's
+        // conditions/biome, then create a MANUAL environment that explicitly
+        // includes it. A manually-included-but-non-matching task is classified
+        // `includedButUnavailable`, which surfaces a `staleIncluded` TASK-kind
+        // issue in the overview — exercising the task/event deep-link (which must
+        // resolve to the OWNING environment id, not the task record id).
+        const blockedConfig = game.settings.get('fabricate', 'gatheringConfig') || {};
+        await game.settings.set('fabricate', 'gatheringConfig', {
+          ...blockedConfig,
+          systems: {
+            ...(blockedConfig.systems || {}),
+            [blockedSystemId]: {
+              tasks: [{
+                id: 'broken-stale-task',
+                name: 'Phantom Harvest',
+                description: 'A task that no longer matches its environment.',
+                enabled: true,
+                biomes: ['tundra'],
+                dropRows: []
+              }],
+              events: [],
+              tools: []
+            }
+          }
+        });
+        const blockedEnvironment = await environmentStore.create({
+          craftingSystemId: blockedSystemId,
+          name: 'Forsaken Hollow',
+          description: 'An environment whose only included task no longer matches it.',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'manual',
+          biomes: ['forest'],
+          enabledTaskIds: ['broken-stale-task']
+        });
+
         return {
           systemId,
+          blockedSystemId,
+          blockedEnvironmentId: blockedEnvironment?.id ?? null,
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id],
           healingPotionRecipeId: recipe2.id,
@@ -2509,6 +2592,7 @@ async function main() {
       });
 
       cleanup.systemId = craftingSetup.systemId;
+      cleanup.blockedSystemId = craftingSetup.blockedSystemId;
       cleanup.recipeIds = craftingSetup.recipeIds;
       cleanup.sceneIds = craftingSetup.sceneIds;
       // The interactable Region is embedded in azureGroveScene, so it is cleaned
@@ -2621,8 +2705,8 @@ async function main() {
         let navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
-        if (navLabels.at(0) !== 'System settings') {
-          throw new Error(`Manager default selection should keep System settings first. Saw: ${navLabels.join(', ')}`);
+        if (navLabels.at(0) !== 'System Overview') {
+          throw new Error(`Manager default selection should keep System Overview first. Saw: ${navLabels.join(', ')}`);
         }
         if (await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)}[aria-selected="true"]`).count() === 0) {
           throw new Error('Manager did not select the smoke test system.');
@@ -2647,10 +2731,10 @@ async function main() {
         if (navLabels.includes('Systems')) {
           throw new Error(`Manager selected nav should not expose a Systems tab. Saw: ${navLabels.join(', ')}`);
         }
-        if (navLabels.at(0) !== 'System settings') {
-          throw new Error(`Manager selected nav should keep System settings first. Saw: ${navLabels.join(', ')}`);
+        if (navLabels.at(0) !== 'System Overview') {
+          throw new Error(`Manager selected nav should keep System Overview first. Saw: ${navLabels.join(', ')}`);
         }
-        for (const expected of ['System settings', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
+        for (const expected of ['System Overview', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
           if (!navLabels.includes(expected)) {
             throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
@@ -2714,7 +2798,7 @@ async function main() {
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
-        if (navLabels.at(0) !== 'System settings') {
+        if (navLabels.at(0) !== 'System Overview') {
           throw new Error(`Manager return to library should preserve selected-system nav. Saw nav: ${navLabels.join(', ')}`);
         }
         if (await page.locator('.fabricate-manager .manager-scope-card').count() === 0) {
@@ -2861,7 +2945,7 @@ async function main() {
         await screenshot(page, 'manager-selected-stacked');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("System settings")').first().click();
+        await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-edit]').first().click();
         await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await exerciseManagerSystemEditPointerTargets(page, craftingSetup.systemId);
         if (await page.locator('.fabricate-manager[data-manager-view="system-edit"]').count() === 0) {
@@ -3360,6 +3444,78 @@ async function main() {
         await assertManagerLayoutStable(page, 'tools normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-tools-normal');
+
+        // ── System Overview tabbed page + system-blocker banner (issue 429 PR-2) ─
+        // Select the deliberately-broken "Broken Workshop" system (progressive
+        // mode with no progressive check + an incomplete recipe) and capture:
+        //   (a) the System Overview page's Validation tab showing the kind-grouped
+        //       issue rows and the system-blocker callout; and
+        //   (b) the Settings tab showing the system-blocker banner above identity.
+        // Guarded so a failure records a failed step without aborting the phase.
+        // Returns to the smoke system's library afterwards so it does not leak the
+        // selected system into later phases.
+        try {
+          await setManagerWindowSize(page, { width: 1280, height: 900 });
+          // Return to the system library, then select the broken system.
+          await page.locator('.fabricate-manager .manager-scope-return').first().click();
+          await page.waitForTimeout(400);
+          await page.locator(`${managerSystemRowSelector(craftingSetup.blockedSystemId)} .manager-system-identity`)
+            .first().waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator(`${managerSystemRowSelector(craftingSetup.blockedSystemId)} .manager-system-identity`)
+            .first().click();
+          await page.waitForTimeout(500);
+
+          // (a) System Overview page — open the tabbed system-edit page, then switch
+          // to the Validation tab and wait on the grouped issue rows (not deep leaf
+          // content). The standalone overview route was folded into this tab.
+          await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-edit]').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-system-tab="validation"]').first().click();
+          await page.locator('.fabricate-manager .manager-system-tab-panel [data-system-overview]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-system-overview] [data-overview-issue]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          if (await page.locator('.fabricate-manager [data-system-overview-blocker]').count() === 0) {
+            throw new Error('System overview validation tab did not render the system-blocker callout for the broken system.');
+          }
+          // The seeded stale-task fixture must surface a TASK-kind row whose
+          // deep-link button resolves to the owning environment (the UX-defect fix).
+          const taskRow = page.locator('.fabricate-manager [data-system-overview] [data-overview-kind="task"]').first();
+          await taskRow.waitFor({ state: 'visible', timeout: 5_000 });
+          if (await taskRow.locator('[data-overview-link="task"]').count() === 0) {
+            throw new Error('System overview task row is missing its environment deep-link button.');
+          }
+          // The validation tab is a kind-grouped LIST view (`.manager-system-overview-row`),
+          // not a table — assertManagerLayoutStable requires a table-row/edit-form
+          // selector and would throw "no table rows" here (as the gathering Settings
+          // form capture also skips it). The explicit issue-row + task-row waits above
+          // already prove the view is populated; assertNoScreenshotOverlays guards bleed.
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-system-overview');
+
+          // (b) Settings tab — wait on the blocker banner above the identity card.
+          await page.locator('.fabricate-manager [data-system-tab="settings"]').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-system-edit-blocker]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertManagerLayoutStable(page, 'system edit blocked');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-system-edit-blocked');
+
+          results.steps.push({ step: 'system-overview-and-banner', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'system-overview-and-banner', passed: false, error: err.message });
+          process.stderr.write(`System overview capture failed: ${err.message}\n`);
+        } finally {
+          // Return to the smoke system so later phases see the expected selection.
+          await page.locator('.fabricate-manager .manager-scope-return').first().click().catch(() => {});
+          await page.waitForTimeout(300);
+          await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`)
+            .first().click().catch(() => {});
+          await page.waitForTimeout(400);
+        }
 
         // ── Canvas interactable config panel (#302) ────────────────────────────
         // Open the GM config panel for the seeded `fabricate.interactable` Region
@@ -4125,6 +4281,18 @@ async function main() {
           const csm = game.fabricate?.getCraftingSystemManager?.();
           if (csm) {
             try { await csm.deleteSystem(cleanupData.systemId); } catch { /* already deleted */ }
+          }
+        }
+
+        // Delete the dedicated broken system seeded for the overview/banner captures
+        // (and its gathering environment via the environment store).
+        if (cleanupData.blockedSystemId) {
+          const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
+          try { await environmentStore?.cleanupByCraftingSystem?.(cleanupData.blockedSystemId); } catch { /* ok */ }
+
+          const csm = game.fabricate?.getCraftingSystemManager?.();
+          if (csm) {
+            try { await csm.deleteSystem(cleanupData.blockedSystemId); } catch { /* already deleted */ }
           }
         }
 

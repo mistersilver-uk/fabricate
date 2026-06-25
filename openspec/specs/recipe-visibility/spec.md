@@ -73,9 +73,18 @@ The matching rules above are unchanged; UI rendering specifics defer to `ui-inte
 A crafting system is evaluated for system-level validity by the derived
 system-validation report (see `data-models`).
 A report whose `blocksSystem === true` means the system is structurally unusable
-(for example a routed check-mode system with no crafting check, a progressive
-system with no progressive check, multi-step recipes left on in alchemy mode, or
-an alchemy ingredient-signature collision).
+(for example a routed system with no crafting check roll formula while a recipe
+routes by the `check` provider, a progressive system with no progressive check,
+multi-step recipes left on in alchemy mode, or an alchemy ingredient-signature
+collision).
+
+A routed system with no configured crafting check roll formula
+(`craftingCheck.routed.rollFormula`) always surfaces a `routedCheckNoFormula`
+overview issue, keyed only off the missing formula.
+It is a non-blocking warning (`severity: 'warning'`, no `blocks` field) while no
+recipe routes by the `check` provider, and escalates to a system-blocker
+(`severity: 'critical', blocks: 'system'`) once any recipe does, so the warning
+never sets `blocksSystem` and only the blocker variant hides the system.
 
 The gate is two-tier and computed — it never mutates any entity's stored
 `enabled` flag, so it auto-restores the moment the underlying gap is fixed:

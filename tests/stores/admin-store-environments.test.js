@@ -1514,4 +1514,65 @@ describe('adminStore gathering library match-loss handling', () => {
 
     assert.equal(services._notify.warn.length, 0);
   });
+
+  // Regression guard for the "Broken Workshop" smoke fixture (issue 429 PR-2):
+  // the GM system-overview view must render populated rows for a system seeded
+  // with BOTH a live system-blocker AND a task-kind issue. This mirrors the smoke
+  // config exactly so the screenshot capture cannot silently go empty:
+  //   - progressive resolution mode with the crafting check DISABLED and no
+  //     progressive rollFormula → a `progressiveNoCheck` system-blocker; and
+  //   - a manual environment that explicitly includes a non-matching library task
+  //     (biome mismatch) → an `includedButUnavailable` record → a `staleIncluded`
+  //     task-kind issue that deep-links to the owning environment.
+  it('builds a populated system-validation report for the broken-system fixture', async () => {
+    const brokenGatheringConfig = {
+      systems: {
+        'system-a': {
+          tasks: [{ id: 'broken-stale-task', name: 'Phantom Harvest', description: 'x', enabled: true, biomes: ['tundra'], regions: [], dropRows: [] }],
+          events: []
+        }
+      }
+    };
+    const services = createServices({
+      systems: [makeSystem({
+        id: 'system-a',
+        name: 'Broken Workshop',
+        resolutionMode: 'progressive',
+        features: { gathering: true },
+        // The crafting check is disabled and there is no progressive rollFormula,
+        // so `checksEnabled` is false and `progressiveNoCheck` fires (this is the
+        // default a freshly-created system normalizes to).
+        craftingCheck: { enabled: false, mode: 'passFail', macroUuid: null, outcomes: [], progressive: { rollFormula: '' } }
+      })],
+      environments: [makeEnvironment({
+        id: 'forsaken-hollow',
+        name: 'Forsaken Hollow',
+        compositionMode: 'manual',
+        biomes: ['forest'],
+        enabledTaskIds: ['broken-stale-task'],
+        // No inline tasks: composition reads the library task from gatheringConfig.
+        tasks: []
+      })],
+      gatheringConfig: brokenGatheringConfig
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+
+    const report = get(store.viewState).systemValidation;
+    assert.ok(report, 'a system-validation report is published on the view state');
+
+    const systemBlocker = report.issues.find(issue => issue.blocks === 'system');
+    assert.ok(systemBlocker, 'the report carries at least one system-blocker issue');
+    assert.equal(systemBlocker.kind, 'system');
+    assert.equal(systemBlocker.code, 'progressiveNoCheck');
+    assert.equal(report.blocksSystem, true, 'blocksSystem is set for the broken system');
+
+    const taskIssue = report.issues.find(issue => issue.kind === 'task');
+    assert.ok(taskIssue, 'the report carries a task-kind issue from the stale environment record');
+    assert.equal(taskIssue.code, 'staleIncluded');
+    // The deep-link must resolve to the OWNING environment id (not the task record id).
+    assert.equal(taskIssue.environmentId, 'forsaken-hollow', 'the task issue carries the owning environment id');
+    assert.equal(taskIssue.entityId, 'broken-stale-task', 'the task issue keeps the record id for identity');
+  });
 });
