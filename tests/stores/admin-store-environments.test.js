@@ -171,8 +171,7 @@ function createServices({
   gatheringConfig = {},
   updateError = null,
   confirmResult = true,
-  sceneOptions = [],
-  rollTableOptions = []
+  sceneOptions = []
 } = {}) {
   const settings = { lastManagedCraftingSystem: '', gatheringConfig };
   const listCalls = [];
@@ -286,7 +285,6 @@ function createServices({
     getGatheringEnvironmentStore: () => gatheringEnvironmentStore,
     getScriptMacros: () => [],
     getSceneOptions: () => sceneOptions,
-    getRollTableOptions: () => rollTableOptions,
     notify: {
       info: (msg) => { notifyCalls.info.push(msg); },
       warn: (msg) => { notifyCalls.warn.push(msg); },
@@ -340,14 +338,12 @@ function createServices({
 }
 
 describe('adminStore gathering environments tab state', () => {
-  it('injects scene and roll-table picker options into the selected system view state', async () => {
+  it('injects scene picker options into the selected system view state', async () => {
     const sceneOptions = [{ uuid: 'Scene.forest', name: 'Forest', img: 'forest.webp' }];
-    const rollTableOptions = [{ uuid: 'RollTable.forage', name: 'Forage Table', img: 'icons/svg/d20-grey.svg' }];
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [makeEnvironment()],
-      sceneOptions,
-      rollTableOptions
+      sceneOptions
     });
     const store = createAdminStore(services);
 
@@ -355,7 +351,6 @@ describe('adminStore gathering environments tab state', () => {
 
     const selectedSystem = get(store.viewState).selectedSystem;
     assert.deepEqual(selectedSystem.sceneOptions, sceneOptions);
-    assert.deepEqual(selectedSystem.rollTableOptions, rollTableOptions);
   });
 
   it('exposes canShowEnvironmentsTab only when the selected system enables gathering', async () => {

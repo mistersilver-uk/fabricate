@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
 
 const viewer = { id: 'user-1', isGM: false };
 const gmViewer = { id: 'gm-1', isGM: true };
@@ -12,8 +13,14 @@ const actor = {
   items: []
 };
 
+// A gathering system with no routed roll formula: routed tasks under it are
+// misconfigured (validation requires the system-level gathering check formula).
+function systemWithoutRoutedCheck() {
+  return { id: 'system-a', enabled: true, features: { gathering: true }, components: [] };
+}
+
 function makeEngine({
-  systems = [{ id: 'system-a', enabled: true, features: { gathering: true }, components: [] }],
+  systems = [{ id: 'system-a', enabled: true, features: { gathering: true }, components: [], gatheringCraftingCheck: routedSystemCheck() }],
   environments = [environment()],
   selectableActors = [actor],
   paused = false,
@@ -25,7 +32,6 @@ function makeEngine({
   validation = null,
   waitingRunResult = null,
   waitingRunError = null,
-  routedOutcome = null,
   progressiveOutcome = null,
   createdResults = [],
   usedTools = [],
@@ -41,7 +47,6 @@ function makeEngine({
   calls.validate = [];
   calls.createTerminalRun = [];
   calls.createWaitingRun = [];
-  calls.resolveRouted = [];
   calls.resolveProgressive = [];
   calls.evaluateCheck = [];
   calls.createResults = [];
@@ -119,15 +124,6 @@ function makeEngine({
       }
     },
     resultResolver: {
-      resolveRouted: async (payload) => {
-        calls.steps.push('resolveRouted');
-        calls.resolveRouted.push(payload);
-        return routedOutcome ?? {
-          status: 'succeeded',
-          resultGroups: [payload.task.resultGroups[0]],
-          checkResult: { outcome: payload.task.resultGroups[0]?.name ?? 'success' }
-        };
-      },
       resolveProgressive: async (payload) => {
         calls.steps.push('resolveProgressive');
         calls.resolveProgressive.push(payload);
@@ -195,7 +191,6 @@ function task(overrides = {}) {
     resolutionMode: 'routed',
     toolIds: [],
     resultGroups: [{ id: 'group-a', name: 'Iron', results: [] }],
-    resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.outcome' },
     ...overrides
   };
 }
@@ -228,12 +223,18 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
     calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a'
-  });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a'
+    });
+  } finally {
+    delete globalThis.Roll;
+  }
 
   assert.equal(result.accepted, true);
   assert.equal(result.started, true);
@@ -254,12 +255,10 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
     taskId: 'task-a'
   });
   assert.equal(calls.createTerminalRun[0][2], 'succeeded');
-  assert.deepEqual(calls.createTerminalRun[0][3], {
-    createdResults: [],
-    usedTools: [],
-    usedTools: [],
-    checkResult: { outcome: 'Iron' }
-  });
+  assert.deepEqual(calls.createTerminalRun[0][3].createdResults, []);
+  assert.deepEqual(calls.createTerminalRun[0][3].usedTools, []);
+  assert.equal(calls.createTerminalRun[0][3].checkResult.outcome, 'Iron');
+  assert.equal(calls.createTerminalRun[0][3].checkResult.success, true);
   assert.deepEqual(calls.createWaitingRun, []);
 });
 
@@ -340,8 +339,7 @@ test('startAttempt accepts selected valid targeted task when an unrelated task i
   const validTask = task({ id: 'valid-task', name: 'Gather Iron' });
   const invalidTask = task({
     id: 'invalid-task',
-    name: 'Broken Gold Route',
-    resultSelection: { provider: 'macroOutcome' }
+    name: 'Broken Gold Route'
   });
   const engine = makeEngine({
     environments: [environment({ tasks: [validTask, invalidTask] })],
@@ -349,12 +347,18 @@ test('startAttempt accepts selected valid targeted task when an unrelated task i
     calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'valid-task'
-  });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'valid-task'
+    });
+  } finally {
+    delete globalThis.Roll;
+  }
 
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'succeeded');
@@ -702,8 +706,8 @@ test('startAttempt rejects timed task with missing tools before waiting run crea
 test('startAttempt rejects task misconfiguration after tools but before run writes', async () => {
   const calls = {};
   const engine = makeEngine({
-    environments: [environment({ tasks: [task({ resultSelection: { provider: 'macroOutcome' } })] })],
-    validation: { valid: false, errors: ['routed task requires a macroUuid'] },
+    // No system routed roll formula → the routed task is misconfigured.
+    systems: [systemWithoutRoutedCheck()],
     calls
   });
 
@@ -711,7 +715,7 @@ test('startAttempt rejects task misconfiguration after tools but before run writ
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
-  assert.deepEqual(result.blockedReasons[0].data.errors, ['Routed macro outcome gathering task requires a macro UUID']);
+  assert.deepEqual(result.blockedReasons[0].data.errors, ['Routed gathering task requires a system-level gathering check roll formula']);
   assert.deepEqual(calls.validate, []);
   assertNoRunMutation(calls);
 });
@@ -719,10 +723,10 @@ test('startAttempt rejects task misconfiguration after tools but before run writ
 test('startAttempt rejects timed task misconfiguration before waiting run creation', async () => {
   const calls = {};
   const engine = makeEngine({
+    systems: [systemWithoutRoutedCheck()],
     environments: [environment({
       tasks: [task({
         id: 'timed-task',
-        resultSelection: { provider: 'macroOutcome' },
         timeRequirement: { hours: 1 }
       })]
     })],
@@ -859,10 +863,11 @@ test('non-GM blind misconfigured start response does not expose task identity, t
   const blindTask = task({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    toolIds: ['tool-sickle'],
-    resultSelection: { provider: 'macroOutcome' }
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
+    // No system routed roll formula → the routed task is misconfigured.
+    systems: [systemWithoutRoutedCheck()],
     environments: [environment({
       selectionMode: 'blind',
       rules: { blindCandidateGate: 'allMatching' },
@@ -1088,7 +1093,13 @@ test('blind reveal policy onAttempt reveals the resolved task on success', async
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
   });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.state, 'succeeded');
   // The blind response stays opaque, but the reveal records the real task id.
   assert.equal(result.taskId, null);
@@ -1103,11 +1114,16 @@ test('blind reveal policy onSuccess does not reveal a failed attempt', async () 
       rules: { revealPolicy: 'onSuccess' },
       tasks: [ironTask({ id: 'reveal-task' })]
     })],
-    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
-    routedOutcome: { status: 'failed', resultGroups: [], checkResult: { outcome: 'fail' } }
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } }
   });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  let result;
+  routedRoll(false); // miss the success tier → routed failure
+  try {
+    result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.state, 'failed');
   assert.deepEqual(captured, []);
 });
@@ -1123,7 +1139,13 @@ test('blind reveal policy never (default) does not reveal', async () => {
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
   });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.state, 'succeeded');
   assert.deepEqual(captured, []);
 });
@@ -1139,6 +1161,11 @@ test('targeted mode never auto-reveals even when the system policy would reveal'
     richState: { revealTask: async (_actor, payload) => { targetedCaptured.push(payload); } },
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
   });
-  await targetedEngine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'targeted-task' });
+  routedRoll(true);
+  try {
+    await targetedEngine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'targeted-task' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.deepEqual(targetedCaptured, []);
 });

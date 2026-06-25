@@ -31,7 +31,7 @@ One of "simple", "routed", or "progressive".
 Returns the result-selection provider for a routed recipe.
 
 **Returns:** `string`.
-One of "ingredientSet", "macroOutcome", or "rollTableOutcome", or `null` for non-routed recipes.
+One of "ingredientSet" or "check", or `null` for non-routed recipes.
 
 ### validateRecipe(recipe)
 
@@ -55,10 +55,9 @@ Hooks.once('fabricate.ready', () => {
 |:-----|:------|
 | Simple | Exactly 1 ingredient set, exactly 1 result group |
 | Routed (`ingredientSet`) | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid, result group names are unique (case-insensitive) and do not use reserved keywords |
-| Routed (`macroOutcome`) | 1+ ingredient sets, 1+ result groups, checks enabled, `resultSelection.macroUuid` present or system fallback set, result group names are unique and do not use reserved keywords |
-| Routed (`rollTableOutcome`) | 1+ ingredient sets, 1+ result groups, `resultSelection.rollTableUuid` present, result group names are unique and do not use reserved keywords |
+| Routed (`check`) | 1+ ingredient sets, 1+ result groups, checks enabled on the system, result group names are unique and do not use reserved keywords |
 
-The unique-name and reserved-keyword rules apply under every routed provider, not just `macroOutcome` and `rollTableOutcome`.
+The unique-name and reserved-keyword rules apply under every routed provider, not just `check`.
 Reserved keywords cover three families.
 The fail family is `fail`, `failed`, `failure`, `f`.
 The hazard family is `hazard`, `danger`, `complication`, `trap`, `oops`, and it also routes a check outcome to the failure path.

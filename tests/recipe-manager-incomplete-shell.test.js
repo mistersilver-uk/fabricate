@@ -472,7 +472,6 @@ function makeStoreServices(recipeManager) {
     getRecipeManager: () => recipeManager,
     getScriptMacros: () => [],
     getSceneOptions: () => [],
-    getRollTableOptions: () => [],
     notify: {
       info: () => {},
       warn: () => {},

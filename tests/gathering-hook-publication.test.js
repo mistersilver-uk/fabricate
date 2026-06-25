@@ -5,6 +5,7 @@ import { GatheringHookPublisher } from '../src/systems/GatheringHookPublisher.js
 import { GATHERING_HOOKS } from '../src/config/hooks.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
+import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
 
 function recordingHooks() {
   const calls = [];
@@ -371,7 +372,6 @@ function timedEnvironment() {
         resultGroups: [
           { id: 'group-a', name: 'Iron', results: [{ id: 'r-a', componentId: 'comp-a', quantity: 2 }] },
         ],
-        resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.outcome' },
       },
     ],
   };
@@ -380,7 +380,13 @@ function timedEnvironment() {
 function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM }) {
   const environments = [timedEnvironment()];
   const systems = [
-    { id: 'system-a', enabled: true, features: { gathering: true }, components: [{ id: 'comp-a' }] },
+    {
+      id: 'system-a',
+      enabled: true,
+      features: { gathering: true },
+      components: [{ id: 'comp-a' }],
+      gatheringCraftingCheck: routedSystemCheck(),
+    },
   ];
   return new GatheringEngine({
     environmentStore: {
@@ -400,13 +406,6 @@ function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM })
     },
     sceneAccess: { canAttempt: () => ({ allowed: true }) },
     toolAvailability: { check: () => ({ available: true, missing: [], failedRequirements: [] }) },
-    resultResolver: {
-      resolveRouted: async (payload) => ({
-        status: 'succeeded',
-        resultGroups: [payload.task.resultGroups[0]],
-        checkResult: { outcome: payload.task.resultGroups[0].name, provider: payload.provider },
-      }),
-    },
     resultCreator: {
       plan: async () => [{ actorUuid: timedActor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
       create: async () => [{ actorUuid: timedActor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
@@ -443,8 +442,13 @@ async function runMaturedTimedAttempt({ isPrimaryGM }) {
     isPrimaryGM,
   });
 
-  const result = await engine.processWorldTime(state.worldTime);
-  return { hooks, result };
+  routedRoll(true); // pass the routed dc 15 → 'Iron' tier routes to the matching group
+  try {
+    const result = await engine.processWorldTime(state.worldTime);
+    return { hooks, result };
+  } finally {
+    delete globalThis.Roll;
+  }
 }
 
 test('processWorldTime publishes the completion hook with initiatedBy: timed on the primary GM', async () => {

@@ -1334,7 +1334,7 @@ const MythwrightDnd5eBootstrap = (() => {
       system: 'dnd5e',
       tags: [],
       enabled: true,
-      resultSelection: { provider: 'macroOutcome' },
+      resultSelection: { provider: 'check' },
       steps: [
         {
           id: `${recipeId}-refine`,
@@ -1361,7 +1361,7 @@ const MythwrightDnd5eBootstrap = (() => {
           id: `${recipeId}-finish`,
           name: 'Finish Quality',
           ingredientSets: [ingredientSet(`${recipeId}-finish-set`, [baseId, 'artisan-catalyst'])],
-          resultSelection: { provider: 'macroOutcome' },
+          resultSelection: { provider: 'check' },
           resultGroups: MUNDANE_QUALITY.map(quality => resultGroup(
             quality.toLowerCase(),
             quality,
@@ -1383,7 +1383,7 @@ const MythwrightDnd5eBootstrap = (() => {
       system: 'dnd5e',
       tags: [],
       enabled: true,
-      resultSelection: { provider: 'macroOutcome' },
+      resultSelection: { provider: 'check' },
       steps: [
         {
           id: `${relicId}-gather`,
@@ -1396,7 +1396,7 @@ const MythwrightDnd5eBootstrap = (() => {
           id: `${relicId}-finish`,
           name: 'Awaken Relic',
           ingredientSets: [ingredientSet(`${relicId}-finish-set`, ['mythic-catalyst', 'dragon-scale'], null, { [essenceId]: 2 })],
-          resultSelection: { provider: 'macroOutcome' },
+          resultSelection: { provider: 'check' },
           resultGroups: RELIC_QUALITY.map(quality => resultGroup(quality.toLowerCase(), quality, relicId))
         }
       ]
@@ -1418,14 +1418,14 @@ const MythwrightDnd5eBootstrap = (() => {
       tags: [],
       enabled: true,
       transferEffects: true,
-      resultSelection: { provider: 'macroOutcome' },
+      resultSelection: { provider: 'check' },
       steps: [{
         id: `${recipeId}-finish`,
         name: 'Elemental Finish',
         ingredientSets: [
           ingredientSet(`${recipeId}-finish-set`, [baseComponentId, 'artisan-catalyst'], null, { [definition.essenceId]: 1 })
         ],
-        resultSelection: { provider: 'macroOutcome' },
+        resultSelection: { provider: 'check' },
         resultGroups: qualityDefinitions.map(variant => resultGroup(variant.quality.id, variant.quality.name, variant.id))
       }]
     };
@@ -1651,7 +1651,7 @@ try {
 } catch (err) {
   console.warn('Mythwright | Falling back to Standard outcome', err);
 }
-if (!finalStep) return { success: true, outcome: 'standard', value: total, data: { provider: 'macroOutcome' } };
+if (!finalStep) return { success: true, outcome: 'standard', value: total, data: { provider: 'check' } };
 if (total <= 1) return { success: false, outcome: 'fail', value: total, message: 'Catastrophic failure', data: {} };
 if (total < 8) return { success: true, outcome: 'flawed', value: total, data: {} };
 if (total < 14) return { success: true, outcome: 'standard', value: total, data: {} };

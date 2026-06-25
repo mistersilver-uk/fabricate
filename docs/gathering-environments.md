@@ -274,7 +274,6 @@ The task editor lets you set:
 |:-----|:-------------|
 | Task basics | Name, description, image, whether it is enabled, and how it is resolved |
 | Visibility gate | Turn task visibility on or off, then set its formula and required threshold |
-| Routed result selection | Choose a macro or a roll table to decide which result group is awarded |
 | Progressive checks | Choose the award mode plus the check formula and an optional threshold |
 | Time requirement | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years |
 | Failure outcome | Leave clear for Fabricate's default failure feedback, or set custom text or a macro |
@@ -287,10 +286,8 @@ Result rows do not store their own difficulty.
 
 New environments start as disabled drafts.
 Library-backed automatic environments can be set up without a placeholder task.
-A placeholder task can be saved while it is disabled, even when its macro, roll table, or progressive check formula is still blank.
+A placeholder task can be saved while it is disabled, even when its progressive check formula is still blank.
 Once a task is enabled, saving requires complete configuration for the way it is resolved.
-
-If a saved macro is no longer present in your world, the editor keeps it shown as the selected value, warns that it is missing, and preserves it until the GM changes the field.
 
 Task images can be typed directly or chosen with Foundry's image file picker when it is available.
 Cancelling the picker leaves the current path unchanged.
@@ -311,17 +308,17 @@ Clearing visibility removes the gate only when the task already had one saved.
 
 ## Routed Result Selection
 
-Routed gathering tasks use either a macro or a roll table to choose which result group is awarded.
+Routed gathering tasks do not carry their own result-selection setting.
+They are resolved by the system's gathering check, which you configure once for the whole system.
+When a routed task is attempted, the gathering check rolls and produces a named outcome.
+That outcome name is matched to a result group by name, and the matching group is awarded.
 
-| Source | What you choose | Notes |
-|:-------|:----------------|:------|
-| Macro | A Foundry script macro | The macro's outcome is matched to a result group by name. |
-| Roll table | A Foundry roll table | The drawn result is matched to a result group by name. |
+A few outcome names are reserved and take the failure path instead of awarding a group.
+Because the match is by name, give each result group a name that lines up with one of your gathering check's outcomes.
+Names are matched ignoring upper and lower case and surrounding spaces, so each result group needs a name that is unique once case is ignored.
 
-Switching between a macro and a roll table keeps only the choice you are currently using, so it does not hold on to the other one.
-
-The roll table field offers a picker populated from your world's roll tables, and you can also paste a reference by hand.
-If a saved roll table is no longer in the list, the editor shows a missing-reference warning and preserves the value until the GM clears or replaces it.
+If the outcome is a success but matches none of your result groups, the attempt fails and no group is awarded.
+A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 
 ## Progressive Checks
 
@@ -488,11 +485,10 @@ Summary entries that point at a field are clickable and jump back to it.
 
 Some errors point at a whole list rather than a single field, such as the result groups, a specific group's name, a group's results, or an individual result row.
 
-Disabled tasks skip the macro, roll table, and progressive completeness checks, so a placeholder task can be saved while a GM is still authoring it.
+Disabled tasks skip the progressive completeness checks, so a placeholder task can be saved while a GM is still authoring it.
 Enabled tasks must be fully configured:
 
-- A macro-routed task needs a macro.
-- A roll-table-routed task needs a roll table.
+- A routed task needs the system to have a gathering check formula configured.
 - A progressive task needs an award mode and a check formula. The threshold is optional.
 
 A custom failure outcome is validated whether or not the task is enabled.

@@ -46,17 +46,17 @@ This guide covers common issues GMs and players encounter when setting up or usi
 ### Crafting Check Macro Not Running
 
 **Symptom:** The crafting check macro never fires.
-Recipes resolve immediately with no skill check, even though the Routed mode (with the macro-outcome option) or Progressive mode is configured.
+Recipes resolve immediately with no skill check, even though the Routed mode (with the skill-check outcome option) or Progressive mode is configured.
 
 **Likely causes:**
 
 - The crafting check is turned off and no macro is set.
   When both are absent, the check is skipped entirely.
 - The configured macro has been deleted or no longer exists.
-- The resolution mode is Simple, or Routed with the ingredient-set or roll-table option.
+- The resolution mode is Simple, or Routed with the ingredient-choice option.
   In these configurations a crafting check is **optional**.
   The check runs if configured but is not required for success.
-- The macro returns something the current mode does not understand (for example, no named outcome for the macro-outcome option, or a missing numeric value for Progressive mode).
+- The check returns something the current mode does not understand (for example, no named outcome for the skill-check outcome option, or a missing numeric value for Progressive mode).
 
 **Step-by-step checks:**
 
@@ -65,11 +65,11 @@ Recipes resolve immediately with no skill check, even though the Routed mode (wi
 2. Is a macro selected?
    Open Foundry's macro directory and confirm that macro still exists.
 3. Check the system's **Resolution Mode**.
-   If the resolution mode is **Routed** with the macro-outcome option, or **Progressive**, a crafting check is required.
+   If the resolution mode is **Routed** with the skill-check outcome option, or **Progressive**, a crafting check is required.
    Fabricate reports a validation error if one is missing.
-   For **Simple** mode or Routed with the ingredient-set or roll-table options, the check is optional and simply does not run if unconfigured.
+   For **Simple** mode or Routed with the ingredient-choice option, the check is optional and simply does not run if unconfigured.
 4. Attempt a craft and watch for any error or warning notifications from Fabricate about the macro.
-5. If a developer set up a custom macro, confirm it returns the result the current mode expects (a named outcome for the macro-outcome option, or a numeric value for Progressive mode). See the API reference for the expected setup.
+5. If a developer set up a custom macro, confirm it returns the result the current mode expects (a named outcome for the skill-check outcome option, or a numeric value for Progressive mode). See the API reference for the expected setup.
 
 **See also:** [Crafting Checks]({% link crafting-checks.md %}) for crafting check configuration.
 

@@ -648,14 +648,10 @@ GatheringTask = {
   encounterHooks?: GatheringEncounterHook[],
 
   // Used by both routed and progressive modes.
+  // Routed resolution routes a system-check outcome tier to the result group
+  // whose name matches that tier (see the routed-resolution requirement below);
+  // a routed task carries no per-task result-selection provider.
   resultGroups: ResultGroup[],
-
-  // Present only when resolutionMode === "routed".
-  resultSelection?: {
-    provider: "macroOutcome" | "rollTableOutcome",
-    macroUuid?: string,
-    rollTableUuid?: string,
-  },
 
   // Present only when resolutionMode === "progressive".
   progressive?: {
@@ -990,8 +986,11 @@ GatheringCheck = {
 1. `resolutionMode === "progressive"` requires `check`.
 2. A configured `check` requires `formula`; `threshold` is optional.
 3. Progressive checks must resolve to a numeric value and may additionally carry a terminal status (`success` or `failure`).
-4. Routed tasks using `macroOutcome` do not require `check`; the macro outcome provider resolves the result directly.
-5. Routed tasks using `rollTableOutcome` do not require `check` unless a future implementation adds an extra pre-roll check layer.
+4. Routed tasks resolve through the system-level routed gathering check
+   (`system.gatheringCraftingCheck.routed.rollFormula`); they carry no per-task
+   result-selection provider.
+5. A routed task with no system routed `rollFormula` is misconfigured and reports
+   a GM-fix-required diagnostic rather than resolving.
 6. A check result with a numeric value and no terminal status is neutral. The runtime must use the value for progressive award evaluation and must not treat the result as success or failure by itself.
 7. Check evaluator diagnostics for missing required fields or malformed return values are GM-fix-required diagnostics, not terminal player failure outcomes.
 8. The check is formula-only: there is no provider discriminator and no macro support on this surface.
@@ -1206,10 +1205,11 @@ A Gathering Task may be placed on the Foundry canvas as a **Scene Region** carry
 
 Resolve exactly one result group, or a special outcome, without ingredients.
 
-### Supported Providers
+### Provider
 
-- `macroOutcome`
-- `rollTableOutcome`
+Routed gathering resolves exclusively through the system-level gathering check.
+A routed task carries no per-task result-selection provider; resolution rolls the
+system routed check formula and routes its outcome tier to a result group by name.
 
 ### Semantics
 
@@ -1219,27 +1219,27 @@ Resolve exactly one result group, or a special outcome, without ingredients.
   - failure
 - `ingredientSet` routing is invalid for gathering.
 
-### Provider: `macroOutcome`
+### System routed check resolution
 
-- `resultSelection.macroUuid` is required.
-- The macro returns `{ success, outcome, description? }`.
-- `outcome` is trim-normalized and case-insensitive.
-- Resolution rules:
-  1. If `outcome` is a reserved failure keyword, take failure path.
-  2. Otherwise `outcome` must match exactly one `ResultGroup.name` under the same normalization.
-  3. If no match exists, abort with a gathering-task misconfiguration error.
+The system routed gathering check
+(`system.gatheringCraftingCheck.routed.rollFormula`, with the routed check's
+threshold/outcome-tier configuration) drives resolution:
 
-### Provider: `rollTableOutcome`
-
-- `resultSelection.rollTableUuid` is required.
-- The table is drawn exactly once per attempt.
-- The drawn result name is trim-normalized and case-insensitive.
-- Resolution uses the same reserved failure keyword and `ResultGroup.name` matching rules as `macroOutcome`.
-- If no result-group match exists and no special keyword applies, abort with a gathering-task misconfiguration error.
+1. Roll the routed `rollFormula` against the effective DC — the task's
+   `dcOverride` when finite, otherwise the routed check's own `dc` (default 15).
+2. The roll yields a named outcome tier and a success disposition.
+3. A failing tier, or no tier name, takes the failure path.
+4. A succeeding tier name must match exactly one `ResultGroup.name` under
+   trim-normalized, case-insensitive comparison; the matched group is awarded.
+5. If a succeeding tier name matches no result group, the attempt resolves to a
+   terminal failure (no group is awarded).
+6. A routed task with no system routed `rollFormula` reports a GM-fix-required
+   misconfiguration diagnostic and does not resolve.
 
 ### Reserved Keywords
 
-Reserved failure keywords:
+Reserved failure keywords (an outcome tier name in this set takes the failure
+path, and a `ResultGroup.name` may not collide with any of them):
 
 - `f`
 - `fail`
@@ -1260,11 +1260,10 @@ Reserved failure keywords:
 
 ### Validation
 
-1. `resultSelection.provider` must be `"macroOutcome"` or `"rollTableOutcome"`.
-2. Provider-specific required fields must be present.
-3. `resultGroups` must contain at least one entry.
-4. `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison.
-5. `ResultGroup.name` may not collide with any reserved failure keyword.
+1. The selected system must configure a routed gathering check `rollFormula`.
+2. `resultGroups` must contain at least one entry.
+3. `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison.
+4. `ResultGroup.name` may not collide with any reserved failure keyword.
 
 ## Progressive Task Resolution
 
@@ -1361,7 +1360,7 @@ There is no multi-step gathering state in this phase.
    - do not apply tool usage/breakage,
    - do not create result items.
 
-Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed tool side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell; automatic composition can use matching library-backed Gathering Tasks without creating or requiring an inline placeholder Environment Task. Legacy inline task drafts may still use disabled placeholders for validation compatibility, and those shells are not configured player-visible gathering paths until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/tool/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task tool-reference (`toolIds`) authoring, selected-task visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Tool authoring references existing per-system library Tools by id (`toolIds`); inline Tool authoring on tasks is not supported (the per-system library is the single source of truth). Visibility authoring is formula-only: it supports enable/clear plus a `formula` and `threshold` field, with incomplete input kept local until both fields are available for a valid draft mutation. Routed result-selection authoring supports `macroOutcome.macroUuid` from available script macro options and `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus a formula-only `check` with an optional threshold. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with failure-outcome `mode` switching (`text`/`macro`) and routed result-selection `provider` switching each clearing stale fields from the prior selection. Task/result/tool/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
+Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed tool side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell; automatic composition can use matching library-backed Gathering Tasks without creating or requiring an inline placeholder Environment Task. Legacy inline task drafts may still use disabled placeholders for validation compatibility, and those shells are not configured player-visible gathering paths until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/tool/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task tool-reference (`toolIds`) authoring, selected-task visibility-gate authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Tool authoring references existing per-system library Tools by id (`toolIds`); inline Tool authoring on tasks is not supported (the per-system library is the single source of truth). Visibility authoring is formula-only: it supports enable/clear plus a `formula` and `threshold` field, with incomplete input kept local until both fields are available for a valid draft mutation. Routed gathering carries no per-task result-selection authoring; routed tasks resolve through the system-level gathering check formula. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus a formula-only `check` with an optional threshold. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with failure-outcome `mode` switching (`text`/`macro`) clearing stale fields from the prior selection. Task/result/tool/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 
 ### Completion Flow
 

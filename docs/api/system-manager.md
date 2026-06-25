@@ -102,10 +102,10 @@ The returned system object also includes the following top-level salvage fields,
 | `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Apply salvage tool breakage even when the check fails (field name retained for backward compatibility, governs Tools) |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"` |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
-| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed macroOutcome routing |
+| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing |
 
 The `craftingCheck` field is always present on the returned system object.
-It controls how skill/ability checks gate recipe outcomes in routed macroOutcome and progressive modes.
+It controls how skill/ability checks gate recipe outcomes in routed check and progressive modes.
 
 `craftingCheck` shape:
 
@@ -124,7 +124,7 @@ It controls how skill/ability checks gate recipe outcomes in routed macroOutcome
 | `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Apply tool breakage when the check fails (field name retained for backward compatibility, governs Tools). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
-| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed macroOutcome routing. |
+| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
 
 **Example: built-in check on D&D 5e.** Configure a routed system to use an Intelligence (Arcana) check, DC 18, without writing a macro:
 

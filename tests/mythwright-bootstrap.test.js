@@ -299,7 +299,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.match(component.description, /standard SRD longsword/);
   });
 
-  it('builds deterministic multi-step SRD recipes with a macroOutcome finishing step', () => {
+  it('builds deterministic multi-step SRD recipes with a check finishing step', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const target = { name: 'Longsword', type: 'weapon', item: { img: 'icons/longsword.webp' } };
     const recipe = helper.buildRecipeForSrd(target, new Map([
@@ -310,7 +310,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(recipe.category, 'Weapons');
     assert.deepEqual(recipe.tags, []);
     assert.equal(recipe.steps.length, 4);
-    assert.equal(recipe.steps.at(-1).resultSelection.provider, 'macroOutcome');
+    assert.equal(recipe.steps.at(-1).resultSelection.provider, 'check');
     assert.ok(recipe.steps.every(step =>
       step.ingredientSets.every(set =>
         set.ingredientGroups.every(group =>
@@ -627,8 +627,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(recipe.category, 'Weapons');
     assert.equal(recipe.img, 'icons/weapons/swords/shortsword-guard-gold-red.webp');
     assert.deepEqual(recipe.tags, []);
-    assert.equal(recipe.resultSelection.provider, 'macroOutcome');
-    assert.equal(recipe.steps[0].resultSelection.provider, 'macroOutcome');
+    assert.equal(recipe.resultSelection.provider, 'check');
+    assert.equal(recipe.steps[0].resultSelection.provider, 'check');
     assert.ok(set.ingredientGroups.every(group =>
       group.options.every(option => option.match.type === 'component')
     ));

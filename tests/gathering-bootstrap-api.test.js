@@ -242,7 +242,6 @@ test('bootstrap constructs gathering collaborators after systems load with expli
     'getSelectableActors: getGatheringSelectableActors',
     'isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer)',
     'sceneAccess: createGatheringSceneAccess({',
-    'resultResolver: createGatheringResultResolver(this.resolutionModeService)',
     'resultCreator: createGatheringResultCreator(this.craftingSystemManager)',
     'failureFeedback: createGatheringFailureFeedback()',
     'getRunViewer: getGatheringRunViewer',

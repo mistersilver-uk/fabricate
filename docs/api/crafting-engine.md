@@ -108,7 +108,7 @@ The `builtIn` configuration object:
 ### Macro Check Branch (`checkSource: "macro"`)
 
 When `checkSource` is `"macro"` (the default), the engine executes the macro at `system.craftingCheck.macroUuid`.
-If no `macroUuid` is configured and the resolution mode requires a check (routed macroOutcome provider or progressive), the engine returns `success: false`.
+If no `macroUuid` is configured and the resolution mode requires a check (routed check provider or progressive), the engine returns `success: false`.
 
 See [Macros]({% link crafting-checks.md %}) for the full macro contract and context shape.
 

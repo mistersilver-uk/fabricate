@@ -195,7 +195,6 @@ function createServices({
     getActorOptions: () => clone(actors),
     getScriptMacros: () => [],
     getSceneOptions: () => [],
-    getRollTableOptions: () => [],
     notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async (options) => { confirmCalls.push(clone(options)); return confirmResult; },
     localize: (key, data = {}) => Object.entries(data).reduce((m, [n, v]) => m.replaceAll(`{${n}}`, String(v)), key),

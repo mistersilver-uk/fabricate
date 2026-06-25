@@ -43,9 +43,8 @@ new Recipe({
   toolIds,               // string[] (library Tool ids required for crafting)
   transferEffects,       // boolean (default false)
   resultSelection: {     // object (routed mode only)
-    provider,            // "ingredientSet" | "macroOutcome" | "rollTableOutcome"
-    macroUuid,           // string | null (macroOutcome provider)
-    rollTableUuid        // string | null (rollTableOutcome provider)
+    provider,            // "ingredientSet" | "check"
+    macroUuid            // string | null (check provider; overrides system craftingCheck.macroUuid)
   },
   metadata               // object (created, modified, author, version)
 })
