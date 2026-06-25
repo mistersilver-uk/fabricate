@@ -82,6 +82,10 @@ export function createGatheringSceneAccess({ getCurrentScene } = {}) {
  * are supplied by their actor roll data and the active Foundry Roll
  * implementation.
  *
+ * Rolls evaluate non-interactively (`allowInteractive: false`): an automated
+ * gathering roll never surfaces a manual roll-fulfilment dialog, even on a
+ * client configured for manual fulfilment (mirrors the crafting/salvage check).
+ *
  * Callsites:
  *  - `kind: 'check'` — gathering check evaluation.
  *  - `kind: 'gate'` — visibility/attempt gates.

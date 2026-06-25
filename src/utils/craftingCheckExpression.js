@@ -9,6 +9,11 @@
  * Extract the dice groups (e.g. `2d6`, `d20`) from a roll expression, in order
  * of appearance. Flat modifiers, operators, and actor references (e.g.
  * `@attributes.con.mod`) are ignored. A bare `dN` counts as a single die.
+ *
+ * This scans only the `NdS` core, so a modified pool is reported under its
+ * STRIPPED key (e.g. `2d20kh1` becomes `2d20`). Use {@link parsePlainDiceGroups}
+ * when only plain, crit-eligible terms should match, since that excludes
+ * modified pools rather than stripping them.
  * @param {string} expression
  * @returns {{ raw: string, count: number, sides: number }[]}
  */
