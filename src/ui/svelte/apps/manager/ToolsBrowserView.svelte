@@ -108,11 +108,20 @@
   function breakageChipClass(tool) {
     const mode = tool?.breakage?.mode;
     if (mode === 'immune') return 'manager-chip is-positive';
+    // Under check-driven authority the per-tool mechanic is not used, so a
+    // non-immune tool simply reads as "breakable".
+    if (isCheckDriven) return 'manager-chip is-warning';
     return mode === 'limitedUses' ? 'manager-chip is-neutral' : 'manager-chip is-warning';
   }
 
   function breakageChipLabel(tool) {
     const mode = tool?.breakage?.mode;
+    if (mode === 'immune') {
+      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryImmune', 'Never breaks');
+    }
+    if (isCheckDriven) {
+      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryBreakable', 'Breakable');
+    }
     if (mode === 'limitedUses') {
       const maxUses = tool?.breakage?.maxUses;
       if (maxUses === null || maxUses === undefined) {
@@ -127,9 +136,6 @@
     if (mode === 'diceExpression') {
       return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryDice', 'Dice < {threshold}')
         .replace('{threshold}', String(tool?.breakage?.threshold ?? 0));
-    }
-    if (mode === 'immune') {
-      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryImmune', 'Never breaks');
     }
     return text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', 'Limited uses');
   }
@@ -213,6 +219,32 @@
     });
   }
 
+  // The per-tool breakage mechanic is authority-driven (issue 419). Under
+  // tool-specific authority the tool's own mode decides breakage, so the original
+  // three mechanics are offered. Under check-driven authority the tool's mechanic
+  // is ignored except `immune`, so the only meaningful per-tool choice is whether
+  // the tool can break at all: Breakable (any non-immune mode) vs Immune.
+  const isCheckDriven = $derived(breakageAuthority === 'checkDriven');
+  const TOOL_SPECIFIC_BREAKAGE_MODES = [
+    { value: 'limitedUses', icon: 'fas fa-hashtag', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', labelFallback: 'Limited uses' },
+    { value: 'breakageChance', icon: 'fas fa-percent', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageChance', labelFallback: 'Breakage chance' },
+    { value: 'diceExpression', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageDice', labelFallback: 'Dice expression' }
+  ];
+  const CHECK_DRIVEN_BREAKAGE_MODES = [
+    { value: 'breakable', icon: 'fas fa-hammer', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageBreakable', labelFallback: 'Breakable' },
+    { value: 'immune', icon: 'fas fa-shield', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageImmune', labelFallback: 'Immune' }
+  ];
+
+  // The breakage option to highlight for a tool under the active authority. Under
+  // check-driven a non-immune mode reads as "breakable"; under tool-specific an
+  // immune tool coerces to "limited uses" (an unlimited limited-uses tool also
+  // never breaks, so the display stays behaviourally faithful until edited).
+  function breakageDisplayMode(tool) {
+    const mode = tool?.breakage?.mode;
+    if (isCheckDriven) return mode === 'immune' ? 'immune' : 'breakable';
+    return !mode || mode === 'immune' ? 'limitedUses' : mode;
+  }
+
   function setBreakageMode(tool, mode) {
     if (mode === 'limitedUses') {
       onUpdateTool?.(tool.id, { breakage: { mode, maxUses: null } });
@@ -224,6 +256,20 @@
     } else {
       onUpdateTool?.(tool.id, { breakage: { mode, formula: '', threshold: 0 } });
     }
+  }
+
+  // Check-driven breakage is binary. "Immune" persists the fields-less immune mode;
+  // "Breakable" keeps the tool's existing non-immune mechanic (so switching the
+  // source back to tool-specific restores it), defaulting to unlimited limited-uses
+  // when the tool was previously immune.
+  function setCheckDrivenBreakage(tool, selection) {
+    if (selection === 'immune') {
+      onUpdateTool?.(tool.id, { breakage: { mode: 'immune' } });
+      return;
+    }
+    const current = tool?.breakage?.mode;
+    if (current && current !== 'immune') return;
+    onUpdateTool?.(tool.id, { breakage: { mode: 'limitedUses', maxUses: null } });
   }
 
   function onBreakageChanceInput(tool, event) {
@@ -502,24 +548,19 @@
                 <fieldset class="manager-radio-group manager-tools-section" role="radiogroup" aria-labelledby={`tool-${tool.id}-breakage-legend`}>
                   <legend id={`tool-${tool.id}-breakage-legend`} class="manager-radio-group-legend">{text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}</legend>
                   <div class="manager-radio-options">
-                    {#each [
-                      { value: 'limitedUses', icon: 'fas fa-hashtag', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', labelFallback: 'Limited uses' },
-                      { value: 'breakageChance', icon: 'fas fa-percent', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageChance', labelFallback: 'Breakage chance' },
-                      { value: 'diceExpression', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageDice', labelFallback: 'Dice expression' },
-                      { value: 'immune', icon: 'fas fa-shield', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageImmune', labelFallback: 'Immune' }
-                    ] as option (option.value)}
-                      <label class={`manager-radio-option ${tool.breakage?.mode === option.value ? 'is-selected' : ''}`}>
+                    {#each (isCheckDriven ? CHECK_DRIVEN_BREAKAGE_MODES : TOOL_SPECIFIC_BREAKAGE_MODES) as option (option.value)}
+                      <label class={`manager-radio-option ${breakageDisplayMode(tool) === option.value ? 'is-selected' : ''}`}>
                         <input type="radio"
                           name={`tool-${tool.id}-breakage-mode`}
                           value={option.value}
-                          checked={tool.breakage?.mode === option.value}
-                          onchange={() => setBreakageMode(tool, option.value)} />
+                          checked={breakageDisplayMode(tool) === option.value}
+                          onchange={() => (isCheckDriven ? setCheckDrivenBreakage(tool, option.value) : setBreakageMode(tool, option.value))} />
                         <i class={option.icon} aria-hidden="true"></i>
                         <span>{text(option.labelKey, option.labelFallback)}</span>
                       </label>
                     {/each}
                   </div>
-                  {#if tool.breakage?.mode === 'limitedUses'}
+                  {#if breakageDisplayMode(tool) === 'limitedUses'}
                     <label class="manager-field manager-tools-inline-field">
                       <span>{text('FABRICATE.Admin.Manager.Tools.BreakageMaxUses', 'Maximum uses')}</span>
                       <input type="number"
@@ -527,14 +568,14 @@
                         min="1"
                         step="1"
                         placeholder={text('FABRICATE.Admin.Manager.Tools.BreakageMaxUsesHint', 'Blank = unlimited')}
-                        value={tool.breakage.maxUses ?? ''}
+                        value={tool.breakage?.maxUses ?? ''}
                         oninput={(event) => {
                           const raw = event.currentTarget.value;
                           const next = raw === '' ? null : Number(raw);
                           onUpdateTool?.(tool.id, { breakage: { mode: 'limitedUses', maxUses: next } });
                         }} />
                     </label>
-                  {:else if tool.breakage?.mode === 'breakageChance'}
+                  {:else if breakageDisplayMode(tool) === 'breakageChance'}
                     <label class="manager-field manager-tools-inline-field">
                       <span>{text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}</span>
                       <span class="manager-drop-rate-value">
@@ -564,7 +605,7 @@
                         </span>
                       </span>
                     </label>
-                  {:else if tool.breakage?.mode === 'diceExpression'}
+                  {:else if breakageDisplayMode(tool) === 'diceExpression'}
                     <div class="manager-tools-inline-fields">
                       <label class="manager-field manager-tools-inline-field">
                         <span>{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span>

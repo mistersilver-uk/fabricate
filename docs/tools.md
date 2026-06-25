@@ -65,7 +65,10 @@ Each Tool picks exactly one breakage mechanic:
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-When you pick **Immune**, the breakage settings for the other modes are hidden, because there is nothing to configure.
+Which of these you can choose for a Tool depends on the **Tool breakage source** described below.
+Under **Tool-specific** you pick one of the first three mechanics and configure its settings.
+Under **Check-driven** the per-Tool choice is simply **Breakable** or **Immune**, with no extra settings, because the check decides whether breakable Tools break.
+A **Breakable** Tool keeps whatever mechanic it had under Tool-specific, so switching the source back restores it.
 An immune Tool is the clean way to model a piece of equipment that is always present but never wears out.
 
 {: .note }
@@ -91,7 +94,7 @@ You choose between these two on the system's **Tools** page, in the **Tool break
 The setting applies to the whole crafting system.
 It covers crafting, salvage, and gathering together.
 
-When you switch to **Check-driven**, the Tools page shows a reminder that per-tool breakage modes are no longer evaluated, except Immune.
+When the source is **Check-driven**, the option explains that per-Tool breakage modes are no longer evaluated, except Immune, and each Tool's breakage control becomes a simple Breakable or Immune choice.
 Immune is how you exempt a single Tool from check-driven breakage.
 Set that Tool to Immune and it will never break, even when the check breaks every other required Tool.
 
@@ -122,7 +125,7 @@ In Manager V2:
 2. **Open the system's Tools page.** With a crafting system selected, click the top-level **Tools** entry in the Manager navigation (it sits alongside Components, Essences, and the Gathering group, and it is not nested under Gathering, because Tools belong to the system).
    Click *Add tool*, pick the Tool component (drag-drop from the Items directory or use the dropdown), and optionally set a display label.
 3. **(Optional) Add a requirement**, a condition checked against the acting character (see [The requirement gate](#the-requirement-gate)).
-4. **Pick a breakage mode**: limited uses, a chance each use, a dice roll, or immune (see [Breakage modes](#breakage-modes)).
+4. **Pick a breakage mode**: under the Tool-specific source, limited uses, a chance each use, or a dice roll; under the Check-driven source, simply Breakable or Immune (see [Breakage modes](#breakage-modes)).
 5. **Pick an on-break action**: destroy it, flag it as broken, or replace it with a broken variant (see [On-break actions](#on-break-actions)).
 6. **Save**, then reference the saved Tool from the recipes, steps, ingredient sets, gathering tasks, or salvage configurations that require it.
 

@@ -398,15 +398,15 @@ It manages the system's single canonical Tool library (`system.tools`).
 
 Tool-breakage authority (issue 419):
 
-- The Tools page carries a system-level **tool-breakage authority** control: a radio group offering `toolSpecific` (default) and `checkDriven`.
+- The Tools page carries a system-level **tool-breakage source** control: a card with a header, descriptive hint, and a radio group offering `toolSpecific` (default) and `checkDriven`.
 - `toolSpecific` means each Tool's own breakage mode decides whether it breaks (plus the legacy per-crit/per-tier `breakTools` force-break); `checkDriven` means the active check's `checkBreakage` triggers decide whether all required tools break and each Tool's own mode is ignored except `immune`.
-- When authority is `checkDriven`, the page shows an advisory communicating that per-tool breakage modes are not evaluated (except `Immune`) and the active check decides whether required tools break.
+- Each source option is self-describing (a bold name above a muted description); the `checkDriven` option's description carries the "per-tool breakage modes are not evaluated (except Immune)" guidance, so there is no separate advisory line.
 
-Per-tool breakage editing:
+Per-tool breakage editing is governed by the active authority; the two authorities never expose their per-tool breakage surfaces at the same time:
 
-- The per-tool breakage mode offers four options: `Limited uses`, `Break chance`, `Dice expression`, and **`Immune`**.
-- Selecting `Immune` hides the breakage-specific field inputs (max uses, break chance, dice formula/threshold) and keeps the `onBreak` configuration.
-- An `Immune` tool never breaks under either authority and is still recorded as used; the browse-row breakage chip reads as a never-breaks state.
+- Under `toolSpecific` authority the per-tool breakage **mechanic** offers the three original modes — `Limited uses`, `Break chance`, `Dice expression` — each with its own field inputs. `Immune` is not offered here; an `Immune` tool coerces to the `Limited uses` display (an unlimited limited-uses tool also never breaks) and persists a concrete mechanic once edited.
+- Under `checkDriven` authority the per-tool breakage mechanic is binary: `Breakable` or `Immune`, with no field inputs. `Breakable` means the tool can break (the active check decides); it preserves the tool's existing non-immune mechanic under the hood (defaulting to unlimited limited-uses), so switching the source back to `toolSpecific` restores it.
+- An `Immune` tool never breaks under either authority and is still recorded as used; the `onBreak` configuration stays available, and the browse-row breakage chip reads as a never-breaks state (and as `Breakable` for a non-immune tool under `checkDriven`).
 
 ### Recipes Tab
 

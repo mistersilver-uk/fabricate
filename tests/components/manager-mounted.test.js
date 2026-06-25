@@ -2676,36 +2676,84 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  // Criterion 1/4 UI: the Tools page offers `immune` as a breakage mode, and
-  // selecting it hides the breakage-field inputs (it carries no fields).
-  it('tools browser: offers immune as a breakage mode and hides the breakage-field inputs', () => {
+  // The per-tool breakage mechanic is authority-driven (issue 419). Mount the
+  // tools browser with one expanded tool and a given authority; return the
+  // emitted onUpdateTool patches so each assertion stays DRY.
+  function mountToolsBrowser(tool, breakageAuthority) {
     target = document.createElement('div');
     document.body.appendChild(target);
     const emitted = [];
     mounted = mount(ToolsBrowserViewComponent, {
       target,
       props: {
-        tools: [
-          { id: 't1', name: 'Hammer', componentId: 'c1', breakage: { mode: 'limitedUses', maxUses: 3 } },
-        ],
-        expandedToolId: 't1',
-        breakageAuthority: 'toolSpecific',
+        tools: [tool],
+        expandedToolId: tool.id,
+        breakageAuthority,
         onUpdateTool: (id, patch) => emitted.push({ id, patch }),
       },
     });
     flushSync();
+    return emitted;
+  }
 
-    // The immune radio is offered alongside the existing three modes.
-    const immuneRadio = target.querySelector('input[name="tool-t1-breakage-mode"][value="immune"]');
-    assert.ok(immuneRadio, 'the immune breakage mode radio renders');
-    // Under limitedUses, the max-uses field shows.
+  it('tools browser: tool-specific authority offers the original three mechanics (no immune)', () => {
+    const emitted = mountToolsBrowser(
+      { id: 't1', name: 'Hammer', componentId: 'c1', breakage: { mode: 'limitedUses', maxUses: 3 } },
+      'toolSpecific'
+    );
+    for (const mode of ['limitedUses', 'breakageChance', 'diceExpression']) {
+      assert.ok(
+        target.querySelector(`input[name="tool-t1-breakage-mode"][value="${mode}"]`),
+        `the ${mode} mechanic radio renders under tool-specific authority`
+      );
+    }
+    assert.equal(
+      target.querySelector('input[name="tool-t1-breakage-mode"][value="immune"]'),
+      null,
+      'immune is not offered as a per-tool mechanic under tool-specific authority'
+    );
     assert.ok(
       target.querySelector('.manager-tools-max-uses-input'),
       'the limited-uses field renders for a limitedUses tool'
     );
+    target.querySelector('input[name="tool-t1-breakage-mode"][value="breakageChance"]').click();
+    flushSync();
+    assert.deepEqual(
+      emitted.at(-1),
+      { id: 't1', patch: { breakage: { mode: 'breakageChance', breakageChance: 0 } } },
+      'selecting a mechanic persists it'
+    );
+  });
 
-    // Selecting immune emits a fields-less breakage block.
-    immuneRadio.click();
+  it('tools browser: check-driven authority offers only breakable and immune with no fields', () => {
+    const emitted = mountToolsBrowser(
+      { id: 't1', name: 'Hammer', componentId: 'c1', breakage: { mode: 'limitedUses', maxUses: 3 } },
+      'checkDriven'
+    );
+    assert.ok(
+      target.querySelector('input[name="tool-t1-breakage-mode"][value="breakable"]'),
+      'the breakable option renders under check-driven authority'
+    );
+    assert.ok(
+      target.querySelector('input[name="tool-t1-breakage-mode"][value="immune"]'),
+      'the immune option renders under check-driven authority'
+    );
+    for (const mode of ['limitedUses', 'breakageChance', 'diceExpression']) {
+      assert.equal(
+        target.querySelector(`input[name="tool-t1-breakage-mode"][value="${mode}"]`),
+        null,
+        `the ${mode} mechanic radio is hidden under check-driven authority`
+      );
+    }
+    // A non-immune tool reads as breakable, and no mechanic fields render.
+    assert.ok(
+      target.querySelector('input[name="tool-t1-breakage-mode"][value="breakable"]').checked,
+      'a non-immune tool is shown as breakable'
+    );
+    assert.equal(target.querySelector('.manager-tools-max-uses-input'), null, 'no limited-uses field');
+    assert.equal(target.querySelector('input[type="range"]'), null, 'no breakage-chance slider');
+    // Selecting immune emits the fields-less immune block.
+    target.querySelector('input[name="tool-t1-breakage-mode"][value="immune"]').click();
     flushSync();
     assert.deepEqual(
       emitted.at(-1),
@@ -2714,30 +2762,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('tools browser: an immune tool shows no breakage-field inputs', () => {
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(ToolsBrowserViewComponent, {
-      target,
-      props: {
-        tools: [{ id: 't1', name: 'Anvil', componentId: 'c1', breakage: { mode: 'immune' } }],
-        expandedToolId: 't1',
-        breakageAuthority: 'toolSpecific',
-        onUpdateTool: () => {},
-      },
-    });
+  it('tools browser: check-driven breakable restores a non-immune mechanic for an immune tool', () => {
+    const emitted = mountToolsBrowser(
+      { id: 't1', name: 'Anvil', componentId: 'c1', breakage: { mode: 'immune' } },
+      'checkDriven'
+    );
+    assert.ok(
+      target.querySelector('input[name="tool-t1-breakage-mode"][value="immune"]').checked,
+      'an immune tool is shown as immune'
+    );
+    target.querySelector('input[name="tool-t1-breakage-mode"][value="breakable"]').click();
     flushSync();
-    assert.equal(
-      target.querySelector('.manager-tools-max-uses-input'),
-      null,
-      'an immune tool shows no limited-uses field'
+    assert.deepEqual(
+      emitted.at(-1),
+      { id: 't1', patch: { breakage: { mode: 'limitedUses', maxUses: null } } },
+      'choosing breakable for an immune tool defaults to unlimited limited-uses'
     );
-    assert.equal(
-      target.querySelector('input[type="range"]'),
-      null,
-      'an immune tool shows no breakage-chance slider'
-    );
-    // The on-break action fieldset still renders (immune onBreak stays configurable).
+    // The on-break action fieldset still renders for an immune tool.
     assert.ok(
       target.querySelector('input[name="tool-t1-on-break-mode"]'),
       'the on-break action controls still render for an immune tool'
