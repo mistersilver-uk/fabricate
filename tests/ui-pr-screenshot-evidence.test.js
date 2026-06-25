@@ -288,9 +288,24 @@ describe('UI PR screenshot evidence', () => {
     assert.throws(() => collectScreenshotEvidence({ changedFiles: [], prNumber: 'abc' }), /Invalid PR number/);
   });
 
-  it('detects i18n language changes and maps them to global UI', () => {
-    assert.equal(hasUiChanges(['lang/en.json']), true);
-    assert.deepEqual(mapChangedFilesToViews(['lang/en.json']).map(view => view.id), ['theme-or-global-ui']);
+  it('treats a lang-only change as non-UI (co-occurrence rule)', () => {
+    const langOnly = ['lang/en.json'];
+    assert.equal(hasUiChanges(langOnly), false);
+    assert.deepEqual(mapChangedFilesToViews(langOnly), []);
+  });
+
+  it('treats a lang change alongside a render file as UI driven by that render file', () => {
+    const view = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
+    const logicOnly = 'src/ui/svelte/stores/adminStore.js';
+    const ids = files => mapChangedFilesToViews(files).map(recipe => recipe.id);
+
+    // A recipe-matching view drives the mapping; the lang file adds nothing.
+    assert.equal(hasUiChanges(['lang/en.json', view]), true);
+    assert.deepEqual(ids(['lang/en.json', view]), ['manager-tools']);
+
+    // A render file that matches no recipe still trips the generic fallback.
+    assert.equal(hasUiChanges(['lang/en.json', logicOnly]), true);
+    assert.deepEqual(ids(['lang/en.json', logicOnly]), ['theme-or-global-ui']);
   });
 
   it('keeps every recipe match pattern pointed at a real tracked file', () => {
