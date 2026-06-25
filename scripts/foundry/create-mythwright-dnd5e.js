@@ -1461,14 +1461,14 @@ const MythwrightDnd5eBootstrap = (() => {
         macroUuid: macroUuid || '',
         mode: 'namedOutcomes',
         outcomes: ['flawed', 'standard', 'fine', 'masterwork', 'mythic'],
-        consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false }
+        consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false }
       },
       salvageResolutionMode: 'routed',
       salvageCraftingCheck: {
         enabled: true,
         macroUuid: macroUuid || '',
         outcomes: ['pass', 'fail'],
-        consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+        consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
       },
       essenceDefinitions: ESSENCES.map(essence => ({
         id: essence.id,

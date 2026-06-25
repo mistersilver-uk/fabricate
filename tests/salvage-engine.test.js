@@ -127,7 +127,7 @@ function makeSystem({
       macroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components,
     tools,
@@ -407,7 +407,7 @@ test('salvage() consumes component on failure when consumeComponentOnFail is tru
       macroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     }
   });
   setupGame(system, actor);
@@ -435,7 +435,7 @@ test('salvage() does not consume component on failure when consumeComponentOnFai
       macroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeComponentOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: false }
     }
   });
   setupGame(system, actor);
@@ -827,7 +827,7 @@ test('_resolveSalvageResultGroups progressive mode awards results up to check va
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [
       component,
@@ -858,7 +858,7 @@ test('_resolveSalvageResultGroups progressive mode awards nothing when check val
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [component, { id: 'item-a', name: 'Item A', difficulty: 2 }]
   });
@@ -887,7 +887,7 @@ test('_resolveSalvageResultGroups progressive exceed mode awards only when value
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'exceed' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [
       component,
@@ -923,7 +923,7 @@ test('_resolveSalvageResultGroups progressive partial mode awards a final partia
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'partial' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [
       component,
@@ -961,7 +961,7 @@ test('_resolveSalvageResultGroups progressive mode skips results with invalid di
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [
       component,
@@ -1007,7 +1007,7 @@ test('salvage() progressive mode creates items matching awarded results', async 
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [component, itemAComp, itemBComp]
   });
@@ -1045,7 +1045,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=true -- both cons
     tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: true }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true }
     }
   });
   setupGame(system, actor);
@@ -1053,7 +1053,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=true -- both cons
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, true, 'Component should be consumed (consumeComponentOnFail=true)');
-  assert.equal(tool.used, true, 'Tool should be broken (consumeCatalystsOnFail=true)');
+  assert.equal(tool.used, true, 'Tool should be broken (breakToolsOnFail=true)');
 });
 
 test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only component consumed', async () => {
@@ -1077,7 +1077,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only com
     tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     }
   });
   setupGame(system, actor);
@@ -1085,7 +1085,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only com
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, true, 'Component should be consumed (consumeComponentOnFail=true)');
-  assert.equal(tool.used, false, 'Tool should NOT be broken (consumeCatalystsOnFail=false)');
+  assert.equal(tool.used, false, 'Tool should NOT be broken (breakToolsOnFail=false)');
 });
 
 test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only tools broken', async () => {
@@ -1109,7 +1109,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only too
     tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: false, consumeCatalystsOnFail: true }
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: true }
     }
   });
   setupGame(system, actor);
@@ -1117,7 +1117,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only too
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be consumed (consumeComponentOnFail=false)');
-  assert.equal(tool.used, true, 'Tool should be broken (consumeCatalystsOnFail=true)');
+  assert.equal(tool.used, true, 'Tool should be broken (breakToolsOnFail=true)');
 });
 
 test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing consumed', async () => {
@@ -1141,7 +1141,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing
     tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: false }
     }
   });
   setupGame(system, actor);
@@ -1149,7 +1149,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be consumed (consumeComponentOnFail=false)');
-  assert.equal(tool.used, false, 'Tool should NOT be broken (consumeCatalystsOnFail=false)');
+  assert.equal(tool.used, false, 'Tool should NOT be broken (breakToolsOnFail=false)');
 });
 
 // ---------------------------------------------------------------------------
@@ -1190,7 +1190,7 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
     salvageResolutionMode: 'simple',
     salvageCraftingCheck: {
       enabled: false, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: true }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true }
     },
     components: [component, scrapComp],
     tools: [tool]

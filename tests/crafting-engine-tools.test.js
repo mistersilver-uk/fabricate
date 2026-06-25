@@ -504,7 +504,7 @@ test('_applyToolBreakage toolSpecific: immune tool never breaks even with a lega
 
 // ---------------------------------------------------------------------------
 // Criterion 10: a matched checkDriven trigger on a FAILED attempt breaks tools
-// only when consumption.consumeCatalystsOnFail === true. This drives the full
+// only when consumption.breakToolsOnFail === true. This drives the full
 // craft() failure path (not _applyToolBreakage directly) so the policy gate that
 // wraps the shared seam is exercised end to end.
 // ---------------------------------------------------------------------------
@@ -532,7 +532,7 @@ const FAILED_NATURAL_ONE_CHECK = {
   data: { total: 1, outcomeId: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }], breakTools: false },
 };
 
-function checkDrivenSystem({ consumeCatalystsOnFail }) {
+function checkDrivenSystem({ breakToolsOnFail }) {
   return {
     id: 'sys-1',
     components: [],
@@ -542,7 +542,7 @@ function checkDrivenSystem({ consumeCatalystsOnFail }) {
     toolBreakage: { authority: 'checkDriven' },
     craftingCheck: {
       simple: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER },
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail },
     },
   };
 }
@@ -594,8 +594,8 @@ function failingCraftEngine() {
   };
 }
 
-test('craft() checkDriven FAIL: a matched trigger breaks NO tools when consumeCatalystsOnFail is false (criterion 10)', async () => {
-  installCheckDrivenSystem({ consumeCatalystsOnFail: false });
+test('craft() checkDriven FAIL: a matched trigger breaks NO tools when breakToolsOnFail is false (criterion 10)', async () => {
+  installCheckDrivenSystem({ breakToolsOnFail: false });
   const { toolItem, run, failurePayload } = failingCraftEngine();
   const result = await run();
   assert.equal(result.success, false);
@@ -603,8 +603,8 @@ test('craft() checkDriven FAIL: a matched trigger breaks NO tools when consumeCa
   assert.deepEqual(failurePayload()?.usedTools ?? [], [], 'no usedTools breakage evidence on the gated failure path');
 });
 
-test('craft() checkDriven FAIL: a matched trigger breaks the non-immune tool when consumeCatalystsOnFail is true (criterion 10)', async () => {
-  installCheckDrivenSystem({ consumeCatalystsOnFail: true });
+test('craft() checkDriven FAIL: a matched trigger breaks the non-immune tool when breakToolsOnFail is true (criterion 10)', async () => {
+  installCheckDrivenSystem({ breakToolsOnFail: true });
   const { toolItem, run, failurePayload } = failingCraftEngine();
   const result = await run();
   assert.equal(result.success, false);
@@ -618,7 +618,7 @@ test('craft() checkDriven FAIL: a matched trigger breaks the non-immune tool whe
 
 // ---------------------------------------------------------------------------
 // Criterion 9: salvage breaks required tools under checkDriven on both the
-// success path and the consumeCatalystsOnFail failure path. Drives the REAL
+// success path and the breakToolsOnFail failure path. Drives the REAL
 // _resolveSalvageBreakageDecision → _applyToolBreakage wiring (exactly how the
 // salvage success/failure paths apply breakage) so a tool actually breaks — not
 // just that the decision reports forceBreak.
@@ -670,7 +670,7 @@ test('salvage checkDriven: the failure path resolver + apply actually breaks the
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
   const system = salvageCheckDrivenSystem();
-  // The failure path is gated by consumeCatalystsOnFail in salvage(); when the gate
+  // The failure path is gated by breakToolsOnFail in salvage(); when the gate
   // is open the same resolver+apply runs, so a failed salvage check still breaks.
   const { hammer, tool, decision } = applySalvageBreak(engine, system, false);
   assert.equal(decision.forceBreak, true, 'the salvage failure resolver forces the break on a matched trigger');

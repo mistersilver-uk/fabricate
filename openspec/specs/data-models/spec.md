@@ -66,7 +66,7 @@ CraftingSystem = {
     failureMacroUuid?: string,
     consumption: {
       consumeComponentOnFail: boolean,  // default true
-      consumeCatalystsOnFail: boolean,  // default false; LEGACY-NAMED key — now governs TOOL usage/breakage on fail (see note below)
+      breakToolsOnFail: boolean,        // default false; governs Tool usage/breakage on a failed salvage (see note below)
     },
     outcomes?: string[],               // routed mode
     // Salvage reuses the crafting check sub-object shapes (so the GM Checks-tab
@@ -107,7 +107,7 @@ CraftingSystem = {
 
     consumption: {
       consumeIngredientsOnFail: boolean, // default true
-      consumeCatalystsOnFail: boolean,   // default false; LEGACY-NAMED key — now governs TOOL usage/breakage on fail (see note below)
+      breakToolsOnFail: boolean,         // default false; governs Tool usage/breakage on a failed craft (see note below)
     },
 
     // Routed mode (the check provider may return one of these, optional)
@@ -255,9 +255,10 @@ It is GM configuration and is not part of the player gathering listing payload.
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.sourceItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
-13. **`consumption.consumeCatalystsOnFail` is a legacy-named flag.** Following the Catalyst retirement, the persisted config key `consumption.consumeCatalystsOnFail` (on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`) was **retained by name** but now governs **Tool usage/breakage on a failed craft or salvage** (read it as "consume/break tools on fail").
-It defaults to `false` (tools are not consumed/broken on failure unless enabled).
-The persisted key was deliberately **not** renamed because renaming a persisted setting key would require its own migration; the in-code semantics are tool-oriented while the wire key stays `consumeCatalystsOnFail`.
+13. **`consumption.breakToolsOnFail` governs Tool usage/breakage on a failed craft or salvage.** It is present on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`.
+It defaults to `false` (tools are not broken on failure unless enabled).
+It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
+Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
 14. When `features.gathering` is true, a crafting system may own a `gatheringRealms` library (default `[]`) and `gatheringRealmSettings`. `gatheringRealmSettings.enabled` (default `false`) gates the whole realm/travel/availability subsystem; the records and behavior are inert until a GM opts in.
 A **Gathering Realm** is the Fabricate gathering-geography concept (renamed from **Gathering Region** to remove the collision with Foundry's own first-class **Region** — `RegionDocument` / Region Behaviour).
 Realm is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed.

@@ -325,7 +325,12 @@ export class CraftingSystemManager {
       builtIn,
       consumption: {
         consumeIngredientsOnFail: check?.consumption?.consumeIngredientsOnFail !== false,
-        consumeCatalystsOnFail: check?.consumption?.consumeCatalystsOnFail === true,
+        // Canonical key is `breakToolsOnFail` (1.7.0 rename of the legacy
+        // `consumeCatalystsOnFail`). Read new-then-legacy so pre-migration imports/exports
+        // still load; the 1.7.0 migration rewrites persisted worlds to the new key.
+        breakToolsOnFail:
+          (check?.consumption?.breakToolsOnFail ?? check?.consumption?.consumeCatalystsOnFail) ===
+          true,
       },
       progressive: this._normalizeProgressiveCraftingCheck(check?.progressive),
       outcomes:
@@ -648,7 +653,11 @@ export class CraftingSystemManager {
       failureMacroUuid: normalizedCheck.failureMacroUuid || null,
       consumption: {
         consumeComponentOnFail: normalizedCheck.consumption?.consumeComponentOnFail !== false,
-        consumeCatalystsOnFail: normalizedCheck.consumption?.consumeCatalystsOnFail === true,
+        // Canonical key is `breakToolsOnFail` (1.7.0 rename); read new-then-legacy so
+        // pre-migration salvage configs still load.
+        breakToolsOnFail:
+          (normalizedCheck.consumption?.breakToolsOnFail ??
+            normalizedCheck.consumption?.consumeCatalystsOnFail) === true,
       },
       // Salvage reuses the crafting check sub-object shapes so the Checks-tab
       // editors are shared. The simple/routed default DC is the sub-object's `dc`;

@@ -252,7 +252,7 @@ It is automatic, versioned, idempotent, and by-reference.
 1. Walk **recipe**-level, step-level, ingredient-set-level, and salvage-definition catalysts.
 Dedupe them into per-system library Tools written onto the crafting system (`system.tools`, the `craftingSystems` setting) and replace the inline catalyst arrays with `toolIds` references.
 2. The gathering `task.catalysts` field is **dead/vestigial** — never authored, only read, always empty.
-It is **not** walked and there is **no** gathering-task migration; `gatheringConfig` is not mutated by this migration.
+The `0.6.0` migration does **not** walk it and does not mutate `gatheringConfig`; the residual field is stripped later by the `1.7.0` migration (below).
 3. Catalyst → Tool mapping:
    - `degradesOnUse: false` (presence-only, never consumed) → `breakage { mode: breakageChance, breakageChance: 0 }` + `onBreak { mode: flagBroken }`.
 This is a deliberate modeling choice (a 0% break chance writes NO item usage flag), preserving the never-consumed behavior.
@@ -307,6 +307,22 @@ It is pure, idempotent, by-reference, and version-gated.
 5. Idempotent: once no `macroOutcome`/`rollTableOutcome` provider, no `rollTableUuid`, and no gathering-task `resultSelection` remain, a re-run is a no-op.
 6. Recovery from the dropped `rollTableUuid`: the table-draw routing mechanism no longer exists, so a former `rollTableOutcome` recipe must be reconfigured by the GM — name its `ResultGroup`s to match the system crafting-check outcomes the `check` provider routes by (the recovery-warning notice lists the affected recipes/steps).
 
+### Break-Tools-on-Fail Rename (`1.7.0`)
+
+The failure-consumption key `consumption.consumeCatalystsOnFail` — retained by its catalyst-era name only to defer a persisted-key migration, but governing **Tool** breakage on a failed craft or salvage since `0.6.0` — is renamed to `consumption.breakToolsOnFail` to match the domain language (Tools *break*, they are not *consumed*).
+The same migration strips residual dead `catalysts` arrays that `0.6.0` could not reach.
+The `1.7.0` migration (`src/migration/migrateBreakToolsOnFail.js`) is pure, idempotent, by-reference, and version-gated.
+
+1. Rename `consumeCatalystsOnFail → breakToolsOnFail` on `system.craftingCheck.consumption` and `system.salvageCraftingCheck.consumption`.
+   The rename guards on "old key present AND new key absent", so a stale legacy key beside an existing new key is left inert.
+2. Strip residual dead `catalysts` arrays.
+   `0.6.0` converts catalysts to `toolIds` and deletes the inline arrays everywhere it can reach, so any survivors are inert dead data the engine never reads.
+   Stripped sites: recipe-level, step-level, step-ingredient-set, and recipe-ingredient-set `catalysts`; `system.components[].salvage.catalysts`; and the dead `gatheringConfig.systems[*].tasks[*].catalysts`.
+   For recipes whose crafting system was missing at `0.6.0` (skipped, never converted) this is a deliberate drop of permanently-dead data.
+3. Mutated setting keys are `craftingSystems`, `recipes`, and `gatheringConfig`.
+4. A read-time normalizer reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so an un-migrated import/export behaves identically before the migration runs.
+5. Idempotent: once every consumption block carries `breakToolsOnFail` and no `catalysts` arrays remain, a re-run is a no-op.
+
 ## Testing Requirements
 
 - Unit tests for each destructive operation clean-up path.
@@ -322,6 +338,7 @@ It is pure, idempotent, by-reference, and version-gated.
 - Unit tests for unmigratable recipe deletion with cascade cleanup and JSON logging output.
 - Unit tests for provider-switch stale-config cleanup.
 - Unit tests for the `1.6.0` legacy-provider removal migration: recipe-level, per-step, and alchemy recipe-level `macroOutcome | rollTableOutcome → check` rewrite; `rollTableUuid` drop; gathering-task `resultSelection` stripping; the surfaced-then-stripped recovery-warning payload; and the chained `1.4.0 → 1.6.0` catch-up path.
+- Unit tests for the `1.7.0` break-tools-on-fail rename: `consumeCatalystsOnFail → breakToolsOnFail` on crafting and salvage consumption; residual `catalysts` stripping across recipes, component salvage, and gathering tasks; idempotency; both-keys-present left inert; and the normalization read-fallback to the legacy key.
 - Unit tests for partial import conflict handling and aggregated conflict reporting.
 - Unit tests for alchemy global save blocking when any system collision exists.
 - Integration tests for mode changes, recipe deletion, and startup migration.

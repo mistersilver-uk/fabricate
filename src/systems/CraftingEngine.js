@@ -320,10 +320,10 @@ export class CraftingEngine {
           // policy consumes ingredients on failure (it is a chosen ingredient).
           await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
         }
-        if (failurePolicy.consumeCatalystsOnFail) {
+        if (failurePolicy.breakToolsOnFail) {
           usedToolPairs = toolValidation.tools;
           // The single shared `evaluateCheckBreakage` seam decides forced breakage
-          // on the check-failure path too (gated by `consumeCatalystsOnFail`, as
+          // on the check-failure path too (gated by `breakToolsOnFail`, as
           // today). Under `toolSpecific` the legacy crit/tier `data.breakTools`
           // force-break applies; under `checkDriven` the active check's
           // `checkBreakage` triggers decide. A macro/builtIn check never force-breaks
@@ -413,7 +413,7 @@ export class CraftingEngine {
           consumedOnValidationFail = await this._consumeIngredients(craftSelection.plan);
           await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
         }
-        if (validationFailurePolicy.consumeCatalystsOnFail) {
+        if (validationFailurePolicy.breakToolsOnFail) {
           usedToolPairsOnValidationFail = toolValidation.tools;
           // Resolution-mode validation failure: route through the shared seam so the
           // breakage authority (and immune handling) stay consistent. The check
@@ -522,7 +522,7 @@ export class CraftingEngine {
     // engine-evaluated crit/tier `breakTools` forces every matched tool to break (a
     // macro/builtIn `data.breakTools` does not); under `checkDriven` the active
     // check's `checkBreakage` triggers decide whether all required non-immune tools
-    // break. The SUCCESS path always applies breakage (no `consumeCatalystsOnFail`
+    // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
     // gate exists here).
     const successBreakDecision = this._resolveCraftingBreakageDecision(
       this._getRecipeSystem(executionRecipe),
@@ -1385,17 +1385,20 @@ export class CraftingEngine {
   _getFailureConsumptionPolicy(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false };
+      return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
     }
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
-      return { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false };
+      return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
     }
     const consumption = system.craftingCheck?.consumption || {};
     return {
       consumeIngredientsOnFail: consumption.consumeIngredientsOnFail !== false,
-      consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true,
+      // Normalized systems carry `breakToolsOnFail`; tolerate the legacy
+      // `consumeCatalystsOnFail` defensively for any un-normalized path.
+      breakToolsOnFail:
+        (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
   }
 
@@ -2372,10 +2375,10 @@ export class CraftingEngine {
             ingredientQuantity
           );
         }
-        if (failurePolicy.consumeCatalystsOnFail) {
+        if (failurePolicy.breakToolsOnFail) {
           usedToolPairs = toolValidation.tools;
           // Salvage parity (issue 419): the FAILURE path breaks required tools only
-          // when `consumeCatalystsOnFail === true` (this gate), matching crafting.
+          // when `breakToolsOnFail === true` (this gate), matching crafting.
           const salvageFailBreak = this._resolveSalvageBreakageDecision(system, checkResult);
           usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
             forceBreak: salvageFailBreak.forceBreak,
@@ -2433,7 +2436,7 @@ export class CraftingEngine {
       ingredientQuantity
     );
     // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
-    // `consumeCatalystsOnFail` gate exists here), via the shared seam.
+    // `breakToolsOnFail` gate exists here), via the shared seam.
     const salvageSuccessBreak = this._resolveSalvageBreakageDecision(system, checkResult);
     const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
       forceBreak: salvageSuccessBreak.forceBreak,
@@ -2547,14 +2550,16 @@ export class CraftingEngine {
 
   /**
    * Get the salvage failure consumption policy from the system.
-   * Defaults: consumeComponentOnFail=true, consumeCatalystsOnFail=false.
+   * Defaults: consumeComponentOnFail=true, breakToolsOnFail=false.
    * @private
    */
   _getSalvageFailureConsumptionPolicy(system) {
     const consumption = system?.salvageCraftingCheck?.consumption || {};
     return {
       consumeComponentOnFail: consumption.consumeComponentOnFail !== false,
-      consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true,
+      // Normalized systems carry `breakToolsOnFail`; tolerate the legacy key defensively.
+      breakToolsOnFail:
+        (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
   }
 

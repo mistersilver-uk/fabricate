@@ -46,7 +46,7 @@ When `craft()` is called, the engine:
    See [Crafting Checks]({% link crafting-checks.md %}) for both modes.
 5. **Applies failure consumption policy.**
    If the check fails, consumes ingredients and/or applies tool breakage according to `craftingCheck.consumption` settings.
-   By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and tools are not broken (`consumeCatalystsOnFail: false`, field name retained for backward compatibility).
+   By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and tools are not broken (`breakToolsOnFail: false`, renamed from the legacy `consumeCatalystsOnFail`).
    See [Consumption on Failure]({% link crafting-checks.md %}#consumption-on-failure).
 6. **Runs failure macro.**
    If the check failed (step 4) or check-result validation failed (step 5), calls `system.craftingCheck.failureMacroUuid` with the failure context.

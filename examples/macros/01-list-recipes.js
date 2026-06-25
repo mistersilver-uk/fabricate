@@ -16,7 +16,7 @@ if (recipes.length === 0) {
     console.log(`   ID: ${recipe.id}`);
     console.log(`   Description: ${recipe.description || 'None'}`);
     console.log(`   Ingredients: ${recipe.ingredients.length}`);
-    console.log(`   Catalysts: ${recipe.catalysts.length}`);
+    console.log(`   Tools: ${recipe.toolIds?.length ?? 0}`);
     console.log(`   Result: ${recipe.getResultDescription()}`);
     console.log(`   Type: ${recipe.isSimpleRecipe() ? 'Simple' : 'Advanced'}`);
     console.log(`   Category: ${recipe.category}`);

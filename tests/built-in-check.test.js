@@ -402,7 +402,7 @@ function makeEngine(systemOverride = {}) {
       checkSource: 'macro',
       builtIn: { ability: 'int', skill: '', dc: 15, advantage: 'normal' },
       outcomes: ['low', 'high'],
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false },
     },
     ...systemOverride,
@@ -433,7 +433,7 @@ test('_runCraftingCheck with checkSource macro calls MacroExecutor', async () =>
       macroUuid: 'macro-uuid-1',
       builtIn: { ability: 'int', skill: '', dc: 15, advantage: 'normal' },
       outcomes: ['fail', 'pass'],
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false },
     },
   });
@@ -466,7 +466,7 @@ test('_runCraftingCheck with checkSource builtIn calls adapter', async () => {
       macroUuid: null,
       builtIn: { ability: 'int', skill: '', dc: 10, advantage: 'normal' },
       outcomes: ['fail', 'pass'],
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false },
     },
   });
@@ -499,7 +499,7 @@ test('_runCraftingCheck with checkSource builtIn and no adapter returns error', 
       macroUuid: null,
       builtIn: { ability: 'str', skill: '', dc: 15, advantage: 'normal' },
       outcomes: ['fail', 'pass'],
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false },
     },
   });
@@ -525,7 +525,7 @@ test('_runCraftingCheck with builtIn adapter error returns failure', async () =>
       macroUuid: null,
       builtIn: { ability: 'int', skill: '', dc: 15, advantage: 'normal' },
       outcomes: ['fail', 'pass'],
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false },
     },
   });
@@ -557,7 +557,7 @@ test('backward compat: system without checkSource uses macro path', async () => 
       // no checkSource field -- should default to 'macro'
       builtIn: { ability: '', skill: '', dc: 15, advantage: 'normal' },
       outcomes: ['fail', 'pass'],
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false },
     },
   });
