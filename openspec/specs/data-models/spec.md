@@ -100,7 +100,7 @@ CraftingSystem = {
       consumeCatalystsOnFail: boolean,   // default false; LEGACY-NAMED key — now governs TOOL usage/breakage on fail (see note below)
     },
 
-    // Routed mode (macroOutcome provider may return one of these, optional)
+    // Routed mode (the check provider may return one of these, optional)
     outcomes?: string[],
 
     // Per-resolution-mode check sub-objects authored in the GM Checks tab; the
@@ -390,14 +390,11 @@ Recipe = {
 
   // Routed/alchemy result-group selection
   resultSelection?: {
-    provider: "ingredientSet" | "macroOutcome" | "rollTableOutcome",
+    provider: "ingredientSet" | "check",
 
-    // provider = "macroOutcome"
+    // provider = "check"
     // If present, overrides CraftingSystem.craftingCheck.macroUuid for this recipe.
     macroUuid?: string,
-
-    // provider = "rollTableOutcome"
-    rollTableUuid?: string,
   },
 
   visibility?: {
@@ -426,14 +423,13 @@ Recipe = {
    `Recipe.validate()` enforces completeness and is the craftability contract; the crafting engine gates on it, so an incomplete recipe is never craftable.
    `Recipe.validateStructure()` omits completeness (it waives the missing-ingredient-set / missing-result-group / missing-result errors) and is the persistence contract.
 2. An authoring *incomplete shell* — a recipe with valid identity (a name; default name "Unnamed Recipe" and default image apply when omitted) that is structurally consistent but missing its ingredient sets and/or result groups — MAY be persisted via the GM authoring path (create-then-edit and identity-only saves).
-   Persistence gates only on structural validity (`validateStructure()`), never on completeness; structural-integrity errors (duplicate result-group/result IDs, invalid results, invalid step time/currency values, rollTable UUID / reserved-name, variable result-mapping and outcome-routing integrity) still block persistence.
+   Persistence gates only on structural validity (`validateStructure()`), never on completeness; structural-integrity errors (duplicate result-group/result IDs, invalid results, invalid step time/currency values, reserved-name, variable result-mapping and outcome-routing integrity) still block persistence.
    Incompleteness is *derived* from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
 3. Resolution-mode constraints are defined in `004-resolution-modes.md`.
 4. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `alchemy`.
-5. `resultSelection.provider` value constraints:
+5. `resultSelection.provider` value constraints (the provider enum is `ingredientSet | check`):
    - `ingredientSet`: each `IngredientSet` must resolve deterministically to exactly one `ResultGroup` (via `IngredientSet.resultGroupId`, or implicitly when only one result group exists).
-   - `macroOutcome`: a check macro must be resolvable (`Recipe.resultSelection.macroUuid` or fallback to `CraftingSystem.craftingCheck.macroUuid`).
-   - `rollTableOutcome`: `Recipe.resultSelection.rollTableUuid` is required.
+   - `check`: the system crafting-check outcome routes to the `ResultGroup` of the same name; crafting checks must be enabled on the system.
 6. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
 7. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
@@ -843,7 +839,7 @@ CraftingRunStepState = {
   lastCheckResult?: {
     success: boolean,
     reason: string,   // user-friendly text returned by the macro explaining the result
-    outcome?: string, // routed/alchemy macroOutcome mode
+    outcome?: string, // routed/alchemy check provider
     value?: number,   // progressive mode
     data?: object,
   },
@@ -874,7 +870,7 @@ CraftingRunStepState = {
 2. `timeGate` is only valid when the corresponding recipe step has `timeRequirement`.
 3. `timeGate.availableAt` must be `> initiatedAt` when both are present.
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
-5. `lastCheckResult.outcome` is only valid in routed/alchemy when provider is `macroOutcome`; `lastCheckResult.value` is only valid in progressive mode.
+5. `lastCheckResult.outcome` is only valid in routed/alchemy when provider is `check`; `lastCheckResult.value` is only valid in progressive mode.
 6. `failureReason` is required when `status` is `failed`.
 
 ## Actor Flags
@@ -1139,13 +1135,13 @@ Input context must include:
 
 Return by mode:
 
-- Simple, routed (`ingredientSet`), routed (`rollTableOutcome`), and alchemy with non-macro routing
+- Simple and routed/alchemy (`ingredientSet`)
 
 ```js
 { success: boolean, description?: string, data?: object }
 ```
 
-- Routed (`macroOutcome`) and alchemy (`macroOutcome`)
+- Routed (`check`) and alchemy (`check`)
 
 ```js
 { success: boolean, outcome: string, description?: string, data?: object }
@@ -1157,7 +1153,7 @@ Return by mode:
 { success: boolean, value: number, description?: string, data?: object }
 ```
 
-Normalization and interpretation rules for `outcome` in routed/alchemy `macroOutcome`:
+Normalization and interpretation rules for `outcome` in routed/alchemy `check`:
 
 1. `outcome` is required and must be interpreted using trim-normalized, case-insensitive comparison.
 2. Preferred reserved keyword:

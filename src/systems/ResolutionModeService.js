@@ -15,10 +15,6 @@ import {
  *    result group (the former `mapped` behavior, now canonical).
  *  - `check` — the system-level crafting-check outcome name routes to the
  *    `ResultGroup` of the same name. This is the canonical check-driven provider.
- *  - `macroOutcome` / `rollTableOutcome` — legacy check-driven providers (route
- *    by macro outcome / roll-table draw) pending removal in favour of `check`
- *    (tracked in #424); still accepted and resolved like `check` until they are
- *    migrated away.
  *
  * Legacy `mapped`/`tiered` are NOT live modes. They are accepted only as
  * one-time inputs to the 1.4.0 migration (`migrateLegacyResolutionModes`), and
@@ -60,7 +56,7 @@ export class ResolutionModeService {
   // Routed name-normalization + reserved-keyword helpers. Shared with Recipe.js
   // via ../utils/routedOutcomeKeywords.js so runtime resolution and authoring-time
   // validation use one source of truth. They apply under every routed provider
-  // (ingredientSet / macroOutcome / rollTableOutcome), not just rollTableOutcome.
+  // (ingredientSet / check).
   // ---------------------------------------------------------------------------
 
   _normalizeName(name) {
@@ -105,75 +101,6 @@ export class ResolutionModeService {
       }
       seenNames.add(normalized);
     }
-  }
-
-  // ---------------------------------------------------------------------------
-  // rollTableOutcome resolution
-  // ---------------------------------------------------------------------------
-
-  /**
-   * @deprecated `rollTableOutcome` is a legacy routed provider slated for removal
-   *   in favour of `check` (system crafting-check outcome). Retained only until a
-   *   migration moves existing recipes off it. Removal is tracked in #424.
-   */
-  async resolveByRollTable(recipe, step, allGroups) {
-    const selection = this.getResultSelection(recipe, step);
-    const tableUuid = selection?.rollTableUuid;
-    if (!tableUuid) {
-      return { groups: [], meta: { error: 'No roll table UUID configured' } };
-    }
-
-    const table = await fromUuid(tableUuid);
-    if (!table || typeof table.draw !== 'function') {
-      return { groups: [], meta: { error: `Roll table not found: ${tableUuid}` } };
-    }
-
-    let drawResult;
-    try {
-      drawResult = await table.draw({ displayChat: false });
-    } catch (error) {
-      return { groups: [], meta: { error: `Roll table draw failed: ${error.message}` } };
-    }
-
-    const results = drawResult?.results || [];
-    if (results.length === 0) {
-      return { groups: [], meta: { error: 'Roll table draw returned no results' } };
-    }
-
-    const drawnName = results[0]?.text || results[0]?.name || '';
-    const normalized = this._normalizeName(drawnName);
-
-    if (this._isFailKeyword(normalized)) {
-      return {
-        groups: [],
-        meta: { drawnName, normalized, disposition: 'fail' },
-      };
-    }
-
-    if (this._isMissKeyword(normalized)) {
-      return {
-        groups: [],
-        meta: { drawnName, normalized, disposition: 'miss' },
-      };
-    }
-
-    const matched = (allGroups || []).filter((g) => this._normalizeName(g.name) === normalized);
-    if (matched.length === 0) {
-      return {
-        groups: [],
-        meta: {
-          drawnName,
-          normalized,
-          disposition: 'misconfiguration',
-          error: `No result group matches drawn name "${drawnName}"`,
-        },
-      };
-    }
-
-    return {
-      groups: matched.slice(0, 1),
-      meta: { drawnName, normalized, disposition: 'success', matchedGroupId: matched[0].id },
-    };
   }
 
   /**
@@ -236,20 +163,13 @@ export class ResolutionModeService {
             errors.push(
               `Step "${step.name || step.id}" in routed mode requires resultSelection.provider`
             );
-        } else if (
-          !['ingredientSet', 'check', 'macroOutcome', 'rollTableOutcome'].includes(provider)
-        ) {
+        } else if (!['ingredientSet', 'check'].includes(provider)) {
           errors.push('Invalid result selection provider: ' + provider);
         }
-        const selection = this.getResultSelection(recipe, step);
-        // @deprecated rollTableOutcome / macroOutcome — legacy check-driven
-        // providers superseded by `check`; these branches go away once a
-        // migration moves existing recipes onto `check` (tracked in #424).
-        if (provider === 'rollTableOutcome' && !selection?.rollTableUuid) {
-          errors.push('rollTableOutcome provider requires a roll table UUID');
-        }
-        if (provider === 'macroOutcome' && !checkEnabled) {
-          errors.push('macroOutcome provider requires crafting checks enabled');
+        // `check` routes by the system crafting-check outcome and therefore
+        // requires crafting checks enabled.
+        if (provider === 'check' && !checkEnabled) {
+          errors.push('check provider requires crafting checks enabled');
         }
         if (provider === 'ingredientSet') {
           // Reference integrity: an ingredientSet resultGroupId must point at a
@@ -265,7 +185,7 @@ export class ResolutionModeService {
           }
         }
         // Reserved/duplicate ResultGroup.name applies under EVERY routed provider
-        // (spec 004 §Validation lines 79-80), not just rollTableOutcome.
+        // (spec 004 §Validation lines 79-80).
         this._validateRoutedGroupNames(groups, step, errors);
       }
 
@@ -323,11 +243,13 @@ export class ResolutionModeService {
         // Missing provider is a completeness gap (drafting shell); waive it unless
         // a complete recipe is required. An invalid provider VALUE still errors below.
         if (requireComplete) errors.push('Alchemy recipe requires resultSelection.provider');
-      } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
+      } else if (!['ingredientSet', 'check'].includes(provider)) {
         errors.push('Invalid result selection provider: ' + provider);
       }
-      if (provider === 'rollTableOutcome' && !recipe?.resultSelection?.rollTableUuid) {
-        errors.push('rollTableOutcome provider requires a roll table UUID');
+      // `check` routes by the system crafting-check outcome and requires crafting
+      // checks enabled.
+      if (provider === 'check' && !checkEnabled) {
+        errors.push('check provider requires crafting checks enabled');
       }
     }
 
@@ -456,19 +378,13 @@ export class ResolutionModeService {
     return tier?.id || null;
   }
 
-  resolveResultGroups({
-    recipe,
-    step,
-    ingredientSet,
-    checkResult,
-    selectedResultGroupId = null,
-    rollTableResult = null,
-  }) {
-    // If a rollTableResult was pre-resolved (for rollTableOutcome provider), use it directly
-    if (rollTableResult) {
-      return rollTableResult;
-    }
-
+  /**
+   * Resolve the result group(s) awarded for a craft attempt, dispatching on the
+   * system resolution mode. Thin dispatcher: each mode's logic lives in a private
+   * `_resolve*ResultGroups` helper so this method stays a simple switch.
+   * @returns {{groups: Array, meta: object}}
+   */
+  resolveResultGroups({ recipe, step, ingredientSet, checkResult, selectedResultGroupId = null }) {
     const system = this.getSystem(recipe);
     const mode = this.getMode(recipe);
     const allGroups =
@@ -479,167 +395,201 @@ export class ResolutionModeService {
           : [];
 
     if (mode === 'simple') {
-      return {
-        groups: allGroups.slice(0, 1),
-        meta: {},
-      };
+      return { groups: allGroups.slice(0, 1), meta: {} };
     }
-
     if (mode === 'routed') {
-      const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
-      const provider = this.getProviderForStep(recipe, step);
-      if (provider === 'ingredientSet') {
-        // Former `mapped` behavior: route by ingredientSet.resultGroupId, with the
-        // legacy resultMapping fallback, then first-group fallback.
-        const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
-        if (mappedId)
-          return { groups: allGroups.filter((group) => group.id === mappedId), meta: {} };
-        if (Array.isArray(ingredientSet?.resultMapping) && ingredientSet.resultMapping.length > 0) {
-          return {
-            groups: allGroups.filter((group) => ingredientSet.resultMapping.includes(group.id)),
-            meta: {},
-          };
-        }
-        return { groups: allGroups.slice(0, 1), meta: {} };
-      }
-      // `check` is the canonical successor to `macroOutcome`: both route by the
-      // crafting-check outcome to a result group.
-      if (provider === 'macroOutcome' || provider === 'check') {
-        const normalized = this._normalizeName(outcome);
-        // Explicit tier→result-set assignment (authored in the recipe editor)
-        // wins: resolve the outcome to a routed-check tier id, then route to the
-        // result group that lists it in `checkOutcomeIds`.
-        const tierId = this._resolveRoutedTierId(system, outcome);
-        if (tierId) {
-          const assigned = allGroups.filter(
-            (group) =>
-              Array.isArray(group.checkOutcomeIds) && group.checkOutcomeIds.includes(tierId)
-          );
-          if (assigned.length > 0)
-            return { groups: assigned.slice(0, 1), meta: { outcome, disposition: 'success' } };
-        }
-        // Fallback for un-migrated recipes: fail/miss keywords, then match the
-        // outcome name to a result group of that name.
-        if (this._isFailKeyword(normalized))
-          return { groups: [], meta: { outcome, disposition: 'fail' } };
-        if (this._isMissKeyword(normalized))
-          return { groups: [], meta: { outcome, disposition: 'miss' } };
-        const matched = allGroups.filter((group) => this._normalizeName(group.name) === normalized);
-        if (matched.length === 0) {
-          return {
-            groups: [],
-            meta: {
-              outcome,
-              disposition: 'misconfiguration',
-              error: `No result group matches outcome "${outcome}"`,
-            },
-          };
-        }
-        return { groups: matched.slice(0, 1), meta: { outcome, disposition: 'success' } };
-      }
-      return { groups: allGroups.slice(0, 1), meta: {} };
+      return this._resolveRoutedResultGroups({
+        recipe,
+        step,
+        ingredientSet,
+        checkResult,
+        selectedResultGroupId,
+        system,
+        allGroups,
+      });
     }
-
     if (mode === 'progressive') {
-      const group = allGroups[0];
-      if (!group) return { groups: [], meta: { awardedResultIds: [], remaining: 0 } };
-
-      const value = Number(checkResult?.value || 0);
-      const awardMode = system?.craftingCheck?.progressive?.awardMode || 'equal';
-      const awarded = [];
-      let remaining = value;
-
-      for (const result of group.results || []) {
-        const cost = this._getDifficulty(system, result?.componentId || result?.systemItemId);
-        if (!Number.isFinite(cost) || cost < 1) continue;
-
-        if (awardMode === 'exceed') {
-          if (remaining > cost) {
-            awarded.push(result);
-            remaining -= cost;
-          } else {
-            break;
-          }
-          continue;
-        }
-
-        if (awardMode === 'partial') {
-          if (remaining >= cost) {
-            awarded.push(result);
-            remaining -= cost;
-            continue;
-          }
-          if (remaining > 0) {
-            awarded.push(result);
-            remaining = 0;
-          }
-          break;
-        }
-
-        // equal
-        if (remaining >= cost) {
-          awarded.push(result);
-          remaining -= cost;
-        } else {
-          break;
-        }
-      }
-
-      return {
-        groups: [
-          {
-            ...group,
-            results: awarded,
-          },
-        ],
-        meta: {
-          awardedResultIds: awarded.map((r) => r.id),
-          remaining,
-        },
-      };
+      return this._resolveProgressiveResultGroups({ checkResult, system, allGroups });
     }
-
     if (mode === 'alchemy') {
-      const provider = this.getProvider(recipe);
-      if (provider === 'ingredientSet') {
-        const mappedId = ingredientSet?.resultGroupId || null;
-        if (mappedId) {
-          return { groups: allGroups.filter((g) => g.id === mappedId), meta: {} };
-        }
-        return { groups: allGroups.slice(0, 1), meta: {} };
-      }
-      if (provider === 'macroOutcome') {
-        const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
-        const normalized = this._normalizeName(outcome);
-        if (this._isFailKeyword(normalized)) {
-          return { groups: [], meta: { outcome, disposition: 'fail' } };
-        }
-        if (this._isMissKeyword(normalized)) {
-          return { groups: [], meta: { outcome, disposition: 'miss' } };
-        }
-        const matched = allGroups.filter((g) => this._normalizeName(g.name) === normalized);
-        if (matched.length === 0) {
-          return {
-            groups: [],
-            meta: {
-              outcome,
-              disposition: 'misconfiguration',
-              error: `No result group matches outcome "${outcome}"`,
-            },
-          };
-        }
-        return { groups: matched.slice(0, 1), meta: { outcome, disposition: 'success' } };
-      }
-      return { groups: allGroups.slice(0, 1), meta: {} };
+      return this._resolveAlchemyResultGroups({ recipe, ingredientSet, checkResult, allGroups });
     }
 
     return {
       groups: [],
-      meta: {
-        error: 'Unknown resolution mode',
-        disposition: 'error',
-      },
+      meta: { error: 'Unknown resolution mode', disposition: 'error' },
     };
+  }
+
+  /**
+   * Route a normalized check `outcome` to a result group by NAME, shared by the
+   * routed and alchemy `check` providers (both key on the crafting-check outcome).
+   * Order: fail keyword → miss keyword → exact name match → misconfiguration.
+   * @param {string|null} outcome raw outcome string (already coerced to string|null)
+   * @param {Array} allGroups candidate result groups
+   * @returns {{groups: Array, meta: object}}
+   */
+  _routeByOutcomeName(outcome, allGroups) {
+    const normalized = this._normalizeName(outcome);
+    if (this._isFailKeyword(normalized))
+      return { groups: [], meta: { outcome, disposition: 'fail' } };
+    if (this._isMissKeyword(normalized))
+      return { groups: [], meta: { outcome, disposition: 'miss' } };
+    const matched = (allGroups || []).filter(
+      (group) => this._normalizeName(group.name) === normalized
+    );
+    if (matched.length === 0) {
+      return {
+        groups: [],
+        meta: {
+          outcome,
+          disposition: 'misconfiguration',
+          error: `No result group matches outcome "${outcome}"`,
+        },
+      };
+    }
+    return { groups: matched.slice(0, 1), meta: { outcome, disposition: 'success' } };
+  }
+
+  /**
+   * Route by the chosen ingredient set's `resultGroupId` (the former `mapped`
+   * behavior), with the legacy `resultMapping` fallback, then first-group
+   * fallback. Shared by routed and alchemy `ingredientSet` providers.
+   * @param {{resultGroupId?: string, resultMapping?: string[]}} ingredientSet
+   * @param {Array} allGroups
+   * @param {string|null} selectedResultGroupId explicit override (routed only)
+   * @returns {{groups: Array, meta: object}}
+   */
+  _routeByIngredientSet(ingredientSet, allGroups, selectedResultGroupId = null) {
+    const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
+    if (mappedId) {
+      return { groups: allGroups.filter((group) => group.id === mappedId), meta: {} };
+    }
+    if (Array.isArray(ingredientSet?.resultMapping) && ingredientSet.resultMapping.length > 0) {
+      return {
+        groups: allGroups.filter((group) => ingredientSet.resultMapping.includes(group.id)),
+        meta: {},
+      };
+    }
+    return { groups: allGroups.slice(0, 1), meta: {} };
+  }
+
+  /**
+   * Routed mode resolution: `ingredientSet` routes by mapping; `check` routes by
+   * explicit tier→result-set assignment first, then by outcome name.
+   * @returns {{groups: Array, meta: object}}
+   */
+  _resolveRoutedResultGroups({
+    recipe,
+    step,
+    ingredientSet,
+    checkResult,
+    selectedResultGroupId,
+    system,
+    allGroups,
+  }) {
+    const provider = this.getProviderForStep(recipe, step);
+    if (provider === 'ingredientSet') {
+      return this._routeByIngredientSet(ingredientSet, allGroups, selectedResultGroupId);
+    }
+    if (provider === 'check') {
+      const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
+      // Explicit tier→result-set assignment (authored in the recipe editor) wins:
+      // resolve the outcome to a routed-check tier id, then route to the result
+      // group that lists it in `checkOutcomeIds`.
+      const assigned = this._routeByTierAssignment(system, outcome, allGroups);
+      if (assigned) return assigned;
+      // Fallback for recipes without explicit tier assignment: fail/miss keywords,
+      // then match the outcome name to a result group of that name.
+      return this._routeByOutcomeName(outcome, allGroups);
+    }
+    return { groups: allGroups.slice(0, 1), meta: {} };
+  }
+
+  /**
+   * Resolve a routed-check outcome to its explicit tier→result-set assignment
+   * (`ResultGroup.checkOutcomeIds`), or null when there is no tier match or no
+   * group is assigned to it (so the caller falls back to name matching).
+   * @returns {{groups: Array, meta: object}|null}
+   */
+  _routeByTierAssignment(system, outcome, allGroups) {
+    const tierId = this._resolveRoutedTierId(system, outcome);
+    if (!tierId) return null;
+    const assigned = allGroups.filter(
+      (group) => Array.isArray(group.checkOutcomeIds) && group.checkOutcomeIds.includes(tierId)
+    );
+    if (assigned.length === 0) return null;
+    return { groups: assigned.slice(0, 1), meta: { outcome, disposition: 'success' } };
+  }
+
+  /**
+   * Alchemy mode resolution: `ingredientSet` routes by mapping; `check` routes by
+   * the crafting-check outcome name (shared with routed via `_routeByOutcomeName`).
+   * @returns {{groups: Array, meta: object}}
+   */
+  _resolveAlchemyResultGroups({ recipe, ingredientSet, checkResult, allGroups }) {
+    const provider = this.getProvider(recipe);
+    if (provider === 'ingredientSet') {
+      const mappedId = ingredientSet?.resultGroupId || null;
+      if (mappedId) {
+        return { groups: allGroups.filter((g) => g.id === mappedId), meta: {} };
+      }
+      return { groups: allGroups.slice(0, 1), meta: {} };
+    }
+    if (provider === 'check') {
+      const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
+      return this._routeByOutcomeName(outcome, allGroups);
+    }
+    return { groups: allGroups.slice(0, 1), meta: {} };
+  }
+
+  /**
+   * Progressive mode resolution: spend the check `value` against ordered result
+   * difficulties using the system `awardMode` (`equal` | `exceed` | `partial`).
+   * @returns {{groups: Array, meta: object}}
+   */
+  _resolveProgressiveResultGroups({ checkResult, system, allGroups }) {
+    const group = allGroups[0];
+    if (!group) return { groups: [], meta: { awardedResultIds: [], remaining: 0 } };
+
+    const awardMode = system?.craftingCheck?.progressive?.awardMode || 'equal';
+    const awarded = [];
+    let remaining = Number(checkResult?.value || 0);
+
+    for (const result of group.results || []) {
+      const cost = this._getDifficulty(system, result?.componentId || result?.systemItemId);
+      if (!Number.isFinite(cost) || cost < 1) continue;
+      const step = this._awardProgressiveResult(awardMode, result, cost, remaining);
+      if (step.award) awarded.push(result);
+      remaining = step.remaining;
+      if (step.stop) break;
+    }
+
+    return {
+      groups: [{ ...group, results: awarded }],
+      meta: { awardedResultIds: awarded.map((r) => r.id), remaining },
+    };
+  }
+
+  /**
+   * Decide whether the current ordered progressive result is awarded under
+   * `awardMode`, and the resulting `remaining` budget plus whether to stop the
+   * loop. Pure helper for `_resolveProgressiveResultGroups`.
+   * @returns {{award: boolean, remaining: number, stop: boolean}}
+   */
+  _awardProgressiveResult(awardMode, result, cost, remaining) {
+    if (awardMode === 'exceed') {
+      if (remaining > cost) return { award: true, remaining: remaining - cost, stop: false };
+      return { award: false, remaining, stop: true };
+    }
+    if (awardMode === 'partial') {
+      if (remaining >= cost) return { award: true, remaining: remaining - cost, stop: false };
+      if (remaining > 0) return { award: true, remaining: 0, stop: true };
+      return { award: false, remaining, stop: true };
+    }
+    // equal
+    if (remaining >= cost) return { award: true, remaining: remaining - cost, stop: false };
+    return { award: false, remaining, stop: true };
   }
 
   validateCheckResult({ recipe, checkResult }) {
@@ -647,7 +597,7 @@ export class ResolutionModeService {
     if (mode === 'routed') {
       const provider = this.getProvider(recipe);
       return (
-        !['macroOutcome', 'check'].includes(provider) ||
+        provider !== 'check' ||
         !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0)
       );
     }

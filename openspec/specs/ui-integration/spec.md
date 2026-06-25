@@ -535,18 +535,14 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 
 - Result selection provider selector:
   - `ingredientSet`
-  - `macroOutcome`
-  - `rollTableOutcome`
+  - `check`
 - `ingredientSet` provider UI:
   - Ingredient sets map to result groups via `resultGroupId`.
   - Validation enforces deterministic mapping for all satisfiable sets.
-- `macroOutcome` provider UI:
+- `check` provider UI:
+  - Routes by the system crafting-check outcome; crafting checks must be enabled on the system.
   - Optional per-recipe macro override field.
-  - Helper text states macro returns `{ outcome, description? }`.
-  - Outcome routes by normalized match to `ResultGroup.name` (not by explicit mapping table).
-- `rollTableOutcome` provider UI:
-  - Roll table picker (`rollTableUuid`).
-  - Helper text states drawn result name routes by normalized match to `ResultGroup.name`.
+  - Result groups carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
 
 ### Alchemy Recipe UI (GM Editor)

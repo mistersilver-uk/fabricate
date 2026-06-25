@@ -115,7 +115,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
    - record the attempt as failed run history.
 4. If signature matches:
    - resolve the target recipe + ingredient set,
-   - execute provider-specific routing (`ingredientSet`, `macroOutcome`, or `rollTableOutcome`),
+   - execute provider-specific routing (`ingredientSet` or `check`),
    - if routed output does not resolve to a valid result group, abort with crafting-system misconfiguration error and do not apply player-failure consumption,
    - if routing returns a reserved failure keyword, apply alchemy failure policy (`consumeOnFail`, default true),
    - on success, consume inputs and create outputs normally.
@@ -311,7 +311,7 @@ When recipe-level `ingredientSets` or `resultGroups` are empty:
   - OR across ingredient sets
   - AND across groups within a set
   - OR within group options
-- Unit tests for routed provider resolution (`ingredientSet`, `macroOutcome`, `rollTableOutcome`).
+- Unit tests for routed provider resolution (`ingredientSet`, `check`).
 - Unit tests for time/currency gate checks.
 - Integration tests for end-to-end multistep crafting, resume, and completion.
 - Unit tests for alchemy no-signature handling (failure + ingredient consumption + history entry).

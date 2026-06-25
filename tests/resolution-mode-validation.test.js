@@ -1,7 +1,7 @@
 /**
  * Unit tests for ResolutionModeService.validateRecipe (T-021)
  * Tests mode-specific validation logic for simple, routed (ingredientSet /
- * macroOutcome / rollTableOutcome), and progressive modes.
+ * check), and progressive modes.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -268,11 +268,11 @@ test('routed ingredientSet — zero result groups → invalid', () => {
 // AC 3 — Routed mode: provider-dependent check requirement + reserved/duplicate
 // ResultGroup.name rules under EVERY routed provider (the legacy tiered
 // outcomeRouting validation is gone; its behavior is reproduced by migrated
-// macroOutcome data).
+// `check` data).
 // ---------------------------------------------------------------------------
 
 /**
- * Build a routed system with crafting checks enabled (the macroOutcome contract).
+ * Build a routed system with crafting checks enabled (the `check` contract).
  */
 function buildRoutedCheckSystem(overrides = {}) {
   return buildSystem({
@@ -302,10 +302,10 @@ function buildRoutedNamedStep(provider, overrides = {}) {
   });
 }
 
-test('routed macroOutcome — checks enabled, distinct group names → valid', () => {
+test('routed check — checks enabled, distinct group names → valid', () => {
   const system = buildRoutedCheckSystem();
   const service = buildService(system);
-  const recipe = buildRecipe([buildRoutedNamedStep('macroOutcome')]);
+  const recipe = buildRecipe([buildRoutedNamedStep('check')]);
 
   const result = service.validateRecipe(recipe);
 
@@ -313,19 +313,19 @@ test('routed macroOutcome — checks enabled, distinct group names → valid', (
   assert.equal(result.errors.length, 0);
 });
 
-test('routed macroOutcome — crafting checks disabled → invalid (check required)', () => {
+test('routed check — crafting checks disabled → invalid (check required)', () => {
   const system = buildRoutedCheckSystem({
     craftingCheck: { enabled: false, macroUuid: null, outcomes: [], progressive: null },
   });
   const service = buildService(system);
-  const recipe = buildRecipe([buildRoutedNamedStep('macroOutcome')]);
+  const recipe = buildRecipe([buildRoutedNamedStep('check')]);
 
   const result = service.validateRecipe(recipe);
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /macroOutcome/i.test(e) || /check/i.test(e)),
-    `expected error about macroOutcome requiring checks, got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /check/i.test(e)),
+    `expected error about check requiring checks, got: ${JSON.stringify(result.errors)}`
   );
 });
 
@@ -339,39 +339,22 @@ test('routed ingredientSet — check optional (no checks enabled still valid)', 
   assert.equal(result.valid, true, result.errors.join(', '));
 });
 
-test('routed rollTableOutcome — requires a roll table UUID', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
-  const service = buildService(system);
-  const recipe = buildRecipe([buildRoutedNamedStep('rollTableOutcome')]);
+// The legacy `macroOutcome` / `rollTableOutcome` providers were removed in 1.6.0
+// (issue 424); they are no longer valid provider VALUES.
+for (const legacy of ['macroOutcome', 'rollTableOutcome']) {
+  test(`routed ${legacy} — removed legacy provider is INVALID`, () => {
+    const system = buildRoutedCheckSystem();
+    const service = buildService(system);
+    const recipe = buildRecipe([buildRoutedNamedStep(legacy)]);
 
-  const result = service.validateRecipe(recipe);
+    const result = service.validateRecipe(recipe);
 
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((e) => /roll table UUID/i.test(e)),
-    `expected error about a missing roll table UUID, got: ${JSON.stringify(result.errors)}`
-  );
-});
-
-test('routed rollTableOutcome — roll table UUID present → valid (check not required)', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
-  const service = buildService(system);
-  const recipe = buildRecipe([
-    buildRoutedNamedStep('rollTableOutcome', {
-      resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'RollTable.x' },
-    }),
-  ]);
-
-  const result = service.validateRecipe(recipe);
-
-  assert.equal(result.valid, true, result.errors.join(', '));
-});
-
-// The routed `resultSelection` for a provider (rollTableOutcome needs a UUID).
-function routedResultSelection(provider) {
-  return provider === 'rollTableOutcome'
-    ? { provider, rollTableUuid: 'RollTable.x' }
-    : { provider };
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.errors.some((e) => /Invalid result selection provider/i.test(e)),
+      `expected invalid-provider error for ${legacy}, got: ${JSON.stringify(result.errors)}`
+    );
+  });
 }
 
 // Validate a routed recipe whose single step carries the given result groups.
@@ -380,14 +363,14 @@ function validateRoutedNamedGroups(provider, resultGroups) {
   const recipe = buildRecipe([
     buildRoutedNamedStep(provider, {
       resultGroups,
-      resultSelection: routedResultSelection(provider),
+      resultSelection: { provider },
     }),
   ]);
   return service.validateRecipe(recipe);
 }
 
 // Reserved-name + duplicate-name rules apply under EVERY routed provider.
-for (const provider of ['ingredientSet', 'macroOutcome', 'rollTableOutcome']) {
+for (const provider of ['ingredientSet', 'check']) {
   test(`routed ${provider} — reserved ResultGroup.name (hazard family) → invalid`, () => {
     const result = validateRoutedNamedGroups(provider, [
       { id: 'rg-ok', name: 'Fine', results: [] },

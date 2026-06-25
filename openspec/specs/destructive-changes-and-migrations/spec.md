@@ -207,8 +207,8 @@ The pre-release migration path removes legacy crafting modes `mapped` and `tiere
    - `tiered` -> `routed`
 2. Recipe migration:
    - legacy mapped recipes -> `resultSelection.provider = "ingredientSet"`
-   - legacy tiered recipes -> `resultSelection.provider = "macroOutcome"`
-2a. For former `tiered` recipes, each `outcomeRouting[outcome] -> groupId` entry is reconciled by renaming the target `ResultGroup.name` to `outcome` (so canonical `macroOutcome` name-matching reproduces the legacy routing), then `outcomeRouting` is removed. Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones; an outcome with no resolvable group is logged and left as a craft-time misconfiguration; an unroutable group keeps its name; a reserved-keyword outcome drops to the failure path without renaming any group; an unavoidable normalized `ResultGroup.name` collision makes the recipe unmigratable (hard cleanup per item 3).
+   - legacy tiered recipes -> `resultSelection.provider = "check"`
+2a. For former `tiered` recipes, each `outcomeRouting[outcome] -> groupId` entry is reconciled by renaming the target `ResultGroup.name` to `outcome` (so canonical `check` name-matching reproduces the legacy routing), then `outcomeRouting` is removed. Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones; an outcome with no resolvable group is logged and left as a craft-time misconfiguration; an unroutable group keeps its name; a reserved-keyword outcome drops to the failure path without renaming any group; an unavoidable normalized `ResultGroup.name` collision makes the recipe unmigratable (hard cleanup per item 3).
 3. Mode and recipe migration is best-effort with hard cleanup on invalid documents:
    - recipes that cannot be migrated are deleted,
    - cascading cleanup is applied immediately (runs, learned flags, UI prefs, and stale references),
@@ -264,6 +264,21 @@ The gathering economy limitation moved from a single mutually-exclusive `mode` e
 2. Already-migrated economies (no `mode`, toggles present) are left untouched, so a re-run is a no-op.
 3. Mutated setting key is `gatheringConfig` (`systems[id].economy`). A read-time normalizer applies the same `mode → toggles` mapping (gated on the toggle KEY being absent) so an un-migrated world behaves identically before the migration runs.
 
+### Legacy Result-Selection Provider Removal (`1.6.0`)
+
+The legacy routed result-selection providers `macroOutcome` and `rollTableOutcome` are removed; result routing is canonicalized on the `check` provider.
+The `1.6.0` migration (`src/migration/migrateRemoveResultSelectionProviders.js`) rewrites persisted recipes onto `check` and drops the now-unsupported roll-table mechanism.
+It is pure, idempotent, by-reference, and version-gated.
+
+1. Recipes — rewrite `resultSelection.provider` `macroOutcome | rollTableOutcome → check` at the recipe level, on every `steps[].resultSelection`, and on alchemy recipe-level (no-`steps[]`) recipes.
+   `macroOutcome → check` is behaviourally equivalent (lossless): both route by the crafting-check outcome name.
+2. `rollTableOutcome → check` is lossy: the table-draw mechanism is gone, so `rollTableUuid` is DROPPED from every selection.
+   Each recipe/step whose `rollTableUuid` was dropped is collected into a recovery-warning payload listing the affected recipes/steps for manual reconfiguration.
+3. Gathering routed tasks (`gatheringConfig.systems[*].tasks[*]`) lose their now-unsupported per-task `resultSelection`; the stripped tasks are collected into the same recovery-warning payload, which instructs the GM to populate the system `gatheringCraftingCheck.routed.rollFormula` so routed gathering resolves via the system check formula.
+4. The recovery-warning payload is surfaced through the runner's transient-field pattern (mirroring `_migratedCatalystCount`): captured in the runner's summary, surfaced as a one-time GM `ui.notifications` notice, then stripped so it is never persisted as a setting.
+5. Idempotent: once no `macroOutcome`/`rollTableOutcome` provider, no `rollTableUuid`, and no gathering-task `resultSelection` remain, a re-run is a no-op.
+6. Recovery from the dropped `rollTableUuid`: the table-draw routing mechanism no longer exists, so a former `rollTableOutcome` recipe must be reconfigured by the GM — name its `ResultGroup`s to match the system crafting-check outcomes the `check` provider routes by (the recovery-warning notice lists the affected recipes/steps).
+
 ## Testing Requirements
 
 - Unit tests for each destructive operation clean-up path.
@@ -278,6 +293,7 @@ The gathering economy limitation moved from a single mutually-exclusive `mode` e
 - Unit tests for pre-release recipe-item migration (`linkedRecipeItemUuid` -> `recipeItemDefinitions` + `recipeItemId`).
 - Unit tests for unmigratable recipe deletion with cascade cleanup and JSON logging output.
 - Unit tests for provider-switch stale-config cleanup.
+- Unit tests for the `1.6.0` legacy-provider removal migration: recipe-level, per-step, and alchemy recipe-level `macroOutcome | rollTableOutcome → check` rewrite; `rollTableUuid` drop; gathering-task `resultSelection` stripping; the surfaced-then-stripped recovery-warning payload; and the chained `1.4.0 → 1.6.0` catch-up path.
 - Unit tests for partial import conflict handling and aggregated conflict reporting.
 - Unit tests for alchemy global save blocking when any system collision exists.
 - Integration tests for mode changes, recipe deletion, and startup migration.

@@ -1,20 +1,19 @@
 /**
  * Canonical reserved routing keywords for routed-mode outcome matching.
  *
- * The routed `check` provider (and the @deprecated legacy `macroOutcome` /
- * `rollTableOutcome` providers, pending removal — tracked in #424) route a check
- * outcome / drawn name to a `ResultGroup` by NAME. Certain normalized names are
- * RESERVED for the failure path and never match (or name) a real result group:
+ * The routed `check` provider routes a crafting-check outcome to a `ResultGroup`
+ * by NAME. Certain normalized names are RESERVED for the failure path and never
+ * match (or name) a real result group:
  *
  *  - the FAIL family:  fail / failed / failure / f
  *  - the MISS family:  miss / missed / m / nothing / none / whiff / whiffed
  *  - the HAZARD family: hazard / danger / complication / trap / oops
  *
  * This single shared set is the source of truth for both
- * `ResolutionModeService` (runtime resolution for `macroOutcome` AND
- * `rollTableOutcome`) and `Recipe.js` (routed `ResultGroup.name` validation),
- * so the two never drift. Living in the utils layer keeps it importable from
- * both `src/models` and `src/systems` without a layering violation.
+ * `ResolutionModeService` (runtime resolution for the `check` provider) and
+ * `Recipe.js` (routed `ResultGroup.name` validation), so the two never drift.
+ * Living in the utils layer keeps it importable from both `src/models` and
+ * `src/systems` without a layering violation.
  */
 
 export const FAIL_KEYWORDS = Object.freeze(['fail', 'failed', 'failure', 'f']);
