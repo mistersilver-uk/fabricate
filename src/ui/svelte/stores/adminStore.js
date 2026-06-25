@@ -6232,6 +6232,10 @@ export function createAdminStore(services) {
   // Persist the structured routed crafting check (type + roll expression +
   // outcome tiers) authored in the Checks editor, preserving the rest of the
   // craftingCheck config. The manager normalizes the routed payload on write.
+  // Deleting an outcome tier here leaves dangling tier ids in recipes'
+  // `ResultGroup.checkOutcomeIds`; strip them on save so they don't silently rot
+  // (the engine name-fallback keeps them inert at craft time, but a stale id
+  // renders as an "unknown" routing chip and a readiness warning).
   async function saveCraftingCheckRouted(routed) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -6242,7 +6246,82 @@ export function createAdminStore(services) {
     await systemManager.updateSystem(sysId, {
       craftingCheck: { ...existing, routed },
     });
+    await _stripDeletedRoutedTierIds(sysId, routed);
     await refresh();
+  }
+
+  // Build the set of outcome-tier ids that still exist in the saved routed config
+  // (the active type's tier list).
+  function _validRoutedTierIds(routed) {
+    const tiers = routed?.type === 'fixed' ? routed?.fixedOutcomes : routed?.relativeOutcomes;
+    const ids = new Set();
+    for (const tier of Array.isArray(tiers) ? tiers : []) {
+      if (tier?.id) ids.add(tier.id);
+    }
+    return ids;
+  }
+
+  // Drop any `checkOutcomeIds` entry that references a tier id no longer present
+  // in the saved routed config, across every recipe in the system (recipe-level
+  // result groups and per-step groups). Returns the count of result groups changed.
+  function _filterGroupOutcomeIds(group, validIds) {
+    const ids = Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : [];
+    const kept = ids.filter((id) => validIds.has(id));
+    if (kept.length === ids.length) return { group, changed: false };
+    return { group: { ...group, checkOutcomeIds: kept }, changed: true };
+  }
+
+  async function _stripDeletedRoutedTierIds(sysId, routed) {
+    const recipeManager = services.getRecipeManager();
+    const validIds = _validRoutedTierIds(routed);
+    const recipes = recipeManager.getRecipes({ craftingSystemId: sysId }) || [];
+    let strippedGroupCount = 0;
+
+    for (const recipe of recipes) {
+      const data = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
+      let recipeChanged = false;
+
+      const nextResultGroups = (Array.isArray(data.resultGroups) ? data.resultGroups : []).map(
+        (group) => {
+          const { group: next, changed } = _filterGroupOutcomeIds(group, validIds);
+          if (changed) {
+            recipeChanged = true;
+            strippedGroupCount += 1;
+          }
+          return next;
+        }
+      );
+
+      const nextSteps = (Array.isArray(data.steps) ? data.steps : []).map((step) => ({
+        ...step,
+        resultGroups: (Array.isArray(step?.resultGroups) ? step.resultGroups : []).map((group) => {
+          const { group: next, changed } = _filterGroupOutcomeIds(group, validIds);
+          if (changed) {
+            recipeChanged = true;
+            strippedGroupCount += 1;
+          }
+          return next;
+        }),
+      }));
+
+      if (!recipeChanged) continue;
+
+      try {
+        await recipeManager.updateRecipe(
+          data.id,
+          { resultGroups: nextResultGroups, steps: nextSteps },
+          { allowIncomplete: true, notify: false }
+        );
+      } catch (err) {
+        console.error('Fabricate | Failed to strip deleted routed tier ids from recipe:', err);
+      }
+    }
+
+    if (strippedGroupCount > 0) {
+      services.notify?.info?.(
+        `Removed deleted tier from ${strippedGroupCount} recipe result group(s).`
+      );
+    }
   }
 
   // Persist the simple pass/fail crafting check (roll formula + static/dynamic DC)

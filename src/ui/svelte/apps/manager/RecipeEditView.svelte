@@ -155,7 +155,11 @@
 
   // Validation badges: critical/warning issue counts. The draft is the single
   // source of truth, so the readiness evaluator reads it directly.
-  const readiness = $derived(evaluateRecipeReadiness({ ...(recipe || {}) }));
+  const readiness = $derived(evaluateRecipeReadiness({ ...(recipe || {}) }, {
+    systemComponents: componentTagOptions,
+    routingProvider,
+    routedOutcomeTierOptions
+  }));
   const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
   const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
   const badges = $derived({
@@ -268,6 +272,8 @@
           <RecipeValidationTab
             {recipe}
             {componentTagOptions}
+            {routingProvider}
+            {routedOutcomeTierOptions}
             onSelectIssue={selectIssue}
           />
         {/if}

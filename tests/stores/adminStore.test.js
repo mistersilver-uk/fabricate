@@ -2139,6 +2139,115 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.craftingCheck.mode, 'passFail');
     });
 
+    it('saveCraftingCheckRouted strips deleted tier ids from recipe result groups and notifies', async () => {
+      const infoMessages = [];
+      const services = createMockServices({
+        notify: { info: (m) => infoMessages.push(m), warn: () => {}, error: () => {} },
+      });
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      sys.craftingCheck = { enabled: true, mode: 'passFail', outcomes: [] };
+
+      // A recipe carrying a stale routed tier id ('t-deleted') alongside a surviving
+      // one ('t-good'), at both the recipe level and inside a step.
+      const recipeUpdates = [];
+      const recipeManager = services.getRecipeManager();
+      const recipeData = {
+        id: 'r-routed',
+        name: 'Routed Recipe',
+        craftingSystemId: 'sys1',
+        resultGroups: [
+          { id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] },
+          { id: 'g-stale', name: 'Stale', checkOutcomeIds: ['t-good', 't-deleted'] },
+        ],
+        steps: [
+          {
+            id: 'step-1',
+            resultGroups: [{ id: 'sg-stale', name: 'StepStale', checkOutcomeIds: ['t-deleted'] }],
+          },
+        ],
+      };
+      services._getRecipesMutable().push(
+        makeRecipe({
+          ...recipeData,
+          toJSON: () => recipeData,
+        })
+      );
+      const origUpdateRecipe = recipeManager.updateRecipe;
+      recipeManager.updateRecipe = async (id, updates, options) => {
+        recipeUpdates.push({ id, updates, options });
+        return origUpdateRecipe(id, updates, options);
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // The saved routed config keeps only 't-good' — 't-deleted' is gone.
+      await store.saveCraftingCheckRouted({
+        type: 'relative',
+        rollExpression: '1d20',
+        relativeOutcomes: [{ id: 't-good', name: 'Good', success: true, breakTools: false, dc: 0 }],
+        fixedOutcomes: [],
+      });
+
+      assert.equal(recipeUpdates.length, 1, 'the affected recipe is persisted once');
+      const persisted = recipeUpdates[0];
+      assert.equal(persisted.id, 'r-routed');
+      assert.equal(persisted.options.notify, false, 'batch update suppresses per-recipe toast');
+      assert.deepEqual(persisted.updates.resultGroups[0].checkOutcomeIds, ['t-good']);
+      assert.deepEqual(
+        persisted.updates.resultGroups[1].checkOutcomeIds,
+        ['t-good'],
+        'the deleted id is stripped, the surviving id stays'
+      );
+      assert.deepEqual(persisted.updates.steps[0].resultGroups[0].checkOutcomeIds, []);
+      // Two result groups (one recipe-level, one step-level) carried the deleted id.
+      assert.ok(
+        infoMessages.some((m) => m.includes('2 recipe result group')),
+        `expected a "2 recipe result group(s)" notification, got: ${JSON.stringify(infoMessages)}`
+      );
+    });
+
+    it('saveCraftingCheckRouted does not notify or persist when no recipe references a deleted tier', async () => {
+      const infoMessages = [];
+      const services = createMockServices({
+        notify: { info: (m) => infoMessages.push(m), warn: () => {}, error: () => {} },
+      });
+      const recipeManager = services.getRecipeManager();
+      const recipeData = {
+        id: 'r-clean',
+        name: 'Clean Recipe',
+        craftingSystemId: 'sys1',
+        resultGroups: [{ id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] }],
+        steps: [],
+      };
+      services._getRecipesMutable().push(
+        makeRecipe({ ...recipeData, toJSON: () => recipeData })
+      );
+      let updateCount = 0;
+      const origUpdateRecipe = recipeManager.updateRecipe;
+      recipeManager.updateRecipe = async (id, updates, options) => {
+        updateCount += 1;
+        return origUpdateRecipe(id, updates, options);
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveCraftingCheckRouted({
+        type: 'relative',
+        rollExpression: '1d20',
+        relativeOutcomes: [{ id: 't-good', name: 'Good', success: true, breakTools: false, dc: 0 }],
+        fixedOutcomes: [],
+      });
+
+      assert.equal(updateCount, 0, 'no recipe is rewritten when nothing is stale');
+      assert.equal(
+        infoMessages.some((m) => m.includes('recipe result group')),
+        false,
+        'no cleanup notification when nothing changed'
+      );
+    });
+
     it('saveCraftingCheckSimple persists the simple config and preserves other check fields', async () => {
       let updateArgs = null;
       const services = createMockServices();
