@@ -2507,11 +2507,17 @@ async function main() {
           await csm.addItemFromUuid(blockedSystemId, blockedWorldItem.uuid);
         }
         // Progressive mode with NO progressive crafting check → blocks:'system'.
-        // Gathering is enabled so the broken system also carries a TASK-kind issue
-        // (below) that deep-links to its owning environment.
+        // The aggregator's `progressiveNoCheck` blocker only fires when
+        // `checksEnabled` is false, i.e. neither `features.craftingChecks` nor
+        // `craftingCheck.enabled` is set. A freshly-created system normalizes both
+        // to false, but disable the crafting check EXPLICITLY here so the blocker
+        // is guaranteed regardless of any future default change. Gathering is
+        // enabled so the broken system also carries a TASK-kind issue (below) that
+        // deep-links to its owning environment.
         await csm.updateSystem(blockedSystemId, {
           resolutionMode: 'progressive',
-          features: { gathering: true }
+          features: { gathering: true, craftingChecks: false },
+          craftingCheck: { enabled: false }
         });
         // NOTE: progressive mode with no crafting check rejects recipe creation
         // ("Progressive mode requires crafting checks enabled"), and a recipe created
@@ -3469,7 +3475,11 @@ async function main() {
           if (await taskRow.locator('[data-overview-link="task"]').count() === 0) {
             throw new Error('System overview task row is missing its environment deep-link button.');
           }
-          await assertManagerLayoutStable(page, 'system overview');
+          // The overview is a kind-grouped LIST view (`.manager-system-overview-row`),
+          // not a table — assertManagerLayoutStable requires a table-row/edit-form
+          // selector and would throw "no table rows" here (as the gathering Settings
+          // form capture also skips it). The explicit issue-row + task-row waits above
+          // already prove the view is populated; assertNoScreenshotOverlays guards bleed.
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-system-overview');
 
