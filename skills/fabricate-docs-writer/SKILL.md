@@ -100,12 +100,14 @@ After stripping fenced code blocks, over the files you changed:
 - no fenced code blocks outside `docs/api/*`
 - no code-path or `method()` identifiers in non-API prose (user-typed formula examples like `@abilities.str.mod` are allowed)
 - every `{% link %}` target file exists, and code fences are balanced
+- `npm run lint:md` passes over the Markdown you changed (it enforces the one-sentence-per-line rule above; wrap any multi-sentence table cell's table in a markdownlint-disable region)
 - if any screenshot changed, `node --test tests/docs-screenshots.test.js` passes
 
 ## Validation rule
 
 Do not run `npm test` or `npm run build` from this skill unless the user explicitly asks.
 Those gates belong to implementation.
+Do run `npm run lint:md` (and `npm run lint:md:fix`) over the docs you change before emitting `DOCS APPROVED`, because the Markdown lint gate is part of this role.
 
 ## PR description template
 

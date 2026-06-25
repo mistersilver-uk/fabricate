@@ -294,8 +294,8 @@ Header lines must be 100 characters or fewer.
 
 ## Linting & formatting
 
-Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, and [Prettier](https://prettier.io/) for formatting.
-All three run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
+Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, [Prettier](https://prettier.io/) for formatting, and [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) (config in `.markdownlint-cli2.jsonc`) for Markdown.
+All of these run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
 
 ```bash
 npm run lint           # ESLint over the gated JS scope (fails on any warning)
@@ -304,7 +304,17 @@ npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
 npm run format         # Prettier-format the gated scope
 npm run format:check   # verify formatting (what CI runs)
+npm run lint:md        # markdownlint over all Markdown (what CI runs)
+npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
 ```
+
+### Markdown linting (markdownlint)
+
+`npm run lint:md` runs [`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2) over every authored Markdown file, using the rules in `.markdownlint-cli2.jsonc`.
+The headline rule is **one sentence per line**: every sentence sits on its own physical line, and no sentence is hard-wrapped across multiple lines.
+Run `npm run lint:md:fix` to auto-split prose, then re-run it until the count stops dropping, because a long paragraph splits one boundary per pass.
+A multi-sentence **table cell** cannot be split across lines, so wrap that table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region.
+Run this before finalising any change that touches Markdown.
 
 ### CSS linting (Stylelint)
 

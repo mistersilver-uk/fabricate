@@ -39,6 +39,7 @@ There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if 
 - `npm run build`
 - `npm run lint` (ESLint) and `npm run lint:css` (Stylelint) when the change touches files those globs cover — the `src/` JavaScript surface and `styles/**` respectively (`tests/`, `src/ui/**`, and `*.svelte` are out of scope today)
 - `npm run format:check` (Prettier) — the CI `lint` job runs Prettier **in addition to** ESLint, so `npm run lint` passing locally is NOT sufficient; run `npm run format` to auto-fix before handoff
+- `npm run lint:md` (markdownlint) when the change touches Markdown — run `npm run lint:md:fix` to auto-split prose to one sentence per line, and wrap a multi-sentence table cell's table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region, since a cell cannot break across lines
 
 1. If any gate fails, fix the problem and rerun all gates.
 2. Commit to the task branch, push it, and open or update the PR targeting `main`.
