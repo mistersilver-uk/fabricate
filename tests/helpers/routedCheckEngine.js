@@ -15,7 +15,12 @@ let _routedIdSeq = 0;
 /** Minimal Foundry shims the engine + checkRoll touch in a headless test run. */
 export function installRoutedCheckEnv() {
   globalThis.foundry = globalThis.foundry || {
-    utils: { randomID: () => `rid-${(_routedIdSeq += 1).toString(36)}` },
+    utils: {
+      randomID: () => {
+        _routedIdSeq += 1;
+        return `rid-${_routedIdSeq.toString(36)}`;
+      },
+    },
   };
   globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () => {} } };
 }

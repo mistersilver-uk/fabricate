@@ -97,10 +97,17 @@ Each step can define:
    - **Progressive**: roll the progressive formula;
      its total is the numeric `value` spent against ordered result difficulties.
 
-   When no roll formula is configured for the active mode, the check falls back to the authored
-   macro / built-in adapter path:
-   it executes the provided crafting check macro (or system adapter) and the macro returns the
-   `outcome`/`value`.
+   A crafting check is not optional-by-absence.
+   Simple mode always carries a system-level check that is either active or deactivated;
+   routed and progressive modes REQUIRE a configured check.
+   The roll formula is one **check source**: when the active mode's check config carries a roll
+   formula the check is engine-evaluated as above; otherwise the same check is sourced from the
+   authored macro or built-in adapter (the `checkSource` axis), which returns the `outcome`/`value`.
+   The check source (engine-formula / macro / built-in adapter) is a distinct axis from the routed
+   result-selection providers removed in 1.6.0; retiring or re-speccing the macro / built-in
+   adapter source is tracked separately (issues #107 / #111) and is out of scope here.
+   A mode that requires a check but has none configured (no roll formula and no macro/adapter
+   source) is a system misconfiguration surfaced by system-level validation, not a silent no-op.
    A `breakTools` flag is honoured for forced tool breakage ONLY from engine-evaluated checks —
    a macro/built-in check's `data.breakTools` is not part of the macro contract and does not
    force breakage.
