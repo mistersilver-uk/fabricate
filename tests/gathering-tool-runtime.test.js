@@ -755,32 +755,13 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
 // checkDriven authority parity via the shared runtime (issue 419)
 // ---------------------------------------------------------------------------
 
-import { evaluateCheckBreakage } from '../src/toolBreakageRuntime.js';
-
-class RuntimeFakeItem {
-  constructor(uuid) {
-    this.uuid = uuid;
-    this._flags = {};
-    this.deleted = false;
-    this.parent = { uuid: 'Actor.g' };
-  }
-  getFlag(scope, key) {
-    const ns = this._flags[scope];
-    if (!ns) return undefined;
-    return String(key).split('.').reduce((v, k) => (v == null ? undefined : v[k]), ns);
-  }
-  async setFlag(scope, key, value) {
-    this._flags[scope] = this._flags[scope] || {};
-    let t = this._flags[scope];
-    const parts = String(key).split('.');
-    const last = parts.pop();
-    for (const p of parts) { if (!t[p] || typeof t[p] !== 'object') t[p] = {}; t = t[p]; }
-    t[last] = value;
-    return value;
-  }
-  async delete() { this.deleted = true; }
-  async update() {}
-}
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import {
+  BreakageFakeItem as RuntimeFakeItem,
+  NATURAL_ONE_TRIGGER,
+  NATURAL_ONE_RESULT,
+  CHECK_DRIVEN_SYSTEM,
+} from './helpers/checkDrivenBreakageFixtures.js';
 
 function gatheringRuntime(items) {
   return createToolBreakageRuntime({
@@ -789,17 +770,9 @@ function gatheringRuntime(items) {
   });
 }
 
-const GATHER_TRIGGER = {
-  enabled: true,
-  triggers: [{ id: 'nat1', label: '1d20 group rolled 1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }]
-};
-const GATHER_RESULT = {
-  engineEvaluated: true,
-  value: null,
-  outcome: null,
-  data: { total: 1, outcomeId: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }], breakTools: false }
-};
-const checkDrivenSystem = { toolBreakage: { authority: 'checkDriven' } };
+const GATHER_TRIGGER = NATURAL_ONE_TRIGGER;
+const GATHER_RESULT = NATURAL_ONE_RESULT;
+const checkDrivenSystem = CHECK_DRIVEN_SYSTEM;
 
 test('gathering checkDriven runtime: forces breakage on non-immune tools, immune survives', async () => {
   const axe = new RuntimeFakeItem('Item.gaxe');
@@ -818,11 +791,49 @@ test('gathering checkDriven runtime: forces breakage on non-immune tools, immune
   assert.equal(byId.ganvil.skippedImmune, true);
 });
 
-test('gathering/crafting drift: identical break decision for the same trigger + roll', () => {
-  // Both surfaces route through the single shared seam, so the decision is identical.
-  const decision = evaluateCheckBreakage({ checkBreakage: GATHER_TRIGGER, checkResult: GATHER_RESULT });
-  assert.equal(decision.forceBreak, true);
-  assert.equal(decision.triggerId, 'nat1');
+test('gathering/crafting drift: the gathering apply breaks exactly what the crafting resolver decides', async () => {
+  // ONE shared persisted checkDriven system + ONE engine-evaluated roll. The
+  // crafting resolver decides the break; the gathering runtime APPLIES it to a real
+  // item. If either surface drifts (resolver decision or runtime application), the
+  // crafting decision and the applied gathering evidence diverge and this fails.
+  const system = {
+    toolBreakage: { authority: 'checkDriven' },
+    resolutionMode: 'simple',
+    craftingCheck: { simple: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+    gatheringCraftingCheck: { routed: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+  };
+
+  // Crafting decision via the REAL resolver (resolution-mode service stub → simple).
+  const craftingEngine = new CraftingEngine(null, null, { getMode: () => 'simple' });
+  const craftingDecision = craftingEngine._resolveCraftingBreakageDecision(
+    system,
+    { id: 'r', craftingSystemId: 'sys' },
+    NATURAL_ONE_RESULT
+  );
+  assert.equal(craftingDecision.forceBreak, true, 'crafting resolver forces the break');
+
+  // Gathering APPLICATION via the real shared runtime against a real item.
+  const axe = new RuntimeFakeItem('Item.drift-axe');
+  const runtime = gatheringRuntime([
+    { tool: { componentId: 'drift-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+  ]);
+  const args = {
+    actor: { uuid: 'Actor.g' },
+    task: { id: 'task-drift', resolutionMode: 'routed' },
+    system,
+    checkResult: NATURAL_ONE_RESULT,
+    // The gathering surface resolves checkBreakage from the routed gathering check,
+    // exactly as GatheringEngine._planTerminalTools/_applyTerminalTools wire it.
+    checkBreakage: system.gatheringCraftingCheck.routed.checkBreakage,
+  };
+  await runtime.plan(args);
+  const applied = await runtime.apply(args);
+
+  // The gathering application result must agree with the crafting decision: same
+  // forceBreak verdict, same triggerId, same human-readable reason on the broken tool.
+  assert.equal(applied[0].broken, craftingDecision.forceBreak, 'gathering breaks iff crafting decided to');
+  assert.equal(applied[0].triggerId, craftingDecision.triggerId, 'same triggerId across surfaces');
+  assert.equal(applied[0].reason, craftingDecision.reason, 'same break reason across surfaces');
 });
 
 test('gathering checkDriven runtime: the realm toolBreakagePolicy is orthogonal to the break decision', async () => {

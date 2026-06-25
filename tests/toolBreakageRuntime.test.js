@@ -300,15 +300,12 @@ test('Tool.applyUsage prefers toolUsage over catalystItemUsage once toolUsage ex
 // ---------------------------------------------------------------------------
 
 const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
-
-function engineCheckResult({ total = null, value = null, outcome = null, outcomeId = null, diceGroups = [], breakTools = false } = {}) {
-  return {
-    engineEvaluated: true,
-    value,
-    outcome,
-    data: { total, outcomeId, diceGroups, breakTools },
-  };
-}
+const {
+  engineCheckResult,
+  NATURAL_ONE_TRIGGER,
+  NATURAL_ONE_RESULT,
+  CHECK_DRIVEN_SYSTEM,
+} = await import('./helpers/checkDrivenBreakageFixtures.js');
 
 test('evaluateCheckBreakage: macro/builtIn (not engine-evaluated) never force-breaks', () => {
   const result = { engineEvaluated: false, data: { breakTools: true } };
@@ -371,15 +368,24 @@ test('evaluateCheckBreakage: diceGroup anyDie natural-1', () => {
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: noOne }) }).forceBreak, false);
 });
 
-test('evaluateCheckBreakage: diceGroup lowestDie and total aggregates', () => {
+test('evaluateCheckBreakage: diceGroup total, lowestDie, highestDie, and allDice aggregates', () => {
   const lowest = { enabled: true, triggers: [{ id: 'l', condition: { type: 'diceGroup', groupId: 1, aggregate: 'lowestDie', operator: '<=', value: 2 } }] };
   const total = { enabled: true, triggers: [{ id: 't', condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '>=', value: 18 } }] };
+  // highestDie: the single d20 face is 19, so >= 18 matches.
+  const highest = { enabled: true, triggers: [{ id: 'h', condition: { type: 'diceGroup', groupId: 0, aggregate: 'highestDie', operator: '>=', value: 18 } }] };
+  // allDice: every die in the 2d6 group is <= 6 → matches; >= 6 would NOT (the 2 fails).
+  const allLow = { enabled: true, triggers: [{ id: 'a', condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '<=', value: 6 } }] };
+  const allHigh = { enabled: true, triggers: [{ id: 'a2', condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '>=', value: 6 } }] };
   const groups = [
     { groupId: 0, group: '1d20', sum: 19, results: [19] },
     { groupId: 1, group: '2d6', sum: 8, results: [2, 6] },
   ];
-  assert.equal(evaluateCheckBreakage({ checkBreakage: lowest, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, true);
-  assert.equal(evaluateCheckBreakage({ checkBreakage: total, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, true);
+  const checkResult = engineCheckResult({ diceGroups: groups });
+  assert.equal(evaluateCheckBreakage({ checkBreakage: lowest, checkResult }).forceBreak, true, 'lowestDie 2 <= 2');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: total, checkResult }).forceBreak, true, 'total 19 >= 18');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: highest, checkResult }).forceBreak, true, 'highestDie 19 >= 18');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: allLow, checkResult }).forceBreak, true, 'allDice (2,6) all <= 6');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: allHigh, checkResult }).forceBreak, false, 'allDice (2,6) NOT all >= 6');
 });
 
 test('evaluateCheckBreakage: non-total aggregate fails open when per-die results are missing', () => {
@@ -404,12 +410,9 @@ function checkDrivenRuntime(items) {
   });
 }
 
-const FORCE_TRIGGER = {
-  enabled: true,
-  triggers: [{ id: 'natural1', label: '1d20 group rolled 1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
-};
-const FORCE_RESULT = engineCheckResult({ diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }] });
-const checkDrivenSystem = { toolBreakage: { authority: 'checkDriven' } };
+const FORCE_TRIGGER = NATURAL_ONE_TRIGGER;
+const FORCE_RESULT = NATURAL_ONE_RESULT;
+const checkDrivenSystem = CHECK_DRIVEN_SYSTEM;
 
 test('checkDriven runtime: forces breakage on all non-immune tools while immune survives', async () => {
   const axe = new FakeItem({}, { uuid: 'Item.axe' });
@@ -455,12 +458,56 @@ test('checkDriven runtime: virtual-present tools are recorded as skipped, not mu
 });
 
 // ---------------------------------------------------------------------------
-// Crafting-vs-gathering drift: identical decision for the same trigger + roll
+// Crafting-vs-gathering drift (criterion 8): the REAL per-surface resolvers must
+// reach the identical decision for ONE shared persisted checkDriven system + ONE
+// engine-evaluated check result. This drives CraftingEngine._resolveCraftingBreakageDecision
+// AND the gathering surface's _resolveGatheringCheckBreakage → evaluateCheckBreakage,
+// so a change to either resolver can fail this test (the former tautology could not).
 // ---------------------------------------------------------------------------
 
-test('drift: evaluateCheckBreakage yields the identical decision regardless of surface', () => {
-  const craftingDecision = evaluateCheckBreakage({ checkBreakage: FORCE_TRIGGER, checkResult: FORCE_RESULT });
-  const gatheringDecision = evaluateCheckBreakage({ checkBreakage: FORCE_TRIGGER, checkResult: FORCE_RESULT });
-  assert.deepEqual(craftingDecision, gatheringDecision);
-  assert.equal(craftingDecision.forceBreak, true);
+const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
+const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
+
+test('drift: crafting and gathering resolvers reach the identical break decision for one shared system + roll', () => {
+  // ONE persisted checkDriven system carrying the same checkBreakage block on the
+  // simple crafting check and the routed gathering check.
+  const system = {
+    toolBreakage: { authority: 'checkDriven' },
+    resolutionMode: 'simple',
+    craftingCheck: { simple: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+    gatheringCraftingCheck: { routed: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+  };
+  const checkResult = NATURAL_ONE_RESULT;
+
+  // Crafting surface: the real resolver. A resolution-mode service stub returns the
+  // simple mode so it reads craftingCheck.simple.checkBreakage (and never touches
+  // the `game` global).
+  const craftingEngine = new CraftingEngine(null, null, { getMode: () => 'simple' });
+  const craftingDecision = craftingEngine._resolveCraftingBreakageDecision(
+    system,
+    { id: 'r', craftingSystemId: 'sys' },
+    checkResult
+  );
+
+  // Gathering surface: the real resolver pulls the routed gathering checkBreakage,
+  // then the shared seam decides — exactly as GatheringEngine wires plan/apply.
+  const gatheringEngine = new GatheringEngine({});
+  const gatheringCheckBreakage = gatheringEngine._resolveGatheringCheckBreakage(system, {
+    resolutionMode: 'routed',
+  });
+  const gatheringDecision = evaluateCheckBreakage({
+    checkBreakage: gatheringCheckBreakage,
+    checkResult,
+  });
+
+  // The shared decision shape ({ forceBreak, triggerId, reason }) must match; the
+  // crafting resolver additionally tags the system authority, which is not part of
+  // the per-surface break decision the gathering runtime compares.
+  assert.equal(craftingDecision.forceBreak, true, 'crafting forces breakage on the natural 1');
+  assert.equal(gatheringDecision.forceBreak, true, 'gathering forces breakage on the natural 1');
+  assert.deepEqual(
+    { forceBreak: craftingDecision.forceBreak, triggerId: craftingDecision.triggerId, reason: craftingDecision.reason },
+    gatheringDecision,
+    'both surfaces resolve the identical { forceBreak, triggerId, reason } decision'
+  );
 });
