@@ -6,6 +6,7 @@
     DEFAULT_GATHERING_TASK_IMG
   } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
+  import { routedSuccessTierOptions } from '../../../../utils/routedOutcomeKeywords.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
@@ -346,14 +347,9 @@
   // Routed-check outcome tiers (active type) offered to the recipe editor's
   // check-mode result-set assignment control as {id, name}. Failure tiers are
   // excluded — a failed check produces no result set to route to.
-  const recipeRoutedOutcomeTierOptions = $derived.by(() => {
-    const routed = selectedSystem?.craftingCheck?.routed;
-    if (!routed) return [];
-    const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
-    return (Array.isArray(tiers) ? tiers : [])
-      .filter((tier) => tier && tier.id && tier.success === true)
-      .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
-  });
+  const recipeRoutedOutcomeTierOptions = $derived.by(() =>
+    routedSuccessTierOptions(selectedSystem?.craftingCheck?.routed)
+  );
 
   // Salvage feature gate + the inputs the per-component salvage editor needs.
   const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);

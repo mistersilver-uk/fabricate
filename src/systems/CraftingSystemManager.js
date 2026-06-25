@@ -384,8 +384,10 @@ export class CraftingSystemManager {
       id: crit.id || foundry.utils.randomID(),
       die,
       // Clamp `raw` to the die's producible range [N, N*S] parsed from the `NdS`
-      // die string (the crit matches the die-term total, so an out-of-range raw
-      // could never fire). If the die can't be parsed, leave `raw` as-is.
+      // die string. The crit matches the die-term total, so an UNCLAMPED out-of-range
+      // raw could never fire; clamping shifts it to the nearest producible boundary
+      // so it fires there instead (e.g. raw 25 on 1d20 clamps to 20 — the natural
+      // max — rather than being a dead config). If the die can't be parsed, leave it.
       raw: this._clampCritRaw(die, raw),
       success: crit.success === true,
       breakTools: crit.breakTools === true,
@@ -395,7 +397,11 @@ export class CraftingSystemManager {
   /**
    * Clamp a critical raw value to the producible total range of an `NdS` die
    * term: minimum `N` (all dice show 1), maximum `N*S` (all dice show their max
-   * face). When the die string does not parse, the value is returned unchanged.
+   * face). Rationale: the crit fires when the die-term total equals `raw`, so a
+   * raw outside `[N, N*S]` can never be rolled and the crit would be inert.
+   * Clamping pulls it to the nearest producible boundary so it fires there — an
+   * authored "crit on 25" for `1d20` now triggers on a natural 20 instead of never.
+   * When the die string does not parse, the value is returned unchanged.
    * @private
    */
   _clampCritRaw(die, raw) {

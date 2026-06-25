@@ -79,8 +79,43 @@ Each step can define:
 
 ### Check and Resolution
 
-1. If checks are enabled, execute the provided crafting check macro.
-2. Resolve result group by active mode rules in `004-resolution-modes.md`.
+1. If a crafting check is required or enabled, run it to produce a check result
+   (`{ success, outcome, value, data }`).
+   The check is **engine-evaluated** when the system's check config for the active mode
+   carries a roll formula:
+   the engine rolls the formula, resolves the base DC,
+   maps the roll to the configured per-mode outcome, and surfaces an authored-crit/tier
+   `breakTools` flag.
+   - **Simple / alchemy**: roll the simple pass/fail formula and compare against the resolved DC
+     (meet-or-exceed / exceed), yielding `success`.
+   - **Routed (`check` provider)**: roll the routed formula and map the total onto a configured
+     outcome tier (relative DC deltas or fixed value ranges);
+     the matched tier's NAME is the `outcome` that drives result routing.
+     The base DC is resolved the SAME way as the simple check
+     (the recipe's selected tier or a dynamic-DC macro, not a flat configured DC),
+     so a recipe tier or dynamic DC shifts every relative threshold.
+   - **Progressive**: roll the progressive formula;
+     its total is the numeric `value` spent against ordered result difficulties.
+
+   When no roll formula is configured for the active mode, the check falls back to the authored
+   macro / built-in adapter path:
+   it executes the provided crafting check macro (or system adapter) and the macro returns the
+   `outcome`/`value`.
+   A `breakTools` flag is honoured for forced tool breakage ONLY from engine-evaluated checks —
+   a macro/built-in check's `data.breakTools` is not part of the macro contract and does not
+   force breakage.
+
+   The check/tier/crit data-model shapes (`RoutedCheck`, `DiceCrit`, `thresholdMode`,
+   `breakTools`, recipe tiers, dynamic DC) are defined in `002-data-models.md`;
+   the per-mode routing rules (including `ResultGroup.checkOutcomeIds` tier→result-group
+   assignment) are defined in `004-resolution-modes.md`.
+
+2. Resolve the result group by active mode rules in `004-resolution-modes.md`.
+   For the routed `check` provider, an authored success-outcome tier that resolves by name but
+   that no result group assigns via `checkOutcomeIds` (when the recipe otherwise uses tier
+   assignment) yields a distinct **unrouted-tier** diagnostic rather than silently falling back
+   to outcome-name matching;
+   a recipe that uses no `checkOutcomeIds` assignment still falls back to name matching.
 
 ### Apply Effects
 
@@ -210,8 +245,16 @@ If it is present, the run must resume automatically when world time reaches the 
 ### Resolution Mode Application
 
 - **Simple**: One result group. Optional pass/fail check. On success, produce the single result group.
-- **Routed**: Check is mandatory. Check macro returns `outcome`. `Component.salvage.outcomeRouting` maps outcomes to result groups.
-- **Progressive**: One result group with ordered results. Check is mandatory. Check macro returns numeric `value`. Awards are evaluated using `salvageCraftingCheck.progressive.awardMode`.
+- **Routed**: Check is mandatory.
+  The engine-evaluated routed salvage check rolls the configured formula and maps the total onto
+  an outcome tier whose NAME is the `outcome`
+  (or the authored macro returns `outcome` when no routed formula is configured).
+  `Component.salvage.outcomeRouting` maps outcomes to result groups.
+- **Progressive**: One result group with ordered results.
+  Check is mandatory.
+  The engine-evaluated progressive salvage check rolls the configured formula to produce the
+  numeric `value` (or the authored macro returns `value`).
+  Awards are evaluated using `salvageCraftingCheck.progressive.awardMode`.
 
 ### Macro Contracts
 

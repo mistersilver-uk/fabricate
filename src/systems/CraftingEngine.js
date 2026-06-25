@@ -322,10 +322,13 @@ export class CraftingEngine {
         }
         if (failurePolicy.consumeCatalystsOnFail) {
           usedToolPairs = toolValidation.tools;
-          // A simple-check crit with `breakTools` forces breakage on the
-          // check-failure path too.
+          // An engine-evaluated check (simple/routed/progressive) crit/tier with
+          // `breakTools` forces breakage on the check-failure path too. A macro /
+          // builtIn check is NOT honoured here: `breakTools` is an authored-crit
+          // concept absent from the macro contract, and macro `data` is passed
+          // through verbatim, so it must not force breakage by passthrough.
           usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
-            forceBreak: checkResult?.data?.breakTools === true,
+            forceBreak: this._checkForcesToolBreak(checkResult),
           });
         }
       } catch (consumptionError) {
@@ -491,10 +494,11 @@ export class CraftingEngine {
     // like the Item-Piles deduct error below — not refunded.
     await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
 
-    // Apply tool usage/breakage for the recipe's resolved library Tools. A
-    // simple-check crit with `breakTools` forces every matched tool to break.
+    // Apply tool usage/breakage for the recipe's resolved library Tools. An
+    // engine-evaluated check (simple/routed/progressive) crit/tier with `breakTools`
+    // forces every matched tool to break; a macro/builtIn `data.breakTools` does not.
     const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
-      forceBreak: checkResult?.data?.breakTools === true,
+      forceBreak: this._checkForcesToolBreak(checkResult),
     });
 
     // Deduct Item Piles currency cost after ingredients are consumed to avoid
@@ -1452,7 +1456,20 @@ export class CraftingEngine {
     const progressiveConfig = system?.craftingCheck?.progressive;
     const useProgressiveCheck = mode === 'progressive' && !!progressiveConfig?.rollFormula;
 
-    if (!checksEnabled && !checkRequired && !useSimpleCheck && !useProgressiveCheck) {
+    // Routed check (Checks editor) for routed mode: rolls the routed formula and
+    // maps the total to an outcome tier whose NAME drives the routed `check`-provider
+    // routing. Only takes over when a routed formula is configured; with no formula
+    // the legacy macro/builtIn routed path below still runs unchanged.
+    const routedConfig = system?.craftingCheck?.routed;
+    const useRoutedCheck = mode === 'routed' && !!routedConfig?.rollFormula;
+
+    if (
+      !checksEnabled &&
+      !checkRequired &&
+      !useSimpleCheck &&
+      !useProgressiveCheck &&
+      !useRoutedCheck
+    ) {
       return { success: true, outcome: null, data: {} };
     }
 
@@ -1462,6 +1479,10 @@ export class CraftingEngine {
 
     if (useProgressiveCheck) {
       return this._runProgressiveCheck(system, recipe, craftingActor);
+    }
+
+    if (useRoutedCheck) {
+      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor);
     }
 
     const config = system.craftingCheck || {};
@@ -1609,7 +1630,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
-    return runFormulaPassFail({
+    const result = await runFormulaPassFail({
       formula: simple.rollFormula,
       dc,
       thresholdMode: simple.thresholdMode,
@@ -1617,6 +1638,62 @@ export class CraftingEngine {
       actor: craftingActor,
       label: 'Crafting',
     });
+    return this._markEngineEvaluated(result);
+  }
+
+  /**
+   * Evaluate the authored routed crafting check: roll the routed formula and map
+   * its total onto one of the configured outcome tiers, returning the matched
+   * tier's NAME as `outcome` for the routed `check`-provider routing
+   * (`ResolutionModeService._routeByTierAssignment` → `checkOutcomeIds`, else the
+   * outcome-name fallback). Mirrors {@link _runSalvageRoutedCheck} for the
+   * roll / tier / crit handling, but — unlike recipe-less salvage / gathering,
+   * which pass the flat `routed.dc` — the base DC resolves via the SAME
+   * recipe-tier / dynamic-macro path as {@link _runSimpleCheck}
+   * ({@link _resolveSimpleCheckDc} parameterized over `routed`), because routed
+   * crafting carries `recipe.checkTierId` and a dynamic-DC macro. For relative
+   * tiers each threshold shifts by `dc + outcome.dc`, so a flat DC would silently
+   * drop the recipe tier / dynamic DC.
+   *
+   * When no routed `rollFormula` is configured this method is NOT reached (the
+   * caller only dispatches here when one is set), so the legacy macro / builtIn
+   * routed path stays unchanged.
+   *
+   * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
+   */
+  async _runRoutedCheck(system, recipe, ingredientSet, craftingActor) {
+    const routed = system?.craftingCheck?.routed || {};
+    const dc = await this._resolveSimpleCheckDc(
+      system,
+      routed,
+      recipe,
+      ingredientSet,
+      craftingActor
+    );
+    const result = await runFormulaRouted({
+      formula: routed.rollFormula,
+      dc,
+      thresholdMode: routed.thresholdMode,
+      type: routed.type,
+      relativeOutcomes: routed.relativeOutcomes,
+      fixedOutcomes: routed.fixedOutcomes,
+      diceCrits: routed.diceCrits,
+      actor: craftingActor,
+      label: 'Crafting',
+    });
+    return this._markEngineEvaluated(result);
+  }
+
+  /**
+   * Tag a check result as engine-evaluated so the craft seam knows its
+   * `data.breakTools` is an authored-crit / authored-tier signal it can honour for
+   * forced tool breakage. Macro / builtIn results are NOT tagged: their `data` is
+   * passed through verbatim, and `breakTools` is not part of the macro contract, so
+   * a macro returning `data:{ breakTools:true }` must not force breakage.
+   * @private
+   */
+  _markEngineEvaluated(result) {
+    return { ...result, engineEvaluated: true };
   }
 
   /**
@@ -1633,18 +1710,32 @@ export class CraftingEngine {
    */
   async _runProgressiveCheck(system, recipe, craftingActor) {
     const progressive = system?.craftingCheck?.progressive || {};
-    return runFormulaProgressive({
+    const result = await runFormulaProgressive({
       formula: progressive.rollFormula,
       diceCrits: progressive.diceCrits,
       actor: craftingActor,
       label: 'Crafting',
     });
+    return this._markEngineEvaluated(result);
   }
 
   /**
-   * Resolve the simple check's DC: a dynamic macro's returned number, the recipe's
+   * Decide whether a check result forces tool breakage. Only engine-evaluated
+   * checks (simple/routed/progressive — tagged by {@link _markEngineEvaluated})
+   * carry an authored-crit / authored-tier `breakTools` flag; macro/builtIn results
+   * pass `data` through verbatim, so their `breakTools` is NOT honoured here.
+   * @private
+   */
+  _checkForcesToolBreak(checkResult) {
+    return checkResult?.engineEvaluated === true && checkResult?.data?.breakTools === true;
+  }
+
+  /**
+   * Resolve the engine check's DC: a dynamic macro's returned number, the recipe's
    * selected static tier, or the static default. Any failure falls back to the
-   * default DC so a misconfiguration never throws mid-craft.
+   * default DC so a misconfiguration never throws mid-craft. Parameterized over the
+   * check config (`simple` or `routed`) so the routed check resolves its base DC via
+   * the SAME recipe-tier / dynamic path as the simple check, not the flat config DC.
    */
   async _resolveSimpleCheckDc(system, simple, recipe, ingredientSet, craftingActor) {
     const fallback = Number.isFinite(Number(simple.dc)) ? Math.trunc(Number(simple.dc)) : 15;

@@ -500,9 +500,15 @@ export class ResolutionModeService {
       // resolve the outcome to a routed-check tier id, then route to the result
       // group that lists it in `checkOutcomeIds`.
       const assigned = this._routeByTierAssignment(system, outcome, allGroups);
+      // A resolved-but-unassigned tier (the outcome matched an authored success tier
+      // but no result group lists its id) is a DISTINCT misconfiguration from "no
+      // tier resolved": surface `unrouted-tier` rather than silently falling through
+      // to name matching, which would mask the missing assignment.
+      if (assigned?.meta?.disposition === 'unrouted-tier') return assigned;
       if (assigned) return assigned;
-      // Fallback for recipes without explicit tier assignment: fail/miss keywords,
-      // then match the outcome name to a result group of that name.
+      // Fallback for recipes without an explicit tier match (no success tier of that
+      // name): fail/miss keywords, then match the outcome name to a result group of
+      // that name.
       return this._routeByOutcomeName(outcome, allGroups);
     }
     return { groups: allGroups.slice(0, 1), meta: {} };
@@ -510,8 +516,16 @@ export class ResolutionModeService {
 
   /**
    * Resolve a routed-check outcome to its explicit tier→result-set assignment
-   * (`ResultGroup.checkOutcomeIds`), or null when there is no tier match or no
-   * group is assigned to it (so the caller falls back to name matching).
+   * (`ResultGroup.checkOutcomeIds`). Three outcomes:
+   *  - `null` — either no success tier of that name resolved, OR the recipe declares
+   *    NO `checkOutcomeIds` on any group (it is name-routed, not tier-routed). The
+   *    caller falls back to outcome-name matching (the legitimate no-assignment path).
+   *  - `disposition:'unrouted-tier'` (empty groups) — the outcome DID resolve to an
+   *    authored success tier AND the recipe opted into tier routing (at least one
+   *    group declares `checkOutcomeIds`), but no group lists THIS tier's id. This is a
+   *    distinct misconfiguration (tier resolved but unassigned); the caller surfaces
+   *    it rather than masking it with name matching.
+   *  - `disposition:'success'` — routed to the assigned group.
    * @returns {{groups: Array, meta: object}|null}
    */
   _routeByTierAssignment(system, outcome, allGroups) {
@@ -520,8 +534,24 @@ export class ResolutionModeService {
     const assigned = allGroups.filter(
       (group) => Array.isArray(group.checkOutcomeIds) && group.checkOutcomeIds.includes(tierId)
     );
-    if (assigned.length === 0) return null;
-    return { groups: assigned.slice(0, 1), meta: { outcome, disposition: 'success' } };
+    if (assigned.length > 0) {
+      return { groups: assigned.slice(0, 1), meta: { outcome, disposition: 'success' } };
+    }
+    // The tier resolved but no group lists it. Distinguish a tier-routed recipe (some
+    // group declares `checkOutcomeIds`) — a genuine unrouted-tier misconfiguration —
+    // from a purely name-routed recipe (no group declares any), which falls through.
+    const recipeUsesTierRouting = allGroups.some(
+      (group) => Array.isArray(group.checkOutcomeIds) && group.checkOutcomeIds.length > 0
+    );
+    if (!recipeUsesTierRouting) return null;
+    return {
+      groups: [],
+      meta: {
+        outcome,
+        disposition: 'unrouted-tier',
+        error: `Outcome tier "${outcome}" is not assigned to any result group`,
+      },
+    };
   }
 
   /**

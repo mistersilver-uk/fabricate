@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
+import { Tool } from '../src/models/Tool.js';
 
 // ---------------------------------------------------------------------------
 // Globals required for the modules to load
@@ -849,4 +850,176 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
   const names = craftingActor.createdItems.map(i => i.name);
   assert.ok(names.includes('Item A'), 'Item A should be created');
   assert.ok(names.includes('Item B'), 'Item B should be created');
+});
+
+// ===========================================================================
+// Group 5: Check-failure breakTools — the engine-evaluated forced-failure crit
+// breaks the owned tool on the consumeCatalystsOnFail path. Each half (the
+// engine check surfacing data.breakTools, and _applyToolBreakage forcing a
+// never-breaking tool) is unit-proven; this exercises the craft() glue end to end.
+// ===========================================================================
+
+// An owned tool item whose Foundry flag set is tracked in a plain map, so
+// flagBroken on-break writes are observable without a Foundry runtime.
+function makeOwnedToolItem(componentId = 'hammer') {
+  const flags = {};
+  const item = {
+    id: `tool-${componentId}`,
+    uuid: `Item.tool-${componentId}`,
+    name: 'Hammer',
+    parent: { uuid: 'Actor.owner', id: 'owner' },
+    getFlag(ns, key) {
+      return flags[`${ns}.${key}`];
+    },
+    async setFlag(ns, key, value) {
+      flags[`${ns}.${key}`] = value;
+      return value;
+    },
+  };
+  return { item, flags };
+}
+
+test('check-failure breakTools: a forced-failure engine crit breaks the owned tool on the consumeCatalystsOnFail path', async () => {
+  const system = makeSystem({
+    id: 'sys-break',
+    resolutionMode: 'simple',
+    craftingCheck: {
+      enabled: true,
+      macroUuid: null,
+      outcomes: [],
+      progressive: null,
+      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: true },
+    },
+    managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }],
+  });
+  setupGame(system);
+  globalThis.fromUuid = async () => makeSourceItem('Potion');
+
+  const herb = makeItem({ id: 'herb-break', name: 'Herb', quantity: 2 });
+  const ingredientSet = makeIngredientSet({ ingredientItem: herb, quantity: 1 });
+  const recipe = makeRecipe({
+    craftingSystemId: 'sys-break',
+    ingredientSets: [ingredientSet],
+    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] }],
+  });
+
+  // A never-breaking tool (breakageChance 0) that records breakage via a flag — so
+  // any observed break is the forced break, not chance.
+  const tool = new Tool({
+    componentId: 'hammer',
+    breakage: { mode: 'breakageChance', breakageChance: 0 },
+    onBreak: { mode: 'flagBroken' },
+  });
+  const { item: toolItem, flags } = makeOwnedToolItem('hammer');
+
+  const sourceActor = makeActor({ id: 'a-break', items: [herb, toolItem] });
+  const craftingActor = makeActor({ id: 'a-break' });
+
+  const recipeManager = {
+    canCraft() {
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+    },
+    getToolsForSet() {
+      return [tool];
+    },
+    toolMatchesItem(_recipe, _tool, item) {
+      return item === toolItem;
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item === herb && item.id === ingredient.systemItemId;
+    },
+  };
+  const resolutionService = makeResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, null, resolutionService);
+  // Engine-evaluated FAILURE with a breakTools crit — mirrors what _runSimpleCheck /
+  // _runRoutedCheck return for a forced-failure breakTools crit.
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 3,
+    data: { breakTools: true },
+    engineEvaluated: true,
+  });
+  engine._runSuccessMacro = async () => {};
+  engine._runFailureMacro = async () => {};
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'the check failed, so the craft fails');
+  assert.equal(
+    flags['fabricate.fabricate.toolBroken'],
+    true,
+    'the forced-failure breakTools crit broke the owned tool on the failure path'
+  );
+  assert.equal(craftingActor.createdItems.length, 0, 'no result items on a failed craft');
+});
+
+test('check-failure breakTools: a macro data.breakTools does NOT force-break the tool', async () => {
+  const system = makeSystem({
+    id: 'sys-nobreak',
+    resolutionMode: 'simple',
+    craftingCheck: {
+      enabled: true,
+      macroUuid: null,
+      outcomes: [],
+      progressive: null,
+      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: true },
+    },
+    managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }],
+  });
+  setupGame(system);
+  globalThis.fromUuid = async () => makeSourceItem('Potion');
+
+  const herb = makeItem({ id: 'herb-nobreak', name: 'Herb', quantity: 2 });
+  const ingredientSet = makeIngredientSet({ ingredientItem: herb, quantity: 1 });
+  const recipe = makeRecipe({
+    craftingSystemId: 'sys-nobreak',
+    ingredientSets: [ingredientSet],
+    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] }],
+  });
+
+  const tool = new Tool({
+    componentId: 'hammer',
+    breakage: { mode: 'breakageChance', breakageChance: 0 },
+    onBreak: { mode: 'flagBroken' },
+  });
+  const { item: toolItem, flags } = makeOwnedToolItem('hammer');
+
+  const sourceActor = makeActor({ id: 'a-nobreak', items: [herb, toolItem] });
+  const craftingActor = makeActor({ id: 'a-nobreak' });
+
+  const recipeManager = {
+    canCraft() {
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+    },
+    getToolsForSet() {
+      return [tool];
+    },
+    toolMatchesItem(_recipe, _tool, item) {
+      return item === toolItem;
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item === herb && item.id === ingredient.systemItemId;
+    },
+  };
+  const resolutionService = makeResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, null, resolutionService);
+  // A MACRO failure (no engineEvaluated marker) returning data.breakTools verbatim:
+  // it must NOT force breakage, since breakTools is not part of the macro contract.
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 3,
+    data: { breakTools: true },
+  });
+  engine._runSuccessMacro = async () => {};
+  engine._runFailureMacro = async () => {};
+
+  await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(
+    flags['fabricate.fabricate.toolBroken'],
+    undefined,
+    'a macro data.breakTools passthrough must not force-break the tool'
+  );
 });
