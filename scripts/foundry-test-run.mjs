@@ -2550,6 +2550,7 @@ async function main() {
           name: 'Forsaken Hollow',
           description: 'An environment whose only included task no longer matches it.',
           enabled: true,
+          selectionMode: 'targeted',
           compositionMode: 'manual',
           biomes: ['forest'],
           enabledTaskIds: ['broken-stale-task']
