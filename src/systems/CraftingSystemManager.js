@@ -8,6 +8,7 @@ import {
   isGatheringActorSelectableByUser,
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeChange.js';
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
 import {
   TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
@@ -1377,19 +1378,31 @@ export class CraftingSystemManager {
 
     const merged = this._normalizeSystem(mergedInput);
     this._assertUniqueComponentSourcesForSystem(merged);
-    const resolutionModeChanged = current.resolutionMode !== merged.resolutionMode;
+    const fromMode = current.resolutionMode || 'simple';
+    const toMode = merged.resolutionMode || 'simple';
+    const resolutionModeChanged = fromMode !== toMode;
 
+    // Persist the merged system FIRST so recipe migration/validation reads the NEW
+    // mode through the in-memory `systems` map (e.g. `RecipeManager` activation and
+    // routed-provider validation consult the current system).
+    this.systems.set(systemId, merged);
+    await this.save();
+
+    // Migration-first mode change: migrate recipes to fit the new mode wherever
+    // possible and delete ONLY those a per-recipe structural constraint of the new
+    // mode rules out. System-level gaps (no progressive/routed check, alchemy
+    // signature collisions, ...) never delete here — the system-validation
+    // aggregator surfaces them and they gate visibility, not deletion.
     if (resolutionModeChanged) {
-      const affectedRecipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
-      for (const recipe of affectedRecipes) {
-        await this.recipeManager.deleteRecipe(recipe.id);
-      }
+      await this._migrateRecipesForModeChange(systemId, fromMode, toMode, merged);
     }
 
-    // Path 1: Mode change -- disable invalid salvage configs
+    // Path 1: Mode change -- disable invalid salvage configs. This mutates `merged`
+    // in place AFTER the early save above, so persist again when anything changed.
     const oldMode = current.salvageResolutionMode || 'simple';
     const disabledComponents = this._disableInvalidSalvageConfigs(merged, oldMode);
     if (disabledComponents.length > 0) {
+      await this.save();
       const names = disabledComponents.join(', ');
       ui?.notifications?.warn?.(
         `Fabricate | Salvage disabled for ${disabledComponents.length} component(s) incompatible with new mode: ${names}`
@@ -1403,13 +1416,97 @@ export class CraftingSystemManager {
       await this._cleanupSalvageRunsForSystem(systemId);
     }
 
-    this.systems.set(systemId, merged);
-    await this.save();
+    // Re-run alchemy signature reconciliation when the system is in alchemy mode and
+    // either the mode just changed to alchemy or the component list changed (the #99
+    // trigger). The helper self-guards non-alchemy systems.
+    const componentsChanged = this._systemComponentsChanged(current, merged);
+    if (toMode === 'alchemy' && (resolutionModeChanged || componentsChanged)) {
+      await this._reconcileAlchemySignaturesAfterDeletion(merged);
+    }
+
     this._notifySystemsChanged();
     if (resolutionModeChanged) {
       await this._cleanupCraftingPreferences();
     }
     return merged;
+  }
+
+  /**
+   * Migrate every recipe in a system to fit a changed resolution mode. Migratable
+   * recipes are updated in place (structural-only persistence, no per-recipe
+   * notification or change emission); structurally un-migratable recipes are
+   * deleted. Emits one aggregated info notification for migrated recipes, one warn
+   * notification listing deleted recipes (only when any were deleted), and a single
+   * `recipesChanged` emission.
+   * @param {string} systemId
+   * @param {string} fromMode
+   * @param {string} toMode
+   * @param {object} system The merged (post-change) system.
+   * @private
+   */
+  async _migrateRecipesForModeChange(systemId, fromMode, toMode, system) {
+    const affectedRecipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
+    let migratedCount = 0;
+    const deletedNames = [];
+
+    for (const recipe of affectedRecipes) {
+      const recipeJSON = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
+      const { outcome, recipe: next } = migrateRecipeForModeChange(
+        recipeJSON,
+        fromMode,
+        toMode,
+        system
+      );
+
+      if (outcome === 'delete') {
+        deletedNames.push(recipe.name || recipe.id);
+        await this.recipeManager.deleteRecipe(recipe.id, { notify: false, emitChange: false });
+        continue;
+      }
+
+      await this.recipeManager.updateRecipe(recipe.id, next, {
+        notify: false,
+        allowIncomplete: true,
+        emitChange: false,
+      });
+      migratedCount += 1;
+    }
+
+    if (migratedCount > 0) {
+      ui?.notifications?.info?.(`Migrated ${migratedCount} recipe(s) to the new resolution mode.`);
+    }
+    if (deletedNames.length > 0) {
+      ui?.notifications?.warn?.(
+        `Deleted ${deletedNames.length} recipe(s) that could not be migrated: ${deletedNames.join(', ')}`
+      );
+    }
+    if (migratedCount > 0 || deletedNames.length > 0) {
+      this.recipeManager._notifyRecipesChanged?.('mode-change', { systemId });
+    }
+  }
+
+  /**
+   * Whether the system's component-list identity changed between two snapshots
+   * (used to trigger the alchemy signature re-check on component edits — the #99
+   * trigger). Compares the set of component ids.
+   * @param {object} before
+   * @param {object} after
+   * @returns {boolean}
+   * @private
+   */
+  _systemComponentsChanged(before, after) {
+    const ids = (system) => {
+      const components = Array.isArray(system?.components)
+        ? system.components
+        : Array.isArray(system?.items)
+          ? system.items
+          : [];
+      return components.map((c) => String(c?.id ?? c?.componentId ?? '')).sort();
+    };
+    const a = ids(before);
+    const b = ids(after);
+    if (a.length !== b.length) return true;
+    return a.some((id, index) => id !== b[index]);
   }
 
   async deleteSystem(systemId) {
