@@ -196,6 +196,21 @@ describe('evaluateSystemValidation — composition', () => {
     assert.equal(salvage.blocks, 'visibility');
   });
 
+  it('treats a component with no salvage result sets as not salvageable (no issue)', () => {
+    // An empty salvage config means the component simply is not salvageable — an
+    // opt-in state, not a misconfiguration — so it must produce no salvage issue,
+    // even though `validateSalvage` would otherwise reject 0 result groups.
+    const component = { id: 'comp-2', name: 'Plain Stone', salvage: { resultGroups: [] } };
+    const system = makeSystem({ salvageResolutionMode: 'simple' });
+    const report = evaluateSystemValidation(system, { components: [component] });
+
+    assert.equal(
+      report.issues.find((issue) => issue.kind === 'salvage'),
+      undefined,
+      'a component with no salvage result sets must not surface a salvage issue'
+    );
+  });
+
   it('composes environment issues from a precomputed composition view-model', () => {
     const environment = {
       id: 'env-1',

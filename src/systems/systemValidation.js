@@ -295,6 +295,13 @@ function collectSalvageIssues(system, components) {
   const issues = [];
   for (const component of asArray(components)) {
     if (!component?.salvage) continue;
+    // A component with no salvage result sets is simply "not salvageable" — an
+    // opt-in state, not a misconfiguration. Only components that declare at least
+    // one salvage result set are validated against the system salvage mode.
+    const salvageGroups = Array.isArray(component.salvage.resultGroups)
+      ? component.salvage.resultGroups
+      : [];
+    if (salvageGroups.length === 0) continue;
     const { valid, errors } = service.validateSalvage(component, systemForSalvage);
     if (valid) continue;
     issues.push({
