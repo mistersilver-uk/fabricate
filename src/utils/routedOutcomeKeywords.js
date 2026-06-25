@@ -97,3 +97,24 @@ export function matchResultGroupsByName(outcome, groups, { firstOnly = false } =
   );
   return firstOnly ? matched.slice(0, 1) : matched;
 }
+
+/**
+ * Build the `{id, name}` options for the recipe editor's check-mode result-set
+ * assignment control from a routed crafting check's active outcome-tier list.
+ * Only SUCCESS tiers (`success === true`) with an id are offered — a failed check
+ * produces no result set to route to, so failure tiers are excluded. The active
+ * list is the `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
+ *
+ * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly and reused
+ * by the recipe-readiness evaluator that needs the same success-filtered list.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @returns {Array<{id: string, name: string}>}
+ */
+export function routedSuccessTierOptions(routed) {
+  if (!routed) return [];
+  const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+  return (Array.isArray(tiers) ? tiers : [])
+    .filter((tier) => tier?.id && tier.success === true)
+    .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
+}

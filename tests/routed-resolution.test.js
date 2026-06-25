@@ -317,6 +317,44 @@ describe('routed recipe resolution', () => {
     assert.equal(result.groups[0].name, 'Mythic');
   });
 
+  it('check mode: a tier-routed recipe with no group assigned to the resolved tier reports unrouted-tier', () => {
+    const system = buildSystem({
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          type: 'relative',
+          rollExpression: '1d20',
+          relativeOutcomes: [
+            { id: 't-myth', name: 'Mythic', success: true, breakTools: false, dc: 10 },
+            { id: 't-std', name: 'Standard', success: true, breakTools: false, dc: 0 },
+          ],
+          fixedOutcomes: [],
+        },
+      },
+    });
+    const service = buildService(system);
+    // The recipe OPTS INTO tier routing (a group declares checkOutcomeIds), but only
+    // for 't-std' — nothing lists 't-myth'. The outcome 'Mythic' resolves to a tier,
+    // yet no group claims it: a distinct unrouted-tier misconfiguration, NOT a silent
+    // fall-through to name matching (which would route to the 'Mythic'-named group).
+    const assigned = groups();
+    assigned[1].checkOutcomeIds = ['t-std'];
+    const recipe = recipeWithStep(
+      step({ resultGroups: assigned, resultSelection: { provider: 'check' } })
+    );
+
+    const result = service.resolveResultGroups({
+      recipe,
+      step: recipe.steps[0],
+      ingredientSet: recipe.steps[0].ingredientSets[0],
+      checkResult: { outcome: 'Mythic' },
+    });
+
+    assert.equal(result.meta.disposition, 'unrouted-tier');
+    assert.notEqual(result.meta.disposition, 'success');
+    assert.deepEqual(result.groups, [], 'no result group is produced for the unrouted tier');
+  });
+
   it('routed check returns no output for fail keywords', () => {
     const activeStep = step({ resultSelection: { provider: 'check' } });
     const recipe = recipeWithStep(activeStep);
