@@ -1,7 +1,7 @@
 import { getFabricateFlag } from '../config/flags.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools } from '../gatheringToolRuntime.js';
-import { getMatchHandler } from '../models/match/matchTypes.js';
+import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
 import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
@@ -820,15 +820,10 @@ export class RecipeManager {
    */
   ingredientMatchesItem(recipe, ingredient, item) {
     const features = this._getSystemFeatures(recipe);
-    const match = ingredient.match || null;
-    const handler = getMatchHandler(match);
     // A component (or legacy systemItem) match resolves its id via the handler;
     // tags/currency/no-match return null and fall to the bare-field fallback,
     // then on to `_matchesIngredient`.
-    const componentId =
-      handler.type === 'component'
-        ? handler.getComponentId(match)
-        : ingredient.componentId || ingredient.systemItemId || null;
+    const componentId = getIngredientComponentId(ingredient);
 
     if (componentId) {
       const managedItem = this._getComponent(recipe, componentId);
@@ -882,14 +877,15 @@ export class RecipeManager {
   _matchesIngredient(ingredient, item, features) {
     if (ingredient.itemUuid && item.uuid === ingredient.itemUuid) return true;
 
-    // Dispatch ONLY for terminal match types (tags/currency) — they fully decide
-    // the result off the match object. A `component`/null/unknown match falls
-    // through to the legacy bare-field `ingredient.tag` block and the
+    // Dispatch ONLY for terminal match types — they fully decide the result off
+    // the match object. A `component`/null/unknown match is non-terminal and
+    // falls through to the legacy bare-field `ingredient.tag` block and the
     // `ingredient.alternatives` recursion below, which key off bare
     // `ingredient.*` fields, not the match (so a `{type:'component'}` ingredient
-    // with `alternatives` still recurses into them).
+    // with `alternatives` still recurses into them). The handler declares its own
+    // terminality (tags/currency → true; component/unknown → false).
     const handler = getMatchHandler(ingredient.match);
-    if (handler.type === 'tags' || handler.type === 'currency') {
+    if (handler.isTerminalInventoryMatch) {
       return handler.matchesItem(ingredient.match, item, { features });
     }
 

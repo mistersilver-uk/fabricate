@@ -8,7 +8,7 @@ import {
   isGatheringActorSelectableByUser,
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { getMatchHandler } from '../models/match/matchTypes.js';
+import { getIngredientComponentId } from '../models/match/matchTypes.js';
 import {
   TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
   TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST,
@@ -2010,14 +2010,9 @@ export class CraftingSystemManager {
           ingredientGroups: (set.ingredientGroups || [])
             .map((group) => ({
               ...group,
-              options: (group.options || []).filter((ing) => {
-                const handler = getMatchHandler(ing.match);
-                const id =
-                  handler.type === 'component'
-                    ? handler.getComponentId(ing.match)
-                    : ing.componentId || ing.systemItemId;
-                return id !== itemId;
-              }),
+              options: (group.options || []).filter(
+                (ing) => getIngredientComponentId(ing) !== itemId
+              ),
             }))
             .filter((group) => (group.options || []).length > 0),
           ingredients: (set.ingredients || []).filter(
@@ -2180,14 +2175,7 @@ export class CraftingSystemManager {
    */
   _recipeReferencesComponent(recipe, itemId) {
     const data = typeof recipe.toJSON === 'function' ? recipe.toJSON() : recipe;
-    const matchesId = (ref) => {
-      const handler = getMatchHandler(ref?.match);
-      const id =
-        handler.type === 'component'
-          ? handler.getComponentId(ref.match)
-          : ref?.componentId || ref?.systemItemId;
-      return id === itemId;
-    };
+    const matchesId = (ref) => getIngredientComponentId(ref) === itemId;
 
     for (const set of data.ingredientSets || []) {
       for (const group of set.ingredientGroups || []) {

@@ -65,6 +65,45 @@ function makeRecipeManager() {
         }
       ],
       resultGroups: [{ id: 'rg3', results: [{ componentId: 'plank' }] }]
+    }),
+    // Carries its component reference via a structured `match: { type: 'component', componentId }`
+    // rather than a bare top-level `componentId`, so deletion must resolve the id through the match
+    // handler (not the bare-field fallback) to strip/detect it.
+    makeRecipe({
+      id: 'recipe-match-iron',
+      name: 'Match Iron Bar',
+      craftingSystemId: 'sys',
+      enabled: true,
+      ingredientSets: [
+        {
+          id: 's4',
+          essences: {},
+          ingredientGroups: [
+            { id: 'g4', options: [{ match: { type: 'component', componentId: 'iron' } }] }
+          ],
+          ingredients: []
+        }
+      ],
+      resultGroups: [{ id: 'rg4', results: [{ componentId: 'bar' }] }]
+    }),
+    // Carries its component reference via the legacy `systemItem`/`systemItemId` alias match shape,
+    // which the handler aliases to the component handler — deletion must still resolve and strip it.
+    makeRecipe({
+      id: 'recipe-alias-iron',
+      name: 'Alias Iron Bar',
+      craftingSystemId: 'sys',
+      enabled: true,
+      ingredientSets: [
+        {
+          id: 's5',
+          essences: {},
+          ingredientGroups: [
+            { id: 'g5', options: [{ match: { type: 'systemItem', systemItemId: 'iron' } }] }
+          ],
+          ingredients: []
+        }
+      ],
+      resultGroups: [{ id: 'rg5', results: [{ componentId: 'bar' }] }]
     })
   ];
 
@@ -129,11 +168,87 @@ test('deleteItem updates only recipes that reference the component, with one sum
 
   assert.deepEqual(
     recipeManager.updateCalls.map(call => call.recipeId),
-    ['recipe-iron'],
-    'only the iron-referencing recipe is updated'
+    ['recipe-iron', 'recipe-match-iron', 'recipe-alias-iron'],
+    'every iron-referencing recipe is updated — including the structured-match and legacy-alias forms'
   );
-  assert.equal(recipeManager.updateCalls[0].options.notify, false, 'per-recipe notification suppressed');
-  assert.deepEqual(notifications, ['Removed "Iron" and updated 1 recipe(s).']);
+  for (const call of recipeManager.updateCalls) {
+    assert.equal(call.options.notify, false, 'per-recipe notification suppressed');
+  }
+  assert.deepEqual(notifications, ['Removed "Iron" and updated 3 recipe(s).']);
+});
+
+test('deleteItem strips a structured component-match ingredient and disables the emptied recipe', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteItem('sys', 'iron');
+
+  const matchUpdate = recipeManager.updateCalls.find(call => call.recipeId === 'recipe-match-iron');
+  assert.ok(matchUpdate, 'the structured-match recipe is updated');
+  // The sole ingredient option referenced iron via `match: { type: 'component', componentId }`, so
+  // stripping it empties the only ingredient set and the recipe is disabled.
+  assert.equal(matchUpdate.updates.ingredientSets.length, 0, 'emptied ingredient set is dropped');
+  assert.equal(matchUpdate.updates.enabled, false, 'recipe left without ingredient sets is disabled');
+});
+
+test('deleteItem strips a legacy systemItem-alias match ingredient', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteItem('sys', 'iron');
+
+  const aliasUpdate = recipeManager.updateCalls.find(call => call.recipeId === 'recipe-alias-iron');
+  assert.ok(aliasUpdate, 'the legacy systemItem-alias recipe is detected and updated');
+  assert.equal(aliasUpdate.updates.ingredientSets.length, 0, 'emptied ingredient set is dropped');
+  assert.equal(aliasUpdate.updates.enabled, false, 'recipe left without ingredient sets is disabled');
+});
+
+test('_recipeReferencesComponent detects structured-match and legacy-alias component references', () => {
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  const matchRecipe = makeRecipe({
+    id: 'r-match',
+    craftingSystemId: 'sys',
+    ingredientSets: [
+      {
+        id: 's',
+        ingredientGroups: [{ id: 'g', options: [{ match: { type: 'component', componentId: 'iron' } }] }],
+        ingredients: []
+      }
+    ],
+    resultGroups: []
+  });
+  const aliasRecipe = makeRecipe({
+    id: 'r-alias',
+    craftingSystemId: 'sys',
+    ingredientSets: [
+      {
+        id: 's',
+        ingredientGroups: [{ id: 'g', options: [{ match: { type: 'systemItem', systemItemId: 'iron' } }] }],
+        ingredients: []
+      }
+    ],
+    resultGroups: []
+  });
+  const unrelated = makeRecipe({
+    id: 'r-none',
+    craftingSystemId: 'sys',
+    ingredientSets: [
+      {
+        id: 's',
+        ingredientGroups: [{ id: 'g', options: [{ match: { type: 'component', componentId: 'wood' } }] }],
+        ingredients: []
+      }
+    ],
+    resultGroups: []
+  });
+
+  assert.equal(manager._recipeReferencesComponent(matchRecipe, 'iron'), true);
+  assert.equal(manager._recipeReferencesComponent(aliasRecipe, 'iron'), true);
+  assert.equal(manager._recipeReferencesComponent(unrelated, 'iron'), false);
 });
 
 test('deleteItem with no referencing recipes emits no notification', async () => {
