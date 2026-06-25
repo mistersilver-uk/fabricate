@@ -70,36 +70,27 @@
       return list;
     }, [])
   );
-  // The set of plain (crit-eligible) die keys, used to detect orphaned crits.
+  // The set of plain (crit-eligible) die keys.
   const plainDiceKeys = $derived(new Set(uniqueDice.map((die) => die.raw)));
   // Modified pools in the formula (e.g. `2d20kh1` → stripped key `2d20`) that are
   // NOT plain: crit-ineligible. Listed so the editor can show the modified-pool
-  // hint and surface any crit still keyed to them under a removal notice.
+  // hint (no crit rows, no Add control).
   const modifiedPoolKeys = $derived(
     parseDiceGroups(rollFormula).reduce((list, group) => {
       if (!plainDiceKeys.has(group.raw) && !list.includes(group.raw)) list.push(group.raw);
       return list;
     }, [])
   );
-  // Crits that can no longer match the formula (keyed to a modified pool, or to a
-  // die that left the formula). The normalizer drops these on save; the editor
-  // surfaces them first so the change is never silent.
-  const orphanedCrits = $derived(crits.filter((crit) => !plainDiceKeys.has(crit.die)));
-  // Orphaned crits grouped by their (now unmatchable) die key, each shown under an
-  // explicit removal notice so the GM sees what will be dropped on save.
-  const orphanGroups = $derived(
-    orphanedCrits.reduce((groups, crit) => {
-      const existing = groups.find((group) => group.die === crit.die);
-      if (existing) existing.rows.push(crit);
-      else groups.push({ die: crit.die, rows: [crit] });
-      return groups;
-    }, [])
-  );
-  const orphanedDiceKeys = $derived(new Set(orphanGroups.map((group) => group.die)));
-  // Modified pools with no crits keyed to them: show the hint and no Add control.
-  const modifiedPoolsWithoutCrits = $derived(
-    modifiedPoolKeys.filter((key) => !orphanedDiceKeys.has(key))
-  );
+  // A crit can only match a plain die group present in the formula. When the
+  // formula changes so a die group is no longer crit-eligible (a modifier was
+  // added, or the die left the formula), eagerly drop its crits from the staged
+  // data — and so from the UI — rather than leaving stale rows behind. The
+  // save-time normalizer drops any that slip through (e.g. imported data) as a
+  // backstop.
+  $effect(() => {
+    const pruned = crits.filter((crit) => plainDiceKeys.has(crit.die));
+    if (pruned.length !== crits.length) onChange(pruned);
+  });
 
   const successOnLabel = $derived(
     forceOnLabel ?? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success')
@@ -115,13 +106,6 @@
       "Critical rolls match a die's total. They aren't available for pools that keep, drop, explode, or reroll dice (e.g. 2d20kh1)."
     )
   );
-  const orphanedCritNotice = $derived(
-    text(
-      'FABRICATE.Admin.Manager.Checks.Crafting.CritOrphanedNotice',
-      'These critical rolls can no longer match this formula and will be removed when you save.'
-    )
-  );
-
   function critsForDie(die) {
     return crits.filter((crit) => crit.die === die);
   }
@@ -170,7 +154,7 @@
 <div class="manager-checks-card-head">
   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.CritTitle', 'Critical rolls')}</h3>
 </div>
-{#if uniqueDice.length === 0 && modifiedPoolKeys.length === 0 && orphanedCrits.length === 0}
+{#if uniqueDice.length === 0 && modifiedPoolKeys.length === 0}
   <p class="manager-muted" data-dice-empty>{text('FABRICATE.Admin.Manager.Checks.Crafting.NoDice', 'No dice detected in this expression.')}</p>
 {:else}
   {#each uniqueDice as die (die.raw)}
@@ -240,36 +224,12 @@
       {/if}
     </div>
   {/each}
-  {#each modifiedPoolsWithoutCrits as poolKey (poolKey)}
+  {#each modifiedPoolKeys as poolKey (poolKey)}
     <div class="manager-checks-crit-group" data-crit-modified-pool={poolKey}>
       <div class="manager-checks-card-head manager-checks-crit-group-head">
         <span class="manager-checks-crit-die" data-crit-die={poolKey}>{poolKey}</span>
       </div>
       <p class="manager-muted manager-checks-crit-hint" data-crit-modified-pool-hint>{modifiedPoolHint}</p>
-    </div>
-  {/each}
-  {#each orphanGroups as group (group.die)}
-    <div class="manager-checks-crit-group is-orphaned" data-crit-orphaned-group={group.die}>
-      <div class="manager-checks-card-head manager-checks-crit-group-head">
-        <span class="manager-checks-crit-die" data-crit-die={group.die}>{group.die}</span>
-      </div>
-      <p class="manager-muted manager-checks-crit-hint" data-crit-orphaned-notice role="alert">{orphanedCritNotice}</p>
-      <div class="manager-checks-outcome-table is-crit" role="table" aria-label={`${group.die} ${orphanedCritNotice}`}>
-        {#each group.rows as crit (crit.id)}
-          <div class="manager-checks-outcome-row" role="row" data-crit-orphaned-row={crit.id}>
-            <span class="manager-checks-crit-orphaned-value" data-crit-orphaned-raw>{crit.raw}</span>
-            <button
-              type="button"
-              class="manager-icon-button is-danger"
-              data-remove-crit
-              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveCrit', 'Remove critical roll')}
-              onclick={() => removeCrit(crit.id)}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-            </button>
-          </div>
-        {/each}
-      </div>
     </div>
   {/each}
 {/if}

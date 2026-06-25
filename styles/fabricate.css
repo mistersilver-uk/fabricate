@@ -1281,9 +1281,9 @@
   font-weight: 700;
 }
 
-/* Per-group hint copy: the multi-die group-total explainer, the modified-pool
-   crit-ineligibility hint, and the orphaned-crit removal notice (see issue 443).
-   Reuses the muted-copy treatment so it wraps cleanly at narrow widths. */
+/* Per-group hint copy: the multi-die group-total explainer and the modified-pool
+   crit-ineligibility hint (see issue 443). Reuses the muted-copy treatment so it
+   wraps cleanly at narrow widths. */
 .fabricate-manager .manager-checks-crit-hint {
   color: var(--fab-mv2-text-muted);
 }

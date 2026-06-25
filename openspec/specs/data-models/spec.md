@@ -141,8 +141,10 @@ CraftingSystem = {
   //     // plain producible range [N, N*S] (for N>1 a group sum, not a single
   //     // face); a matched success crit forces pass / award-all, a failure crit
   //     // forces fail / award-none. Modified pools (keep/drop/explode/reroll)
-  //     // are NOT crit-eligible: no crit row is offered and crits authored
-  //     // against them are dropped on normalization.
+  //     // are NOT crit-eligible: no crit row is offered, and when a die group
+  //     // leaves the plain-eligible set (a modifier is added, or the die leaves
+  //     // the formula) its crits are eagerly purged from the editor draft and
+  //     // staged data, and dropped by normalization on save as a backstop.
 
   recipeVisibility: {
     listMode: "global" | "player" | "knowledge",  // default "global"

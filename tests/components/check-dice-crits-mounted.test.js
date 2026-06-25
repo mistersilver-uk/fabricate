@@ -79,27 +79,67 @@ describe('CheckDiceCrits (mounted): modified-pool gating + multi-die label', () 
     );
   });
 
-  it('surfaces a persisted crit orphaned by a modified pool under a removal notice', async () => {
-    // A crit authored against 2d20kh1 was stored under the stripped key `2d20`.
+  it('eagerly purges a crit orphaned by a modified pool from the staged data and UI', async () => {
+    // A crit keyed to `2d20` can no longer match once the formula becomes the
+    // modified pool `2d20kh1`: it is dropped from the staged data (emitted via
+    // onChange) and never rendered — no lingering rows, no removal notice.
+    const emitted = [];
     const root = await harness.mount({
       rollFormula: '2d20kh1',
-      diceCrits: [{ id: 'orphan', die: '2d20', raw: 20, success: true, breakTools: false }]
+      diceCrits: [{ id: 'orphan', die: '2d20', raw: 20, success: true, breakTools: false }],
+      onChange: (next) => emitted.push(next)
     });
     assert.equal(
       root.querySelector('[data-crit-group]'),
       null,
       'the orphaned crit does NOT render as an editable group'
     );
-    const notice = root.querySelector('[data-crit-orphaned-notice]');
-    assert.ok(notice, 'the orphaned-crit removal notice renders (not a silent empty group)');
     assert.equal(
-      notice.textContent.trim(),
-      en.FABRICATE.Admin.Manager.Checks.Crafting.CritOrphanedNotice,
-      'the notice resolves to the localized copy'
+      root.querySelector('[data-crit-orphaned-row]'),
+      null,
+      'no lingering orphaned crit row is left behind'
     );
+    assert.ok(emitted.length >= 1, 'the orphaned crit is pruned from the staged data');
+    assert.deepEqual(
+      emitted.at(-1),
+      [],
+      'onChange emits the crit array with the orphaned crit removed'
+    );
+    const hint = root.querySelector('[data-crit-modified-pool-hint]');
+    assert.ok(hint, 'the modified-pool hint still explains why crits are unavailable');
+    assert.equal(
+      hint.textContent.trim(),
+      en.FABRICATE.Admin.Manager.Checks.Crafting.CritModifiedPoolHint,
+      'the hint resolves to the localized copy'
+    );
+  });
+
+  it('purges only the orphaned die when one of several dice leaves the formula', async () => {
+    // Formula has only `2d6`; a stale `1d20` crit (its die no longer present) is
+    // dropped while the still-valid `2d6` crit is kept and rendered.
+    const emitted = [];
+    const root = await harness.mount({
+      rollFormula: '2d6',
+      diceCrits: [
+        { id: 'gone', die: '1d20', raw: 20, success: true, breakTools: false },
+        { id: 'kept', die: '2d6', raw: 7, success: false, breakTools: false }
+      ],
+      onChange: (next) => emitted.push(next)
+    });
+    assert.deepEqual(
+      emitted.at(-1).map((crit) => crit.id),
+      ['kept'],
+      'only the orphaned 1d20 crit is pruned; the 2d6 crit survives'
+    );
+    assert.ok(root.querySelector('[data-crit-group="2d6"]'), 'the 2d6 group still renders');
     assert.ok(
-      root.querySelector('[data-crit-orphaned-row="orphan"]'),
-      'the orphaned crit row is shown so the GM sees what will be removed'
+      root.querySelector('[data-crit-row="kept"]'),
+      'the surviving 2d6 crit row is shown'
+    );
+    assert.equal(
+      root.querySelector('[data-crit-group="1d20"]'),
+      null,
+      'no group for the departed 1d20'
     );
   });
 
