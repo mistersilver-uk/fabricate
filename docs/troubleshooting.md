@@ -10,7 +10,7 @@ This guide covers common issues GMs and players encounter when setting up or usi
 
 ---
 
-### Recipes Not Appearing in the Crafting App
+## Recipes Not Appearing in the Crafting App
 
 **Symptom:** A recipe exists in the GM admin panel but does not appear in the player crafting app.
 
@@ -43,7 +43,7 @@ This guide covers common issues GMs and players encounter when setting up or usi
 
 ---
 
-### Crafting Check Macro Not Running
+## Crafting Check Macro Not Running
 
 **Symptom:** The crafting check macro never fires.
 Recipes resolve immediately with no skill check, even though the Routed mode (with the skill-check outcome option) or Progressive mode is configured.
@@ -69,13 +69,14 @@ Recipes resolve immediately with no skill check, even though the Routed mode (wi
    Fabricate reports a validation error if one is missing.
    For **Simple** mode or Routed with the ingredient-choice option, the check is optional and simply does not run if unconfigured.
 4. Attempt a craft and watch for any error or warning notifications from Fabricate about the macro.
-5. If a developer set up a custom macro, confirm it returns the result the current mode expects (a named outcome for the skill-check outcome option, or a numeric value for Progressive mode). See the API reference for the expected setup.
+5. If a developer set up a custom macro, confirm it returns the result the current mode expects (a named outcome for the skill-check outcome option, or a numeric value for Progressive mode).
+See the API reference for the expected setup.
 
 **See also:** [Crafting Checks]({% link crafting-checks.md %}) for crafting check configuration.
 
 ---
 
-### Routed Recipe Produces Nothing on a Successful Check
+## Routed Recipe Produces Nothing on a Successful Check
 
 **Symptom:** A recipe that routes by skill-check outcome rolls a success, but no result is produced.
 
@@ -102,7 +103,7 @@ Recipes resolve immediately with no skill check, even though the Routed mode (wi
 
 ---
 
-### Tools Not Breaking or Tracking Usage
+## Tools Not Breaking or Tracking Usage
 
 {: .note }
 > The standalone **Catalyst** concept was retired in version 0.6.0.
@@ -138,7 +139,7 @@ Recipes resolve immediately with no skill check, even though the Routed mode (wi
 
 ---
 
-### Effect Transfer Not Applying
+## Effect Transfer Not Applying
 
 **Symptom:** Crafting completes successfully but the result item does not receive active effects from essence source items.
 
@@ -180,7 +181,7 @@ Additional causes:
 
 ---
 
-### Salvage Configuration Rejected
+## Salvage Configuration Rejected
 
 **Symptom:** Salvage fails with a validation error, or attempting to salvage a component produces an error instead of results.
 
@@ -216,7 +217,7 @@ Additional causes:
 
 ---
 
-### Recipe Appears Uncraftable Despite Owning Recipe Item or Components
+## Recipe Appears Uncraftable Despite Owning Recipe Item or Components
 
 **Symptom:** A recipe shows as "Cannot craft" or is excluded from the "Craftable only" filter even though the player's actor owns a copy of the linked recipe item and all required components.
 This is most common after upgrading to Foundry v12 or after importing items from a compendium.
@@ -248,7 +249,7 @@ The "Craftable only" filter will include the recipe once all required items are 
 
 ---
 
-### Crafting App Fails to Open
+## Crafting App Fails to Open
 
 **Symptom:** Clicking **Craft Item** from the Items sidebar does nothing, or the Crafting App opens briefly then closes.
 
@@ -268,7 +269,7 @@ Ask your GM to clear that actor's crafting run history (this removes the run his
 
 ---
 
-### Completed Simple Craft Still Shows as In-Progress
+## Completed Simple Craft Still Shows as In-Progress
 
 **Symptom:** After a single-step (simple) craft completes successfully or fails, the Crafting App still shows the recipe as in-progress.
 Reloading the page clears the stale state, but it reappears on the next craft.
@@ -288,7 +289,7 @@ Ask your GM to clear that actor's crafting run history (this removes the run his
 
 ---
 
-### Dropping an Actor, Folder, or Non-Item Document onto the Items Tab Shows a Warning
+## Dropping an Actor, Folder, or Non-Item Document onto the Items Tab Shows a Warning
 
 **Symptom:** Dragging something onto the **Items** tab drop zone in the Crafting Admin panel produces a warning notification such as "Only Item documents can be added as crafting components" or "Folder contains no Item documents", and nothing is added.
 
@@ -304,11 +305,15 @@ If the folder holds no Items (for example, it contains only Actors), a notificat
 
 **What each notification means:**
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Notification | Meaning |
 |:-------------|:--------|
 | "Only Item documents can be added as crafting components. Dropped: Actor." | You dragged a character or NPC sheet onto the drop zone. Use an Item from the sidebar or a compendium instead. |
 | "Folder contains no Item documents." | The folder you dropped holds no Items. It may contain Actors, JournalEntries, or other document types. |
 | "Drop an Item document from sidebar or compendium." | The drag data could not be resolved to any UUID. This can happen when dragging something that does not emit standard Foundry drag data. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Step-by-step checks:**
 
@@ -325,7 +330,7 @@ If the folder holds no Items (for example, it contains only Actors), a notificat
 
 ---
 
-### Dropping Items onto the Recipe Manager or Crafting App Does Nothing
+## Dropping Items onto the Recipe Manager or Crafting App Does Nothing
 
 **Symptom:** Dragging an item from the sidebar or a compendium and dropping it onto a Fabricate drop zone (such as the Items tab in the Recipe Manager) produces no result.
 The item is not added, no error or notification appears from Fabricate, and in some cases Foundry displays its own "Drop an Item document from sidebar or compendium." message.

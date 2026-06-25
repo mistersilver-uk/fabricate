@@ -54,24 +54,33 @@ In crafting the Tool is flagged as missing or unsatisfied in the craftability su
 
 Each Tool picks exactly one breakage mechanic:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Mode | Behaviour |
 |:-----|:----------|
 | Limited uses | A usage counter ticks up each attempt. The Tool breaks when the counter reaches the chosen maximum. Leave the maximum unset for unlimited use, in which case usage is still tracked. |
 | A chance each use | A flat percent chance per attempt that the Tool breaks. Set it to 100 to always break and to 0 to never break. |
 | A dice roll | A dice roll is compared against a numeric threshold. The Tool breaks when the roll comes in below the threshold. |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 {: .note }
-> Only limited-uses Tools track how many times each item has been used. The other two modes never record a per-item usage count.
+> Only limited-uses Tools track how many times each item has been used.
+The other two modes never record a per-item usage count.
 
 ## On-break actions
 
 When a Tool breaks, the on-break action you chose runs:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Action | Behaviour |
 |:-------|:----------|
 | Destroy it | The owned Tool is removed from the character's inventory. |
 | Flag it as broken | The Tool stays in inventory but is marked as broken. A broken Tool fails the presence check on future attempts until a GM clears it. |
 | Replace it with a broken variant | The original is removed and a broken variant component is created on the character. You can build a recipe that consumes the broken variant to produce the repaired Tool. While the character holds the broken variant, the gathering app shows the required Tool as **Broken** rather than **Missing**. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ## Authoring a Tool
 
@@ -115,14 +124,19 @@ After the migration runs, the GM sees a one-time notification with a count of mi
 
 The conversion preserves behaviour:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Old catalyst | Resulting Tool |
 |:-------------|:---------------|
 | Present but never consumed | A Tool that never breaks and is flagged as broken if it ever would. It is present-only and tracks no usage. |
 | Consumed on use, limited uses, destroyed when exhausted | A limited-uses Tool that is destroyed when it breaks. |
 | Consumed on use, limited uses, kept when exhausted | A limited-uses Tool that is flagged as broken when it breaks. |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 {: .note }
-> The present-only row is a deliberate, behaviour-preserving choice. A Tool with a zero breakage chance never wears out and never records usage, exactly matching the old never-consumed behaviour.
+> The present-only row is a deliberate, behaviour-preserving choice.
+A Tool with a zero breakage chance never wears out and never records usage, exactly matching the old never-consumed behaviour.
 
 Identical catalysts are combined into a single shared library Tool.
 Catalysts that differ in meaning are kept separate.
@@ -147,7 +161,11 @@ Once the old copies are cleared, running it again does nothing.
 
 ## See Also
 
-- [Recipes overview]({% link recipes/index.md %}). How Tools fit into recipe definitions and resolution modes.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}). A worked example of a gathering Tool that wears out.
-- [Canvas Interactables]({% link canvas-interactables.md %}). Place Tool stations on the canvas as Scene Regions players activate by walking in, so they can use a Tool without owning it.
-- [Crafting Engine API]({% link api/crafting-engine.md %}). Programmatic control over crafting runs and Tool validation.
+- [Recipes overview]({% link recipes/index.md %}).
+How Tools fit into recipe definitions and resolution modes.
+- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
+A worked example of a gathering Tool that wears out.
+- [Canvas Interactables]({% link canvas-interactables.md %}).
+Place Tool stations on the canvas as Scene Regions players activate by walking in, so they can use a Tool without owning it.
+- [Crafting Engine API]({% link api/crafting-engine.md %}).
+Programmatic control over crafting runs and Tool validation.

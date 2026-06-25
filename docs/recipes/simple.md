@@ -7,7 +7,8 @@ nav_order: 1
 
 # Simple Mode
 
-The simplest resolution mode. One ingredient set, one result group, optional pass/fail check.
+The simplest resolution mode.
+One ingredient set, one result group, optional pass/fail check.
 
 ---
 

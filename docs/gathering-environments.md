@@ -37,10 +37,14 @@ The only mode available today is **d100**, which is selected by default.
 
 Each crafting system decides how often its gathering tasks can be attempted through **two independent limitations**, set on the system's gathering **Settings** tab under **Limitation**:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Limitation | Toggle | What it caps |
 |:-----------|:-------|:-------------|
 | **Stamina** | **Stamina** pill | A per-character stamina pool. Each attempt spends the task's stamina cost. A character can keep going only while they have stamina, which regenerates as world time passes. |
 | **Resource nodes** | **Resource nodes** pill | A finite per-task node pool in each environment. Each accepted attempt depletes one node. Once a pool is empty the task is blocked until its nodes respawn over world time. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The two toggles are **independent, not a single choice**.
 Each can be on or off on its own:
@@ -182,6 +186,8 @@ Your edits are held until you click **Save changes**, leaving with unsaved edits
 
 Each library tool carries:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
 | **Component** | The managed component the tool refers to (required) |
@@ -189,6 +195,8 @@ Each library tool carries:
 | **Tool requirement** | Optional formula checked against the character's roll data. See [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
 | **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), or **Dice expression** (a formula compared against a threshold) |
 | **On-break action** | One of **Destroy item**, **Mark as broken**, or **Replace with item** (the replacement must differ from the original) |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 A tool is invalid if it has no component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
 The Save button stays disabled until every tool is valid.
@@ -213,6 +221,8 @@ GMs can toggle matched task and event records on or off per environment.
 
 Gathering Task records support:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
 | **Name, description, image, enabled** | GM-authored task identity and availability |
@@ -222,11 +232,15 @@ Gathering Task records support:
 | **Stamina and modifiers** | Optional stamina cost and a gathering roll modifier formula |
 | **Required tools** | Optional references to the system's Gathering Tools library. All referenced tools are required. |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 {: .note }
 > Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more).
 > See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use examples.
 
 Reusable event records support:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Field | Description |
 |:------|:------------|
@@ -235,6 +249,8 @@ Reusable event records support:
 | **Weather, time of day** | Optional runtime availability gates. Empty means any |
 | **Trigger rate** | The event trigger rate from 1 to 100 |
 | **Modifier** | Optional event roll modifier formula |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Disabled Gathering Tasks and events never match for player gathering.
 
@@ -270,6 +286,8 @@ If no events are enabled or matched, the environment is mechanically safe even w
 An environment contains one or more Environment Tasks.
 The task editor lets you set:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Area | What you set |
 |:-----|:-------------|
 | Task basics | Name, description, image, whether it is enabled, and how it is resolved |
@@ -280,6 +298,8 @@ The task editor lets you set:
 | Result groups | Add, rename, delete, and reorder groups |
 | Results | Add, edit, delete, and reorder component results, each with a component and a quantity |
 | Required tools | Reference the system's Tools library. The tools themselves (their component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Progressive task result difficulty comes from the chosen component's own difficulty.
 Result rows do not store their own difficulty.
@@ -324,11 +344,15 @@ A routed task whose system has no gathering check formula reports a setup proble
 
 Progressive gathering tasks need an award mode and a check formula.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
 | Award mode | One of equal, partial, or exceed |
 | Check formula | Required. A roll expression evaluated against the acting character's roll data |
 | Check threshold | Optional. When left blank the check just produces a value |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 When you set a threshold, the rolled value is compared against it for success or failure.
 When you leave it blank, the check simply produces a value.
@@ -441,6 +465,8 @@ Every referenced tool must be an enabled library entry, and the character must h
 
 A library tool carries:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
 | Component | The managed component the tool is, taken from the system's component library (required) |
@@ -451,6 +477,8 @@ A library tool carries:
 | Dice expression and threshold | For a dice expression: a roll formula and a number it must reach to avoid breaking |
 | On-break action | One of destroy the item, mark it as broken, or replace it with another component |
 | Replacement | For replace: a different managed component given to the character when the tool breaks |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The system-level Gathering Rules setting **Tool breakage outcome** controls what happens when any tool breaks.
 By default a break makes the attempt fail and clears its drops.
@@ -489,7 +517,8 @@ Disabled tasks skip the progressive completeness checks, so a placeholder task c
 Enabled tasks must be fully configured:
 
 - A routed task needs the system to have a gathering check formula configured.
-- A progressive task needs an award mode and a check formula. The threshold is optional.
+- A progressive task needs an award mode and a check formula.
+The threshold is optional.
 
 A custom failure outcome is validated whether or not the task is enabled.
 

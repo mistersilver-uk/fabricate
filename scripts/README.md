@@ -3,7 +3,8 @@
 ## Latest Module Versions
 
 `latest-module-versions.mjs` queries the current latest manifest for Fabricate and the
-premium sibling modules without requiring S3 bucket listing permission. It reads the root
+premium sibling modules without requiring S3 bucket listing permission.
+It reads the root
 `release.s3.config.json` plus `../fabricate-premium/release.config.json`, then fetches
 exact keys in the form `modules/<moduleId>/<channel>/latest/module.json`.
 
@@ -30,7 +31,8 @@ Useful options:
 ## Foundry Integration Smoke Test
 
 The smoke test (`foundry-test-run.mjs`) verifies that Fabricate loads and functions correctly
-in a live Foundry VTT instance. It uses Playwright to drive a headless Chromium browser
+in a live Foundry VTT instance.
+It uses Playwright to drive a headless Chromium browser
 through the full crafting lifecycle.
 
 ### Running
@@ -54,6 +56,8 @@ node scripts/foundry-test-run.mjs
 
 ### Environment Variables
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Variable | Default | Description |
 |---|---|---|
 | `FOUNDRY_URL` | `http://localhost:30100` | Base URL of the Foundry instance |
@@ -63,11 +67,15 @@ node scripts/foundry-test-run.mjs
 | `FOUNDRY_RELEASE_URL` | unset | Optional explicit Foundry release URL. When unset, `test:foundry:up` uses a matching local cached zip if one exists. |
 | `FOUNDRY_RECREATE` | unset | Set to `1` before `npm run test:foundry:up` to discard and recreate the cached container. |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 ### Foundry Download Cache
 
-The harness first looks for `.foundry-e2e/cache/foundryvtt-<version>.zip`. When the archive exists, `test:foundry:up` passes it to the container as a local `FOUNDRY_RELEASE_URL`, which avoids requesting a presigned release URL from Foundry during clean installs.
+The harness first looks for `.foundry-e2e/cache/foundryvtt-<version>.zip`.
+When the archive exists, `test:foundry:up` passes it to the container as a local `FOUNDRY_RELEASE_URL`, which avoids requesting a presigned release URL from Foundry during clean installs.
 
-The harness also preserves the stopped Docker container between normal smoke-test runs. This keeps the extracted Foundry application cached in the container filesystem, so reruns do not repeat installation work.
+The harness also preserves the stopped Docker container between normal smoke-test runs.
+This keeps the extracted Foundry application cached in the container filesystem, so reruns do not repeat installation work.
 
 Use `node scripts/foundry-test-down.mjs --clean` or `FOUNDRY_RECREATE=1 npm run test:foundry:up` when you need to refresh the cached container after changing Docker image, port, or container-level configuration.
 
@@ -86,7 +94,8 @@ The smoke test executes 6 phases:
 
 ### Screenshot Catalog
 
-All screenshots are written to `test-results/` with auto-incrementing numeric prefixes. The
+All screenshots are written to `test-results/` with auto-incrementing numeric prefixes.
+The
 stable part of each filename is the trailing label, not the numeric prefix.
 
 | File label | Contents |
@@ -108,8 +117,10 @@ The smoke test creates the following Foundry documents:
 **Actors:**
 
 All actors are imported from the dnd5e **Starter Heroes** compendium (`dnd5e.heroes`) and
-tagged `flags.fabricate.smokeSeed` for idempotent cleanup. Sorted by name, the first two are
+tagged `flags.fabricate.smokeSeed` for idempotent cleanup.
+Sorted by name, the first two are
 used by current flows; the rest fill the gathering actor-selection bar:
+
 - crafter — first hero alphabetically (inventory: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale); owned by the Fabricate Gatherer user and remembered as the default gathering actor
 - travel-party member — second hero alphabetically (inventory: 3x Iron Ore, 1x Dragon Scale)
 
@@ -119,6 +130,7 @@ Iron Ore, Mystic Herb, Dragon Scale, Empty Vial, Iron Sword, Healing Potion, Dra
 **Crafting System:** "Arcane Forge" with all 7 items registered as components
 
 **Recipes (3):**
+
 | Recipe | Ingredients | Result |
 |---|---|---|
 | Forge Iron Sword | 2x Iron Ore | 1x Iron Sword |
@@ -135,7 +147,8 @@ Iron Ore, Mystic Herb, Dragon Scale, Empty Vial, Iron Sword, Healing Potion, Dra
 
 ### Foundry V13 API Patterns
 
-The smoke test uses `page.evaluate()` to interact with Foundry APIs. Key patterns for V13:
+The smoke test uses `page.evaluate()` to interact with Foundry APIs.
+Key patterns for V13:
 
 - **Document types are Sets:** `Array.from(game.documentTypes.Item)` before `.includes()`
 - **Tab switching:** `actor.sheet.changeTab('inventory', 'primary')` — DOM clicks on `[data-tab]` don't trigger Foundry's tab management
@@ -146,6 +159,7 @@ The smoke test uses `page.evaluate()` to interact with Foundry APIs. Key pattern
 ### CI Integration
 
 The smoke test gates releases via the `foundry-integration.yml` workflow:
+
 - Runs on push to main, PRs to main (on `src/`, `scripts/`, `module.json` changes), weekly, and as part of `release.yml`
 - Uploads `test-results/` as a build artifact on every run
 - Opens a GitHub issue with `foundry-smoke-failure` label on failure

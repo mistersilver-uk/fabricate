@@ -247,7 +247,8 @@ The `attemptCompleted` payload is a cloned, JSON-serializable object:
 | `events` | The triggered encounters (also emitted individually as `eventTriggered`). |
 | `checkResult` | The normalized resolution detail. |
 
-**Where it fires.** The hook fires on the client that resolved the attempt. Immediate attempts fire on the acting user's client; matured timed runs fire once, on the primary GM client (so the `updateWorldTime` broadcast does not duplicate them across clients).
+**Where it fires.** The hook fires on the client that resolved the attempt.
+Immediate attempts fire on the acting user's client; matured timed runs fire once, on the primary GM client (so the `updateWorldTime` broadcast does not duplicate them across clients).
 
 For a **blind** task viewed by a non-GM, the payload is redacted to match what that client may see: `taskId`/`taskName`, `gatheredItems`, `usedTools`, `events`, and `checkResult` are omitted, and no `eventTriggered` hook fires.
 A subscriber that throws is caught and logged — it never breaks the gathering flow.

@@ -16,7 +16,8 @@ Use teaser mode when you want discovery to be gradual.
 Players can see that "Philosopher's Stone" exists and that they are 2 of 5 fragments away from learning it, but cannot yet see what it requires.
 
 {: .note }
-> Teaser mode requires setting the crafting system to teaser mode. The existing global, player, and knowledge modes continue to work unchanged when teaser mode is off.
+> Teaser mode requires setting the crafting system to teaser mode.
+The existing global, player, and knowledge modes continue to work unchanged when teaser mode is off.
 
 ---
 
@@ -33,11 +34,15 @@ Players can see that "Philosopher's Stone" exists and that they are 2 of 5 fragm
 
 You choose how players build up discovery progress for the system.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Discovery method | Description |
 |:-----------------|:------------|
 | Manual | The GM sets a progress value for each player and recipe. Progress changes when the GM edits it in the **Teaser Progress Editor**. |
 | Fragments | Players gain discovery progress by acquiring specific in-world items called **fragments**. Each fragment grants a set amount of progress when the player adds it to their inventory. |
 | Both | Manual progress and fragment progress add together. Both pathways contribute to the same total. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ---
 
@@ -66,8 +71,10 @@ Each fragment you define has:
 
 For each recipe, the GM uses the recipe editor's **Teaser** tab, which appears when the system is in teaser mode, to set:
 
-- Which details are hidden from players until the recipe is unlocked. You can hide the ingredients, the results, the description, the tools, and the essences.
-- How much discovery progress is required for full discovery. When a player reaches this amount, every hidden detail is shown and the recipe becomes craftable.
+- Which details are hidden from players until the recipe is unlocked.
+You can hide the ingredients, the results, the description, the tools, and the essences.
+- How much discovery progress is required for full discovery.
+When a player reaches this amount, every hidden detail is shown and the recipe becomes craftable.
 - A teaser description shown to players in place of the real description while the recipe is still locked.
 
 **Example:** A recipe that hides its ingredients and results and needs three points of progress shows the recipe name and teaser description to players, but hides the ingredient list and result list until they build up three discovery progress points.
@@ -113,6 +120,9 @@ See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [R
 
 ## See Also
 
-- [Visibility & Knowledge]({% link visibility.md %}). The full visibility system including global, player, and knowledge modes.
-- [Recipes]({% link recipes/index.md %}). Configure recipe fields controlled by teaser mode.
-- [Crafting Systems]({% link crafting-systems.md %}). All system-level settings and feature toggles.
+- [Visibility & Knowledge]({% link visibility.md %}).
+The full visibility system including global, player, and knowledge modes.
+- [Recipes]({% link recipes/index.md %}).
+Configure recipe fields controlled by teaser mode.
+- [Crafting Systems]({% link crafting-systems.md %}).
+All system-level settings and feature toggles.

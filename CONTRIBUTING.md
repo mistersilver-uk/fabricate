@@ -7,7 +7,8 @@
 **All non-trivial code changes must follow this OpenSpec workflow:**
 
 1. **Read the Canonical Spec** – Start with the relevant file(s) in `openspec/specs/*/spec.md`
-2. **Capture the Change Delta in the Issue** – Author the OpenSpec delta in the work's GitHub issue, inside the managed `openspec-delta` block (append it to an existing issue and preserve the reporter's text, or create one from the `OpenSpec Change Delta` issue template for prompt-driven work). It is not versioned under `openspec/changes/`.
+2. **Capture the Change Delta in the Issue** – Author the OpenSpec delta in the work's GitHub issue, inside the managed `openspec-delta` block (append it to an existing issue and preserve the reporter's text, or create one from the `OpenSpec Change Delta` issue template for prompt-driven work).
+It is not versioned under `openspec/changes/`.
 3. **Fill the Delta Sections** – Proposal, Design, Tasks, optional Spec Deltas, Resolved Roster, and Verification & Acceptance before implementation
 4. **Await Approval** – Plan-review agents (and any maintainer) accept the delta via plan-review verdicts on the issue before implementation begins
 5. **Implement** – Write code and make the canonical spec changes the delta requires under `openspec/specs/`
@@ -78,15 +79,19 @@ Link the **project root** into Foundry's module directory:
 npm run setup:dev
 ```
 
-The script is idempotent — re-run it any time (for example after a Foundry update). It creates a directory junction on Windows (no admin or Developer Mode needed) and a symlink on Linux and macOS. Default Foundry Data paths:
+The script is idempotent — re-run it any time (for example after a Foundry update).
+It creates a directory junction on Windows (no admin or Developer Mode needed) and a symlink on Linux and macOS.
+Default Foundry Data paths:
 
 - Windows: `%LOCALAPPDATA%\FoundryVTT\Data`
 - macOS: `~/Library/Application Support/FoundryVTT/Data`
 - Linux: `~/.local/share/FoundryVTT/Data`
 
-If your Foundry install uses a custom Data location, set `FOUNDRY_DATA_PATH` before running the script. If an existing link points at the wrong place, re-run with `--force` to repoint it (the script refuses to clobber a real directory or file at the target path under any flag).
+If your Foundry install uses a custom Data location, set `FOUNDRY_DATA_PATH` before running the script.
+If an existing link points at the wrong place, re-run with `--force` to repoint it (the script refuses to clobber a real directory or file at the target path under any flag).
 
-**Troubleshooting:** If the Fabricate module is missing from Foundry's Setup screen after a Foundry major-version update, the symlink is probably fine — check `compatibility.verified` and `compatibility.maximum` in `module.json`. Foundry hides modules whose `maximum` is below the running major version.
+**Troubleshooting:** If the Fabricate module is missing from Foundry's Setup screen after a Foundry major-version update, the symlink is probably fine — check `compatibility.verified` and `compatibility.maximum` in `module.json`.
+Foundry hides modules whose `maximum` is below the running major version.
 
 Start Foundry at `http://localhost:30000` with a world that has the module enabled, then:
 
@@ -94,7 +99,9 @@ Start Foundry at `http://localhost:30000` with a world that has the module enabl
 npm run dev
 ```
 
-Open `http://localhost:5173` instead of `:30000`. Foundry loads normally, but Fabricate's source files are served by Vite with HMR transforms. Svelte component edits appear instantly without a page reload; other JS changes trigger a full reload.
+Open `http://localhost:5173` instead of `:30000`.
+Foundry loads normally, but Fabricate's source files are served by Vite with HMR transforms.
+Svelte component edits appear instantly without a page reload; other JS changes trigger a full reload.
 
 **How it works:**
 
@@ -123,11 +130,12 @@ The `--no-zip` flag (`npm run release:build`) is designed for use in GitHub Acti
 
 ## UI Architecture (Svelte)
 
-Fabricate's UI is built with **Svelte 5** (runes mode). All components use `$props()`, `$state`, `$derived`, `$effect`, and `onclick`/`onchange` event attributes.
+Fabricate's UI is built with **Svelte 5** (runes mode).
+All components use `$props()`, `$state`, `$derived`, `$effect`, and `onclick`/`onchange` event attributes.
 
 ### File Layout
 
-```
+```text
 src/ui/svelte/
 ├── apps/                        # Root components (one per Foundry window)
 │   ├── CraftingAppRoot.svelte   # Player crafting interface
@@ -150,25 +158,32 @@ src/ui/svelte/
 
 ### Foundry Integration
 
-Each Foundry window is an `ApplicationV2` subclass using `SvelteApplicationMixin`. The mixin mounts a root Svelte component in `_renderHTML()` and unmounts it in `close()`. App classes are registered via factory functions in `src/ui/appFactory.js` to avoid importing `.svelte.js` files in the Node test environment.
+Each Foundry window is an `ApplicationV2` subclass using `SvelteApplicationMixin`.
+The mixin mounts a root Svelte component in `_renderHTML()` and unmounts it in `close()`.
+App classes are registered via factory functions in `src/ui/appFactory.js` to avoid importing `.svelte.js` files in the Node test environment.
 
 ### Store Pattern
 
-Stores use a **factory pattern** — `createCraftingStore(services)`, `createEditorStore(services, options)`, `createAdminStore(services)`. Each app instance creates its own store to prevent state leaking between multiple open windows. Services (RecipeManager, CraftingEngine, etc.) are injected for testability.
+Stores use a **factory pattern** — `createCraftingStore(services)`, `createEditorStore(services, options)`, `createAdminStore(services)`.
+Each app instance creates its own store to prevent state leaking between multiple open windows.
+Services (RecipeManager, CraftingEngine, etc.) are injected for testability.
 
 ### Foundry Bridge
 
-`src/ui/svelte/util/foundryBridge.js` wraps Foundry APIs (`game.i18n.localize`, `Dialog.confirm`, notifications). Components import from this module rather than accessing `game.*` directly, making them testable outside Foundry.
+`src/ui/svelte/util/foundryBridge.js` wraps Foundry APIs (`game.i18n.localize`, `Dialog.confirm`, notifications).
+Components import from this module rather than accessing `game.*` directly, making them testable outside Foundry.
 
 ### Drag-and-Drop
 
-The `use:dragDrop` action (`src/ui/svelte/actions/dragDrop.js`) integrates with Foundry's drag-and-drop system. Apply it to any element that should accept drops from Foundry sidebars or other modules.
+The `use:dragDrop` action (`src/ui/svelte/actions/dragDrop.js`) integrates with Foundry's drag-and-drop system.
+Apply it to any element that should accept drops from Foundry sidebars or other modules.
 
 ### Testing
 
 - **Store tests** (pure JS, no DOM): `tests/stores/*.test.js` — exercise state transitions and service interactions using `node --test` with Foundry global mocks.
 - **App/UI tests**: existing test files in `tests/` test store and app-class behaviour with mocked services.
-- **Test runner**: Node's built-in `node --test`. No Jest, Vitest, or Playwright.
+- **Test runner**: Node's built-in `node --test`.
+No Jest, Vitest, or Playwright.
 
 ### CSS
 
@@ -241,7 +256,8 @@ Use the single class (`.fabricate-app …`) — matching how `.fabricate-admin`/
 **Checklist when adding/auditing a control or surface:**
 
 - New top-level app surface (new root application class)? It needs its own paired focus block — a partial `:focus:not(:focus-visible)` rule reads as "handled" but isn't.
-- Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — put it in the area block. Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the area default doesn't fight them.
+- Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — put it in the area block.
+Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the area default doesn't fight them.
 - Custom-content button clipping? Apply the layout fix in Instance 1.
 - Verify both in real Foundry (`npm run test:foundry`) — Foundry's global cascade is not reproduced by compiled-source inspection or unit tests.
 
@@ -268,7 +284,7 @@ The accepted commit types are:
 
 For `feat` and `fix` commits, include the related GitHub issue number as the scope:
 
-```
+```text
 feat(#42): add shopping list panel to crafting UI
 fix(#99): correct ingredient deduplication in alchemy mode
 ```
@@ -278,8 +294,8 @@ Header lines must be 100 characters or fewer.
 
 ## Linting & formatting
 
-Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, and [Prettier](https://prettier.io/) for formatting.
-All three run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
+Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, [Prettier](https://prettier.io/) for formatting, and [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) (config in `.markdownlint-cli2.jsonc`) for Markdown.
+All of these run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
 
 ```bash
 npm run lint           # ESLint over the gated JS scope (fails on any warning)
@@ -288,7 +304,17 @@ npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
 npm run format         # Prettier-format the gated scope
 npm run format:check   # verify formatting (what CI runs)
+npm run lint:md        # markdownlint over all Markdown (what CI runs)
+npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
 ```
+
+### Markdown linting (markdownlint)
+
+`npm run lint:md` runs [`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2) over every authored Markdown file, using the rules in `.markdownlint-cli2.jsonc`.
+The headline rule is **one sentence per line**: every sentence sits on its own physical line, and no sentence is hard-wrapped across multiple lines.
+Run `npm run lint:md:fix` to auto-split prose, then re-run it until the count stops dropping, because a long paragraph splits one boundary per pass.
+A multi-sentence **table cell** cannot be split across lines, so wrap that table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region.
+Run this before finalising any change that touches Markdown.
 
 ### CSS linting (Stylelint)
 
@@ -477,7 +503,8 @@ Hit list seen historically:
 - `.manager-environment-edit-view.is-placeholder` and `.manager-environment-placeholder-card` — gone since the real composition editor replaced the placeholder.
 - "Return to environments" button text — renamed to "Back to environments" and rewired through `confirmRouteExit`.
 - `.manager-environment-details-band` — CSS rule survived in `styles/fabricate.css`, but the Svelte usage was removed; the harness kept waiting on it.
-- `.manager-travel-party-row` / `.manager-travel-member-row` — the **singular** classes from the retired `GatheringTravelView`. The live Travel tab renders `GatheringPartiesTab` (`.manager-travel-parties-row`, **plural**) and `PartyExpandedBody` (`.manager-party-member-row`); the harness `waitFor` timed out until the selectors were repointed.
+- `.manager-travel-party-row` / `.manager-travel-member-row` — the **singular** classes from the retired `GatheringTravelView`.
+The live Travel tab renders `GatheringPartiesTab` (`.manager-travel-parties-row`, **plural**) and `PartyExpandedBody` (`.manager-party-member-row`); the harness `waitFor` timed out until the selectors were repointed.
 
 **Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done.
 Prefer running `npm run test:foundry` locally at least once on UI-touching PRs.
@@ -489,8 +516,11 @@ Don't assume green PR CI means the full smoke walk passes.
 
 ### Running it locally (gotchas)
 
-- Needs Docker Desktop running and `.env.foundry` with `FOUNDRY_USERNAME` / `FOUNDRY_PASSWORD` (the `up` script loads it; CI sets the vars directly). The container is cached between runs, so re-runs boot in ~5s.
-- The `run` phase **wipes `test-results/`** at startup. Do **not** redirect run logs into `test-results/` (e.g. `... | Tee-Object test-results/x.log`) — on Windows the open log file can't be unlinked and the run dies with `EBUSY`. Tee to a path outside `test-results/` if you need a copy.
+- Needs Docker Desktop running and `.env.foundry` with `FOUNDRY_USERNAME` / `FOUNDRY_PASSWORD` (the `up` script loads it; CI sets the vars directly).
+The container is cached between runs, so re-runs boot in ~5s.
+- The `run` phase **wipes `test-results/`** at startup.
+Do **not** redirect run logs into `test-results/` (e.g. `... | Tee-Object test-results/x.log`) — on Windows the open log file can't be unlinked and the run dies with `EBUSY`.
+Tee to a path outside `test-results/` if you need a copy.
 
 ### Documentation screenshot source
 
@@ -544,7 +574,8 @@ The rule applies when a PR changes any file under `src/ui/`, `styles/`, `lang/` 
    npm run screenshots:ui -- --base origin/main --pr <number>
    ```
 
-   This copies the relevant smoke artifacts from `test-results/` into `tmp/pr-screenshots/<number>/`. PR-scoped screenshots are temporary handoff files only.
+   This copies the relevant smoke artifacts from `test-results/` into `tmp/pr-screenshots/<number>/`.
+PR-scoped screenshots are temporary handoff files only.
 
 4. Upload and embed automatically:
 
@@ -590,8 +621,10 @@ It reads the live PR body, changed files, and labels, then passes when the body 
 
 - The heading match is case-insensitive, accepts any ATX level (`#`–`######`) and the singular form (`## Screenshot`).
 - The section runs from the heading to the next heading of the same or higher level, so an image under a *different* later heading does not count.
-- Images may be markdown (`![alt](url)`) or HTML (`<img src=...>`). GitHub drag-and-drop attachment URLs have no file extension, so the image syntax — not the URL shape — is what matters.
-- An image with no Screenshots heading, or a Screenshots heading with no image, does not pass. There is **no `SCREENSHOTS_NEEDED:` text bypass**.
+- Images may be markdown (`![alt](url)`) or HTML (`<img src=...>`).
+GitHub drag-and-drop attachment URLs have no file extension, so the image syntax — not the URL shape — is what matters.
+- An image with no Screenshots heading, or a Screenshots heading with no image, does not pass.
+There is **no `SCREENSHOTS_NEEDED:` text bypass**.
 
 The only way to skip the check is the **`screenshots-exempt` label**, which only a maintainer can apply.
 An agent must never apply it.
@@ -631,7 +664,10 @@ Steps:
 1. Run unit tests (`npm test`) and build.
 2. Run the Foundry integration smoke test (via the reusable workflow).
 3. Run `semantic-release` to determine the version bump, inject the release version into `module.json`, build and zip the module, and publish a GitHub prerelease.
-4. Compare RC tags pointing at `HEAD` before and after `semantic-release`. If exactly one new `v<x.y.z>-rc.N` tag was created, call `.github/workflows/release-s3.yml` with `dry_run: false` and `overwrite: false`. If no RC tag was created, skip S3 publishing. If multiple new RC tags are detected at `HEAD`, fail the run because the S3 publish target is ambiguous.
+4. Compare RC tags pointing at `HEAD` before and after `semantic-release`.
+If exactly one new `v<x.y.z>-rc.N` tag was created, call `.github/workflows/release-s3.yml` with `dry_run: false` and `overwrite: false`.
+If no RC tag was created, skip S3 publishing.
+If multiple new RC tags are detected at `HEAD`, fail the run because the S3 publish target is ambiguous.
 
 ### S3 release-candidate workflow
 
@@ -665,7 +701,9 @@ Files:
 Requirements:
 
 - Repository secret: `OPENAI_API_KEY`
-- Repository secret: `WORKFLOW_GH_TOKEN` — a GitHub token used by `team-b-backlog.yml` (and other agent workflows) to push the implementation branch, create the PR, manage issue/PR labels and comments, delete the branch on cleanup, and patch the PR body when publishing UI screenshots. The default `GITHUB_TOKEN` is insufficient because org policy blocks Actions from creating PRs. A **fine-grained, repo-scoped** token needs these repository permissions:
+- Repository secret: `WORKFLOW_GH_TOKEN` — a GitHub token used by `team-b-backlog.yml` (and other agent workflows) to push the implementation branch, create the PR, manage issue/PR labels and comments, delete the branch on cleanup, and patch the PR body when publishing UI screenshots.
+The default `GITHUB_TOKEN` is insufficient because org policy blocks Actions from creating PRs.
+A **fine-grained, repo-scoped** token needs these repository permissions:
   - **Contents: Read and write** — push commits/branches and delete refs.
   - **Pull requests: Read and write** — create PRs, apply PR labels, read and patch the PR body.
   - **Issues: Read and write** — edit issue labels and post issue comments.
@@ -674,7 +712,10 @@ Requirements:
 
   The labels it applies (`agent-created`, `in-progress`, `agent-failed`, `screenshots-exempt`) must already exist in the repo.
   This token grants no AWS access — S3 screenshot uploads authenticate separately via OIDC (see below).
-- AWS for S3 screenshot publishing: in CI, **OIDC only** (never static keys), via a **dedicated, least-privilege role** distinct from the module-release role. Repository variable `AWS_SCREENSHOTS_ROLE_TO_ASSUME` (the role ARN) plus the shared `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` variables and `permissions: id-token: write`. Local runs use the AWS default provider chain. See [Screenshot publishing infrastructure](#screenshot-publishing-infrastructure) for the exact IAM and bucket policies.
+- AWS for S3 screenshot publishing: in CI, **OIDC only** (never static keys), via a **dedicated, least-privilege role** distinct from the module-release role.
+Repository variable `AWS_SCREENSHOTS_ROLE_TO_ASSUME` (the role ARN) plus the shared `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` variables and `permissions: id-token: write`.
+Local runs use the AWS default provider chain.
+See [Screenshot publishing infrastructure](#screenshot-publishing-infrastructure) for the exact IAM and bucket policies.
 
 Behavior:
 
@@ -791,7 +832,8 @@ The pipeline is configured in `release.config.js`.
 
 1. Reads all commits since the last tag using `@semantic-release/commit-analyzer`.
 2. Generates release notes with `@semantic-release/release-notes-generator`.
-3. Calls `node scripts/release.js --version <new-version>` via `@semantic-release/exec`. This injects the version into `module.json`, runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
+3. Calls `node scripts/release.js --version <new-version>` via `@semantic-release/exec`.
+This injects the version into `module.json`, runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
 4. Creates a GitHub Release with the zip and the raw `module.json` as assets.
 5. On `main`, the release-candidate workflow detects the newly-created RC tag at `HEAD` and publishes that exact tag to S3 through the reusable S3 workflow.
 

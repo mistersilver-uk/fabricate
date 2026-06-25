@@ -69,7 +69,8 @@ screenshot evidence for UI work).
 
 ### Deviations
 
-Filled during post-implementation reconciliation. When the shipped canonical-spec
+Filled during post-implementation reconciliation.
+When the shipped canonical-spec
 change justifiably differs from what was proposed above, record the difference and
 the justification here so the reviewer can confirm the delta accurately describes
 what exists.

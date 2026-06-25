@@ -43,6 +43,7 @@ Full visibility and access evaluation for a single recipe.
 **Returns:** `{ visible: boolean, craftable: boolean, reason: string, knowledge: object }`
 
 Possible `reason` values:
+
 - `"ok"` means visible and craftable.
 - `"visibility"` means blocked by player list.
 - `"knowledge"` means blocked by knowledge requirements.

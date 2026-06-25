@@ -77,12 +77,16 @@ A marker is only the visible face of the interactable.
 The interactable keeps working even with no marker at all.
 What a marker does is mirror the interactable: it is hidden when the interactable is locked or disabled, and a tile marker's image can change when the shared gathering supply runs out (see below).
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Variant | What it is | Notes |
 |:--------|:-----------|:------|
 | **Tile marker** (default) | A Foundry tile placed on the map | Created and centred on the drop point. Takes its image from the tool or task icon. Hidden from players when the interactable is disabled or hidden. Image can change when the gathering supply runs out (gathering tasks). |
 | **Drawing marker** | A Foundry drawing | A labelled translucent rectangle "zone" marker. |
 | **Token marker** | An *existing* GM-owned token you relink | **Never changed or deleted**. It is the GM's own token (e.g. a merchant NPC). |
 | **Region only** | No marker at all | The region itself is the interactable, hidden, presence-only. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 #### Depleted-marker image swap (gathering tasks)
 

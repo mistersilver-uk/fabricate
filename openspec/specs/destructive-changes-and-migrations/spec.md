@@ -170,9 +170,11 @@ When a migration pass aborts, Fabricate must provide explicit GM guidance:
    - `Keep existing data` (the pre-selected default button)
    - `I will manually fix or delete failed documents, then retry migration`
 6. If the GM keeps existing data, no additional migration writes occur during that startup session.
-7. If the GM opts to fix/delete and retry, retry is explicit and user-initiated (never automatic in the same aborted pass). Because `migrationVersion` is unchanged on abort, the pending migrations re-run automatically on the next world reload after the GM fixes or deletes the failed documents; the fix/retry choice is informational and triggers no same-pass retry.
+7. If the GM opts to fix/delete and retry, retry is explicit and user-initiated (never automatic in the same aborted pass).
+Because `migrationVersion` is unchanged on abort, the pending migrations re-run automatically on the next world reload after the GM fixes or deletes the failed documents; the fix/retry choice is informational and triggers no same-pass retry.
 
-The prompt's DialogV2 configuration (window title, content mirroring the console guidance, both choices, and the `Keep existing data` default) is produced by a pure builder (`src/migration/migrationRecoveryPrompt.js`) so the default choice is unit-testable without Foundry. The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
+The prompt's DialogV2 configuration (window title, content mirroring the console guidance, both choices, and the `Keep existing data` default) is produced by a pure builder (`src/migration/migrationRecoveryPrompt.js`) so the default choice is unit-testable without Foundry.
+The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
 
 ### Write-on-Change Persistence
 
@@ -193,8 +195,10 @@ The migration framework supports the canonical-write / legacy-read compatibility
 - Migrations MUST rewrite legacy field names to their canonical equivalents (e.g., `systemItemId` -> `componentId`, `managedItems` -> `components`).
 - Migration output payloads SHOULD be canonical-first and SHOULD remove retired legacy keys where safe.
 - Runtime constructors and normalization functions continue to accept legacy aliases as read fallbacks to handle data that has not yet been migrated (e.g., data from external imports, manual JSON edits, or worlds that skipped a migration version).
-- Transitional write aliases (dual-emit in `toJSON()`) are temporary compatibility outputs for runtime writers and UI paths. They are deprecated and must not be introduced for new fields.
-- During the transitional window, persisted settings MAY still include documented transitional aliases when written by runtime managers. This does not invalidate migration correctness.
+- Transitional write aliases (dual-emit in `toJSON()`) are temporary compatibility outputs for runtime writers and UI paths.
+They are deprecated and must not be introduced for new fields.
+- During the transitional window, persisted settings MAY still include documented transitional aliases when written by runtime managers.
+This does not invalidate migration correctness.
 - Each migration entry in the registry should document which legacy aliases it retires from persisted data.
 - Cross-reference: full alias tables are maintained in `002-data-models.md § Canonical-Write and Legacy-Read Compatibility Policy`.
 
@@ -208,7 +212,9 @@ The pre-release migration path removes legacy crafting modes `mapped` and `tiere
 2. Recipe migration:
    - legacy mapped recipes -> `resultSelection.provider = "ingredientSet"`
    - legacy tiered recipes -> `resultSelection.provider = "check"`
-2a. For former `tiered` recipes, each `outcomeRouting[outcome] -> groupId` entry is reconciled by renaming the target `ResultGroup.name` to `outcome` (so canonical `check` name-matching reproduces the legacy routing), then `outcomeRouting` is removed. Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones; an outcome with no resolvable group is logged and left as a craft-time misconfiguration; an unroutable group keeps its name; a reserved-keyword outcome drops to the failure path without renaming any group; an unavoidable normalized `ResultGroup.name` collision makes the recipe unmigratable (hard cleanup per item 3).
+2a.
+For former `tiered` recipes, each `outcomeRouting[outcome] -> groupId` entry is reconciled by renaming the target `ResultGroup.name` to `outcome` (so canonical `check` name-matching reproduces the legacy routing), then `outcomeRouting` is removed.
+Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones; an outcome with no resolvable group is logged and left as a craft-time misconfiguration; an unroutable group keeps its name; a reserved-keyword outcome drops to the failure path without renaming any group; an unavoidable normalized `ResultGroup.name` collision makes the recipe unmigratable (hard cleanup per item 3).
 3. Mode and recipe migration is best-effort with hard cleanup on invalid documents:
    - recipes that cannot be migrated are deleted,
    - cascading cleanup is applied immediately (runs, learned flags, UI prefs, and stale references),
@@ -233,36 +239,51 @@ The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUui
 
 ### Catalyst → Tool Migration (`0.6.0`)
 
-The `0.6.0` migration (`src/migration/migrateCatalystsToTools.js`) retires the Catalyst concept by converting recipe-side catalysts into shared library **Tools** referenced by `toolIds`. It is automatic, versioned, idempotent, and by-reference.
+The `0.6.0` migration (`src/migration/migrateCatalystsToTools.js`) retires the Catalyst concept by converting recipe-side catalysts into shared library **Tools** referenced by `toolIds`.
+It is automatic, versioned, idempotent, and by-reference.
 
-1. Walk **recipe**-level, step-level, ingredient-set-level, and salvage-definition catalysts. Dedupe them into per-system library Tools written onto the crafting system (`system.tools`, the `craftingSystems` setting) and replace the inline catalyst arrays with `toolIds` references.
-2. The gathering `task.catalysts` field is **dead/vestigial** — never authored, only read, always empty. It is **not** walked and there is **no** gathering-task migration; `gatheringConfig` is not mutated by this migration.
+1. Walk **recipe**-level, step-level, ingredient-set-level, and salvage-definition catalysts.
+Dedupe them into per-system library Tools written onto the crafting system (`system.tools`, the `craftingSystems` setting) and replace the inline catalyst arrays with `toolIds` references.
+2. The gathering `task.catalysts` field is **dead/vestigial** — never authored, only read, always empty.
+It is **not** walked and there is **no** gathering-task migration; `gatheringConfig` is not mutated by this migration.
 3. Catalyst → Tool mapping:
-   - `degradesOnUse: false` (presence-only, never consumed) → `breakage { mode: breakageChance, breakageChance: 0 }` + `onBreak { mode: flagBroken }`. This is a deliberate modeling choice (a 0% break chance writes NO item usage flag), preserving the never-consumed behavior. The migration is **behavior-preserving**, not strictly structurally lossless, for this case.
+   - `degradesOnUse: false` (presence-only, never consumed) → `breakage { mode: breakageChance, breakageChance: 0 }` + `onBreak { mode: flagBroken }`.
+This is a deliberate modeling choice (a 0% break chance writes NO item usage flag), preserving the never-consumed behavior.
+The migration is **behavior-preserving**, not strictly structurally lossless, for this case.
    - `degradesOnUse: true`, `maxUses: N`, `destroyWhenExhausted: true` → `breakage { mode: limitedUses, maxUses: N }` + `onBreak { mode: destroy }`.
    - `degradesOnUse: true`, `maxUses: N`, `destroyWhenExhausted: false` → `breakage { mode: limitedUses, maxUses: N }` + `onBreak { mode: flagBroken }`.
 4. Dedup keys on the **full** catalyst shape (componentId + degradesOnUse + maxUses + destroyWhenExhausted) so semantically different catalysts are NOT merged into one library Tool.
 5. Recipes whose crafting system is missing are **skipped, not thrown** — log and continue.
 6. Mutated setting keys are `recipes` and `craftingSystems` (`systems[id].tools`); `gatheringConfig` is untouched.
-7. **Item-flag fallback (migrated `limitedUses` tools only).** At runtime, tool usage reads `flags.fabricate.toolUsage` and falls back to the legacy `flags.fabricate.catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) when `toolUsage` is absent, so in-flight per-item usage counters survive the cutover without an item-flag rewrite. The first post-migration `applyUsage` writes `toolUsage` (authoritative thereafter); the legacy flag is never back-filled or cleared. This fallback is meaningless for presence-only (`breakageChance: 0`) tools, which never read or write usage.
-8. After the pass, a one-time GM `ui.notifications` notice states that recipe catalysts moved to the Tools library, including a count of migrated entries and a pointer to the Tools tab. The migrated count is surfaced through the runner (`_migratedCatalystCount`) and is never persisted as a setting.
+7. **Item-flag fallback (migrated `limitedUses` tools only).** At runtime, tool usage reads `flags.fabricate.toolUsage` and falls back to the legacy `flags.fabricate.catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) when `toolUsage` is absent, so in-flight per-item usage counters survive the cutover without an item-flag rewrite.
+The first post-migration `applyUsage` writes `toolUsage` (authoritative thereafter); the legacy flag is never back-filled or cleared.
+This fallback is meaningless for presence-only (`breakageChance: 0`) tools, which never read or write usage.
+8. After the pass, a one-time GM `ui.notifications` notice states that recipe catalysts moved to the Tools library, including a count of migrated entries and a pointer to the Tools tab.
+The migrated count is surfaced through the runner (`_migratedCatalystCount`) and is never persisted as a setting.
 
 ### Tools-to-System Reconciliation (`0.7.0`)
 
-Tools are **system-owned**: every consumer reads `system.tools`. The `0.7.0` migration (`src/migration/migrateToolsToSystem.js`) reconciles any UI-authored gathering-scoped tools — persisted under `gatheringConfig.systems[id].tools` before tools became system-owned — onto the matching crafting system's `tools`, the single canonical source. It is pure, idempotent, and version-gated.
+Tools are **system-owned**: every consumer reads `system.tools`.
+The `0.7.0` migration (`src/migration/migrateToolsToSystem.js`) reconciles any UI-authored gathering-scoped tools — persisted under `gatheringConfig.systems[id].tools` before tools became system-owned — onto the matching crafting system's `tools`, the single canonical source.
+It is pure, idempotent, and version-gated.
 
 1. For each `gatheringConfig.systems[id].tools` array, MOVE its tools onto the matching `system.tools` and clear the gathering-config copy (`delete systemConfig.tools`).
-2. Dedupe by tool `id`: when the same id exists on both the system and the gathering config, the **existing system tool wins** (the gathering copy is dropped, not merged), so a re-author on the system is never clobbered. Tools without an `id` are skipped.
+2. Dedupe by tool `id`: when the same id exists on both the system and the gathering config, the **existing system tool wins** (the gathering copy is dropped, not merged), so a re-author on the system is never clobbered.
+Tools without an `id` are skipped.
 3. A gathering-config tools array whose `systemId` has **no matching crafting system** is left in place rather than dropping authored data.
-4. Mutated setting keys are `craftingSystems` (`systems[].tools`) and `gatheringConfig` (`systems[id].tools` cleared). Idempotent: once the config arrays are emptied/removed a re-run is a no-op.
+4. Mutated setting keys are `craftingSystems` (`systems[].tools`) and `gatheringConfig` (`systems[id].tools` cleared).
+Idempotent: once the config arrays are emptied/removed a re-run is a no-op.
 
 ### Gathering Limitation Toggles (`0.8.0`)
 
-The gathering economy limitation moved from a single mutually-exclusive `mode` enum (`none` | `stamina` | `nodes`) to two independent boolean toggles (`stamina.enabled` / `nodes.enabled`). The `0.8.0` migration (`src/migration/migrateGatheringLimitationToggles.js`) rewrites the legacy `mode` into the toggles. It is pure, idempotent, by-reference, and version-gated.
+The gathering economy limitation moved from a single mutually-exclusive `mode` enum (`none` | `stamina` | `nodes`) to two independent boolean toggles (`stamina.enabled` / `nodes.enabled`).
+The `0.8.0` migration (`src/migration/migrateGatheringLimitationToggles.js`) rewrites the legacy `mode` into the toggles.
+It is pure, idempotent, by-reference, and version-gated.
 
 1. For each `gatheringConfig.systems[id].economy` still carrying a legacy `mode`, write `stamina.enabled = (mode === 'stamina')` and `nodes.enabled = (mode === 'nodes')`, then delete `mode`.
 2. Already-migrated economies (no `mode`, toggles present) are left untouched, so a re-run is a no-op.
-3. Mutated setting key is `gatheringConfig` (`systems[id].economy`). A read-time normalizer applies the same `mode → toggles` mapping (gated on the toggle KEY being absent) so an un-migrated world behaves identically before the migration runs.
+3. Mutated setting key is `gatheringConfig` (`systems[id].economy`).
+A read-time normalizer applies the same `mode → toggles` mapping (gated on the toggle KEY being absent) so an un-migrated world behaves identically before the migration runs.
 
 ### Legacy Result-Selection Provider Removal (`1.6.0`)
 
