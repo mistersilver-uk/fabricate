@@ -2,7 +2,7 @@
  * Unit tests for T-008: Failure Consumption Policy
  *
  * Tests that CraftingEngine correctly applies consumeIngredientsOnFail and
- * consumeCatalystsOnFail policies on both crafting check failure paths.
+ * breakToolsOnFail policies on both crafting check failure paths.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,7 +44,7 @@ function setupGame(consumptionPolicy = {}) {
       macroUuid: 'macro:check-uuid',
       consumption: {
         consumeIngredientsOnFail: consumptionPolicy.consumeIngredientsOnFail,
-        consumeCatalystsOnFail: consumptionPolicy.consumeCatalystsOnFail
+        breakToolsOnFail: consumptionPolicy.breakToolsOnFail
       }
     }
   };
@@ -188,7 +188,7 @@ test('_getFailureConsumptionPolicy returns spec defaults when recipe has no craf
   const engine = new CraftingEngine({});
   const policy = engine._getFailureConsumptionPolicy({ craftingSystemId: null });
   assert.equal(policy.consumeIngredientsOnFail, true);
-  assert.equal(policy.consumeCatalystsOnFail, false);
+  assert.equal(policy.breakToolsOnFail, false);
 });
 
 test('_getFailureConsumptionPolicy returns policy from system craftingCheck.consumption', () => {
@@ -197,7 +197,7 @@ test('_getFailureConsumptionPolicy returns policy from system craftingCheck.cons
       getCraftingSystemManager: () => ({
         getSystem: () => ({
           craftingCheck: {
-            consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: true }
+            consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true }
           }
         })
       })
@@ -206,7 +206,7 @@ test('_getFailureConsumptionPolicy returns policy from system craftingCheck.cons
   const engine = new CraftingEngine({});
   const policy = engine._getFailureConsumptionPolicy({ craftingSystemId: 'sys-1' });
   assert.equal(policy.consumeIngredientsOnFail, false);
-  assert.equal(policy.consumeCatalystsOnFail, true);
+  assert.equal(policy.breakToolsOnFail, true);
 });
 
 test('_getFailureConsumptionPolicy defaults consumeIngredientsOnFail to true when consumption object is empty', () => {
@@ -224,7 +224,7 @@ test('_getFailureConsumptionPolicy defaults consumeIngredientsOnFail to true whe
   assert.equal(policy.consumeIngredientsOnFail, true);
 });
 
-test('_getFailureConsumptionPolicy defaults consumeCatalystsOnFail to false when consumption object is empty', () => {
+test('_getFailureConsumptionPolicy defaults breakToolsOnFail to false when consumption object is empty', () => {
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({
@@ -236,15 +236,15 @@ test('_getFailureConsumptionPolicy defaults consumeCatalystsOnFail to false when
   };
   const engine = new CraftingEngine({});
   const policy = engine._getFailureConsumptionPolicy({ craftingSystemId: 'sys-1' });
-  assert.equal(policy.consumeCatalystsOnFail, false);
+  assert.equal(policy.breakToolsOnFail, false);
 });
 
 // ---------------------------------------------------------------------------
 // Test Group 2: Failure consumption on crafting check failure — all four flag combos
 // ---------------------------------------------------------------------------
 
-async function runCheckFailureScenario({ consumeIngredientsOnFail, consumeCatalystsOnFail }) {
-  setupGame({ consumeIngredientsOnFail, consumeCatalystsOnFail });
+async function runCheckFailureScenario({ consumeIngredientsOnFail, breakToolsOnFail }) {
+  setupGame({ consumeIngredientsOnFail, breakToolsOnFail });
 
   const ingredientItem = buildFakeItem('ing-1', 2);
   const toolItem = buildFakeItem('tool-item-1', 1);
@@ -269,7 +269,7 @@ async function runCheckFailureScenario({ consumeIngredientsOnFail, consumeCataly
 test('craft() consumes ingredients AND breaks tools on check failure when both flags true', async () => {
   const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: true,
-    consumeCatalystsOnFail: true
+    breakToolsOnFail: true
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.updateCalled, true, 'ingredient should have been partially consumed via update');
@@ -280,7 +280,7 @@ test('craft() consumes ingredients AND breaks tools on check failure when both f
 test('craft() consumes ingredients but NOT tools on check failure (default policy: true/false)', async () => {
   const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: true,
-    consumeCatalystsOnFail: false
+    breakToolsOnFail: false
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.updateCalled, true, 'ingredient should have been partially consumed via update');
@@ -291,7 +291,7 @@ test('craft() consumes ingredients but NOT tools on check failure (default polic
 test('craft() does NOT consume ingredients but DOES break tools on check failure (false/true)', async () => {
   const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: false,
-    consumeCatalystsOnFail: true
+    breakToolsOnFail: true
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
@@ -302,7 +302,7 @@ test('craft() does NOT consume ingredients but DOES break tools on check failure
 test('craft() does NOT consume ingredients AND does NOT break tools on check failure when both flags false', async () => {
   const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: false,
-    consumeCatalystsOnFail: false
+    breakToolsOnFail: false
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
@@ -314,8 +314,8 @@ test('craft() does NOT consume ingredients AND does NOT break tools on check fai
 // Test Group 3: Failure consumption on check result validation failure
 // ---------------------------------------------------------------------------
 
-async function runValidationFailureScenario({ consumeIngredientsOnFail, consumeCatalystsOnFail }) {
-  setupGame({ consumeIngredientsOnFail, consumeCatalystsOnFail });
+async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToolsOnFail }) {
+  setupGame({ consumeIngredientsOnFail, breakToolsOnFail });
 
   const ingredientItem = buildFakeItem('ing-2', 3);
   const toolItem = buildFakeItem('tool-item-2', 1);
@@ -364,7 +364,7 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, consumeC
 test('craft() applies failure consumption policy when check result validation fails (both true)', async () => {
   const { result, ingredientItem, toolUsed } = await runValidationFailureScenario({
     consumeIngredientsOnFail: true,
-    consumeCatalystsOnFail: true
+    breakToolsOnFail: true
   });
   assert.equal(result.success, false);
   assert.match(result.message, /resolution mode requirements/i);
@@ -376,7 +376,7 @@ test('craft() applies failure consumption policy when check result validation fa
 test('craft() does not consume when policy is false/false and check result validation fails', async () => {
   const { result, ingredientItem, toolUsed } = await runValidationFailureScenario({
     consumeIngredientsOnFail: false,
-    consumeCatalystsOnFail: false
+    breakToolsOnFail: false
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
@@ -389,7 +389,7 @@ test('craft() does not consume when policy is false/false and check result valid
 // ---------------------------------------------------------------------------
 
 test('craft() does not consume on pre-check failure (missing ingredients)', async () => {
-  setupGame({ consumeIngredientsOnFail: true, consumeCatalystsOnFail: true });
+  setupGame({ consumeIngredientsOnFail: true, breakToolsOnFail: true });
 
   const ingredientItem = buildFakeItem('ing-3', 1);
   const fakeTool = buildFakeTool('tool-3');
@@ -448,7 +448,7 @@ test('_consumeIngredients defaults missing item.system.quantity to 1', async () 
 test('craft() success path still consumes ingredients regardless of consumeIngredientsOnFail policy', async () => {
   // consumeIngredientsOnFail: false means nothing consumed ON FAILURE —
   // it should have no effect on the success path which always consumes.
-  setupGame({ consumeIngredientsOnFail: false, consumeCatalystsOnFail: false });
+  setupGame({ consumeIngredientsOnFail: false, breakToolsOnFail: false });
 
   const ingredientItem = buildFakeItem('ing-4', 2);
   const ingredientSet = buildFakeIngredientSet(ingredientItem);

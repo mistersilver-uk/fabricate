@@ -91,7 +91,7 @@ test('Changing salvageResolutionMode from simple to routed disables components w
       enabled: true,
       macroUuid: 'Macro.check',
       outcomes: ['pass', 'fail'],
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false }
     },
     components: [{
@@ -130,7 +130,7 @@ test('Changing salvageResolutionMode from routed to simple disables components w
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       enabled: true, macroUuid: 'Macro.check', outcomes: ['pass', 'fail'],
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false }
     },
     components: [{
@@ -169,7 +169,7 @@ test('Mode change does not disable components that are already valid for the new
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       enabled: false, macroUuid: null, outcomes: [],
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false }
     },
     components: [{
@@ -207,7 +207,7 @@ test('GM notification sent when components are disabled by mode change', async (
     salvageResolutionMode: 'simple',
     salvageCraftingCheck: {
       enabled: true, macroUuid: 'Macro.check', outcomes: ['pass', 'fail'],
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false }
     },
     components: [{

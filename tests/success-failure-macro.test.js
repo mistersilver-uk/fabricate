@@ -45,7 +45,7 @@ function setupGame(craftingCheck = {}) {
       failureMacroUuid: craftingCheck.failureMacroUuid || null,
       consumption: {
         consumeIngredientsOnFail: false,
-        consumeCatalystsOnFail: false
+        breakToolsOnFail: false
       }
     }
   };

@@ -109,7 +109,7 @@ The returned system object also includes the following top-level salvage fields,
 | `successMacroUuid` | `string\|null` | `null` | UUID of the macro called on salvage success |
 | `failureMacroUuid` | `string\|null` | `null` | UUID of the macro called on salvage failure |
 | `consumption.consumeComponentOnFail` | `boolean` | `true` | Consume the source component even when the check fails |
-| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Apply salvage tool breakage even when the check fails (field name retained for backward compatibility, governs Tools) |
+| `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools even when the salvage check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback) |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"` |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing |
@@ -135,7 +135,7 @@ It controls how skill/ability checks gate recipe outcomes in routed check and pr
 | `builtIn.dc` | `number` | `15` | Difficulty class for the built-in check. Must be a positive integer, and invalid values fall back to `15`. |
 | `builtIn.advantage` | `string` | `"normal"` | `"advantage"`, `"disadvantage"`, or `"normal"`. |
 | `consumption.consumeIngredientsOnFail` | `boolean` | `true` | Remove ingredients from inventory when the check fails. |
-| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Apply tool breakage when the check fails (field name retained for backward compatibility, governs Tools). |
+| `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools when the crafting check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
@@ -213,7 +213,7 @@ Hooks.once('fabricate.ready', async () => {
       macroUuid: 'Macro.salvage-check-uuid',
       consumption: {
         consumeComponentOnFail: true,
-        consumeCatalystsOnFail: false
+        breakToolsOnFail: false
       },
       outcomes: ['critical', 'pass', 'fail']
     }

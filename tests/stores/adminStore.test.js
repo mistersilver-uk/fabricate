@@ -2082,7 +2082,7 @@ describe('createAdminStore', () => {
           failureMacroUuid: 'macro-failure',
           consumption: {
             consumeIngredientsOnFail: false,
-            consumeCatalystsOnFail: true,
+            breakToolsOnFail: true,
           },
           progressive: {
             awardMode: 'partial',

@@ -9,6 +9,7 @@
 
 import { SETTING_KEYS } from '../config/settings.js';
 
+import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
 import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem.js';
@@ -219,6 +220,15 @@ const MIGRATIONS = [
       const { recipes, gatheringConfig, _removedResultSelectionProviders } =
         migrateRemoveResultSelectionProviders(data);
       return { recipes, gatheringConfig, _removedResultSelectionProviders };
+    },
+  },
+  {
+    version: '1.7.0',
+    label:
+      'Rename consumeCatalystsOnFail → breakToolsOnFail on crafting/salvage consumption; ' +
+      'strip residual dead catalysts arrays from recipes, component salvage, and gathering tasks',
+    migrate(data) {
+      return migrateBreakToolsOnFail(data);
     },
   },
   // Future migrations added here in version order

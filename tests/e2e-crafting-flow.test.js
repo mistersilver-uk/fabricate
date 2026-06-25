@@ -179,7 +179,7 @@ function makeSystem({
       failureMacroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false }
     },
     managedItems,
     components: managedItems
@@ -555,7 +555,7 @@ function makeLegacyOutcomeRoutingSystem(id = 'sys-legacy-routing') {
       failureMacroUuid: null,
       outcomes: ['critical', 'pass', 'fail'],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
       { id: 'comp-great-potion', sourceUuid: 'uuid:great-potion', difficulty: 1 },
@@ -709,7 +709,7 @@ function makeProgressiveSystem(id = 'sys-prog') {
       failureMacroUuid: null,
       outcomes: [],
       progressive: { awardMode: 'equal' },
-      consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
       { id: 'comp-a', sourceUuid: 'uuid:item-a', difficulty: 3 },
@@ -854,7 +854,7 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
 
 // ===========================================================================
 // Group 5: Check-failure breakTools — the engine-evaluated forced-failure crit
-// breaks the owned tool on the consumeCatalystsOnFail path. Each half (the
+// breaks the owned tool on the breakToolsOnFail path. Each half (the
 // engine check surfacing data.breakTools, and _applyToolBreakage forcing a
 // never-breaking tool) is unit-proven; this exercises the craft() glue end to end.
 // ===========================================================================
@@ -879,7 +879,7 @@ function makeOwnedToolItem(componentId = 'hammer') {
   return { item, flags };
 }
 
-test('check-failure breakTools: a forced-failure engine crit breaks the owned tool on the consumeCatalystsOnFail path', async () => {
+test('check-failure breakTools: a forced-failure engine crit breaks the owned tool on the breakToolsOnFail path', async () => {
   const system = makeSystem({
     id: 'sys-break',
     resolutionMode: 'simple',
@@ -888,7 +888,7 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
       macroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: true },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
     },
     managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }],
   });
@@ -963,7 +963,7 @@ test('check-failure breakTools: a macro data.breakTools does NOT force-break the
       macroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: true },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
     },
     managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }],
   });

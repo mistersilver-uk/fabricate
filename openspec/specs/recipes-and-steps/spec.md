@@ -293,8 +293,8 @@ Success and failure macros follow the same contracts as crafting, substituting `
 ### Failure Consumption Policy
 
 - `salvageCraftingCheck.consumption.consumeComponentOnFail`: if true (default), the component is consumed even on failure.
-- `salvageCraftingCheck.consumption.consumeCatalystsOnFail`: a **legacy-named** key (retained to avoid a persisted-key migration); if false (default), Tools are not consumed/broken on failure.
-Read it as "consume/break tools on fail".
+- `salvageCraftingCheck.consumption.breakToolsOnFail`: if false (default), Tools are not broken on failure.
+It was renamed from the legacy `consumeCatalystsOnFail` by the 1.7.0 migration (normalization still reads the legacy key as a fallback).
 
 When `Component.salvage.timeRequirement` is present, these policies are evaluated when the timed salvage run completes, not when it is first started.
 

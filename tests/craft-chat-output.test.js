@@ -56,7 +56,7 @@ function buildSystem(chatOutputEnabled = true) {
       macroUuid: null,
       successMacroUuid: null,
       failureMacroUuid: null,
-      consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     }
   };
 }

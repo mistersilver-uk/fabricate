@@ -56,30 +56,32 @@ test('migrations run in version order: componentId migration applied from 0.0.0'
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.0.0',
-      recipes: [{ catalysts: [{ systemItemId: 'forge' }] }],
-      craftingSystems: []
+      recipes: [],
+      craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }]
     }
   });
 
   await runner.run();
 
-  const savedRecipes = settings.store.get('recipes');
-  assert.equal(savedRecipes[0].catalysts[0].componentId, 'forge');
-  assert.equal('systemItemId' in savedRecipes[0].catalysts[0], false);
+  // 0.1.0 renames the system's managedItems -> components; this observable survives every
+  // later migration (unlike recipe catalysts, which 0.6.0 converts and 1.7.0 strips).
+  const savedSystems = settings.store.get('craftingSystems');
+  assert.ok(Array.isArray(savedSystems[0].components));
+  assert.equal('managedItems' in savedSystems[0], false);
 });
 
 test('only pending migrations run: skip all when migrationVersion is 0.1.0', async () => {
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.1.0',
-      recipes: [{ catalysts: [{ systemItemId: 'forge' }] }],
+      recipes: [{ id: 'r1' }],
       craftingSystems: []
     }
   });
 
   await runner.run();
 
-  // recipes/systems should NOT be touched (all migrations already applied)
+  // recipes/systems should NOT be touched (no pending migration mutates this data)
   const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('recipes'), 'recipes should not be persisted when no migrations are pending');
   assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems should not be persisted when no migrations are pending');
@@ -129,7 +131,7 @@ test('running twice from 0.0.0 produces identical output', async () => {
 });
 
 test('data already in target shape passes through unchanged', async () => {
-  const alreadyMigrated = [{ catalysts: [{ componentId: 'forge', degradesOnUse: false }] }];
+  const alreadyMigrated = [{ id: 'r1' }];
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.0.0',
@@ -149,7 +151,7 @@ test('runner does not persist recipes/systems when data is identical after migra
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.0.0',
-      recipes: [{ id: 'r1', catalysts: [{ componentId: 'c1' }] }],
+      recipes: [{ id: 'r1' }],
       craftingSystems: [{ id: 's1', components: [] }]
     }
   });
@@ -171,21 +173,22 @@ test('null in recipes array is handled gracefully, valid entries still migrated'
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.0.0',
-      recipes: [null, { catalysts: [{ systemItemId: 'iron' }] }],
-      craftingSystems: []
+      recipes: [null, { id: 'keep', craftingSystemId: 'sys-1', catalysts: [{ systemItemId: 'iron' }] }],
+      craftingSystems: [{ id: 'sys-1' }]
     }
   });
 
   await runner.run();
 
   const recipes = settings.store.get('recipes');
+  const systems = settings.store.get('craftingSystems');
   assert.ok(Array.isArray(recipes));
-  // The non-null entry should be migrated
+  // The non-null entry should be migrated: 0.1.0 renames systemItemId -> componentId,
+  // 0.6.0 converts the catalyst into a system Tool, 1.7.0 strips the residual array.
   const validEntry = recipes.find(r => r !== null && typeof r === 'object');
   assert.ok(validEntry, 'valid entry should remain');
-  if (validEntry) {
-    assert.equal(validEntry.catalysts[0].componentId, 'iron');
-  }
+  assert.equal('catalysts' in validEntry, false);
+  assert.equal(systems[0].tools[0].componentId, 'iron');
 });
 
 test('non-object in recipes array is skipped without crashing', async () => {
@@ -242,8 +245,8 @@ test('full run from 0.0.0 applies componentId migration correctly', async () => 
   const recipes = settings.store.get('recipes');
   const systems = settings.store.get('craftingSystems');
 
-  assert.equal(recipes[0].catalysts[0].componentId, 'cat-a');
-  assert.equal('systemItemId' in recipes[0].catalysts[0], false);
+  // recipe-level catalysts are converted (0.6.0) / stripped (1.7.0); the surviving 0.1.0
+  // observables below confirm the componentId migration ran through the runner.
   assert.equal(recipes[0].resultGroups[0].results[0].componentId, 'result-a');
   assert.equal(recipes[0].ingredientSets[0].ingredients[0].match.componentId, 'ing-a');
   assert.equal(recipes[0].ingredientSets[0].ingredients[0].match.type, 'component');
@@ -252,22 +255,22 @@ test('full run from 0.0.0 applies componentId migration correctly', async () => 
 });
 
 test('full run from 0.1.0 skips componentId migration', async () => {
-  const originalData = [{ catalysts: [{ systemItemId: 'legacy' }] }];
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.1.0',
-      recipes: JSON.parse(JSON.stringify(originalData)),
-      craftingSystems: []
+      recipes: [],
+      craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }]
     }
   });
 
   await runner.run();
 
-  // Data should be untouched since migration was already applied
-  const recipes = settings.store.get('recipes');
-  // setSetting for recipes should not have been called
+  // 0.1.0 is gated out, so its managedItems -> components rename does NOT run and the
+  // system is left untouched (no later migration touches a managedItems-only system).
+  const systems = settings.store.get('craftingSystems');
+  assert.ok('managedItems' in systems[0], 'managedItems left untouched when 0.1.0 is gated');
   const setKeys = settings.calls.set.map(c => c.key);
-  assert.ok(!setKeys.includes('recipes'));
+  assert.ok(!setKeys.includes('craftingSystems'));
 });
 
 test('migrationVersion setting is updated to the highest migration version after successful run', async () => {
@@ -283,7 +286,7 @@ test('migrationVersion setting is updated to the highest migration version after
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '1.6.0');
+  assert.equal(versionCall.value, '1.7.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -310,7 +313,7 @@ test('unchanged data only triggers setSetting for migrationVersion', async () =>
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.0.0',
-      recipes: [{ id: 'r1', catalysts: [{ componentId: 'c1' }] }],
+      recipes: [{ id: 'r1' }],
       craftingSystems: [{ id: 's1', components: [] }]
     }
   });
@@ -351,7 +354,7 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
-  assert.equal(versionCall?.value, '1.6.0');
+  assert.equal(versionCall?.value, '1.7.0');
 });
 
 test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
@@ -415,11 +418,9 @@ test('0.1.0 backward-compat: gatheringConfig is preserved across the spread-merg
   assert.deepEqual(saved.conditions, originalGathering.conditions, 'conditions preserved');
   assert.deepEqual(saved.systems, originalGathering.systems, 'systems preserved');
 
-  // 0.1.0's recipe / system migrations also took effect.
-  const recipes = settings.store.get('recipes');
+  // 0.1.0's system migration took effect (the recipe's catalysts are stripped by 1.7.0,
+  // so the managedItems -> components rename is the surviving 0.1.0 observable).
   const systems = settings.store.get('craftingSystems');
-  assert.equal(recipes[0].catalysts[0].componentId, 'forge');
-  assert.equal('systemItemId' in recipes[0].catalysts[0], false);
   assert.ok(Array.isArray(systems[0].components));
   assert.equal('managedItems' in systems[0], false);
 });
@@ -465,7 +466,7 @@ test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode
   assert.equal(config.systems['sys-1'].economy.stamina.enabled, false);
   assert.equal(config.systems['sys-1'].economy.nodes.enabled, true);
 
-  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.7.0');
 });
 
 test('0.4.0 collapses legacy node respawn policies in library tasks and environments', async () => {
@@ -494,7 +495,7 @@ test('0.4.0 collapses legacy node respawn policies in library tasks and environm
   assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.4, intervalUnit: 'hours', intervalAmount: 2 });
   assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.2, intervalUnit: 'minutes', intervalAmount: 1 });
 
-  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.7.0');
 });
 
 test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
@@ -566,7 +567,7 @@ test('0.8.0 rewrites legacy economy.mode into independent stamina/nodes flags', 
   assert.equal(systems['sys-none'].economy.stamina.enabled, false);
   assert.equal(systems['sys-none'].economy.nodes.enabled, false);
 
-  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.7.0');
 });
 
 test('0.8.0 is idempotent and leaves already-migrated economies untouched', async () => {
@@ -610,7 +611,7 @@ test('0.3.0 -> 0.8.0 compose: env-level economyMode becomes the two flags', asyn
   assert.equal('mode' in economy, false, '0.8.0 drops the mode 0.3.0 seeded');
   assert.equal(economy.stamina.enabled, true);
   assert.equal(economy.nodes.enabled, false);
-  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.7.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -637,7 +638,7 @@ test('1.2.0 rewrites a legacy elapsedTime stamina-regen policy to overTime', asy
   assert.equal(stamina.regen.unit, 'days');
   assert.equal(stamina.regen.amount, 5);
   assert.equal(stamina.max, '20');
-  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.7.0');
 });
 
 test('1.2.0 is idempotent and leaves already-overTime economies untouched (no re-persist)', async () => {

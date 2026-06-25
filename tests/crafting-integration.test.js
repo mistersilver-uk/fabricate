@@ -191,7 +191,7 @@ function buildSystem({ id = 'sys-1', resolutionMode = 'simple', craftingCheck = 
       failureMacroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems,
     components: managedItems
@@ -550,7 +550,7 @@ function buildLegacyOutcomeRoutingFixture() {
       failureMacroUuid: null,
       outcomes: ['pass', 'fail'],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     }
   });
 
@@ -660,7 +660,7 @@ function buildProgressiveFixture() {
       failureMacroUuid: null,
       outcomes: [],
       progressive: { awardMode: 'equal' },
-      consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
       { id: 'comp-a', sourceUuid: 'uuid:a', difficulty: 2 },

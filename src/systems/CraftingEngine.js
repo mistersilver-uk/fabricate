@@ -320,7 +320,7 @@ export class CraftingEngine {
           // policy consumes ingredients on failure (it is a chosen ingredient).
           await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
         }
-        if (failurePolicy.consumeCatalystsOnFail) {
+        if (failurePolicy.breakToolsOnFail) {
           usedToolPairs = toolValidation.tools;
           // An engine-evaluated check (simple/routed/progressive) crit/tier with
           // `breakTools` forces breakage on the check-failure path too. A macro /
@@ -404,7 +404,7 @@ export class CraftingEngine {
           consumedOnValidationFail = await this._consumeIngredients(craftSelection.plan);
           await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
         }
-        if (validationFailurePolicy.consumeCatalystsOnFail) {
+        if (validationFailurePolicy.breakToolsOnFail) {
           usedToolPairsOnValidationFail = toolValidation.tools;
           usedToolsOnValidationFail = await this._applyToolBreakage(
             executionRecipe,
@@ -1289,17 +1289,20 @@ export class CraftingEngine {
   _getFailureConsumptionPolicy(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false };
+      return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
     }
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
-      return { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false };
+      return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
     }
     const consumption = system.craftingCheck?.consumption || {};
     return {
       consumeIngredientsOnFail: consumption.consumeIngredientsOnFail !== false,
-      consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true,
+      // Normalized systems carry `breakToolsOnFail`; tolerate the legacy
+      // `consumeCatalystsOnFail` defensively for any un-normalized path.
+      breakToolsOnFail:
+        (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
   }
 
@@ -2215,7 +2218,7 @@ export class CraftingEngine {
             ingredientQuantity
           );
         }
-        if (failurePolicy.consumeCatalystsOnFail) {
+        if (failurePolicy.breakToolsOnFail) {
           usedToolPairs = toolValidation.tools;
           usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools);
         }
@@ -2374,14 +2377,16 @@ export class CraftingEngine {
 
   /**
    * Get the salvage failure consumption policy from the system.
-   * Defaults: consumeComponentOnFail=true, consumeCatalystsOnFail=false.
+   * Defaults: consumeComponentOnFail=true, breakToolsOnFail=false.
    * @private
    */
   _getSalvageFailureConsumptionPolicy(system) {
     const consumption = system?.salvageCraftingCheck?.consumption || {};
     return {
       consumeComponentOnFail: consumption.consumeComponentOnFail !== false,
-      consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true,
+      // Normalized systems carry `breakToolsOnFail`; tolerate the legacy key defensively.
+      breakToolsOnFail:
+        (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
   }
 

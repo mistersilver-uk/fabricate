@@ -385,7 +385,7 @@ test('0.6.0 runs from 0.5.0: catalysts become tools + toolIds and version advanc
   assert.equal(systems[0].tools.length, 1);
   // The full runner also applies the later 0.7.0, 0.8.0, and 0.9.0 migrations, so the
   // persisted version advances to the highest migration version.
-  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.7.0');
   assert.equal(summary.migratedCatalystCount, 1);
 
   // The transient count field is never persisted onto any setting payload.
@@ -396,7 +396,7 @@ test('0.6.0 runs from 0.5.0: catalysts become tools + toolIds and version advanc
   }
 });
 
-test('version gate: 0.6.0 is NOT re-applied when migrationVersion is already 0.6.0', async () => {
+test('version gate: 0.6.0 conversion is NOT re-applied when migrationVersion is already 0.6.0', async () => {
   const settings = makeSettings({
     migrationVersion: '0.6.0',
     recipes: [{ id: 'r1', craftingSystemId: 'sys-1', catalysts: [{ componentId: 'forge', degradesOnUse: false }] }],
@@ -406,20 +406,24 @@ test('version gate: 0.6.0 is NOT re-applied when migrationVersion is already 0.6
 
   const summary = await runner.run();
 
-  // The 0.6.0 catalyst migration itself is gated out (catalysts untouched). The
-  // later 0.7.0 tool-reconciliation migration is still pending and runs, but with
-  // no gathering-config tools to move it is a data no-op — only the version bumps.
+  // The 0.6.0 catalyst CONVERSION is gated out: no library Tool is created and the
+  // catalysts are not turned into toolIds. The later 1.7.0 migration still strips the
+  // residual dead catalysts array (the engine only reads toolIds), so the recipe is
+  // re-persisted by that strip alone.
   const recipes = settings.store.get('recipes');
-  assert.ok('catalysts' in recipes[0], 'catalysts untouched when 0.6.0 gate blocks the run');
+  const systems = settings.store.get('craftingSystems');
+  assert.equal(systems[0].tools?.length ?? 0, 0, 'no Tool created when the 0.6.0 conversion is gated');
+  assert.equal(recipes[0].toolIds?.length ?? 0, 0, 'catalysts not converted to toolIds');
+  assert.equal('catalysts' in recipes[0], false, '1.7.0 strips the residual dead catalysts array');
   const setKeys = settings.calls.set.map(c => c.key);
-  assert.ok(!setKeys.includes('recipes'), 'recipes not persisted (0.6.0 gated, 0.7.0 untouched)');
-  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted');
-  assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted');
-  assert.equal(settings.store.get('migrationVersion'), '1.6.0');
+  assert.ok(setKeys.includes('recipes'), 'recipes re-persisted by the 1.7.0 catalysts strip');
+  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted (no conversion, no rename)');
+  assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted (no task catalysts here)');
+  assert.equal(settings.store.get('migrationVersion'), '1.7.0');
   assert.equal(summary.migratedCatalystCount, 0);
 });
 
-test('0.6.0 does not touch gatheringConfig', async () => {
+test('the dead gathering task.catalysts survives 0.6.0 but is stripped by 1.7.0', async () => {
   const settings = makeSettings({
     migrationVersion: '0.5.0',
     recipes: [{ id: 'r1', craftingSystemId: 'sys-1', catalysts: [{ componentId: 'forge', degradesOnUse: false }] }],
@@ -430,11 +434,14 @@ test('0.6.0 does not touch gatheringConfig', async () => {
 
   await runner.run();
 
+  // 0.6.0 never walks gatheringConfig (its pure function only returns recipes/systems);
+  // the dead task.catalysts field is removed later by the 1.7.0 strip, which re-persists
+  // gatheringConfig.
   const setKeys = settings.calls.set.map(c => c.key);
-  assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig is never persisted by 0.6.0');
-  // dead task.catalysts left exactly as-is
-  assert.deepEqual(
-    settings.store.get('gatheringConfig').systems['sys-1'].tasks[0].catalysts,
-    [{ componentId: 'x' }]
+  assert.ok(setKeys.includes('gatheringConfig'), 'gatheringConfig re-persisted by the 1.7.0 strip');
+  assert.equal(
+    'catalysts' in settings.store.get('gatheringConfig').systems['sys-1'].tasks[0],
+    false,
+    '1.7.0 strips the dead task.catalysts'
   );
 });
