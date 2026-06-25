@@ -6,7 +6,7 @@ nav_order: 3.2
 
 # Effect Transfer
 
-When the Effect transfer feature is enabled, Fabricate can copy active effects from essence source items to the newly created result item after a successful craft. 
+When the Effect transfer feature is enabled, Fabricate can copy active effects from essence source items to the newly created result item after a successful craft.
 This lets the magical properties bound to an essence carry over into the finished product.
 For example, crafting with fire-essence ingredients can automatically give the result fire-resistance or burning damage effects.
 
@@ -54,6 +54,9 @@ See the [Crafting Engine API]({% link api/crafting-engine.md %}).
 
 ## See Also
 
-- [Essences]({% link essences.md %}). Define essences and link each one to a source item whose active effects will be transferred.
-- [Crafting Systems]({% link crafting-systems.md %}). Enable the Essences and Effect transfer feature toggles on your system.
-- [Recipes]({% link recipes/index.md %}). Turn on effect transfer for individual recipes in the recipe editor.
+- [Essences]({% link essences.md %}).
+Define essences and link each one to a source item whose active effects will be transferred.
+- [Crafting Systems]({% link crafting-systems.md %}).
+Enable the Essences and Effect transfer feature toggles on your system.
+- [Recipes]({% link recipes/index.md %}).
+Turn on effect transfer for individual recipes in the recipe editor.

@@ -89,7 +89,8 @@ The adapter calls the game system's native dice API (`actor.rollSkill()` or `act
 
 **If no adapter is registered** for the current game system, the engine returns immediately with `success: false` and the message:
 
-> No system adapter available for built-in checks. Switch to macro mode or install a compatible game system.
+> No system adapter available for built-in checks.
+Switch to macro mode or install a compatible game system.
 
 Nothing is consumed and no macros are called in that case.
 
@@ -98,12 +99,16 @@ The failure consumption policy (step 5) then applies.
 
 The `builtIn` configuration object:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
 | `ability` | `string` | `""` | Ability key (e.g. `"int"`, `"wis"`) |
 | `skill` | `string` | `""` | Skill key (e.g. `"arc"`, `"nat"`). Takes precedence over `ability` when set. |
 | `dc` | `number` | `15` | Difficulty class. Roll total must meet or exceed this value to succeed. |
 | `advantage` | `string` | `"normal"` | `"advantage"`, `"disadvantage"`, or `"normal"` |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ### Macro Check Branch (`checkSource: "macro"`)
 

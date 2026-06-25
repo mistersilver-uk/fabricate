@@ -41,6 +41,8 @@ GM only.
 The `features` object controls which optional behaviours are active.
 Every key defaults to `false` when omitted.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Feature key | Type | Default | Description |
 |:------------|:-----|:--------|:------------|
 | `recipeCategories` | `boolean` | `false` | Organise recipes into named categories |
@@ -51,6 +53,8 @@ Every key defaults to `false` when omitted.
 | `multiStepRecipes` | `boolean` | `false` | Multi-step recipes |
 | `salvage` | `boolean` | `false` | Allow components to be broken down into constituent parts. When `true`, each normalised component gains a `salvage` sub-object. See [Salvage]({% link salvage.md %}). |
 | `gathering` | `boolean` | `false` | Enable GM authoring for gathering environments and tasks. See [Gathering Environments]({% link gathering-environments.md %}). |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ```javascript
 const mgr = game.fabricate.getCraftingSystemManager();
@@ -85,12 +89,18 @@ console.log(`Created system: ${system.id}`);
 
 The returned system object also includes the following top-level salvage fields, which are always normalised regardless of whether the `salvage` feature is enabled:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
 | `salvageResolutionMode` | `string` | `"simple"` | How salvage result groups are selected. Accepts `"simple"`, `"routed"`, or `"progressive"`. Legacy `"tiered"` input is normalized to `"routed"`. `"mapped"` and `"alchemy"` are rejected and fall back to `"simple"`. |
 | `salvageCraftingCheck` | `object` | see below | System-level salvage check configuration. |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 `salvageCraftingCheck` shape:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
@@ -104,10 +114,14 @@ The returned system object also includes the following top-level salvage fields,
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 The `craftingCheck` field is always present on the returned system object.
 It controls how skill/ability checks gate recipe outcomes in routed check and progressive modes.
 
 `craftingCheck` shape:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
@@ -125,6 +139,8 @@ It controls how skill/ability checks gate recipe outcomes in routed check and pr
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Example: built-in check on D&D 5e.** Configure a routed system to use an Intelligence (Arcana) check, DC 18, without writing a macro:
 
@@ -253,10 +269,14 @@ A component can claim a full source-reference chain through `sourceUuid`, `sourc
 2. **Unclaimed source chain.**
    No component claims any of those references, so a new component is created and `action` is `"added"`.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `systemId` | `string` | System ID |
 | `itemUuid` | `string` | UUID of the Foundry item to add. Accepts both world item UUIDs (`Item.abc123`) and compendium item UUIDs (`Compendium.pack.id.itemId`). |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Returns:** `Promise<{ item: object, action: 'added' | 'updated' | 'skipped', sourceFallbacks: object[] }>`
 
@@ -387,6 +407,8 @@ Returns all essence definitions for a system.
 
 Each returned object has the following shape:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Type | Description |
 |:------|:-----|:------------|
 | `id` | `string` | Unique identifier derived from the name |
@@ -394,6 +416,8 @@ Each returned object has the following shape:
 | `description` | `string` | Flavour text (may be empty) |
 | `icon` | `string` | FontAwesome class string. Always a non-empty string, and defaults to `fas fa-mortar-pestle`. |
 | `sourceItemUuid` | `string\|null` | Authoritative field. The `componentId` of the component linked to this essence, or `null`. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ```javascript
 const mgr = game.fabricate.getCraftingSystemManager();

@@ -4,7 +4,7 @@ title: Home
 nav_order: 1
 ---
 
-![](img/fabricate-repo-preview.png)
+![Fabricate repository preview](img/fabricate-repo-preview.png)
 
 # Fabricate
 
@@ -19,6 +19,8 @@ The player-facing Crafting and Alchemy tabs in the unified Fabricate window are 
 ---
 
 ## What can Fabricate do?
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Feature                    | Description                                                                                                       |
 |:---------------------------|:------------------------------------------------------------------------------------------------------------------|
@@ -38,6 +40,8 @@ The player-facing Crafting and Alchemy tabs in the unified Fabricate window are 
 | **Recipe Graph**           | Planned. Visualise recipe dependencies as an interactive graph in the GM admin panel                             |
 | **How-To Guides**          | Quick answers to common crafting tasks                                                                            |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 {: .tip }
 > Use the **search bar** in the sidebar to quickly find settings, configuration options, and examples across the documentation.
 
@@ -53,7 +57,7 @@ Tools can be both things you would carry, like a hammer, knife, or satchel or th
 ## Gathering
 
 GMs can define material gathering locations in [Gathering Environments]({% link gathering-environments.md %}) when a crafting system enables the "Gathering" feature.
-Gathering can also be location-aware! 
+Gathering can also be location-aware!
 GMs can describe campaign geography as realms, group actors into Fabricate-managed parties, and gate environments by the party's current realm.
 See [Gathering Realms & Travel]({% link gathering-realms.md %}).
 

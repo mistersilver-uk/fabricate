@@ -1,4 +1,4 @@
-![](https://img.shields.io/endpoint?url=https%3A%2F%2Ffoundryshields.com%2Fversion%3Fstyle%3Dfor-the-badge%26url%3Dhttps%3A%2F%2Fgithub.com%2Fmistersilver-uk%2Ffabricate%2Freleases%2Flatest%2Fdownload%2Fmodule.json)
+![Supported Foundry version](https://img.shields.io/endpoint?url=https%3A%2F%2Ffoundryshields.com%2Fversion%3Fstyle%3Dfor-the-badge%26url%3Dhttps%3A%2F%2Fgithub.com%2Fmistersilver-uk%2Ffabricate%2Freleases%2Flatest%2Fdownload%2Fmodule.json)
 <!--- Downloads @ Latest Badge -->
 ![Latest Release Download Count](https://img.shields.io/github/downloads/mistersilver-uk/fabricate/latest/total?sort=semver&style=for-the-badge&cacheSeconds=3600)
 ![Total Release Download Count](https://img.shields.io/github/downloads/mistersilver-uk/fabricate/total?label=total%20downloads&style=for-the-badge&cacheSeconds=3600)
@@ -10,7 +10,7 @@
 <!--- replace <your-module-name> with the `name` in your manifest -->
 <!--- ![Forge Installs](https://img.shields.io/badge/dynamic/json?label=Forge%20Installs&query=package.installs&suffix=%25&url=https%3A%2F%2Fforge-vtt.com%2Fapi%2Fbazaar%2Fpackage%2Ffabricate&colorB=4aa94a) -->
 
-![](/assets/img/fabricate-repo-preview.png)
+![Fabricate repository preview](/assets/img/fabricate-repo-preview.png)
 
 # Fabricate - Universal Gathering & Crafting System
 
@@ -59,7 +59,8 @@ npm test         # Run test suite
 npm run build    # Vite build to /dist
 ```
 
-Canonical specifications live under `openspec/specs/`. Non-trivial work is planned as an OpenSpec change delta in the work's GitHub issue (see `openspec/README.md`), not as versioned files.
+Canonical specifications live under `openspec/specs/`.
+Non-trivial work is planned as an OpenSpec change delta in the work's GitHub issue (see `openspec/README.md`), not as versioned files.
 
 ### Live Foundry Smoke Test
 
@@ -109,12 +110,16 @@ See [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [openspec/RE
 
 Fabricate is licensed under the PolyForm Noncommercial License 1.0.0 for noncommercial use.
 
-Commercial use is not permitted under that license. If you use Fabricate in connection with a paid product, paid service, subscription, commissioned work, monetized content, or other commercial
+Commercial use is not permitted under that license.
+If you use Fabricate in connection with a paid product, paid service, subscription, commissioned work, monetized content, or other commercial
 activity, you need a separate commercial license.
 
-Commercial licenses are handled through Patreon. If you need commercial rights, contact me with a brief description of your project and its expected or actual revenue. I will either direct you to an appropriate existing Patreon commercial license tier or create a suitable tier based on your revenue and use case.
+Commercial licenses are handled through Patreon.
+If you need commercial rights, contact me with a brief description of your project and its expected or actual revenue.
+I will either direct you to an appropriate existing Patreon commercial license tier or create a suitable tier based on your revenue and use case.
 
-Your commercial license remains active only while you maintain the required Patreon tier subscription. If that subscription ends, you must stop new commercial use of Fabricate unless we agree a
+Your commercial license remains active only while you maintain the required Patreon tier subscription.
+If that subscription ends, you must stop new commercial use of Fabricate unless we agree a
 separate license in writing.
 
 ## Credits

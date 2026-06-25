@@ -45,7 +45,8 @@ class RecipeBrowser {
 }
 ```
 
-The composition edge may use `game`. The object receives the collaborators it needs.
+The composition edge may use `game`.
+The object receives the collaborators it needs.
 
 ## Digging Into Collaborators
 
@@ -156,7 +157,8 @@ class LearnedRecipeRegistry {
 function visibleRecipeRows({ recipes, craftability }) {}
 ```
 
-The store or controller coordinates UI state. Domain decisions move to separately testable seams.
+The store or controller coordinates UI state.
+Domain decisions move to separately testable seams.
 
 ## Testing Implications
 

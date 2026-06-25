@@ -28,7 +28,8 @@ After:
 const result = recipeBook.resolveRecipeForActor(id, actor);
 ```
 
-The better boundary owns the workflow. Callers ask for the behavior they need instead of pulling internal data across the seam.
+The better boundary owns the workflow.
+Callers ask for the behavior they need instead of pulling internal data across the seam.
 
 ### Small, Cohesive Units
 
@@ -40,7 +41,8 @@ The better boundary owns the workflow. Callers ask for the behavior they need in
 
 - Public behavior should have a clear contract.
 - Prefer composing narrow collaborators over inheritance hierarchies or broad utility surfaces.
-- In JavaScript, exported module APIs are the contract. Keep them small and intention-revealing.
+- In JavaScript, exported module APIs are the contract.
+Keep them small and intention-revealing.
 
 ## Boundary Shape Selection
 
@@ -71,7 +73,9 @@ const sourceItemMatch = {
 };
 ```
 
-This is a narrow strategy object. It owns one rule and relies on the shared source-UUID resolver instead of duplicating Foundry source-field logic. Do not use a plain object as a mutable bag that outside code wires together through getters and setters.
+This is a narrow strategy object.
+It owns one rule and relies on the shared source-UUID resolver instead of duplicating Foundry source-field logic.
+Do not use a plain object as a mutable bag that outside code wires together through getters and setters.
 
 ### Closure Or Factory
 
@@ -108,11 +112,13 @@ export class CraftingSession {
 }
 ```
 
-Keep construction boring. The constructor should not fetch the recipe, read Foundry globals, or assemble the inventory.
+Keep construction boring.
+The constructor should not fetch the recipe, read Foundry globals, or assemble the inventory.
 
 ### Svelte Store
 
-Use a Svelte store for UI state and derived view state. Do not make it own domain workflows just because UI components can import it.
+Use a Svelte store for UI state and derived view state.
+Do not make it own domain workflows just because UI components can import it.
 
 Good store work:
 
@@ -136,7 +142,8 @@ export function createFoundryItemTypes({ game }) {
 }
 ```
 
-The adapter may touch Foundry. The domain object should receive `foundryItemTypes`, not `game`.
+The adapter may touch Foundry.
+The domain object should receive `foundryItemTypes`, not `game`.
 
 ### Avoid Static And Global Utility Thinking
 
@@ -205,7 +212,8 @@ export function withRequirement(recipe, requirement) {
 
 ## Adaptation Notes
 
-- Fabricate uses ES modules, functions, Svelte stores, and Foundry globals at runtime edges. Do not force everything into classes.
+- Fabricate uses ES modules, functions, Svelte stores, and Foundry globals at runtime edges.
+Do not force everything into classes.
 - The point is explicit ownership, low surprise, and decomposable seams, not ideological purity.
 - Leave a simple private pure helper alone when it supports one cohesive module and does not hide dependencies.
 - Prefer a small exported function over an object when there is no identity, lifecycle, captured collaborator, or meaningful behavior cluster.

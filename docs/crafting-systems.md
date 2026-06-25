@@ -21,12 +21,16 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 
 ### System Settings
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Setting                      | Description                                                                                                                                        |
 |:-----------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Name**                     | Display name shown in the UI                                                                                                                       |
 | **Description**              | Optional flavour text                                                                                                                              |
 | **Recipe resolution mode**   | How recipes produce results: Simple, Routed, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
 | **Salvage resolution mode**  | How salvaging a component awards results: Simple (default), Progressive, or Routed by check. See [Salvage]({% link salvage.md %}#salvage-resolution-mode) |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ### Tags And Categories
 
@@ -38,6 +42,8 @@ The reserved **General** recipe category is always present and is not stored in 
 Each system can independently enable or disable optional features.
 Most optional features are off by default and must be explicitly enabled by a GM.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Feature             | Default | Description                                                                                                                                               |
 |:--------------------|:--------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Essences            | Off     | Enable the essences system for abstract ingredient properties                                                                                             |
@@ -46,11 +52,15 @@ Most optional features are off by default and must be explicitly enabled by a GM
 | Multi-step recipes  | Off     | Allow recipes with multiple sequential steps                                                                                                              |
 | Gathering           | Off     | Show the Environments tab for authoring gathering locations and tasks. Any enabled system also exposes the player Gathering action in the Items Directory |
 
-Toggle optional features in the **Features** card on the System tab of the Crafting Admin panel. 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Toggle optional features in the **Features** card on the System tab of the Crafting Admin panel.
 Each toggle takes effect immediately for all future crafting attempts in that system.
 
 {: .warning }
-> Changing the **recipe resolution mode** is a destructive operation. All recipes in the system will be deleted because they may be invalid under the new mode. You will be asked to confirm.
+> Changing the **recipe resolution mode** is a destructive operation.
+All recipes in the system will be deleted because they may be invalid under the new mode.
+You will be asked to confirm.
 
 Changing the **salvage resolution mode** is not destructive.
 No recipes or runs are deleted.
@@ -115,8 +125,8 @@ For full details on each mode, knowledge sub-options, recipe items, the learn fl
 
 Alchemy mode is a special resolution mode where recipe names and ingredient lists are hidden from players.
 Macros and integrations can submit selected items to the alchemy engine.
-Fabricate matches the combination against known recipe signatures. 
-Set the resolution mode of a system to Alchemy to enable this. 
+Fabricate matches the combination against known recipe signatures.
+Set the resolution mode of a system to Alchemy to enable this.
 See [Alchemy Mode]({% link recipes/alchemy.md %}) for current usage, configuration, signature matching, consume-on-fail, and learn-on-craft options.
 
 ---
@@ -140,8 +150,8 @@ Salvaging can also be used to harvest monster corpses and world resources for us
 
 ## Gathering
 
-When the gathering feature is enabled, GMs can author environments and gathering tasks for the system's managed components. 
-If at least one crafting system has gathering enabled, players see a separate **Gathering** action in the Items Directory that opens the player Gathering app. 
+When the gathering feature is enabled, GMs can author environments and gathering tasks for the system's managed components.
+If at least one crafting system has gathering enabled, players see a separate **Gathering** action in the Items Directory that opens the player Gathering app.
 The action is removed again when no systems have gathering enabled.
 
 See [Gathering Environments]({% link gathering-environments.md %}) for the current GM editor fields, task authoring, player app behavior, active/history surfaces, required-tool references, and validation behavior.
@@ -174,7 +184,7 @@ The cleanup leaves things alone when nothing is stale, so nothing is written unl
 
 ## Components
 
-Components are the building blocks of recipes. 
+Components are the building blocks of recipes.
 Instead of pointing at a single specific world item, recipes refer to a component, and any matching item can satisfy it.
 This means:
 
@@ -184,12 +194,12 @@ This means:
 
 ### Adding Components
 
-Open the **Items** tab of the GM admin panel. 
+Open the **Items** tab of the GM admin panel.
 You can add items one at a time or import an entire compendium pack at once.
 
 #### Single-item drop
 
-Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the components list. 
+Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the components list.
 
 1. Open the Items sidebar or the compendium browser
 2. Drag the item onto the **Items** tab drop zone in the Crafting Admin panel
@@ -203,12 +213,12 @@ If Foundry reports an original compendium source but that source no longer exist
 After import, Fabricate also listens for linked Foundry Item updates from a GM client.
 When a linked item changes its name, image, or description, matching components refresh their stored name, image, and display-safe plain-text description automatically.
 
-If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported. 
+If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported.
 If the drag data cannot be resolved to any UUID, the same warning is shown.
 
 #### Bulk compendium pack drop
 
-To import all Item documents from a compendium pack at once, drag the **compendium pack header** (the title row in the compendium directory sidebar, not an individual entry within it) onto the drop zone. 
+To import all Item documents from a compendium pack at once, drag the **compendium pack header** (the title row in the compendium directory sidebar, not an individual entry within it) onto the drop zone.
 Fabricate iterates over every Item document in the pack and adds each one.
 
 - Items not yet in the system are added as new components.
@@ -221,13 +231,14 @@ Fabricate iterates over every Item document in the pack and adds each one.
 
 #### Folder drop
 
-Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder. 
-Fabricate expands the folder, applies the same source-chain deduplication logic as single-item drops, and shows a summary notification with the number of items added. 
-If any imported item has a broken original source link, Fabricate warns once with the affected count. 
+Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder.
+Fabricate expands the folder, applies the same source-chain deduplication logic as single-item drops, and shows a summary notification with the number of items added.
+If any imported item has a broken original source link, Fabricate warns once with the affected count.
 If the folder contains no Item documents, a notification says so and nothing is written.
 
 {: .note }
-> Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row. If your Foundry version does not support this drag shape, use single-item drops instead, or import the pack through the [API]({% link api/system-manager.md %}).
+> Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row.
+If your Foundry version does not support this drag shape, use single-item drops instead, or import the pack through the [API]({% link api/system-manager.md %}).
 
 ---
 
@@ -237,7 +248,7 @@ Systems can optionally require time or currency for crafting.
 
 ### Time Requirements
 
-When enabled, individual recipe steps can require an amount of time, given in minutes, hours, days, months, or years. 
+When enabled, individual recipe steps can require an amount of time, given in minutes, hours, days, months, or years.
 The step is blocked until world time advances past the required duration.
 
 Time gates are checked:

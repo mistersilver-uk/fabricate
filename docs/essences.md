@@ -26,12 +26,16 @@ Below you will find the fields that [define an essence](#defining-essences) and 
 Essences are defined at the crafting system level.
 Each essence definition has the following fields:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
 | Name | Display name, for example "Fire", "Arcane", or "Nature" |
 | Icon | A FontAwesome icon class. Leave it blank to use the default mortar-and-pestle icon. |
 | Description | Flavour text |
 | Source item | The component whose active effects represent this essence, used for effect transfer. Leave it unset if the essence is not linked to an item. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 When you link an essence to a source item, Fabricate checks that the component still exists.
 If the linked component is later removed, the link is cleared.
@@ -62,6 +66,7 @@ Ingredient sets can require specific essence quantities.
 When a player crafts, the essences from their chosen ingredients are totalled and compared against the requirement.
 
 For example, an ingredient set requiring "3 Fire essence and 2 Arcane essence" could be satisfied by:
+
 - 1x Dragon Scale (3 Fire + 1 Arcane) + 1x Arcane Dust (2 Arcane) = 3 Fire + 3 Arcane (meets requirement)
 
 ## Effect Transfer via Essences
@@ -98,6 +103,9 @@ The label in the UI reads **Source item**.
 
 ## See Also
 
-- [Effect Transfer]({% link effect-transfer.md %}). Configure the effect transfer pipeline that uses essence source items.
-- [Recipes overview]({% link recipes/index.md %}). See how essence requirements work inside ingredient sets.
-- [Recipe Manager API]({% link api/recipe-manager.md %}). Create and manage recipes with essence-based ingredients programmatically.
+- [Effect Transfer]({% link effect-transfer.md %}).
+Configure the effect transfer pipeline that uses essence source items.
+- [Recipes overview]({% link recipes/index.md %}).
+See how essence requirements work inside ingredient sets.
+- [Recipe Manager API]({% link api/recipe-manager.md %}).
+Create and manage recipes with essence-based ingredients programmatically.

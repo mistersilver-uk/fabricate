@@ -30,7 +30,8 @@ Every recipe brings together a few things.
 - For a routed recipe, how the result is chosen when more than one outcome is possible.
 
 {: .note }
-> For multi-step recipes, the ingredients and results are defined on each individual step rather than on the recipe as a whole. See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
+> For multi-step recipes, the ingredients and results are defined on each individual step rather than on the recipe as a whole.
+See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 
 ## Enabling and Disabling Recipes
 
@@ -74,12 +75,16 @@ Each ingredient option decides how it is matched against the items a player is c
 
 The resolution mode determines how ingredients map to results:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Mode                                             | Sets | Result Groups | Check Required     | Use When                                                      |
 |:-------------------------------------------------|:-----|:--------------|:-------------------|:--------------------------------------------------------------|
 | [Simple]({% link recipes/simple.md %})           | 1    | 1             | Optional           | Basic A + B = C crafting                                      |
 | [Routed]({% link recipes/routed.md %})           | 1+   | 1+            | Provider-dependent | Ingredient choice or skill check selects the result           |
 | [Progressive]({% link recipes/progressive.md %}) | 1    | 1 (ordered)   | **Yes**            | Skill check value "buys" results in order                     |
 | [Alchemy]({% link recipes/alchemy.md %})         | 1+   | 1+            | Optional           | Players experiment with ingredients. Recipe names are hidden  |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ## Multi-Step Recipes
 
@@ -107,4 +112,5 @@ Runtime crafting is available through the public API.
 See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.
 
 {: .note }
-> A player-facing Crafting tab is planned and not yet available. Recipe crafting works through the API today.
+> A player-facing Crafting tab is planned and not yet available.
+Recipe crafting works through the API today.

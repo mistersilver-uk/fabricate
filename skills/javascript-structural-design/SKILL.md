@@ -72,12 +72,15 @@ Flag or refactor these patterns when they create real risk:
 
 ## JavaScript Adaptation
 
-Elegant Objects is stricter than this codebase needs. Apply the direction, not dogma:
+Elegant Objects is stricter than this codebase needs.
+Apply the direction, not dogma:
 
 - Private module-scope pure helpers are fine when they support one cohesive module.
 - Exported helpers are acceptable only when they form a clear abstraction with a stable contract, not a generic `utils` bucket.
-- Not every boundary needs a class. Functions and closures are fine if dependencies stay explicit and the seam stays testable.
-- Foundry globals are unavoidable at runtime edges. Wrap or localize them instead of letting them leak through the whole call chain.
+- Not every boundary needs a class.
+Functions and closures are fine if dependencies stay explicit and the seam stays testable.
+- Foundry globals are unavoidable at runtime edges.
+Wrap or localize them instead of letting them leak through the whole call chain.
 
 ## Expected Output
 

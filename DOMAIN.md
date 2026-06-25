@@ -14,6 +14,8 @@
 
 ### Aggregates and Records
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Term                      | Definition                                                                                                                                             | Canonical Mapping                                                                       | Spec Reference               |
 |---------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|------------------------------|
 | **Crafting System**       | A self-contained configuration that owns components, recipes, feature toggles, and execution rules.                                                    | `CraftingSystemManager.systems`, normalized system object                               | openspec/specs/overview/spec.md, openspec/specs/data-models/spec.md           |
@@ -39,7 +41,11 @@
 | **Realm Disclosure / Travel Guidance** | The redaction-safe display layer for location-aware gathering. A `GatheringRealmDisclosure` (`{ id, label/labelKey, discovered, secret, placeholder }`) NEVER leaks a secret undiscovered realm's id or name to a non-GM viewer (it returns `id: null` and an undiscovered placeholder key). Travel guidance for a blocked environment resolves to one of `noCurrentRealm` (ask the GM to set the party's current realm), `excluded`, or `travel`, with known destinations disclosed safely and secret/undiscovered destinations summarized as a count. The viewer-facing location summary returns raw `realmIds`/`staleRealmIds` only to GMs. | `buildRealmDisclosure`/`buildTravelGuidance`/`buildLocationSummaryForViewer` in `src/systems/gatheringLocation.js`; exposed via `game.fabricate.gathering.getLocationForActor` | openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-integration/spec.md |
 | **Discovered Gathering Realms** | Actor-scoped realm knowledge, stored under the module flag namespace via the bare key `discoveredGatheringRealms` (sibling to `learnedRecipes`/`gatheringRuns`). Logical shape `{ [systemId]: { [realmId]: { discoveredAt, source, partyId?, sceneUuid?, sceneRegionUuid? } } }`, where `source` is one of `manual` \| `partyToken` \| `import` \| `api` (the `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and are kept verbatim). Discovery follows the character across party changes. **SHIPPED:** the flag helpers and GM reveal/hide mutators (writes validate the realm belongs to the referenced system); reads never throw on stale `partyId`, and reads accept the legacy `discoveredGatheringRegions` flag as a fallback while every write persists only `discoveredGatheringRealms`. Player-facing discovery controls and `partyToken` auto-discovery are later-phase follow-ups. | `discoveredGatheringRealms`; `revealGatheringRealm`/`hideGatheringRealm`/`getDiscoveredRealmIdsForSystem` in `src/systems/gatheringRealmDiscovery.js`; `src/config/flags.js` | openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 ### Acquisition, Knowledge, and Resolution Terms
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Term                           | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Canonical Mapping                                                                    | Spec Reference               |
 |--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|------------------------------|
@@ -112,6 +118,8 @@
 | **System Gathering Check**     | The system-level gathering check singleton (`system.gatheringCraftingCheck = { enabled, progressive{…}, routed{…} }`), reusing the shared Check shapes (no `simple` sub-object; d100 needs no editable config). A per-task `dcOverride` shifts the resolved DC. **Routed → result-group routing differs by activity:** crafting and salvage use an explicit `outcomeRouting` map (outcome name → group id), but gathering matches the matched tier NAME against the task **result-group name** (case-insensitive) — so a routed gathering task's result groups are addressed BY NAME. The engine consults the system progressive/routed formula only when one is configured. | `system.gatheringCraftingCheck`, `_normalizeGatheringCraftingCheck`; `_resolveRoutedFormulaOutcome`/`_resolveGatheringRoutedDc` in `GatheringEngine` | openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md |
 | **Check DC Override**          | A per-attempt DC shift applied **only where a DC is used** — i.e. the simple and routed runners. A per-component `salvage.dcOverride` and a per-task gathering `dcOverride` replace the check sub-object's default `dc` (else fallback 15) when finite. Progressive checks have **no DC**, so an override is irrelevant to (and ignored by) progressive salvage and progressive gathering: it is not a universal knob. | `salvage.dcOverride`, `GatheringTask.dcOverride`; `_resolveSalvageDc` in `CraftingEngine`, `_resolveGatheringRoutedDc` in `GatheringEngine` | openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md |
 | **Character Modifier**         | A reusable, formula-only actor-derived contribution to a d100 gathering drop row or event threshold. Library entries live per crafting system under `gatheringConfig.systems[systemId].characterModifiers` and have `{ id, label, icon, expression }` (no provider, no macro); rows and events reference them by `modifierId` with an operator (`+`/`-`) and optional `min`/`max` caps. The additive-vs-multiplicative application mode is NOT set per modifier: it is a single global system setting `gatheringConfig.systems[systemId].rules.dropModifierMode` (one of `additive`/`multiplicative`, defaulting to `additive`; the legacy `characterModifierMode` key is read-compatible) and cannot be overridden or subverted per modifier. That global mode selects whether each clamped value applies as an additive percentage-point delta or as a multiplicative factor `(1 ± V/100)`, and it governs ALL drop-chance modifiers uniformly — character modifiers AND condition modifiers (weather, time of day, biome). Under additive mode every contribution is summed onto the base; under multiplicative mode every contribution is a factor: additive deltas apply to the base first, then the product of every multiplicative factor, then the rate is clamped and rounded once; biome modifiers are aggregated by the system biome aggregation under the global mode (additive subset into one delta, multiplicative subset into one factor); stamina-cost adjustments stay additive regardless of mode. Character modifiers adjust the **threshold side** of the d100 comparison; the existing `task.gatheringModifier` and `event.eventModifier` continue to adjust the **roll side**, and the two surfaces are evaluated independently. A per-row `expressionOverride` lets a single row substitute its own expression in place of the library entry's expression. Presets for `dnd5e` and `pf2e` ship as opt-in seedable bundles (keyed on `game.system.id`, supplying system-specific roll expressions); nothing is added without explicit GM action. | `gatheringConfig.systems[systemId].characterModifiers`; `normalizeDropCharacterModifiers`/`normalizeEventCharacterModifiers`, `applyDropModifierContributions`/`matchingConditionModifierEntries`/`matchingBiomeModifierEntries`, and `resolveD100Attempt` in `GatheringRichStateService`; `DND5E_CHARACTER_MODIFIER_PRESETS`/`PF2E_CHARACTER_MODIFIER_PRESETS` in `src/config/gatheringCharacterModifierPresets.js`; admin store actions `addGatheringCharacterModifier`, `seedGatheringCharacterModifierPresets`, and the row/event-scoped add/update/delete actions | openspec/specs/gathering-and-harvesting/spec.md |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ## Concept Taxonomy
 
@@ -386,7 +394,8 @@ stateDiagram-v2
 ```
 
 Harvesting note: when the user-facing activity is "harvest a corpse" or "harvest bark", the lifecycle is still either
-the salvage lifecycle or the crafting lifecycle. There is no separate harvesting lifecycle.
+the salvage lifecycle or the crafting lifecycle.
+There is no separate harvesting lifecycle.
 
 ### Current Realm Resolution (Phase 1 shipped)
 
@@ -405,33 +414,47 @@ stateDiagram-v2
 
 Location-aware gathering re-resolves current realms per system at most once per listing call (memoized) and again,
 freshly, in the start-attempt guard so a stale listing — e.g. an override cleared between list and start — cannot start
-a location-gated attempt. Ungated environments (no availability rules, or empty-after-normalization rules) are never
-location-blocked, preserving existing worlds. The `travelActor` source token is reserved but not yet resolved; the
-Travel route presents it as "automation not yet available". Phase 3 token sensing will map Foundry Scene Regions onto
+a location-gated attempt.
+Ungated environments (no availability rules, or empty-after-normalization rules) are never
+location-blocked, preserving existing worlds.
+The `travelActor` source token is reserved but not yet resolved; the
+Travel route presents it as "automation not yet available".
+Phase 3 token sensing will map Foundry Scene Regions onto
 Realms via each realm's `sceneMappings[].sceneRegionUuid`.
 
 Issue `#179` backend timed-lifecycle and GM-tab foundation checkpoint: `GatheringEngine.startAttempt` validates the selected environment/task
-path before execution. Non-timed tasks resolve routed/progressive terminal outcomes after pause, reference, system,
+path before execution.
+Non-timed tasks resolve routed/progressive terminal outcomes after pause, reference, system,
 enabled-state, ownership, scene/token, visibility, duplicate-run, tool-availability, and selected-task-configuration
 guards pass; invalid `failureOutcome` configuration aborts as task misconfiguration before resolver calls or terminal side
-effects. Immediate terminal attempts first plan gathered-result refs for success and tool usage/breakage refs for both success and
+effects.
+Immediate terminal attempts first plan gathered-result refs for success and tool usage/breakage refs for both success and
 failure, then write newest-first terminal gathering history with those planned refs before committing item creation,
-tool usage/breakage, or failure feedback. If terminal history persistence fails, no result, tool, or failure-feedback commit
-occurs. Successful immediate attempts then create gathered results on the selected actor and apply terminal tool usage/breakage
-against that actor only. Failed immediate attempts create no gathered results but still apply terminal tool usage/breakage and
-failure feedback after terminal history persistence succeeds. Timed tasks run the same guards, then create exactly one
+tool usage/breakage, or failure feedback.
+If terminal history persistence fails, no result, tool, or failure-feedback commit
+occurs.
+Successful immediate attempts then create gathered results on the selected actor and apply terminal tool usage/breakage
+against that actor only.
+Failed immediate attempts create no gathered results but still apply terminal tool usage/breakage and
+failure feedback after terminal history persistence succeeds.
+Timed tasks run the same guards, then create exactly one
 awaited `waitingTime` run through `GatheringRunManager.createWaitingRun` without result, tool, or terminal history side
 effects.
 
 `GatheringEngine.processWorldTime(worldTime)` now processes matured `waitingTime` runs returned by
-`GatheringRunManager.getMaturedWaitingRuns()`. On successful or failed timed completion it re-resolves the task, plans
+`GatheringRunManager.getMaturedWaitingRuns()`.
+On successful or failed timed completion it re-resolves the task, plans
 terminal result/tool/check refs, calls `completeRun`, and commits result, tool, or failure-feedback side effects
 only after terminal history is written; `completeRun` returning `null` or throwing blocks those side effects and reports an
-error. If the run's actor, system, environment, or task reference disappears before resume, the engine cancels the run into
-terminal history instead of silently deleting it. Deliberate environment-store cleanup for deleted systems, environments,
-or tasks remains destructive record cleanup and does not create cancellation history. If GM edits make the task
+error.
+If the run's actor, system, environment, or task reference disappears before resume, the engine cancels the run into
+terminal history instead of silently deleting it.
+Deliberate environment-store cleanup for deleted systems, environments,
+or tasks remains destructive record cleanup and does not create cancellation history.
+If GM edits make the task
 misconfigured before resume, the engine clears the active run without terminal player history, results, tool usage, or
-failure feedback, which removes duplicate-run blocking and requires a fresh manual start after repair. Non-GM blind
+failure feedback, which removes duplicate-run blocking and requires a fresh manual start after repair.
+Non-GM blind
 blocked, cancellation, and terminal responses keep task identity, tool details, result details, provider diagnostics,
 and check internals redacted; persisted blind terminal history uses the generic `taskId: "blind"` marker and redacted
 payloads.
@@ -439,89 +462,126 @@ payloads.
 Bootstrap now constructs the gathering environment store, run manager, evaluator, and engine internally during module
 initialization after crafting systems load. `game.fabricate` exposes the persistence/support seams needed by UI callers
 (`getGatheringEnvironmentStore()`, `getGatheringRunManager()`, and `getGatheringGateAndCheckEvaluator()`) plus the narrow
-viewer-enforcing runtime methods `listGatheringForActor(options)` and `startGatheringAttempt(options)`. These runtime
+viewer-enforcing runtime methods `listGatheringForActor(options)` and `startGatheringAttempt(options)`.
+These runtime
 methods replace any caller-supplied `viewer` with the current Foundry user before delegating, so public API callers cannot
-spoof GM visibility. The raw `GatheringEngine` instance is not exposed as a public `game.fabricate` getter or property.
+spoof GM visibility.
+The raw `GatheringEngine` instance is not exposed as a public `game.fabricate` getter or property.
 Ready and `updateWorldTime` dispatch to a guarded world-time processor that calls the module-private
 `GatheringEngine.processWorldTime(worldTime)` without coupling gathering failures to crafting or salvage processing.
-The GM admin now has a gated `Environments` editor. It lists environments for the selected
+The GM admin now has a gated `Environments` editor.
+It lists environments for the selected
 gathering-enabled system, exposes a cloned selected draft, resets draft state on system changes, and falls back to a valid
-tab when `features.gathering` is disabled or the selected system cannot show environments. The selected draft can edit
+tab when `features.gathering` is disabled or the selected system cannot show environments.
+The selected draft can edit
 environment name, description, enabled state, selection mode, and scene UUID; dirty state exists for that draft, and
-save/cancel affordances are visible. New environment creation persists a disabled draft shell with one disabled placeholder
+save/cancel affordances are visible.
+New environment creation persists a disabled draft shell with one disabled placeholder
 task for validation compatibility; that shell is not a configured player-visible gathering path until configured and
-enabled by the GM. Duplicate, delete, and reorder use environment-store methods; delete requires confirmation and cleans
-referenced gathering runs through the store. The selected draft supports task-list CRUD (add, select, duplicate, delete,
+enabled by the GM.
+Duplicate, delete, and reorder use environment-store methods; delete requires confirmation and cleans
+referenced gathering runs through the store.
+The selected draft supports task-list CRUD (add, select, duplicate, delete,
 and reorder), base task fields (`name`, `description`, `img`, `enabled`, `resolutionMode`), selected-task result-group
 authoring (add, rename, delete, reorder), component-based result authoring (add, edit `componentId`/`quantity`, delete,
 reorder), and selected-task tool-reference authoring (add/remove `toolIds` referencing system-owned library Tools; inline
 Tool authoring on tasks is not supported), and selected-task visibility-gate authoring (enable/clear plus a
-formula-only `formula` + `threshold` pair, no provider/macro). Incomplete visibility input remains local to the Environments tab until
-both `formula` and `threshold` are present; clearing calls the store only when a committed visibility gate exists. Store-owned
+formula-only `formula` + `threshold` pair, no provider/macro).
+Incomplete visibility input remains local to the Environments tab until
+both `formula` and `threshold` are present; clearing calls the store only when a committed visibility gate exists.
+Store-owned
 task/result/tool/visibility/result-selection/progressive/check callbacks are wired from the root into
-the tab, and the component delegates mutations to the admin store. Base task, result, tool, visibility,
+the tab, and the component delegates mutations to the admin store.
+Base task, result, tool, visibility,
 result-selection, progressive, and check edits preserve nested task configuration outside edited collections and persist
-only through the environment-store validation boundary. Routed gathering carries **no** per-task result-selection authoring
-(as of 1.6.0); routed tasks resolve through the system-level `gatheringCraftingCheck.routed.rollFormula`. Progressive authoring edits
+only through the environment-store validation boundary.
+Routed gathering carries **no** per-task result-selection authoring
+(as of 1.6.0); routed tasks resolve through the system-level `gatheringCraftingCheck.routed.rollFormula`.
+Progressive authoring edits
 `awardMode` values `equal`, `partial`, and `exceed` plus a formula-only `check` (`formula` + optional `threshold`, no provider/macro); the check threshold
-is optional and is not the same rule as a required visibility-gate threshold. Time-requirement authoring clears
-`timeRequirement` for immediate tasks or edits minutes, hours, days, months, and years for timed tasks. Failure-outcome
+is optional and is not the same rule as a required visibility-gate threshold.
+Time-requirement authoring clears
+`timeRequirement` for immediate tasks or edits minutes, hours, days, months, and years for timed tasks.
+Failure-outcome
 authoring clears to default failure feedback or edits text and macro custom outcomes; switching the failure-outcome
 `mode` (`text`/`macro`) clears stale fields from the prior selection.
 Disabled draft tasks may save without progressive check targets, but a present malformed
-`failureOutcome` is still rejected as task misconfiguration, not as a player failure outcome. Save failures expose
+`failureOutcome` is still rejected as task misconfiguration, not as a player failure outcome.
+Save failures expose
 `environmentValidationState` with localized summary text, field-addressable errors, a first-invalid target used for focus,
 and an attempt counter; these failures keep the selected draft dirty and leave persisted environment data unchanged.
 Result-group validation maps duplicate/reserved-name failures to group-name fields, while collection-level missing group or
-missing result failures map to focusable result-group/result anchors. Stale scene UUID and macro UUID references remain
-visible in the editor and preserve the saved UUID until the GM changes the field. New draft placeholder result groups
-receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root
-and passed into the tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from the selected
-managed component difficulty and is not persisted on individual result rows. A Tool's `breakage.maxUses` is validation- and
-runtime-relevant only for the `limitedUses` breakage mode. Dirty environment drafts now require discard confirmation before
+missing result failures map to focusable result-group/result anchors.
+Stale scene UUID and macro UUID references remain
+visible in the editor and preserve the saved UUID until the GM changes the field.
+New draft placeholder result groups
+receive immediate IDs so they can be edited before save/reload.
+Managed item options are prepared by the admin store/root
+and passed into the tab; the tab does not perform Foundry lookups.
+Progressive difficulty is displayed from the selected
+managed component difficulty and is not persisted on individual result rows.
+A Tool's `breakage.maxUses` is validation- and
+runtime-relevant only for the `limitedUses` breakage mode.
+Dirty environment drafts now require discard confirmation before
 GM navigation, selected-system changes, environment replacement by select/new/duplicate, gathering feature disable, and
-app close. Declining the prompt preserves the dirty draft and blocks the attempted transition; accepting intentionally
-discards the draft or proceeds with the replacement or close. Concurrent navigation attempts share a single in-flight
-discard confirmation. Persisted environment delete uses its destructive delete confirmation directly, including when the
+app close.
+Declining the prompt preserves the dirty draft and blocks the attempted transition; accepting intentionally
+discards the draft or proceeds with the replacement or close.
+Concurrent navigation attempts share a single in-flight
+discard confirmation.
+Persisted environment delete uses its destructive delete confirmation directly, including when the
 selected persisted draft is dirty, and does not stack a separate dirty-discard prompt; unsaved new drafts still use discard
 confirmation because there is no persisted environment record to delete.
 
 Player gathering app entry/store foundation checkpoint: Fabricate now registers a dedicated `SvelteGatheringApp` through
 `appFactory` and opens it from a feature-gated Items Directory `Gathering` action when at least one normalized crafting
 system has `features.gathering === true`; it does not route through the crafting app shell. `createGatheringStore` is a UI
-state boundary over injected services. It selects and persists `lastGatheringActor`, clears invalid remembered actor state
+state boundary over injected services.
+It selects and persists `lastGatheringActor`, clears invalid remembered actor state
 when the actor no longer resolves or is no longer selectable, refreshes runtime listings through
 `game.fabricate.listGatheringForActor({ actor })`, and starts attempts through
-`game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`. Actor options come from permission/resolution
-checks, not actor-type exclusions. The player list keeps otherwise visible blocked scene/token entries visible with
+`game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`.
+Actor options come from permission/resolution
+checks, not actor-type exclusions.
+The player list keeps otherwise visible blocked scene/token entries visible with
 localized reasons, and runtime listings include UI-safe active timed runs plus recent history for the selected actor even
-when browsing is empty or blocked. Non-GM blind rows and missing-environment run rows stay opaque/generic; targeted rows
+when browsing is empty or blocked.
+Non-GM blind rows and missing-environment run rows stay opaque/generic; targeted rows
 can show useful labels, status, time-gate data, and terminal metadata. `createGatheringStore` carries those `activeRuns`,
-`history`, and `lastResult` feedback values as UI state while the runtime remains the domain source of truth. Immediate
+`history`, and `lastResult` feedback values as UI state while the runtime remains the domain source of truth.
+Immediate
 terminal failures rely on the runtime/configured failure feedback path, with default failure feedback localized through
 `FABRICATE.Gathering.FailureDefault`, so the store intentionally avoids emitting a duplicate generic failed-attempt
-warning. Responsive behavior for the GM environments editor and player gathering app now keys off each app/container's
+warning.
+Responsive behavior for the GM environments editor and player gathering app now keys off each app/container's
 inline size with CSS container queries rather than browser viewport width, so narrow Foundry ApplicationV2 windows can
 stack editor panes and player active/history rows without changing gathering runtime semantics or validation behavior.
 Runtime integration coverage now includes scene-linked gathering, hook-driven timed completion, and the harvesting
-boundary regression guard. Validation/accessibility polish is implemented; live Foundry validation remains conditional
+boundary regression guard.
+Validation/accessibility polish is implemented; live Foundry validation remains conditional
 for future runtime-specific or screenshot-required work.
 
 Player gathering detail-column checkpoint: the player app's center column now renders the selected environment's detail
 panel, and the player listing carries two additional per-task/per-environment concepts. **`successChance`** is a per-task
-`0`–`1` fraction (or `null`) used to render the success-chance bar. It is a deliberate drop-only static approximation —
+`0`–`1` fraction (or `null`) used to render the success-chance bar.
+It is a deliberate drop-only static approximation —
 `1 − ∏(1 − dropRate_i/100)` over the task's enabled drop rows, defined only for `resolutionMode === 'd100'` (and `null`
-for progressive/routed modes or when no drop rows are enabled). It means "chance at least one drop row rolls" (the chance
+for progressive/routed modes or when no drop rows are enabled).
+It means "chance at least one drop row rolls" (the chance
 the attempt finds something), NOT whole-attempt success: it ignores the d100 threshold, condition/character modifiers, the
 attempt/node/stamina/tool gates, and event policy, so the bar can read high while the attempt is still blocked or
-fails its check. It is never attached to the opaque `blindGather` entry, so it leaks no aggregate drop information.
+fails its check.
+It is never attached to the opaque `blindGather` entry, so it leaks no aggregate drop information.
 **`discoveredTasks`** is the transparent, individually-attemptable set of revealed-task models shown on a non-GM viewer's
 `blind`-environment listing: each carries `discovered: true` and the same real task identity, blocked reasons, and
-`successChance` as a targeted row. The non-GM blind `tasks` array stays collapsed to a single opaque `blindGather` action,
-so the discovered rows live only in `discoveredTasks`. The distinction between *discovered* and *visible/attemptable* on
+`successChance` as a targeted row.
+The non-GM blind `tasks` array stays collapsed to a single opaque `blindGather` action,
+so the discovered rows live only in `discoveredTasks`.
+The distinction between *discovered* and *visible/attemptable* on
 the player surface matters here: `discoveredTaskCount` counts every task revealed at the effective reveal scope, whereas
 `discoveredTasks` is built only from the intersection of those reveals with the entry's currently-visible tasks (never a
-fresh visibility pass, so no unrevealed task can leak). The two may legitimately diverge — `discoveredTasks.length` can be
+fresh visibility pass, so no unrevealed task can leak).
+The two may legitimately diverge — `discoveredTasks.length` can be
 smaller than `discoveredTaskCount` when a revealed task is currently invisible or disabled. `discoveredTasks` is always
 empty for targeted environments, locked entries, GM viewers (who already get the full transparent `tasks`), and when the
 effective `revealPolicy === 'never'`.
@@ -608,7 +668,8 @@ effective `revealPolicy === 'never'`.
 
 ## Remaining Drift to Track
 
-- Issue `#2`: the gathering domain is spec-complete and backend listing/attemptability, immediate terminal resolution, timed waiting-run creation, timed world-time completion/resume, bootstrap/ready/updateWorldTime hook wiring, narrow global accessors, a gated GM `Environments` editor, save-blocking validation/accessibility presentation, dedicated player gathering app registration, player gathering store foundation with active/history/terminal feedback state, the feature-gated Items Directory `Gathering` action, container-query responsive polish for GM/player gathering surfaces, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage exist. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
+- Issue `#2`: the gathering domain is spec-complete and backend listing/attemptability, immediate terminal resolution, timed waiting-run creation, timed world-time completion/resume, bootstrap/ready/updateWorldTime hook wiring, narrow global accessors, a gated GM `Environments` editor, save-blocking validation/accessibility presentation, dedicated player gathering app registration, player gathering store foundation with active/history/terminal feedback state, the feature-gated Items Directory `Gathering` action, container-query responsive polish for GM/player gathering surfaces, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage exist.
+Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 - Issue `#111`: built-in crafting checks (`checkSource: "builtIn"`, `CraftingCheckAdapter`) exist in runtime but remain
   under-specified in the domain/spec layer.
 - Issue `#119`: discovery-mode rename remains partial in runtime (`teaserConfig`, `Recipe.teaser`,
@@ -623,8 +684,10 @@ effective `revealPolicy === 'never'`.
   `GatheringRealmSceneMapping`/`onPartyTokenEntry`), realm modifier *application* (Phase 4, `GatheringRealmModifier` records
   normalize/validate but do not yet adjust runtime), player travel view, and player-facing/full discovery controls.
 - Issue `#286` (unify gathering regions) **SUPERSEDES the prior `#257` model** in these ways (shipped): (1) `GatheringRealm`
-  is the SOLE gathering-geography concept — geography only. Geography is **no longer a composition axis**; composition matches by biome + danger only
-  (`evaluateEnvironmentMatch` dropped the geography axis and `evidence.region`). Note this is an intentional behavior change: a task/event
+  is the SOLE gathering-geography concept — geography only.
+Geography is **no longer a composition axis**; composition matches by biome + danger only
+  (`evaluateEnvironmentMatch` dropped the geography axis and `evidence.region`).
+Note this is an intentional behavior change: a task/event
   previously narrowed by a region tag but with empty `biomes` now matches "any biome" and may appear in MORE environments. (2) The whole
   realm/travel/availability subsystem is **default-off** behind the per-system `gatheringRealmSettings.enabled` toggle
   (`isGatheringRealmsEnabled` is the single gate source of truth across engine/resolver/API/Manager). (3) The legacy **region vocabulary
@@ -635,7 +698,8 @@ effective `revealPolicy === 'never'`.
   fully into the Travel route. (6) An idempotent startup migration derives `GatheringRealm` records from the legacy per-system region
   vocabulary and maps `environment.region` → `includedRealmIds` (orphan free-text strings left inert), clears the per-system region vocab,
   strips task/event region tags, leaves `enabled` unset (→ false), and fires a one-time GM notice; pre-unification exports upgrade on the
-  next migration run after import. The subsequent `1.1.0` Gathering Region → Gathering Realm key-rename migration runs after this and
+  next migration run after import.
+The subsequent `1.1.0` Gathering Region → Gathering Realm key-rename migration runs after this and
   rewrites the persisted `gatheringRegions`/`gatheringRegionSettings`/`includedRegionIds`/`currentRegionOverrides` keys to their realm equivalents.
 
 ## Open Questions
@@ -648,8 +712,10 @@ None.
 
 - **Key concepts:** Tool proficiency as gate, gold cost = 50% item value, 10 GP/day progress, magic items require
   specific tool proficiency.
-- **Fabricate relevance:** Fabricate's Tool concept (with an optional `requirement` gate) maps well to tool proficiency requirements. Fabricate lacks a "
-  crafting time as gold progress" model — the time requirement is duration-based, not progress-based. A "daily progress"
+- **Fabricate relevance:** Fabricate's Tool concept (with an optional `requirement` gate) maps well to tool proficiency requirements.
+Fabricate lacks a "
+  crafting time as gold progress" model — the time requirement is duration-based, not progress-based.
+A "daily progress"
   crafting model could be a future resolution mode or time requirement variant.
 
 ### Pathfinder 2e Crafting
@@ -657,15 +723,18 @@ None.
 - **Key concepts:** Formula (recipe knowledge gate), Craft check (skill check with critical success/failure), batch
   crafting (up to 4 consumables at once), reduced time with formulas.
 - **Fabricate relevance:** PF2e's "formula" concept maps directly to Fabricate's recipe item definitions plus
-  knowledge mode. Batch crafting (quantity multiplier on a single craft action) is not supported by Fabricate but would be
-  useful — the shopping list aggregates quantities but crafting is still per-recipe. Critical success/failure maps to
+  knowledge mode.
+Batch crafting (quantity multiplier on a single craft action) is not supported by Fabricate but would be
+  useful — the shopping list aggregates quantities but crafting is still per-recipe.
+Critical success/failure maps to
   routed mode with the `check` provider (the system crafting-check outcome routes to the matching result group).
 
 ### FFXIV Crafting
 
 - **Key concepts:** Crafting Log (recipe browser), Quality/Progress dual resource, Durability limit, CP resource, HQ
   ingredients boost quality, multi-step rotation, Condition randomness.
-- **Fabricate relevance:** FFXIV's Crafting Log is the closest analog to Fabricate's CraftingApp. FFXIV's quality
+- **Fabricate relevance:** FFXIV's Crafting Log is the closest analog to Fabricate's CraftingApp.
+FFXIV's quality
   dimension (probability of HQ) has no Fabricate equivalent — progressive mode awards by threshold, not probability.
   FFXIV's "use HQ ingredients for better output" maps to Fabricate's essence/effect transfer concept or alternatively
   to Fabricate's routed mode with higher quality ingredient sets routing to higher quality outcomes.
@@ -674,27 +743,35 @@ None.
 
 - **Key concepts:** Seven features of crafting systems: Recipe Definition, Fidelity of Action, Completion Constraints,
   Variable Outcome, System Recognition, Player Expressiveness, Progression.
-- **Fabricate relevance:** Fabricate is strong on Recipe Definition and Variable Outcome. It is weak on Player
+- **Fabricate relevance:** Fabricate is strong on Recipe Definition and Variable Outcome.
+It is weak on Player
   Expressiveness (no free-form crafting outside alchemy) and Progression (no character-level crafting skill
-  advancement). The taxonomy confirms Fabricate's resolution modes cover the core design space: simple (fixed outcome),
+  advancement).
+The taxonomy confirms Fabricate's resolution modes cover the core design space: simple (fixed outcome),
   routed (variable outcome), progressive (skill-based), alchemy (discovery).
 
 ### Other VTT Modules
 
-- **Furukai's Simple Crafting:** Three recipe types (text, items, tags). Simpler than Fabricate but validates that
+- **Furukai's Simple Crafting:** Three recipe types (text, items, tags).
+Simpler than Fabricate but validates that
   item-tag matching is a common need.
-- **Beaver's Crafting:** Broader than crafting alone. It models recipes as configurable progress processes with
+- **Beaver's Crafting:** Broader than crafting alone.
+It models recipes as configurable progress processes with
   requirements, costs, tests/steps, optional failure consumption, and results, and it extends the same framework into
-  harvesting, gathering, downtime, and advancement workflows. Fabricate relevance: this validates that "crafting" in
+  harvesting, gathering, downtime, and advancement workflows.
+Fabricate relevance: this validates that "crafting" in
   Foundry often expands into a generalized task/progress engine, but it also shows the tradeoff Fabricate is making by
   keeping gathering, salvage, and recipe crafting as related but distinct domain concepts rather than one umbrella
   subsystem.
-- **Fabricate v1:** The predecessor. Key learning: the v1 "Essence" system was unique but underused. v2's progressive
+- **Fabricate v1:** The predecessor.
+Key learning: the v1 "Essence" system was unique but underused. v2's progressive
   complexity principle (start simple, add features) was a response to v1's all-or-nothing complexity.
 - **Mastercrafted:** Centers on recipe books and recipe pages, with alternate-ingredient panels, tag-based matching,
   player-selectable result panels, timed crafting, tool requirements, permissions, and a separate Cauldron flow for
-  recipe discovery. It also explicitly separates the actor performing the craft (`Craft as`) from the actor providing
-  inventory (`Use Inventory`). Fabricate relevance: this is strong evidence for keeping recipe discovery distinct from
+  recipe discovery.
+It also explicitly separates the actor performing the craft (`Craft as`) from the actor providing
+  inventory (`Use Inventory`).
+Fabricate relevance: this is strong evidence for keeping recipe discovery distinct from
   normal crafting execution, for supporting structured alternate-ingredient authoring, and for using actor-vs-inventory
   source language when reasoning about `componentSourceActors`.
 

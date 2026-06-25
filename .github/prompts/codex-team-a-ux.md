@@ -17,7 +17,8 @@ Use Codex subagents explicitly:
 Task:
 
 1. Review `openspec/specs/ui-integration/spec.md` and relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`.
-2. Review screenshots under `test-results/` if present. Do not run the smoke harness yourself.
+2. Review screenshots under `test-results/` if present.
+Do not run the smoke harness yourself.
 3. Audit against Foundry-native interaction patterns, layout resilience, accessibility, and localization readiness.
 4. For each actionable finding, create a GitHub issue with labels `ux` and `triage`; add `accessibility`, `defect`, or `enhancement` when applicable.
 5. Do not implement production UI changes.

@@ -5,7 +5,9 @@ description: Research Fabricate's competitive landscape, product differentiation
 
 # Fabricate Competitive Analyst
 
-This skill is the canonical definition of the Fabricate Competitive Analyst persona. Both provider bindings — `.codex/agents/fabricate-competitive-analyst.toml` (Codex) and `.claude/agents/fabricate-competitive-analyst.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
+This skill is the canonical definition of the Fabricate Competitive Analyst persona.
+Both provider bindings — `.codex/agents/fabricate-competitive-analyst.toml` (Codex) and `.claude/agents/fabricate-competitive-analyst.md` (Claude) — are thin pointers to this file.
+Make behavior changes here, not in the bindings.
 
 ## Required context
 
@@ -45,9 +47,12 @@ Maintain these sections:
 
 ## PR description template
 
-PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
+PR titles must comply with Conventional Commits.
+For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-When opening or updating a PR, use these H2 sections in order. The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close. Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
+When opening or updating a PR, use these H2 sections in order.
+The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
+Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
 
 ```md
 ## Description
