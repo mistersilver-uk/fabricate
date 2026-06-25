@@ -218,13 +218,27 @@ Locked recipes:
 - Cannot be crafted by anyone other than the GM
 - Are reported as locked to the rest of Fabricate (the planned "Locked" badge is noted above)
 
+## Broken Systems and Recipes Are Hidden
+
+On top of the list modes above, Fabricate hides recipes that players could not use because of a setup problem, while still showing them to the GM.
+
+- If a crafting system has a blocker that makes it unusable, players see none of its recipes regardless of list mode, and crafting in it is refused.
+- If a single recipe or component is broken but the system as a whole is fine, only that one entity is hidden from players.
+  The rest of the system stays visible.
+- A GM always sees the whole system and every recipe, so the problem can be found and fixed.
+
+These checks run live, so a recipe reappears for players as soon as the GM resolves the underlying problem.
+The GM finds and fixes these problems in the System Overview.
+See [System Overview]({% link crafting-systems.md %}#system-overview).
+
 ## Crafting Guards
 
 Before starting, resuming, or advancing a crafting run, Fabricate re-evaluates:
 
-1. Is the recipe still visible to this user?
-2. Is the recipe locked? (non-GM blocked)
-3. Does the user still have knowledge access? (if applicable)
+1. Is the system free of blockers, and is this recipe not individually hidden? (non-GM blocked, GM bypasses)
+2. Is the recipe still visible to this user?
+3. Is the recipe locked? (non-GM blocked)
+4. Does the user still have knowledge access? (if applicable)
 
 If any guard fails, the action is blocked with a notification explaining why.
 

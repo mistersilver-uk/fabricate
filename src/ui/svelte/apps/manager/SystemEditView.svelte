@@ -456,7 +456,7 @@
             legendKey="FABRICATE.Admin.SystemSettings.ResolutionMode"
             legendFallback="Recipe resolution mode"
             hintKey="FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint"
-            hintFallback="Changing resolution mode uses the current destructive confirmation and cleanup behavior."
+            hintFallback="Changing resolution mode migrates recipes to the new mode where possible and only deletes recipes that cannot be migrated, after a confirmation that reports the counts."
             options={resolutionModeOptions}
             selectedValue={systemResolutionModeValue}
             groupName="manager-system-resolution-mode"

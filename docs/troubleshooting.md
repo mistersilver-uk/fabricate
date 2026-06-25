@@ -21,25 +21,58 @@ This guide covers common issues GMs and players encounter when setting up or usi
 - The recipe is restricted to specific users and the current player is not on the allow-list.
 - The system uses knowledge mode and the player has not learned the recipe or does not own a matching recipe item.
 - The recipe belongs to a crafting system that no longer exists.
+- The crafting system has a blocker, or this individual recipe is broken.
+  Fabricate hides recipes that players could not use because of a setup problem, while still showing them to the GM.
 
 **Step-by-step checks:**
 
-1. Open the Crafting Admin panel and go to the **Recipes** tab.
+1. Open the Crafting Admin panel, select the system, and open the **Overview**.
+   A blocker means players see none of the system's recipes until you fix it.
+   An issue listed against the recipe itself hides only that recipe.
+   Use the **Open** button on an issue to jump to the editor that owns it.
+2. Go to the **Recipes** tab.
    Is the recipe's enable toggle (checkbox) in the Actions column checked?
    Disabled recipes show reduced opacity and a grey "Disabled" badge.
-2. Check the **Visibility** column in the recipe list.
+3. Check the **Visibility** column in the recipe list.
    Does it show "Restricted" with a user count?
    If so, make sure the affected player is in the allow-list.
-3. Check the **Recipe Visibility** card on the Systems tab.
+4. Check the **Recipe Visibility** card on the Systems tab.
    If the system is set to knowledge mode:
    - Does the player's actor own the item linked to the recipe?
    - Has the player learned the recipe? Confirm this in the player's knowledge list.
-4. Confirm the recipe still belongs to an existing crafting system.
+5. Confirm the recipe still belongs to an existing crafting system.
    If its system was deleted, the recipe will not show for players.
 
 **See also:** [Recipes]({% link recipes/index.md %}) for enabling and disabling recipes.
 [Visibility & Knowledge]({% link visibility.md %}) for list modes and knowledge access.
-[Crafting Systems]({% link crafting-systems.md %}) for recipe visibility configuration.
+[Crafting Systems]({% link crafting-systems.md %}#system-overview) for the System Overview and how broken systems and recipes are hidden.
+
+---
+
+### Recipes Disappeared After Changing the Resolution Mode
+
+**Symptom:** After changing a crafting system's recipe resolution mode, some or all recipes are no longer present.
+
+**What to expect:** Changing the resolution mode is no longer delete-all.
+Fabricate migrates each recipe to the new mode wherever it can, and only deletes a recipe whose structure cannot be made to fit.
+The confirmation prompt runs a dry run first and tells you exactly what will happen: how many recipes will be migrated, and, only when some cannot be migrated, how many will be deleted and their names.
+
+**Likely causes for a recipe being deleted:**
+
+- You narrowed into Simple or Progressive mode (which each expect exactly one ingredient set and one result group) from a recipe that had more than one of either.
+- You moved a multi-step recipe into Alchemy mode, which does not support multi-step recipes.
+
+**Step-by-step checks:**
+
+1. Read the confirmation prompt before confirming.
+   It names the recipes that cannot be migrated and will be deleted.
+   Cancel if you are not ready to lose them.
+2. Export the system first to keep a backup if you are unsure.
+   You can re-import it to recover deleted recipes.
+3. If a recipe simply vanished from players but is still in the admin panel, the cause is a system or recipe problem, not deletion.
+   Open the **Overview** to find and fix it.
+
+**See also:** [Crafting Systems]({% link crafting-systems.md %}#system-settings) for the migration-first mode change and the System Overview.
 
 ---
 
