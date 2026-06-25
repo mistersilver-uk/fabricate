@@ -2705,8 +2705,8 @@ async function main() {
         let navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
-        if (navLabels.at(0) !== 'System settings') {
-          throw new Error(`Manager default selection should keep System settings first. Saw: ${navLabels.join(', ')}`);
+        if (navLabels.at(0) !== 'System Overview') {
+          throw new Error(`Manager default selection should keep System Overview first. Saw: ${navLabels.join(', ')}`);
         }
         if (await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)}[aria-selected="true"]`).count() === 0) {
           throw new Error('Manager did not select the smoke test system.');
@@ -2731,10 +2731,10 @@ async function main() {
         if (navLabels.includes('Systems')) {
           throw new Error(`Manager selected nav should not expose a Systems tab. Saw: ${navLabels.join(', ')}`);
         }
-        if (navLabels.at(0) !== 'System settings') {
-          throw new Error(`Manager selected nav should keep System settings first. Saw: ${navLabels.join(', ')}`);
+        if (navLabels.at(0) !== 'System Overview') {
+          throw new Error(`Manager selected nav should keep System Overview first. Saw: ${navLabels.join(', ')}`);
         }
-        for (const expected of ['System settings', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
+        for (const expected of ['System Overview', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
           if (!navLabels.includes(expected)) {
             throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
@@ -2798,7 +2798,7 @@ async function main() {
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
-        if (navLabels.at(0) !== 'System settings') {
+        if (navLabels.at(0) !== 'System Overview') {
           throw new Error(`Manager return to library should preserve selected-system nav. Saw nav: ${navLabels.join(', ')}`);
         }
         if (await page.locator('.fabricate-manager .manager-scope-card').count() === 0) {
@@ -2945,7 +2945,7 @@ async function main() {
         await screenshot(page, 'manager-selected-stacked');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("System settings")').first().click();
+        await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-edit]').first().click();
         await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await exerciseManagerSystemEditPointerTargets(page, craftingSetup.systemId);
         if (await page.locator('.fabricate-manager[data-manager-view="system-edit"]').count() === 0) {
@@ -3445,12 +3445,12 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-tools-normal');
 
-        // ── System overview + system-blocker banner (issue 429 PR-2) ───────────
+        // ── System Overview tabbed page + system-blocker banner (issue 429 PR-2) ─
         // Select the deliberately-broken "Broken Workshop" system (progressive
         // mode with no progressive check + an incomplete recipe) and capture:
-        //   (a) the System overview rail item showing the kind-grouped issue rows
-        //       and the system-blocker callout; and
-        //   (b) System settings showing the system-blocker banner above identity.
+        //   (a) the System Overview page's Validation tab showing the kind-grouped
+        //       issue rows and the system-blocker callout; and
+        //   (b) the Settings tab showing the system-blocker banner above identity.
         // Guarded so a failure records a failed step without aborting the phase.
         // Returns to the smoke system's library afterwards so it does not leak the
         // selected system into later phases.
@@ -3465,14 +3465,19 @@ async function main() {
             .first().click();
           await page.waitForTimeout(500);
 
-          // (a) System overview — wait on the grouped issue rows, not deep leaf content.
-          await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-overview]').first().click();
-          await page.locator('.fabricate-manager[data-manager-view="system-overview"]').first()
+          // (a) System Overview page — open the tabbed system-edit page, then switch
+          // to the Validation tab and wait on the grouped issue rows (not deep leaf
+          // content). The standalone overview route was folded into this tab.
+          await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-edit]').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-system-tab="validation"]').first().click();
+          await page.locator('.fabricate-manager .manager-system-tab-panel [data-system-overview]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await page.locator('.fabricate-manager [data-system-overview] [data-overview-issue]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           if (await page.locator('.fabricate-manager [data-system-overview-blocker]').count() === 0) {
-            throw new Error('System overview did not render the system-blocker callout for the broken system.');
+            throw new Error('System overview validation tab did not render the system-blocker callout for the broken system.');
           }
           // The seeded stale-task fixture must surface a TASK-kind row whose
           // deep-link button resolves to the owning environment (the UX-defect fix).
@@ -3481,7 +3486,7 @@ async function main() {
           if (await taskRow.locator('[data-overview-link="task"]').count() === 0) {
             throw new Error('System overview task row is missing its environment deep-link button.');
           }
-          // The overview is a kind-grouped LIST view (`.manager-system-overview-row`),
+          // The validation tab is a kind-grouped LIST view (`.manager-system-overview-row`),
           // not a table — assertManagerLayoutStable requires a table-row/edit-form
           // selector and would throw "no table rows" here (as the gathering Settings
           // form capture also skips it). The explicit issue-row + task-row waits above
@@ -3489,8 +3494,8 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-system-overview');
 
-          // (b) System settings — wait on the blocker banner above the identity card.
-          await page.locator('.fabricate-manager .manager-nav-button:has-text("System settings")').first().click();
+          // (b) Settings tab — wait on the blocker banner above the identity card.
+          await page.locator('.fabricate-manager [data-system-tab="settings"]').first().click();
           await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await page.locator('.fabricate-manager [data-system-edit-blocker]').first()

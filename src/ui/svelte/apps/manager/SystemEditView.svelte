@@ -1,18 +1,40 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  System Overview page. A full-width tabbed shell (mirroring the environment
+  editor's EnvironmentEditView) with two tabs: Settings (the system settings form
+  and the issue 454 system-blocker banner) and Validation (the kind-grouped validation
+  issue list rendered by SystemOverviewView). The standalone "Overview" route was
+  folded in here; the Settings tab is the default, and callers that want the
+  validation list open pass `requestedTab='validation'`. GM-only by construction:
+  the whole crafting manager admin is GM-scoped.
+-->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import IconPicker from '../../components/IconPicker.svelte';
   import ResolutionModeCard from './ResolutionModeCard.svelte';
+  import SystemEditorTabs from './system/SystemEditorTabs.svelte';
+  import SystemOverviewView from './SystemOverviewView.svelte';
 
   let {
     selectedSystem = null,
     // True when the system carries a `blocks:'system'` validation issue. Drives a
-    // GM-only full-width callout above the identity card that links to the system
-    // overview. The whole crafting manager admin is GM-scoped, so this is GM-only
-    // by construction.
+    // GM-only full-width callout above the identity card on the Settings tab. The
+    // whole crafting manager admin is GM-scoped, so this is GM-only by
+    // construction.
     systemBlocked = false,
+    // The `evaluateSystemValidation` report driving the Validation tab's
+    // kind-grouped issue list and the tab's open-issue badge.
+    validationReport = { issues: [], counts: { critical: 0, warning: 0, info: 0, blockers: 0 }, blocksSystem: false },
+    // The tab the page should open on. The parent bumps `requestedTab` (and a
+    // matching nonce) to request the Validation tab — e.g. from the blocker banner
+    // link or a folded-in overview deep link.
+    requestedTab = 'settings',
+    // Bumped by the parent alongside `requestedTab` so re-requesting the same tab
+    // (or re-selecting the same system) still re-applies the requested tab.
+    requestedTabNonce = 0,
+    onSelectIssue = () => {},
     onShowSystemOverview = () => {},
     onSaveDetails = () => {},
     onSetResolutionMode = async () => true,
@@ -43,6 +65,28 @@
     onClearCurrencyMacro = async () => {},
     onToggleCurrency = async () => {}
   } = $props();
+
+  // Settings is the default tab. A bumped `requestedTabNonce` re-applies the
+  // parent's `requestedTab` (so the blocker-link / folded-in overview deep link
+  // can force the Validation tab open even when this page is already mounted, and
+  // re-selecting the same system resets the tab sensibly).
+  let activeTab = $state('settings');
+  let appliedRequestNonce = $state(-1);
+  $effect(() => {
+    if (requestedTabNonce !== appliedRequestNonce) {
+      appliedRequestNonce = requestedTabNonce;
+      activeTab = requestedTab === 'validation' ? 'validation' : 'settings';
+    }
+  });
+
+  const validationCounts = $derived(
+    validationReport?.counts || { critical: 0, warning: 0, info: 0, blockers: 0 }
+  );
+  const validationBadges = $derived([
+    ...(validationCounts.critical > 0 ? [{ label: String(validationCounts.critical), tone: 'danger' }] : []),
+    ...(validationCounts.warning > 0 ? [{ label: String(validationCounts.warning), tone: 'warning' }] : [])
+  ]);
+  const tabBadges = $derived({ validation: validationBadges });
 
   const CURRENCY_SPEND_STRATEGY_OPTIONS = [
     { value: 'actorProperty', labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorProperty', fallback: 'Actor data path', hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorPropertyHint', hintFallback: 'Read and spend coins at a flat actor data path (e.g. dnd5e currency).' },
@@ -357,6 +401,17 @@
 </script>
 
 {#if selectedSystem}
+  <div class="manager-environment-edit-view manager-system-edit-view" data-system-editor>
+    <SystemEditorTabs {activeTab} badges={tabBadges} onSelect={(tab) => { activeTab = tab; }} />
+
+    <div class="manager-environment-workspace manager-system-workspace is-inspector-hidden">
+      <div
+        class="manager-environment-tab-panel manager-system-tab-panel"
+        role="tabpanel"
+        id={`system-panel-${activeTab}`}
+        aria-labelledby={`system-tab-${activeTab}`}
+      >
+      {#if activeTab === 'settings'}
   <main class="manager-main manager-system-edit-main" aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings')}>
     <section class="manager-section-header">
       <div class="manager-heading">
@@ -374,7 +429,7 @@
             <strong>{text('FABRICATE.Admin.Manager.SystemEdit.BlockerTitle', 'This system has a blocker')}</strong>
             <span>{text('FABRICATE.Admin.Manager.SystemEdit.BlockerBody', 'Players cannot see or use any of this system\'s recipes until the blocker is resolved. Open the system overview to review and fix it.')}</span>
           </div>
-          <button type="button" class="manager-button manager-system-edit-blocker-link" data-system-edit-blocker-link onclick={onShowSystemOverview}>
+          <button type="button" class="manager-button manager-system-edit-blocker-link" data-system-edit-blocker-link onclick={() => { activeTab = 'validation'; onShowSystemOverview(); }}>
             {text('FABRICATE.Admin.Manager.SystemEdit.BlockerLink', 'Open system overview')}
           </button>
         </div>
@@ -820,4 +875,10 @@
       {/if}
     </form>
   </main>
+      {:else if activeTab === 'validation'}
+        <SystemOverviewView report={validationReport} {onSelectIssue} />
+      {/if}
+      </div>
+    </div>
+  </div>
 {/if}

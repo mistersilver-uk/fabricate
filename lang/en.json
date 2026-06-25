@@ -828,8 +828,16 @@
           "Title": "System settings",
           "Subtitle": "Edit base settings for the selected crafting system.",
           "Breadcrumb": "System settings",
-          "Nav": "System settings",
+          "PageTitle": "System Overview",
+          "PageSubtitle": "Edit base settings and review validation issues for the selected crafting system.",
+          "PageBreadcrumb": "System Overview",
+          "Nav": "System Overview",
           "Actions": "System edit actions",
+          "Tabs": {
+            "Label": "System overview sections",
+            "Settings": "Settings",
+            "Validation": "Validation"
+          },
           "BackToSystems": "Back to systems",
           "EditBaseSettings": "Edit base settings",
           "EditBaseSettingsHint": "Changes use the existing admin store persistence and confirmation flows.",
@@ -863,7 +871,6 @@
           }
         },
         "SystemOverview": {
-          "Nav": "Overview",
           "Kicker": "System overview",
           "Title": "System overview",
           "Heading": "Validation overview",

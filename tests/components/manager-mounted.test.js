@@ -109,6 +109,7 @@ function compileManagerRoot() {
     );
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
@@ -932,6 +933,13 @@ function createStore(calls = [], options = {}) {
       },
     },
     foundrySystemId: options.foundrySystemId || '',
+    // The `evaluateSystemValidation` report drives the System Overview page's
+    // Validation tab, its nav badge, and the system-blocker banner.
+    systemValidation: options.systemValidation || {
+      issues: [],
+      counts: { critical: 0, warning: 0, info: 0, blockers: 0 },
+      blocksSystem: false,
+    },
   });
 
   function applySelectedSystem(id) {
@@ -1345,6 +1353,31 @@ async function mountCurrencyEditor(storeOptions) {
   return { calls };
 }
 
+// Mount the manager and open the tabbed System Overview page for Alchemy with an
+// injected validation report. Mirrors `mountCurrencyEditor`: the same mount +
+// "Edit Alchemy" + flush dance, shared `mounted`/`target` so `afterEach` cleans up.
+async function mountSystemOverviewPage(systemValidation) {
+  const calls = [];
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  mounted = mount(Component, {
+    target,
+    props: {
+      // experimentalFeaturesEnabled keeps the recipe route available so a recipe
+      // deep link from the Validation tab resolves to the recipe editor.
+      store: createStore(calls, { systemValidation, experimentalFeaturesEnabled: true }),
+      services: { openCurrentAdmin: () => {} },
+    },
+  });
+  flushSync();
+  target.querySelector('[aria-label="Edit Alchemy"]').click();
+  await Promise.resolve();
+  await Promise.resolve();
+  await tick();
+  flushSync();
+  return { calls };
+}
+
 // Shared assertion for a ResolutionModeCard's option list: the rows render in the
 // expected order, each wraps a real radio in the named group, and each has a
 // non-empty description. Hoisted so the recipe/salvage tests stay DRY (Sonar gate).
@@ -1477,8 +1510,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         label.textContent.trim()
       ),
       [
-        'System settings',
-        'Overview',
+        'System Overview',
         'Components',
         'Tags & Categories',
         'Essences',
@@ -1496,15 +1528,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       false,
       'system library header should not expose the legacy admin launch button'
     );
-    const systemSettingsNav = Array.from(target.querySelectorAll('.manager-nav-button')).find(
+    // The standalone "Overview" nav item was folded into the renamed "System
+    // Overview" nav item, which now carries the open-validation-issue badge.
+    const systemOverviewNav = Array.from(target.querySelectorAll('.manager-nav-button')).find(
       (button) =>
-        button.querySelector('.manager-nav-label')?.textContent.trim() === 'System settings'
+        button.querySelector('.manager-nav-label')?.textContent.trim() === 'System Overview'
     );
-    assert.ok(systemSettingsNav, 'system settings nav button should render');
+    assert.ok(systemOverviewNav, 'system overview nav button should render');
+    assert.ok(
+      systemOverviewNav.querySelector('.fas.fa-clipboard-check'),
+      'system overview nav should use the validation clipboard icon'
+    );
     assert.equal(
-      systemSettingsNav.querySelector('.manager-nav-count'),
-      null,
-      'system settings nav should not show an Edit badge'
+      Array.from(target.querySelectorAll('.manager-nav-button[data-nav-system-overview]')).length,
+      0,
+      'the standalone Overview nav item should be removed'
     );
     const toolsNav = Array.from(target.querySelectorAll('.manager-nav-button')).find(
       (button) => button.querySelector('.manager-nav-label')?.textContent.trim() === 'Tools'
@@ -2805,8 +2843,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         label.textContent.trim()
       ),
       [
-        'System settings',
-        'Overview',
+        'System Overview',
         'Components',
         'Tags & Categories',
         'Tools',
@@ -2913,8 +2950,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         label.textContent.trim()
       ),
       [
-        'System settings',
-        'Overview',
+        'System Overview',
         'Recipes',
         'Components',
         'Tags & Categories',
@@ -9239,7 +9275,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(onEditSystemCalled, false);
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
-    assert.ok(target.textContent.includes('System settings'));
+    assert.ok(target.textContent.includes('System Overview'));
+    // The Settings tab is the default, so its form renders immediately.
+    assert.equal(target.querySelector('[data-system-tab="settings"]')?.getAttribute('aria-selected'), 'true');
     assert.ok(target.querySelector('.manager-system-edit-form'));
     assert.deepEqual(calls.slice(-4), [
       ['selectSystem', 'smithing'],
@@ -9341,6 +9379,131 @@ describe('CraftingSystemManager mounted behavior', () => {
         (call) => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false
       )
     );
+  });
+
+  // A report carrying a system blocker plus a deep-linkable recipe issue, so the
+  // Validation tab's grouped list and deep-link wiring are both exercised.
+  const overviewReport = {
+    issues: [
+      {
+        kind: 'system',
+        entityId: null,
+        entityName: 'Alchemy',
+        severity: 'critical',
+        blocks: 'system',
+        code: 'progressiveNoCheck',
+        message: 'Progressive mode requires a configured progressive crafting check.',
+        nav: { view: 'system-overview' },
+      },
+      {
+        kind: 'recipe',
+        entityId: 'r1',
+        entityName: 'Healing Draught',
+        severity: 'warning',
+        blocks: 'enable',
+        code: 'noResultGroup',
+        message: 'A step is missing a result group.',
+        nav: { view: 'recipe-edit' },
+      },
+    ],
+    counts: { critical: 1, warning: 1, info: 0, blockers: 1 },
+    blocksSystem: true,
+  };
+
+  it('opens the System Overview page on the Settings tab by default', async () => {
+    await mountSystemOverviewPage(overviewReport);
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+    const settingsTab = target.querySelector('[data-system-tab="settings"]');
+    const validationTab = target.querySelector('[data-system-tab="validation"]');
+    assert.ok(settingsTab, 'Settings tab renders');
+    assert.ok(validationTab, 'Validation tab renders');
+    assert.equal(settingsTab.getAttribute('aria-selected'), 'true', 'Settings is the default tab');
+    assert.equal(validationTab.getAttribute('aria-selected'), 'false');
+    assert.ok(target.querySelector('.manager-system-edit-form'), 'the settings form renders');
+    assert.ok(
+      target.querySelector('[data-system-edit-blocker]'),
+      'the system-blocker banner stays on the Settings tab'
+    );
+    assert.equal(
+      target.querySelector('[data-system-overview]'),
+      null,
+      'the validation list is not rendered while Settings is active'
+    );
+    // The renamed nav item carries the open-issue badge (critical + warning = 2).
+    const navBadge = navButton('System Overview').querySelector('.manager-nav-count');
+    assert.equal(navBadge?.textContent.trim(), '2');
+    // The Validation tab carries a danger + warning badge of open issues.
+    assert.equal(
+      validationTab.querySelector('.manager-environment-tab-badge.is-danger')?.textContent.trim(),
+      '1'
+    );
+    assert.equal(
+      validationTab.querySelector('.manager-environment-tab-badge.is-warning')?.textContent.trim(),
+      '1'
+    );
+  });
+
+  it('renders the kind-grouped validation list on the Validation tab and deep-links an issue', async () => {
+    const { calls } = await mountSystemOverviewPage(overviewReport);
+
+    target.querySelector('[data-system-tab="validation"]').click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('[data-system-tab="validation"]').getAttribute('aria-selected'),
+      'true'
+    );
+    assert.ok(
+      target.querySelector('[data-system-overview]'),
+      'the validation list renders in the Validation panel'
+    );
+    assert.ok(
+      target.querySelector('[data-system-overview-group="system"]'),
+      'the system-blocker group renders'
+    );
+    assert.ok(
+      target.querySelector('[data-system-overview-blocker]'),
+      'the validation list keeps its blocker note'
+    );
+    // The summary badges + Review copy stay on the validation tab.
+    assert.ok(
+      target.querySelector('[data-system-overview-counts]'),
+      'the critical/warning/notes summary badges render'
+    );
+
+    const recipeLink = target.querySelector(
+      '[data-overview-issue="noResultGroup"] [data-overview-link="recipe"]'
+    );
+    assert.ok(recipeLink, 'the recipe issue exposes a deep-link button');
+    recipeLink.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-edit',
+      'the deep link routes to the recipe editor'
+    );
+  });
+
+  it("switches to the Validation tab when the Settings tab's blocker link is clicked", async () => {
+    await mountSystemOverviewPage(overviewReport);
+
+    const blockerLink = target.querySelector('[data-system-edit-blocker-link]');
+    assert.ok(blockerLink, 'the blocker banner exposes an open-overview link');
+    blockerLink.click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('[data-system-tab="validation"]').getAttribute('aria-selected'),
+      'true',
+      'the blocker link opens the Validation tab in place'
+    );
+    assert.ok(target.querySelector('[data-system-overview]'), 'the validation list is shown');
   });
 
   it('renders the salvage resolution-mode card (simple/progressive/routed) and routes its change', async () => {

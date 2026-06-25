@@ -22,8 +22,10 @@ const AGGREGATOR_KINDS = ['recipe', 'environment', 'task', 'event', 'salvage', '
 // via a selection helper). Kept in sync with `setView`/`normalizedActiveView`.
 const ROOT_VIEW_TOKENS = new Set([
   'systems',
+  // The standalone `system-overview` route was folded into the `system-edit`
+  // page's Validation tab; `system-edit` is the routed token deep links resolve
+  // to (the page opens its Validation tab via requestedTab).
   'system-edit',
-  'system-overview',
   'recipes',
   'recipe-edit',
   'components',
@@ -82,12 +84,14 @@ describe('System overview deep-link drift guard', () => {
 
   it('routes the aggregator nav.view tokens through the root (no orphaned target)', () => {
     // The raw `nav: { view: '<token>' }` literals the aggregator emits. Every one
-    // must either be a real root view token directly, or `items` — the salvage
-    // alias the root resolves to `component-edit` via the salvage deep-link map.
+    // must either be a real root view token directly, or a known alias: `items`
+    // (the salvage alias the root resolves to `component-edit` via the salvage
+    // deep-link map) or `system-overview` (the folded-in overview, which the root
+    // resolves to the `system-edit` page's Validation tab via normalizedActiveView).
     const navViews = new Set(
       [...aggregatorSource.matchAll(/nav:\s*\{\s*view:\s*'([\w-]+)'/g)].map((match) => match[1])
     );
-    const ALLOWED_ALIASES = new Set(['items']);
+    const ALLOWED_ALIASES = new Set(['items', 'system-overview']);
     for (const view of navViews) {
       assert.ok(
         ROOT_VIEW_TOKENS.has(view) || ALLOWED_ALIASES.has(view),
@@ -99,6 +103,12 @@ describe('System overview deep-link drift guard', () => {
       rootSource,
       /salvage:\s*\{\s*view:\s*'component-edit'/,
       'the salvage kind (aggregator nav.view "items") must resolve to the component-edit view'
+    );
+    // The `system-overview` alias must fold into the `system-edit` page in the root.
+    assert.match(
+      rootSource,
+      /view === 'system-overview'\) return 'system-edit'/,
+      'the folded-in overview (aggregator nav.view "system-overview") must resolve to the system-edit page'
     );
   });
 

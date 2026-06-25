@@ -28,7 +28,6 @@
   import RecipeEditView from './RecipeEditView.svelte';
   import RecipeItemInspector from './RecipeItemInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
-  import SystemOverviewView from './SystemOverviewView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
 
@@ -38,6 +37,12 @@
   const viewState = store.viewState;
 
   let activeView = $state('systems');
+  // The tab the System Overview page (`system-edit`) should open on. The standalone
+  // overview route was folded into this page as its Validation tab; bumping
+  // `requestedSystemTabNonce` alongside `requestedSystemTab` lets a deep link (or the
+  // blocker banner) force the Validation tab open even when the page is already shown.
+  let requestedSystemTab = $state('settings');
+  let requestedSystemTabNonce = $state(0);
   let selectedRecipeId = $state('');
   let selectedComponentId = $state('');
   let selectedEssenceId = $state('');
@@ -1474,9 +1479,11 @@
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable, recipesAvailable) {
-    // A stale `system-overview` (no system selected) falls through to the
-    // `systems` library here; with a system it is an always-available route.
+    // The standalone `system-overview` route was folded into the `system-edit`
+    // page's Validation tab; a stale value (no system selected) falls through to
+    // the `systems` library here.
     if (!system) return 'systems';
+    if (view === 'system-overview') return 'system-edit';
     if ((view === 'recipes' || view === 'recipe-edit') && !recipesAvailable) return 'system-edit';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
@@ -1521,8 +1528,7 @@
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings');
-    if (currentView === 'system-overview') return text('FABRICATE.Admin.Manager.SystemOverview.Title', 'System overview');
+    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.PageTitle', 'System Overview');
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
 
@@ -1546,8 +1552,7 @@
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected event.');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system.');
-    if (currentView === 'system-overview') return text('FABRICATE.Admin.Manager.SystemOverview.Subtitle', 'Review every validation issue across this crafting system and jump straight to the editor that owns each one.');
+    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.PageSubtitle', 'Edit base settings and review validation issues for the selected crafting system.');
     return text('FABRICATE.Admin.Manager.Subtitle', 'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.');
   }
 
@@ -1587,7 +1592,6 @@
     if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
-    if (currentView === 'system-overview') return text('FABRICATE.Admin.Manager.SystemOverview.Actions', 'System overview actions');
     return text('FABRICATE.Admin.Manager.SystemActions', 'System actions');
   }
 
@@ -1602,7 +1606,6 @@
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelInspector', 'Selected party inspector');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Inspector', 'Selected tool inspector');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Inspector', 'Selected environment inspector');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Inspector', 'System edit evidence');
     return text('FABRICATE.Admin.Manager.SelectedSystemInspector', 'Selected system inspector');
   }
 
@@ -1823,7 +1826,7 @@
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'system-overview' || view === 'tools' || view === 'checks') && !selectedSystem) return;
+    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'checks') && !selectedSystem) return;
     if (view === 'recipes' && !recipesRouteEnabled) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
@@ -1852,14 +1855,32 @@
     afterTruthyResult(selected, () => { activeView = 'systems'; });
   }
 
-  function editSystem(systemId) {
-    if (!systemId) return;
-    afterTruthyResult(selectSystem(systemId, 'system-edit'), () => { activeView = 'system-edit'; });
+  // Open the System Overview page (`system-edit`) on a specific tab. Bumping the
+  // nonce re-applies the requested tab in the child even when the page is already
+  // shown or the same system is re-selected, so deep links and the blocker banner
+  // can force the Validation tab open.
+  function requestSystemTab(tab) {
+    requestedSystemTab = tab === 'validation' ? 'validation' : 'settings';
+    requestedSystemTabNonce += 1;
   }
 
+  function editSystem(systemId) {
+    if (!systemId) return;
+    afterTruthyResult(selectSystem(systemId, 'system-edit'), () => {
+      requestSystemTab('settings');
+      activeView = 'system-edit';
+    });
+  }
+
+  // The standalone overview route was folded into the System Overview page's
+  // Validation tab. Anything that asked for the old overview now opens this page
+  // with the Validation tab active.
   function showSystemOverview() {
     if (!selectedSystem) return;
-    afterTruthyResult(confirmRouteExit('system-overview'), () => { activeView = 'system-overview'; });
+    afterTruthyResult(confirmRouteExit('system-edit'), () => {
+      requestSystemTab('validation');
+      activeView = 'system-edit';
+    });
   }
 
   // Maps a system-validation issue `kind` to the manager's deep-link selection
@@ -3743,11 +3764,7 @@
         {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.SystemEdit.Breadcrumb', 'System settings')}</span>
-        {/if}
-        {#if currentView === 'system-overview'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.SystemOverview.Breadcrumb', 'System overview')}</span>
+          <span>{text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')}</span>
         {/if}
       </nav>
       <h1 class="manager-title">{viewTitle()}</h1>
@@ -3934,11 +3951,6 @@
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span>
         </button>
-      {:else if currentView === 'system-overview'}
-        <button type="button" class="manager-button" onclick={backToSystemsBrowser}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span>
-        </button>
       {:else}
         <button type="button" class="manager-button" onclick={importSystem}>
           <i class="fas fa-file-import" aria-hidden="true"></i>
@@ -3996,13 +4008,9 @@
 
       <nav class="manager-nav" aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}>
         {#if selectedSystem}
-          <button type="button" class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`} aria-current={currentView === 'system-edit' ? 'page' : undefined} onclick={() => editSystem(selectedSystem.id)}>
-            <i class="fas fa-cog" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System settings')}</span>
-          </button>
-          <button type="button" class={`manager-nav-button ${currentView === 'system-overview' ? 'is-active' : ''}`} aria-current={currentView === 'system-overview' ? 'page' : undefined} data-nav-system-overview onclick={showSystemOverview}>
+          <button type="button" class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`} aria-current={currentView === 'system-edit' ? 'page' : undefined} data-nav-system-edit onclick={() => editSystem(selectedSystem.id)}>
             <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemOverview.Nav', 'Overview')}</span>
+            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')}</span>
             {#if systemOverviewCount > 0}
               <span class="manager-nav-count" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
             {/if}
@@ -4410,15 +4418,14 @@
         onDeleteRecipe={(id) => deleteRecipe(id)}
         onToggleEnabled={(id, enabled) => store.toggleRecipeEnabled?.(id, enabled)}
       />
-    {:else if currentView === 'system-overview' && selectedSystem}
-      <SystemOverviewView
-        report={systemValidationReport}
-        onSelectIssue={(issue) => selectOverviewIssue(issue)}
-      />
     {:else if currentView === 'system-edit' && selectedSystem}
       <SystemEditView
         {selectedSystem}
         systemBlocked={systemBlocksSystem}
+        validationReport={systemValidationReport}
+        requestedTab={requestedSystemTab}
+        requestedTabNonce={requestedSystemTabNonce}
+        onSelectIssue={(issue) => selectOverviewIssue(issue)}
         onShowSystemOverview={showSystemOverview}
         onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
         onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
@@ -4463,7 +4470,7 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-overview' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">
@@ -6099,38 +6106,6 @@
           onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
           onCopyItemUuid={(uuid) => services?.onCopySourceUuid?.(uuid)}
         />
-      {:else if currentView === 'system-edit' && selectedSystem}
-        <section class="manager-inspector-card">
-          <div class="manager-inspector-title-row is-hero-large">
-            <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-              <i class="fas fa-layer-group"></i>
-            </span>
-            <div class="manager-inspector-copy">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.SystemEdit.Editing', 'Editing')}</p>
-              <h2 class="manager-inspector-name" title={selectedSystem.name}>{selectedSystem.name}</h2>
-              <div class="manager-chip-row">
-                <span class="manager-chip is-active">{resolutionModeLabel(selectedSystem.resolutionMode)}</span>
-              </div>
-            </div>
-          </div>
-
-          <p class="manager-muted">
-            {selectedSystem.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-          </p>
-        </section>
-
-        <section class="manager-inspector-card">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Details', 'System Details')}</h3>
-          <div class="manager-fact-grid">
-            <div class="manager-fact">
-              <span class="manager-fact-line"><strong>{resolutionModeLabel(selectedSystem.resolutionMode)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span></span>
-            </div>
-            <div class="manager-fact">
-              <span class="manager-fact-line"><strong>{enabledFeatureLabels.length}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.SystemEdit.EnabledFeatureCount', 'Features enabled')}</span></span>
-            </div>
-          </div>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.SystemEdit.DeepConfigHint', 'Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager views.')}</p>
-        </section>
       {:else if selectedSystem}
         <section class="manager-inspector-card">
           <div class="manager-inspector-title-row is-hero-large">

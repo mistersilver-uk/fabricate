@@ -108,7 +108,7 @@ While Fabricate is still initializing or the recipe/crafting system managers hav
 - When at least one crafting system exists, manager v2 always has a selected crafting system.
 An empty or stale persisted selection resolves to the first available crafting system.
 - When no crafting systems exist, selected-system feature tabs are hidden and the systems browser is the active management surface.
-- When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.
+- When a crafting system is selected, `System Overview` is the first left-nav item and stays in that position regardless of feature gates.
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders.
 If a route is still planned only, it may remain in the placeholder/deferred-view set.
@@ -127,13 +127,13 @@ Gathering section navigation must not be duplicated as an in-page horizontal tab
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`.
 It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - The root `Crafting Systems` breadcrumb returns to the systems browser.
-The selected-system breadcrumb opens that system's in-manager System settings route.
+The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
 - The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button.
 Activating that button returns to the systems browser without clearing the real selected-system store state.
 
 Rail and count layout:
 
-- The manager left rail can be collapsed to an icon-only strip to reclaim horizontal width for the middle content column; section navigation (System settings, Recipes, Components, Essences, Tools, the Gathering submenu parent, etc.) remains reachable when collapsed via its section icons, and a localized, keyboard-reachable toggle control switches between expanded and collapsed.
+- The manager left rail can be collapsed to an icon-only strip to reclaim horizontal width for the middle content column; section navigation (System Overview, Recipes, Components, Essences, Tools, the Gathering submenu parent, etc.) remains reachable when collapsed via its section icons, and a localized, keyboard-reachable toggle control switches between expanded and collapsed.
 The per-client preference persists in `fabricate.managerRailCollapsed` (default expanded).
 - The selected-system rail scope has stable geometry.
 Long system names are visually prominent but are capped or truncated before they can overflow the rail or move nav buttons below it.
@@ -274,16 +274,35 @@ Visibility and learning semantics are defined in `006`.
 
 ### System Overview
 
-The manager exposes a GM-only **System overview** view as the second navigation-rail item,
-immediately after `System settings` and before `Components`.
+The manager exposes a GM-only **System Overview** page as the first navigation-rail item,
+immediately before `Components`.
 It is an always-available implemented route for any selected system —
 not an experimental-gated feature and not a disabled placeholder.
-The whole crafting-manager admin is GM-scoped, so the overview and its banner are GM-only by construction.
+The whole crafting-manager admin is GM-scoped, so the page and its banner are GM-only by construction.
 
-The overview renders the derived system-validation report
+The System Overview page is a full-width tabbed shell mirroring the environment editor's full-width tab pattern.
+A full-width tab bar (`role="tablist"`, with `role="tab"` buttons and badge support) sits above a bounded, scrollable workspace.
+The page has two tabs: **Settings** (the system settings form, the default-selected tab) and **Validation** (the kind-grouped validation issue list).
+The shared right inspector is skipped for this full-width page, exactly as it is for the environment editor.
+Selecting a different system, or opening the page from the rail, resets the active tab to Settings.
+
+The renamed rail item uses the validation clipboard icon (`fas fa-clipboard-check`).
+There is no separate standalone Overview rail item; the validation list lives on the Validation tab.
+The rail item SHALL surface a count badge with the number of open critical-plus-warning issues when greater than zero.
+
+#### Settings Tab
+
+The default-selected Settings tab renders the system settings form (identity, resolution modes, optional features, character modifiers, and currency configuration) unchanged.
+It writes through the existing admin-store persistence and confirmation flows.
+
+#### Validation Tab
+
+The Validation tab renders the derived system-validation report
 (`evaluateSystemValidation`, defined in `data-models`) for the selected system.
 The report is a computed view assembled by the admin store from the system's recipes, environments, and components;
 nothing is persisted on the `CraftingSystem`.
+The tab header keeps the "Review every validation issue…" copy and the `critical / warning / notes` summary badges.
+The tab also carries danger and warning badges in the tab bar reflecting the open critical and warning counts.
 
 Issues are grouped by their `kind` —
 `system` (system blockers), `recipe`, `environment`, `task`, `event`, and `salvage` —
@@ -297,18 +316,18 @@ reusing the manager's existing selection helpers
 (recipe issues open the recipe editor, environment/task/event issues open the environment editor,
 and salvage issues open the component editor).
 The `system` kind is the overview itself and carries no deep-link button.
-When there are no issues, the overview shows an empty "ready to use" state.
-A rail count badge SHALL surface the number of open critical-plus-warning issues when greater than zero.
+When there are no issues, the Validation tab shows an empty "ready to use" state.
 
 When the report's `blocksSystem` is true,
-the overview renders a full-width `role="note"` callout explaining that players cannot see or use any of the system's recipes until the blocker is resolved.
+the Validation tab renders a full-width `role="note"` callout explaining that players cannot see or use any of the system's recipes until the blocker is resolved.
 
 #### System-Blocker Banner
 
 When the selected system's report has `blocksSystem === true`,
-the `System settings` view SHALL render a full-width `role="note"` callout
+the System Overview page's Settings tab SHALL render a full-width `role="note"` callout
 (reusing the `manager-environment-comp-callout` treatment) above the identity card.
-The banner is GM-only, explains that the system is blocked from player visibility, and links to the System overview.
+The banner is GM-only, explains that the system is blocked from player visibility, and links to the Validation tab.
+Activating the banner link switches the page to the Validation tab in place.
 It is not shown when `blocksSystem` is false.
 
 ### Item Sheets

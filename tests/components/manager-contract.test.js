@@ -609,19 +609,56 @@ describe('CraftingSystemManager source contract', () => {
     }
   });
 
-  it('retitles the system summary card and aligns system/recipe detail facts with the environment details card', () => {
-    // The card is retitled "System Details"; the old "Edit summary" key is gone.
-    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Details, 'System Details');
+  it('folds the validation overview into a full-width tabbed System Overview page (#429)', () => {
+    // The standalone overview route and the legacy "Edit summary" key are gone.
     assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Summary, undefined, 'the legacy Summary key is removed');
     assert.ok(!rootSource.includes('SystemEdit.Summary'), 'no consumer references the removed Summary key');
-    assert.ok(rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.Details', 'System Details')"), 'system details card uses the renamed title');
 
-    // System and recipe detail facts use the same inline fact-line/fact-label
-    // typography as the environment details card (the layout reference).
+    // The System Overview page is the renamed system-edit route; the page title,
+    // breadcrumb, and nav label all read "System Overview".
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Nav, 'System Overview', 'the nav item is renamed System Overview');
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.PageTitle, 'System Overview');
     assert.ok(
-      rootSource.includes('<span class="manager-fact-line"><strong>{resolutionModeLabel(selectedSystem.resolutionMode)}</strong> <span class="manager-fact-label">'),
-      'system details facts use the shared manager-fact-line/label styling'
+      rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.PageTitle', 'System Overview')"),
+      'the page title reads System Overview'
     );
+    assert.ok(
+      rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')"),
+      'the renamed nav item reads System Overview'
+    );
+
+    // The standalone Overview route was folded into the system-edit page; its old
+    // nav item and routed view token are gone.
+    assert.ok(!rootSource.includes('data-nav-system-overview'), 'the standalone Overview nav item is removed');
+    assert.ok(!rootSource.includes("activeView = 'system-overview'"), 'no route transitions to the standalone overview view');
+    assert.ok(rootSource.includes("if (view === 'system-overview') return 'system-edit'"), 'a stale overview token folds into the system-edit page');
+
+    // The renamed nav item uses the validation clipboard icon and carries the
+    // open-issue badge that the standalone Overview item used to own.
+    assert.ok(
+      rootSource.includes('data-nav-system-edit'),
+      'the renamed nav item exposes a stable data hook'
+    );
+    assert.ok(
+      rootSource.includes("{#if systemOverviewCount > 0}"),
+      'the renamed nav item carries the open-validation-issue badge'
+    );
+
+    // The page is a full-width tabbed shell mirroring the environment editor: the
+    // shared inspector is skipped, and SystemEditView owns the tabs + workspace.
+    assert.ok(
+      rootSource.includes("currentView !== 'system-edit'") &&
+        rootSource.includes("class=\"manager-inspector\""),
+      'the shared inspector is skipped for the full-width system-edit page'
+    );
+    assert.ok(systemEditSource.includes('SystemEditorTabs'), 'SystemEditView renders the tab bar');
+    assert.ok(systemEditSource.includes("activeTab === 'settings'"), 'Settings is a tab panel');
+    assert.ok(systemEditSource.includes("activeTab === 'validation'"), 'Validation is a tab panel');
+    assert.ok(systemEditSource.includes('SystemOverviewView'), 'the Validation tab renders the overview list');
+    assert.ok(systemEditSource.includes('manager-system-workspace'), 'the workspace mirrors the environment workspace');
+
+    // Recipe detail facts still use the shared inline fact-line/fact-label
+    // typography as the environment details card (the layout reference).
     assert.ok(
       rootSource.includes('<span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">'),
       'recipe details facts use the shared manager-fact-line/label styling'
