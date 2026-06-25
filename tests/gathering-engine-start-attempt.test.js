@@ -465,6 +465,50 @@ test('startAttempt rejects disabled gathering systems before record guards', asy
   assertNoRunMutation(calls);
 });
 
+// A `blocks: 'system'` gathering system (issue 429): gathering is ENABLED, so it
+// passes the pre-existing features.gathering guard, but multi-step recipes left on
+// in alchemy mode is a structural system-validation blocker (needs no recipes to
+// fire). The start-path system-validity guard must reject a non-GM attempt while a
+// GM bypasses it.
+const blockedGatheringSystem = {
+  id: 'system-a',
+  enabled: true,
+  features: { gathering: true, multiStepRecipes: true },
+  resolutionMode: 'alchemy',
+  components: [],
+  gatheringCraftingCheck: routedSystemCheck()
+};
+
+test('startAttempt rejects a system-blocked system for a non-GM before record guards', async () => {
+  const calls = {};
+  const engine = makeEngine({ systems: [blockedGatheringSystem], calls });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+  assert.equal(result.accepted, false);
+  assert.deepEqual(codes(result), ['SYSTEM_DISABLED']);
+  assert.deepEqual(calls.scene, []);
+  assert.deepEqual(calls.visibility, []);
+  assert.deepEqual(calls.tools, []);
+  assertNoRunMutation(calls);
+});
+
+test('startAttempt does not reject a system-blocked system for a GM (GM bypass)', async () => {
+  const calls = {};
+  const engine = makeEngine({ systems: [blockedGatheringSystem], calls });
+
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+  // The GM bypasses the system-validity guard: whatever the eventual outcome, it
+  // is NOT the SYSTEM_DISABLED rejection from this branch, and the attempt reached
+  // the downstream record guards a non-GM (blocked at the gate) never gets to.
+  assert.equal(codes(result).includes('SYSTEM_DISABLED'), false, 'GM bypasses the system-blocker guard');
+  assert.ok(
+    calls.activeRuns.length > 0,
+    'GM attempt reached the active-run guard past the system-validity gate'
+  );
+});
+
 test('startAttempt rejects disabled environment and disabled task before visibility or tools', async () => {
   const environmentCalls = {};
   const disabledEnvironmentEngine = makeEngine({
