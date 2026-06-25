@@ -47,8 +47,9 @@ Author a Foundry roll formula (for example `1d20 + @abilities.str.mod`) and a nu
    - **Destroy item**.
 The owned tool is removed from the character's inventory.
    - **Mark as broken**.
-The tool stays in inventory but is marked as broken.
+The tool stays in inventory but is marked as broken, and Fabricate appends " (broken)" to its name so it reads as broken at a glance in the inventory.
      Broken tools block future attempts until a GM clears that mark.
+     Clearing the mark does not remove the " (broken)" name, so the GM also renames the tool back to undo the break.
    - **Replace with...**.
 Pick a second managed component (the "broken" variant).
      On break, the original is removed and the replacement is created on the character.

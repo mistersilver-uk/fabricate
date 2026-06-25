@@ -77,7 +77,7 @@ When a Tool breaks, the on-break action you chose runs:
 | Action | Behaviour |
 |:-------|:----------|
 | Destroy it | The owned Tool is removed from the character's inventory. |
-| Flag it as broken | The Tool stays in inventory but is marked as broken. A broken Tool fails the presence check on future attempts until a GM clears it. |
+| Flag it as broken | The Tool stays in inventory but is marked as broken, and Fabricate appends " (broken)" to its name so it reads as broken at a glance. A broken Tool fails the presence check on future attempts until a GM clears it. Clearing the mark does not remove the " (broken)" name, so the GM also renames the Tool back to undo the break. |
 | Replace it with a broken variant | The original is removed and a broken variant component is created on the character. You can build a recipe that consumes the broken variant to produce the repaired Tool. While the character holds the broken variant, the gathering app shows the required Tool as **Broken** rather than **Missing**. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

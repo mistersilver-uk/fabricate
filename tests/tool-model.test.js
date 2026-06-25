@@ -36,9 +36,10 @@ function setPathValue(object, path, value) {
 }
 
 class FakeItem {
-  constructor(flags = {}) {
+  constructor(flags = {}, { name } = {}) {
     this._flags = { fabricate: flags };
     this.deleted = false;
+    if (name !== undefined) this.name = name;
   }
 
   getFlag(scope, key) {
@@ -52,9 +53,26 @@ class FakeItem {
     return value;
   }
 
+  async update(changes = {}) {
+    Object.assign(this, changes);
+    return this;
+  }
+
   async delete() {
     this.deleted = true;
   }
+}
+
+// A renamable item with a `name` and the FakeItem `update` method.
+function makeNamedItem(name, flags = {}) {
+  return new FakeItem(flags, { name });
+}
+
+// A headless item lacking `name`/`update` (e.g. the legacy fake / non-rename path).
+function makeUpdatelessItem(name, flags = {}) {
+  const item = new FakeItem(flags, { name });
+  item.update = undefined;
+  return item;
 }
 
 // ---------------------------------------------------------------------------
@@ -395,6 +413,53 @@ test('applyBreakage flagBroken - sets toolBroken flag and does not delete', asyn
   assert.equal(item.deleted, false);
   assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
   assert.equal(result.action, 'flagged');
+});
+
+const flagBrokenTool = () => new Tool({ componentId: 'comp-axe', onBreak: { mode: 'flagBroken' } });
+
+test('applyBreakage flagBroken - appends " (broken)" suffix and flags a named item', async () => {
+  const item = makeNamedItem('Hammer');
+  const result = await flagBrokenTool().applyBreakage({ item });
+  assert.equal(item.name, 'Hammer (broken)');
+  assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+  assert.equal(item.deleted, false);
+  assert.equal(result.action, 'flagged');
+});
+
+test('applyBreakage flagBroken - idempotent on an already-suffixed name', async () => {
+  const item = makeNamedItem('Hammer (broken)');
+  await flagBrokenTool().applyBreakage({ item });
+  assert.equal(item.name, 'Hammer (broken)');
+  assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+});
+
+test('applyBreakage flagBroken - does not rename an item already flagged broken', async () => {
+  const item = makeNamedItem('Hammer', { fabricate: { toolBroken: true } });
+  await flagBrokenTool().applyBreakage({ item });
+  assert.equal(item.name, 'Hammer');
+  assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+});
+
+test('applyBreakage flagBroken - flags without renaming when item.update is absent', async () => {
+  const item = makeUpdatelessItem('Hammer');
+  const result = await flagBrokenTool().applyBreakage({ item });
+  assert.equal(item.name, 'Hammer');
+  assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+  assert.equal(result.action, 'flagged');
+});
+
+test('applyBreakage flagBroken - uses the localized suffix when game.i18n resolves it', async () => {
+  const priorGame = globalThis.game;
+  globalThis.game = { i18n: { localize: (key) => (key === 'FABRICATE.Tool.BrokenNameSuffix' ? ' [kaputt]' : key) } };
+  try {
+    const item = makeNamedItem('Hammer');
+    await flagBrokenTool().applyBreakage({ item });
+    assert.equal(item.name, 'Hammer [kaputt]');
+    assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+  } finally {
+    if (priorGame === undefined) delete globalThis.game;
+    else globalThis.game = priorGame;
+  }
 });
 
 test('applyBreakage replaceWith - deletes original and invokes createReplacement', async () => {

@@ -1131,6 +1131,10 @@ Requirements:
 
 1. When set to `true`, the item does not satisfy a crafting or gathering tool presence gate.
 2. The flag is not cleared by Fabricate; the GM clears it via the Foundry item flag editor (or future repair flow).
+3. The `flagBroken` action also appends a localized leading-space `(broken)` suffix (the literal `" (broken)"`) to the owned item's display name.
+The suffix is applied idempotently — never double-appended, and never appended to an item that was already `toolBroken`-flagged before the action fired.
+The suffix is display-only and is not auto-cleared by Fabricate; the flag (not the name) remains the authoritative presence-gate disqualifier (data-models req 7, gathering req 2).
+A managed component matched purely by name (no `sourceUuid`/fallback ids) stops matching its component once renamed, so a GM clearing the flag must also restore the original name to regain `damaged`-tier recognition.
 
 ## Canvas Interactables
 
