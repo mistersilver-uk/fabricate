@@ -1977,7 +1977,13 @@ async function main() {
             enabled: true,
             routed: {
               type: 'relative',
-              rollFormula: '1d20',
+              // `1d20 + 20` (total 21-40) always meets the Masterwork threshold, so the
+              // Phase-E Brew Healing Potion craft deterministically succeeds. Before #431
+              // the routed check was authored-only (never rolled); now that it is engine-
+              // evaluated a bare `1d20` vs dc 12 would fail the craft ~55% of the time
+              // (flaky smoke). The named tiers below are unchanged so the routed-check and
+              // validation-tab captures still render their authored outcomes.
+              rollFormula: '1d20 + 20',
               dc: 12,
               thresholdMode: 'meet',
               relativeOutcomes: [
