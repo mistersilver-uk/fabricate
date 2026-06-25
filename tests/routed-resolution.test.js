@@ -355,6 +355,44 @@ describe('routed recipe resolution', () => {
     assert.deepEqual(result.groups, [], 'no result group is produced for the unrouted tier');
   });
 
+  it('check mode: a checkOutcomeIds for a since-deleted tier falls back to name-matching without crash or spurious group', () => {
+    // The system's routed config no longer offers a 'Mythic' tier (it was deleted),
+    // so the outcome resolves to no tier id. The recipe still carries a stale
+    // `checkOutcomeIds: ['t-deleted']` on its 'Mythic'-named group. Resolution must
+    // not crash and must not produce a group via the dangling tier id; it falls back
+    // to outcome-name matching, routing to the like-named group.
+    const system = buildSystem({
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          type: 'relative',
+          rollExpression: '1d20',
+          relativeOutcomes: [
+            { id: 't-std', name: 'Standard', success: true, breakTools: false, dc: 0 },
+          ],
+          fixedOutcomes: [],
+        },
+      },
+    });
+    const service = buildService(system);
+    const assigned = groups();
+    assigned[2].checkOutcomeIds = ['t-deleted'];
+    const recipe = recipeWithStep(
+      step({ resultGroups: assigned, resultSelection: { provider: 'check' } })
+    );
+
+    const result = service.resolveResultGroups({
+      recipe,
+      step: recipe.steps[0],
+      ingredientSet: recipe.steps[0].ingredientSets[0],
+      checkResult: { outcome: 'Mythic' },
+    });
+
+    assert.equal(result.meta.disposition, 'success', 'falls back to name-matching');
+    assert.equal(result.groups.length, 1, 'no spurious group from the dangling tier id');
+    assert.equal(result.groups[0].name, 'Mythic');
+  });
+
   it('routed check returns no output for fail keywords', () => {
     const activeStep = step({ resultSelection: { provider: 'check' } });
     const recipe = recipeWithStep(activeStep);

@@ -14,6 +14,11 @@
   let {
     recipe = null,
     componentTagOptions = [],
+    // Routed check-mode authoring inputs: the recipe's routing provider and the
+    // system's success-filtered routed-check outcome tiers {id,name}. Used to flag
+    // unrouted result groups and unproduced success tiers.
+    routingProvider = null,
+    routedOutcomeTierOptions = [],
     onSelectIssue = () => {}
   } = $props();
 
@@ -22,7 +27,11 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const readiness = $derived(evaluateRecipeReadiness(recipe || {}, { systemComponents: componentTagOptions }));
+  const readiness = $derived(evaluateRecipeReadiness(recipe || {}, {
+    systemComponents: componentTagOptions,
+    routingProvider,
+    routedOutcomeTierOptions
+  }));
   const issuesBy = $derived({
     critical: readiness.issues.filter(issue => issue.severity === 'critical'),
     warning: readiness.issues.filter(issue => issue.severity === 'warning'),
@@ -35,7 +44,9 @@
     hasResultGroup: ['CheckResultGroup', 'Every step has at least one result set'],
     stepsNamed: ['CheckStepsNamed', 'Every step is named'],
     noDuplicateMatches: ['CheckNoDuplicateMatches', 'No duplicate component or tag matches'],
-    noRequirementOverlap: ['CheckNoRequirementOverlap', 'No overlapping ingredient requirements']
+    noRequirementOverlap: ['CheckNoRequirementOverlap', 'No overlapping ingredient requirements'],
+    routedResultGroupsRouted: ['CheckRoutedResultGroupsRouted', 'Every check-mode result set is assigned a check outcome'],
+    routedOutcomeTiersProduced: ['CheckRoutedOutcomeTiersProduced', 'Every check success outcome produces a result set']
   };
   const ISSUE_LABELS = {
     noName: ['IssueNoName', 'The recipe needs a name.'],
@@ -44,7 +55,9 @@
     disabledIncomplete: ['IssueDisabledIncomplete', 'The recipe is disabled and cannot be enabled until its requirements are complete.'],
     duplicateAlternative: ['IssueDuplicateAlternative', 'An OR group repeats the same component or tag match.'],
     duplicateRequirement: ['IssueDuplicateRequirement', 'A set repeats the same ingredient requirement.'],
-    requirementOverlap: ['IssueRequirementOverlap', 'Two requirements in a set can be satisfied by the same component (ambiguous).']
+    requirementOverlap: ['IssueRequirementOverlap', 'Two requirements in a set can be satisfied by the same component (ambiguous).'],
+    unroutedResultGroup: ['IssueUnroutedResultGroup', 'A result set is not assigned to any check outcome and will never be produced.'],
+    unproducedOutcomeTier: ['IssueUnproducedOutcomeTier', 'A check outcome is not assigned to any result set, so it produces nothing.']
   };
 
   function checkLabel(id) {

@@ -121,4 +121,56 @@ describe('RecipeValidationTab (mounted)', () => {
     assert.deepEqual(targets, ['ingredients'], 'View deep-links to the Ingredients tab');
     harness.remount();
   });
+
+  // A check-routed recipe whose result groups do not cover every authored success
+  // tier: 'g-good' routes 't-good', but 't-great' is unproduced and 'g-orphan'
+  // routes nothing. Both warnings deep-link to the results tab.
+  const routedOutcomeTierOptions = [
+    { id: 't-good', name: 'Good' },
+    { id: 't-great', name: 'Great' }
+  ];
+  const routedRecipe = {
+    name: 'Routed Brew',
+    enabled: true,
+    ingredientSets: [{ id: 's1' }],
+    resultGroups: [
+      { id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] },
+      { id: 'g-orphan', name: 'Orphan', checkOutcomeIds: [] }
+    ]
+  };
+
+  it('lists routed check-mode warnings that deep-link to the results tab', async () => {
+    const targets = [];
+    const target = await harness.mount({
+      recipe: routedRecipe,
+      routingProvider: 'check',
+      routedOutcomeTierOptions,
+      onSelectIssue: (deepLink) => targets.push(deepLink)
+    });
+    const warningList = target.querySelector('[data-issue-severity="warning"]');
+    assert.ok(warningList, 'a warning issue group renders');
+    assert.ok(warningList.querySelector('[data-issue="unroutedResultGroup"]'), 'unrouted group warning listed');
+    assert.ok(warningList.querySelector('[data-issue="unproducedOutcomeTier"]'), 'unproduced tier warning listed');
+    assert.equal(target.querySelector('[data-check="routedResultGroupsRouted"]').dataset.satisfied, 'false');
+    assert.equal(target.querySelector('[data-check="routedOutcomeTiersProduced"]').dataset.satisfied, 'false');
+
+    const view = target.querySelector('[data-issue="unroutedResultGroup"] [data-recipe-issue-view]');
+    assert.ok(view, 'a View button renders on the routed warning');
+    view.click();
+    await flushRender();
+    assert.deepEqual(targets, ['results'], 'View deep-links to the Results tab');
+    harness.remount();
+  });
+
+  it('does not list routed warnings off check-mode routing', async () => {
+    const target = await harness.mount({
+      recipe: routedRecipe,
+      routingProvider: 'ingredientSet',
+      routedOutcomeTierOptions
+    });
+    assert.equal(target.querySelector('[data-issue="unroutedResultGroup"]'), null, 'no routed warning off check-mode');
+    assert.equal(target.querySelector('[data-issue="unproducedOutcomeTier"]'), null);
+    assert.equal(target.querySelector('[data-check="routedResultGroupsRouted"]'), null, 'no routed checklist entry off check-mode');
+    harness.remount();
+  });
 });

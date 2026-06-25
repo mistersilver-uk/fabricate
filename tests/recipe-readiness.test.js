@@ -417,3 +417,99 @@ describe('evaluateRecipeReadiness overlapping requirements', () => {
     assert.equal(issues.filter(i => i.id === 'requirementOverlap').length, 1, 'one issue per set');
   });
 });
+
+describe('evaluateRecipeReadiness routed check-mode warnings', () => {
+  // Two authored success tiers offered by the system's routed check (the
+  // success-filtered {id,name} list the recipe editor threads in).
+  const routedOutcomeTierOptions = [
+    { id: 't-good', name: 'Good' },
+    { id: 't-great', name: 'Great' }
+  ];
+
+  it('warns when a check-mode result group has no assigned outcome tier, deep-linking to results', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'Routed',
+      enabled: true,
+      ingredientSets: [{ id: 's1' }],
+      resultGroups: [
+        { id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] },
+        { id: 'g-orphan', name: 'Orphan', checkOutcomeIds: [] }
+      ]
+    }, { routingProvider: 'check', routedOutcomeTierOptions });
+
+    const unrouted = issues.filter(i => i.id === 'unroutedResultGroup');
+    assert.equal(unrouted.length, 1, 'one unroutedResultGroup warning for the orphan group');
+    assert.equal(unrouted[0].severity, 'warning');
+    assert.equal(unrouted[0].target, 'results', 'deep-links to the results tab');
+    assert.equal('blocks' in unrouted[0], false, 'never blocks enabling');
+    assert.equal(check(checks, 'routedResultGroupsRouted').satisfied, false);
+    assert.equal(blocksEnable(issues), false);
+  });
+
+  it('treats a group referencing only a deleted tier id as unrouted', () => {
+    const { issues } = evaluateRecipeReadiness({
+      name: 'Stale',
+      enabled: true,
+      ingredientSets: [{ id: 's1' }],
+      resultGroups: [
+        { id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] },
+        { id: 'g-great', name: 'Great', checkOutcomeIds: ['t-great'] },
+        // References a since-deleted tier id only → counts as unrouted.
+        { id: 'g-stale', name: 'Stale', checkOutcomeIds: ['t-deleted'] }
+      ]
+    }, { routingProvider: 'check', routedOutcomeTierOptions });
+
+    assert.equal(issues.filter(i => i.id === 'unroutedResultGroup').length, 1);
+    // Both valid tiers are produced, so no unproduced-tier warning.
+    assert.equal(issues.some(i => i.id === 'unproducedOutcomeTier'), false);
+  });
+
+  it('warns when an authored success tier produces no result group, deep-linking to results', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'Routed',
+      enabled: true,
+      ingredientSets: [{ id: 's1' }],
+      // Only 't-good' is produced; 't-great' is unproduced.
+      resultGroups: [{ id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] }]
+    }, { routingProvider: 'check', routedOutcomeTierOptions });
+
+    const unproduced = issues.filter(i => i.id === 'unproducedOutcomeTier');
+    assert.equal(unproduced.length, 1, 'one unproducedOutcomeTier warning');
+    assert.equal(unproduced[0].severity, 'warning');
+    assert.equal(unproduced[0].target, 'results', 'deep-links to the results tab');
+    assert.equal('blocks' in unproduced[0], false, 'never blocks enabling');
+    assert.equal(check(checks, 'routedOutcomeTiersProduced').satisfied, false);
+    assert.equal(blocksEnable(issues), false);
+  });
+
+  it('does not fire routed warnings when the recipe is not check-routed', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'IngredientRouted',
+      enabled: true,
+      ingredientSets: [{ id: 's1' }],
+      resultGroups: [{ id: 'g-orphan', name: 'Orphan', checkOutcomeIds: [] }]
+    }, { routingProvider: 'ingredientSet', routedOutcomeTierOptions });
+
+    assert.equal(issues.some(i => i.id === 'unroutedResultGroup'), false);
+    assert.equal(issues.some(i => i.id === 'unproducedOutcomeTier'), false);
+    assert.equal(check(checks, 'routedResultGroupsRouted'), undefined, 'no routed checklist entry off check-mode');
+    assert.equal(check(checks, 'routedOutcomeTiersProduced'), undefined);
+  });
+
+  it('is clean when every group routes and every tier is produced', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'Routed',
+      enabled: true,
+      ingredientSets: [{ id: 's1' }],
+      resultGroups: [
+        { id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] },
+        { id: 'g-great', name: 'Great', checkOutcomeIds: ['t-great'] }
+      ]
+    }, { routingProvider: 'check', routedOutcomeTierOptions });
+
+    assert.equal(issues.some(i => i.id === 'unroutedResultGroup'), false);
+    assert.equal(issues.some(i => i.id === 'unproducedOutcomeTier'), false);
+    assert.equal(check(checks, 'routedResultGroupsRouted').satisfied, true);
+    assert.equal(check(checks, 'routedOutcomeTiersProduced').satisfied, true);
+  });
+});

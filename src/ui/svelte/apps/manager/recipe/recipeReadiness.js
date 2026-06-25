@@ -8,6 +8,7 @@
  *
  * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
  * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', stepId?: string, stepName?: string }} ReadinessIssue
+ * @typedef {{ id: string, name: string }} RoutedOutcomeTier
  */
 
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
@@ -288,15 +289,91 @@ function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComp
 }
 
 /**
+ * Routed check-mode authoring warnings. Only meaningful for a recipe whose result
+ * routing is the routed `check` provider: the result groups route by the system's
+ * routed-check outcome tiers via `ResultGroup.checkOutcomeIds`. Two soft (warning)
+ * misconfigurations are surfaced:
+ *  - a result group that lists no VALID assigned outcome tier (empty or only
+ *    references to since-deleted tiers) — it can never be routed to, so a check
+ *    success silently produces nothing;
+ *  - an authored success tier that no result group produces — that outcome resolves
+ *    to the distinct `unrouted-tier` misconfiguration at craft time.
+ * Both deep-link to the results tab (`target: 'results'`), mirroring the soft
+ * `requirementOverlap` warning rather than blocking enable.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @param {RoutedOutcomeTier[]} routedOutcomeTierOptions Success-filtered `{id,name}`.
+ * @returns {{ issues: ReadinessIssue[], checks: ReadinessCheck[] }}
+ */
+function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions) {
+  const validTierIds = new Set(
+    routedOutcomeTierOptions.map((tier) => tier?.id).filter((id) => typeof id === 'string' && id)
+  );
+  const issues = [];
+
+  // An unrouted check-mode group: a group whose `checkOutcomeIds` contains no
+  // currently-valid tier id (empty, or only stale references to deleted tiers).
+  let hasUnroutedGroup = false;
+  for (const step of executionSteps) {
+    const stepHasUnroutedGroup = asArray(step.resultGroups).some((group) => {
+      const assigned = asArray(group?.checkOutcomeIds).filter((id) => validTierIds.has(id));
+      return assigned.length === 0;
+    });
+    if (stepHasUnroutedGroup) {
+      hasUnroutedGroup = true;
+      issues.push({
+        id: 'unroutedResultGroup',
+        severity: 'warning',
+        target: 'results',
+        ...stepTag(step, isMultiStep),
+      });
+    }
+  }
+
+  // An unproduced success tier: an authored success tier id that no result group
+  // lists in its `checkOutcomeIds`.
+  const producedTierIds = new Set();
+  for (const step of executionSteps) {
+    for (const group of asArray(step.resultGroups)) {
+      for (const id of asArray(group?.checkOutcomeIds)) {
+        if (validTierIds.has(id)) producedTierIds.add(id);
+      }
+    }
+  }
+  const hasUnproducedTier = [...validTierIds].some((id) => !producedTierIds.has(id));
+  if (hasUnproducedTier) {
+    issues.push({ id: 'unproducedOutcomeTier', severity: 'warning', target: 'results' });
+  }
+
+  const checks = [
+    { id: 'routedResultGroupsRouted', satisfied: !hasUnroutedGroup },
+    { id: 'routedOutcomeTiersProduced', satisfied: !hasUnproducedTier },
+  ];
+
+  return { issues, checks };
+}
+
+/**
  * @param {object} recipe Projected plain recipe.
  * @param {object} [options]
  * @param {object[]} [options.systemComponents] Managed components (`{ id, tags }`)
  *   used to expand tag/component matches for overlap detection. Absent (the
  *   one-arg call) → overlap detection no-ops.
+ * @param {string|null} [options.routingProvider] The recipe's result-routing
+ *   provider (`'check'` for routed check-mode); the routed warnings only fire when
+ *   it is `'check'`.
+ * @param {RoutedOutcomeTier[]} [options.routedOutcomeTierOptions] The system's
+ *   success-filtered routed-check outcome tiers (`{id,name}`), used to flag
+ *   unrouted groups and unproduced tiers.
  * @returns {{ checks: ReadinessCheck[], issues: ReadinessIssue[] }}
  */
 export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const systemComponents = Array.isArray(options.systemComponents) ? options.systemComponents : [];
+  const routingProvider = options.routingProvider || null;
+  const routedOutcomeTierOptions = Array.isArray(options.routedOutcomeTierOptions)
+    ? options.routedOutcomeTierOptions
+    : [];
   const executionSteps = getExecutionSteps(recipe);
   const isMultiStep = executionSteps.length > 0 && executionSteps[0].explicit;
   const active = recipe?.enabled !== false;
@@ -334,6 +411,14 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   );
   issues.push(...overlapIssues);
   checks.push({ id: 'noRequirementOverlap', satisfied: overlapIssues.length === 0 });
+
+  // Routed check-mode authoring warnings: only meaningful when the recipe routes
+  // its results by the routed `check` provider.
+  if (routingProvider === 'check') {
+    const routed = collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions);
+    issues.push(...routed.issues);
+    checks.push(...routed.checks);
+  }
 
   // A disabled recipe still saves, but flag that it cannot be enabled until the
   // critical requirements above are met. The store/model projects `incomplete`;
