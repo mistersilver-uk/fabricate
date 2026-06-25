@@ -115,6 +115,6 @@ export function routedSuccessTierOptions(routed) {
   if (!routed) return [];
   const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
   return (Array.isArray(tiers) ? tiers : [])
-    .filter((tier) => tier && tier.id && tier.success === true)
+    .filter((tier) => tier?.id && tier.success === true)
     .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
 }

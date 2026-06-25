@@ -9,10 +9,13 @@
 
 import { CraftingEngine } from '../../src/systems/CraftingEngine.js';
 
+/** Deterministic id sequence for the headless `randomID` shim (no Math.random — Sonar S2245). */
+let _routedIdSeq = 0;
+
 /** Minimal Foundry shims the engine + checkRoll touch in a headless test run. */
 export function installRoutedCheckEnv() {
   globalThis.foundry = globalThis.foundry || {
-    utils: { randomID: () => Math.random().toString(36).slice(2) },
+    utils: { randomID: () => `rid-${(_routedIdSeq += 1).toString(36)}` },
   };
   globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () => {} } };
 }
@@ -105,6 +108,8 @@ export function makeRoutedEngine({
  * dispatch (mirrors the simple suite's `run` seam), passing the recipe + optional
  * ingredient set so recipe-tier / dynamic DC resolution is exercised end to end.
  */
-export function runRoutedCheck(engine, recipe = { craftingSystemId: 'sys-1' }, ingredientSet = null) {
+const DEFAULT_ROUTED_RECIPE = Object.freeze({ craftingSystemId: 'sys-1' });
+
+export function runRoutedCheck(engine, recipe = DEFAULT_ROUTED_RECIPE, ingredientSet = null) {
   return engine._runCraftingCheck(recipe, ROUTED_ACTOR, [ROUTED_ACTOR], ingredientSet);
 }
