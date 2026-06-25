@@ -30,29 +30,7 @@
  * Runs at the new highest version (1.7.0), strictly after the 0.6.0 catalyst→tool conversion.
  */
 
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function clone(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
-
-/**
- * Rename `oldKey` → `newKey` on a plain object in place, but only when `oldKey` is present
- * and `newKey` is absent (idempotent; never clobbers an existing new key).
- *
- * @param {object} obj
- * @param {string} oldKey
- * @param {string} newKey
- */
-function renameKey(obj, oldKey, newKey) {
-  if (!isPlainObject(obj)) return;
-  if (!Object.prototype.hasOwnProperty.call(obj, oldKey)) return;
-  if (Object.prototype.hasOwnProperty.call(obj, newKey)) return; // already migrated → leave stale inert
-  obj[newKey] = obj[oldKey];
-  delete obj[oldKey];
-}
+import { isPlainObject, clone, renameKey } from './migrationHelpers.js';
 
 /**
  * Rename the failure-consumption key on a check's `consumption` sub-object, if present.
@@ -77,6 +55,63 @@ function stripCatalysts(container) {
 }
 
 /**
+ * Strip the dead `catalysts` array from every plain-object entry of `list` (a no-op when
+ * `list` is not an array).
+ *
+ * @param {*} list
+ */
+function stripCatalystsFromEach(list) {
+  if (!Array.isArray(list)) return;
+  for (const entry of list) stripCatalysts(entry);
+}
+
+/**
+ * Migrate one crafting system: rename the consumption key on both check kinds and strip
+ * residual dead salvage catalysts on every component.
+ *
+ * @param {object} system - raw crafting-system object (mutated)
+ */
+function migrateSystem(system) {
+  if (!isPlainObject(system)) return;
+  renameConsumptionKey(system.craftingCheck);
+  renameConsumptionKey(system.salvageCraftingCheck);
+  if (!Array.isArray(system.components)) return;
+  for (const component of system.components) {
+    if (isPlainObject(component)) stripCatalysts(component.salvage);
+  }
+}
+
+/**
+ * Strip residual dead catalysts at every recipe level: the recipe, both step-level and
+ * recipe-level ingredient sets, and each step. These survive only on recipes whose crafting
+ * system was missing at 0.6.0; the engine reads `toolIds`, so the arrays are inert.
+ *
+ * @param {object} recipe - raw recipe object (mutated)
+ */
+function stripRecipeCatalysts(recipe) {
+  if (!isPlainObject(recipe)) return;
+  stripCatalysts(recipe);
+  stripCatalystsFromEach(recipe.ingredientSets);
+  if (!Array.isArray(recipe.steps)) return;
+  for (const step of recipe.steps) {
+    stripCatalysts(step);
+    if (isPlainObject(step)) stripCatalystsFromEach(step.ingredientSets);
+  }
+}
+
+/**
+ * Drop the never-authored, dead/vestigial `task.catalysts` field from every gathering task.
+ *
+ * @param {object} gatheringConfig - the gatheringConfig setting (mutated)
+ */
+function stripGatheringTaskCatalysts(gatheringConfig) {
+  if (!isPlainObject(gatheringConfig.systems)) return;
+  for (const gatheringSystem of Object.values(gatheringConfig.systems)) {
+    if (isPlainObject(gatheringSystem)) stripCatalystsFromEach(gatheringSystem.tasks);
+  }
+}
+
+/**
  * Run the 1.7.0 sweep over the runner's one-pass data bundle.
  *
  * @param {{ recipes?: object[], systems?: object[], gatheringConfig?: object }} data
@@ -87,50 +122,9 @@ export function migrateBreakToolsOnFail(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
   const gatheringConfig = isPlainObject(data?.gatheringConfig) ? clone(data.gatheringConfig) : {};
 
-  // 1. Crafting systems: rename the consumption key on both check kinds; strip residual
-  //    dead salvage catalysts on every component.
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
-    renameConsumptionKey(system.craftingCheck);
-    renameConsumptionKey(system.salvageCraftingCheck);
-
-    const components = Array.isArray(system.components) ? system.components : null;
-    if (components) {
-      for (const component of components) {
-        if (isPlainObject(component)) stripCatalysts(component.salvage);
-      }
-    }
-  }
-
-  // 2. Recipes: strip residual dead catalysts at every level (recipe, steps, both step-level
-  //    and recipe-level ingredient sets). These survive only on recipes whose crafting system
-  //    was missing at 0.6.0; the engine reads `toolIds`, so the arrays are inert.
-  for (const recipe of recipes) {
-    if (!isPlainObject(recipe)) continue;
-    stripCatalysts(recipe);
-
-    if (Array.isArray(recipe.steps)) {
-      for (const step of recipe.steps) {
-        stripCatalysts(step);
-        if (isPlainObject(step) && Array.isArray(step.ingredientSets)) {
-          for (const set of step.ingredientSets) stripCatalysts(set);
-        }
-      }
-    }
-
-    if (Array.isArray(recipe.ingredientSets)) {
-      for (const set of recipe.ingredientSets) stripCatalysts(set);
-    }
-  }
-
-  // 3. Gathering tasks: drop the never-authored, dead/vestigial `task.catalysts` field.
-  const gatheringSystems = isPlainObject(gatheringConfig.systems) ? gatheringConfig.systems : null;
-  if (gatheringSystems) {
-    for (const gatheringSystem of Object.values(gatheringSystems)) {
-      if (!isPlainObject(gatheringSystem) || !Array.isArray(gatheringSystem.tasks)) continue;
-      for (const task of gatheringSystem.tasks) stripCatalysts(task);
-    }
-  }
+  for (const system of systems) migrateSystem(system);
+  for (const recipe of recipes) stripRecipeCatalysts(recipe);
+  stripGatheringTaskCatalysts(gatheringConfig);
 
   return { recipes, systems, gatheringConfig };
 }

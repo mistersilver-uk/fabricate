@@ -32,30 +32,7 @@
  * `gatheringRegions` key.
  */
 
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function clone(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
-
-/**
- * Rename `oldKey` → `newKey` on a plain object in place, but only when `oldKey`
- * is present and `newKey` is absent (idempotent; never clobbers an existing new
- * key). A stale `oldKey` left beside an existing `newKey` is left inert.
- *
- * @param {object} obj
- * @param {string} oldKey
- * @param {string} newKey
- */
-function renameKey(obj, oldKey, newKey) {
-  if (!isPlainObject(obj)) return;
-  if (!Object.prototype.hasOwnProperty.call(obj, oldKey)) return;
-  if (Object.prototype.hasOwnProperty.call(obj, newKey)) return; // already migrated → leave stale inert
-  obj[newKey] = obj[oldKey];
-  delete obj[oldKey];
-}
+import { isPlainObject, clone, renameKey } from './migrationHelpers.js';
 
 /**
  * Run the gathering-region → realm rename over the runner's one-pass data bundle.

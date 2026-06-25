@@ -33,13 +33,7 @@
  * sees the per-system vocabulary that migration intentionally preserves.
  */
 
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function clone(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
+import { isPlainObject, clone } from './migrationHelpers.js';
 
 /**
  * Normalize a vocabulary id (or a region/environment id) to its canonical form.
