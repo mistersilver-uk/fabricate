@@ -274,3 +274,47 @@ test('salvage simple: a dcOverride of 0 is honoured as a valid DC (not treated a
   assert.equal(r.data.dc, 0, '0 override replaces the default DC');
   assert.equal(r.success, true, '0 >= 0 passes');
 });
+
+// ── engineEvaluated + checkDriven parity (issue 419) ─────────────────────────
+
+test('salvage simple is engine-evaluated and surfaces data.diceGroups', async () => {
+  const engine = makeEngine();
+  stubRoll(16, [{ number: 1, faces: 20, total: 16, results: [{ result: 16, active: true }] }]);
+  const r = await run(engine, sys({ simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet' } }, 'simple'));
+  assert.equal(r.engineEvaluated, true);
+  assert.deepEqual(r.data.diceGroups, [{ groupId: 0, group: '1d20', sum: 16, results: [16] }]);
+});
+
+test('checkDriven salvage: the active salvage check checkBreakage decides forced breakage (parity)', async () => {
+  const engine = makeEngine();
+  stubRoll(1, [{ number: 1, faces: 20, total: 1, results: [{ result: 1, active: true }] }]);
+  const checkBreakage = {
+    enabled: true,
+    triggers: [{ id: 'nat1', label: 'Nat 1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+  };
+  const system = {
+    salvageResolutionMode: 'simple',
+    salvageCraftingCheck: { simple: { rollFormula: '1d20', dc: 1, thresholdMode: 'meet', checkBreakage } },
+    toolBreakage: { authority: 'checkDriven' },
+  };
+  const r = await run(engine, system);
+  const decision = engine._resolveSalvageBreakageDecision(system, r);
+  assert.equal(decision.authority, 'checkDriven');
+  assert.equal(decision.forceBreak, true);
+  assert.equal(decision.triggerId, 'nat1');
+});
+
+test('checkDriven salvage: a legacy crit breakTools is honoured under toolSpecific (now engine-evaluated)', async () => {
+  const engine = makeEngine();
+  stubRoll(3, [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }]);
+  const system = {
+    salvageResolutionMode: 'simple',
+    salvageCraftingCheck: {
+      simple: { rollFormula: '1d20', dc: 15, diceCrits: [{ id: 'c', die: '1d20', raw: 20, success: true, breakTools: true }] },
+    },
+  };
+  const r = await run(engine, system);
+  const decision = engine._resolveSalvageBreakageDecision(system, r);
+  assert.equal(decision.authority, 'toolSpecific');
+  assert.equal(decision.forceBreak, true, 'salvage now reaches crafting parity for crit breakTools');
+});

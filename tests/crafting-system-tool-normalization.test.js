@@ -167,3 +167,83 @@ test('_normalizeSystem round-trips tools through normalization (re-normalize is 
   const twice = manager._normalizeSystem(once);
   assert.deepEqual(twice.tools, once.tools);
 });
+
+// ---------------------------------------------------------------------------
+// issue 419: immune breakage mode, toolBreakage.authority, checkBreakage
+// ---------------------------------------------------------------------------
+
+test('_normalizeToolBreakage accepts immune and carries no breakage fields', () => {
+  const manager = makeManager();
+  const breakage = manager._normalizeToolBreakage({ mode: 'immune', maxUses: 5, breakageChance: 9 });
+  assert.deepEqual(breakage, { mode: 'immune' });
+});
+
+test('_normalizeSystem defaults toolBreakage.authority to toolSpecific when absent', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 's', name: 'S' });
+  assert.deepEqual(system.toolBreakage, { authority: 'toolSpecific' });
+});
+
+test('_normalizeSystem coerces an unknown toolBreakage.authority to toolSpecific', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 's', name: 'S', toolBreakage: { authority: 'bogus' } });
+  assert.deepEqual(system.toolBreakage, { authority: 'toolSpecific' });
+});
+
+test('_normalizeSystem preserves a checkDriven toolBreakage.authority', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 's', name: 'S', toolBreakage: { authority: 'checkDriven' } });
+  assert.deepEqual(system.toolBreakage, { authority: 'checkDriven' });
+});
+
+test('_normalizeCheckBreakage defaults to disabled with no triggers', () => {
+  const manager = makeManager();
+  assert.deepEqual(manager._normalizeCheckBreakage(undefined), { enabled: false, triggers: [] });
+  assert.deepEqual(manager._normalizeCheckBreakage({ enabled: 'yes' }), { enabled: false, triggers: [] });
+});
+
+test('_normalizeCheckBreakage normalizes valid triggers and drops malformed ones', () => {
+  const manager = makeManager();
+  const block = manager._normalizeCheckBreakage({
+    enabled: true,
+    triggers: [
+      { id: 't1', label: 'Roll low', condition: { type: 'rollTotal', operator: '<=', value: '5' } },
+      { id: 't2', condition: { type: 'progressiveValue', operator: '>=', value: 10 } },
+      { id: 't3', condition: { type: 'outcomeTier', tierIds: ['x'], outcomeKeys: ['Pass'] } },
+      {
+        id: 't4',
+        condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+      },
+      // malformed → dropped:
+      { id: 'bad-op', condition: { type: 'rollTotal', operator: '!=', value: 1 } },
+      { id: 'bad-type', condition: { type: 'unknown' } },
+      { id: 'bad-agg', condition: { type: 'diceGroup', groupId: 0, aggregate: 'sum', operator: '==', value: 1 } },
+      { id: 'bad-tier', condition: { type: 'outcomeTier' } },
+      'not-an-object',
+    ],
+  });
+  assert.equal(block.enabled, true);
+  assert.equal(block.triggers.length, 4);
+  assert.deepEqual(block.triggers[0].condition, { type: 'rollTotal', operator: '<=', value: 5 });
+  assert.deepEqual(block.triggers[2].condition, {
+    type: 'outcomeTier',
+    tierIds: ['x'],
+    outcomeKeys: ['pass'],
+  });
+  assert.deepEqual(block.triggers[3].condition, {
+    type: 'diceGroup',
+    groupId: 0,
+    aggregate: 'anyDie',
+    operator: '==',
+    value: 1,
+  });
+});
+
+test('_normalizeSimpleCraftingCheck carries a normalized checkBreakage block', () => {
+  const manager = makeManager();
+  const simple = manager._normalizeSimpleCraftingCheck({
+    rollFormula: '1d20',
+    checkBreakage: { enabled: true, triggers: [] },
+  });
+  assert.deepEqual(simple.checkBreakage, { enabled: true, triggers: [] });
+});

@@ -91,6 +91,168 @@ function stringOrEmpty(value) {
 }
 
 /**
+ * Compare two numbers with one of the DSL operators.
+ * @private
+ */
+function compareNumeric(actual, operator, expected) {
+  switch (operator) {
+    case '==': {
+      return actual === expected;
+    }
+    case '<=': {
+      return actual <= expected;
+    }
+    case '>=': {
+      return actual >= expected;
+    }
+    case '<': {
+      return actual < expected;
+    }
+    case '>': {
+      return actual > expected;
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
+/**
+ * Reduce a dice group's per-die `results[]` to the value an aggregate targets.
+ * Returns `null` when the aggregate needs per-die faces but none are present
+ * (fail-open: the trigger does not match), EXCEPT `total`, which uses the group
+ * `sum` and is always available.
+ * @private
+ */
+function aggregateDiceGroup(group, aggregate) {
+  if (aggregate === 'total') {
+    const sum = Number(group?.sum);
+    return Number.isFinite(sum) ? sum : null;
+  }
+  const results = Array.isArray(group?.results) ? group.results : [];
+  if (results.length === 0) return null; // fail-open: no per-die data
+  switch (aggregate) {
+    case 'anyDie':
+    case 'allDice': {
+      // any/all are evaluated per-die against the operator (handled by the caller);
+      // returning the array signals the per-die comparison path.
+      return results;
+    }
+    case 'lowestDie': {
+      return Math.min(...results);
+    }
+    case 'highestDie': {
+      return Math.max(...results);
+    }
+    default: {
+      return null;
+    }
+  }
+}
+
+/**
+ * Evaluate one `checkBreakage` condition against a checkResult.
+ * @private
+ * @returns {boolean}
+ */
+function evaluateCheckBreakageCondition(condition, checkResult) {
+  if (!condition || typeof condition !== 'object') return false;
+  const data = checkResult?.data || {};
+  switch (condition.type) {
+    case 'rollTotal': {
+      const total = Number(data.total);
+      if (!Number.isFinite(total)) return false;
+      return compareNumeric(total, condition.operator, condition.value);
+    }
+    case 'progressiveValue': {
+      // Only meaningful on progressive checks. Absent (non-progressive) → no match.
+      const value = Number(checkResult?.value);
+      if (!Number.isFinite(value)) return false;
+      return compareNumeric(value, condition.operator, condition.value);
+    }
+    case 'outcomeTier': {
+      const tierIds = Array.isArray(condition.tierIds) ? condition.tierIds : [];
+      const outcomeKeys = Array.isArray(condition.outcomeKeys) ? condition.outcomeKeys : [];
+      const outcomeId = data.outcomeId ?? null;
+      const outcome =
+        typeof checkResult?.outcome === 'string' ? checkResult.outcome.trim().toLowerCase() : null;
+      if (outcomeId !== null && tierIds.includes(String(outcomeId))) return true;
+      if (outcome !== null && outcomeKeys.includes(outcome)) return true;
+      return false;
+    }
+    case 'diceGroup': {
+      const groups = Array.isArray(data.diceGroups) ? data.diceGroups : [];
+      const group = groups.find((entry) => Number(entry?.groupId) === Number(condition.groupId));
+      if (!group) return false;
+      const reduced = aggregateDiceGroup(group, condition.aggregate);
+      if (reduced === null) return false; // fail-open
+      if (Array.isArray(reduced)) {
+        // anyDie / allDice: per-die comparison against the operator.
+        const matches = reduced.map((face) =>
+          compareNumeric(face, condition.operator, condition.value)
+        );
+        return condition.aggregate === 'allDice' ? matches.every(Boolean) : matches.some(Boolean);
+      }
+      return compareNumeric(reduced, condition.operator, condition.value);
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
+/**
+ * Decide whether the active check forces every required tool to break (issue 419).
+ *
+ * This is the single shared trigger-evaluator seam that crafting, salvage, and
+ * gathering all route through, so the decision cannot drift between surfaces. It is
+ * a PURE decision (no side effects); the side-effect point stays in the engine /
+ * runtime `apply`.
+ *
+ * - Macro/builtIn checks (`engineEvaluated !== true`) never force-break (the legacy
+ *   guard formerly in `CraftingEngine._checkForcesToolBreak`).
+ * - The legacy `data.breakTools` (the two seed presets: per-die `DiceCrit.breakTools`
+ *   and routed per-tier `outcome.breakTools`) is honoured as an implicit always-on
+ *   trigger, so existing crit/tier flags keep working without separate persistence.
+ * - Each configured trigger's condition is evaluated against the checkResult; any
+ *   match force-breaks all required tools (triggers are ORed).
+ *
+ * @param {object} params
+ * @param {{ enabled?: boolean, triggers?: Array<object> }} [params.checkBreakage]
+ * @param {object} [params.checkResult]
+ * @returns {{ forceBreak: boolean, triggerId: string|null, reason: string|null }}
+ */
+export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
+  const none = { forceBreak: false, triggerId: null, reason: null };
+  // Macro/builtIn results are passed through verbatim; `breakTools`/`checkBreakage`
+  // are authored-engine concepts absent from the macro contract.
+  if (checkResult?.engineEvaluated !== true) return none;
+
+  // Legacy implicit trigger: a crit/tier `data.breakTools` flag always force-breaks.
+  if (checkResult?.data?.breakTools === true) {
+    return {
+      forceBreak: true,
+      triggerId: 'legacyBreakTools',
+      reason: 'Critical / tier breakage',
+    };
+  }
+
+  if (checkBreakage?.enabled !== true) return none;
+  const triggers = Array.isArray(checkBreakage.triggers) ? checkBreakage.triggers : [];
+  for (const trigger of triggers) {
+    if (evaluateCheckBreakageCondition(trigger?.condition, checkResult)) {
+      return {
+        forceBreak: true,
+        triggerId: trigger.id ?? null,
+        reason:
+          typeof trigger.label === 'string' && trigger.label ? trigger.label : 'Check breakage',
+      };
+    }
+  }
+  return none;
+}
+
+/**
  * Apply usage and (if planned/decided broken) on-break side effects to a single
  * owned tool item. Returns the evidence entry recorded against the run.
  *
@@ -184,25 +346,85 @@ export function createToolBreakageRuntime({
     };
   }
 
+  // Resolve the system's breakage authority (issue 419). Unknown / missing →
+  // `toolSpecific` (today's behaviour).
+  function resolveAuthority(system) {
+    return system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+  }
+
   return {
-    async plan({ actor, system, task, tools = [], presentTools = null } = {}) {
+    async plan({
+      actor,
+      system,
+      task,
+      tools = [],
+      presentTools = null,
+      checkResult = null,
+      checkBreakage = null,
+    } = {}) {
       const matched = matchTools({ actor, system, task, tools, presentTools });
+      const authority = resolveAuthority(system);
+      // Under checkDriven authority, the active check decides whether ALL required
+      // tools break for this attempt; per-tool modes are ignored except `immune`.
+      const decision =
+        authority === 'checkDriven'
+          ? evaluateCheckBreakage({ checkBreakage, checkResult })
+          : { forceBreak: false, triggerId: null, reason: null };
+      const checkId = checkResult?.data?.checkId ?? checkResult?.checkId ?? null;
       const planned = [];
       for (const { tool, item, virtual } of matched.items) {
-        // Virtual-present (canvas-tool) matches have no owned item to break/use.
-        if (virtual || !item) continue;
         const model = tool instanceof Tool ? tool : Tool.fromJSON(tool);
-        const breakageResult = await evaluateToolBreakagePlan(model, {
-          actor,
-          item,
-          evaluateExpression,
-        });
+        // Virtual-present (canvas-tool) matches have no owned item to break/use.
+        // Under checkDriven they are still recorded as skipped evidence.
+        if (virtual || !item) {
+          if (authority === 'checkDriven') {
+            planned.push({
+              componentId: model.componentId,
+              itemRef: null,
+              mode: model.breakage?.mode ?? null,
+              broken: false,
+              evidence: { authority, virtual: true },
+              authority,
+              virtual: true,
+            });
+          }
+          continue;
+        }
+        const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
+        const isImmune = model.breakage?.mode === 'immune';
+        let breakageResult;
+        let extra = {};
+        if (authority === 'checkDriven') {
+          if (isImmune) {
+            // Immune tools never break and are recorded as skipped-immune.
+            breakageResult = { mode: 'immune', broken: false, evidence: { authority } };
+            extra = { authority, skippedImmune: true };
+          } else if (decision.forceBreak) {
+            breakageResult = { mode: 'forced', broken: true, evidence: { authority } };
+            extra = {
+              authority,
+              checkId,
+              triggerId: decision.triggerId,
+              reason: decision.reason,
+            };
+          } else {
+            breakageResult = { mode: 'forced', broken: false, evidence: { authority } };
+            extra = { authority };
+          }
+        } else {
+          breakageResult = await evaluateToolBreakagePlan(model, {
+            actor,
+            item,
+            evaluateExpression,
+          });
+        }
         const entry = {
           componentId: model.componentId,
-          itemRef: typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null,
+          itemRef,
           mode: breakageResult.mode,
           broken: breakageResult.broken,
           evidence: breakageResult.evidence,
+          ...extra,
         };
         if (breakageResult.broken) {
           entry.onBreak = plannedToolBreakageOutcome(model);
@@ -213,7 +435,15 @@ export function createToolBreakageRuntime({
       return planned;
     },
 
-    async apply({ actor, system, task, tools = [], presentTools = null } = {}) {
+    async apply({
+      actor,
+      system,
+      task,
+      tools = [],
+      presentTools = null,
+      checkResult = null,
+      checkBreakage = null,
+    } = {}) {
       const matched = matchTools({ actor, system, task, tools, presentTools });
       const key = keyOf({ actor, task });
       const plannedByItem = new Map(
@@ -223,13 +453,52 @@ export function createToolBreakageRuntime({
         ])
       );
       pendingPlans.delete(key);
+      const authority = resolveAuthority(system);
+      const decision =
+        authority === 'checkDriven'
+          ? evaluateCheckBreakage({ checkBreakage, checkResult })
+          : { forceBreak: false, triggerId: null, reason: null };
+      const checkId = checkResult?.data?.checkId ?? checkResult?.checkId ?? null;
       const evidence = [];
       for (const { tool: toolData, item, virtual } of matched.items) {
-        // Virtual-present (canvas-tool) matches have no owned item to break/use.
-        if (virtual || !item) continue;
         const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
+        // Virtual-present (canvas-tool) matches have no owned item to break/use;
+        // under checkDriven they are recorded as skipped evidence (not mutated).
+        if (virtual || !item) {
+          if (authority === 'checkDriven') {
+            evidence.push({
+              componentId: tool.componentId,
+              itemRef: null,
+              mode: tool.breakage?.mode ?? null,
+              broken: false,
+              evidence: { authority, virtual: true },
+              authority,
+              virtual: true,
+            });
+          }
+          continue;
+        }
         const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-        const planned = plannedByItem.get(stringOrEmpty(itemRef?.itemUuid));
+        const isImmune = tool.breakage?.mode === 'immune';
+        let planned = plannedByItem.get(stringOrEmpty(itemRef?.itemUuid));
+        let extra = {};
+        if (authority === 'checkDriven') {
+          if (isImmune) {
+            planned = { mode: 'immune', broken: false, evidence: { authority } };
+            extra = { authority, skippedImmune: true };
+          } else if (decision.forceBreak) {
+            planned = { mode: 'forced', broken: true, evidence: { authority } };
+            extra = {
+              authority,
+              checkId,
+              triggerId: decision.triggerId,
+              reason: decision.reason,
+            };
+          } else {
+            planned = { mode: 'forced', broken: false, evidence: { authority } };
+            extra = { authority };
+          }
+        }
         const entry = await applyToolUsageAndBreakage({
           tool,
           actor,
@@ -239,7 +508,7 @@ export function createToolBreakageRuntime({
           buildItemRef,
           createReplacement: makeCreateReplacement(actor, system),
         });
-        evidence.push(entry);
+        evidence.push({ ...entry, ...extra });
       }
       return evidence;
     },

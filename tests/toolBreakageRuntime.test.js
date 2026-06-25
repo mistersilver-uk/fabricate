@@ -294,3 +294,173 @@ test('Tool.applyUsage prefers toolUsage over catalystItemUsage once toolUsage ex
   await tool.applyUsage(item);
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 6 });
 });
+
+// ---------------------------------------------------------------------------
+// evaluateCheckBreakage (issue 419) — the single shared trigger-evaluator seam
+// ---------------------------------------------------------------------------
+
+const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
+
+function engineCheckResult({ total = null, value = null, outcome = null, outcomeId = null, diceGroups = [], breakTools = false } = {}) {
+  return {
+    engineEvaluated: true,
+    value,
+    outcome,
+    data: { total, outcomeId, diceGroups, breakTools },
+  };
+}
+
+test('evaluateCheckBreakage: macro/builtIn (not engine-evaluated) never force-breaks', () => {
+  const result = { engineEvaluated: false, data: { breakTools: true } };
+  assert.deepEqual(evaluateCheckBreakage({ checkResult: result }), {
+    forceBreak: false,
+    triggerId: null,
+    reason: null,
+  });
+});
+
+test('evaluateCheckBreakage: legacy data.breakTools is an implicit always-on trigger', () => {
+  const result = engineCheckResult({ breakTools: true });
+  const decision = evaluateCheckBreakage({ checkResult: result });
+  assert.equal(decision.forceBreak, true);
+  assert.equal(decision.triggerId, 'legacyBreakTools');
+});
+
+test('evaluateCheckBreakage: rollTotal trigger', () => {
+  const checkBreakage = {
+    enabled: true,
+    triggers: [{ id: 'r', label: 'Low roll', condition: { type: 'rollTotal', operator: '<=', value: 3 } }],
+  };
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 2 }) }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 4 }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: progressiveValue trigger; absent value on a non-progressive check never matches', () => {
+  const checkBreakage = {
+    enabled: true,
+    triggers: [{ id: 'p', condition: { type: 'progressiveValue', operator: '>=', value: 100 } }],
+  };
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ value: 120, total: 12 }) }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ value: null, total: 12 }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: rollTotal and progressiveValue resolve from distinct sources on the same roll', () => {
+  const checkResult = engineCheckResult({ value: Number.MAX_SAFE_INTEGER, total: 1 });
+  const rollTotalTrigger = { enabled: true, triggers: [{ id: 'rt', condition: { type: 'rollTotal', operator: '==', value: 1 } }] };
+  const progValueTrigger = { enabled: true, triggers: [{ id: 'pv', condition: { type: 'progressiveValue', operator: '<=', value: 5 } }] };
+  assert.equal(evaluateCheckBreakage({ checkBreakage: rollTotalTrigger, checkResult }).forceBreak, true, 'rollTotal sees the raw 1');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: progValueTrigger, checkResult }).forceBreak, false, 'progressiveValue sees the awarded MAX');
+});
+
+test('evaluateCheckBreakage: outcomeTier trigger matches by tierId or outcome key', () => {
+  const byId = { enabled: true, triggers: [{ id: 'o', condition: { type: 'outcomeTier', tierIds: ['t-danger'], outcomeKeys: [] } }] };
+  const byKey = { enabled: true, triggers: [{ id: 'o', condition: { type: 'outcomeTier', tierIds: [], outcomeKeys: ['danger'] } }] };
+  const result = engineCheckResult({ outcome: 'Danger', outcomeId: 't-danger' });
+  assert.equal(evaluateCheckBreakage({ checkBreakage: byId, checkResult: result }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage: byKey, checkResult: result }).forceBreak, true);
+});
+
+test('evaluateCheckBreakage: diceGroup anyDie natural-1', () => {
+  const checkBreakage = {
+    enabled: true,
+    triggers: [{ id: 'g', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+  };
+  const groups = [{ groupId: 0, group: '2d20', sum: 21, results: [1, 20] }];
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, true);
+  const noOne = [{ groupId: 0, group: '2d20', sum: 30, results: [10, 20] }];
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: noOne }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: diceGroup lowestDie and total aggregates', () => {
+  const lowest = { enabled: true, triggers: [{ id: 'l', condition: { type: 'diceGroup', groupId: 1, aggregate: 'lowestDie', operator: '<=', value: 2 } }] };
+  const total = { enabled: true, triggers: [{ id: 't', condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '>=', value: 18 } }] };
+  const groups = [
+    { groupId: 0, group: '1d20', sum: 19, results: [19] },
+    { groupId: 1, group: '2d6', sum: 8, results: [2, 6] },
+  ];
+  assert.equal(evaluateCheckBreakage({ checkBreakage: lowest, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage: total, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, true);
+});
+
+test('evaluateCheckBreakage: non-total aggregate fails open when per-die results are missing', () => {
+  const checkBreakage = { enabled: true, triggers: [{ id: 'g', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }] };
+  const groups = [{ groupId: 0, group: '2d20', sum: 21 }];
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: disabled checkBreakage with no legacy breakTools never matches', () => {
+  const checkBreakage = { enabled: false, triggers: [{ id: 'g', condition: { type: 'rollTotal', operator: '<=', value: 99 } }] };
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 1 }) }).forceBreak, false);
+});
+
+// ---------------------------------------------------------------------------
+// createToolBreakageRuntime checkDriven authority (issue 419)
+// ---------------------------------------------------------------------------
+
+function checkDrivenRuntime(items) {
+  return createToolBreakageRuntime({
+    matchTools: () => ({ items, missing: [] }),
+    buildItemRef: (_actor, i) => ({ actorUuid: 'Actor.a', itemUuid: i.uuid, quantity: 1 }),
+  });
+}
+
+const FORCE_TRIGGER = {
+  enabled: true,
+  triggers: [{ id: 'natural1', label: '1d20 group rolled 1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+};
+const FORCE_RESULT = engineCheckResult({ diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }] });
+const checkDrivenSystem = { toolBreakage: { authority: 'checkDriven' } };
+
+test('checkDriven runtime: forces breakage on all non-immune tools while immune survives', async () => {
+  const axe = new FakeItem({}, { uuid: 'Item.axe' });
+  const hammer = new FakeItem({}, { uuid: 'Item.hammer' });
+  const immune = new FakeItem({}, { uuid: 'Item.immune' });
+  const runtime = checkDrivenRuntime([
+    { tool: { componentId: 'axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+    { tool: { componentId: 'hammer', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'flagBroken' } }, item: hammer },
+    { tool: { componentId: 'immune', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } }, item: immune },
+  ]);
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: FORCE_RESULT, checkBreakage: FORCE_TRIGGER };
+  await runtime.plan(args);
+  const applied = await runtime.apply(args);
+  const byId = Object.fromEntries(applied.map((e) => [e.componentId, e]));
+  assert.equal(byId.axe.broken, true, 'breakageChance-0 tool still breaks under checkDriven');
+  assert.equal(byId.axe.reason, '1d20 group rolled 1');
+  assert.equal(byId.hammer.broken, true);
+  assert.equal(byId.immune.broken, false, 'immune never breaks');
+  assert.equal(byId.immune.skippedImmune, true);
+});
+
+test('checkDriven runtime: no trigger match breaks nothing', async () => {
+  const axe = new FakeItem({}, { uuid: 'Item.axe' });
+  const runtime = checkDrivenRuntime([
+    { tool: { componentId: 'axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+  ]);
+  const noMatch = engineCheckResult({ diceGroups: [{ groupId: 0, group: '1d20', sum: 15, results: [15] }] });
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: noMatch, checkBreakage: FORCE_TRIGGER };
+  await runtime.plan(args);
+  const applied = await runtime.apply(args);
+  assert.equal(applied[0].broken, false, 'limitedUses own-mode is ignored under checkDriven; no trigger then no break');
+});
+
+test('checkDriven runtime: virtual-present tools are recorded as skipped, not mutated', async () => {
+  const runtime = checkDrivenRuntime([
+    { tool: { componentId: 'station', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } }, item: null, virtual: true },
+  ]);
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: FORCE_RESULT, checkBreakage: FORCE_TRIGGER };
+  const applied = await runtime.apply(args);
+  assert.equal(applied.length, 1);
+  assert.equal(applied[0].virtual, true);
+  assert.equal(applied[0].broken, false);
+});
+
+// ---------------------------------------------------------------------------
+// Crafting-vs-gathering drift: identical decision for the same trigger + roll
+// ---------------------------------------------------------------------------
+
+test('drift: evaluateCheckBreakage yields the identical decision regardless of surface', () => {
+  const craftingDecision = evaluateCheckBreakage({ checkBreakage: FORCE_TRIGGER, checkResult: FORCE_RESULT });
+  const gatheringDecision = evaluateCheckBreakage({ checkBreakage: FORCE_TRIGGER, checkResult: FORCE_RESULT });
+  assert.deepEqual(craftingDecision, gatheringDecision);
+  assert.equal(craftingDecision.forceBreak, true);
+});

@@ -750,3 +750,91 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
   assert.deepEqual(ok.usedTools, [], 'no usedTools evidence for the virtual canvas tool');
   assert.equal(buildRefs.length, 0, 'breakage runtime never touched an owned item');
 });
+
+// ---------------------------------------------------------------------------
+// checkDriven authority parity via the shared runtime (issue 419)
+// ---------------------------------------------------------------------------
+
+import { evaluateCheckBreakage } from '../src/toolBreakageRuntime.js';
+
+class RuntimeFakeItem {
+  constructor(uuid) {
+    this.uuid = uuid;
+    this._flags = {};
+    this.deleted = false;
+    this.parent = { uuid: 'Actor.g' };
+  }
+  getFlag(scope, key) {
+    const ns = this._flags[scope];
+    if (!ns) return undefined;
+    return String(key).split('.').reduce((v, k) => (v == null ? undefined : v[k]), ns);
+  }
+  async setFlag(scope, key, value) {
+    this._flags[scope] = this._flags[scope] || {};
+    let t = this._flags[scope];
+    const parts = String(key).split('.');
+    const last = parts.pop();
+    for (const p of parts) { if (!t[p] || typeof t[p] !== 'object') t[p] = {}; t = t[p]; }
+    t[last] = value;
+    return value;
+  }
+  async delete() { this.deleted = true; }
+  async update() {}
+}
+
+function gatheringRuntime(items) {
+  return createToolBreakageRuntime({
+    matchTools: () => ({ items, missing: [] }),
+    buildItemRef: (actor, item) => ({ actorUuid: actor?.uuid ?? null, itemUuid: item.uuid, quantity: 1 })
+  });
+}
+
+const GATHER_TRIGGER = {
+  enabled: true,
+  triggers: [{ id: 'nat1', label: '1d20 group rolled 1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }]
+};
+const GATHER_RESULT = {
+  engineEvaluated: true,
+  value: null,
+  outcome: null,
+  data: { total: 1, outcomeId: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }], breakTools: false }
+};
+const checkDrivenSystem = { toolBreakage: { authority: 'checkDriven' } };
+
+test('gathering checkDriven runtime: forces breakage on non-immune tools, immune survives', async () => {
+  const axe = new RuntimeFakeItem('Item.gaxe');
+  const anvil = new RuntimeFakeItem('Item.ganvil');
+  const runtime = gatheringRuntime([
+    { tool: { componentId: 'gaxe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+    { tool: { componentId: 'ganvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } }, item: anvil }
+  ]);
+  const args = { actor: { uuid: 'Actor.g' }, task: { id: 'task-a' }, system: checkDrivenSystem, checkResult: GATHER_RESULT, checkBreakage: GATHER_TRIGGER };
+  await runtime.plan(args);
+  const applied = await runtime.apply(args);
+  const byId = Object.fromEntries(applied.map(e => [e.componentId, e]));
+  assert.equal(byId.gaxe.broken, true);
+  assert.equal(byId.gaxe.reason, '1d20 group rolled 1');
+  assert.equal(byId.ganvil.broken, false);
+  assert.equal(byId.ganvil.skippedImmune, true);
+});
+
+test('gathering/crafting drift: identical break decision for the same trigger + roll', () => {
+  // Both surfaces route through the single shared seam, so the decision is identical.
+  const decision = evaluateCheckBreakage({ checkBreakage: GATHER_TRIGGER, checkResult: GATHER_RESULT });
+  assert.equal(decision.forceBreak, true);
+  assert.equal(decision.triggerId, 'nat1');
+});
+
+test('gathering checkDriven runtime: the realm toolBreakagePolicy is orthogonal to the break decision', async () => {
+  // The breakage runtime decides WHETHER a tool breaks; the realm toolBreakagePolicy
+  // (failureOnBreak/successDespiteBreak) governs what a broken tool does to the gather
+  // outcome and is applied elsewhere — it never reaches the runtime, so the break
+  // decision is the same regardless of policy.
+  const axe = new RuntimeFakeItem('Item.gaxe2');
+  const runtime = gatheringRuntime([
+    { tool: { componentId: 'gaxe2', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'flagBroken' } }, item: axe }
+  ]);
+  const args = { actor: { uuid: 'Actor.g' }, task: { id: 'task-b' }, system: checkDrivenSystem, checkResult: GATHER_RESULT, checkBreakage: GATHER_TRIGGER };
+  const applied = await runtime.apply(args);
+  assert.equal(applied[0].broken, true, 'the decision depends only on the check, not the realm policy');
+});

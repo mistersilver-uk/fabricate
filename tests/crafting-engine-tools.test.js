@@ -423,3 +423,81 @@ test('craft(): missing required tool blocks the craft before consuming ingredien
   assert.equal(result.success, false);
   assert.match(result.message, /Missing required tool/);
 });
+
+// ---------------------------------------------------------------------------
+// _applyToolBreakage under checkDriven authority (issue 419)
+// ---------------------------------------------------------------------------
+
+const checkDrivenOpts = (overrides = {}) => ({ forceBreak: true, authority: 'checkDriven', reason: '1d20 group rolled 1', triggerId: 'natural1', ...overrides });
+
+test('_applyToolBreakage checkDriven: forceBreak breaks all required non-immune tools', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  // breakageChance-0 tool would never break on its own; checkDriven forces it.
+  const axe = new FakeItem('c-axe', { parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], checkDrivenOpts());
+  assert.equal(used[0].broken, true);
+  assert.equal(used[0].authority, 'checkDriven');
+  assert.equal(used[0].reason, '1d20 group rolled 1');
+  assert.equal(used[0].triggerId, 'natural1');
+  assert.equal(getPath(axe._flags.fabricate, 'fabricate.toolBroken'), true);
+});
+
+test('_applyToolBreakage checkDriven: immune tool is filtered out of the forced set and recorded skipped', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  const anvil = new FakeItem('c-anvil', { parent: actorRef });
+  const tool = { componentId: 'c-anvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: anvil }], checkDrivenOpts());
+  assert.equal(used[0].broken, false);
+  assert.equal(used[0].skippedImmune, true);
+  assert.equal(getPath(anvil._flags.fabricate, 'fabricate.toolBroken'), undefined);
+});
+
+test('_applyToolBreakage checkDriven: no forceBreak breaks nothing (per-tool mode ignored)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  // limitedUses past maxUses would break under toolSpecific; checkDriven ignores it.
+  const axe = new FakeItem('c-axe', { flags: { fabricate: { toolUsage: { timesUsed: 9 } } }, parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], { forceBreak: false, authority: 'checkDriven' });
+  assert.equal(used[0].broken, false);
+});
+
+test('_applyToolBreakage checkDriven: virtual-present tool recorded as skipped evidence (not mutated)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const tool = { componentId: 'c-station', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: null, virtual: true }], checkDrivenOpts());
+  assert.equal(used.length, 1);
+  assert.equal(used[0].virtual, true);
+  assert.equal(used[0].broken, false);
+});
+
+test('_applyToolBreakage toolSpecific: legacy forceBreak still breaks (superset of current behaviour)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  const axe = new FakeItem('c-axe', { parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], { forceBreak: true, authority: 'toolSpecific' });
+  assert.equal(used[0].broken, true);
+  assert.equal(used[0].authority, undefined, 'toolSpecific carries no authority evidence');
+});
+
+test('_applyToolBreakage toolSpecific: immune tool never breaks even with a legacy forceBreak', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  const anvil = new FakeItem('c-anvil', { parent: actorRef });
+  const tool = { componentId: 'c-anvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } };
+  // "An immune Tool never breaks under either authority" — a legacy crit/tier
+  // forceBreak must NOT break an immune tool under toolSpecific.
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: anvil }], { forceBreak: true, authority: 'toolSpecific' });
+  assert.equal(used[0].broken, false);
+  assert.equal(getPath(anvil._flags.fabricate, 'fabricate.toolBroken'), undefined);
+});

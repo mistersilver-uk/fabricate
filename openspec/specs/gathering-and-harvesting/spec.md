@@ -599,11 +599,12 @@ GatheringToolLibraryEntry = {
     formula: string,
   },
   breakage: {
-    mode: "limitedUses" | "breakageChance" | "diceExpression",
+    mode: "limitedUses" | "breakageChance" | "diceExpression" | "immune",
     maxUses?: number | null,                   // limitedUses; null is unlimited
     breakageChance?: number,                   // breakageChance; integer 0..100
     formula?: string,                          // diceExpression
     threshold?: number,                        // diceExpression
+    // "immune": no fields; never breaks under either authority; still recorded as used.
   },
   onBreak: {
     mode: "destroy" | "flagBroken" | "replaceWith",
@@ -1329,10 +1330,14 @@ Tool usage/breakage semantics for terminal gathering attempts:
 - A task may reference zero or more required Tools via `toolIds`.
 - A Tool's usage/breakage is applied only for a **terminal** attempt (`succeeded` or `failed`).
 - Blocked or misconfiguration-aborted attempts do not apply tool usage/breakage.
-- Usage tracking and breakage follow the Tool `breakage` / `onBreak` semantics (`limitedUses` / `breakageChance` / `diceExpression`).
+- Usage tracking and breakage follow the Tool `breakage` / `onBreak` semantics (`limitedUses` / `breakageChance` / `diceExpression` / `immune`).
+- An `immune` Tool never breaks under either authority and is excluded from breakage, but it is still included in the usage record (no `toolUsage` flag is written, because that flag is `limitedUses`-only).
 - Gathering tasks do not draw Tools from component source actors; tool presence and terminal tool usage/breakage are both evaluated against the selected acting actor.
 - Terminal tool usage/breakage is applied only after the gathering outcome has resolved to `succeeded` or `failed`.
 - A virtual-present Tool injected by a canvas Tool station (`presentTools`, system-scoped) satisfies the gate without an owned item and is excluded from usage/breakage.
+- Under `CraftingSystem.toolBreakage.authority === "checkDriven"`, the active gathering check's `checkBreakage` triggers decide whether **all required tools** break for the attempt via the single shared evaluator (`evaluateCheckBreakage`), reaching parity with crafting and salvage; each Tool's own `breakage.mode` is ignored except `immune`.
+This is orthogonal to the realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`), which still governs whether a broken tool fails the gather outcome and is applied independently.
+Crafting and gathering route the same trigger + roll through the same evaluator, so the break decision cannot drift between surfaces.
 
 ## Gathering Task Tools
 
@@ -1353,11 +1358,12 @@ Tool = {
     formula: string,
   },
   breakage: {
-    mode: "limitedUses" | "breakageChance" | "diceExpression",
+    mode: "limitedUses" | "breakageChance" | "diceExpression" | "immune",
     maxUses?: number | null,         // limitedUses
     breakageChance?: number,         // breakageChance; integer 0..100
     formula?: string,                // diceExpression
     threshold?: number,              // diceExpression; broken when result < threshold
+    // "immune": no fields; never breaks under either authority; still recorded as used.
   },
   onBreak: {
     mode: "destroy" | "flagBroken" | "replaceWith",
@@ -1377,7 +1383,7 @@ All resolved tools are required (catalyst-style); the start-attempt gate blocks 
 3. The optional `requirement` is formula-only and is evaluated against the selected acting actor through the existing system-agnostic expression adapter.
 A truthy resolved value (non-zero number, non-empty string, `true`) satisfies the requirement.
 There is no provider discriminator and no macro support on this surface.
-4. Exactly one `breakage.mode` is configured per tool. `limitedUses` uses the `flags.fabricate.toolUsage = { timesUsed }` item flag, incremented on each attempt; the tool breaks when `timesUsed >= maxUses` (after the increment) when `maxUses` is non-null. `breakageChance` breaks when `Math.random() * 100 < breakageChance`. `diceExpression` evaluates `formula` through the expression adapter; the tool breaks when the numeric result is `< threshold`.
+4. Exactly one `breakage.mode` is configured per tool. `limitedUses` uses the `flags.fabricate.toolUsage = { timesUsed }` item flag, incremented on each attempt; the tool breaks when `timesUsed >= maxUses` (after the increment) when `maxUses` is non-null. `breakageChance` breaks when `Math.random() * 100 < breakageChance`. `diceExpression` evaluates `formula` through the expression adapter; the tool breaks when the numeric result is `< threshold`. `immune` carries no fields and never breaks under either authority (still recorded as used).
 5. Exactly one `onBreak.mode` is configured per tool. `destroy` deletes the owned item. `flagBroken` sets `flags.fabricate.toolBroken = true` and appends a localized `" (broken)"` suffix to the owned item's name (display-only; idempotent; not auto-cleared). `replaceWith` deletes the original and creates the `replacementComponentId` managed component on the actor; the replacement is a normal managed component that recipes can consume to repair the tool.
 6. Tool breakage is planned before result creation so the system-level `toolBreakagePolicy` can override the outcome.
 The `failureOnBreak` policy (default) flips a successful attempt to `failed` and clears `outcome.resultGroups` when any tool breaks.
@@ -1702,6 +1708,7 @@ It complements `Integrations` (`openspec/specs/integrations/spec.md`), which gov
 7. Hook publication never throws into the gathering flow; payload construction and emission are guarded so a malformed source object or a subscriber error is caught, logged, and does not affect the attempt outcome or the response returned to the caller.
 8. The published hook names and payload shape are a public, backwards-compatible contract within a major version; the payload carries `schemaVersion` to signal future evolution.
 The payload exposes a public projection of gathered items and used tools and does not leak internal breakage diagnostics (`evidence`, `mode`).
+Under `checkDriven` authority a tool-breakage entry may carry a human-readable `reason` (e.g. "1d20 group rolled 1"); the `reason` is public-safe and may surface in run/chat output, but `evidence` and `mode` stay stripped from the public projection.
 9. Publication occurs on the client that resolved the attempt: immediate attempts publish on the acting client, while matured timed runs — processed on every client via the synced `updateWorldTime` hook — publish exactly once, on the primary GM client, to avoid multi-client duplication.
 
 ## Gathering Chat Messages
