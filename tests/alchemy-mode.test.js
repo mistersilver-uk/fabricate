@@ -332,7 +332,10 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with check provider i
   assert.equal(result.errors.length, 0);
 });
 
-test('ResolutionModeService.validateRecipe: alchemy recipe with check provider requires checks enabled', () => {
+test('ResolutionModeService.validateRecipe: alchemy recipe with check provider is valid even when checks are unconfigured', () => {
+  // A `check`-provider recipe is structurally valid regardless of the system's
+  // check configuration. Whether the system has a usable routed crafting check is
+  // a system-level concern surfaced by systemValidation, NOT a per-recipe error.
   const system = buildAlchemySystem({
     craftingCheck: { enabled: false, macroUuid: null, outcomes: [] }
   });
@@ -344,11 +347,8 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with check provider r
     { resultSelection: { provider: 'check' } }
   );
   const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some(e => /check provider requires crafting checks enabled/i.test(e)),
-    `expected check-requires-checks error, got: ${JSON.stringify(result.errors)}`
-  );
+  assert.equal(result.valid, true, result.errors.join(', '));
+  assert.equal(result.errors.length, 0);
 });
 
 test('ResolutionModeService.validateRecipe: valid alchemy recipe with ingredientSet provider passes', () => {

@@ -1189,7 +1189,8 @@
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-main,
-.fabricate-manager[data-manager-view="checks"] .manager-main {
+.fabricate-manager[data-manager-view="checks"] .manager-main,
+.fabricate-manager[data-manager-view="system-edit"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -3744,16 +3745,38 @@
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
-.fabricate-manager[data-manager-view="checks"] .manager-body {
+.fabricate-manager[data-manager-view="checks"] .manager-body,
+.fabricate-manager[data-manager-view="system-edit"] .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
-.fabricate-manager[data-manager-view="checks"] .manager-body.is-rail-collapsed {
+.fabricate-manager[data-manager-view="checks"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
 .fabricate-manager .manager-environment-edit-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The System Overview page mirrors the environment editor's full-width tabbed
+   shell: a fixed tab bar above a bounded, scrollable workspace. Like the
+   environment editor, SystemEditView is wrapped by the parent in a
+   `<main class="manager-main manager-environment-edit-main">` (the
+   header-coloured `--fab-mv2-surface-1` band) and a
+   `.manager-environment-editor-shell` that owns the `var(--fab-space-3)` padding
+   around the whole editor. This view therefore carries NO padding of its own:
+   the tab bar (`.manager-environment-tabs`, `background: none`) fills the shell's
+   content box edge-to-edge and shows the surface-1 band through it, exactly like
+   the environment editor's tab bar, while the card breathing room comes from the
+   workspace/tab-panel gaps and the shared `.manager-environment-tab-panel`
+   right-edge buffer below the bar. */
+.fabricate-manager .manager-system-edit-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--fab-space-3);
@@ -9035,11 +9058,13 @@
   }
 
   .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
-  .fabricate-manager[data-manager-view="checks"] .manager-body {
+  .fabricate-manager[data-manager-view="checks"] .manager-body,
+  .fabricate-manager[data-manager-view="system-edit"] .manager-body {
     grid-template-columns: 1fr;
   }
 
-  .fabricate-manager .manager-environment-edit-view {
+  .fabricate-manager .manager-environment-edit-view,
+  .fabricate-manager .manager-system-edit-view {
     min-height: auto;
     overflow: visible;
   }
@@ -10382,6 +10407,74 @@
 .fabricate-manager .manager-environment-comp-callout i {
   color: var(--fab-mv2-accent);
   margin-top: var(--fab-space-2xs);
+}
+
+/* System overview view + the system-blocker callouts */
+.fabricate-manager .manager-system-overview-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-4);
+}
+
+.fabricate-manager .manager-system-overview-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-system-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-system-overview-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-system-overview-entity {
+  font-weight: 600;
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-system-overview-message {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-system-overview-link {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-system-overview-blocker {
+  border-left-color: var(--fab-mv2-danger, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-system-edit-blocker {
+  align-items: center;
+  border-left-color: var(--fab-mv2-danger, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-system-edit-blocker-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-system-edit-blocker-link {
+  flex: 0 0 auto;
 }
 
 /* Composition table */

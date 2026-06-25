@@ -43,6 +43,7 @@
  * @typedef {{
  *   kind: IssueKind,
  *   entityId: string|null,
+ *   environmentId?: string|null,
  *   entityName: string,
  *   severity: 'critical'|'warning'|'info',
  *   blocks: IssueBlocks,
@@ -50,6 +51,11 @@
  *   message: string,
  *   nav: IssueNav,
  * }} SystemValidationIssue
+ *
+ * `environmentId` is the owning gathering environment's id, present on
+ * environment-derived issues (`environment`/`task`/`event`). The GM overview's
+ * deep-link selects the environment by this id because the environment editor
+ * cannot deep-target an individual task/event row.
  * @typedef {{
  *   issues: SystemValidationIssue[],
  *   counts: { critical: number, warning: number, info: number, blockers: number },
@@ -189,8 +195,13 @@ function tagRecipeIssue(issue, recipe) {
 
 /**
  * Re-tag an environment readiness issue. Issues bound to a task/event record
- * (`recordKind`) are kinded `task`/`event` and deep-link there; the rest are
- * environment-level and deep-link to the environment editor.
+ * (`recordKind`) are kinded `task`/`event`; the rest are environment-level. All
+ * three deep-link to the environment editor, which selects an environment by id
+ * — so every environment-derived issue carries `environmentId` (the owning
+ * environment) for the deep-link, while `entityId` stays the record's own id
+ * (task/event record id, or the environment id) for display/identity. The
+ * environment editor cannot deep-target an individual task/event row, so
+ * selecting the owning environment is the resolvable deep-link target.
  *
  * @param {object} issue Issue from `evaluateEnvironmentReadiness`.
  * @param {object} environment The environment.
@@ -200,13 +211,15 @@ function tagEnvironmentIssue(issue, environment) {
   const recordKind =
     issue.recordKind === 'task' || issue.recordKind === 'event' ? issue.recordKind : null;
   const kind = recordKind || 'environment';
-  const entityId = recordKind ? (issue.recordId ?? null) : (environment?.id ?? null);
+  const environmentId = environment?.id ?? null;
+  const entityId = recordKind ? (issue.recordId ?? null) : environmentId;
   const entityName = recordKind
     ? trimmed(issue.recordName) || issue.recordId || recordKind
     : trimmed(environment?.name) || environment?.id || 'environment';
   return {
     kind,
     entityId,
+    environmentId,
     entityName,
     severity: issue.severity,
     blocks: issue.blocks === 'enable' ? 'enable' : undefined,
@@ -282,6 +295,13 @@ function collectSalvageIssues(system, components) {
   const issues = [];
   for (const component of asArray(components)) {
     if (!component?.salvage) continue;
+    // A component with no salvage result sets is simply "not salvageable" — an
+    // opt-in state, not a misconfiguration. Only components that declare at least
+    // one salvage result set are validated against the system salvage mode.
+    const salvageGroups = Array.isArray(component.salvage.resultGroups)
+      ? component.salvage.resultGroups
+      : [];
+    if (salvageGroups.length === 0) continue;
     const { valid, errors } = service.validateSalvage(component, systemForSalvage);
     if (valid) continue;
     issues.push({
@@ -353,28 +373,48 @@ function collectSystemBlockers(system, recipes, components) {
   const check = system?.craftingCheck || {};
   const checksEnabled = features.craftingChecks === true || check.enabled === true;
 
-  // Routed `check` provider in use but no usable crafting check: a routed recipe
-  // whose result routing is the `check` provider needs either a routed roll
-  // formula OR an enabled macro/builtIn check. With neither, every such craft
-  // dead-ends — the whole system is unusable.
+  // A routed system needs a configured routed crafting-check roll formula for any
+  // `check`-provider recipe to resolve. The only thing that makes a routed check
+  // usable is an authored `craftingCheck.routed.rollFormula` — NOT the `enabled`
+  // flag. Product decision: warn always, block when used.
+  //  - When a recipe routes by the `check` provider, a missing formula dead-ends
+  //    every such craft → a `blocks: 'system'` blocker that hides the system.
+  //  - Otherwise it is a non-blocking WARNING (same shape as #431's per-recipe
+  //    routed warnings: `severity: 'warning'`, no `blocks` field) so it counts as
+  //    `counts.warning`, never increments `counts.blockers`, and never sets
+  //    `blocksSystem`.
   if (mode === 'routed') {
     const usesCheckProvider = asArray(recipes).some((recipe) => {
       const raw = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe || {};
       return raw?.resultSelection?.provider === 'check';
     });
     const hasRoutedFormula = Boolean(trimmed(check.routed?.rollFormula));
-    if (usesCheckProvider && !hasRoutedFormula && !checksEnabled) {
-      blockers.push({
-        kind: 'system',
-        entityId: null,
-        entityName: trimmed(system?.name) || system?.id || 'system',
-        severity: 'critical',
-        blocks: 'system',
-        code: 'routedCheckNoFormula',
-        message:
-          'Routed check-mode recipes are configured but the system has no routed crafting check.',
-        nav: { view: 'system-overview' },
-      });
+    if (!hasRoutedFormula) {
+      const entityName = trimmed(system?.name) || system?.id || 'system';
+      blockers.push(
+        usesCheckProvider
+          ? {
+              kind: 'system',
+              entityId: null,
+              entityName,
+              severity: 'critical',
+              blocks: 'system',
+              code: 'routedCheckNoFormula',
+              message:
+                'Routed check-mode recipes are configured but the system has no routed crafting check roll formula.',
+              nav: { view: 'system-overview' },
+            }
+          : {
+              kind: 'system',
+              entityId: null,
+              entityName,
+              severity: 'warning',
+              code: 'routedCheckNoFormula',
+              message:
+                'This routed system has no crafting check roll formula; recipes that route by the check provider will not resolve until one is configured.',
+              nav: { view: 'system-overview' },
+            }
+      );
     }
   }
 

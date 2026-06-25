@@ -65,6 +65,7 @@ import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gath
 import { Tool } from '../../../models/Tool.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
+import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1950,6 +1951,15 @@ export function createAdminStore(services) {
     recipes: [],
     recipeCategories: [],
     showVisibilitySummary: false,
+    // The derived `evaluateSystemValidation` report for the selected system,
+    // consumed by the GM system-overview view, its rail count badge, and the
+    // system-blocker banner. A derived/computed view — nothing is persisted on
+    // the CraftingSystem.
+    systemValidation: {
+      issues: [],
+      counts: { critical: 0, warning: 0, info: 0, blockers: 0 },
+      blocksSystem: false,
+    },
     recipeSearchTerm: '',
     itemSearchTerm: '',
     graphData: { nodes: [], edges: [], width: 0, height: 0 },
@@ -3243,6 +3253,51 @@ export function createAdminStore(services) {
     };
   }
 
+  /**
+   * Build the derived `evaluateSystemValidation` report for the selected system.
+   * Assembles exactly the collaborators the pure aggregator needs:
+   *
+   *  - `recipes`: the system's Recipe models (the aggregator projects them);
+   *  - `components`: the system's managed components (drive salvage + alchemy
+   *    signature + progressive-difficulty checks);
+   *  - `environments`: each gathering environment carrying the precomputed
+   *    `composition` view-model the environment readiness evaluator consumes.
+   *
+   * The aggregator itself derives the per-recipe `routingProvider` and the
+   * system's `routedOutcomeTierOptions`, so nothing extra is built here. Pure and
+   * synchronous; environments are passed in (already listed by the caller).
+   *
+   * @param {object|null} selectedSystem The selected crafting system model.
+   * @param {object[]} [environments] Gathering environments for the system.
+   * @returns {{ issues: object[], counts: object, blocksSystem: boolean }}
+   */
+  function _buildSystemValidationReport(selectedSystem, environments = []) {
+    const emptyReport = {
+      issues: [],
+      counts: { critical: 0, warning: 0, info: 0, blockers: 0 },
+      blocksSystem: false,
+    };
+    if (!selectedSystem) return emptyReport;
+
+    const recipeManager = services.getRecipeManager?.();
+    const recipes = recipeManager?.getRecipes
+      ? recipeManager.getRecipes({ craftingSystemId: selectedSystem.id })
+      : [];
+    const components = _getManagedItems(selectedSystem);
+    const environmentsWithComposition = (Array.isArray(environments) ? environments : []).map(
+      (environment) => ({
+        ...environment,
+        composition: _buildEnvironmentCompositionViewModel(environment),
+      })
+    );
+
+    return evaluateSystemValidation(selectedSystem, {
+      recipes,
+      components,
+      environments: environmentsWithComposition,
+    });
+  }
+
   function _classifyCompositionRecords({
     records,
     environment,
@@ -4166,6 +4221,14 @@ export function createAdminStore(services) {
 
     const environmentState = await _buildEnvironmentState(selectedSystem);
 
+    // The derived system-validation report. Reads the system's recipes /
+    // components and the environments just listed (each annotated with its
+    // composition view-model). Computed once per refresh for the GM overview.
+    const systemValidation = _buildSystemValidationReport(
+      selectedSystem,
+      Array.isArray(environmentState.environments) ? environmentState.environments : []
+    );
+
     // --- Graph data (lazy, computed only when graph tab is active) ---
     let graphData = { nodes: [], edges: [], width: 0, height: 0 };
     if (get(activeTab) === 'graph' && selectedSystem) {
@@ -4190,6 +4253,7 @@ export function createAdminStore(services) {
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
+      systemValidation,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
       graphData,
