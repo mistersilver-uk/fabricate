@@ -217,7 +217,7 @@ describe('evaluateSystemValidation — composition', () => {
 // ---------------------------------------------------------------------------
 
 describe('evaluateSystemValidation — system blockers set blocksSystem', () => {
-  it('routed check provider in use with no routed formula and checks disabled', () => {
+  it('routed check provider in use with no routed formula blocks the system', () => {
     const system = makeSystem({
       resolutionMode: 'routed',
       features: { craftingChecks: false },
@@ -229,11 +229,40 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
     assert.equal(report.blocksSystem, true);
     const blocker = report.issues.find((issue) => issue.code === 'routedCheckNoFormula');
     assert.ok(blocker);
+    assert.equal(blocker.severity, 'critical');
     assert.equal(blocker.blocks, 'system');
     assert.equal(blocker.kind, 'system');
+    assert.equal(blocker.nav.view, 'system-overview');
+    assert.ok(report.counts.blockers >= 1, 'the critical variant counts as a blocker');
   });
 
-  it('does NOT block a routed check system once a routed formula is configured', () => {
+  it('routed system with no formula and NO check-provider recipe warns without blocking', () => {
+    const system = makeSystem({
+      resolutionMode: 'routed',
+      features: { craftingChecks: false },
+      craftingCheck: { routed: { rollFormula: '' } },
+    });
+    // An ingredientSet-provider recipe never routes by the check, so the missing
+    // formula is only a warning, not a system blocker.
+    const recipe = makeRecipe({ resultSelection: { provider: 'ingredientSet' } });
+    const report = evaluateSystemValidation(system, { recipes: [recipe] });
+
+    const warnings = report.issues.filter((issue) => issue.code === 'routedCheckNoFormula');
+    assert.equal(warnings.length, 1, 'exactly one routedCheckNoFormula issue');
+    assert.equal(warnings[0].severity, 'warning');
+    assert.equal(warnings[0].blocks, undefined, 'a warning carries no blocks field');
+    assert.equal(warnings[0].kind, 'system');
+    assert.equal(warnings[0].nav.view, 'system-overview');
+    assert.equal(report.blocksSystem, false, 'the warning never sets blocksSystem');
+    assert.equal(report.counts.warning >= 1, true, 'the warning increments counts.warning');
+    assert.equal(
+      report.counts.blockers,
+      0,
+      'the warning does NOT increment counts.blockers'
+    );
+  });
+
+  it('does NOT warn or block a routed check system once a routed formula is configured', () => {
     const system = makeSystem({
       resolutionMode: 'routed',
       craftingCheck: { routed: { rollFormula: '1d20' } },
@@ -241,6 +270,11 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
     const recipe = makeRecipe({ routedCheck: true });
     const report = evaluateSystemValidation(system, { recipes: [recipe] });
     assert.equal(report.blocksSystem, false, 'configuring the check clears the blocker');
+    assert.equal(
+      report.issues.some((issue) => issue.code === 'routedCheckNoFormula'),
+      false,
+      'a configured routed formula clears the routedCheckNoFormula issue'
+    );
   });
 
   it('progressive mode with no progressive check', () => {

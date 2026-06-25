@@ -366,28 +366,48 @@ function collectSystemBlockers(system, recipes, components) {
   const check = system?.craftingCheck || {};
   const checksEnabled = features.craftingChecks === true || check.enabled === true;
 
-  // Routed `check` provider in use but no usable crafting check: a routed recipe
-  // whose result routing is the `check` provider needs either a routed roll
-  // formula OR an enabled macro/builtIn check. With neither, every such craft
-  // dead-ends — the whole system is unusable.
+  // A routed system needs a configured routed crafting-check roll formula for any
+  // `check`-provider recipe to resolve. The only thing that makes a routed check
+  // usable is an authored `craftingCheck.routed.rollFormula` — NOT the `enabled`
+  // flag. Product decision: warn always, block when used.
+  //  - When a recipe routes by the `check` provider, a missing formula dead-ends
+  //    every such craft → a `blocks: 'system'` blocker that hides the system.
+  //  - Otherwise it is a non-blocking WARNING (same shape as #431's per-recipe
+  //    routed warnings: `severity: 'warning'`, no `blocks` field) so it counts as
+  //    `counts.warning`, never increments `counts.blockers`, and never sets
+  //    `blocksSystem`.
   if (mode === 'routed') {
     const usesCheckProvider = asArray(recipes).some((recipe) => {
       const raw = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe || {};
       return raw?.resultSelection?.provider === 'check';
     });
     const hasRoutedFormula = Boolean(trimmed(check.routed?.rollFormula));
-    if (usesCheckProvider && !hasRoutedFormula && !checksEnabled) {
-      blockers.push({
-        kind: 'system',
-        entityId: null,
-        entityName: trimmed(system?.name) || system?.id || 'system',
-        severity: 'critical',
-        blocks: 'system',
-        code: 'routedCheckNoFormula',
-        message:
-          'Routed check-mode recipes are configured but the system has no routed crafting check.',
-        nav: { view: 'system-overview' },
-      });
+    if (!hasRoutedFormula) {
+      const entityName = trimmed(system?.name) || system?.id || 'system';
+      blockers.push(
+        usesCheckProvider
+          ? {
+              kind: 'system',
+              entityId: null,
+              entityName,
+              severity: 'critical',
+              blocks: 'system',
+              code: 'routedCheckNoFormula',
+              message:
+                'Routed check-mode recipes are configured but the system has no routed crafting check roll formula.',
+              nav: { view: 'system-overview' },
+            }
+          : {
+              kind: 'system',
+              entityId: null,
+              entityName,
+              severity: 'warning',
+              code: 'routedCheckNoFormula',
+              message:
+                'This routed system has no crafting check roll formula; recipes that route by the check provider will not resolve until one is configured.',
+              nav: { view: 'system-overview' },
+            }
+      );
     }
   }
 

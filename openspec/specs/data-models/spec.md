@@ -289,13 +289,17 @@ Requirements:
 1. The report composes the existing per-entity readiness evaluators (recipe,
    environment, salvage, ingredient-signature) and re-tags each composed issue
    with its `kind`, `entityId`, and `nav`.
-2. The report adds NEW system-level checks keyed on the system's own fields,
-   each `blocks: 'system'` (a routed check-mode system with no usable crafting
-   check; a progressive system with no progressive check or no component with a
-   difficulty of 1 or more; multi-step recipes left on in alchemy mode; an
-   alchemy ingredient-signature collision).
-   These are distinct from the per-recipe routed-authoring warnings, which stay
-   `severity: 'warning'` with no `blocks`.
+2. The report adds NEW system-level checks keyed on the system's own fields.
+   Most are `blocks: 'system'` (a progressive system with no progressive check or
+   no component with a difficulty of 1 or more; multi-step recipes left on in
+   alchemy mode; an alchemy ingredient-signature collision).
+   The routed crafting-check formula check is keyed ONLY off
+   `craftingCheck.routed.rollFormula`: a routed system with no formula always emits
+   a `routedCheckNoFormula` issue, which is a non-blocking `severity: 'warning'`
+   with no `blocks` field while no recipe routes by the `check` provider and
+   escalates to `severity: 'critical', blocks: 'system'` once one does.
+   These warnings are distinct from the per-recipe routed-authoring warnings,
+   which also stay `severity: 'warning'` with no `blocks`.
 3. `blocks` carries the visibility contract consumed by `recipe-visibility`:
    `'system'` hides the whole system for non-GM users; `'visibility'` hides one
    entity; `'enable'` marks an entity that cannot be enabled until its gap is

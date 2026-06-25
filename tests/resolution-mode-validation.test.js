@@ -302,8 +302,10 @@ function buildRoutedNamedStep(provider, overrides = {}) {
   });
 }
 
-test('routed check — checks enabled, distinct group names → valid', () => {
-  const system = buildRoutedCheckSystem();
+test('routed check — distinct group names with a configured routed formula → valid', () => {
+  const system = buildRoutedCheckSystem({
+    craftingCheck: { routed: { rollFormula: '1d20' } },
+  });
   const service = buildService(system);
   const recipe = buildRecipe([buildRoutedNamedStep('check')]);
 
@@ -313,21 +315,47 @@ test('routed check — checks enabled, distinct group names → valid', () => {
   assert.equal(result.errors.length, 0);
 });
 
-test('routed check — crafting checks disabled → invalid (check required)', () => {
-  const system = buildRoutedCheckSystem({
-    craftingCheck: { enabled: false, macroUuid: null, outcomes: [], progressive: null },
+// A `check`-provider recipe is structurally valid regardless of the system's
+// check configuration. Whether the system has a usable routed crafting check
+// (a configured `routed.rollFormula`) is a SYSTEM-level concern surfaced by
+// systemValidation, NOT a per-recipe validation error. Verify both a complete
+// save and a draft (`requireComplete: false`) save, with and without a formula.
+for (const requireComplete of [true, false]) {
+  test(`routed check — valid WITH a system routed formula (requireComplete: ${requireComplete})`, () => {
+    const system = buildRoutedCheckSystem({
+      craftingCheck: { routed: { rollFormula: '1d20' } },
+    });
+    const service = buildService(system);
+    const recipe = buildRecipe([buildRoutedNamedStep('check')]);
+
+    const result = service.validateRecipe(recipe, { requireComplete });
+
+    assert.equal(result.valid, true, result.errors.join(', '));
+    assert.equal(
+      result.errors.some((e) => /crafting checks enabled/i.test(e)),
+      false,
+      'no per-recipe check-enabled error should be produced'
+    );
   });
-  const service = buildService(system);
-  const recipe = buildRecipe([buildRoutedNamedStep('check')]);
 
-  const result = service.validateRecipe(recipe);
+  test(`routed check — valid WITHOUT a system routed formula (requireComplete: ${requireComplete})`, () => {
+    const system = buildSystem({
+      resolutionMode: 'routed',
+      craftingCheck: { enabled: false, macroUuid: null, outcomes: [], routed: { rollFormula: '' } },
+    });
+    const service = buildService(system);
+    const recipe = buildRecipe([buildRoutedNamedStep('check')]);
 
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((e) => /check/i.test(e)),
-    `expected error about check requiring checks, got: ${JSON.stringify(result.errors)}`
-  );
-});
+    const result = service.validateRecipe(recipe, { requireComplete });
+
+    assert.equal(result.valid, true, result.errors.join(', '));
+    assert.equal(
+      result.errors.some((e) => /crafting checks enabled/i.test(e)),
+      false,
+      'an unconfigured routed check is a system-level concern, not a per-recipe error'
+    );
+  });
+}
 
 test('routed ingredientSet — check optional (no checks enabled still valid)', () => {
   const system = buildSystem({ resolutionMode: 'routed' });

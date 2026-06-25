@@ -56,7 +56,8 @@ No other result groups are awarded.**
 ### Provider: `check`
 
 - The system-level crafting-check outcome name routes to the `ResultGroup` of the same name.
-- Crafting checks must be enabled on the system; the outcome is produced by the configured check source (macro, built-in adapter, or simple/routed roll formula).
+- The outcome is produced by the system's configured routed crafting check, whose only required field is an authored `craftingCheck.routed.rollFormula`.
+- A recipe that routes by the `check` provider is structurally valid regardless of the system's check configuration; whether the system has a usable routed check is a system-level concern, not a per-recipe validation error.
 - `outcome` is trim-normalized and case-insensitive.
 - Resolution rules:
   1. Explicit tier assignment wins: when the outcome resolves to a routed-check outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
@@ -69,7 +70,8 @@ No other result groups are awarded.**
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
 - `resultSelection.provider` must be one of the two supported values (`ingredientSet`, `check`).
-- The `check` provider requires crafting checks enabled on the system.
+- The `check` provider does not require crafting checks to be "enabled" on the system; a `check`-provider recipe is structurally valid regardless of the system's check configuration.
+- An unconfigured routed check (no `craftingCheck.routed.rollFormula`) surfaces as a system-level overview warning that escalates to a system-blocker once a recipe routes by the `check` provider (see `recipe-visibility`).
 - Provider-specific required fields must be present.
 - `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison.
 - `ResultGroup.name` may not be any reserved failure keyword.

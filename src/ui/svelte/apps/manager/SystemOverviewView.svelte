@@ -66,7 +66,7 @@
     taskNoDescription: ['IssueTaskNoDescription', 'A gathering task has no description.'],
     locallyExcluded: ['IssueLocallyExcluded', 'Some records are excluded for this environment.'],
     invalidSalvage: ['IssueInvalidSalvage', 'The component salvage is invalid for the current salvage mode.'],
-    routedCheckNoFormula: ['IssueRoutedCheckNoFormula', 'Routed check-mode recipes are configured but the system has no routed crafting check.'],
+    routedCheckNoFormula: ['IssueRoutedCheckNoFormula', 'This routed system has no crafting check roll formula; recipes that route by the check provider will not resolve until one is configured.'],
     progressiveNoCheck: ['IssueProgressiveNoCheck', 'Progressive mode requires a configured progressive crafting check.'],
     progressiveNoDifficulty: ['IssueProgressiveNoDifficulty', 'Progressive mode requires at least one component with a difficulty of 1 or more.'],
     multiStepInAlchemy: ['IssueMultiStepInAlchemy', 'Multi-step recipes cannot be used while the system is in alchemy mode.'],
