@@ -3,6 +3,7 @@ import { Tool } from '../models/Tool.js';
 import { applyToolUsageAndBreakage } from '../toolBreakageRuntime.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
+import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import {
   getItemSourceReferences,
   getComponentSourceReferences,
@@ -2348,43 +2349,24 @@ export class CraftingEngine {
       const group = allGroups[0];
       if (!group) return [];
 
-      const value = Number(checkResult?.value || 0);
-      const awardMode = system?.salvageCraftingCheck?.progressive?.awardMode || 'equal';
-      const awarded = [];
-      let remaining = value;
-
-      for (const result of group.results || []) {
-        const managedItems = system?.components || [];
-        const managedItem = managedItems.find(
-          (e) => e.id === (result.componentId || result.systemItemId)
-        );
-        const cost = Number(managedItem?.difficulty);
-        if (!Number.isFinite(cost) || cost < 1) continue;
-
-        if (awardMode === 'exceed') {
-          if (remaining > cost) {
-            awarded.push(result);
-            remaining -= cost;
-          } else break;
-          continue;
-        }
-        if (awardMode === 'partial') {
-          if (remaining >= cost) {
-            awarded.push(result);
-            remaining -= cost;
-            continue;
-          }
-          if (remaining > 0) {
-            awarded.push(result);
-          }
-          break;
-        }
-        // equal (default)
-        if (remaining >= cost) {
-          awarded.push(result);
-          remaining -= cost;
-        } else break;
-      }
+      // Salvage normalizes the budget with `Number(value || 0)` (divergence 4) and
+      // skips invalid-cost results (divergence 1: `invalidCost: 'skip'`). It does
+      // NOT zero the budget after a `partial` tail award (divergence 2:
+      // `zeroRemainingOnPartial: false`) — that divergence is latent because the
+      // salvage return shape never exposes `remaining`; see #431.
+      const managedItems = system?.components || [];
+      const { awarded } = resolveProgressiveAward({
+        results: group.results || [],
+        initialRemaining: Number(checkResult?.value || 0),
+        costFor: (result) =>
+          Number(
+            managedItems.find((e) => e.id === (result.componentId || result.systemItemId))
+              ?.difficulty
+          ),
+        awardMode: system?.salvageCraftingCheck?.progressive?.awardMode || 'equal',
+        invalidCost: 'skip',
+        zeroRemainingOnPartial: false,
+      });
 
       return [{ ...group, results: awarded }];
     }

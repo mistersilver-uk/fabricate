@@ -812,6 +812,69 @@ test('progressive: system awardMode drives the award (per-task award mode is ign
   }
 });
 
+test('progressive exceed mode awards only results whose cost is strictly below remaining', async () => {
+  const calls = {};
+  // comp-a cost 3, comp-b cost 5, comp-c cost 7. value 8 (exceed): comp-a (8 > 3,
+  // remaining 5) awarded; comp-b (5 > 5 false) stops. Only comp-a is awarded.
+  const task = progressiveTask();
+  stubRoll(8);
+  try {
+    const engine = makeEngine({
+      task,
+      includeProgressiveResolver: false,
+      gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'exceed' } },
+      createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, true);
+    assert.equal(result.state, 'succeeded');
+    assert.deepEqual(
+      calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
+      ['result-a'],
+      'exceed awards comp-a only (8 > 3); comp-b stops (5 > 5 is false)'
+    );
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('progressive: a result whose component lacks a valid difficulty makes the task misconfigured', async () => {
+  const calls = {};
+  // Gathering FAILS (does not skip) a result referencing a component without a
+  // finite difficulty >= 1: INVALID_PROGRESSIVE_DIFFICULTY → misconfigured → the
+  // attempt surfaces TASK_MISCONFIGURED and creates no results.
+  const task = progressiveTask({
+    resultGroups: [{
+      id: 'group-progressive',
+      name: 'Ore',
+      results: [
+        { id: 'result-a', componentId: 'comp-a', quantity: 1 }, // difficulty 3
+        { id: 'result-x', componentId: 'comp-missing', quantity: 1 } // no such component → invalid difficulty
+      ]
+    }]
+  });
+  stubRoll(20); // ample value so the loop reaches the invalid result
+  try {
+    const engine = makeEngine({
+      task,
+      includeProgressiveResolver: false,
+      gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'equal' } },
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, false);
+    assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+    assert.deepEqual(calls.createResults, []);
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
 test('routed: system routed formula resolves a tier name and routes to the same-named result group', async () => {
   const calls = {};
   const task = routedTask({

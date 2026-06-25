@@ -868,6 +868,116 @@ test('_resolveSalvageResultGroups progressive mode awards nothing when check val
   assert.equal(awarded[0].results.length, 0, 'Value 0 should award nothing');
 });
 
+test('_resolveSalvageResultGroups progressive exceed mode awards only when value strictly exceeds cost', () => {
+  // exceed: a result is awarded only when `remaining > cost` (strict). value 5,
+  // costs 2 then 3 → item-a (5 > 2, remaining 3) awarded; item-b (3 > 3 false) stops.
+  const engine = makeEngine();
+  const resultGroup = {
+    id: 'rg-1', name: 'Loot',
+    results: [
+      { id: 'r-1', componentId: 'item-a', quantity: 1 }, // difficulty 2
+      { id: 'r-2', componentId: 'item-b', quantity: 1 }  // difficulty 3
+    ]
+  };
+  const component = {
+    id: 'comp-1', name: 'Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
+  };
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    salvageCraftingCheck: {
+      enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'exceed' },
+      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+    },
+    components: [
+      component,
+      { id: 'item-a', name: 'Item A', difficulty: 2 },
+      { id: 'item-b', name: 'Item B', difficulty: 3 }
+    ]
+  });
+
+  const awarded = engine._resolveSalvageResultGroups(component, system, { outcome: null, value: 5 });
+  assert.equal(awarded.length, 1);
+  assert.equal(awarded[0].results.length, 1, 'exceed awards item-a only (5 > 2); item-b stops (3 > 3 is false)');
+  assert.equal(awarded[0].results[0].componentId, 'item-a');
+});
+
+test('_resolveSalvageResultGroups progressive partial mode awards a final partial result on remainder', () => {
+  // partial: full results while `remaining >= cost`, then ONE final result on any
+  // leftover `remaining > 0`. value 4, costs 3 then 5 → item-a fully (remaining 1),
+  // item-b as the partial tail (remaining 1 > 0), then stop.
+  const engine = makeEngine();
+  const resultGroup = {
+    id: 'rg-1', name: 'Loot',
+    results: [
+      { id: 'r-1', componentId: 'item-a', quantity: 1 }, // difficulty 3
+      { id: 'r-2', componentId: 'item-b', quantity: 1 }, // difficulty 5
+      { id: 'r-3', componentId: 'item-c', quantity: 1 }  // difficulty 2
+    ]
+  };
+  const component = {
+    id: 'comp-1', name: 'Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
+  };
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    salvageCraftingCheck: {
+      enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'partial' },
+      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+    },
+    components: [
+      component,
+      { id: 'item-a', name: 'Item A', difficulty: 3 },
+      { id: 'item-b', name: 'Item B', difficulty: 5 },
+      { id: 'item-c', name: 'Item C', difficulty: 2 }
+    ]
+  });
+
+  const awarded = engine._resolveSalvageResultGroups(component, system, { outcome: null, value: 4 });
+  assert.equal(awarded.length, 1);
+  assert.equal(awarded[0].results.length, 2, 'partial awards item-a (full) then item-b (partial tail), stopping before item-c');
+  assert.equal(awarded[0].results[0].componentId, 'item-a');
+  assert.equal(awarded[0].results[1].componentId, 'item-b');
+});
+
+test('_resolveSalvageResultGroups progressive mode skips results with invalid difficulty and continues', () => {
+  // Salvage skips (continue) a result whose component difficulty is missing/<1
+  // rather than failing the whole award. value 6: item-a (cost 2) awarded, item-b
+  // (no difficulty) skipped, item-c (cost 3) awarded → both valid results awarded.
+  const engine = makeEngine();
+  const resultGroup = {
+    id: 'rg-1', name: 'Loot',
+    results: [
+      { id: 'r-1', componentId: 'item-a', quantity: 1 }, // difficulty 2
+      { id: 'r-2', componentId: 'item-b', quantity: 1 }, // no/invalid difficulty -> skipped
+      { id: 'r-3', componentId: 'item-c', quantity: 1 }  // difficulty 3
+    ]
+  };
+  const component = {
+    id: 'comp-1', name: 'Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
+  };
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    salvageCraftingCheck: {
+      enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
+      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+    },
+    components: [
+      component,
+      { id: 'item-a', name: 'Item A', difficulty: 2 },
+      { id: 'item-b', name: 'Item B', difficulty: 0 }, // invalid (< 1) -> skipped, not a misconfiguration
+      { id: 'item-c', name: 'Item C', difficulty: 3 }
+    ]
+  });
+
+  const awarded = engine._resolveSalvageResultGroups(component, system, { outcome: null, value: 6 });
+  assert.equal(awarded.length, 1);
+  assert.equal(awarded[0].results.length, 2, 'item-a and item-c awarded; item-b skipped on invalid difficulty');
+  assert.equal(awarded[0].results[0].componentId, 'item-a');
+  assert.equal(awarded[0].results[1].componentId, 'item-c');
+});
+
 test('salvage() progressive mode creates items matching awarded results', async () => {
   const itemAComp = { id: 'item-a', name: 'Item A', sourceUuid: null, difficulty: 2 };
   const itemBComp = { id: 'item-b', name: 'Item B', sourceUuid: null, difficulty: 5 };

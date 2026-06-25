@@ -1,4 +1,6 @@
+import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import {
+  matchResultGroupsByName,
   normalizeRoutedName,
   isFailKeyword,
   isMissKeyword,
@@ -435,9 +437,9 @@ export class ResolutionModeService {
       return { groups: [], meta: { outcome, disposition: 'fail' } };
     if (this._isMissKeyword(normalized))
       return { groups: [], meta: { outcome, disposition: 'miss' } };
-    const matched = (allGroups || []).filter(
-      (group) => this._normalizeName(group.name) === normalized
-    );
+    // Crafting routes a check outcome to a SINGLE result group (`firstOnly: true`);
+    // the per-system routing keys (tier / `checkOutcomeIds`) stay in the caller.
+    const matched = matchResultGroupsByName(outcome, allGroups, { firstOnly: true });
     if (matched.length === 0) {
       return {
         groups: [],
@@ -448,7 +450,7 @@ export class ResolutionModeService {
         },
       };
     }
-    return { groups: matched.slice(0, 1), meta: { outcome, disposition: 'success' } };
+    return { groups: matched, meta: { outcome, disposition: 'success' } };
   }
 
   /**
@@ -552,44 +554,22 @@ export class ResolutionModeService {
     const group = allGroups[0];
     if (!group) return { groups: [], meta: { awardedResultIds: [], remaining: 0 } };
 
-    const awardMode = system?.craftingCheck?.progressive?.awardMode || 'equal';
-    const awarded = [];
-    let remaining = Number(checkResult?.value || 0);
-
-    for (const result of group.results || []) {
-      const cost = this._getDifficulty(system, result?.componentId || result?.systemItemId);
-      if (!Number.isFinite(cost) || cost < 1) continue;
-      const step = this._awardProgressiveResult(awardMode, result, cost, remaining);
-      if (step.award) awarded.push(result);
-      remaining = step.remaining;
-      if (step.stop) break;
-    }
+    // Crafting normalizes the budget with `Number(value || 0)` (divergence 4) and
+    // skips invalid-cost results (divergence 1: `invalidCost: 'skip'`), zeroing the
+    // budget after a `partial` tail award (divergence 2: `zeroRemainingOnPartial`).
+    const { awarded, remaining } = resolveProgressiveAward({
+      results: group.results || [],
+      initialRemaining: Number(checkResult?.value || 0),
+      costFor: (result) => this._getDifficulty(system, result?.componentId || result?.systemItemId),
+      awardMode: system?.craftingCheck?.progressive?.awardMode || 'equal',
+      invalidCost: 'skip',
+      zeroRemainingOnPartial: true,
+    });
 
     return {
       groups: [{ ...group, results: awarded }],
       meta: { awardedResultIds: awarded.map((r) => r.id), remaining },
     };
-  }
-
-  /**
-   * Decide whether the current ordered progressive result is awarded under
-   * `awardMode`, and the resulting `remaining` budget plus whether to stop the
-   * loop. Pure helper for `_resolveProgressiveResultGroups`.
-   * @returns {{award: boolean, remaining: number, stop: boolean}}
-   */
-  _awardProgressiveResult(awardMode, result, cost, remaining) {
-    if (awardMode === 'exceed') {
-      if (remaining > cost) return { award: true, remaining: remaining - cost, stop: false };
-      return { award: false, remaining, stop: true };
-    }
-    if (awardMode === 'partial') {
-      if (remaining >= cost) return { award: true, remaining: remaining - cost, stop: false };
-      if (remaining > 0) return { award: true, remaining: 0, stop: true };
-      return { award: false, remaining, stop: true };
-    }
-    // equal
-    if (remaining >= cost) return { award: true, remaining: remaining - cost, stop: false };
-    return { award: false, remaining, stop: true };
   }
 
   validateCheckResult({ recipe, checkResult }) {

@@ -3,6 +3,8 @@ import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
 } from '../gatheringToolRuntime.js';
+import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
+import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
@@ -2332,9 +2334,11 @@ export class GatheringEngine {
     if (rolled.success !== true || !outcomeName) {
       return normalizeTerminalOutcome({ status: 'failed', outcome: outcomeName, checkResult });
     }
-    const matched = normalizeList(task.resultGroups).filter(
-      (group) => normalizeOutcomeText(group?.name) === normalizeOutcomeText(outcomeName)
-    );
+    // Gathering keeps ALL same-named groups (`firstOnly: false`); the per-system
+    // routing key (the success tier name) stays in the caller above.
+    const matched = matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
+      firstOnly: false,
+    });
     return normalizeTerminalOutcome({
       status: 'succeeded',
       outcome: outcomeName,
@@ -3252,48 +3256,28 @@ function resolveProgressiveAward({ system, task, checkResult }) {
   const awardMode = ['partial', 'equal', 'exceed'].includes(requestedAwardMode)
     ? requestedAwardMode
     : 'equal';
-  const awarded = [];
-  let remaining = Math.max(0, value);
 
-  for (const result of normalizeList(group.results)) {
-    const cost = difficultyForResult(system, result);
-    if (!Number.isFinite(cost) || cost < 1) {
-      return misconfiguredOutcome({
-        code: 'INVALID_PROGRESSIVE_DIFFICULTY',
-        message: 'Progressive gathering result references a component without valid difficulty',
-        checkResult,
-      });
-    }
+  // Divergence 4 stays here: gathering already validated `Number.isFinite(value)`
+  // above and clamps `Math.max(0, value)` before handing the budget to the shared
+  // loop. Divergence 1 is `invalidCost: 'fail'` — an invalid per-result difficulty
+  // short-circuits with `invalidResultId`, which we raise as a misconfiguration
+  // here (the loop never builds that shape). Divergence 2 zeroes the budget after a
+  // `partial` tail award (`zeroRemainingOnPartial: true`).
+  const { awarded, remaining, invalidResultId } = resolveProgressiveAwardLoop({
+    results: normalizeList(group.results),
+    initialRemaining: Math.max(0, value),
+    costFor: (result) => difficultyForResult(system, result),
+    awardMode,
+    invalidCost: 'fail',
+    zeroRemainingOnPartial: true,
+  });
 
-    if (awardMode === 'exceed') {
-      if (remaining > cost) {
-        awarded.push(result);
-        remaining -= cost;
-      } else {
-        break;
-      }
-      continue;
-    }
-
-    if (awardMode === 'partial') {
-      if (remaining >= cost) {
-        awarded.push(result);
-        remaining -= cost;
-        continue;
-      }
-      if (remaining > 0) {
-        awarded.push(result);
-        remaining = 0;
-      }
-      break;
-    }
-
-    if (remaining >= cost) {
-      awarded.push(result);
-      remaining -= cost;
-    } else {
-      break;
-    }
+  if (invalidResultId !== undefined) {
+    return misconfiguredOutcome({
+      code: 'INVALID_PROGRESSIVE_DIFFICULTY',
+      message: 'Progressive gathering result references a component without valid difficulty',
+      checkResult,
+    });
   }
 
   return {
@@ -3427,7 +3411,11 @@ function validateResultGroupNames(resultGroups) {
   const seen = new Map();
 
   for (const group of resultGroups) {
-    const normalizedName = normalizeOutcomeText(group?.name);
+    // Routed `ResultGroup.name` validation uses the SAME normalizer as the routed
+    // match path (`normalizeRoutedName`), so a name can never validate yet fail to
+    // route (or vice versa). The `String(value ?? '')` vs `String(name || '')`
+    // edge (0/false → '') is immaterial for outcome-name strings.
+    const normalizedName = normalizeRoutedName(group?.name);
     if (!normalizedName) {
       errors.push('Gathering result groups require names');
       continue;
