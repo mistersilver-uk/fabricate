@@ -75,6 +75,33 @@ Recipes resolve immediately with no skill check, even though the Routed mode (wi
 
 ---
 
+### Routed Recipe Produces Nothing on a Successful Check
+
+**Symptom:** A recipe that routes by skill-check outcome rolls a success, but no result is produced.
+
+**Likely causes:**
+
+- A success outcome tier is not wired to any result set.
+  When the check rolls that tier, there is nothing to produce.
+- A result set is assigned only to an outcome tier that was later deleted from the routed crafting check.
+  The stale assignment no longer points at a real outcome, so that result set can never be selected.
+- The recipe mixes explicit outcome assignment with name matching, and the rolled outcome's name does not match any result set name.
+
+**Step-by-step checks:**
+
+1. Open the recipe in the recipe editor and go to the **Validation** tab.
+   Look for the warning that a result set is not assigned to any check outcome, and the warning that a check success outcome produces no result set.
+2. On the **Results** tab, check each result set's **Produced on outcome** assignment.
+   Make sure every success outcome tier you expect to use is assigned to a result set, and that every result set is assigned to an outcome that still exists.
+3. If you removed an outcome tier from the routed crafting check, Fabricate strips that tier from any recipe result set that referenced it and posts a notification saying how many result sets were updated.
+   Re-open the affected recipes and assign the result sets to a current outcome tier.
+4. If you rely on name matching instead of explicit assignment, confirm each result set name matches the outcome tier name once case and surrounding spaces are ignored.
+
+**See also:** [Routed Mode]({% link recipes/routed.md %}) for how outcomes match results, including explicit outcome assignment and name matching.
+[Crafting Checks]({% link crafting-checks.md %}) for how a routed check rolls and resolves its difficulty.
+
+---
+
 ### Tools Not Breaking or Tracking Usage
 
 {: .note }
