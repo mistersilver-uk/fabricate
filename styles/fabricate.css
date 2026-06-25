@@ -1273,6 +1273,42 @@
   grid-template-columns: 92px minmax(110px, 1fr) 40px;
 }
 
+/* Per-check tool-breakage trigger editor (issue 419). Each trigger is a bordered,
+   padded card; its condition controls (When / Group / Measure / Is / Value) sit on
+   one wrapping row instead of stacking, since `.manager-field` is column-flex. */
+.fabricate-manager .manager-checks-breakage-trigger {
+  display: grid;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-checks-breakage-trigger-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-breakage-trigger-head .manager-checks-breakage-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-breakage-condition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-breakage-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
 .fabricate-manager .manager-checks-force-outcome {
   display: flex;
   gap: var(--fab-space-2);
@@ -9619,6 +9655,12 @@
   text-transform: uppercase;
   color: var(--fab-mv2-text-muted);
   padding: 0 var(--fab-space-1);
+}
+
+/* checkDriven authority advisory (issue 419): sits below the authority radios with
+   a little breathing room. */
+.fabricate-manager .manager-tools-authority-advisory {
+  margin-top: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-tools-inline-field {

@@ -331,7 +331,7 @@
         {/each}
       </div>
       {#if isCheckDriven}
-        <p class="manager-muted manager-tools-authority-advisory" data-breakage-authority-advisory>
+        <p class="manager-muted manager-tools-authority-advisory" role="status" data-breakage-authority-advisory>
           {text(
             'FABRICATE.Admin.Manager.Tools.AuthorityCheckDrivenAdvisory',
             'Per-tool breakage modes are not evaluated (except Immune); the active check decides whether required tools break.'
