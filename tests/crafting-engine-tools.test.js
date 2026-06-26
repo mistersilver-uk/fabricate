@@ -513,11 +513,11 @@ test('_applyToolBreakage toolSpecific: immune tool never breaks even with a lega
 // resolution-mode service that returns null, so _resolveCraftingCheckBreakage
 // falls back to system.resolutionMode and reads craftingCheck.simple.checkBreakage.
 const NATURAL_ONE_TRIGGER = {
-  enabled: true,
   triggers: [
     {
       id: 'natural1',
-      label: '1d20 group rolled 1',
+      breakTools: true,
+      outcome: 'none',
       condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
     },
   ],

@@ -33,14 +33,15 @@ export function engineCheckResult({
 }
 
 // The default "natural 1 on the first d20" trigger and the matching roll: the
-// first dice group rolled a 1, so `anyDie == 1` matches.
+// first dice group rolled a 1, so `anyDie == 1` matches. The trigger opts into
+// breakage (`breakTools: true`) — only break-tools triggers force a break.
 export const NATURAL_ONE_TRIGGER = Object.freeze({
-  enabled: true,
   triggers: [
     {
       id: 'natural1',
-      label: '1d20 group rolled 1',
       condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+      outcome: 'none',
+      breakTools: true,
     },
   ],
 });

@@ -44,8 +44,9 @@
     gatheringResolutionMode = 'd100',
     gatheringCheckProgressive = null,
     gatheringCheckRouted = null,
-    // Tool-breakage authority (issue 419): under `checkDriven` each editor shows the
-    // CheckBreakage trigger editor and hides the legacy break-tools toggles.
+    // Tool-breakage authority (issue 419): each editor always shows the unified
+    // CheckTriggers editor; under `checkDriven` it also exposes the per-trigger
+    // break-tools toggle.
     breakageAuthority = 'toolSpecific',
     // Feature flags gate which subsystem check-breakage controls are reachable:
     // salvage is always on; gathering only when features.gathering === true.
@@ -85,8 +86,8 @@
   const gatheringRouted = $derived(gatheringResolutionMode === 'routed');
 
   // Subsystem-gated breakage authority. Crafting + salvage (salvage always on) honour
-  // the system authority; gathering only shows check-breakage controls when the
-  // gathering feature is enabled — otherwise it stays toolSpecific (CheckBreakage hidden).
+  // the system authority; gathering only exposes the per-trigger break-tools control
+  // when the gathering feature is enabled — otherwise it stays toolSpecific.
   const craftingBreakageAuthority = $derived(breakageAuthority);
   const salvageBreakageAuthority = $derived(features?.salvage === false ? 'toolSpecific' : breakageAuthority);
   const gatheringBreakageAuthority = $derived(

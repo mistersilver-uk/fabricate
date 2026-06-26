@@ -32,8 +32,7 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
     dcMode: 'static',
     tiers: [],
     macroUuid: null,
-    diceCrits: [],
-    checkBreakage: { enabled: false, triggers: [] },
+    checkBreakage: { triggers: [] },
   });
   assert.equal(check.routed.type, 'relative');
   assert.equal(check.routed.dc, 15);
@@ -41,12 +40,11 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
     awardMode: 'equal',
     allowPlayerReorder: false,
     rollFormula: '',
-    diceCrits: [],
-    checkBreakage: { enabled: false, triggers: [] },
+    checkBreakage: { triggers: [] },
   });
 });
 
-test('_normalizeSalvageCraftingCheck normalizes provided salvage simple/progressive config', () => {
+test('_normalizeSalvageCraftingCheck normalizes provided salvage simple/progressive config and migrates crits', () => {
   const mgr = makeManager();
   const check = mgr._normalizeSalvageCraftingCheck({
     simple: { rollFormula: '1d20', dc: '18.6', thresholdMode: 'exceed' },
@@ -59,9 +57,13 @@ test('_normalizeSalvageCraftingCheck normalizes provided salvage simple/progress
   assert.equal(check.simple.rollFormula, '1d20');
   assert.equal(check.simple.dc, 18, 'dc truncates to an integer');
   assert.equal(check.simple.thresholdMode, 'exceed');
+  assert.equal(check.simple.diceCrits, undefined, 'the legacy diceCrits field is dropped');
   assert.equal(check.progressive.awardMode, 'partial');
   assert.equal(check.progressive.rollFormula, '2d6');
-  assert.equal(check.progressive.diceCrits.length, 1);
+  assert.equal(check.progressive.diceCrits, undefined, 'the legacy diceCrits field is dropped');
+  // The legacy crit is migrated into a unified trigger forcing success.
+  assert.equal(check.progressive.checkBreakage.triggers.length, 1);
+  assert.equal(check.progressive.checkBreakage.triggers[0].outcome, 'success');
 });
 
 // ── System-level gathering check ────────────────────────────────────────────
@@ -74,8 +76,7 @@ test('_normalizeGatheringCraftingCheck defaults to disabled with progressive/rou
     awardMode: 'equal',
     allowPlayerReorder: false,
     rollFormula: '',
-    diceCrits: [],
-    checkBreakage: { enabled: false, triggers: [] },
+    checkBreakage: { triggers: [] },
   });
   assert.equal(check.routed.type, 'relative');
   // d100 needs no editable config — there is no `simple` sub-object.

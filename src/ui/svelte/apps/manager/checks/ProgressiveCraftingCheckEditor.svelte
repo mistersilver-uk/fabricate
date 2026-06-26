@@ -6,22 +6,19 @@
   spends that value against each result's difficulty, in order, until the value can
   no longer cover the next result; the award mode (equal / partial / exceed) decides
   exactly how the spend stops. There is no DC, comparison, or recipe tier — just the
-  formula, the award mode, and the per-die critical-rolls table. A matched crit
-  forces the award: a SUCCESS crit awards everything, a FAILURE crit awards nothing,
-  and either may break tools. The formula field and crit table are shared with the
-  simple/routed editors (the formula field hides the DC via `showDc={false}`, and the
-  crit pills are relabelled award-all/award-none for this numeric context).
+  formula, the award mode, and the unified CheckTriggers editor. A matching trigger
+  can force the award (its outcome select is relabelled Award all / Award none for
+  this numeric context) and, under `checkDriven` authority, break tools.
 
   Controlled component: renders `value` and emits the next value via `onChange`.
-  `value` carries `{ awardMode, allowPlayerReorder, rollFormula, diceCrits }`;
+  `value` carries `{ awardMode, allowPlayerReorder, rollFormula, checkBreakage }`;
   `allowPlayerReorder` is preserved across edits.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
-  import CheckDiceCrits from './CheckDiceCrits.svelte';
   import CheckAwardMode from './CheckAwardMode.svelte';
-  import CheckBreakage from './CheckBreakage.svelte';
+  import CheckTriggers from './CheckTriggers.svelte';
 
   let { value = null, breakageAuthority = 'toolSpecific', onChange = () => {} } = $props();
 
@@ -31,11 +28,6 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-
-  const awardAllLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.AwardAll', 'Award all'));
-  const awardNoneLabel = $derived(
-    text('FABRICATE.Admin.Manager.Checks.Crafting.AwardNone', 'Award none')
-  );
 
   function emit(patch) {
     onChange({ ...value, ...patch });
@@ -56,24 +48,15 @@
       showDc={false}
       onChange={emit}
     />
-    <CheckDiceCrits
-      rollFormula={value?.rollFormula || ''}
-      diceCrits={value?.diceCrits || []}
-      forceOnLabel={awardAllLabel}
-      forceOffLabel={awardNoneLabel}
-      showBreakTools={!checkDriven}
-      onChange={(diceCrits) => emit({ diceCrits })}
-    />
   </section>
 
-  {#if checkDriven}
-    <CheckBreakage
-      value={value?.checkBreakage || null}
-      rollFormula={value?.rollFormula || ''}
-      kind="progressive"
-      onChange={(checkBreakage) => emit({ checkBreakage })}
-    />
-  {/if}
+  <CheckTriggers
+    value={value?.checkBreakage || null}
+    rollFormula={value?.rollFormula || ''}
+    kind="progressive"
+    showBreakTools={checkDriven}
+    onChange={(checkBreakage) => emit({ checkBreakage })}
+  />
 
   <section class="manager-inspector-card" data-award-mode>
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}</h3>

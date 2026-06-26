@@ -1261,21 +1261,11 @@
   grid-template-columns: minmax(140px, 1fr) 96px 40px;
 }
 
-/* Simple-check per-die critical rolls: Raw roll + a "Force Outcome" cell holding
-   the auto-fail/auto-succeed pills on one line + remove. */
-.fabricate-manager .manager-checks-outcome-table.is-crit {
-  grid-template-columns: 92px minmax(110px, 1fr) minmax(110px, 1fr) 40px;
-}
-
-/* Crit table with the break-tools column hidden (checkDriven authority): the
-   break column is dropped, so only Raw roll + Force Outcome + remove remain. */
-.fabricate-manager .manager-checks-outcome-table.is-crit-no-break {
-  grid-template-columns: 92px minmax(110px, 1fr) 40px;
-}
-
-/* Per-check tool-breakage trigger editor (issue 419). Each trigger is a bordered,
-   padded card; its condition controls (When / Group / Measure / Is / Value) sit on
-   one wrapping row instead of stacking, since `.manager-field` is column-flex. */
+/* Unified per-check trigger editor (issue 419 recombine). Each trigger is a
+   bordered, padded card split into two rows by a divider: the top row carries the
+   condition controls (When / Group / Measure / Is / Value) with the remove button
+   pinned to its top-right; the bottom row carries the Outcome three-way toggle and
+   the optional Break-tools pill. */
 .fabricate-manager .manager-checks-breakage-trigger {
   display: grid;
   gap: var(--fab-space-2);
@@ -1285,22 +1275,101 @@
   background: var(--fab-surface-soft);
 }
 
-.fabricate-manager .manager-checks-breakage-trigger-head {
+/* Top row: condition fields take the available width and wrap; the remove button
+   sits at the top-right, aligned with the first field row. */
+.fabricate-manager .manager-checks-trigger-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-checks-breakage-trigger-head .manager-checks-breakage-label {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 .fabricate-manager .manager-checks-breakage-condition {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--fab-space-2);
+}
+
+/* Remove button: top-right of the card, not bottom-aligned with the fields. */
+.fabricate-manager .manager-checks-trigger-remove {
+  flex: 0 0 auto;
+}
+
+/* Hairline divider between the condition row and the effects row. */
+.fabricate-manager .manager-checks-trigger-divider {
+  width: 100%;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--fab-border);
+}
+
+/* Bottom row: the Outcome toggle and the Break-tools pill, bottom-aligned. */
+.fabricate-manager .manager-checks-trigger-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-checks-trigger-break {
+  flex: 0 0 auto;
+}
+
+/* Three-way Outcome toggle: a segmented control (success | no effect | failure)
+   mirroring `.manager-recipe-tag-match-toggle`, with the SELECTED segment carrying
+   a green / neutral / red tint so the forced outcome reads at a glance. */
+.fabricate-manager .manager-checks-outcome-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-2xs);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-checks-outcome-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-outcome-option:hover:not(.is-selected):not(:disabled) {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-checks-outcome-option:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.fabricate-manager .manager-checks-outcome-option.is-selected.is-success {
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-success-border);
+}
+
+.fabricate-manager .manager-checks-outcome-option.is-selected.is-danger {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-danger-border);
+}
+
+.fabricate-manager .manager-checks-outcome-option.is-selected.is-neutral {
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-checks-breakage-tiers {

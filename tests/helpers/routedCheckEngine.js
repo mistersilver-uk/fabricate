@@ -73,7 +73,7 @@ export function clearRollEngine() {
 
 /**
  * Build a default routed crafting-check config. `type` selects the active tier
- * list; pass `relativeOutcomes` / `fixedOutcomes` / `diceCrits` / `tiers` /
+ * list; pass `relativeOutcomes` / `fixedOutcomes` / `checkBreakage` / `tiers` /
  * `dcMode` / `macroUuid` overrides as needed.
  */
 export function defaultRouted(overrides = {}) {
@@ -87,7 +87,7 @@ export function defaultRouted(overrides = {}) {
     fixedOutcomes: [],
     tiers: [],
     macroUuid: null,
-    diceCrits: [],
+    checkBreakage: { triggers: [] },
     ...overrides,
   };
 }

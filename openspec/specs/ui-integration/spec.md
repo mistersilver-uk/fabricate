@@ -223,14 +223,15 @@ Mode semantics are defined in `004`.
 
 ##### Check Tool-Breakage Controls
 
-Tool-breakage authoring on a check is governed by the system's `toolBreakage.authority` (issue 419); the two authorities never expose their authoring surfaces at the same time.
+All three check editors (simple, routed, and progressive) ALWAYS render a single unified `CheckTriggers` editor (issue 419 recombine) — one trigger list per check, replacing the former separate per-die crit table and tool-breakage trigger card.
+Each trigger pairs an expressive dice-matching condition with two effects: a themed outcome `<select>` and (under `checkDriven` authority) a break-tools pill.
 
-- Under `toolSpecific` authority: the existing per-die `DiceCrit.breakTools` toggle (in the dice-crits sub-component) and the routed per-tier `outcome.breakTools` pills render as the breakage-authoring surface, and the shared `CheckBreakage` section is hidden.
-- Under `checkDriven` authority: the per-die/per-tier `breakTools` toggles are hidden and a shared `CheckBreakage` section renders in all three check editors (simple, routed, and progressive).
-The `CheckBreakage` section offers an enable toggle, a default preset (break all required tools when the first d20 dice group rolls any die equal to 1; no trigger seeded when the formula has no d20 term), and add/remove of triggers — `rollTotal`, `progressiveValue` (progressive editors only), `diceGroup` aggregate, and `outcomeTier` (routed editors only).
-Dice groups are labelled from the formula, with duplicate `NdS` groups disambiguated (`#1` / `#2`).
-- This authority gate applies per subsystem: crafting and salvage (salvage is always on) honour the system authority; gathering exposes its check-breakage controls only when `features.gathering === true`.
-A disabled subsystem renders no breakage controls.
+- The outcome select forces the check to Automatic success / Automatic failure / No effect (relabelled Award all / Award none / No effect on a progressive editor, reusing the existing award keys), and is disabled + pinned to No effect for an `outcomeTier` condition.
+Outcome forcing applies under BOTH authorities.
+- The per-trigger break-tools pill (and the routed per-tier `outcome.breakTools` column) renders ONLY under `checkDriven` authority (`showBreakTools={checkDriven}`); under `toolSpecific` it is hidden and a check never breaks tools.
+- There is no free-text trigger label, no per-block enable toggle, and no natural-1 auto-seed; an empty trigger list is inert and the GM adds triggers explicitly.
+Condition types are `rollTotal`, `progressiveValue` (progressive editors only), `diceGroup` aggregate, and `outcomeTier` (routed editors only); dice groups are labelled from the formula, with duplicate `NdS` groups disambiguated (`#1` / `#2`).
+- This authority gate applies per subsystem: crafting and salvage (salvage is always on) honour the system authority; gathering exposes the per-trigger break-tools control only when `features.gathering === true`, otherwise it stays `toolSpecific`.
 
 #### Requirements Controls
 
@@ -399,7 +400,7 @@ It manages the system's single canonical Tool library (`system.tools`).
 Tool-breakage authority (issue 419):
 
 - The Tools page carries a system-level **tool-breakage source** control: a card with a header, descriptive hint, and a radio group offering `toolSpecific` (default) and `checkDriven`.
-- `toolSpecific` means each Tool's own breakage mode decides whether it breaks (plus the legacy per-crit/per-tier `breakTools` force-break); `checkDriven` means the active check's `checkBreakage` triggers decide whether all required tools break and each Tool's own mode is ignored except `immune`.
+- `toolSpecific` means each Tool's own breakage mode decides whether it breaks and a check never breaks tools; `checkDriven` means the active check's `checkBreakage` triggers decide whether all required tools break and each Tool's own mode is ignored except `immune`.
 - Each source option is self-describing (a bold name above a muted description); the `checkDriven` option's description carries the "per-tool breakage modes are not evaluated (except Immune)" guidance, so there is no separate advisory line.
 
 Per-tool breakage editing is governed by the active authority; the two authorities never expose their per-tool breakage surfaces at the same time:

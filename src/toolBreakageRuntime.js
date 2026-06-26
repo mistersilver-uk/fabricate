@@ -152,10 +152,15 @@ function aggregateDiceGroup(group, aggregate) {
 
 /**
  * Evaluate one `checkBreakage` condition against a checkResult.
- * @private
+ *
+ * Exported so the check-roll runners ({@link module:src/systems/checkRoll}) can
+ * reuse the SAME condition-matching logic for forced-outcome resolution, instead
+ * of duplicating it. The forced-outcome path passes a synthetic `checkResult`
+ * carrying just `{ value, data: { total, diceGroups } }` and skips `outcomeTier`
+ * conditions (the routed tier is not yet known when the outcome is being forced).
  * @returns {boolean}
  */
-function evaluateCheckBreakageCondition(condition, checkResult) {
+export function evaluateCheckBreakageCondition(condition, checkResult) {
   if (!condition || typeof condition !== 'object') return false;
   const data = checkResult?.data || {};
   switch (condition.type) {
@@ -211,14 +216,15 @@ function evaluateCheckBreakageCondition(condition, checkResult) {
  *
  * - Macro/builtIn checks (`engineEvaluated !== true`) never force-break (the legacy
  *   guard formerly in `CraftingEngine._checkForcesToolBreak`).
- * - The legacy `data.breakTools` (the two seed presets: per-die `DiceCrit.breakTools`
- *   and routed per-tier `outcome.breakTools`) is honoured as an implicit always-on
- *   trigger, so existing crit/tier flags keep working without separate persistence.
- * - Each configured trigger's condition is evaluated against the checkResult; any
- *   match force-breaks all required tools (triggers are ORed).
+ * - The legacy `data.breakTools` (the routed per-tier `outcome.breakTools` bridge) is
+ *   honoured as an implicit always-on trigger, so existing tier flags keep working
+ *   without separate persistence.
+ * - Each configured trigger force-breaks all required tools (triggers are ORed) only
+ *   when it both opts into breakage (`breakTools === true`) AND its condition matches
+ *   the checkResult.
  *
  * @param {object} params
- * @param {{ enabled?: boolean, triggers?: Array<object> }} [params.checkBreakage]
+ * @param {{ triggers?: Array<object> }} [params.checkBreakage]
  * @param {object} [params.checkResult]
  * @returns {{ forceBreak: boolean, triggerId: string|null, reason: string|null }}
  */
@@ -228,7 +234,7 @@ export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
   // are authored-engine concepts absent from the macro contract.
   if (checkResult?.engineEvaluated !== true) return none;
 
-  // Legacy implicit trigger: a crit/tier `data.breakTools` flag always force-breaks.
+  // Legacy implicit trigger: a routed per-tier `data.breakTools` flag always force-breaks.
   if (checkResult?.data?.breakTools === true) {
     return {
       forceBreak: true,
@@ -237,15 +243,16 @@ export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
     };
   }
 
-  if (checkBreakage?.enabled !== true) return none;
-  const triggers = Array.isArray(checkBreakage.triggers) ? checkBreakage.triggers : [];
+  const triggers = Array.isArray(checkBreakage?.triggers) ? checkBreakage.triggers : [];
   for (const trigger of triggers) {
-    if (evaluateCheckBreakageCondition(trigger?.condition, checkResult)) {
+    if (
+      trigger?.breakTools === true &&
+      evaluateCheckBreakageCondition(trigger?.condition, checkResult)
+    ) {
       return {
         forceBreak: true,
         triggerId: trigger.id ?? null,
-        reason:
-          typeof trigger.label === 'string' && trigger.label ? trigger.label : 'Check breakage',
+        reason: 'Check breakage',
       };
     }
   }

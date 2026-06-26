@@ -122,7 +122,7 @@ Tool usage/breakage is tracked on owned item instances.
    a macro/built-in check's `data.breakTools` is not part of the macro contract and does not
    force breakage.
 
-   The check/tier/crit data-model shapes (`RoutedCheck`, `DiceCrit`, `thresholdMode`,
+   The check/tier/trigger data-model shapes (`RoutedCheck`, `CheckBreakage` triggers, `thresholdMode`,
    `breakTools`, recipe tiers, dynamic DC) are defined in `002-data-models.md`;
    the per-mode routing rules (including `ResultGroup.checkOutcomeIds` tier→result-group
    assignment) are defined in `004-resolution-modes.md`.

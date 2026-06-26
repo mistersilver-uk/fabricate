@@ -56,14 +56,13 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     dc: 15,
     thresholdMode: 'meet',
     tiers: [],
-    diceCrits: [],
     relativeOutcomes: [],
     fixedOutcomes: [],
-    checkBreakage: { enabled: false, triggers: [] },
+    checkBreakage: { triggers: [] },
   });
 });
 
-test('_normalizeCraftingCheck routed mirrors the simple formula/DC/tiers/crits', () => {
+test('_normalizeCraftingCheck routed migrates legacy crits into unified triggers', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     routed: {
@@ -80,10 +79,17 @@ test('_normalizeCraftingCheck routed mirrors the simple formula/DC/tiers/crits',
   assert.equal(result.routed.tiers[0].name, 'Hard');
   assert.equal(result.routed.tiers[0].dc, 18);
   assert.ok(result.routed.tiers[0].id, 'a tier id is generated');
-  assert.deepEqual(
-    { ...result.routed.diceCrits[0], id: undefined },
-    { id: undefined, die: '1d20', raw: 20, success: true, breakTools: true }
-  );
+  assert.equal(result.routed.diceCrits, undefined, 'the legacy diceCrits field is dropped');
+  const trigger = result.routed.checkBreakage.triggers[0];
+  assert.deepEqual(trigger.condition, {
+    type: 'diceGroup',
+    groupId: 0,
+    aggregate: 'total',
+    operator: '==',
+    value: 20,
+  });
+  assert.equal(trigger.outcome, 'success');
+  assert.equal(trigger.breakTools, true);
 });
 
 test('_normalizeCraftingCheck normalizes relative and fixed tiers independently', () => {
@@ -137,8 +143,7 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
     dcMode: 'static',
     tiers: [],
     macroUuid: null,
-    diceCrits: [],
-    checkBreakage: { enabled: false, triggers: [] },
+    checkBreakage: { triggers: [] },
   });
 });
 
@@ -149,12 +154,11 @@ test('_normalizeCraftingCheck defaults the progressive check when absent', () =>
     awardMode: 'equal',
     allowPlayerReorder: false,
     rollFormula: '',
-    diceCrits: [],
-    checkBreakage: { enabled: false, triggers: [] },
+    checkBreakage: { triggers: [] },
   });
 });
 
-test('_normalizeCraftingCheck normalizes the progressive check (formula, crits, award settings)', () => {
+test('_normalizeCraftingCheck migrates progressive crits into unified triggers (formula, award settings)', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     progressive: {
@@ -172,14 +176,16 @@ test('_normalizeCraftingCheck normalizes the progressive check (formula, crits, 
   assert.equal(result.progressive.awardMode, 'partial', 'award settings are preserved');
   assert.equal(result.progressive.allowPlayerReorder, true);
   assert.equal(result.progressive.rollFormula, '2d6+@abilities.int.mod');
-  // Crits share the simple-check shape; only die-less / non-object entries are dropped.
-  assert.equal(result.progressive.diceCrits.length, 2);
-  assert.equal(result.progressive.diceCrits[0].id, 'c1');
-  assert.equal(result.progressive.diceCrits[0].raw, 12, 'raw is truncated to an integer');
-  assert.equal(result.progressive.diceCrits[0].success, true);
-  assert.equal(result.progressive.diceCrits[0].breakTools, true);
-  assert.equal(result.progressive.diceCrits[1].success, false);
-  assert.equal(result.progressive.diceCrits[1].breakTools, false);
+  assert.equal(result.progressive.diceCrits, undefined, 'the legacy diceCrits field is dropped');
+  // Each valid crit converts to a diceGroup/total/== trigger; die-less / non-object dropped.
+  const triggers = result.progressive.checkBreakage.triggers;
+  assert.equal(triggers.length, 2);
+  assert.equal(triggers[0].id, 'c1');
+  assert.equal(triggers[0].condition.value, 12, 'raw is truncated into the trigger value');
+  assert.equal(triggers[0].outcome, 'success');
+  assert.equal(triggers[0].breakTools, true);
+  assert.equal(triggers[1].outcome, 'failure');
+  assert.equal(triggers[1].breakTools, false);
 });
 
 test('_normalizeCraftingCheck coerces an invalid progressive awardMode to equal', () => {
@@ -188,7 +194,7 @@ test('_normalizeCraftingCheck coerces an invalid progressive awardMode to equal'
   assert.equal(result.progressive.awardMode, 'equal');
 });
 
-test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dice crits)', () => {
+test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, migrated crits)', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     simple: {
@@ -219,19 +225,19 @@ test('_normalizeCraftingCheck normalizes the simple check (threshold, tiers, dic
   assert.equal(result.simple.tiers[0].name, 'Hard');
   assert.equal(result.simple.tiers[1].id, 'keep', 'an existing tier id is preserved');
   assert.equal(result.simple.tiers[1].dc, 10, 'tier DC is truncated to an integer');
-  // Multiple crits per die persist; only die-less / non-object entries are dropped
-  // (a crit always forces an outcome — no off state).
-  assert.equal(result.simple.diceCrits.length, 2);
-  assert.equal(result.simple.diceCrits[0].id, 'c1', 'an existing crit id is preserved');
-  assert.equal(result.simple.diceCrits[0].raw, 20, 'raw is truncated to an integer');
-  assert.equal(result.simple.diceCrits[0].success, true);
-  assert.equal(result.simple.diceCrits[0].breakTools, true);
-  assert.ok(result.simple.diceCrits[1].id, 'a missing crit id is generated');
-  assert.equal(result.simple.diceCrits[1].success, false);
-  assert.equal(result.simple.diceCrits[1].breakTools, false, 'breakTools defaults to false');
+  // Each valid crit migrates to a unified trigger; die-less / non-object dropped.
+  const triggers = result.simple.checkBreakage.triggers;
+  assert.equal(triggers.length, 2);
+  assert.equal(triggers[0].id, 'c1', 'an existing crit id is preserved as the trigger id');
+  assert.equal(triggers[0].condition.value, 20, 'raw is truncated into the trigger value');
+  assert.equal(triggers[0].outcome, 'success');
+  assert.equal(triggers[0].breakTools, true);
+  assert.ok(triggers[1].id, 'a missing crit id is generated');
+  assert.equal(triggers[1].outcome, 'failure');
+  assert.equal(triggers[1].breakTools, false, 'breakTools defaults to false');
 });
 
-test('_normalizeCraftingCheck clamps a crit raw to the die produceable range', () => {
+test('_normalizeCraftingCheck clamps a converted crit value to the die produceable range', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     simple: {
@@ -248,13 +254,17 @@ test('_normalizeCraftingCheck clamps a crit raw to the die produceable range', (
       ],
     },
   });
-  const byId = Object.fromEntries(result.simple.diceCrits.map((c) => [c.id, c]));
-  assert.equal(byId.hi.raw, 20, 'raw above N*S clamps to the max');
-  assert.equal(byId.lo.raw, 2, 'raw below N clamps to the min');
-  assert.equal(byId.ok.raw, 7, 'an in-range raw is unchanged');
+  const byId = Object.fromEntries(
+    result.simple.checkBreakage.triggers.map((t) => [t.id, t])
+  );
+  assert.equal(byId.hi.condition.value, 20, 'raw above N*S clamps to the max');
+  assert.equal(byId.hi.condition.groupId, 0, '1d20 maps to the first group');
+  assert.equal(byId.lo.condition.value, 2, 'raw below N clamps to the min');
+  assert.equal(byId.lo.condition.groupId, 1, '2d6 maps to the second group');
+  assert.equal(byId.ok.condition.value, 7, 'an in-range raw is unchanged');
 });
 
-test('_normalizeCraftingCheck canonicalizes a bare dN crit die to 1dN (matches the formula)', () => {
+test('_normalizeCraftingCheck canonicalizes a bare dN crit die when converting it', () => {
   const mgr = makeManager();
   const result = mgr._normalizeCraftingCheck({
     simple: {
@@ -262,15 +272,20 @@ test('_normalizeCraftingCheck canonicalizes a bare dN crit die to 1dN (matches t
       diceCrits: [{ id: 'bare', die: 'd20', raw: 20, success: true }],
     },
   });
-  assert.equal(result.simple.diceCrits.length, 1, 'a bare dN crit is kept');
-  assert.equal(result.simple.diceCrits[0].die, '1d20', 'die is canonicalized to 1dN');
+  assert.equal(result.simple.checkBreakage.triggers.length, 1, 'a bare dN crit is converted');
+  assert.deepEqual(result.simple.checkBreakage.triggers[0].condition, {
+    type: 'diceGroup',
+    groupId: 0,
+    aggregate: 'total',
+    operator: '==',
+    value: 20,
+  });
 });
 
 test('_normalizeCraftingCheck drops a crit authored against a modified pool, across simple/progressive/routed', () => {
   const mgr = makeManager();
-  // `2d20kh1` is a modified pool: `parseDiceGroups` historically stored the crit
-  // under the stripped key `2d20`, but the pool exposes no plain group total, so
-  // the crit is crit-ineligible and dropped on normalization in every check shape.
+  // `2d20kh1` is a modified pool exposing no plain group total, so a crit keyed to
+  // it is crit-ineligible and dropped (converted to no trigger) in every check shape.
   const orphanedCrit = { id: 'orphan', die: '2d20', raw: 20, success: true };
   const simple = mgr._normalizeCraftingCheck({
     simple: { rollFormula: '2d20kh1', diceCrits: [orphanedCrit] },
@@ -281,9 +296,9 @@ test('_normalizeCraftingCheck drops a crit authored against a modified pool, acr
   const routed = mgr._normalizeCraftingCheck({
     routed: { rollFormula: '2d20kh1', diceCrits: [orphanedCrit] },
   });
-  assert.deepEqual(simple.simple.diceCrits, [], 'simple drops the modified-pool crit');
-  assert.deepEqual(progressive.progressive.diceCrits, [], 'progressive drops the modified-pool crit');
-  assert.deepEqual(routed.routed.diceCrits, [], 'routed drops the modified-pool crit');
+  assert.deepEqual(simple.simple.checkBreakage.triggers, [], 'simple drops the modified-pool crit');
+  assert.deepEqual(progressive.progressive.checkBreakage.triggers, [], 'progressive drops the modified-pool crit');
+  assert.deepEqual(routed.routed.checkBreakage.triggers, [], 'routed drops the modified-pool crit');
 });
 
 test('_normalizeCraftingCheck coerces invalid simple dcMode/thresholdMode to defaults', () => {

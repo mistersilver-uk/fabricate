@@ -2369,7 +2369,7 @@ export class GatheringEngine {
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
-      diceCrits: routed.diceCrits,
+      triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Gathering',
     });
@@ -2539,7 +2539,7 @@ export class GatheringEngine {
     if (rollFormula) {
       const rolled = await runFormulaProgressive({
         formula: rollFormula,
-        diceCrits: progressive.diceCrits,
+        triggers: progressive.checkBreakage?.triggers,
         actor,
         label: 'Gathering',
       });

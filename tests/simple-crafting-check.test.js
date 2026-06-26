@@ -22,9 +22,24 @@ function defaultSimple(overrides = {}) {
     dcMode: 'static',
     tiers: [],
     macroUuid: null,
-    diceCrits: [],
+    checkBreakage: { triggers: [] },
     ...overrides,
   };
+}
+
+// A unified trigger forcing `outcome` (and optionally breakTools) when the rolled
+// group total equals `value` — the recombined replacement for a per-die crit.
+function totalTrigger({ id = 't', groupId = 0, value, outcome = 'none', breakTools = false }) {
+  return {
+    id,
+    condition: { type: 'diceGroup', groupId, aggregate: 'total', operator: '==', value },
+    outcome,
+    breakTools,
+  };
+}
+
+function breakage(...triggers) {
+  return { checkBreakage: { triggers } };
 }
 
 function makeEngine({
@@ -214,33 +229,30 @@ test('dynamic DC: no macro linked falls back to the default DC', async () => {
   assert.equal(result.success, true);
 });
 
-// ── Critical raw rolls ──────────────────────────────────────────────────────
+// ── Forced-outcome triggers ─────────────────────────────────────────────────
 
-test('a critical forces success below the DC (and can break tools)', async () => {
+test('a forced-success trigger passes below the DC', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       dc: 15,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true, breakTools: true }],
+      ...breakage(totalTrigger({ groupId: 0, value: 20, outcome: 'success', breakTools: true })),
     }),
   });
   stubRoll(5, [{ number: 1, faces: 20, total: 20 }]);
   const result = await run(engine);
   assert.equal(result.success, true);
-  assert.equal(result.data.crit.success, true);
-  assert.equal(result.data.breakTools, true, 'the crit surfaces breakTools');
 });
 
-test('a critical forces failure above the DC', async () => {
+test('a forced-failure trigger fails above the DC', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       dc: 15,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 1, success: false }],
+      ...breakage(totalTrigger({ groupId: 0, value: 1, outcome: 'failure' })),
     }),
   });
   stubRoll(30, [{ number: 1, faces: 20, total: 1 }]);
   const result = await run(engine);
   assert.equal(result.success, false);
-  assert.equal(result.data.crit.success, false);
 });
 
 test('a matching forced failure takes precedence over a matching forced success', async () => {
@@ -248,10 +260,10 @@ test('a matching forced failure takes precedence over a matching forced success'
     simple: defaultSimple({
       rollFormula: '1d20+1d6',
       dc: 15,
-      diceCrits: [
-        { id: 'c1', die: '1d20', raw: 20, success: true },
-        { id: 'c2', die: '1d6', raw: 1, success: false },
-      ],
+      ...breakage(
+        totalTrigger({ id: 'c1', groupId: 0, value: 20, outcome: 'success' }),
+        totalTrigger({ id: 'c2', groupId: 1, value: 1, outcome: 'failure' })
+      ),
     }),
   });
   stubRoll(21, [
@@ -260,20 +272,18 @@ test('a matching forced failure takes precedence over a matching forced success'
   ]);
   const result = await run(engine);
   assert.equal(result.success, false, 'forced failure wins');
-  assert.equal(result.data.crit.success, false);
 });
 
-test('a non-matching critical raw roll leaves the comparison in charge', async () => {
+test('a non-matching forced-outcome trigger leaves the comparison in charge', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       dc: 15,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true }],
+      ...breakage(totalTrigger({ groupId: 0, value: 20, outcome: 'success' })),
     }),
   });
   stubRoll(13, [{ number: 1, faces: 20, total: 13 }]);
   const result = await run(engine);
-  assert.equal(result.data.crit, null);
-  assert.equal(result.success, false, '13 < 15 and no crit');
+  assert.equal(result.success, false, '13 < 15 and no forced outcome');
 });
 
 // ── Gating: simple vs alchemy vs disabled ───────────────────────────────────
@@ -329,38 +339,35 @@ test('a roll that throws fails the check with a message', async () => {
   assert.match(result.message, /roll failed/i);
 });
 
-test('dice-group sums (not single die faces) drive multi-die crits', async () => {
+test('dice-group sums (not single die faces) drive a multi-die total trigger', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       rollFormula: '2d6',
       dc: 99,
-      diceCrits: [{ id: 'c1', die: '2d6', raw: 12, success: true }],
+      ...breakage(totalTrigger({ groupId: 0, value: 12, outcome: 'success' })),
     }),
   });
-  // 2d6 summing to 12 matches the crit configured on the "2d6" group.
+  // 2d6 summing to 12 matches the trigger's total==12 on group 0.
   stubRoll(12, [{ number: 2, faces: 6, total: 12 }]);
   const result = await run(engine);
   assert.equal(result.success, true);
-  assert.equal(result.data.crit.success, true);
 });
 
-test('duplicate dice terms: a 1d20 crit fires when EITHER d20 term totals 20', async () => {
+test('duplicate dice terms: a trigger targets a specific group by groupId', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({
       rollFormula: '1d20+1d20',
       dc: 99,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true }],
+      // A trigger on the SECOND d20 term (groupId 1) fires when that term totals 20.
+      ...breakage(totalTrigger({ groupId: 1, value: 20, outcome: 'success' })),
     }),
   });
-  // Two separate 1d20 terms; only the SECOND totals 20. `.some` semantics in
-  // _resolveSimpleCheckCrit mean the crit still fires.
   stubRoll(33, [
     { number: 1, faces: 20, total: 13 },
     { number: 1, faces: 20, total: 20 },
   ]);
   const result = await run(engine);
-  assert.equal(result.success, true, 'crit fires when either matching d20 term totals 20');
-  assert.equal(result.data.crit.success, true);
+  assert.equal(result.success, true, 'the groupId:1 trigger fires for the second d20 term');
 });
 
 // ── Simple-vs-legacy precedence ─────────────────────────────────────────────
@@ -455,39 +462,44 @@ test('_applyToolBreakage default (no options) does not force breakage', async ()
   assert.equal(evidence[0].broken, false, 'the default path follows per-tool behavior');
 });
 
-test('_runSimpleCheck sets data.breakTools from a forced-success crit', async () => {
-  const { engine } = makeEngine({
+test('checkDriven simple: a breakTools trigger forces break via the decision seam', async () => {
+  const { engine, system } = makeEngine({
     simple: defaultSimple({
-      dc: 15,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true, breakTools: true }],
+      dc: 1,
+      ...breakage(totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'success', breakTools: true })),
     }),
   });
-  stubRoll(5, [{ number: 1, faces: 20, total: 20 }]);
+  system.toolBreakage = { authority: 'checkDriven' };
+  stubRoll(20, [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }]);
   const result = await run(engine);
   assert.equal(result.success, true);
-  assert.equal(result.data.breakTools, true, 'a forced-success breakTools crit surfaces the flag');
+  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, result);
+  assert.equal(decision.forceBreak, true, 'the breakTools trigger forces a break under checkDriven');
+  assert.equal(decision.triggerId, 'bt');
 });
 
-test('a forced-success crit with breakTools:false does not surface breakTools', async () => {
-  const { engine } = makeEngine({
+test('toolSpecific simple: a breakTools trigger never force-breaks (either-or authority)', async () => {
+  const { engine, system } = makeEngine({
     simple: defaultSimple({
-      dc: 15,
-      diceCrits: [{ id: 'c1', die: '1d20', raw: 20, success: true, breakTools: false }],
+      dc: 1,
+      ...breakage(totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'none', breakTools: true })),
     }),
   });
-  stubRoll(5, [{ number: 1, faces: 20, total: 20 }]);
+  // Default toolSpecific authority: a check never breaks tools.
+  stubRoll(20, [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }]);
   const result = await run(engine);
-  assert.equal(result.success, true);
-  assert.equal(result.data.breakTools, false);
+  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, result);
+  assert.equal(decision.authority, 'toolSpecific');
+  assert.equal(decision.forceBreak, false, 'a matching breakTools trigger is inert under toolSpecific');
 });
 
-test('a non-crit success path does not surface breakTools', async () => {
+test('a non-forced success path surfaces no crit/breakTools fields', async () => {
   const { engine } = makeEngine({ simple: defaultSimple({ dc: 15 }) });
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
   const result = await run(engine);
   assert.equal(result.success, true);
-  assert.equal(result.data.crit, null);
-  assert.equal(result.data.breakTools, false);
+  assert.equal(result.data.crit, undefined, 'passFail no longer surfaces a crit object');
+  assert.equal(result.data.breakTools, undefined, 'passFail no longer surfaces breakTools');
 });
 
 // ── checkBreakage / diceGroups surfacing (issue 419) ─────────────────────────
@@ -503,8 +515,7 @@ test('checkDriven simple: a diceGroup anyDie==1 trigger forces breakage on the s
   const simple = defaultSimple({
     dc: 1,
     checkBreakage: {
-      enabled: true,
-      triggers: [{ id: 'nat1', label: 'Nat 1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+      triggers: [{ id: 'nat1', breakTools: true, outcome: 'none', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
     },
   });
   const { engine, system } = makeEngine({ simple });

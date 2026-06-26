@@ -14,7 +14,7 @@ import {
   TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
   TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST,
 } from '../models/Tool.js';
-import { parsePlainDiceGroups } from '../utils/craftingCheckExpression.js';
+import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
   getSourceUuid,
@@ -349,12 +349,12 @@ export class CraftingSystemManager {
   // value is polymorphic — either a static default with optional named recipe
   // tiers, or a dynamic value computed by a dropped macro. Both the static and
   // dynamic fields are kept so switching `dcMode` never destroys the other side's
-  // configuration. Per-die critical raw rolls auto-fail/auto-succeed.
+  // configuration. The unified `checkBreakage` trigger list (issue 419) forces
+  // outcomes and/or breaks tools; legacy `diceCrits` are migrated into it on read.
   _normalizeSimpleCraftingCheck(simple = {}) {
     const source = !simple || typeof simple !== 'object' ? {} : simple;
     const dc = Number(source.dc);
     const tiers = Array.isArray(source.tiers) ? source.tiers : [];
-    const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
     const rollFormula = typeof source.rollFormula === 'string' ? source.rollFormula : '';
     return {
       rollFormula,
@@ -363,31 +363,35 @@ export class CraftingSystemManager {
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
       macroUuid: source.macroUuid || null,
-      diceCrits: this._normalizeDiceCrits(diceCrits, rollFormula),
-      checkBreakage: this._normalizeCheckBreakage(source.checkBreakage),
+      checkBreakage: this._normalizeUnifiedTriggers(
+        rollFormula,
+        source.diceCrits,
+        source.checkBreakage
+      ),
     };
   }
 
   // Progressive crafting check (progressive resolution mode): a roll formula whose
   // total is the numeric value progressive result-awarding spends against result
-  // difficulties — no DC, no comparison, no recipe tiers. Per-die critical raw
-  // rolls force award-all/award-none (and may break tools). The `awardMode` and
+  // difficulties — no DC, no comparison, no recipe tiers. The unified `checkBreakage`
+  // trigger list (issue 419) forces award-all/award-none and (under checkDriven) may
+  // break tools; legacy `diceCrits` are migrated into it on read. The `awardMode` and
   // `allowPlayerReorder` award settings live on this same object (read by the
   // ResolutionModeService progressive branch) and are preserved here.
   _normalizeProgressiveCraftingCheck(progressive = {}) {
     const source = !progressive || typeof progressive !== 'object' ? {} : progressive;
-    const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
+    const rollFormula = typeof source.rollFormula === 'string' ? source.rollFormula : '';
     return {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
         ? source.awardMode
         : 'equal',
       allowPlayerReorder: source.allowPlayerReorder === true,
-      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
-      diceCrits: this._normalizeDiceCrits(
-        diceCrits,
-        typeof source.rollFormula === 'string' ? source.rollFormula : ''
+      rollFormula,
+      checkBreakage: this._normalizeUnifiedTriggers(
+        rollFormula,
+        source.diceCrits,
+        source.checkBreakage
       ),
-      checkBreakage: this._normalizeCheckBreakage(source.checkBreakage),
     };
   }
 
@@ -402,55 +406,60 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize a check's per-die crit list against its roll formula. Crits are
-   * matched against the GROUP TOTAL of a plain, unmodified `NdS` die term, so a
-   * crit is kept only when its (canonicalized) die appears as a plain die group
-   * in the formula. Crits authored against a modified pool (keep/drop/explode/
-   * reroll, e.g. `2d20kh1`) — which `parseDiceGroups` historically stored under
-   * the stripped key `2d20` — are crit-ineligible and dropped here (the editor
-   * surfaces them under a removal notice before this drop). The classifier
-   * ({@link parsePlainDiceGroups}) is shared with the editor so UI eligibility
-   * and persistence cannot drift, including the bare `dN` ≡ `1dN`
-   * canonicalization.
+   * Convert a check's legacy per-die crit list into unified trigger objects (issue
+   * 419 recombine). Each legacy crit `{ die, raw, success, breakTools }` becomes a
+   * `diceGroup`/`total`/`==` trigger forcing the matching outcome (and optionally
+   * breaking tools).
+   *
+   * A crit is kept only when its (canonicalized) die appears as a plain, unmodified
+   * `NdS` group in the formula — mirroring the previous ineligible-crit drop. The
+   * trigger's `groupId` is the index of the FIRST {@link parseDiceGroups} term whose
+   * `raw` matches that die (the same evaluated-term index the engine reports), so
+   * duplicate-die formulas (`1d20 + 1d20`) target the first matching group only
+   * (an accepted migration caveat).
    * @private
    */
-  _normalizeDiceCrits(crits, rollFormula) {
+  _convertDiceCritsToTriggers(crits, rollFormula) {
     const list = Array.isArray(crits) ? crits : [];
+    if (list.length === 0) return [];
+    const groups = parseDiceGroups(rollFormula);
     const plainDice = new Set(parsePlainDiceGroups(rollFormula).map((group) => group.raw));
-    return list.map((crit) => this._normalizeSimpleDiceCrit(crit, plainDice)).filter(Boolean);
-  }
-
-  _normalizeSimpleDiceCrit(crit, plainDice) {
-    if (!crit || typeof crit !== 'object') return null;
-    // Canonicalize the die key (bare `dN` ≡ `1dN`) so it agrees with the shared
-    // classifier and the formula's plain die groups.
-    const die = this._canonicalDie(crit.die);
-    // A die may carry several crits (e.g. raw 1 forces failure, raw 20 forces
-    // success), so each is its own keyed row. A crit always forces an outcome —
-    // there is no off state. Drop a crit with no die, or one keyed to a die that
-    // is not a plain `NdS` group in the formula (modified pools / orphaned keys).
-    if (!die) return null;
-    if (plainDice instanceof Set && !plainDice.has(die)) return null;
-    const raw = Number.isFinite(Number(crit.raw)) ? Math.trunc(Number(crit.raw)) : 0;
-    return {
-      id: crit.id || foundry.utils.randomID(),
-      die,
-      // Clamp `raw` to the die's producible range [N, N*S] parsed from the `NdS`
-      // die string. The crit matches the die-term total, so an UNCLAMPED out-of-range
-      // raw could never fire; clamping shifts it to the nearest producible boundary
-      // so it fires there instead (e.g. raw 25 on 1d20 clamps to 20 — the natural
-      // max — rather than being a dead config). If the die can't be parsed, leave it.
-      raw: this._clampCritRaw(die, raw),
-      success: crit.success === true,
-      breakTools: crit.breakTools === true,
-    };
+    return list
+      .map((crit) => {
+        if (!crit || typeof crit !== 'object') return null;
+        // Canonicalize the die key (bare `dN` ≡ `1dN`) and drop crits keyed to a die
+        // that is not a plain `NdS` group in the formula (modified pools / orphans).
+        const die = this._canonicalDie(crit.die);
+        if (!die || !plainDice.has(die)) return null;
+        const groupId = groups.findIndex((group) => group.raw === die);
+        if (groupId === -1) return null;
+        const raw = Number.isFinite(Number(crit.raw)) ? Math.trunc(Number(crit.raw)) : 0;
+        return {
+          id: String(crit.id || foundry.utils.randomID()),
+          condition: {
+            type: 'diceGroup',
+            groupId,
+            aggregate: 'total',
+            operator: '==',
+            // Clamp `raw` to the die's producible total range [N, N*S]; the legacy
+            // crit matched the die-term total, so an out-of-range raw could never
+            // fire (see {@link _clampCritRaw}).
+            value: this._clampCritRaw(die, raw),
+          },
+          // Legacy `success:false` always meant force-failure (there was no off
+          // state), so the disposition maps directly.
+          outcome: crit.success === true ? 'success' : 'failure',
+          breakTools: crit.breakTools === true,
+        };
+      })
+      .filter(Boolean);
   }
 
   /**
    * Canonical plain `NdS` form of a stored crit die key, via the shared
    * classifier (bare `dN` ≡ `1dN`). Returns '' when the key is not a plain,
    * unmodified die term (e.g. a modified pool such as `2d20kh1`), so such crits
-   * are dropped by {@link _normalizeSimpleDiceCrit}.
+   * are dropped by {@link _convertDiceCritsToTriggers}.
    * @private
    */
   _canonicalDie(die) {
@@ -490,7 +499,6 @@ export class CraftingSystemManager {
     const relative = Array.isArray(source.relativeOutcomes) ? source.relativeOutcomes : [];
     const fixed = Array.isArray(source.fixedOutcomes) ? source.fixedOutcomes : [];
     const tiers = Array.isArray(source.tiers) ? source.tiers : [];
-    const diceCrits = Array.isArray(source.diceCrits) ? source.diceCrits : [];
     const dc = Number(source.dc);
     // The roll formula, default DC, comparison, per-die crits, and recipe tiers
     // mirror the simple check (so the editors share components). `rollExpression`
@@ -507,14 +515,17 @@ export class CraftingSystemManager {
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
-      diceCrits: this._normalizeDiceCrits(diceCrits, rollFormula),
       relativeOutcomes: relative
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'relative'))
         .filter(Boolean),
       fixedOutcomes: fixed
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'fixed'))
         .filter(Boolean),
-      checkBreakage: this._normalizeCheckBreakage(source.checkBreakage),
+      checkBreakage: this._normalizeUnifiedTriggers(
+        rollFormula,
+        source.diceCrits,
+        source.checkBreakage
+      ),
     };
   }
 
@@ -540,42 +551,72 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize the optional per-check `checkBreakage` block (issue 419) carried by
+   * Normalize the unified per-check trigger list (issue 419 recombine) carried by
    * each crafting/salvage/gathering check sub-object (simple/routed/progressive).
-   * Shape: `{ enabled: boolean, triggers: CheckBreakageTrigger[] }`. Triggers are
-   * ORed; any match breaks every required tool under `checkDriven` authority.
-   * Malformed triggers (unknown condition type, missing operands) are dropped so a
-   * bad authoring payload can never throw at runtime.
+   * Migrates legacy data on read (no versioned migration): any legacy `diceCrits`
+   * are converted to `diceGroup` triggers and concatenated ahead of the normalized
+   * `checkBreakage.triggers`. Idempotent — a re-normalized block carries no
+   * `diceCrits` and its triggers already hold `outcome`/`breakTools`, so the second
+   * pass converts nothing and re-normalizes the triggers to themselves.
    *
-   * `rollFormula` is accepted for parity with the editor (group enumeration) but is
-   * not persisted here — `diceGroup` triggers carry their own `groupId`.
+   * @param {string} rollFormula     Formula used to resolve a converted crit's groupId.
+   * @param {Array<object>} [diceCrits]   Legacy per-die crit list (pre-recombine).
+   * @param {object} [checkBreakage]      Existing `{ triggers }` block.
+   * @returns {{ triggers: Array<object> }}
+   * @private
+   */
+  _normalizeUnifiedTriggers(rollFormula, diceCrits, checkBreakage) {
+    const converted = this._convertDiceCritsToTriggers(diceCrits, rollFormula);
+    const { triggers } = this._normalizeCheckBreakage(checkBreakage);
+    return { triggers: [...converted, ...triggers] };
+  }
+
+  /**
+   * Normalize the `checkBreakage` block's own trigger list (no crit conversion).
+   * Shape: `{ triggers: UnifiedTrigger[] }`. Malformed triggers (unknown condition
+   * type, missing operands) are dropped so a bad authoring payload can never throw
+   * at runtime.
    *
    * @param {object} [input] Raw `checkBreakage` block.
-   * @returns {{ enabled: boolean, triggers: Array<object> }}
+   * @returns {{ triggers: Array<object> }}
    * @private
    */
   _normalizeCheckBreakage(input) {
     const source = !input || typeof input !== 'object' ? {} : input;
     const rawTriggers = Array.isArray(source.triggers) ? source.triggers : [];
     const triggers = rawTriggers
-      .map((trigger) => this._normalizeCheckBreakageTrigger(trigger))
+      .map((trigger) => this._normalizeUnifiedTrigger(trigger))
       .filter(Boolean);
-    return { enabled: source.enabled === true, triggers };
+    return { triggers };
   }
 
   /**
-   * Normalize a single `checkBreakage` trigger `{ id, label, condition }`, dropping
-   * it (returning null) when its condition shape is malformed.
+   * Normalize a single unified trigger `{ id, condition, outcome, breakTools }`,
+   * dropping it (returning null) when its condition shape is malformed.
+   *
+   * - `outcome` is one of `'success' | 'failure' | 'none'` (default `'none'`);
+   *   pinned to `'none'` for an `outcomeTier` condition, whose match is resolved
+   *   only after the routed outcome is known (so it can never force one).
+   * - `breakTools` defaults to `false`, EXCEPT a legacy break-only trigger (one
+   *   carrying neither an `outcome` nor a `breakTools` prop, as authored before the
+   *   recombine) is migrated to `breakTools: true` so it keeps breaking tools.
+   * - The free-text `label` is dropped.
    * @private
    */
-  _normalizeCheckBreakageTrigger(trigger) {
+  _normalizeUnifiedTrigger(trigger) {
     if (!trigger || typeof trigger !== 'object') return null;
     const condition = this._normalizeCheckBreakageCondition(trigger.condition);
     if (!condition) return null;
+    const isLegacyBreakOnly = trigger.outcome === undefined && trigger.breakTools === undefined;
+    let outcome = ['success', 'failure', 'none'].includes(trigger.outcome)
+      ? trigger.outcome
+      : 'none';
+    if (condition.type === 'outcomeTier') outcome = 'none';
     return {
       id: String(trigger.id || foundry.utils.randomID()),
-      label: typeof trigger.label === 'string' ? trigger.label : '',
       condition,
+      outcome,
+      breakTools: isLegacyBreakOnly ? true : trigger.breakTools === true,
     };
   }
 

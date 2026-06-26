@@ -47,8 +47,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDiceCrits.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckBreakage.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckTriggers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckAwardMode.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
@@ -1855,17 +1854,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelector('[data-checks-active-toggle]'), null);
 
-    // No Save button until there are unsaved edits.
-    assert.equal(target.querySelector('[data-checks-save]'), null);
+    // The Save button is always present, disabled until there are unsaved edits.
+    const saveButtonInitial = target.querySelector('[data-checks-save]');
+    assert.ok(saveButtonInitial, 'the Save button is always rendered');
+    assert.ok(saveButtonInitial.disabled, 'the Save button is disabled with no unsaved edits');
 
-    // Editing stages a change: the Save button appears and persists via the store
+    // Editing stages a change: the Save button enables and persists via the store
     // seam (not auto-saved), then the unsaved state clears.
     expressionInput.value = '2d6+1d4';
     expressionInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     const saveButton = target.querySelector('[data-checks-save]');
-    assert.ok(saveButton, 'editing reveals the Save button');
+    assert.ok(saveButton, 'the Save button is present');
+    assert.equal(saveButton.disabled, false, 'editing enables the Save button');
 
     saveButton.click();
     await tick();
@@ -1874,10 +1876,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     const saved = calls.find((call) => call[0] === 'saveCraftingCheckRouted');
     assert.ok(saved, 'Save persists the routed config through the store');
     assert.equal(saved[1].rollFormula, '2d6+1d4');
-    assert.equal(
-      target.querySelector('[data-checks-save]'),
-      null,
-      'saving clears the unsaved state'
+    assert.ok(
+      target.querySelector('[data-checks-save]').disabled,
+      'saving clears the unsaved state and re-disables the Save button'
     );
   });
 
@@ -1919,15 +1920,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the selector is seeded from the persisted award mode'
     );
 
-    // No Save button until an edit stages a change.
-    assert.equal(target.querySelector('[data-checks-save]'), null);
+    // The Save button is present but disabled until an edit stages a change.
+    assert.ok(
+      target.querySelector('[data-checks-save]')?.disabled,
+      'the Save button is disabled with no unsaved edits'
+    );
 
-    // Change the award mode; the shared (tab-aware) Save button appears.
+    // Change the award mode; the shared (tab-aware) Save button enables.
     salvageEditor.querySelector('[data-award-mode-option="exceed"] input').click();
     await tick();
     flushSync();
     const saveButton = target.querySelector('[data-checks-save]');
-    assert.ok(saveButton, 'editing the salvage award mode reveals the Save button');
+    assert.ok(saveButton, 'the Save button is present');
+    assert.equal(saveButton.disabled, false, 'editing the salvage award mode enables the Save button');
 
     saveButton.click();
     await tick();
@@ -1945,10 +1950,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       undefined,
       'the salvage tab does not call the crafting save seam'
     );
-    assert.equal(
-      target.querySelector('[data-checks-save]'),
-      null,
-      'saving clears the unsaved state'
+    assert.ok(
+      target.querySelector('[data-checks-save]').disabled,
+      'saving clears the unsaved state and re-disables the Save button'
     );
   });
 
@@ -2037,14 +2041,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the editor is seeded from the persisted award mode'
     );
 
-    // No Save button until an edit stages a change.
-    assert.equal(target.querySelector('[data-checks-save]'), null);
+    // The Save button is present but disabled until an edit stages a change.
+    assert.ok(
+      target.querySelector('[data-checks-save]')?.disabled,
+      'the Save button is disabled with no unsaved edits'
+    );
 
     editor.querySelector('[data-award-mode-option="exceed"] input').click();
     await tick();
     flushSync();
     const saveButton = target.querySelector('[data-checks-save]');
-    assert.ok(saveButton, 'editing the gathering award mode reveals the Save button');
+    assert.ok(saveButton, 'the Save button is present');
+    assert.equal(saveButton.disabled, false, 'editing the gathering award mode enables the Save button');
 
     saveButton.click();
     await tick();
@@ -2159,7 +2167,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(toggled[1], true, 'enabling the check sends true');
   });
 
-  it('crafting check editor (relative): formula/DC/comparison, per-die crits, recipe tiers, and outcomes', () => {
+  it('crafting check editor (relative): formula/DC/comparison, unified triggers, recipe tiers, and outcomes', () => {
     const emitted = [];
     const value = {
       type: 'relative',
@@ -2167,7 +2175,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       dc: 14,
       thresholdMode: 'meet',
       tiers: [],
-      diceCrits: [],
+      checkBreakage: { triggers: [] },
       relativeOutcomes: [
         { id: 'a1b2c3d4ef', name: 'Fail', success: false, breakTools: true, dc: -2 },
       ],
@@ -2183,29 +2191,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    // Routed mirrors simple: a formula/DC/comparison row and a per-die crit table
-    // (one group per detected die), not display-only chips.
+    // Routed mirrors simple: a formula/DC/comparison row and the always-rendered
+    // unified trigger editor (replacing the old per-die crit table).
     assert.equal(target.querySelector('[data-check-roll-formula]').value, '2d6+1d4');
     assert.equal(target.querySelector('[data-check-dc]').value, '14');
     assert.ok(target.querySelector('[data-threshold-mode]'), 'comparison select renders');
-    assert.deepEqual(
-      [...target.querySelectorAll('[data-crit-group]')].map((g) =>
-        g.getAttribute('data-crit-group')
-      ),
-      ['2d6', '1d4']
-    );
+    assert.ok(target.querySelector('[data-check-triggers]'), 'the unified trigger editor renders');
+    assert.equal(target.querySelector('[data-crit-group]'), null, 'the old crit table is gone');
     // Relative checks expose recipe tiers (DC overrides); fixed checks do not.
     assert.ok(
       target.querySelector('[data-routed-tiers]'),
       'relative mode shows the recipe tiers card'
     );
 
-    // Column labels live in the table header, not on every row.
+    // Column labels live in the table header, not on every row. Under toolSpecific
+    // authority (the default here) the per-outcome Break tools column is hidden.
     assert.deepEqual(
       [...target.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
         .map((cell) => cell.textContent.trim())
         .filter(Boolean),
-      ['Name', 'DC ±', 'Outcome', 'Break tools']
+      ['Name', 'DC ±', 'Outcome']
     );
     assert.ok(target.querySelector('[data-outcome-dc]'), 'relative tiers expose a DC field');
     assert.equal(
@@ -2235,14 +2240,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       successToggle.classList.contains('is-negative'),
       'the failure state is the red/negative pill'
     );
-    const breakPill = target.querySelector('[data-outcome-break]');
-    assert.ok(
-      breakPill.textContent.includes('Break'),
-      "the break pill shows Break/Don't break, not On/Off"
-    );
-    assert.ok(
-      breakPill.classList.contains('is-negative'),
-      'breaking tools is the red/negative pill'
+    // The per-outcome break-tools pill is hidden under toolSpecific authority.
+    assert.equal(
+      target.querySelector('[data-outcome-break]'),
+      null,
+      'the per-outcome break column is hidden under toolSpecific'
     );
     successToggle.click();
     assert.equal(emitted.at(-1).relativeOutcomes[0].success, true, 'clicking flips success state');
@@ -2322,7 +2324,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('simple check editor: threshold + comparison, crit table, tiers, and macro modes', () => {
+  it('simple check editor: threshold + comparison, unified triggers, tiers, and macro modes', () => {
     const emitted = [];
     const value = {
       rollFormula: '1d20+@abilities.int.mod',
@@ -2331,11 +2333,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       dcMode: 'static',
       tiers: [{ id: 'tier1', name: 'Hard', dc: 18 }],
       macroUuid: null,
-      // Two crits on the same die: raw 1 forces failure, raw 20 forces success.
-      diceCrits: [
-        { id: 'c1', die: '1d20', raw: 1, success: false, breakTools: false },
-        { id: 'c2', die: '1d20', raw: 20, success: true, breakTools: false },
-      ],
+      // Two unified triggers: a forced failure and a forced success on the d20 total.
+      checkBreakage: {
+        triggers: [
+          { id: 'c1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 1 }, outcome: 'failure', breakTools: false },
+          { id: 'c2', condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 20 }, outcome: 'success', breakTools: false },
+        ],
+      },
     };
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2350,48 +2354,31 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-check-dc]').value, '12');
     assert.equal(target.querySelector('[data-threshold-mode]').value, 'meet');
 
-    // Dice chips are replaced by a per-die crit group that holds multiple rows.
-    assert.equal(target.querySelector('[data-dice-group]'), null, 'chips are replaced');
-    const group = target.querySelector('[data-crit-group="1d20"]');
-    assert.ok(group, 'one crit group per die');
-    assert.equal(
-      group.querySelectorAll('[data-crit-row]').length,
-      2,
-      'both crits on the die render'
+    // The old crit table is replaced by the always-rendered unified trigger editor.
+    assert.equal(target.querySelector('[data-crit-group]'), null, 'the old crit table is gone');
+    const triggers = target.querySelector('[data-check-triggers]');
+    assert.ok(triggers, 'the unified trigger editor renders');
+    assert.equal(triggers.querySelectorAll('[data-trigger]').length, 2, 'both triggers render');
+    // Under toolSpecific authority the outcome toggle is available but the break pill is not.
+    const c2 = triggers.querySelector('[data-trigger="c2"]');
+    assert.ok(
+      c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-selected'),
+      'the success trigger shows the Automatic success segment selected'
     );
-    const rawInput = group.querySelector('[data-crit-row="c2"] [data-crit-raw]');
-    assert.equal(rawInput.getAttribute('min'), '1');
-    assert.equal(rawInput.getAttribute('max'), '20');
-    assert.equal(rawInput.value, '20');
+    assert.equal(triggers.querySelector('[data-trigger-break]'), null, 'no break pill under toolSpecific');
 
-    // Columns: Raw roll | Force Outcome (success/failure toggle) | Break tools.
-    assert.deepEqual(
-      [...group.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
-        .map((cell) => cell.textContent.trim())
-        .filter(Boolean),
-      ['Raw roll', 'Force Outcome', 'Break tools']
-    );
-    const c2 = group.querySelector('[data-crit-row="c2"]');
-    const force = c2.querySelector('[data-crit-success]');
-    assert.ok(force.classList.contains('is-positive'), 'success crit shows the green pill');
-    assert.ok(force.textContent.includes('Success'));
-    const breakPill = c2.querySelector('[data-crit-break]');
-    assert.ok(breakPill.textContent.includes("Don't break"), 'break toggle defaults to off');
-    // Toggling Force Outcome flips success; no off state.
-    force.click();
-    assert.equal(emitted.at(-1).diceCrits.find((c) => c.id === 'c2').success, false);
-    breakPill.click();
-    assert.equal(emitted.at(-1).diceCrits.find((c) => c.id === 'c2').breakTools, true);
+    // Clicking a segment emits the new outcome.
+    c2.querySelector('[data-trigger-outcome="none"]').click();
+    assert.equal(emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c2').outcome, 'none');
 
-    // Add appends a new crit row to the same die; remove drops one.
-    group.querySelector('[data-add-crit]').click();
-    assert.equal(emitted.at(-1).diceCrits.length, 3, 'add appends a crit for the die');
-    assert.equal(emitted.at(-1).diceCrits.at(-1).die, '1d20');
-    group.querySelector('[data-crit-row="c1"] [data-remove-crit]').click();
+    // Add appends a new trigger; remove drops one.
+    triggers.querySelector('[data-add-trigger]').click();
+    assert.equal(emitted.at(-1).checkBreakage.triggers.length, 3, 'add appends a trigger');
+    triggers.querySelector('[data-trigger="c1"] [data-remove-trigger]').click();
     assert.deepEqual(
-      emitted.at(-1).diceCrits.map((crit) => crit.id),
+      emitted.at(-1).checkBreakage.triggers.map((t) => t.id),
       ['c2'],
-      'remove drops just that row'
+      'remove drops just that trigger'
     );
 
     // Static mode shows the tiers table (no macro drop zone).
@@ -2436,16 +2423,28 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-check-dc]'));
   });
 
-  it('progressive check editor: formula + crit table only (no DC, comparison, tiers, or macro)', () => {
+  it('progressive check editor: formula + unified trigger list only (no DC, comparison, tiers, or macro)', () => {
     const emitted = [];
     const value = {
       awardMode: 'equal',
       allowPlayerReorder: false,
       rollFormula: '2d6',
-      diceCrits: [
-        { id: 'c1', die: '2d6', raw: 12, success: true, breakTools: false },
-        { id: 'c2', die: '2d6', raw: 2, success: false, breakTools: false },
-      ],
+      checkBreakage: {
+        triggers: [
+          {
+            id: 'c1',
+            condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 12 },
+            outcome: 'success',
+            breakTools: false,
+          },
+          {
+            id: 'c2',
+            condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 2 },
+            outcome: 'failure',
+            breakTools: false,
+          },
+        ],
+      },
     };
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2465,16 +2464,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-tier-name]'), null);
     assert.equal(target.querySelector('[data-check-macro-dropzone]'), null);
 
-    // The shared per-die crit table renders, with the Force Outcome + Break tools toggles.
-    const group = target.querySelector('[data-crit-group="2d6"]');
-    assert.ok(group, 'one crit group per die');
-    const force = group.querySelector('[data-crit-row="c1"] [data-crit-success]');
-    assert.ok(force.classList.contains('is-positive'), 'success crit shows the green pill');
-    // In the progressive (numeric) context the Force Outcome pill is relabelled
-    // award-all/award-none rather than success/failure.
-    assert.ok(force.textContent.includes('Award all'), 'success crit reads "Award all"');
-    const failRow = group.querySelector('[data-crit-row="c2"] [data-crit-success]');
-    assert.ok(failRow.textContent.includes('Award none'), 'failure crit reads "Award none"');
+    // The unified trigger list renders. In the progressive (numeric) context the
+    // outcome toggle is relabelled award-all/award-none rather than success/failure.
+    const triggers = target.querySelector('[data-check-triggers]');
+    assert.ok(triggers, 'the unified trigger editor renders');
+    const c1Triggers = triggers.querySelector('[data-trigger="c1"]');
+    assert.ok(
+      c1Triggers.querySelector('[data-trigger-outcome="success"]').classList.contains('is-selected'),
+      'the success trigger selects the award-all segment'
+    );
+    const optionLabels = [...c1Triggers.querySelectorAll('[data-trigger-outcome]')].map(
+      (b) => b.textContent
+    );
+    assert.ok(optionLabels.some((label) => label.includes('Award all')), 'success reads "Award all"');
+    assert.ok(optionLabels.some((label) => label.includes('Award none')), 'failure reads "Award none"');
+    // Default toolSpecific authority hides the per-trigger break pill.
+    assert.equal(triggers.querySelector('[data-trigger-break]'), null, 'no break pill under toolSpecific');
 
     // The award-mode selector renders, defaults to equal, and emits the chosen mode.
     const awardCard = target.querySelector('[data-award-mode]');
@@ -2486,18 +2491,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     awardCard.querySelector('[data-award-mode-option="partial"] input').click();
     assert.equal(emitted.at(-1).awardMode, 'partial', 'selecting an award mode emits it');
 
-    // Editing the crit table preserves the carried award settings.
-    force.click();
-    assert.equal(emitted.at(-1).diceCrits.find((c) => c.id === 'c1').success, false);
-    assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on a crit edit');
+    // Editing a trigger outcome preserves the carried award settings.
+    c1Triggers.querySelector('[data-trigger-outcome="none"]').click();
+    flushSync();
+    assert.equal(
+      emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c1').outcome,
+      'none',
+      'clicking a segment emits the new outcome'
+    );
+    assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on a trigger edit');
     assert.equal(emitted.at(-1).allowPlayerReorder, false);
   });
 
-  // Tool-breakage authority UI (issue 419). Each editor accepts a `breakageAuthority`
-  // prop: under `toolSpecific` the legacy per-die/per-outcome break-tools toggles
-  // render and the CheckBreakage section is hidden; under `checkDriven` the toggles
-  // are hidden and the CheckBreakage trigger editor renders. Mount an editor with a
-  // given authority and return the target so each assertion stays DRY.
+  // Tool-breakage authority UI (issue 419 recombine). Each editor accepts a
+  // `breakageAuthority` prop and ALWAYS renders the unified CheckTriggers editor; the
+  // per-trigger break-tools pill (and the routed per-outcome break column) is shown
+  // ONLY under `checkDriven`. Mount an editor with a given authority and return the
+  // emitted patches so each assertion stays DRY.
   function mountCheckEditor(EditorComponent, value, breakageAuthority, extraProps = {}) {
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2515,6 +2525,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     return emitted;
   }
 
+  const breakageTriggers = {
+    triggers: [
+      {
+        id: 'c1',
+        condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+        outcome: 'failure',
+        breakTools: false,
+      },
+    ],
+  };
   const simpleBreakageValue = {
     rollFormula: '1d20',
     dc: 12,
@@ -2522,13 +2542,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     dcMode: 'static',
     tiers: [],
     macroUuid: null,
-    diceCrits: [{ id: 'c1', die: '1d20', raw: 1, success: false, breakTools: false }],
+    checkBreakage: breakageTriggers,
   };
   const progressiveBreakageValue = {
     awardMode: 'equal',
     allowPlayerReorder: false,
     rollFormula: '2d6',
-    diceCrits: [{ id: 'c1', die: '2d6', raw: 2, success: false, breakTools: false }],
+    checkBreakage: {
+      triggers: [
+        {
+          id: 'c1',
+          condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 2 },
+          outcome: 'failure',
+          breakTools: false,
+        },
+      ],
+    },
   };
   const routedBreakageValue = {
     type: 'relative',
@@ -2536,13 +2565,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     dc: 14,
     thresholdMode: 'meet',
     tiers: [],
-    diceCrits: [{ id: 'c1', die: '1d20', raw: 1, success: false, breakTools: false }],
+    checkBreakage: breakageTriggers,
     relativeOutcomes: [{ id: 'o1', name: 'Success', success: true, breakTools: false, dc: 0 }],
     fixedOutcomes: [],
   };
 
-  // Criterion 13: CheckBreakage hidden under toolSpecific (legacy toggles shown),
-  // shown under checkDriven (legacy toggles hidden), across all three editors.
+  // The unified trigger editor is ALWAYS rendered, regardless of authority; only the
+  // per-trigger break pill is gated. Confirm across all three editors.
   const breakageEditorCases = [
     { name: 'simple', component: () => SimpleCraftingCheckEditorComponent, value: () => simpleBreakageValue },
     {
@@ -2553,89 +2582,125 @@ describe('CraftingSystemManager mounted behavior', () => {
     { name: 'routed', component: () => CraftingCheckEditorComponent, value: () => routedBreakageValue },
   ];
   for (const editorCase of breakageEditorCases) {
-    it(`${editorCase.name} check editor: hides CheckBreakage and keeps break-tools toggles under toolSpecific`, () => {
+    it(`${editorCase.name} check editor: renders the unified triggers with no break pill under toolSpecific`, () => {
       mountCheckEditor(editorCase.component(), editorCase.value(), 'toolSpecific');
-      assert.equal(
-        target.querySelector('[data-check-breakage]'),
-        null,
-        'the CheckBreakage section is hidden under toolSpecific authority'
-      );
-      // The legacy per-die break-tools toggle stays under toolSpecific.
+      const triggers = target.querySelector('[data-check-triggers]');
+      assert.ok(triggers, 'the unified trigger editor renders under toolSpecific authority');
+      // The outcome toggle is always available (forcing works under both authorities).
       assert.ok(
-        target.querySelector('[data-crit-break]'),
-        'the per-die break-tools toggle renders under toolSpecific'
+        triggers.querySelector('[data-trigger-outcome]'),
+        'the outcome toggle renders under toolSpecific'
+      );
+      // The break-tools pill is gated off under toolSpecific.
+      assert.equal(
+        triggers.querySelector('[data-trigger-break]'),
+        null,
+        'the per-trigger break pill is hidden under toolSpecific'
+      );
+      // The free-text label input is gone entirely.
+      assert.equal(
+        triggers.querySelector('[data-breakage-trigger-label]'),
+        null,
+        'no trigger label input remains'
       );
     });
 
-    it(`${editorCase.name} check editor: shows CheckBreakage and hides break-tools toggles under checkDriven`, () => {
+    it(`${editorCase.name} check editor: renders the unified triggers WITH the break pill under checkDriven`, () => {
       mountCheckEditor(editorCase.component(), editorCase.value(), 'checkDriven');
+      const triggers = target.querySelector('[data-check-triggers]');
+      assert.ok(triggers, 'the unified trigger editor renders under checkDriven authority');
       assert.ok(
-        target.querySelector('[data-check-breakage]'),
-        'the CheckBreakage section renders under checkDriven authority'
+        triggers.querySelector('[data-trigger-outcome]'),
+        'the outcome toggle renders under checkDriven'
       );
-      assert.equal(
-        target.querySelector('[data-crit-break]'),
-        null,
-        'the per-die break-tools toggle is hidden under checkDriven'
+      assert.ok(
+        triggers.querySelector('[data-trigger-break]'),
+        'the per-trigger break pill renders under checkDriven'
       );
     });
   }
 
-  it('routed check editor: hides the per-outcome break-tools column under checkDriven', () => {
+  it('routed check editor: shows the per-outcome break-tools column only under checkDriven', () => {
     mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'toolSpecific');
-    assert.ok(
+    assert.equal(
       target.querySelector('[data-outcome-break]'),
-      'the per-outcome break-tools pill renders under toolSpecific'
+      null,
+      'the per-outcome break-tools pill is hidden under toolSpecific'
     );
 
     if (mounted) unmount(mounted);
     target.remove();
     mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'checkDriven');
-    assert.equal(
+    assert.ok(
       target.querySelector('[data-outcome-break]'),
-      null,
-      'the per-outcome break-tools pill is hidden under checkDriven'
+      'the per-outcome break-tools pill renders under checkDriven'
     );
   });
 
-  it('check breakage editor: seeds the natural-1 preset on first enable and lists its triggers', () => {
-    const emitted = mountCheckEditor(SimpleCraftingCheckEditorComponent, simpleBreakageValue, 'checkDriven');
-    // First enable seeds the default preset (the formula has a d20 group).
-    const toggle = target.querySelector('[data-check-breakage-toggle]');
-    assert.ok(toggle, 'the enable toggle renders');
-    toggle.click();
-    flushSync();
-    const breakage = emitted.at(-1).checkBreakage;
-    assert.equal(breakage.enabled, true, 'enabling sets enabled true');
-    assert.equal(breakage.triggers.length, 1, 'the default preset seeds exactly one trigger');
-    assert.deepEqual(
+  it('check triggers editor: Add seeds a default trigger and the break pill toggles breakTools', () => {
+    const emitted = mountCheckEditor(
+      SimpleCraftingCheckEditorComponent,
       {
-        type: breakage.triggers[0].condition.type,
-        aggregate: breakage.triggers[0].condition.aggregate,
-        operator: breakage.triggers[0].condition.operator,
-        value: breakage.triggers[0].condition.value,
+        ...simpleBreakageValue,
+        checkBreakage: {
+          triggers: [
+            { id: 'c1', condition: { type: 'rollTotal', operator: '<=', value: 3 }, outcome: 'none', breakTools: true },
+          ],
+        },
       },
-      { type: 'diceGroup', aggregate: 'anyDie', operator: '==', value: 1 },
-      'the seeded preset is a diceGroup anyDie == 1 trigger'
+      'checkDriven'
+    );
+    // Add appends a new default trigger (controlled component: the DOM reflects the
+    // value prop, not the emit, so the new trigger is asserted on the emitted block).
+    target.querySelector('[data-add-trigger]').click();
+    flushSync();
+    const added = emitted.at(-1).checkBreakage.triggers;
+    assert.equal(added.length, 2, 'adding appends a trigger');
+    assert.equal(added[1].outcome, 'none', 'a new trigger forces no outcome by default');
+    assert.equal(added[1].breakTools, true, 'a new trigger breaks tools by default under checkDriven');
+
+    // The existing trigger's break pill renders (checkDriven) and toggles breakTools.
+    const breakPill = target.querySelector('[data-trigger="c1"] [data-trigger-break]');
+    assert.ok(breakPill, 'the break pill renders under checkDriven');
+    breakPill.click();
+    flushSync();
+    assert.equal(
+      emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c1').breakTools,
+      false,
+      'clicking the break pill toggles breakTools off'
     );
   });
 
-  it('check breakage editor: shows the no-d20 empty state when the formula has no d20 group', () => {
-    const noD20 = { ...progressiveBreakageValue, rollFormula: '2d6', checkBreakage: { enabled: true, triggers: [] } };
-    mountCheckEditor(ProgressiveCraftingCheckEditorComponent, noD20, 'checkDriven');
-    const empty = target.querySelector('[data-breakage-empty]');
-    assert.ok(empty, 'the empty state renders when enabled with no triggers');
-    assert.match(
-      empty.textContent,
-      /no d20 group|has no d20/i,
-      'the empty state explains the formula has no d20 group to seed the preset'
+  it('check triggers editor: disables the forcing segments for an outcomeTier condition', () => {
+    mountCheckEditor(
+      CraftingCheckEditorComponent,
+      {
+        ...routedBreakageValue,
+        checkBreakage: {
+          triggers: [
+            {
+              id: 't1',
+              condition: { type: 'outcomeTier', tierIds: ['o1'], outcomeKeys: [] },
+              outcome: 'none',
+              breakTools: true,
+            },
+          ],
+        },
+      },
+      'checkDriven'
     );
+    const tierTrigger = target.querySelector('[data-trigger="t1"]');
+    const successSeg = tierTrigger.querySelector('[data-trigger-outcome="success"]');
+    const noneSeg = tierTrigger.querySelector('[data-trigger-outcome="none"]');
+    assert.ok(successSeg, 'the outcome toggle renders for an outcomeTier trigger');
+    assert.ok(successSeg.disabled, 'an outcomeTier condition disables the forcing segments');
+    assert.ok(noneSeg.classList.contains('is-selected'), 'the outcome is pinned to No effect');
   });
 
-  // Criterion 13 (disabled-subsystem hiding): ChecksView forces toolSpecific for a
-  // subsystem whose feature is off, so its editor never shows the CheckBreakage
-  // section even when the system authority is checkDriven. Mount ChecksView with the
-  // gathering feature off and the gathering tab active, and confirm no CheckBreakage.
+  // ChecksView forces toolSpecific for a subsystem whose feature is off, so its
+  // editor renders the unified triggers WITHOUT the break pill even when the system
+  // authority is checkDriven. Mount ChecksView with the gathering feature off and the
+  // gathering tab active, and confirm the break pill gating.
   function mountChecksView(props) {
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2646,21 +2711,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
   }
 
-  it('checks view: a checkDriven crafting editor shows CheckBreakage; gathering hides it when its feature is off', () => {
+  it('checks view: a checkDriven crafting editor shows the break pill; a feature-off gathering editor hides it', () => {
     mountChecksView({
       breakageAuthority: 'checkDriven',
       features: { gathering: false },
       gatheringResolutionMode: 'routed',
       gatheringCheckRouted: routedBreakageValue,
     });
-    // Crafting (always on) honours the system authority and shows CheckBreakage.
+    // Crafting (always on) honours the system authority and shows the break pill.
+    const craftingTriggers = target.querySelector('[data-check-triggers]');
+    assert.ok(craftingTriggers, 'crafting editor renders the unified triggers');
     assert.ok(
-      target.querySelector('[data-check-breakage]'),
-      'crafting editor renders CheckBreakage under checkDriven authority'
+      craftingTriggers.querySelector('[data-trigger-break]'),
+      'crafting break pill renders under checkDriven authority'
     );
 
     // Switch to the gathering tab: the disabled gathering subsystem forces
-    // toolSpecific, so its editor renders no CheckBreakage section.
+    // toolSpecific, so its editor renders the triggers without the break pill.
     const gatheringTab = target.querySelector('[data-checks-tab-button="gathering"]');
     assert.ok(gatheringTab, 'the gathering tab renders');
     gatheringTab.click();
@@ -2669,10 +2736,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-checks-panel="gathering"]'),
       'the gathering panel is shown'
     );
+    const gatheringTriggers = target.querySelector('[data-check-triggers]');
+    assert.ok(gatheringTriggers, 'the gathering editor still renders the unified triggers');
     assert.equal(
-      target.querySelector('[data-check-breakage]'),
+      gatheringTriggers.querySelector('[data-trigger-break]'),
       null,
-      'the disabled gathering subsystem shows no CheckBreakage section'
+      'the disabled gathering subsystem hides the per-trigger break pill'
     );
   });
 
@@ -2864,17 +2933,21 @@ describe('CraftingSystemManager mounted behavior', () => {
         'not the routed editor'
       );
 
-      // Seeded from the persisted config; no Save button until edited.
+      // Seeded from the persisted config; Save present but disabled until edited.
       const dcInput = target.querySelector('[data-check-dc]');
       assert.equal(dcInput.value, '12');
-      assert.equal(target.querySelector('[data-checks-save]'), null);
+      assert.ok(
+        target.querySelector('[data-checks-save]')?.disabled,
+        'the Save button is disabled with no unsaved edits'
+      );
 
       dcInput.value = '17';
       dcInput.dispatchEvent(new Event('input', { bubbles: true }));
       await tick();
       flushSync();
       const saveButton = target.querySelector('[data-checks-save]');
-      assert.ok(saveButton, 'editing reveals the Save button');
+      assert.ok(saveButton, 'the Save button is present');
+      assert.equal(saveButton.disabled, false, 'editing enables the Save button');
 
       saveButton.click();
       await tick();
@@ -2883,10 +2956,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       const saved = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
       assert.ok(saved, 'Save persists the simple config through the store');
       assert.equal(saved[1].dc, 17);
-      assert.equal(
-        target.querySelector('[data-checks-save]'),
-        null,
-        'saving clears the unsaved state'
+      assert.ok(
+        target.querySelector('[data-checks-save]').disabled,
+        'saving clears the unsaved state and re-disables the Save button'
       );
     });
   }

@@ -8,6 +8,8 @@
  * messages so each activity reads naturally; the result shape is identical.
  */
 
+import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
+
 /**
  * Summarise an evaluated Roll's dice as
  * `{ groupId, group: "NdS", sum, results: number[] }` entries.
@@ -19,10 +21,10 @@
  * - `sum` is the DiceTerm#total — the GROUP TOTAL (POST-MODIFIER, active-only). The
  *   `group` key (`NdS`) carries no modifiers, so a modified pool (keep/drop/explode/
  *   reroll, e.g. `2d20kh1`) reports its modified total under the plain `2d20` key — a
- *   total that need not be in `[N, N*S]`. Per-die crits are authored only against
- *   PLAIN die terms and matched against this group total (see {@link resolveCheckCrit});
- *   the editor + normalizer make modified pools crit-ineligible, so a clamped crit can
- *   never collide with a modified total. When the die has no finite total (an
+ *   total that need not be in `[N, N*S]`. A `diceGroup` trigger's `total` aggregate
+ *   matches this group total; the editor + normalizer make modified pools
+ *   crit-ineligible, so a converted legacy crit can never collide with a modified
+ *   total. When the die has no finite total (an
  *   unevaluated/headless die) the active-only raw faces are summed as a fallback,
  *   matching Foundry's own modified total.
  * - `results` are the ACTIVE-only raw faces: `die.results[].result` (raw face),
@@ -59,29 +61,43 @@ export function rolledDiceGroups(roll) {
 }
 
 /**
- * Resolve any forced outcome from the configured per-die critical raw rolls. Each
- * crit forces success or failure (and may break tools) when its die's rolled total
- * matches its raw value. A matching forced FAILURE takes precedence over a forced
- * success. Returns the matched crit `{ success, breakTools }`, or null when none
- * match. Matching compares `crit.raw` against the die-term GROUP TOTAL
- * (`group.sum`) for a plain `NdS` term; modified pools (keep/drop/explode/reroll)
- * are not crit-eligible (no crit is authored against them — the editor and the
- * normalizer drop such crits), so they never match here.
+ * Resolve any forced outcome from the unified per-check trigger list (issue 419).
+ * Each trigger whose `outcome` is `'success'` or `'failure'` forces that
+ * disposition when its condition matches the roll. A matching forced FAILURE takes
+ * precedence over a forced success. Returns `{ disposition: 'success' | 'failure' }`
+ * for the winning trigger, or null when none force an outcome.
+ *
+ * Condition matching reuses the shared {@link evaluateCheckBreakageCondition}
+ * evaluator with a synthetic checkResult `{ value, data: { total, diceGroups } }`,
+ * restricted to the outcome-independent condition types (`rollTotal` /
+ * `progressiveValue` / `diceGroup`). `outcomeTier` conditions are ignored here: the
+ * routed tier is resolved AFTER the forced outcome, so matching on it would be
+ * circular (such triggers still break tools at the engine seam where the tier is
+ * known).
+ *
+ * @param {Array<object>} triggers
+ * @param {{ total?: number, value?: number, diceGroups?: Array<object> }} roll
+ * @returns {{ disposition: 'success' | 'failure' } | null}
  */
-export function resolveCheckCrit(diceCrits, diceGroups) {
-  const crits = Array.isArray(diceCrits) ? diceCrits : [];
-  let triggered = null;
-  for (const crit of crits) {
-    if (!crit || typeof crit !== 'object' || !crit.die) continue;
-    const matches = diceGroups.some(
-      (group) => group.group === crit.die && group.sum === Number(crit.raw)
-    );
-    if (!matches) continue;
-    const resolved = { success: crit.success === true, breakTools: crit.breakTools === true };
-    if (!resolved.success) return resolved; // forced failure wins
-    triggered = resolved;
+export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}) {
+  const list = Array.isArray(triggers) ? triggers : [];
+  const checkResult = {
+    value,
+    data: { total, diceGroups: Array.isArray(diceGroups) ? diceGroups : [] },
+  };
+  let forcedSuccess = null;
+  for (const trigger of list) {
+    if (!trigger || typeof trigger !== 'object') continue;
+    const outcome = trigger.outcome;
+    if (outcome !== 'success' && outcome !== 'failure') continue;
+    // outcomeTier conditions are circular here (the tier is forced by this very
+    // resolution), so they can never force an outcome.
+    if (trigger.condition?.type === 'outcomeTier') continue;
+    if (!evaluateCheckBreakageCondition(trigger.condition, checkResult)) continue;
+    if (outcome === 'failure') return { disposition: 'failure' }; // forced failure wins
+    forcedSuccess = { disposition: 'success' };
   }
-  return triggered;
+  return forcedSuccess;
 }
 
 /**
@@ -103,14 +119,15 @@ export async function evaluateCheckRoll(formula, actor) {
 
 /**
  * Run a pass/fail formula check: roll the formula, compare the total against `dc`
- * (met-or-exceeded or strictly exceeded), honouring per-die crits. Returns
+ * (met-or-exceeded or strictly exceeded), honouring the unified per-check trigger
+ * list's forced outcomes (issue 419). Returns
  * `{ success, outcome: 'pass'|'fail', value, data, message }`.
  */
 export async function runFormulaPassFail({
   formula: rawFormula,
   dc,
   thresholdMode,
-  diceCrits,
+  triggers,
   actor,
   label = 'Crafting',
 }) {
@@ -139,17 +156,16 @@ export async function runFormulaPassFail({
     diceGroups = rolled.diceGroups;
   }
 
-  const crit = resolveCheckCrit(diceCrits, diceGroups);
+  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
   const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
   let success;
-  if (crit) {
-    success = crit.success;
+  if (forced) {
+    success = forced.disposition === 'success';
   } else if (comparison === 'exceed') {
     success = total > dc;
   } else {
     success = total >= dc;
   }
-  const breakTools = crit ? crit.breakTools === true : false;
   return {
     success,
     outcome: success ? 'pass' : 'fail',
@@ -159,8 +175,6 @@ export async function runFormulaPassFail({
       formula,
       total,
       comparison,
-      crit: crit ? { success: crit.success, breakTools } : null,
-      breakTools,
       diceGroups,
     },
     message: success ? null : `${label} check failed`,
@@ -170,13 +184,13 @@ export async function runFormulaPassFail({
 /**
  * Run a progressive formula check: roll the formula and return its total as the
  * numeric `value` progressive awarding spends against result difficulties. The
- * activity always proceeds. A matched success crit awards everything
- * (`MAX_SAFE_INTEGER`), a failure crit awards nothing (`0`). Returns
+ * activity always proceeds. A matched forced SUCCESS awards everything
+ * (`MAX_SAFE_INTEGER`), a forced FAILURE awards nothing (`0`). Returns
  * `{ success: true, outcome: null, value, data }`.
  */
 export async function runFormulaProgressive({
   formula: rawFormula,
-  diceCrits,
+  triggers,
   actor,
   label = 'Crafting',
 }) {
@@ -205,28 +219,27 @@ export async function runFormulaProgressive({
     diceGroups = rolled.diceGroups;
   }
 
-  const crit = resolveCheckCrit(diceCrits, diceGroups);
+  // Forced-outcome resolution sees the RAW total as the awarding value (the
+  // `progressiveValue` condition targets the natural value before any forcing).
+  const forced = resolveForcedOutcome(triggers, { total, value: total, diceGroups });
   let value;
-  if (crit) {
-    value = crit.success ? Number.MAX_SAFE_INTEGER : 0;
+  if (forced) {
+    value = forced.disposition === 'success' ? Number.MAX_SAFE_INTEGER : 0;
   } else {
     value = total;
   }
-  const breakTools = crit ? crit.breakTools === true : false;
   return {
     success: true,
     outcome: null,
-    // `value` is the AWARDING value (a crit can overwrite it to MAX_SAFE_INTEGER/0),
-    // while `data.total` keeps the RAW roll total. A `progressiveValue` trigger
-    // targets `value`; a `rollTotal` trigger targets `data.total` — so the two can
-    // resolve differently on the same roll.
+    // `value` is the AWARDING value (a forced outcome can overwrite it to
+    // MAX_SAFE_INTEGER/0), while `data.total` keeps the RAW roll total. A
+    // `progressiveValue` trigger targets `value`; a `rollTotal` trigger targets
+    // `data.total` — so the two can resolve differently on the same roll.
     value,
     data: {
       formula,
       total,
       value,
-      crit: crit ? { success: crit.success, breakTools } : null,
-      breakTools,
       diceGroups,
     },
   };
@@ -317,11 +330,12 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  * Run a routed formula check: roll the formula and map the total onto one of the
  * configured outcome tiers (relative DC deltas or fixed value ranges), returning
  * the matched tier's NAME as `outcome` for the activity's outcome→result-group
- * routing. Per-die crits override the disposition: a forced SUCCESS routes to the
- * best succeeding tier, a forced FAILURE to the worst failing tier, and the crit's
- * `breakTools` takes precedence for the surfaced flag. When no tier matches (and no
- * crit reroutes), `outcome` is null and `success` reflects the crit (when any) or
- * `false`.
+ * routing. A unified trigger's forced outcome overrides the disposition: a forced
+ * SUCCESS routes to the best succeeding tier, a forced FAILURE to the worst failing
+ * tier. The surfaced `data.breakTools` is the matched (or rerouted) tier's own flag
+ * (the routed per-tier legacy bridge). When no tier matches (and no forced outcome
+ * reroutes), `outcome` is null and `success` reflects the forced outcome (when any)
+ * or `false`.
  *
  * HEADLESS: with no dice engine the routed check cannot simulate a tier, so it
  * returns a non-blocking `{ success: true, outcome: null, value: null }` rather
@@ -336,7 +350,7 @@ export async function runFormulaRouted({
   type,
   relativeOutcomes,
   fixedOutcomes,
-  diceCrits,
+  triggers,
   actor,
   label = 'Crafting',
 }) {
@@ -373,7 +387,7 @@ export async function runFormulaRouted({
   }
 
   const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
-  const crit = resolveCheckCrit(diceCrits, diceGroups);
+  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
 
   let matched = matchRoutedOutcome({
     type,
@@ -384,24 +398,26 @@ export async function runFormulaRouted({
     fixedOutcomes,
   });
 
-  if (crit) {
-    const rerouted = routeCritOutcome({
+  if (forced) {
+    // A forced outcome overrides the disposition: route to the best (success) /
+    // worst (failure) tier of that flag. If none exists, drop the tier-derived
+    // match entirely.
+    matched = routeCritOutcome({
       type,
-      forcedSuccess: crit.success,
+      forcedSuccess: forced.disposition === 'success',
       relativeOutcomes,
       fixedOutcomes,
     });
-    // A crit forces the disposition: route to the best (success) / worst (failure)
-    // tier of that flag. If none exists, drop the tier-derived match entirely.
-    matched = rerouted;
   }
 
-  const success = crit ? crit.success : matched ? matched.success === true : false;
-  const breakTools = crit
-    ? crit.breakTools === true
+  const success = forced
+    ? forced.disposition === 'success'
     : matched
-      ? matched.breakTools === true
+      ? matched.success === true
       : false;
+  // The matched (or rerouted) tier's `breakTools` is the only `data.breakTools`
+  // source — the routed per-tier legacy bridge the breakage seam reads.
+  const breakTools = matched ? matched.breakTools === true : false;
 
   return {
     success,
@@ -416,7 +432,6 @@ export async function runFormulaRouted({
       outcomeId: matched?.id ?? null,
       success,
       breakTools,
-      crit: crit ? { success: crit.success, breakTools: crit.breakTools === true } : null,
       diceGroups,
     },
     message: success ? null : `${label} check failed`,

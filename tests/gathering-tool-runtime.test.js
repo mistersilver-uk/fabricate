@@ -786,7 +786,7 @@ test('gathering checkDriven runtime: forces breakage on non-immune tools, immune
   const applied = await runtime.apply(args);
   const byId = Object.fromEntries(applied.map(e => [e.componentId, e]));
   assert.equal(byId.gaxe.broken, true);
-  assert.equal(byId.gaxe.reason, '1d20 group rolled 1');
+  assert.equal(byId.gaxe.reason, 'Check breakage');
   assert.equal(byId.ganvil.broken, false);
   assert.equal(byId.ganvil.skippedImmune, true);
 });
