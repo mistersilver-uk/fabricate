@@ -38,6 +38,8 @@ Make behavior changes here, not in the bindings.
 - File enhancement or test-gap work when structural smells materially reduce readability, change safety, or testability even if no runtime bug is proven yet.
 - Flag any hand-maintained mirror of another part of the repo (selectors, labels, path/recipe maps, fixture lists) that lacks a drift-detecting test — i.e. a test that fails when a mapping entry no longer resolves to a real file/symbol.
 Unguarded mirrors rot silently.
+- Hunt for source-of-truth mismatches where validation, the authoring UI, and the runtime read the same conceptual data from different fields (e.g. a legacy flat list vs a modern tier model).
+The high-signal symptom is an entity stuck in a validation-error state the UI offers no control to fix; treat that as a probable mismatch and trace whether the validator, editor, and engine all key on the same field.
 - Confirm new tests are actually gated by `npm test`, not merely passing in isolation.
 The `test` script in `package.json` globs a fixed set of directories; a test in a directory the glob omits never runs in CI even though `node --test <file>` passes.
 When reviewing added tests, verify the directory is in the glob and that `npm test`'s total count rose — do not certify coverage by running a file directly.
