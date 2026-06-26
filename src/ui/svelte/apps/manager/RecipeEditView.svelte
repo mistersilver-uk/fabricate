@@ -42,6 +42,7 @@
     // assignment controls.
     routingProvider = null,
     routedOutcomeTierOptions = [],
+    routedOutcomeTiersDefined = false,
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
     onAddStep = () => {},
@@ -252,6 +253,7 @@
             {componentOptions}
             {routingProvider}
             outcomeTierOptions={routedOutcomeTierOptions}
+            outcomeTiersDefined={routedOutcomeTiersDefined}
             onAssignIngredientSet={assignIngredientSet}
             onUpdateResultGroups={updateResultGroups}
             onDeleteStep={deleteStepFrom('results')}

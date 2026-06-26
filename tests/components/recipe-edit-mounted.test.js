@@ -501,6 +501,32 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('check mode: empty routing hint distinguishes no tiers from no success tiers', async () => {
+    const groups = [{ id: 'grp-a', name: 'Group A', checkOutcomeIds: [], results: [] }];
+
+    // No tiers authored at all → "define tiers first".
+    const noTiers = await mountResultGroups(groups, {
+      props: { routingProvider: 'check', routedOutcomeTierOptions: [], routedOutcomeTiersDefined: false },
+    });
+    assert.match(
+      noTiers.target.querySelector('[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty').textContent,
+      /Define outcome tiers/,
+      'with no tiers defined, the hint asks to define tiers'
+    );
+    editHarness.remount();
+
+    // Tiers exist but none is a Success → success-filtered options empty, distinct hint.
+    const noSuccess = await mountResultGroups(groups, {
+      props: { routingProvider: 'check', routedOutcomeTierOptions: [], routedOutcomeTiersDefined: true },
+    });
+    assert.match(
+      noSuccess.target.querySelector('[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty').textContent,
+      /marked as a Success/,
+      'with failure-only tiers, the hint points to marking a tier as Success'
+    );
+    editHarness.remount();
+  });
+
   it('hides the ingredient-set name in check mode but shows it in ingredient mode', async () => {
     const ingredientSets = [
       { id: 'iset-1', name: 'Alpha', ingredientGroups: [] },

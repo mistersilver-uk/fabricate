@@ -85,6 +85,13 @@
   // tier can never be routed, so a winning roll on it silently yields nothing —
   // surface it here so the GM names every tier.
   const hasUnnamedOutcome = $derived(outcomes.some((outcome) => !String(outcome?.name || '').trim()));
+  // Only SUCCESS tiers can be routed to a result set (a failed check produces
+  // nothing). A tier list with no Success leaves every recipe result set
+  // unroutable — surface it here, at the source, so the GM doesn't have to
+  // discover it from the recipe editor's empty routing picker.
+  const hasNoSuccessOutcome = $derived(
+    outcomes.length > 0 && !outcomes.some((outcome) => outcome?.success === true)
+  );
 
   const validationMessages = $derived(
     [
@@ -104,6 +111,12 @@
         ? text(
             'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeUnnamed',
             'Name every outcome tier — an unnamed tier cannot be routed to a result group.'
+          )
+        : null,
+      hasNoSuccessOutcome
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeNoSuccess',
+            "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success."
           )
         : null,
     ].filter(Boolean)
