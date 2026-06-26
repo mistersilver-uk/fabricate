@@ -31,6 +31,10 @@
     ingredientSetOptions = [],
     assignedIngredientSetIds = [],
     outcomeTierOptions = [],
+    // Whether the routed check has ANY outcome tier (even failure-only). When the
+    // success-filtered `outcomeTierOptions` is empty this disambiguates "no tiers
+    // authored yet" from "tiers exist but none is a Success" for the empty hint.
+    outcomeTiersDefined = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
     onRemove = () => {}
@@ -121,7 +125,15 @@
           label={text('FABRICATE.Admin.Manager.Recipe.RoutingOutcomeTiers', 'Produced on outcome')}
           addLabel={text('FABRICATE.Admin.Manager.Recipe.RoutingAddOutcomeTier', 'Add outcome')}
           placeholder={text('FABRICATE.Admin.Manager.Recipe.RoutingSearchOutcomeTiers', 'Search outcomes...')}
-          emptyHint={text('FABRICATE.Admin.Manager.Recipe.RoutingNoOutcomeTiers', 'Define outcome tiers in the routed crafting check first.')}
+          emptyHint={outcomeTiersDefined
+            ? text(
+                'FABRICATE.Admin.Manager.Recipe.RoutingNoSuccessOutcomeTiers',
+                'No outcome tier is marked as a Success. Mark one as Success in the crafting check to route a result set to it.'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Recipe.RoutingNoOutcomeTiers',
+                'Define outcome tiers in the routed crafting check first.'
+              )}
           onAdd={(id) => addOutcomeTier(id)}
           onRemove={(id) => removeOutcomeTier(id)}
         />

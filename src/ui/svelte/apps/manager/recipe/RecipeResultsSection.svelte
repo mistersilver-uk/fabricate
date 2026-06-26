@@ -35,6 +35,7 @@
     routingProvider = null,
     ingredientSets = [],
     outcomeTierOptions = [],
+    outcomeTiersDefined = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
     idPrefix = ''
@@ -165,6 +166,7 @@
             ingredientSetOptions={ingredientOptionsFor(group)}
             assignedIngredientSetIds={assignedSetIdsFor(group)}
             outcomeTierOptions={tierOptionsFor(index)}
+            {outcomeTiersDefined}
             onAssignIngredientSet={(setId, assigned) =>
               onAssignIngredientSet(group?.id || null, setId, assigned)}
             onChange={(nextGroup) => updateGroup(index, nextGroup)}

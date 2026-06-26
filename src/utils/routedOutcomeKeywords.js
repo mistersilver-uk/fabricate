@@ -118,3 +118,23 @@ export function routedSuccessTierOptions(routed) {
     .filter((tier) => tier?.id && tier.success === true)
     .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
 }
+
+/**
+ * Does the routed check have ANY outcome tier defined (regardless of success)?
+ * The active list is `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
+ *
+ * This is the companion to {@link routedSuccessTierOptions}: it returns `true` even
+ * when every tier is a failure tier, so callers can tell "no tiers authored yet"
+ * apart from "tiers exist but none is a Success" — two states that both make
+ * `routedSuccessTierOptions` return `[]` but need different guidance in the UI.
+ *
+ * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @returns {boolean}
+ */
+export function routedHasOutcomeTiers(routed) {
+  if (!routed) return false;
+  const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+  return Array.isArray(tiers) && tiers.some((tier) => tier?.id);
+}

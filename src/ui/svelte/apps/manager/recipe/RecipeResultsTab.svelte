@@ -28,6 +28,7 @@
     // back through onAssignIngredientSet(stepId, groupId, setId, assigned).
     routingProvider = null,
     outcomeTierOptions = [],
+    outcomeTiersDefined = false,
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {}
@@ -66,6 +67,7 @@
             {routingProvider}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
+            {outcomeTiersDefined}
             onAssignIngredientSet={(groupId, setId, assigned) =>
               onAssignIngredientSet(step.id, groupId, setId, assigned)}
             onChange={(nextGroups) => onUpdateResultGroups(step.id, nextGroups)}
@@ -81,6 +83,7 @@
       {routingProvider}
       {ingredientSets}
       {outcomeTierOptions}
+      {outcomeTiersDefined}
       onAssignIngredientSet={(groupId, setId, assigned) =>
         onAssignIngredientSet(null, groupId, setId, assigned)}
       onChange={(nextGroups) => onUpdateResultGroups(null, nextGroups)}

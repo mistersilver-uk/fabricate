@@ -6,7 +6,10 @@
     DEFAULT_GATHERING_TASK_IMG
   } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
-  import { routedSuccessTierOptions } from '../../../../utils/routedOutcomeKeywords.js';
+  import {
+    routedSuccessTierOptions,
+    routedHasOutcomeTiers
+  } from '../../../../utils/routedOutcomeKeywords.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
@@ -390,6 +393,12 @@
   // excluded — a failed check produces no result set to route to.
   const recipeRoutedOutcomeTierOptions = $derived.by(() =>
     routedSuccessTierOptions(selectedSystem?.craftingCheck?.routed)
+  );
+  // Whether ANY outcome tier is defined (even failure-only). Lets the recipe
+  // editor tell "no tiers authored" apart from "tiers exist but none is Success"
+  // — both empty the option list above, but each needs a different hint.
+  const recipeRoutedHasOutcomeTiers = $derived.by(() =>
+    routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
   );
 
   // Salvage feature gate + the inputs the per-component salvage editor needs.
@@ -4424,6 +4433,7 @@
         checkTierOptions={recipeCheckTierOptions}
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
+        routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
         onAddStep={handleAddStep}
