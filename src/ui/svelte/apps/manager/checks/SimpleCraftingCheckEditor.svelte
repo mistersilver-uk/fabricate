@@ -9,8 +9,9 @@
     - dynamic: a dropped macro is handed the ingredient set, recipe, and actor
                and returns the DC. Both sides persist so switching the DC mode is
                non-destructive.
-  Per-die critical raw rolls force success or failure (and may break tools). The
-  formula row, crit table, and recipe-tier table are shared with the routed editor.
+  The unified CheckTriggers editor lets each trigger force success or failure and
+  (under `checkDriven` authority) break tools. The formula row, trigger editor, and
+  recipe-tier table are shared with the routed editor.
 
   `showDcSource` (default true) renders the DC-source section (static/dynamic
   radios + the recipe-tier table + the dynamic-DC macro). Salvage and gathering
@@ -25,12 +26,11 @@
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
-  import CheckDiceCrits from './CheckDiceCrits.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
-  import CheckBreakage from './CheckBreakage.svelte';
+  import CheckTriggers from './CheckTriggers.svelte';
 
-  // `breakageAuthority` (issue 419): under `checkDriven` the CheckBreakage editor
-  // replaces the legacy per-die break-tools toggles for authoring tool breakage.
+  // `breakageAuthority` (issue 419): the unified CheckTriggers editor is always
+  // rendered; under `checkDriven` it also exposes the per-trigger break-tools toggle.
   let {
     value = null,
     showDcSource = true,
@@ -116,22 +116,15 @@
       thresholdMode={value?.thresholdMode || 'meet'}
       onChange={emit}
     />
-    <CheckDiceCrits
-      rollFormula={value?.rollFormula || ''}
-      diceCrits={value?.diceCrits || []}
-      showBreakTools={!checkDriven}
-      onChange={(diceCrits) => emit({ diceCrits })}
-    />
   </section>
 
-  {#if checkDriven}
-    <CheckBreakage
-      value={value?.checkBreakage || null}
-      rollFormula={value?.rollFormula || ''}
-      kind="simple"
-      onChange={(checkBreakage) => emit({ checkBreakage })}
-    />
-  {/if}
+  <CheckTriggers
+    value={value?.checkBreakage || null}
+    rollFormula={value?.rollFormula || ''}
+    kind="simple"
+    showBreakTools={checkDriven}
+    onChange={(checkBreakage) => emit({ checkBreakage })}
+  />
 
   {#if showDcSource}
   <section class="manager-inspector-card">

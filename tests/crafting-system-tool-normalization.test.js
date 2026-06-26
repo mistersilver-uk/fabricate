@@ -196,22 +196,26 @@ test('_normalizeSystem preserves a checkDriven toolBreakage.authority', () => {
   assert.deepEqual(system.toolBreakage, { authority: 'checkDriven' });
 });
 
-test('_normalizeCheckBreakage defaults to disabled with no triggers', () => {
+test('_normalizeCheckBreakage defaults to an empty trigger list (no enabled flag)', () => {
   const manager = makeManager();
-  assert.deepEqual(manager._normalizeCheckBreakage(undefined), { enabled: false, triggers: [] });
-  assert.deepEqual(manager._normalizeCheckBreakage({ enabled: 'yes' }), { enabled: false, triggers: [] });
+  assert.deepEqual(manager._normalizeCheckBreakage(undefined), { triggers: [] });
+  assert.deepEqual(manager._normalizeCheckBreakage({}), { triggers: [] });
 });
 
-test('_normalizeCheckBreakage normalizes valid triggers and drops malformed ones', () => {
+test('_normalizeCheckBreakage normalizes unified triggers and drops malformed ones', () => {
   const manager = makeManager();
   const block = manager._normalizeCheckBreakage({
-    enabled: true,
     triggers: [
-      { id: 't1', label: 'Roll low', condition: { type: 'rollTotal', operator: '<=', value: '5' } },
+      // Unified trigger carrying an explicit outcome/breakTools; the label is dropped.
+      { id: 't1', label: 'Roll low', outcome: 'failure', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: '5' } },
+      // Legacy break-only trigger (no outcome/breakTools) → breakTools true, outcome none.
       { id: 't2', condition: { type: 'progressiveValue', operator: '>=', value: 10 } },
-      { id: 't3', condition: { type: 'outcomeTier', tierIds: ['x'], outcomeKeys: ['Pass'] } },
+      // outcomeTier cannot force an outcome → outcome coerced to none.
+      { id: 't3', outcome: 'success', condition: { type: 'outcomeTier', tierIds: ['x'], outcomeKeys: ['Pass'] } },
       {
         id: 't4',
+        outcome: 'none',
+        breakTools: false,
         condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
       },
       // malformed → dropped:
@@ -222,9 +226,16 @@ test('_normalizeCheckBreakage normalizes valid triggers and drops malformed ones
       'not-an-object',
     ],
   });
-  assert.equal(block.enabled, true);
   assert.equal(block.triggers.length, 4);
+  assert.equal(block.triggers[0].label, undefined, 'the free-text label is dropped');
   assert.deepEqual(block.triggers[0].condition, { type: 'rollTotal', operator: '<=', value: 5 });
+  assert.equal(block.triggers[0].outcome, 'failure');
+  assert.equal(block.triggers[0].breakTools, true);
+  // Legacy break-only trigger migrates to breakTools:true / outcome:none.
+  assert.equal(block.triggers[1].outcome, 'none');
+  assert.equal(block.triggers[1].breakTools, true);
+  // outcomeTier coerces outcome to none (it can never force one).
+  assert.equal(block.triggers[2].outcome, 'none');
   assert.deepEqual(block.triggers[2].condition, {
     type: 'outcomeTier',
     tierIds: ['x'],
@@ -237,13 +248,61 @@ test('_normalizeCheckBreakage normalizes valid triggers and drops malformed ones
     operator: '==',
     value: 1,
   });
+  assert.equal(block.triggers[3].outcome, 'none');
+  assert.equal(block.triggers[3].breakTools, false);
 });
 
-test('_normalizeSimpleCraftingCheck carries a normalized checkBreakage block', () => {
+test('_normalizeUnifiedTriggers converts legacy diceCrits ahead of the checkBreakage triggers', () => {
+  const manager = makeManager();
+  const block = manager._normalizeUnifiedTriggers(
+    '1d20',
+    [{ id: 'crit', die: '1d20', raw: 1, success: false, breakTools: true }],
+    { triggers: [{ id: 'r', outcome: 'success', breakTools: false, condition: { type: 'rollTotal', operator: '>=', value: 18 } }] }
+  );
+  assert.equal(block.triggers.length, 2);
+  // The converted crit comes first as a diceGroup/total/== trigger.
+  assert.deepEqual(block.triggers[0].condition, {
+    type: 'diceGroup',
+    groupId: 0,
+    aggregate: 'total',
+    operator: '==',
+    value: 1,
+  });
+  assert.equal(block.triggers[0].outcome, 'failure', 'success:false maps to force-failure');
+  assert.equal(block.triggers[0].breakTools, true);
+  assert.equal(block.triggers[1].outcome, 'success', 'the existing trigger is preserved');
+});
+
+test('_normalizeUnifiedTriggers drops a crit keyed to a modified pool, and is idempotent', () => {
+  const manager = makeManager();
+  // A crit on the modified pool 2d20kh1 is crit-ineligible → dropped.
+  const dropped = manager._normalizeUnifiedTriggers(
+    '2d20kh1',
+    [{ id: 'crit', die: '2d20', raw: 20, success: true }],
+    undefined
+  );
+  assert.deepEqual(dropped, { triggers: [] });
+
+  // Re-normalizing the converted output (no diceCrits, triggers carry outcome/breakTools)
+  // produces the same list — the migration does not double-convert.
+  const once = manager._normalizeUnifiedTriggers(
+    '1d20',
+    [{ id: 'crit', die: '1d20', raw: 1, success: false, breakTools: false }],
+    undefined
+  );
+  const twice = manager._normalizeUnifiedTriggers('1d20', undefined, once);
+  assert.deepEqual(twice, once, 'normalization is idempotent');
+});
+
+test('_normalizeSimpleCraftingCheck carries a unified checkBreakage block and drops diceCrits', () => {
   const manager = makeManager();
   const simple = manager._normalizeSimpleCraftingCheck({
     rollFormula: '1d20',
-    checkBreakage: { enabled: true, triggers: [] },
+    diceCrits: [{ id: 'crit', die: '1d20', raw: 1, success: false, breakTools: true }],
+    checkBreakage: { triggers: [] },
   });
-  assert.deepEqual(simple.checkBreakage, { enabled: true, triggers: [] });
+  assert.equal(simple.diceCrits, undefined, 'the legacy diceCrits field is dropped');
+  assert.equal(simple.checkBreakage.triggers.length, 1, 'the legacy crit is migrated into a trigger');
+  assert.equal(simple.checkBreakage.triggers[0].outcome, 'failure');
+  assert.equal(simple.checkBreakage.triggers[0].breakTools, true);
 });

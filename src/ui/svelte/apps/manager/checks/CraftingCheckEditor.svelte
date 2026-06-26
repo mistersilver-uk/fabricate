@@ -3,20 +3,20 @@
   Routed-mode crafting check editor.
 
   A routed crafting check has a TYPE (relative or fixed), a roll FORMULA with a
-  default DC and comparison (shared with the simple check), per-die critical raw
-  rolls, and a table of OUTCOME TIERS:
+  default DC and comparison (shared with the simple check), the unified CheckTriggers
+  editor, and a table of OUTCOME TIERS:
     - relative: each tier's threshold is expressed relative to the recipe's DC
                 (DC -5, DC +10, …); relative checks may also define recipe TIERS
                 that override the default DC.
     - fixed:    each tier owns a start/end segment of the formula's value range;
                 segments must not overlap.
   Every outcome has a name, a generated secret id (kept in data, never shown), a
-  success toggle, and a break-tools toggle. Both the relative DC and the fixed
-  start/end are kept on each outcome so switching type never destroys the other
-  mode's values.
+  success toggle, and (under `checkDriven` authority) a break-tools toggle. Both the
+  relative DC and the fixed start/end are kept on each outcome so switching type never
+  destroys the other mode's values.
 
-  Reuses the shared check sub-components (formula/DC/comparison, crit table, recipe
-  tiers) so routed and simple stay structurally identical. Controlled component:
+  Reuses the shared check sub-components (formula/DC/comparison, unified triggers,
+  recipe tiers) so routed and simple stay structurally identical. Controlled component:
   renders `value`, emits the next value through `onChange`. Range parsing lives in
   utils/craftingCheckExpression.js.
 -->
@@ -24,15 +24,15 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
-  import CheckDiceCrits from './CheckDiceCrits.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
-  import CheckBreakage from './CheckBreakage.svelte';
+  import CheckTriggers from './CheckTriggers.svelte';
 
   // `showTiers` (default true) renders the per-recipe tier table (relative type
   // only). Salvage/gathering reuse this editor with `showTiers={false}` — they have
   // no recipes to pick a tier from; a per-entity DC override lives elsewhere.
-  // `breakageAuthority` (issue 419): under `checkDriven` the per-outcome break-tools
-  // pills are hidden and tool breakage is authored via the CheckBreakage editor.
+  // `breakageAuthority` (issue 419): tool breakage is a check-driven concept, so the
+  // per-outcome break-tools pills (and the unified trigger break pills) are shown
+  // only under `checkDriven`.
   let {
     value = null,
     showTiers = true,
@@ -41,7 +41,7 @@
   } = $props();
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
-  // Outcome options for the CheckBreakage outcomeTier condition — both tier lists
+  // Outcome options for the CheckTriggers outcomeTier condition — both tier lists
   // carry an id + name; the active list is the one the editor is showing.
   const breakageOutcomeOptions = $derived(
     outcomes.map((outcome) => ({ id: outcome.id, name: outcome.name }))
@@ -206,23 +206,16 @@
       placeholder="1d20"
       onChange={emit}
     />
-    <CheckDiceCrits
-      rollFormula={value?.rollFormula || ''}
-      diceCrits={value?.diceCrits || []}
-      showBreakTools={!checkDriven}
-      onChange={(diceCrits) => emit({ diceCrits })}
-    />
   </section>
 
-  {#if checkDriven}
-    <CheckBreakage
-      value={value?.checkBreakage || null}
-      rollFormula={value?.rollFormula || ''}
-      kind="routed"
-      outcomeOptions={breakageOutcomeOptions}
-      onChange={(checkBreakage) => emit({ checkBreakage })}
-    />
-  {/if}
+  <CheckTriggers
+    value={value?.checkBreakage || null}
+    rollFormula={value?.rollFormula || ''}
+    kind="routed"
+    outcomeOptions={breakageOutcomeOptions}
+    showBreakTools={checkDriven}
+    onChange={(checkBreakage) => emit({ checkBreakage })}
+  />
 
   {#if showTiers && type === 'relative'}
     <section class="manager-inspector-card" data-routed-tiers>
@@ -246,7 +239,7 @@
     {#if outcomes.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes', 'No outcome tiers yet. Add the tiers this check routes results into.')}</p>
     {:else}
-      <div class={`manager-checks-outcome-table ${type === 'fixed' ? 'is-fixed' : 'is-relative'} ${checkDriven ? 'is-no-break' : ''}`} role="table" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}>
+      <div class={`manager-checks-outcome-table ${type === 'fixed' ? 'is-fixed' : 'is-relative'} ${checkDriven ? '' : 'is-no-break'}`} role="table" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}>
         <div class="manager-checks-outcome-head" role="row">
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span>
           {#if type === 'relative'}
@@ -256,7 +249,7 @@
             <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}</span>
           {/if}
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeColumn', 'Outcome')}</span>
-          {#if !checkDriven}
+          {#if checkDriven}
             <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
           {/if}
           <span role="columnheader" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}></span>
@@ -312,7 +305,7 @@
               {outcome.success === true ? successOnLabel : successOffLabel}
             </button>
 
-            {#if !checkDriven}
+            {#if checkDriven}
               <button
                 type="button"
                 class={`manager-checks-state-pill ${outcome.breakTools === true ? 'is-negative' : 'is-positive'}`}

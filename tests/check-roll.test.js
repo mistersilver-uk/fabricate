@@ -6,12 +6,23 @@ import assert from 'node:assert/strict';
 
 const {
   rolledDiceGroups,
-  resolveCheckCrit,
+  resolveForcedOutcome,
   evaluateCheckRoll,
   runFormulaPassFail,
   runFormulaProgressive,
   runFormulaRouted,
 } = await import('../src/systems/checkRoll.js');
+
+// A unified trigger forcing `outcome` when its `diceGroup`/`total`/`==` condition
+// matches the rolled group total (the recombined replacement for a per-die crit).
+function totalTrigger({ id = 't', groupId = 0, value, outcome }) {
+  return {
+    id,
+    condition: { type: 'diceGroup', groupId, aggregate: 'total', operator: '==', value },
+    outcome,
+    breakTools: false,
+  };
+}
 
 // Mixed-activity results for the non-finite-total fallback (defect 2): a kept
 // (active:true), a dropped (active:false), and a kept-without-the-flag result —
@@ -137,25 +148,43 @@ test('runFormula* paths evaluate with { allowInteractive: false }', async () => 
   assert.deepEqual(evaluateArgs.at(-1), { allowInteractive: false });
 });
 
-// ── resolveCheckCrit ────────────────────────────────────────────────────────
+// ── resolveForcedOutcome ────────────────────────────────────────────────────
 
-test('resolveCheckCrit returns the matched crit; forced failure beats forced success', () => {
-  const groups = [
-    { group: '1d20', sum: 20 },
-    { group: '1d6', sum: 1 },
+test('resolveForcedOutcome returns the matched disposition; forced failure beats forced success', () => {
+  const diceGroups = [
+    { groupId: 0, group: '1d20', sum: 20, results: [20] },
+    { groupId: 1, group: '1d6', sum: 1, results: [1] },
   ];
-  const crit = resolveCheckCrit(
+  const forced = resolveForcedOutcome(
     [
-      { die: '1d20', raw: 20, success: true },
-      { die: '1d6', raw: 1, success: false, breakTools: true },
+      totalTrigger({ id: 'a', groupId: 0, value: 20, outcome: 'success' }),
+      totalTrigger({ id: 'b', groupId: 1, value: 1, outcome: 'failure' }),
     ],
-    groups
+    { total: 21, diceGroups }
   );
-  assert.deepEqual(crit, { success: false, breakTools: true });
+  assert.deepEqual(forced, { disposition: 'failure' });
 });
 
-test('resolveCheckCrit returns null when no crit matches', () => {
-  assert.equal(resolveCheckCrit([{ die: '1d20', raw: 20, success: true }], [{ group: '1d20', sum: 5 }]), null);
+test('resolveForcedOutcome returns null when no trigger matches', () => {
+  assert.equal(
+    resolveForcedOutcome([totalTrigger({ groupId: 0, value: 20, outcome: 'success' })], {
+      total: 5,
+      diceGroups: [{ groupId: 0, group: '1d20', sum: 5, results: [5] }],
+    }),
+    null
+  );
+});
+
+test('resolveForcedOutcome ignores outcomeTier conditions (circular) and outcome:none triggers', () => {
+  const diceGroups = [{ groupId: 0, group: '1d20', sum: 1, results: [1] }];
+  const tierTrigger = {
+    id: 'tier',
+    condition: { type: 'outcomeTier', tierIds: ['x'], outcomeKeys: [] },
+    outcome: 'failure',
+    breakTools: false,
+  };
+  const noneTrigger = totalTrigger({ groupId: 0, value: 1, outcome: 'none' });
+  assert.equal(resolveForcedOutcome([tierTrigger, noneTrigger], { total: 1, diceGroups }), null);
 });
 
 // ── runFormulaPassFail ──────────────────────────────────────────────────────
@@ -169,18 +198,19 @@ test('runFormulaPassFail: meet comparison passes at/above the DC', async () => {
   assert.equal(r.data.comparison, 'meet');
 });
 
-test('runFormulaPassFail: a crit forces the outcome and surfaces breakTools; label drives the message', async () => {
+test('runFormulaPassFail: a forced-failure trigger overrides the comparison; label drives the message', async () => {
+  // total 2 would meet dc 1, but the trigger matches the rolled group total (1) and
+  // forces failure.
   stubRoll(2, [{ number: 1, faces: 20, total: 1 }]);
   const r = await runFormulaPassFail({
     formula: '1d20',
     dc: 1,
     thresholdMode: 'meet',
-    diceCrits: [{ die: '1d20', raw: 1, success: false, breakTools: true }],
+    triggers: [totalTrigger({ groupId: 0, value: 1, outcome: 'failure' })],
     actor: ACTOR,
     label: 'Salvage',
   });
   assert.equal(r.success, false);
-  assert.equal(r.data.breakTools, true);
   assert.equal(r.message, 'Salvage check failed');
 });
 
@@ -200,21 +230,27 @@ test('runFormulaPassFail: no dice engine does not block (pass, value null)', asy
 
 // ── runFormulaProgressive ───────────────────────────────────────────────────
 
-test('runFormulaProgressive: the total is the value; success/failure crits force all/none', async () => {
+test('runFormulaProgressive: the total is the value; success/failure triggers force all/none', async () => {
   stubRoll(8, [{ number: 2, faces: 6, total: 8 }]);
   assert.equal((await runFormulaProgressive({ formula: '2d6', actor: ACTOR })).value, 8);
 
   stubRoll(3, [{ number: 2, faces: 6, total: 12 }]);
   assert.equal(
-    (await runFormulaProgressive({ formula: '2d6', diceCrits: [{ die: '2d6', raw: 12, success: true }], actor: ACTOR }))
-      .value,
+    (await runFormulaProgressive({
+      formula: '2d6',
+      triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })],
+      actor: ACTOR,
+    })).value,
     Number.MAX_SAFE_INTEGER
   );
 
   stubRoll(9, [{ number: 2, faces: 6, total: 2 }]);
   assert.equal(
-    (await runFormulaProgressive({ formula: '2d6', diceCrits: [{ die: '2d6', raw: 2, success: false }], actor: ACTOR }))
-      .value,
+    (await runFormulaProgressive({
+      formula: '2d6',
+      triggers: [totalTrigger({ groupId: 0, value: 2, outcome: 'failure' })],
+      actor: ACTOR,
+    })).value,
     0
   );
 });
@@ -303,8 +339,8 @@ test('runFormulaRouted: no tier matches → outcome null, success false', async 
   assert.equal(r.value, 4);
 });
 
-test('runFormulaRouted: a success crit forces the highest succeeding tier', async () => {
-  // total 4 would match nothing, but the success crit reroutes to the best success tier.
+test('runFormulaRouted: a success trigger forces the highest succeeding tier', async () => {
+  // total 4 would match nothing, but the success trigger reroutes to the best success tier.
   stubRoll(4, [{ number: 1, faces: 20, total: 20 }]);
   const r = await runFormulaRouted({
     formula: '1d20',
@@ -312,15 +348,15 @@ test('runFormulaRouted: a success crit forces the highest succeeding tier', asyn
     thresholdMode: 'meet',
     type: 'relative',
     relativeOutcomes: RELATIVE,
-    diceCrits: [{ die: '1d20', raw: 20, success: true }],
+    triggers: [totalTrigger({ groupId: 0, value: 20, outcome: 'success' })],
     actor: ACTOR,
   });
   assert.equal(r.outcome, 'Critical Success');
   assert.equal(r.success, true);
 });
 
-test('runFormulaRouted: a failure crit forces the lowest failing tier', async () => {
-  // total 20 would match a success tier, but the failure crit reroutes to the worst failing tier.
+test('runFormulaRouted: a failure trigger forces the lowest failing tier', async () => {
+  // total 20 would match a success tier, but the failure trigger reroutes to the worst failing tier.
   stubRoll(20, [{ number: 1, faces: 20, total: 1 }]);
   const r = await runFormulaRouted({
     formula: '1d20',
@@ -328,7 +364,7 @@ test('runFormulaRouted: a failure crit forces the lowest failing tier', async ()
     thresholdMode: 'meet',
     type: 'relative',
     relativeOutcomes: RELATIVE,
-    diceCrits: [{ die: '1d20', raw: 1, success: false }],
+    triggers: [totalTrigger({ groupId: 0, value: 1, outcome: 'failure' })],
     actor: ACTOR,
   });
   assert.equal(r.outcome, 'Failure');
@@ -336,21 +372,21 @@ test('runFormulaRouted: a failure crit forces the lowest failing tier', async ()
 });
 
 test('runFormulaRouted: a forced disposition with no matching tier leaves outcome null', async () => {
-  // Only a single success tier exists; a failure crit has nowhere to route.
+  // Only a single success tier exists; a failure trigger has nowhere to route.
   stubRoll(12, [{ number: 1, faces: 20, total: 1 }]);
   const r = await runFormulaRouted({
     formula: '1d20',
     dc: 15,
     type: 'relative',
     relativeOutcomes: [{ id: 'only', name: 'Win', success: true, dc: 0 }],
-    diceCrits: [{ die: '1d20', raw: 1, success: false }],
+    triggers: [totalTrigger({ groupId: 0, value: 1, outcome: 'failure' })],
     actor: ACTOR,
   });
   assert.equal(r.outcome, null);
   assert.equal(r.success, false);
 });
 
-test('runFormulaRouted: a matched tier surfaces its breakTools; a crit breakTools takes precedence', async () => {
+test('runFormulaRouted: the matched (or rerouted) tier surfaces its breakTools', async () => {
   // Fixed "Fumble" range matches and carries breakTools: true.
   stubRoll(3, [{ number: 1, faces: 20, total: 3 }]);
   const tier = await runFormulaRouted({
@@ -363,19 +399,19 @@ test('runFormulaRouted: a matched tier surfaces its breakTools; a crit breakTool
   assert.equal(tier.outcome, 'Fumble');
   assert.equal(tier.data.breakTools, true);
 
-  // A crit with breakTools reroutes and surfaces its own breakTools.
+  // A failure trigger reroutes to the worst failing tier ("Fumble"), surfacing that
+  // tier's own breakTools (the routed per-tier legacy bridge).
   stubRoll(8, [{ number: 1, faces: 20, total: 1 }]);
-  const crit = await runFormulaRouted({
+  const forced = await runFormulaRouted({
     formula: '1d20',
     dc: 0,
     type: 'fixed',
     fixedOutcomes: FIXED,
-    diceCrits: [{ die: '1d20', raw: 1, success: false, breakTools: true }],
+    triggers: [totalTrigger({ groupId: 0, value: 1, outcome: 'failure' })],
     actor: ACTOR,
   });
-  assert.equal(crit.outcome, 'Fumble');
-  assert.equal(crit.data.breakTools, true);
-  assert.deepEqual(crit.data.crit, { success: false, breakTools: true });
+  assert.equal(forced.outcome, 'Fumble');
+  assert.equal(forced.data.breakTools, true);
 });
 
 test('runFormulaRouted: no dice engine does not block and does not fabricate a route', async () => {

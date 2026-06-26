@@ -21,6 +21,21 @@ installRoutedCheckEnv();
 const { MacroExecutor } = await import('../src/utils/MacroExecutor.js');
 const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
 
+// A unified trigger forcing `outcome` (and optionally breakTools) when the rolled
+// group total equals `value` — the recombined replacement for a per-die crit.
+function totalTrigger({ id = 't', groupId = 0, value, outcome = 'none', breakTools = false }) {
+  return {
+    id,
+    condition: { type: 'diceGroup', groupId, aggregate: 'total', operator: '==', value },
+    outcome,
+    breakTools,
+  };
+}
+
+function breakage(...triggers) {
+  return { checkBreakage: { triggers } };
+}
+
 // Two success tiers (relative deltas) + one failure tier, so threshold + crit
 // routing have something to land on. Base DC default is 15.
 const RELATIVE_TIERS = [
@@ -134,21 +149,21 @@ test('a matched breakTools tier surfaces data.breakTools', async () => {
   assert.equal(r.data.breakTools, true, 'the matched tier carries breakTools');
 });
 
-test('a breakTools crit reroutes the disposition and forces breakTools', async () => {
+test('a forced-failure trigger reroutes the disposition; the rerouted tier surfaces breakTools', async () => {
   const { engine } = makeRoutedEngine({
     routed: defaultRouted({
       relativeOutcomes: RELATIVE_TIERS,
       dc: 15,
-      diceCrits: [{ id: 'c-fail', die: '1d20', raw: 1, success: false, breakTools: true }],
+      ...breakage(totalTrigger({ id: 'c-fail', groupId: 0, value: 1, outcome: 'failure' })),
     }),
   });
-  // High roll would map to Mythic, but a natural-1 crit forces failure → worst
-  // failing tier (Botch), and the crit's breakTools wins.
+  // High roll would map to Mythic, but the failure trigger forces failure → worst
+  // failing tier (Botch), whose own breakTools is the surfaced flag.
   stubRoll(20, [{ number: 1, faces: 20, total: 1 }]);
   const r = await runRoutedCheck(engine);
-  assert.equal(r.success, false, 'the forced-failure crit overrides the threshold');
+  assert.equal(r.success, false, 'the forced-failure trigger overrides the threshold');
   assert.equal(r.outcome, 'Botch', 'reroutes to the worst failing tier');
-  assert.equal(r.data.breakTools, true);
+  assert.equal(r.data.breakTools, true, 'the rerouted Botch tier carries breakTools');
 });
 
 // ── Base-DC resolution (mirrors the simple check, NOT the flat routed.dc) ──────
@@ -295,8 +310,7 @@ test('checkDriven routed: an outcomeTier trigger on a SUCCESSFUL tier forces bre
       relativeOutcomes: [successTier],
       dc: 15,
       checkBreakage: {
-        enabled: true,
-        triggers: [{ id: 'tier', label: 'Win breaks', condition: { type: 'outcomeTier', tierIds: ['t-win'], outcomeKeys: [] } }],
+        triggers: [{ id: 'tier', breakTools: true, outcome: 'none', condition: { type: 'outcomeTier', tierIds: ['t-win'], outcomeKeys: [] } }],
       },
     }),
   });

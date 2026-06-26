@@ -166,11 +166,13 @@ function makeSystem({
   resolutionMode = 'simple',
   craftingCheck = null,
   managedItems = [],
-  features = {}
+  features = {},
+  toolBreakage = undefined
 } = {}) {
   const sys = {
     id,
     resolutionMode,
+    ...(toolBreakage ? { toolBreakage } : {}),
     features: { multiStepRecipes: false, craftingChecks: false, essences: false, ...features },
     craftingCheck: craftingCheck || {
       enabled: false,
@@ -883,6 +885,10 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
   const system = makeSystem({
     id: 'sys-break',
     resolutionMode: 'simple',
+    // The routed/tier `data.breakTools` legacy bridge only force-breaks under
+    // checkDriven authority (issue 419 either-or rule): a check never breaks tools
+    // under toolSpecific.
+    toolBreakage: { authority: 'checkDriven' },
     craftingCheck: {
       enabled: true,
       macroUuid: null,
@@ -931,8 +937,8 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
   };
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
-  // Engine-evaluated FAILURE with a breakTools crit — mirrors what _runSimpleCheck /
-  // _runRoutedCheck return for a forced-failure breakTools crit.
+  // Engine-evaluated FAILURE with a tier `data.breakTools` flag — mirrors what
+  // _runRoutedCheck returns for a rerouted breakTools tier (the legacy bridge).
   engine._runCraftingCheck = async () => ({
     success: false,
     outcome: 'fail',

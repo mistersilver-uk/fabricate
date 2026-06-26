@@ -1733,7 +1733,7 @@ export class CraftingEngine {
       formula: simple.rollFormula,
       dc,
       thresholdMode: simple.thresholdMode,
-      diceCrits: simple.diceCrits,
+      triggers: simple.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
     });
@@ -1776,7 +1776,7 @@ export class CraftingEngine {
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
-      diceCrits: routed.diceCrits,
+      triggers: routed.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
     });
@@ -1811,7 +1811,7 @@ export class CraftingEngine {
     const progressive = system?.craftingCheck?.progressive || {};
     const result = await runFormulaProgressive({
       formula: progressive.rollFormula,
-      diceCrits: progressive.diceCrits,
+      triggers: progressive.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
     });
@@ -1856,6 +1856,13 @@ export class CraftingEngine {
   _resolveSalvageBreakageDecision(system, checkResult) {
     const authority =
       system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    // Either-or authority (issue 419): a check can only break tools under
+    // `checkDriven`. Under `toolSpecific` tools break solely by their own modes, so
+    // the check-driven force-break (and the routed per-tier legacy bridge) is not
+    // consulted.
+    if (authority !== 'checkDriven') {
+      return { forceBreak: false, triggerId: null, reason: null, authority };
+    }
     const checkBreakage = this._resolveSalvageCheckBreakage(system);
     const decision = evaluateCheckBreakage({ checkBreakage, checkResult });
     return { ...decision, authority };
@@ -1864,18 +1871,25 @@ export class CraftingEngine {
   /**
    * Resolve the breakage decision for a crafting attempt via the single shared
    * {@link evaluateCheckBreakage} seam (issue 419). Returns the `{ forceBreak,
-   * triggerId, reason }` decision plus the system's breakage `authority`. Subsumes
-   * the former `_checkForcesToolBreak`: under `toolSpecific` the legacy
-   * `data.breakTools` force-break still applies (each Tool's own mode otherwise
-   * decides); under `checkDriven` the active check's `checkBreakage` triggers (and
-   * the implicit legacy `data.breakTools`) decide whether all required tools break.
-   * Macro/builtIn checks never force-break (the legacy `engineEvaluated` guard is
-   * preserved inside `evaluateCheckBreakage`).
+   * triggerId, reason }` decision plus the system's breakage `authority`. Authority
+   * is strictly either-or: under `toolSpecific` a check NEVER breaks tools (each
+   * Tool's own mode decides, so the seam is not consulted); under `checkDriven` the
+   * active check's `checkBreakage` triggers (those opting in via `breakTools`, plus
+   * the implicit routed per-tier `data.breakTools` bridge) decide whether all
+   * required tools break. Macro/builtIn checks never force-break (the legacy
+   * `engineEvaluated` guard is preserved inside `evaluateCheckBreakage`).
    * @private
    */
   _resolveCraftingBreakageDecision(system, recipe, checkResult) {
     const authority =
       system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    // Either-or authority (issue 419): a check can only break tools under
+    // `checkDriven`. Under `toolSpecific` tools break solely by their own modes, so
+    // the check-driven force-break (and the routed per-tier legacy bridge) is not
+    // consulted.
+    if (authority !== 'checkDriven') {
+      return { forceBreak: false, triggerId: null, reason: null, authority };
+    }
     const checkBreakage = this._resolveCraftingCheckBreakage(system, recipe);
     const decision = evaluateCheckBreakage({ checkBreakage, checkResult });
     return { ...decision, authority };
@@ -2758,7 +2772,7 @@ export class CraftingEngine {
       formula: simple.rollFormula,
       dc: this._resolveSalvageDc(simple, component),
       thresholdMode: simple.thresholdMode,
-      diceCrits: simple.diceCrits,
+      triggers: simple.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
     });
@@ -2773,7 +2787,7 @@ export class CraftingEngine {
   async _runSalvageProgressiveCheck(progressive, actor) {
     const result = await runFormulaProgressive({
       formula: progressive.rollFormula,
-      diceCrits: progressive.diceCrits,
+      triggers: progressive.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
     });
@@ -2797,7 +2811,7 @@ export class CraftingEngine {
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
-      diceCrits: routed.diceCrits,
+      triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
     });

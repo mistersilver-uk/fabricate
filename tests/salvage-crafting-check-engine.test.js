@@ -37,6 +37,17 @@ const sys = (salvageCraftingCheck, salvageResolutionMode) => ({
   salvageResolutionMode,
   salvageCraftingCheck,
 });
+
+// A unified trigger forcing `outcome` (and optionally breakTools) when the rolled
+// group total equals `value` — the recombined replacement for a per-die crit.
+function totalTrigger({ id = 't', groupId = 0, value, outcome = 'none', breakTools = false }) {
+  return {
+    id,
+    condition: { type: 'diceGroup', groupId, aggregate: 'total', operator: '==', value },
+    outcome,
+    breakTools,
+  };
+}
 const run = (engine, system, component = {}) =>
   engine._runSalvageCraftingCheck(component, system, ACTOR, []);
 
@@ -64,18 +75,23 @@ test('salvage simple: a per-component dcOverride replaces the default DC', async
   assert.equal(r.success, false, '16 < 20');
 });
 
-test('salvage simple: a crit forces success below the DC and surfaces breakTools', async () => {
+test('salvage simple: a forced-success trigger passes below the DC', async () => {
   const engine = makeEngine();
   stubRoll(3, [{ number: 1, faces: 20, total: 20 }]);
   const r = await run(
     engine,
     sys(
-      { simple: { rollFormula: '1d20', dc: 15, diceCrits: [{ id: 'c', die: '1d20', raw: 20, success: true, breakTools: true }] } },
+      {
+        simple: {
+          rollFormula: '1d20',
+          dc: 15,
+          checkBreakage: { triggers: [totalTrigger({ groupId: 0, value: 20, outcome: 'success' })] },
+        },
+      },
       'simple'
     )
   );
   assert.equal(r.success, true);
-  assert.equal(r.data.breakTools, true);
 });
 
 // ── Salvage progressive ─────────────────────────────────────────────────────
@@ -88,19 +104,19 @@ test('salvage progressive: the roll total is the numeric value', async () => {
   assert.equal(r.value, 8);
 });
 
-test('salvage progressive: a success crit awards all (MAX_SAFE_INTEGER), a failure crit awards none', async () => {
+test('salvage progressive: a success trigger awards all (MAX_SAFE_INTEGER), a failure trigger awards none', async () => {
   const engine = makeEngine();
   stubRoll(7, [{ number: 2, faces: 6, total: 12 }]);
   const all = await run(
     engine,
-    sys({ progressive: { rollFormula: '2d6', diceCrits: [{ id: 'c', die: '2d6', raw: 12, success: true }] } }, 'progressive')
+    sys({ progressive: { rollFormula: '2d6', checkBreakage: { triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })] } } }, 'progressive')
   );
   assert.equal(all.value, Number.MAX_SAFE_INTEGER);
 
   stubRoll(11, [{ number: 2, faces: 6, total: 2 }]);
   const none = await run(
     engine,
-    sys({ progressive: { rollFormula: '2d6', diceCrits: [{ id: 'c', die: '2d6', raw: 2, success: false }] } }, 'progressive')
+    sys({ progressive: { rollFormula: '2d6', checkBreakage: { triggers: [totalTrigger({ groupId: 0, value: 2, outcome: 'failure' })] } } }, 'progressive')
   );
   assert.equal(none.value, 0);
 });
@@ -289,8 +305,7 @@ test('checkDriven salvage: the active salvage check checkBreakage decides forced
   const engine = makeEngine();
   stubRoll(1, [{ number: 1, faces: 20, total: 1, results: [{ result: 1, active: true }] }]);
   const checkBreakage = {
-    enabled: true,
-    triggers: [{ id: 'nat1', label: 'Nat 1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+    triggers: [{ id: 'nat1', breakTools: true, outcome: 'none', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
   };
   const system = {
     salvageResolutionMode: 'simple',
@@ -304,17 +319,21 @@ test('checkDriven salvage: the active salvage check checkBreakage decides forced
   assert.equal(decision.triggerId, 'nat1');
 });
 
-test('checkDriven salvage: a legacy crit breakTools is honoured under toolSpecific (now engine-evaluated)', async () => {
+test('toolSpecific salvage: a breakTools trigger never force-breaks (either-or authority)', async () => {
   const engine = makeEngine();
   stubRoll(3, [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }]);
   const system = {
     salvageResolutionMode: 'simple',
     salvageCraftingCheck: {
-      simple: { rollFormula: '1d20', dc: 15, diceCrits: [{ id: 'c', die: '1d20', raw: 20, success: true, breakTools: true }] },
+      simple: {
+        rollFormula: '1d20',
+        dc: 15,
+        checkBreakage: { triggers: [totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'success', breakTools: true })] },
+      },
     },
   };
   const r = await run(engine, system);
   const decision = engine._resolveSalvageBreakageDecision(system, r);
   assert.equal(decision.authority, 'toolSpecific');
-  assert.equal(decision.forceBreak, true, 'salvage now reaches crafting parity for crit breakTools');
+  assert.equal(decision.forceBreak, false, 'a check never breaks tools under toolSpecific');
 });

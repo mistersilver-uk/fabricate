@@ -103,15 +103,17 @@
   function cloneCheckBreakage(checkBreakage) {
     const source = checkBreakage && typeof checkBreakage === 'object' ? checkBreakage : {};
     return {
-      enabled: source.enabled === true,
       triggers: Array.isArray(source.triggers)
         ? source.triggers.map((trigger) => ({
             id: trigger?.id,
-            label: typeof trigger?.label === 'string' ? trigger.label : '',
             condition:
               trigger?.condition && typeof trigger.condition === 'object'
                 ? { ...trigger.condition }
-                : null
+                : null,
+            outcome: ['success', 'failure', 'none'].includes(trigger?.outcome)
+              ? trigger.outcome
+              : 'none',
+            breakTools: trigger?.breakTools === true
           }))
         : []
     };
@@ -136,9 +138,6 @@
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
       tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
-      diceCrits: Array.isArray(source.diceCrits)
-        ? source.diceCrits.map((crit) => ({ ...crit }))
-        : [],
       relativeOutcomes: Array.isArray(source.relativeOutcomes)
         ? source.relativeOutcomes.map((outcome) => ({ ...outcome }))
         : [],
@@ -171,7 +170,6 @@
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
       tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
       macroUuid: source.macroUuid || null,
-      diceCrits: Array.isArray(source.diceCrits) ? source.diceCrits.map((crit) => ({ ...crit })) : [],
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
@@ -196,9 +194,6 @@
         : 'equal',
       allowPlayerReorder: source.allowPlayerReorder === true,
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
-      diceCrits: Array.isArray(source.diceCrits)
-        ? source.diceCrits.map((crit) => ({ ...crit }))
-        : [],
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
@@ -3852,13 +3847,13 @@
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
-        {#if checksDirty || checksSaving}
+        {#if checksDirty}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
-          <button type="button" class="manager-button is-primary" data-checks-save onclick={saveChecks} disabled={!checksDirty || checksSaving}>
-            <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
-          </button>
         {/if}
+        <button type="button" class="manager-button is-primary" data-checks-save onclick={saveChecks} disabled={!checksDirty || checksSaving}>
+          <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
+        </button>
       {:else if currentView === 'essences'}
         <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
           <i class="fas fa-plus" aria-hidden="true"></i>

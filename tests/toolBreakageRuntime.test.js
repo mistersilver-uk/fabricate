@@ -323,19 +323,23 @@ test('evaluateCheckBreakage: legacy data.breakTools is an implicit always-on tri
   assert.equal(decision.triggerId, 'legacyBreakTools');
 });
 
-test('evaluateCheckBreakage: rollTotal trigger', () => {
+test('evaluateCheckBreakage: rollTotal trigger (breakTools opt-in)', () => {
   const checkBreakage = {
-    enabled: true,
-    triggers: [{ id: 'r', label: 'Low roll', condition: { type: 'rollTotal', operator: '<=', value: 3 } }],
+    triggers: [{ id: 'r', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: 3 } }],
   };
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 2 }) }).forceBreak, true);
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 4 }) }).forceBreak, false);
 });
 
+test('evaluateCheckBreakage: a matching trigger that does NOT opt into breakTools never force-breaks', () => {
+  // A trigger may force an outcome only (breakTools false/absent); it must not break tools.
+  const outcomeOnly = { triggers: [{ id: 'o', outcome: 'failure', breakTools: false, condition: { type: 'rollTotal', operator: '<=', value: 99 } }] };
+  assert.equal(evaluateCheckBreakage({ checkBreakage: outcomeOnly, checkResult: engineCheckResult({ total: 1 }) }).forceBreak, false);
+});
+
 test('evaluateCheckBreakage: progressiveValue trigger; absent value on a non-progressive check never matches', () => {
   const checkBreakage = {
-    enabled: true,
-    triggers: [{ id: 'p', condition: { type: 'progressiveValue', operator: '>=', value: 100 } }],
+    triggers: [{ id: 'p', breakTools: true, condition: { type: 'progressiveValue', operator: '>=', value: 100 } }],
   };
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ value: 120, total: 12 }) }).forceBreak, true);
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ value: null, total: 12 }) }).forceBreak, false);
@@ -343,15 +347,15 @@ test('evaluateCheckBreakage: progressiveValue trigger; absent value on a non-pro
 
 test('evaluateCheckBreakage: rollTotal and progressiveValue resolve from distinct sources on the same roll', () => {
   const checkResult = engineCheckResult({ value: Number.MAX_SAFE_INTEGER, total: 1 });
-  const rollTotalTrigger = { enabled: true, triggers: [{ id: 'rt', condition: { type: 'rollTotal', operator: '==', value: 1 } }] };
-  const progValueTrigger = { enabled: true, triggers: [{ id: 'pv', condition: { type: 'progressiveValue', operator: '<=', value: 5 } }] };
+  const rollTotalTrigger = { triggers: [{ id: 'rt', breakTools: true, condition: { type: 'rollTotal', operator: '==', value: 1 } }] };
+  const progValueTrigger = { triggers: [{ id: 'pv', breakTools: true, condition: { type: 'progressiveValue', operator: '<=', value: 5 } }] };
   assert.equal(evaluateCheckBreakage({ checkBreakage: rollTotalTrigger, checkResult }).forceBreak, true, 'rollTotal sees the raw 1');
   assert.equal(evaluateCheckBreakage({ checkBreakage: progValueTrigger, checkResult }).forceBreak, false, 'progressiveValue sees the awarded MAX');
 });
 
 test('evaluateCheckBreakage: outcomeTier trigger matches by tierId or outcome key', () => {
-  const byId = { enabled: true, triggers: [{ id: 'o', condition: { type: 'outcomeTier', tierIds: ['t-danger'], outcomeKeys: [] } }] };
-  const byKey = { enabled: true, triggers: [{ id: 'o', condition: { type: 'outcomeTier', tierIds: [], outcomeKeys: ['danger'] } }] };
+  const byId = { triggers: [{ id: 'o', breakTools: true, condition: { type: 'outcomeTier', tierIds: ['t-danger'], outcomeKeys: [] } }] };
+  const byKey = { triggers: [{ id: 'o', breakTools: true, condition: { type: 'outcomeTier', tierIds: [], outcomeKeys: ['danger'] } }] };
   const result = engineCheckResult({ outcome: 'Danger', outcomeId: 't-danger' });
   assert.equal(evaluateCheckBreakage({ checkBreakage: byId, checkResult: result }).forceBreak, true);
   assert.equal(evaluateCheckBreakage({ checkBreakage: byKey, checkResult: result }).forceBreak, true);
@@ -359,8 +363,7 @@ test('evaluateCheckBreakage: outcomeTier trigger matches by tierId or outcome ke
 
 test('evaluateCheckBreakage: diceGroup anyDie natural-1', () => {
   const checkBreakage = {
-    enabled: true,
-    triggers: [{ id: 'g', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+    triggers: [{ id: 'g', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
   };
   const groups = [{ groupId: 0, group: '2d20', sum: 21, results: [1, 20] }];
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, true);
@@ -369,13 +372,13 @@ test('evaluateCheckBreakage: diceGroup anyDie natural-1', () => {
 });
 
 test('evaluateCheckBreakage: diceGroup total, lowestDie, highestDie, and allDice aggregates', () => {
-  const lowest = { enabled: true, triggers: [{ id: 'l', condition: { type: 'diceGroup', groupId: 1, aggregate: 'lowestDie', operator: '<=', value: 2 } }] };
-  const total = { enabled: true, triggers: [{ id: 't', condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '>=', value: 18 } }] };
+  const lowest = { triggers: [{ id: 'l', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'lowestDie', operator: '<=', value: 2 } }] };
+  const total = { triggers: [{ id: 't', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '>=', value: 18 } }] };
   // highestDie: the single d20 face is 19, so >= 18 matches.
-  const highest = { enabled: true, triggers: [{ id: 'h', condition: { type: 'diceGroup', groupId: 0, aggregate: 'highestDie', operator: '>=', value: 18 } }] };
+  const highest = { triggers: [{ id: 'h', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'highestDie', operator: '>=', value: 18 } }] };
   // allDice: every die in the 2d6 group is <= 6 → matches; >= 6 would NOT (the 2 fails).
-  const allLow = { enabled: true, triggers: [{ id: 'a', condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '<=', value: 6 } }] };
-  const allHigh = { enabled: true, triggers: [{ id: 'a2', condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '>=', value: 6 } }] };
+  const allLow = { triggers: [{ id: 'a', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '<=', value: 6 } }] };
+  const allHigh = { triggers: [{ id: 'a2', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '>=', value: 6 } }] };
   const groups = [
     { groupId: 0, group: '1d20', sum: 19, results: [19] },
     { groupId: 1, group: '2d6', sum: 8, results: [2, 6] },
@@ -389,13 +392,13 @@ test('evaluateCheckBreakage: diceGroup total, lowestDie, highestDie, and allDice
 });
 
 test('evaluateCheckBreakage: non-total aggregate fails open when per-die results are missing', () => {
-  const checkBreakage = { enabled: true, triggers: [{ id: 'g', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }] };
+  const checkBreakage = { triggers: [{ id: 'g', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }] };
   const groups = [{ groupId: 0, group: '2d20', sum: 21 }];
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, false);
 });
 
-test('evaluateCheckBreakage: disabled checkBreakage with no legacy breakTools never matches', () => {
-  const checkBreakage = { enabled: false, triggers: [{ id: 'g', condition: { type: 'rollTotal', operator: '<=', value: 99 } }] };
+test('evaluateCheckBreakage: an empty trigger list with no legacy breakTools never matches', () => {
+  const checkBreakage = { triggers: [] };
   assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 1 }) }).forceBreak, false);
 });
 
@@ -428,7 +431,7 @@ test('checkDriven runtime: forces breakage on all non-immune tools while immune 
   const applied = await runtime.apply(args);
   const byId = Object.fromEntries(applied.map((e) => [e.componentId, e]));
   assert.equal(byId.axe.broken, true, 'breakageChance-0 tool still breaks under checkDriven');
-  assert.equal(byId.axe.reason, '1d20 group rolled 1');
+  assert.equal(byId.axe.reason, 'Check breakage');
   assert.equal(byId.hammer.broken, true);
   assert.equal(byId.immune.broken, false, 'immune never breaks');
   assert.equal(byId.immune.skippedImmune, true);
