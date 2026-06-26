@@ -65,7 +65,10 @@
 
 import { evaluateEnvironmentReadiness } from '../ui/svelte/apps/manager/environment/environmentReadiness.js';
 import { evaluateRecipeReadiness } from '../ui/svelte/apps/manager/recipe/recipeReadiness.js';
-import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
+import {
+  routedSuccessTierOptions,
+  routedOutcomeTierNames,
+} from '../utils/routedOutcomeKeywords.js';
 
 import { ResolutionModeService } from './ResolutionModeService.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -414,6 +417,51 @@ function collectSystemBlockers(system, recipes, components) {
                 'This routed system has no crafting check roll formula; recipes that route by the check provider will not resolve until one is configured.',
               nav: { view: 'system-overview' },
             }
+      );
+    }
+  }
+
+  // Routed SALVAGE (the system's own `salvageResolutionMode`, independent of the
+  // crafting `mode`) routes a salvage check outcome to a per-component result group
+  // by tier NAME, so it needs BOTH a routed salvage roll formula and at least one
+  // authored outcome tier. Salvage is a per-component opt-in, so "used" = at least
+  // one component declares salvage result groups; mirror the crafting rule's "warn
+  // always, escalate when used". A misconfigured optional feature must NOT hide the
+  // whole system, so these carry no `blocks` field — they surface as a single
+  // actionable issue rather than N per-component criticals (`validateSalvage` defers
+  // the no-tiers gap here precisely so this is the one place it is reported).
+  if (system?.salvageResolutionMode === 'routed') {
+    const salvageCheck = system?.salvageCraftingCheck || {};
+    const hasSalvageFormula = Boolean(trimmed(salvageCheck.routed?.rollFormula));
+    const hasSalvageTiers = routedOutcomeTierNames(salvageCheck.routed).length > 0;
+    const salvageInUse = asArray(components).some(
+      (component) =>
+        Array.isArray(component?.salvage?.resultGroups) && component.salvage.resultGroups.length > 0
+    );
+    const entityName = trimmed(system?.name) || system?.id || 'system';
+    const pushSalvageIssue = (code, usedMessage, idleMessage) => {
+      blockers.push({
+        kind: 'system',
+        entityId: null,
+        entityName,
+        severity: salvageInUse ? 'critical' : 'warning',
+        code,
+        message: salvageInUse ? usedMessage : idleMessage,
+        nav: { view: 'system-overview' },
+      });
+    };
+    if (!hasSalvageFormula) {
+      pushSalvageIssue(
+        'salvageRoutedNoFormula',
+        'Components are salvageable but routed salvage has no roll formula; salvage will not resolve until one is configured.',
+        'Routed salvage has no roll formula; salvage will not resolve until one is configured.'
+      );
+    }
+    if (!hasSalvageTiers) {
+      pushSalvageIssue(
+        'salvageRoutedNoTiers',
+        'Components are salvageable but routed salvage has no outcome tiers; configure salvage outcome tiers so salvage can be routed.',
+        'Routed salvage has no outcome tiers; configure salvage outcome tiers so salvage can be routed.'
       );
     }
   }

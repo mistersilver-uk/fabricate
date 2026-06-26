@@ -162,7 +162,14 @@ test('simple mode — 2 result groups → invalid', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Group 3: Routed mode (6 tests — 5 original + 1 macroUuid test)
+// Group 3: Routed mode
+//
+// Routing keys on the salvage check's routed outcome-tier NAMES (the same source
+// the authoring UI offers and the runtime routes by), NOT the legacy flat
+// `outcomes` list. Validation requires every SUCCESS tier to route to a real
+// result group; failure tiers may stay unrouted. When the check defines no tiers,
+// the gap is reported once at the SYSTEM level (see system-validation tests), so
+// the component itself is not faulted.
 // ---------------------------------------------------------------------------
 
 function buildRoutedSystem(overrides = {}) {
@@ -173,12 +180,24 @@ function buildRoutedSystem(overrides = {}) {
       macroUuid: null,
       outcomes: ['fail', 'pass'],
       progressive: null,
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        dc: 15,
+        thresholdMode: 'meet',
+        relativeOutcomes: [
+          { id: 't-pass', name: 'pass', success: true, dc: 0 },
+          { id: 't-fail', name: 'fail', success: false, dc: -5 },
+        ],
+        fixedOutcomes: [],
+      },
     },
     ...overrides,
   });
 }
 
-function buildRoutedComponent(outcomeRouting = { fail: 'rg-fail', pass: 'rg-pass' }) {
+// Only the SUCCESS tier ("pass") needs a route; the failure tier may stay unrouted.
+function buildRoutedComponent(outcomeRouting = { pass: 'rg-pass' }) {
   return buildComponent({
     salvage: {
       enabled: true,
@@ -192,14 +211,55 @@ function buildRoutedComponent(outcomeRouting = { fail: 'rg-fail', pass: 'rg-pass
   });
 }
 
-test('routed mode — checks enabled, outcomes present, valid routing → valid', () => {
+test('routed mode — success tier routed to a real group → valid', () => {
   const service = buildService();
   const system = buildRoutedSystem();
   const component = buildRoutedComponent();
 
   const result = service.validateSalvage(component, system);
 
-  assert.equal(result.valid, true);
+  assert.equal(result.valid, true, result.errors.join(', '));
+  assert.equal(result.errors.length, 0);
+});
+
+test('routed mode — failure tier left unrouted → valid (matches runtime tolerance)', () => {
+  const service = buildService();
+  const system = buildRoutedSystem();
+  // Route only the success tier; the "fail" tier is intentionally unrouted.
+  const component = buildRoutedComponent({ pass: 'rg-pass' });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, true, result.errors.join(', '));
+  assert.equal(result.errors.length, 0);
+});
+
+test('routed mode — fixed-type check reads fixedOutcomes for tier names', () => {
+  const service = buildService();
+  const system = buildRoutedSystem({
+    salvageCraftingCheck: {
+      enabled: true,
+      macroUuid: null,
+      outcomes: ['fail', 'pass'],
+      progressive: null,
+      routed: {
+        type: 'fixed',
+        rollFormula: '1d20',
+        dc: 15,
+        thresholdMode: 'meet',
+        relativeOutcomes: [],
+        fixedOutcomes: [
+          { id: 'f-pass', name: 'pass', success: true, start: 10, end: 20 },
+          { id: 'f-fail', name: 'fail', success: false, start: 0, end: 9 },
+        ],
+      },
+    },
+  });
+  const component = buildRoutedComponent({ pass: 'rg-pass' });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, true, result.errors.join(', '));
   assert.equal(result.errors.length, 0);
 });
 
@@ -217,6 +277,14 @@ test('legacy tiered salvageResolutionMode token normalizes to routed and validat
       macroUuid: null,
       outcomes: ['fail', 'pass'],
       progressive: null,
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        relativeOutcomes: [
+          { id: 't-pass', name: 'pass', success: true, dc: 0 },
+          { id: 't-fail', name: 'fail', success: false, dc: -5 },
+        ],
+      },
     },
   });
   assert.equal(normalized.salvageResolutionMode, 'routed');
@@ -230,70 +298,38 @@ test('legacy tiered salvageResolutionMode token normalizes to routed and validat
   assert.equal(result.errors.length, 0);
 });
 
-test('routed mode — salvageCraftingCheck disabled → invalid', () => {
-  const service = buildService();
-  const system = buildRoutedSystem({
-    salvageCraftingCheck: {
-      enabled: false,
-      macroUuid: null,
-      outcomes: ['fail', 'pass'],
-      progressive: null,
-    },
-  });
-  const component = buildRoutedComponent();
-
-  const result = service.validateSalvage(component, system);
-
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((e) => /check/i.test(e)),
-    `expected error about checks being disabled, got: ${JSON.stringify(result.errors)}`
-  );
-});
-
-test('routed mode — checks enabled via macroUuid (not boolean enabled) → valid', () => {
-  const service = buildService();
-  const system = buildRoutedSystem({
-    salvageCraftingCheck: {
-      enabled: false,
-      macroUuid: 'Macro.some-uuid',
-      outcomes: ['fail', 'pass'],
-      progressive: null,
-    },
-  });
-  const component = buildRoutedComponent();
-
-  const result = service.validateSalvage(component, system);
-
-  assert.equal(result.valid, true);
-  assert.equal(result.errors.length, 0);
-});
-
-test('routed mode — empty outcomes array → invalid', () => {
+test('routed mode — no outcome tiers defined → valid (gap deferred to system level)', () => {
+  // The reported bug: a routed salvage check with no outcome tiers left every
+  // component permanently critical with no UI path to author routing. The
+  // component must now validate; the missing tiers surface as a single
+  // system-level issue instead.
   const service = buildService();
   const system = buildRoutedSystem({
     salvageCraftingCheck: {
       enabled: true,
       macroUuid: null,
-      outcomes: [],
+      outcomes: ['fail', 'pass'],
       progressive: null,
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        relativeOutcomes: [],
+        fixedOutcomes: [],
+      },
     },
   });
   const component = buildRoutedComponent({});
 
   const result = service.validateSalvage(component, system);
 
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((e) => /outcome/i.test(e)),
-    `expected error mentioning outcomes, got: ${JSON.stringify(result.errors)}`
-  );
+  assert.equal(result.valid, true, result.errors.join(', '));
+  assert.equal(result.errors.length, 0);
 });
 
-test('routed mode — outcome maps to non-existent result group → invalid', () => {
+test('routed mode — success tier routes to non-existent result group → invalid', () => {
   const service = buildService();
   const system = buildRoutedSystem();
-  const component = buildRoutedComponent({ fail: 'rg-fail', pass: 'rg-does-not-exist' });
+  const component = buildRoutedComponent({ pass: 'rg-does-not-exist' });
 
   const result = service.validateSalvage(component, system);
 
@@ -304,18 +340,33 @@ test('routed mode — outcome maps to non-existent result group → invalid', ()
   );
 });
 
-test('routed mode — missing routing entry for an outcome → invalid', () => {
+test('routed mode — success tier left unrouted → invalid', () => {
   const service = buildService();
   const system = buildRoutedSystem();
-  // 'pass' outcome has no routing entry
+  // The "pass" success tier has no routing entry.
   const component = buildRoutedComponent({ fail: 'rg-fail' });
 
   const result = service.validateSalvage(component, system);
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /pass/i.test(e) || /outcome/i.test(e)),
+    result.errors.some((e) => /pass/i.test(e) && /result group/i.test(e)),
     `expected error about missing routing for "pass", got: ${JSON.stringify(result.errors)}`
+  );
+});
+
+test('routed mode — dangling route to a deleted group → invalid', () => {
+  const service = buildService();
+  const system = buildRoutedSystem();
+  // Success tier routed correctly, but a stale route points at a removed group.
+  const component = buildRoutedComponent({ pass: 'rg-pass', fail: 'rg-removed' });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /missing result group/i.test(e)),
+    `expected error about a missing result group, got: ${JSON.stringify(result.errors)}`
   );
 });
 

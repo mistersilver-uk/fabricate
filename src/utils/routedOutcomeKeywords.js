@@ -138,3 +138,25 @@ export function routedHasOutcomeTiers(routed) {
   const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
   return Array.isArray(tiers) && tiers.some((tier) => tier?.id);
 }
+
+/**
+ * All NON-EMPTY outcome-tier NAMES of a routed check's active type — success AND
+ * failure tiers — in author order. The active list is the `fixedOutcomes` when
+ * `type === 'fixed'`, else `relativeOutcomes`. This is the single source of truth
+ * for "what outcome names can be routed", shared by the per-component salvage
+ * routing UI and `ResolutionModeService` salvage validation so the editor and the
+ * validator can never disagree about which outcomes exist (the bug that left
+ * routed salvage permanently invalid when the two read different fields).
+ *
+ * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @returns {Array<string>}
+ */
+export function routedOutcomeTierNames(routed) {
+  if (!routed) return [];
+  const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+  return (Array.isArray(tiers) ? tiers : [])
+    .map((tier) => String(tier?.name || '').trim())
+    .filter((name) => name.length > 0);
+}

@@ -5,6 +5,8 @@ import {
   isFailKeyword,
   isMissKeyword,
   isReservedRoutedName,
+  routedOutcomeTierNames,
+  routedSuccessTierOptions,
 } from '../utils/routedOutcomeKeywords.js';
 
 /**
@@ -291,28 +293,45 @@ export class ResolutionModeService {
     }
 
     if (mode === 'routed') {
-      const checkEnabled =
-        system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
-      const outcomes = Array.isArray(system.salvageCraftingCheck?.outcomes)
-        ? system.salvageCraftingCheck.outcomes
-        : [];
-
-      if (!checkEnabled) errors.push('Routed salvage mode requires crafting checks enabled');
-      if (outcomes.length === 0)
-        errors.push('Routed salvage mode requires at least one declared outcome');
       if (groups.length === 0)
         errors.push(
           `Salvage for "${componentLabel}" must have at least 1 result group in routed mode`
         );
 
+      // Routing keys on the routed check's outcome-tier NAMES — the SAME source the
+      // authoring UI offers and the runtime routes by (CraftingEngine
+      // `_runSalvageRoutedCheck` → `_resolveSalvageResultGroups`). Reading the legacy
+      // flat `salvageCraftingCheck.outcomes` list here (which always defaulted to
+      // `['fail','pass']`) demanded routes the editor never surfaced, leaving routed
+      // salvage permanently invalid with no UI fix.
+      const routed = system.salvageCraftingCheck?.routed;
+      const tierNames = routedOutcomeTierNames(routed);
       const groupIds = new Set(groups.map((g) => g.id));
       const routing = component.salvage.outcomeRouting || {};
-      for (const outcome of outcomes) {
-        const target = routing[outcome];
-        if (!target || !groupIds.has(target)) {
-          errors.push(
-            `Outcome "${outcome}" must map to a valid salvage result group for "${componentLabel}"`
-          );
+
+      // When the salvage check defines NO outcome tiers, routing is impossible and
+      // there is nothing the component author can fix — that gap is reported once at
+      // the system level (`salvageRoutedNoTiers`), so the component is not faulted.
+      if (tierNames.length > 0) {
+        // Every SUCCESS tier must route to a real result group: a passed salvage
+        // check must yield something. Failure tiers may stay unrouted (the runtime
+        // yields nothing for an unrouted outcome), so they are not required here.
+        for (const { name } of routedSuccessTierOptions(routed)) {
+          const target = routing[name];
+          if (!target || !groupIds.has(target)) {
+            errors.push(
+              `Outcome "${name}" must map to a valid salvage result group for "${componentLabel}"`
+            );
+          }
+        }
+        // No dangling routes: an authored route pointing at a now-deleted group is a
+        // misconfiguration regardless of which tier it belongs to.
+        for (const [name, target] of Object.entries(routing)) {
+          if (target && !groupIds.has(target)) {
+            errors.push(
+              `Salvage routing for "${name}" references a missing result group for "${componentLabel}"`
+            );
+          }
         }
       }
     }
