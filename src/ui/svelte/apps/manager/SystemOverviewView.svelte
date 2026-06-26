@@ -67,6 +67,8 @@
     locallyExcluded: ['IssueLocallyExcluded', 'Some records are excluded for this environment.'],
     invalidSalvage: ['IssueInvalidSalvage', 'The component salvage is invalid for the current salvage mode.'],
     routedCheckNoFormula: ['IssueRoutedCheckNoFormula', 'This routed system has no crafting check roll formula; recipes that route by the check provider will not resolve until one is configured.'],
+    salvageRoutedNoFormula: ['IssueSalvageRoutedNoFormula', 'Routed salvage has no roll formula; salvage will not resolve until one is configured.'],
+    salvageRoutedNoTiers: ['IssueSalvageRoutedNoTiers', 'Routed salvage has no outcome tiers; configure salvage outcome tiers so salvage can be routed.'],
     progressiveNoCheck: ['IssueProgressiveNoCheck', 'Progressive mode requires a configured progressive crafting check.'],
     progressiveNoDifficulty: ['IssueProgressiveNoDifficulty', 'Progressive mode requires at least one component with a difficulty of 1 or more.'],
     multiStepInAlchemy: ['IssueMultiStepInAlchemy', 'Multi-step recipes cannot be used while the system is in alchemy mode.'],

@@ -8,7 +8,8 @@
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
   import {
     routedSuccessTierOptions,
-    routedHasOutcomeTiers
+    routedHasOutcomeTiers,
+    routedOutcomeTierNames
   } from '../../../../utils/routedOutcomeKeywords.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
@@ -405,14 +406,9 @@
   const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);
   // Routed-salvage outcome tier NAMES (active type), used by the per-component
   // outcome-routing selects. Names map to result-group ids in component.salvage.
-  const salvageOutcomeNames = $derived.by(() => {
-    const routed = selectedSystem?.salvageCraftingCheck?.routed;
-    if (!routed) return [];
-    const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
-    return (Array.isArray(tiers) ? tiers : [])
-      .map((tier) => String(tier?.name || '').trim())
-      .filter((name) => name.length > 0);
-  });
+  const salvageOutcomeNames = $derived(
+    routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
+  );
   // System components offered to the salvage result picker ({id, name, img}).
   const salvageComponentOptions = $derived(
     itemCards.map((item) => ({ id: item.id, name: item.name, img: item.img }))

@@ -92,7 +92,17 @@ test('Changing salvageResolutionMode from simple to routed disables components w
       macroUuid: 'Macro.check',
       outcomes: ['pass', 'fail'],
       consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
-      progressive: { awardMode: 'equal', allowPlayerReorder: false }
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+      // Routed salvage routes by outcome-tier name: a success tier the component
+      // never routes makes it invalid for routed (see ResolutionModeService).
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        relativeOutcomes: [
+          { id: 't-pass', name: 'pass', success: true, dc: 0 },
+          { id: 't-fail', name: 'fail', success: false, dc: -5 }
+        ]
+      }
     },
     components: [{
       id: 'comp-1',
@@ -101,7 +111,7 @@ test('Changing salvageResolutionMode from simple to routed disables components w
         enabled: true,
         ingredientQuantity: 1,
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
-        // no outcomeRouting → invalid for routed
+        // no outcomeRouting → the "pass" success tier is unrouted → invalid for routed
       }
     }]
   };
@@ -208,7 +218,15 @@ test('GM notification sent when components are disabled by mode change', async (
     salvageCraftingCheck: {
       enabled: true, macroUuid: 'Macro.check', outcomes: ['pass', 'fail'],
       consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
-      progressive: { awardMode: 'equal', allowPlayerReorder: false }
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        relativeOutcomes: [
+          { id: 't-pass', name: 'pass', success: true, dc: 0 },
+          { id: 't-fail', name: 'fail', success: false, dc: -5 }
+        ]
+      }
     },
     components: [{
       id: 'comp-1',
@@ -217,7 +235,7 @@ test('GM notification sent when components are disabled by mode change', async (
         enabled: true,
         ingredientQuantity: 1,
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
-        // no outcomeRouting → invalid for routed
+        // no outcomeRouting → the "pass" success tier is unrouted → invalid for routed
       }
     }]
   };

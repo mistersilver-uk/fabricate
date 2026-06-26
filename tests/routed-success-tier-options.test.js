@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { routedSuccessTierOptions, routedHasOutcomeTiers } = await import(
+const { routedSuccessTierOptions, routedHasOutcomeTiers, routedOutcomeTierNames } = await import(
   '../src/utils/routedOutcomeKeywords.js'
 );
 
@@ -89,4 +89,44 @@ test('routedHasOutcomeTiers: tiers without an id do not count', () => {
     false
   );
   assert.equal(routedHasOutcomeTiers({ type: 'relative', relativeOutcomes: null }), false);
+});
+
+// ---------------------------------------------------------------------------
+// routedOutcomeTierNames — ALL non-empty active-type tier names (success AND
+// failure), shared by the salvage routing UI and salvage validation.
+// ---------------------------------------------------------------------------
+
+test('tier names — null/undefined routed config yields no names', () => {
+  assert.deepEqual(routedOutcomeTierNames(null), []);
+  assert.deepEqual(routedOutcomeTierNames(undefined), []);
+});
+
+test('tier names — relative type returns success AND failure tier names, trimmed', () => {
+  const routed = {
+    type: 'relative',
+    relativeOutcomes: [
+      { id: 't1', name: '  Pass  ', success: true },
+      { id: 't2', name: 'Fail', success: false }, // failure tiers ARE included here
+      { id: 't3', name: '', success: true }, // empty name → excluded
+      { id: 't4', success: true }, // missing name → excluded
+    ],
+    fixedOutcomes: [{ id: 'f1', name: 'Ignored', success: true }],
+  };
+  assert.deepEqual(routedOutcomeTierNames(routed), ['Pass', 'Fail']);
+});
+
+test('tier names — fixed type reads the fixed outcome list', () => {
+  const routed = {
+    type: 'fixed',
+    relativeOutcomes: [{ id: 'r1', name: 'Ignored', success: true }],
+    fixedOutcomes: [
+      { id: 'f1', name: 'Low', success: true },
+      { id: 'f2', name: 'High', success: false },
+    ],
+  };
+  assert.deepEqual(routedOutcomeTierNames(routed), ['Low', 'High']);
+});
+
+test('tier names — a non-array outcome list yields no names', () => {
+  assert.deepEqual(routedOutcomeTierNames({ type: 'relative', relativeOutcomes: null }), []);
 });

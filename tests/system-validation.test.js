@@ -292,6 +292,76 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
     );
   });
 
+  it('routed salvage with no tiers and salvage in use surfaces ONE critical system issue (not per-component)', () => {
+    // The Mythwright bug: routed salvage with no outcome tiers left every
+    // salvageable component permanently critical. Now the per-component salvage
+    // is valid and the gap is a single system-level issue instead.
+    const component = {
+      id: 'comp-1',
+      name: 'Slain Balehound',
+      salvage: { resultGroups: [{ id: 'g1', results: [] }] },
+    };
+    const system = makeSystem({ salvageResolutionMode: 'routed' });
+    const report = evaluateSystemValidation(system, { components: [component] });
+
+    assert.equal(
+      report.issues.some((issue) => issue.kind === 'salvage'),
+      false,
+      'the per-component salvage critical no longer fires'
+    );
+    const noTiers = report.issues.find((issue) => issue.code === 'salvageRoutedNoTiers');
+    const noFormula = report.issues.find((issue) => issue.code === 'salvageRoutedNoFormula');
+    assert.ok(noTiers, 'expected a single salvageRoutedNoTiers system issue');
+    assert.ok(noFormula, 'expected a single salvageRoutedNoFormula system issue');
+    assert.equal(noTiers.severity, 'critical', 'salvage in use escalates to critical');
+    assert.equal(noTiers.kind, 'system');
+    assert.equal(noTiers.entityId, null);
+    assert.equal(noTiers.nav.view, 'system-overview');
+    assert.equal(report.blocksSystem, false, 'a salvage gap never blocks the whole system');
+    assert.equal(report.counts.blockers, 0, 'salvage gaps carry no blocks field');
+  });
+
+  it('routed salvage with no tiers and NO salvage in use warns without escalating', () => {
+    const system = makeSystem({ salvageResolutionMode: 'routed' });
+    const report = evaluateSystemValidation(system, { components: [] });
+
+    const noTiers = report.issues.find((issue) => issue.code === 'salvageRoutedNoTiers');
+    assert.ok(noTiers, 'expected the salvageRoutedNoTiers issue');
+    assert.equal(noTiers.severity, 'warning', 'no salvageable component → warning, not critical');
+    assert.equal(report.blocksSystem, false);
+  });
+
+  it('routed salvage with a formula and outcome tiers surfaces no salvage system issue', () => {
+    const component = {
+      id: 'comp-1',
+      name: 'Slain Balehound',
+      salvage: {
+        resultGroups: [{ id: 'rg-pass', results: [] }],
+        outcomeRouting: { pass: 'rg-pass' },
+      },
+    };
+    const system = makeSystem({
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        routed: {
+          type: 'relative',
+          rollFormula: '1d20',
+          relativeOutcomes: [{ id: 't-pass', name: 'pass', success: true, dc: 0 }],
+        },
+      },
+    });
+    const report = evaluateSystemValidation(system, { components: [component] });
+
+    assert.equal(
+      report.issues.some(
+        (issue) =>
+          issue.code === 'salvageRoutedNoTiers' || issue.code === 'salvageRoutedNoFormula'
+      ),
+      false,
+      'a configured routed salvage check clears the salvage system issues'
+    );
+  });
+
   it('progressive mode with no progressive check', () => {
     const system = makeSystem({
       resolutionMode: 'progressive',
