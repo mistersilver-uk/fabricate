@@ -40,6 +40,7 @@ There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if 
 - `npm run lint` (ESLint) and `npm run lint:css` (Stylelint) when the change touches files those globs cover — the `src/` JavaScript surface and `styles/**` respectively (`tests/`, `src/ui/**`, and `*.svelte` are out of scope today)
 - `npm run format:check` (Prettier) — the CI `lint` job runs Prettier **in addition to** ESLint, so `npm run lint` passing locally is NOT sufficient; run `npm run format` to auto-fix before handoff
 - `npm run lint:md` (markdownlint) when the change touches Markdown — run `npm run lint:md:fix` to auto-split prose to one sentence per line, and wrap a multi-sentence table cell's table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region, since a cell cannot break across lines
+- A standalone `npm run lint:svelte` exists but is NOT part of the CI `lint` gate and currently reports many pre-existing repo-wide errors; treat its output as background noise, not your change's failures
 
 1. If any gate fails, fix the problem and rerun all gates.
 2. Commit to the task branch, push it, and open or update the PR targeting `main`.
@@ -69,6 +70,8 @@ Stay within your assigned file ownership; do not revert unrelated edits or touch
 That boilerplate is identical across the mount tests, so a fresh copy adds new duplicated lines and fails the SonarCloud new-code duplication gate (>3% on new code).
 - A mounted-component suite does NOT fail loudly when a rendered `.svelte` (or a module it transitively imports) is missing from the harness allowlist (`createMountedComponentHarness`'s compiled-component list / `RAW_MODULES`) — it **hangs**, and `node --test` reports the blocked tests as `# cancelled N`, never `# fail`.
 When you add a component, or make an existing tree render a new one, register it in EVERY harness that mounts that tree (e.g. both `tests/components/recipe-edit-mounted.test.js` and `tests/components/manager-mounted.test.js`), and after the change confirm the mounted suites report `# cancelled 0` — not just `# fail 0`.
+- A fresh git worktree starts with NO `node_modules`: pure-logic `node --test` files still pass (Node resolves the parent repo's modules by walking up), but mounted Svelte tests fail with `ERR_MODULE_NOT_FOUND` (e.g. `svelte/src/index-client.js`).
+Run `npm ci` in the worktree (or junction/symlink the main repo's `node_modules`, since versions match within one repo) before trusting a full `npm test`.
 - When code hand-maintains a mirror of another part of the repo (selectors, labels, path/recipe maps, fixture lists), add a guard test that fails when they drift — e.g. assert every mapping entry resolves to a real tracked file or emitted symbol.
 These mirrors rot silently otherwise.
 - Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration or the user explicitly asks for live Foundry evidence.

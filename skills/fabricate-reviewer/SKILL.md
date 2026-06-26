@@ -44,6 +44,9 @@ An unexplained mismatch between the shipped canonical spec and the delta is a fi
 - The change achieves its stated goal, and any artifact it produces is faithful to the real system.
 A synthetic, mocked, or hand-authored stand-in presented as real output or evidence (e.g. a fabricated "screenshot" that does not depict the running app) is a finding, not a convenience — judge the artifact against reality, not just the diff against style.
 - Hand-maintained mirrors of other parts of the repo (selectors, labels, path/recipe maps, fixture lists) are guarded by a test that fails when they drift; flag an unguarded mirror as a finding.
+- When validation, the authoring UI, and the runtime each read the SAME conceptual data (e.g. routed outcome names, available options, allowed keys), confirm they read the SAME field.
+A validation rule that demands data the authoring UI offers no way to produce — or that reads a legacy/duplicate field the runtime no longer consumes — creates an unfixable error state for the user; flag the source-of-truth mismatch as a finding, and prefer a single shared accessor over three independent reads.
+- A whole-system configuration gap (e.g. a routed mode with no usable check) should surface as ONE system-level issue, not as N per-entity errors the user cannot individually resolve; flag per-entity criticals that have no per-entity fix.
 - New or newly-rendered `.svelte` components are registered in every mounted-test harness allowlist (`createMountedComponentHarness`).
 An omission does not fail the suite — it hangs and is reported as `# cancelled`, so confirm the driver's mounted results show `# cancelled 0`; flag a missing registration (or a green-looking run with non-zero cancelled) as a finding.
 - Types are explicit and defensible.

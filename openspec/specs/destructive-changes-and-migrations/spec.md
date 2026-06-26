@@ -25,6 +25,7 @@ When `CraftingSystem.resolutionMode` changes:
    Migrated recipes are persisted on structural validity alone.
 4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met by seed/clear: narrowing into `simple`/`progressive` from a recipe that is not 1×1, or moving a multi-step recipe into `alchemy`.
 5. System-level gaps (a target mode whose required check is unconfigured, an alchemy signature collision, ...) never delete or disable a recipe here; they are surfaced as system-validation issues that gate visibility (see `recipe-visibility`), not deletions.
+   Migrating into routed `check` seeds the provider but does NOT author outcome tiers or mark any tier `success`, so a migrated routed system produces no result until a GM authors at least one Success outcome tier and routes a result group to it; this is surfaced as a validation issue, never auto-healed.
 6. Apply the standard clean-up for any recipes that were deleted: remove in-progress runs, learned-recipe entries, and per-user progressive ordering preferences referencing them.
 7. When the new mode is `alchemy`, re-run the alchemy signature reconciliation (also re-run it on alchemy component-list edits) so signature collisions are surfaced rather than silently broken.
 8. Emit aggregated notifications: one summary of migrated recipes, one warning listing deleted recipes only when any were deleted, and a single `recipesChanged` emission for the whole pass (never one notification per recipe).

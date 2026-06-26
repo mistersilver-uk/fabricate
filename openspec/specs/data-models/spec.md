@@ -368,6 +368,13 @@ Requirements:
    escalates to `severity: 'critical', blocks: 'system'` once one does.
    These warnings are distinct from the per-recipe routed-authoring warnings,
    which also stay `severity: 'warning'` with no `blocks`.
+   Routed SALVAGE adds the parallel `salvageRoutedNoFormula` and
+   `salvageRoutedNoTiers` checks, keyed off `salvageCraftingCheck.routed.rollFormula`
+   and its active-type outcome tiers.
+   Because salvage is a per-component opt-in rather than a whole-system selection,
+   these carry no `blocks` field: each is `severity: 'warning'` while no component
+   declares salvage result groups and escalates to `severity: 'critical'` (still no
+   `blocks`) once one does, so a misconfigured optional feature never hides the system.
 3. `blocks` carries the visibility contract consumed by `recipe-visibility`:
    `'system'` hides the whole system for non-GM users; `'visibility'` hides one
    entity; `'enable'` marks an entity that cannot be enabled until its gap is
@@ -516,7 +523,10 @@ Represent one curated item entry available to recipes and salvage operations.
 5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
 Explicit `fabricate.essences` item flags remain a compatibility override for that item.
-7. `salvage.outcomeRouting` is only valid when `salvageResolutionMode` is `"routed"`.
+7. `salvage.outcomeRouting` is only meaningful when `salvageResolutionMode` is `"routed"`.
+In routed salvage mode it keys on the salvage check's outcome-tier NAMES (`salvageCraftingCheck.routed.{relativeOutcomes,fixedOutcomes}` for the active `type`) — the same source the per-component routing editor offers and the runtime routes by — NOT the legacy flat `salvageCraftingCheck.outcomes` list.
+Every SUCCESS tier must route to an existing result group; failure tiers may stay unrouted (the runtime yields nothing for an unrouted outcome), and a route pointing at a deleted group is invalid.
+When the salvage check defines no outcome tiers, routing is impossible and the component must NOT be faulted — the gap surfaces once as the system-level `salvageRoutedNoTiers` issue instead of a per-component error.
 8. `salvage.ingredientQuantity` must be a positive integer.
 9. If a linked source item updates its name, image, or description, managed components that match the item's live UUID, canonical source UUID, or fallback source references must refresh their stored `name`, `img`, and display-safe plain-text `description` from the linked item.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
