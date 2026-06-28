@@ -17,7 +17,6 @@ function buildSystem(overrides = {}) {
     salvageResolutionMode: 'simple',
     salvageCraftingCheck: {
       enabled: false,
-      macroUuid: null,
       outcomes: ['fail', 'pass'],
       progressive: null,
     },
@@ -177,7 +176,6 @@ function buildRoutedSystem(overrides = {}) {
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: ['fail', 'pass'],
       progressive: null,
       routed: {
@@ -239,7 +237,6 @@ test('routed mode — fixed-type check reads fixedOutcomes for tier names', () =
   const system = buildRoutedSystem({
     salvageCraftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: ['fail', 'pass'],
       progressive: null,
       routed: {
@@ -274,7 +271,6 @@ test('legacy tiered salvageResolutionMode token normalizes to routed and validat
     salvageResolutionMode: 'tiered',
     salvageCraftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: ['fail', 'pass'],
       progressive: null,
       routed: {
@@ -307,7 +303,6 @@ test('routed mode — no outcome tiers defined → valid (gap deferred to system
   const system = buildRoutedSystem({
     salvageCraftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: ['fail', 'pass'],
       progressive: null,
       routed: {
@@ -379,9 +374,8 @@ function buildProgressiveSystem(components = [], overrides = {}) {
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
+      progressive: { awardMode: 'equal', rollFormula: '2d6' },
     },
     components,
     ...overrides,
@@ -398,7 +392,7 @@ function buildProgressiveComponent(results = []) {
   });
 }
 
-test('progressive mode — checks enabled, progressive config, difficulty >= 1 → valid', () => {
+test('progressive mode — authored progressive formula, progressive config, difficulty >= 1 → valid', () => {
   const service = buildService();
   const system = buildProgressiveSystem([{ id: 'scrap-1', difficulty: 2 }]);
   const component = buildProgressiveComponent([{ id: 'r-1', componentId: 'scrap-1' }]);
@@ -409,14 +403,13 @@ test('progressive mode — checks enabled, progressive config, difficulty >= 1 �
   assert.equal(result.errors.length, 0);
 });
 
-test('progressive mode — salvageCraftingCheck disabled → invalid', () => {
+test('progressive mode — no progressive roll formula → invalid', () => {
   const service = buildService();
   const system = buildProgressiveSystem([], {
     salvageCraftingCheck: {
       enabled: false,
-      macroUuid: null,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
+      progressive: { awardMode: 'equal', rollFormula: '' },
     },
   });
   const component = buildProgressiveComponent([]);
@@ -425,8 +418,8 @@ test('progressive mode — salvageCraftingCheck disabled → invalid', () => {
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /check/i.test(e)),
-    `expected error about checks being disabled, got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /roll formula/i.test(e)),
+    `expected error about the missing progressive roll formula, got: ${JSON.stringify(result.errors)}`
   );
 });
 
@@ -435,7 +428,6 @@ test('progressive mode — missing progressive config → invalid', () => {
   const system = buildProgressiveSystem([], {
     salvageCraftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: [],
       progressive: null,
     },

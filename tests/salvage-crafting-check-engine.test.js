@@ -1,7 +1,7 @@
 // Engine tests for the formula-based salvage check (CraftingEngine
 // ._runSalvageCraftingCheck dispatch): salvage simple (DC + per-component override
-// + crits) and salvage progressive (value + award-all/none crits), plus the legacy
-// macro fallback when no formula is configured.
+// + crits) and salvage progressive (value + award-all/none crits), plus the
+// no-formula behaviour (optional no-op success, or a loud required-check failure).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -11,7 +11,6 @@ globalThis.foundry = globalThis.foundry || {
 globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
-const { MacroExecutor } = await import('../src/utils/MacroExecutor.js');
 
 function makeEngine() {
   return new CraftingEngine({}, null, {});
@@ -121,23 +120,13 @@ test('salvage progressive: a success trigger awards all (MAX_SAFE_INTEGER), a fa
   assert.equal(none.value, 0);
 });
 
-// ── Fallbacks ───────────────────────────────────────────────────────────────
+// ── No-formula behaviour ─────────────────────────────────────────────────────
 
-test('no formula configured falls back to the legacy macro path', async () => {
+test('simple salvage with no formula is a no-op success (no legacy macro path)', async () => {
   const engine = makeEngine();
-  const orig = MacroExecutor.run;
-  let called = false;
-  MacroExecutor.run = async () => {
-    called = true;
-    return { success: true, outcome: 'pass', value: 5 };
-  };
-  try {
-    const r = await run(engine, sys({ enabled: true, macroUuid: 'Macro.s', simple: { rollFormula: '' } }, 'simple'));
-    assert.equal(called, true, 'the macro ran, not the formula check');
-    assert.equal(r.value, 5);
-  } finally {
-    MacroExecutor.run = orig;
-  }
+  const r = await run(engine, sys({ enabled: true, simple: { rollFormula: '' } }, 'simple'));
+  assert.equal(r.success, true, 'an optional simple salvage check with no formula does not run');
+  assert.equal(r.outcome, null);
 });
 
 test('salvage simple: a throwing roll fails the check with a message', async () => {
@@ -251,30 +240,15 @@ test('salvage routed: a per-component dcOverride shifts the relative thresholds'
   assert.equal(r.success, false);
 });
 
-test('salvage routed WITHOUT a formula still falls through to the legacy macro path', async () => {
+test('salvage routed WITHOUT a formula fails loudly (no legacy macro path)', async () => {
   const engine = makeEngine();
-  // Would throw if the routed formula were actually rolled — proves no roll happens.
-  stubThrowingRoll();
-  const orig = MacroExecutor.run;
-  let called = false;
-  MacroExecutor.run = async () => {
-    called = true;
-    return { success: true, outcome: 'Success', value: 3 };
-  };
-  try {
-    const r = await run(
-      engine,
-      sys(
-        { enabled: true, macroUuid: 'Macro.r', routed: { type: 'relative', rollFormula: '', dc: 12 } },
-        'routed'
-      )
-    );
-    assert.equal(called, true, 'the macro ran, not the formula check');
-    assert.equal(r.outcome, 'Success');
-    assert.equal(r.value, 3);
-  } finally {
-    MacroExecutor.run = orig;
-  }
+  const r = await run(
+    engine,
+    sys({ enabled: true, routed: { type: 'relative', rollFormula: '', dc: 12 } }, 'routed')
+  );
+  assert.equal(r.success, false, 'routed salvage with no formula fails');
+  assert.equal(r.outcome, null);
+  assert.match(r.message, /requires a configured salvage check roll formula/);
 });
 
 // ── dcOverride = 0 edge (0 is a valid, finite DC) ───────────────────────────

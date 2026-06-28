@@ -61,10 +61,7 @@ CraftingSystem = {
   salvageResolutionMode: "simple" | "routed" | "progressive",
 
   salvageCraftingCheck: {
-    enabled: boolean,
-    macroUuid?: string,
-    successMacroUuid?: string,
-    failureMacroUuid?: string,
+    enabled: boolean,                  // on/off toggle for optional simple salvage checks
     consumption: {
       consumeComponentOnFail: boolean,  // default true
       breakToolsOnFail: boolean,        // default false; governs Tool usage/breakage on a failed salvage (see note below)
@@ -101,10 +98,14 @@ CraftingSystem = {
   },
 
   craftingCheck: {
+    // `enabled` is ONLY the on/off toggle for optional checks (simple/alchemy
+    // crafting). A check is "usable" iff its resolution mode has an authored roll
+    // formula (simple.rollFormula / routed.rollFormula / progressive.rollFormula);
+    // `enabled` is not a proxy for "the check works". The deprecated check sources
+    // (root macroUuid, successMacroUuid, failureMacroUuid, checkSource, builtIn
+    // adapter) were removed in 1.8.0. (simple.macroUuid is a different feature — the
+    // dynamic-DC macro — and is retained.)
     enabled: boolean,
-    macroUuid?: string,
-    successMacroUuid?: string,
-    failureMacroUuid?: string,
 
     consumption: {
       consumeIngredientsOnFail: boolean, // default true
@@ -308,7 +309,7 @@ Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whethe
 A trigger's forced `outcome` (success/failure/award) still applies under both authorities; only its `breakTools` effect is gated to `checkDriven`.
 23. Under `"checkDriven"` authority, the active check's `checkBreakage` triggers decide whether **all required tools** break for the attempt; each Tool's own `breakage.mode` is **not** evaluated, except `immune`, which is always honoured (filtered out of the force-break set and recorded as skipped-immune evidence).
 The decision is made by a single shared evaluator (`evaluateCheckBreakage`) that crafting, salvage, and gathering all route through, so the decision cannot drift between surfaces.
-The evaluator additionally reads the routed per-tier `data.breakTools` as an implicit always-on trigger (the only remaining legacy bridge), so a routed tier's `breakTools` needs no separate persistence, and never force-breaks for a macro/built-in check (`engineEvaluated !== true`).
+The evaluator additionally reads the routed per-tier `data.breakTools` as an implicit always-on trigger (the only remaining legacy bridge), so a routed tier's `breakTools` needs no separate persistence, and only an engine-evaluated roll-formula check result can force-break (`engineEvaluated === true`); any other result never force-breaks.
 A configured trigger force-breaks only when it both opts in (`breakTools === true`) AND its condition matches.
 24. `checkBreakage` triggers always target **all required tools** for the attempt (never a single check-selected tool in v1).
 The `rollTotal` condition targets the raw roll total (`data.total`); `progressiveValue` targets the awarding `value` and is meaningful only on progressive checks (absent → never matches); these are distinct sources because a forced-outcome trigger can overwrite `value` while `data.total` keeps the raw roll.

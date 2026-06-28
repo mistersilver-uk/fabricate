@@ -42,141 +42,58 @@ When `craft()` is called, the engine:
 3. **Validates essences.**
    If essences are enabled, checks essence requirements.
 4. **Runs crafting check.**
-   If enabled, executes the check (built-in or macro) and interprets the result per the resolution mode.
-   See [Crafting Checks]({% link crafting-checks.md %}) for both modes.
+   When the resolution mode has a usable check (an authored roll formula), rolls it and interprets the result per the resolution mode.
+   See [Crafting Checks]({% link crafting-checks.md %}).
 5. **Applies failure consumption policy.**
    If the check fails, consumes ingredients and/or applies tool breakage according to `craftingCheck.consumption` settings.
    By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and tools are not broken (`breakToolsOnFail: false`, renamed from the legacy `consumeCatalystsOnFail`).
    See [Consumption on Failure]({% link crafting-checks.md %}#consumption-on-failure).
-6. **Runs failure macro.**
-   If the check failed (step 4) or check-result validation failed (step 5), calls `system.craftingCheck.failureMacroUuid` with the failure context.
-   See [Crafting Checks]({% link crafting-checks.md %}).
-   Macro errors are caught and logged.
-   They do not affect the returned result.
-7. **Resolves result groups.**
+6. **Resolves result groups.**
    Determines which result group(s) to create based on mode and check result.
-8. **Consumes ingredients.**
+7. **Consumes ingredients.**
    Removes consumed items from source actors.
-9. **Applies tool breakage.**
+8. **Applies tool breakage.**
    Runs each tool's breakage mechanic (`limitedUses` / `breakageChance` / `diceExpression`) and its on-break action, recording `usedTools` evidence.
-10. **Creates results.**
-    Creates new items on the crafting actor.
-11. **Applies property macros.**
+9. **Creates results.**
+   Creates new items on the crafting actor.
+10. **Applies property macros.**
     If enabled, runs property macros on created items.
-12. **Transfers effects.**
+11. **Transfers effects.**
     If `system.features.essences`, `system.features.effectTransfer`, and `recipe.transferEffects` are all `true`, collects active effects from the `sourceItemUuid` of each contributing essence definition and copies them to the result item.
     See [Effect Transfer]({% link effect-transfer.md %}).
-13. **Runs success macro.**
-    Calls `system.craftingCheck.successMacroUuid` with the full success context.
-    See [Crafting Checks]({% link crafting-checks.md %}).
-    Macro errors are caught and logged.
-    The crafting result is still returned as a success.
 
 {: .note }
-> Steps 5 and 6 only execute when the crafting check returns a failure result or check-result validation fails.
-> Pre-check failures (missing ingredients, missing or unsatisfied tools, invalid recipe, missing actor) return immediately without consuming anything and without calling either macro.
+> Step 5 only executes when the crafting check returns a failure result or check-result validation fails.
+> Pre-check failures (missing ingredients, missing or unsatisfied tools, invalid recipe, missing actor) return immediately without consuming anything.
 
 ---
 
 ## Crafting Check Execution
 
-Step 4 of the pipeline dispatches to one of two execution paths based on `system.craftingCheck.checkSource`.
+Step 4 of the pipeline rolls the check for the active resolution mode.
+A check is only "usable" when its resolution-mode sub-object carries an authored roll formula.
 
-### Built-In Check Branch (`checkSource: "builtIn"`)
+| Resolution mode | Sub-object | Usable when |
+|:----------------|:-----------|:------------|
+| `simple` / `alchemy` | `system.craftingCheck.simple` | `simple.rollFormula` is set |
+| `routed` (with the `check` provider) | `system.craftingCheck.routed` | `routed.rollFormula` is set |
+| `progressive` | `system.craftingCheck.progressive` | `progressive.rollFormula` is set |
 
-When `checkSource` is `"builtIn"`, the engine looks up a `CraftingCheckAdapter` for the current game system via `CraftingCheckAdapterRegistry`.
-The adapter calls the game system's native dice API (`actor.rollSkill()` or `actor.rollAbilityCheck()` for D&D 5e) using the fields in `system.craftingCheck.builtIn`.
+In simple mode the check is optional.
+It runs only when `simple.rollFormula` is set and the system enables crafting checks (`craftingCheck.enabled` is `true` or the system's `craftingChecks` feature is on).
+In alchemy mode the check is always on whenever `simple.rollFormula` is set.
 
-**If no adapter is registered** for the current game system, the engine returns immediately with `success: false` and the message:
+The routed `check` provider and progressive mode both require a usable check.
+When the resolution mode requires a check but no roll formula is configured, the engine fails loudly with `success: false` and a message of the form `<mode> mode requires a configured crafting check roll formula`, so the misconfiguration is visible.
+When an optional check has no roll formula to run, the engine treats it as a no-op success.
 
-> No system adapter available for built-in checks.
-Switch to macro mode or install a compatible game system.
+### Dynamic DC Macro
 
-Nothing is consumed and no macros are called in that case.
-
-**If the adapter throws**, the engine catches the error, logs it with `Fabricate | Built-in crafting check failed`, and returns `success: false`.
-The failure consumption policy (step 5) then applies.
-
-The `builtIn` configuration object:
-
-<!-- markdownlint-disable markdownlint-sentences-per-line -->
-
-| Field | Type | Default | Description |
-|:------|:-----|:--------|:------------|
-| `ability` | `string` | `""` | Ability key (e.g. `"int"`, `"wis"`) |
-| `skill` | `string` | `""` | Skill key (e.g. `"arc"`, `"nat"`). Takes precedence over `ability` when set. |
-| `dc` | `number` | `15` | Difficulty class. Roll total must meet or exceed this value to succeed. |
-| `advantage` | `string` | `"normal"` | `"advantage"`, `"disadvantage"`, or `"normal"` |
-
-<!-- markdownlint-enable markdownlint-sentences-per-line -->
-
-### Macro Check Branch (`checkSource: "macro"`)
-
-When `checkSource` is `"macro"` (the default), the engine executes the macro at `system.craftingCheck.macroUuid`.
-If no `macroUuid` is configured and the resolution mode requires a check (routed check provider or progressive), the engine returns `success: false`.
-
-See [Macros]({% link crafting-checks.md %}) for the full macro contract and context shape.
-
----
-
-## CraftingCheckAdapter Interface
-
-The adapter layer allows any game system to support built-in checks.
-A built-in D&D 5e adapter (`Dnd5eCraftingCheckAdapter`) is registered automatically when the `dnd5e` game system is active.
-
-Custom adapters must implement three methods:
-
-{% raw %}
-
-```javascript
-class MyCraftingCheckAdapter extends CraftingCheckAdapter {
-  constructor() { super('my-system-id'); }
-
-  /** @returns {Array<{key: string, label: string}>} */
-  getAbilities() { /* ... */ }
-
-  /** @returns {Array<{key: string, label: string}>} */
-  getSkills() { /* ... */ }
-
-  /**
-   * @param {Actor} actor
-   * @param {{ ability: string, skill: string, dc: number, advantage: string }} config
-   * @returns {Promise<{ success: boolean, outcome: string|null, value: number|null, data: object }>}
-   */
-  async executeCheck(actor, config) { /* ... */ }
-}
-```
-
-{% endraw %}
-
-Register a custom adapter during module initialisation:
-
-```javascript
-Hooks.once('fabricate.ready', () => {
-  CraftingCheckAdapterRegistry.register('my-system-id', MyCraftingCheckAdapter);
-});
-```
-
-See [Registering a Custom Adapter]({% link crafting-checks.md %}#registering-a-custom-adapter) for a worked example.
-
----
-
-### Success and Failure Macros
-
-Configure macros to react to crafting outcomes without modifying the pipeline itself.
-Both macros are configured on the crafting system, not on individual recipes.
-
-| Setting | Path | Description |
-|:--------|:-----|:------------|
-| Success macro | `system.craftingCheck.successMacroUuid` | UUID of the macro to run after a successful step |
-| Failure macro | `system.craftingCheck.failureMacroUuid` | UUID of the macro to run after a failed step |
-
-Both fields are optional.
-When absent or `null`, no macro is executed for that outcome.
-If a macro throws, Fabricate catches the error, logs it to the browser console with `Fabricate |`, and continues.
-The `craft()` return value is not changed.
-
-See the full context shapes in [Macros & Examples]({% link crafting-checks.md %}).
+The simple pass/fail check can compute its DC from a macro instead of a static value.
+When `simple.dcMode` is `"dynamic"`, the engine runs the macro at `system.craftingCheck.simple.macroUuid` and uses its returned number as the DC.
+If the macro is absent or throws, the engine falls back to the static DC.
+This dynamic-DC macro is the only macro the crafting check still uses, and it only computes the DC.
+It never resolves the check outcome itself.
 
 ### Effect Transfer Gating
 

@@ -280,8 +280,6 @@ function makeEngine(system, { actorInventoryCoinSpender = null, actorPropertyCoi
     actorPropertyCoinSpender
   );
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createResultItems = async (craftingActor) => {
     const [created] = await craftingActor.createEmbeddedDocuments('Item', [
       { name: 'Result', system: { quantity: 1 } },

@@ -307,7 +307,7 @@ const {
   CHECK_DRIVEN_SYSTEM,
 } = await import('./helpers/checkDrivenBreakageFixtures.js');
 
-test('evaluateCheckBreakage: macro/builtIn (not engine-evaluated) never force-breaks', () => {
+test('evaluateCheckBreakage: a non-engine-evaluated result never force-breaks', () => {
   const result = { engineEvaluated: false, data: { breakTools: true } };
   assert.deepEqual(evaluateCheckBreakage({ checkResult: result }), {
     forceBreak: false,

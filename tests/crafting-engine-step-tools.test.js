@@ -233,7 +233,6 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
   engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
-  engine._runSuccessMacro = async () => {};
 
   const recipe = twoStepRecipe();
   const actorRef = { uuid: 'Actor.a1' };
@@ -290,7 +289,6 @@ test('(c) failure-path: a failed check breaks the step-tier tool when breakTools
   // Force the crafting check to FAIL so the failure-path consumption runs.
   engine._runCraftingCheck = async () => ({ success: false, message: 'check failed', outcome: null, value: null, data: {} });
   engine._postCraftChatMessage = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const recipe = twoStepRecipe();
   const actorRef = { uuid: 'Actor.a1' };

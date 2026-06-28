@@ -186,9 +186,6 @@ function buildSystem({ id = 'sys-1', resolutionMode = 'simple', craftingCheck = 
     features: { multiStepRecipes: true, craftingChecks: !!craftingCheck?.enabled, essences: false },
     craftingCheck: craftingCheck || {
       enabled: false,
-      macroUuid: null,
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: [],
       progressive: null,
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
@@ -206,8 +203,6 @@ function buildSystem({ id = 'sys-1', resolutionMode = 'simple', craftingCheck = 
  */
 function stubEngine(engine, checkResult, createdItem = null) {
   engine._runCraftingCheck = async () => checkResult;
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   if (createdItem !== null) {
     engine._createSingleResult = async () => createdItem;
   }
@@ -306,8 +301,6 @@ test('unknown resolution mode: craft fails instead of creating all result groups
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   let createSingleResultCalled = false;
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async () => {
     createSingleResultCalled = true;
     return new FakeItem('unexpected', 'Unexpected');
@@ -440,8 +433,6 @@ test('multistep: start run, advance through 2 steps, complete', async () => {
   const resultItem2 = new FakeItem('ingot-1', 'Ingot', 1);
   let callCount = 0;
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async () => {
     callCount++;
     return callCount === 1 ? resultItem1 : resultItem2;
@@ -511,8 +502,6 @@ test('multistep: step failure records failure and stops run', async () => {
 
   // Crafting check fails on first step
   engine._runCraftingCheck = async () => ({ success: false, message: 'Check failed: roll too low', outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async () => null;
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -545,9 +534,6 @@ function buildLegacyOutcomeRoutingFixture() {
     resolutionMode: 'routed',
     craftingCheck: {
       enabled: true,
-      macroUuid: 'macro:check',
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: ['pass', 'fail'],
       progressive: null,
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
@@ -592,8 +578,6 @@ test("routed check: 'pass' outcome routes craft to the pass-named result group",
   const failPotion = new FakeItem('weak-potion-1', 'Weak Potion', 1);
 
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'pass', value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async (_actor, result) => {
     // Return item matching the result componentId
     if (result.componentId === 'good-potion') return passPotion;
@@ -629,8 +613,6 @@ test("routed check: reserved 'fail' outcome takes the failure path (no group awa
   const failPotion = new FakeItem('weak-potion-2', 'Weak Potion', 1);
 
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'fail', value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async (_actor, result) => {
     if (result.componentId === 'good-potion') return passPotion;
     if (result.componentId === 'weak-potion') return failPotion;
@@ -655,11 +637,8 @@ function buildProgressiveFixture() {
     resolutionMode: 'progressive',
     craftingCheck: {
       enabled: true,
-      macroUuid: 'macro:check',
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
+      progressive: { awardMode: 'equal', rollFormula: '1d20' },
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
@@ -707,8 +686,6 @@ test('progressive mode: check value 7 awards comp-a (cost 2) and comp-b (cost 3)
   const itemC = new FakeItem('result-c', 'Item C', 1);
 
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 7, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async (_actor, result) => {
     if (result.componentId === 'comp-a') return itemA;
     if (result.componentId === 'comp-b') return itemB;
@@ -742,8 +719,6 @@ test('progressive mode: zero check value awards nothing', async () => {
 
   let createCalled = 0;
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 0, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async () => { createCalled++; return new FakeItem(`prog-result-${createCalled}`, 'Result', 1); };
 
   const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});

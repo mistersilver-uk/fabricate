@@ -110,17 +110,18 @@ Tool usage/breakage is tracked on owned item instances.
    A crafting check is not optional-by-absence.
    Simple mode always carries a system-level check that is either active or deactivated;
    routed and progressive modes REQUIRE a configured check.
-   The roll formula is one **check source**: when the active mode's check config carries a roll
-   formula the check is engine-evaluated as above; otherwise the same check is sourced from the
-   authored macro or built-in adapter (the `checkSource` axis), which returns the `outcome`/`value`.
-   The check source (engine-formula / macro / built-in adapter) is a distinct axis from the routed
-   result-selection providers removed in 1.6.0; retiring or re-speccing the macro / built-in
-   adapter source is tracked separately (issues #107 / #111) and is out of scope here.
-   A mode that requires a check but has none configured (no roll formula and no macro/adapter
-   source) is a system misconfiguration surfaced by system-level validation, not a silent no-op.
-   A `breakTools` flag is honoured for forced tool breakage ONLY from engine-evaluated checks —
-   a macro/built-in check's `data.breakTools` is not part of the macro contract and does not
-   force breakage.
+   A check is **usable** iff the active mode's check config carries an authored roll formula
+   (`simple.rollFormula` / `routed.rollFormula` / `progressive.rollFormula`), in which case it is
+   engine-evaluated as above; `craftingCheck.enabled` is only the on/off toggle for optional
+   simple/alchemy checks, not a proxy for "the check works".
+   The deprecated macro / built-in adapter check sources (root `macroUuid`, `successMacroUuid`,
+   `failureMacroUuid`, `checkSource`, and the `builtIn` adapter config) were removed in 1.8.0;
+   there is no longer a `checkSource` axis. (The dynamic-DC macro on `simple.macroUuid` is a
+   different feature and is retained.)
+   A mode that requires a check but has no roll formula configured is a system misconfiguration
+   surfaced by system-level validation (and a loud runtime failure), not a silent no-op.
+   A `breakTools` flag is honoured for forced tool breakage ONLY from engine-evaluated
+   roll-formula checks (`engineEvaluated === true`).
 
    The check/tier/trigger data-model shapes (`RoutedCheck`, `CheckBreakage` triggers, `thresholdMode`,
    `breakTools`, recipe tiers, dynamic DC) are defined in `002-data-models.md`;

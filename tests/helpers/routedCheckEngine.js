@@ -74,7 +74,7 @@ export function clearRollEngine() {
 /**
  * Build a default routed crafting-check config. `type` selects the active tier
  * list; pass `relativeOutcomes` / `fixedOutcomes` / `checkBreakage` / `tiers` /
- * `dcMode` / `macroUuid` overrides as needed.
+ * `dcMode` overrides as needed.
  */
 export function defaultRouted(overrides = {}) {
   return {
@@ -86,7 +86,6 @@ export function defaultRouted(overrides = {}) {
     relativeOutcomes: [],
     fixedOutcomes: [],
     tiers: [],
-    macroUuid: null,
     checkBreakage: { triggers: [] },
     ...overrides,
   };
@@ -101,8 +100,7 @@ export const ROUTED_ACTOR = { id: 'a1', name: 'Crafter', items: [] };
  * `{ engine, system }`.
  *
  * `craftingCheck` overrides merge into `{ enabled, routed }` so a test can add a
- * sibling `simple`/`progressive`/`checkSource`/`macroUuid` without re-stating the
- * routed block.
+ * sibling `simple`/`progressive` block without re-stating the routed block.
  */
 export function makeRoutedEngine({
   routed,

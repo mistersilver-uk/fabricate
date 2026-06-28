@@ -290,7 +290,6 @@ test('craft(): records usedTools on the success run record and increments toolUs
   engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
-  engine._runSuccessMacro = async () => {};
 
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem, toolItem] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
@@ -391,7 +390,6 @@ test('craft(): a tool absent from inventory but present as activeCanvasTool craf
   engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
-  engine._runSuccessMacro = async () => {};
 
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
@@ -583,7 +581,6 @@ function failingCraftEngine() {
   // trigger matches) — the only thing under test is whether the failure path breaks.
   engine._runCraftingCheck = async () => FAILED_NATURAL_ONE_CHECK;
   engine._postCraftChatMessage = async () => {};
-  engine._runFailureMacro = async () => {};
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem, toolItem] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
   return {

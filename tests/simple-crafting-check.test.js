@@ -370,31 +370,19 @@ test('duplicate dice terms: a trigger targets a specific group by groupId', asyn
   assert.equal(result.success, true, 'the groupId:1 trigger fires for the second d20 term');
 });
 
-// ── Simple-vs-legacy precedence ─────────────────────────────────────────────
+// ── Simple-vs-no-formula precedence ─────────────────────────────────────────
 
-test('an empty simple roll formula defers to the legacy macro checkSource', async () => {
+test('an empty simple roll formula makes the optional simple check a no-op success', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({ rollFormula: '' }),
     resolutionMode: 'simple',
     enabled: true,
-    craftingCheck: { checkSource: 'macro', macroUuid: 'Macro.legacy' },
   });
-  // If the simple check ran, it would auto-succeed without touching the macro.
-  // With no formula, useSimpleCheck is false, so the macro check runs instead.
-  const orig = MacroExecutor.run;
-  let macroCalled = false;
-  MacroExecutor.run = async () => {
-    macroCalled = true;
-    return { outcome: 'pass', value: 17 };
-  };
-  try {
-    const result = await run(engine);
-    assert.equal(macroCalled, true, 'the legacy macro check ran, not the simple check');
-    assert.equal(result.success, true);
-    assert.equal(result.value, 17, 'the macro result value is surfaced (not a simple-check total)');
-  } finally {
-    MacroExecutor.run = orig;
-  }
+  // With no roll formula the simple check is not usable; in optional simple mode the
+  // attempt proceeds with no check rather than running a (now-removed) macro source.
+  const result = await run(engine);
+  assert.equal(result.success, true);
+  assert.equal(result.outcome, null, 'no check ran, so there is no outcome');
 });
 
 // ── Crit breakTools forces tool breakage ────────────────────────────────────

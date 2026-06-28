@@ -44,7 +44,7 @@ new Recipe({
   transferEffects,       // boolean (default false)
   resultSelection: {     // object (routed mode only)
     provider,            // "ingredientSet" | "check"
-    macroUuid            // string | null (check provider; overrides system craftingCheck.macroUuid)
+    macroUuid            // string | null (check provider)
   },
   metadata               // object (created, modified, author, version)
 })

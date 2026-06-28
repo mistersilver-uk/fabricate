@@ -35,6 +35,16 @@ export class ResolutionModeService {
     return this.craftingSystemManager?.getSystem(recipe.craftingSystemId) || null;
   }
 
+  /**
+   * A check sub-object (simple/routed/progressive) is "usable" only when it carries
+   * an authored, non-empty roll formula. This is the single notion of an enabled
+   * check now that the legacy macro/builtIn check sources are gone.
+   * @private
+   */
+  _hasRollFormula(check) {
+    return typeof check?.rollFormula === 'string' && check.rollFormula.trim().length > 0;
+  }
+
   getMode(recipe) {
     const system = this.getSystem(recipe);
     return system?.resolutionMode || 'simple';
@@ -129,10 +139,6 @@ export class ResolutionModeService {
 
     const mode = this.getMode(recipe);
     const steps = this.getExecutionSteps(recipe);
-    const checkEnabled =
-      system?.craftingCheck?.enabled === true ||
-      !!system?.craftingCheck?.macroUuid ||
-      system?.craftingCheck?.checkSource === 'builtIn';
 
     for (const step of steps) {
       const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
@@ -194,14 +200,15 @@ export class ResolutionModeService {
       }
 
       if (mode === 'progressive') {
-        // A system whose progressive crafting check is not yet enabled/configured is a
-        // SYSTEM-level concern surfaced by systemValidation (`progressiveNoCheck`); waive
-        // it while drafting so an authoring shell can be created, and enforce it only when
-        // a complete recipe is required (persistence-complete / activation).
-        if (requireComplete && !checkEnabled)
-          errors.push('Progressive mode requires crafting checks enabled');
-        if (requireComplete && !system?.craftingCheck?.progressive) {
-          errors.push('Progressive mode requires craftingCheck.progressive configuration');
+        // A progressive crafting check is usable only when an authored progressive
+        // roll formula exists. This is a SYSTEM-level concern also surfaced by
+        // systemValidation (`progressiveNoCheck`); waive it while drafting so an
+        // authoring shell can be created, and enforce it only when a complete recipe
+        // is required (persistence-complete / activation).
+        if (requireComplete && !this._hasRollFormula(system?.craftingCheck?.progressive)) {
+          errors.push(
+            'Progressive mode requires a configured progressive crafting check (roll formula)'
+          );
         }
         if (requireComplete && sets.length !== 1)
           errors.push(
@@ -342,13 +349,9 @@ export class ResolutionModeService {
     }
 
     if (mode === 'progressive') {
-      const checkEnabled =
-        system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
-
-      if (!checkEnabled) errors.push('Progressive salvage mode requires crafting checks enabled');
-      if (!system.salvageCraftingCheck?.progressive) {
+      if (!this._hasRollFormula(system.salvageCraftingCheck?.progressive)) {
         errors.push(
-          'Progressive salvage mode requires salvageCraftingCheck.progressive configuration'
+          'Progressive salvage mode requires a configured progressive salvage check (roll formula)'
         );
       }
       if (groups.length !== 1) {

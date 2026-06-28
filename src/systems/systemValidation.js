@@ -374,7 +374,6 @@ function collectSystemBlockers(system, recipes, components) {
   const mode = system?.resolutionMode || 'simple';
   const features = system?.features || {};
   const check = system?.craftingCheck || {};
-  const checksEnabled = features.craftingChecks === true || check.enabled === true;
 
   // A routed system needs a configured routed crafting-check roll formula for any
   // `check`-provider recipe to resolve. The only thing that makes a routed check
@@ -467,11 +466,12 @@ function collectSystemBlockers(system, recipes, components) {
   }
 
   // Progressive mode with no progressive check, or components missing a usable
-  // difficulty: the progressive award math needs a configured formula (or an
-  // enabled check) and per-component `difficulty >= 1`.
+  // difficulty: the progressive award math needs an authored progressive roll
+  // formula (a missing formula always blocks, mirroring routed) and per-component
+  // `difficulty >= 1`.
   if (mode === 'progressive') {
     const progressive = check.progressive || {};
-    const hasProgressiveCheck = Boolean(trimmed(progressive.rollFormula)) || checksEnabled;
+    const hasProgressiveCheck = Boolean(trimmed(progressive.rollFormula));
     if (!hasProgressiveCheck) {
       blockers.push({
         kind: 'system',

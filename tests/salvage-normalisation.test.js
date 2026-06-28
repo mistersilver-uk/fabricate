@@ -82,11 +82,12 @@ test('default salvageCraftingCheck has enabled: false, consumeComponentOnFail: t
   assert.equal(check.consumption.breakToolsOnFail, false);
 });
 
-test('salvageCraftingCheck preserves macro UUIDs when provided', () => {
+test('salvageCraftingCheck drops the deprecated check-source fields', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
     salvageCraftingCheck: {
+      enabled: false,
       macroUuid: 'Macro.abc123',
       successMacroUuid: 'Macro.success',
       failureMacroUuid: 'Macro.fail'
@@ -94,11 +95,11 @@ test('salvageCraftingCheck preserves macro UUIDs when provided', () => {
   });
   const check = system.salvageCraftingCheck;
 
-  assert.equal(check.macroUuid, 'Macro.abc123');
-  assert.equal(check.successMacroUuid, 'Macro.success');
-  assert.equal(check.failureMacroUuid, 'Macro.fail');
-  // enabled=true because macroUuid is set
-  assert.equal(check.enabled, true);
+  assert.equal(check.macroUuid, undefined, 'root macroUuid is removed');
+  assert.equal(check.successMacroUuid, undefined);
+  assert.equal(check.failureMacroUuid, undefined);
+  // `enabled` is now purely the on/off toggle — a legacy macro config no longer flips it on.
+  assert.equal(check.enabled, false);
 });
 
 test('salvageCraftingCheck.consumption.consumeComponentOnFail can be set to false', () => {
@@ -308,7 +309,6 @@ test('full round-trip: system with salvage enabled, component with full salvage 
     features: { salvage: true },
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
-      macroUuid: 'Macro.salvage-check',
       consumption: {
         consumeComponentOnFail: false,
         breakToolsOnFail: true
@@ -345,7 +345,7 @@ test('full round-trip: system with salvage enabled, component with full salvage 
   // System-level checks
   assert.equal(system.features.salvage, true);
   assert.equal(system.salvageResolutionMode, 'routed');
-  assert.equal(system.salvageCraftingCheck.macroUuid, 'Macro.salvage-check');
+  assert.equal(system.salvageCraftingCheck.macroUuid, undefined, 'deprecated macroUuid is dropped');
   assert.equal(system.salvageCraftingCheck.consumption.consumeComponentOnFail, false);
   assert.equal(system.salvageCraftingCheck.consumption.breakToolsOnFail, true);
   assert.deepEqual(system.salvageCraftingCheck.outcomes, ['critical', 'pass', 'fail']);

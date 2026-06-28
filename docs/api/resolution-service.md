@@ -102,8 +102,8 @@ Hooks.once('fabricate.ready', () => {
 | Mode | Rules |
 |:-----|:------|
 | Simple | Exactly 1 result group required. |
-| Routed | Crafting checks must be enabled (via `salvageCraftingCheck.enabled: true` or a non-null `macroUuid`), at least 1 outcome declared, at least 1 result group present, and every declared outcome must map to a valid result group ID in `component.salvage.outcomeRouting`. |
-| Progressive | Crafting checks must be enabled, `salvageCraftingCheck.progressive` config must be present, exactly 1 result group required, the group must contain at least 1 ordered result, and every result must reference a component with `difficulty >= 1`. |
+| Routed | At least 1 result group present, and (when the routed salvage check declares outcome tiers) every success tier name must map to a valid result group ID in `component.salvage.outcomeRouting` with no routes pointing at a missing group, since routing keys on the routed check's outcome-tier names. |
+| Progressive | A progressive salvage check roll formula must be configured (`salvageCraftingCheck.progressive.rollFormula`), exactly 1 result group required, the group must contain at least 1 ordered result, and every result must reference a component with `difficulty >= 1`. |
 
 **Error message examples:**
 

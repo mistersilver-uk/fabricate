@@ -2,7 +2,7 @@
 // (CraftingEngine._runRoutedCheck via the _runCraftingCheck routed dispatch):
 // relative + fixed tier mapping, threshold meet/exceed, breakTools tiers, the
 // recipe-tier / dynamic base-DC resolution (which mirrors the simple check, NOT
-// the flat salvage DC), and the no-formula fallback to the legacy macro path.
+// the flat salvage DC), and the no-formula required-check failure.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -217,27 +217,16 @@ test('an unknown recipe tier falls back to the flat routed DC', async () => {
   assert.equal(r.outcome, 'Fine');
 });
 
-// ── No-formula fallback (legacy macro path unchanged) ─────────────────────────
+// ── No-formula required-check failure ─────────────────────────────────────────
 
-test('no routed rollFormula falls back to the legacy macro path', async () => {
+test('routed + check provider with no rollFormula fails loudly (no legacy macro path)', async () => {
   const { engine } = makeRoutedEngine({
     routed: defaultRouted({ rollFormula: '' }),
-    craftingCheck: { checkSource: 'macro', macroUuid: 'Macro.legacy', outcomes: ['Fine'] },
   });
-  const orig = MacroExecutor.run;
-  let called = false;
-  MacroExecutor.run = async () => {
-    called = true;
-    return { outcome: 'Fine', value: 7 };
-  };
-  try {
-    const r = await runRoutedCheck(engine);
-    assert.equal(called, true, 'the macro ran, not the routed formula check');
-    assert.equal(r.outcome, 'Fine');
-    assert.equal(r.value, 7);
-  } finally {
-    MacroExecutor.run = orig;
-  }
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.success, false, 'a required routed check with no formula fails');
+  assert.equal(r.outcome, null);
+  assert.match(r.message, /requires a configured crafting check roll formula/);
 });
 
 // ── engineEvaluated marker + breakTools gating ────────────────────────────────
@@ -254,25 +243,18 @@ test('an engine-evaluated routed check is tagged engineEvaluated', async () => {
   assert.equal(evaluateCheckBreakage({ checkResult: r }).forceBreak, false);
 });
 
-test('evaluateCheckBreakage: a macro data.breakTools does NOT force breakage', async () => {
-  const { engine } = makeRoutedEngine({
-    routed: defaultRouted({ rollFormula: '' }),
-    craftingCheck: { checkSource: 'macro', macroUuid: 'Macro.legacy', outcomes: ['Fine'] },
-  });
-  const orig = MacroExecutor.run;
-  MacroExecutor.run = async () => ({ outcome: 'Fine', value: 7, data: { breakTools: true } });
-  try {
-    const r = await runRoutedCheck(engine);
-    assert.equal(r.data.breakTools, true, 'the macro passthrough is preserved on data');
-    assert.notEqual(r.engineEvaluated, true, 'a macro result is not engine-evaluated');
-    assert.equal(
-      evaluateCheckBreakage({ checkResult: r }).forceBreak,
-      false,
-      'a macro data.breakTools must not force tool breakage'
-    );
-  } finally {
-    MacroExecutor.run = orig;
-  }
+test('evaluateCheckBreakage: a non-engine-evaluated result does NOT force breakage', () => {
+  // A result that was not produced by an engine roll-formula path (no
+  // `engineEvaluated` marker) can never force tool breakage, even if it carries a
+  // `data.breakTools` flag. This guards the `engineEvaluated` gate inside
+  // evaluateCheckBreakage now that the legacy macro check source is gone.
+  const checkResult = { success: true, outcome: 'Fine', value: 7, data: { breakTools: true } };
+  assert.notEqual(checkResult.engineEvaluated, true);
+  assert.equal(
+    evaluateCheckBreakage({ checkResult }).forceBreak,
+    false,
+    'a non-engine-evaluated data.breakTools must not force tool breakage'
+  );
 });
 
 test('evaluateCheckBreakage: an engine routed breakTools tier DOES force breakage', async () => {
