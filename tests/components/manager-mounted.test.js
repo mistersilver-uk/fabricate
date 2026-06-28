@@ -4143,6 +4143,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Progressive difficulty'));
     assert.ok(target.textContent.includes('Missing'));
 
+    // A set difficulty renders as a plain, borderless value (not a chip); an
+    // unset one shows a centered "None".
+    const c1DifficultyCell = target.querySelector('[data-component-id="c1"] .manager-component-difficulty-cell');
+    assert.ok(c1DifficultyCell, 'difficulty cell renders for a progressive system');
+    assert.ok(
+      c1DifficultyCell.querySelector('.manager-component-difficulty-value'),
+      'a set difficulty renders as a plain value element'
+    );
+    assert.equal(
+      c1DifficultyCell.querySelector('.manager-chip'),
+      null,
+      'the difficulty value is not boxed in a chip'
+    );
+    assert.match(c1DifficultyCell.textContent, /2/, 'the set difficulty value is shown');
+    const c2DifficultyCell = target.querySelector('[data-component-id="c2"] .manager-component-difficulty-cell');
+    assert.match(c2DifficultyCell.textContent, /None/, 'an unset difficulty shows "None"');
+
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
     flushSync();
