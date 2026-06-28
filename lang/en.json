@@ -1100,6 +1100,7 @@
           "ToolSearchPlaceholder": "Search tools...",
           "NoToolsDefined": "No tools defined",
           "AllToolsAdded": "All tools added",
+          "UnnamedTool": "Unnamed tool",
           "NoStepsHint": "Add a step in Overview to configure this section.",
           "Tabs": {
             "Label": "Recipe editor sections",
@@ -1248,7 +1249,7 @@
           "NoEssences": "No essences",
           "ProgressiveDifficulty": "Progressive difficulty",
           "ProgressiveDifficultyLabel": "Difficulty value",
-          "ProgressiveDifficultyHint": "Cost spent against the crafting roll in progressive mode. Whole number, 1 or greater; leave blank to clear.",
+          "ProgressiveDifficultyHint": "Cost spent against the crafting roll in progressive mode. Whole number, 1 or greater; leave blank to clear. Saved with the editor.",
           "NoDifficulty": "No difficulty",
           "Salvage": "Salvage",
           "SalvageQuantity": "{count} required",

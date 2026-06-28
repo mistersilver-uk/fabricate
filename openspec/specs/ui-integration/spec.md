@@ -370,7 +370,8 @@ Folder
   progressive-difficulty input.
 It is shown only when the system's crafting resolution mode is `progressive` (parity with the
   read-only components-browser column).
-It accepts an integer of 1 or greater, or blank to clear the value, and persists immediately.
+It accepts an integer of 1 or greater, or blank to clear the value.
+The input is staged into the component editor's draft and persisted with the rest of the edit on Save (not written on change), contributing to the editor's dirty state and unsaved-changes guard.
 - Replace associated source item by drag/drop.
 
 Component import warnings:

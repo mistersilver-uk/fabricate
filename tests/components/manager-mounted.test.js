@@ -4324,7 +4324,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  it('renders an editable progressive-difficulty inspector and persists changes for a progressive system', async () => {
+  it('stages progressive-difficulty edits into the component editor save flow', async () => {
     const calls = [];
     await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
 
@@ -4334,23 +4334,48 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(input, 'difficulty card should expose a number input');
     assert.equal(input.value, '2', 'input should seed from the persisted component difficulty');
 
-    // Commit a valid integer on change.
+    // Editing stages the value but must NOT write to the store immediately.
     input.value = '5';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    const setCall = calls.find((call) => call[0] === 'updateComponent');
-    assert.ok(setCall, 'editing difficulty should call store.updateComponent');
-    assert.equal(setCall[1], 'c1');
-    assert.deepEqual(setCall[2], { difficulty: 5 }, 'valid value should persist a truncated integer');
+    assert.equal(
+      calls.some((call) => call[0] === 'updateComponent'),
+      false,
+      'editing difficulty must not persist before Save'
+    );
 
-    // Clearing the input commits null to clear the value.
-    input.value = '';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    // Staging a change makes the editor dirty and enables Save.
+    const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
+    assert.ok(saveButton, 'component editor Save button should render');
+    assert.equal(saveButton.disabled, false, 'a staged difficulty change should enable Save');
+
+    // Saving persists the staged difficulty through the editor's save flow.
+    saveButton.click();
     await tick();
     flushSync();
-    const clearCall = calls.filter((call) => call[0] === 'updateComponent').at(-1);
-    assert.deepEqual(clearCall[2], { difficulty: null }, 'blank input should clear the difficulty');
+    const saveCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(saveCall, 'Save should call store.updateComponent');
+    assert.equal(saveCall[1], 'c1');
+    assert.equal(saveCall[2].difficulty, 5, 'the staged truncated integer should persist on Save');
+  });
+
+  it('clears a staged progressive difficulty on Save when the input is blanked', async () => {
+    const calls = [];
+    await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
+
+    const input = target.querySelector('[data-component-edit-section="difficulty"] input');
+    input.value = '';
+    input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    target.querySelector('button[form="manager-component-edit-form"]').click();
+    await tick();
+    flushSync();
+    const saveCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(saveCall, 'Save should call store.updateComponent');
+    assert.equal(saveCall[2].difficulty, null, 'blanking the input clears the difficulty on Save');
   });
 
   it('hides the progressive-difficulty inspector for a non-progressive system', async () => {
