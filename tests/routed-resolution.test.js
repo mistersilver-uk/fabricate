@@ -103,15 +103,17 @@ describe('routed recipe resolution', () => {
     assert.equal(system.resolutionMode, 'routed');
   });
 
-  it('Recipe preserves step.resultSelection through normalization and toJSON', () => {
+  it('Recipe preserves step.resultSelection.provider and drops the retired macroUuid', () => {
     const activeStep = step({
+      // Legacy data may still carry the retired resultSelection.macroUuid (a 1.6.0
+      // macroOutcome vestige); normalization drops it.
       resultSelection: { provider: 'check', macroUuid: 'Macro.step' },
     });
     const recipe = recipeWithStep(activeStep);
 
     assert.equal(recipe.steps[0].resultSelection.provider, 'check');
     assert.equal(recipe.toJSON().steps[0].resultSelection.provider, 'check');
-    assert.equal(recipe.toJSON().steps[0].resultSelection.macroUuid, 'Macro.step');
+    assert.equal('macroUuid' in recipe.toJSON().steps[0].resultSelection, false);
   });
 
   it('Recipe.validate accepts explicit-step recipes with no top-level result groups', () => {

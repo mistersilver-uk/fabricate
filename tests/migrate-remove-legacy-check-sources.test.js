@@ -1,7 +1,8 @@
 // Tests for the 1.8.0 migration that strips the deprecated check-source fields
 // (root macroUuid / successMacroUuid / failureMacroUuid / checkSource / builtIn)
 // from craftingCheck / salvageCraftingCheck / gatheringCraftingCheck, while
-// preserving simple.macroUuid (the dynamic-DC macro) and every other field.
+// preserving simple.macroUuid (the dynamic-DC macro) and every other field. It also
+// retires the orphaned recipe resultSelection.macroUuid (a 1.6.0 macroOutcome vestige).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -102,6 +103,38 @@ test('tolerates missing checks and non-object systems', () => {
   });
   assert.equal(systems.length, 3);
   assert.deepEqual(systems[0], { id: 'bare' });
+});
+
+test('strips the orphaned resultSelection.macroUuid from recipe-level and steps', () => {
+  const { recipes } = migrateRemoveLegacyCheckSources({
+    recipes: [
+      {
+        id: 'r-1',
+        resultSelection: { provider: 'check', macroUuid: 'Macro.recipe' },
+        steps: [
+          { id: 's-1', resultSelection: { provider: 'check', macroUuid: 'Macro.step' } },
+          { id: 's-2', resultSelection: { provider: 'ingredientSet' } },
+          { id: 's-3' },
+        ],
+      },
+    ],
+  });
+  const recipe = recipes[0];
+
+  assert.equal('macroUuid' in recipe.resultSelection, false);
+  assert.equal(recipe.resultSelection.provider, 'check', 'provider is preserved');
+  assert.equal('macroUuid' in recipe.steps[0].resultSelection, false);
+  assert.equal(recipe.steps[0].resultSelection.provider, 'check');
+  assert.equal(recipe.steps[1].resultSelection.provider, 'ingredientSet');
+});
+
+test('does not mutate the input recipes (deep-clones)', () => {
+  const input = {
+    id: 'r-1',
+    resultSelection: { provider: 'check', macroUuid: 'Macro.recipe' },
+  };
+  migrateRemoveLegacyCheckSources({ recipes: [input] });
+  assert.equal(input.resultSelection.macroUuid, 'Macro.recipe', 'the source recipe is untouched');
 });
 
 // ---------------------------------------------------------------------------

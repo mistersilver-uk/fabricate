@@ -1,6 +1,7 @@
 /**
  * Migration 1.8.0: remove the deprecated "check source" mechanisms from persisted
- * crafting systems.
+ * crafting systems, and the orphaned recipe-level result-selection macro they were
+ * paired with.
  *
  * A crafting/salvage/gathering check is now "usable" iff it carries an authored roll
  * formula for its resolution mode (`simple.rollFormula` / `routed.rollFormula` /
@@ -19,6 +20,12 @@
  * Applied to `system.craftingCheck`, `system.salvageCraftingCheck`, and
  * `system.gatheringCraftingCheck`. The `enabled` flag and the simple/routed/progressive
  * sub-objects (including `simple.macroUuid`, the dynamic-DC macro) are untouched.
+ *
+ * It also retires the orphaned `resultSelection.macroUuid` on recipes. The legacy
+ * `macroOutcome` result-selection provider was removed in 1.6.0 (rewritten onto
+ * `check` by `migrateRemoveResultSelectionProviders`, which deliberately kept the
+ * paired `macroUuid`); nothing has read that field since, so it is stripped here from
+ * each recipe's top-level `resultSelection` and every `steps[].resultSelection`.
  *
  * Pure function: no I/O, no Foundry calls, deep-clones its input. Idempotent — each
  * field removal is a `delete` of an already-absent key on re-run, so a second pass is a
@@ -66,13 +73,46 @@ function migrateSystem(system) {
 }
 
 /**
+ * Delete the orphaned `macroUuid` from one `resultSelection` object (the 1.6.0
+ * `macroOutcome` vestige). The `provider` and any other fields are left intact.
+ *
+ * @param {object} selection - a recipe/step `resultSelection` object (mutated)
+ */
+function stripResultSelectionMacroUuid(selection) {
+  if (!isPlainObject(selection)) return;
+  if (Object.prototype.hasOwnProperty.call(selection, 'macroUuid')) {
+    delete selection.macroUuid;
+  }
+}
+
+/**
+ * Migrate one recipe: strip the orphaned `resultSelection.macroUuid` from the recipe-level
+ * container and every step.
+ *
+ * @param {object} recipe - raw recipe object (mutated)
+ */
+function migrateRecipe(recipe) {
+  if (!isPlainObject(recipe)) return;
+  stripResultSelectionMacroUuid(recipe.resultSelection);
+  if (Array.isArray(recipe.steps)) {
+    for (const step of recipe.steps) {
+      if (isPlainObject(step)) stripResultSelectionMacroUuid(step.resultSelection);
+    }
+  }
+}
+
+/**
  * Run the 1.8.0 sweep over the runner's one-pass data bundle.
  *
- * @param {{ systems?: object[] }} data
- * @returns {{ systems: object[] }}
+ * @param {{ systems?: object[], recipes?: object[] }} data
+ * @returns {{ systems: object[], recipes: object[] }}
  */
 export function migrateRemoveLegacyCheckSources(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
   for (const system of systems) migrateSystem(system);
-  return { systems };
+
+  const recipes = Array.isArray(data?.recipes) ? clone(data.recipes) : [];
+  for (const recipe of recipes) migrateRecipe(recipe);
+
+  return { systems, recipes };
 }

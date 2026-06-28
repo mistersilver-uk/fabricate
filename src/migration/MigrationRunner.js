@@ -235,7 +235,7 @@ const MIGRATIONS = [
   {
     version: '1.8.0',
     label:
-      'Remove deprecated check sources (root macroUuid/successMacroUuid/failureMacroUuid/checkSource/builtIn) from crafting/salvage/gathering checks',
+      'Remove deprecated check sources (root macroUuid/successMacroUuid/failureMacroUuid/checkSource/builtIn) from crafting/salvage/gathering checks, and the orphaned recipe resultSelection.macroUuid',
     migrate(data) {
       return migrateRemoveLegacyCheckSources(data);
     },

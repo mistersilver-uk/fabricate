@@ -564,10 +564,6 @@ Recipe = {
   // Routed/alchemy result-group selection
   resultSelection?: {
     provider: "ingredientSet" | "check",
-
-    // provider = "check"
-    // If present, overrides CraftingSystem.craftingCheck.macroUuid for this recipe.
-    macroUuid?: string,
   },
 
   visibility?: {
