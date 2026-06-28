@@ -398,7 +398,11 @@ describe('CraftingSystemManager source contract', () => {
     for (const snippet of [
       'class="manager-systems-table"',
       'manager-system-row',
-      'manager-system-identity'
+      'manager-system-identity',
+      // Same-named systems are disambiguated in the rail via the shared helper (issue 346).
+      "import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js'",
+      'buildSystemLabelMap(systems)',
+      'systemDisplayLabel(system, systemLabels)'
     ]) {
       assert.ok(systemsBrowserSource.includes(snippet), `SystemsBrowserView should include ${snippet}`);
     }

@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js';
 
   let {
     systems = [],
@@ -19,6 +20,11 @@
   let statusFilter = $state('all');
   let pageIndex = $state(0);
   let pageSize = $state(10);
+
+  // Same-named systems are indistinguishable in the rail; disambiguate colliding
+  // display names with a short id suffix (issue 346). Built from the FULL list so a
+  // collision is detected even when filtering/pagination hides the sibling.
+  const systemLabels = $derived(buildSystemLabelMap(systems));
 
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const filteredSystems = $derived((systems || []).filter(system => {
@@ -172,7 +178,7 @@
                 <i class="fas fa-layer-group"></i>
               </span>
               <span class="manager-system-copy">
-                <span class="manager-system-name" title={system.name}>{system.name}</span>
+                <span class="manager-system-name" title={systemDisplayLabel(system, systemLabels)}>{systemDisplayLabel(system, systemLabels)}</span>
                 {#if system.description}
                   <span class="manager-system-description" title={system.description}>{system.description}</span>
                 {:else}
