@@ -386,7 +386,7 @@
             </span>
             {#if showProgressiveDifficulty}
               <span role="cell" class="manager-labeled-cell manager-component-difficulty-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}>
-                {#if Object.prototype.hasOwnProperty.call(item, 'difficulty')}
+                {#if Number.isFinite(Number(item.difficulty)) && Number(item.difficulty) >= 1}
                   <span class="manager-component-difficulty-value">{item.difficulty}</span>
                 {:else}
                   <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None')}</span>

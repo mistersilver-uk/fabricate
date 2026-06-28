@@ -447,6 +447,10 @@ function createStore(calls = [], options = {}) {
         sourceMissing: false,
         showTags: true,
         showEssences: true,
+        // Mirror the normalized component shape: the `difficulty` key is always
+        // present and set to undefined when unset, so the browser must show
+        // "None" by value (not by key absence).
+        difficulty: undefined,
       },
       ...(options.extendedComponentCards
         ? [
