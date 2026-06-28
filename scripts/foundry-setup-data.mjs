@@ -45,7 +45,12 @@ function main() {
     cpSync(DIST_DIR, moduleDest, { recursive: true });
     process.stdout.write('Copied module: dist/ → data/Data/modules/fabricate/\n');
   } else {
-    process.stderr.write('Warning: dist/ not found. Run npm run build first.\n');
+    // Fail fast: without dist/ the module is never copied into the data dir, so
+    // Foundry has no `fabricate` module to enable. Continuing here surfaces much
+    // later in the run as a misleading "module could not be activated" error.
+    // Make the real cause obvious and actionable at setup time instead.
+    process.stderr.write('Error: dist/ not found — run `npm run build` before the Foundry smoke test.\n');
+    process.exit(1);
   }
 
   // Copy CI smoke world fixture. The runtime dir is wiped and recopied on
