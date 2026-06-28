@@ -95,6 +95,9 @@ For systems in `alchemy` mode:
 
 1. Signature uniqueness is validated across all recipes in the system.
 2. Any detected collision blocks saves globally until resolved, including saves from unrelated recipe edits.
+3. Editing an already-`alchemy` system (for example changing its component list, essences, or recipe-item definitions) revalidates signature uniqueness against the proposed system before persisting, and blocks the update with actionable diagnostics naming the conflicting recipes when a collision is detected, so a rejected update never persists the colliding state.
+4. This system-level revalidation applies only to edits of a system that is already in `alchemy` mode; a resolution-mode change *into* `alchemy` instead follows the migration policy below (recipes are migrated and colliding recipes are disabled to gate visibility, not hard-blocked).
+5. Non-`alchemy` system updates are not signature-validated.
 
 ## Clean-up Rules
 
