@@ -1665,15 +1665,6 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Whether the system's component-list identity changed between two snapshots
-   * (used to trigger the alchemy signature re-check on component edits — the #99
-   * trigger). Compares the set of component ids.
-   * @param {object} before
-   * @param {object} after
-   * @returns {boolean}
-   * @private
-   */
-  /**
    * Block an alchemy-system update that would introduce (or leave unresolved) an
    * ingredient signature collision. Validates the PROPOSED merged system — its
    * components against the system's CURRENT recipes — via the pure
