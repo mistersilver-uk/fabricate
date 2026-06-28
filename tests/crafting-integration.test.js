@@ -375,6 +375,77 @@ test('_createSingleResult uses deterministic loot fallback type when managed sou
   }
 });
 
+test('misconfigured required check: craft aborts with ZERO mutation (no consume/spend/break)', async () => {
+  // A routed+check system whose required check has no authored roll formula is a
+  // GM-side misconfiguration, not a rolled failure. The craft must abort before any
+  // consumption even though the failure policy WOULD otherwise consume ingredients.
+  const system = buildSystem({
+    id: 'sys-misconfig',
+    resolutionMode: 'routed',
+    craftingCheck: {
+      enabled: true,
+      outcomes: [],
+      progressive: null,
+      // Policy would consume ingredients + break tools on a genuine failure.
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
+    },
+  });
+  setupGame(system);
+
+  const wood = new FakeItem('wood-mc', 'Wood', 2);
+  const ingredientSet = buildIngredientSet('set-mc', [{ componentId: 'wood-mc', quantity: 1 }]);
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-misconfig',
+    resultSelection: { provider: 'check' },
+    ingredientSets: [ingredientSet],
+    resultGroups: [{ id: 'rg-mc', name: 'pass', results: [] }],
+  });
+
+  const sourceActor = new FakeActor('Crafter', [wood]);
+  const craftingActor = new FakeActor('Crafter');
+
+  const recipeManager = buildMockRecipeManager(true);
+  const resolutionService = buildResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, null, resolutionService);
+
+  // The real required-check guard returns this shape; assert craft honours the flag.
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    misconfigured: true,
+    outcome: null,
+    value: null,
+    data: {},
+    message: 'routed mode requires a configured crafting check roll formula',
+  });
+
+  let consumeCalled = false;
+  let spendCalled = false;
+  let breakCalled = false;
+  engine._consumeIngredients = async () => {
+    consumeCalled = true;
+    return [];
+  };
+  engine._spendCraftCurrency = async () => {
+    spendCalled = true;
+  };
+  engine._applyToolBreakage = async () => {
+    breakCalled = true;
+    return [];
+  };
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'a misconfigured required check fails the craft');
+  assert.equal(result.results, null, 'no results on a misconfigured abort');
+  assert.match(result.message, /requires a configured crafting check roll formula/);
+  assert.equal(consumeCalled, false, 'ingredients must NOT be consumed on a misconfiguration');
+  assert.equal(spendCalled, false, 'currency must NOT be spent on a misconfiguration');
+  assert.equal(breakCalled, false, 'tools must NOT be broken on a misconfiguration');
+  assert.equal(wood._updates.length, 0, 'source item is untouched');
+  assert.equal(wood.system.quantity, 2, 'source quantity is unchanged');
+  assert.equal(craftingActor._createdDocs.length, 0, 'no result items are created');
+});
+
 // ===========================================================================
 // Group 2: Multistep mode integration (AC2)
 // ===========================================================================

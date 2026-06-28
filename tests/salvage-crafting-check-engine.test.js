@@ -248,6 +248,19 @@ test('salvage routed WITHOUT a formula fails loudly (no legacy macro path)', asy
   );
   assert.equal(r.success, false, 'routed salvage with no formula fails');
   assert.equal(r.outcome, null);
+  assert.equal(r.misconfigured, true, 'the loud failure is flagged as a misconfiguration');
+  assert.match(r.message, /requires a configured salvage check roll formula/);
+});
+
+test('salvage progressive WITHOUT a formula fails loudly (no legacy macro path)', async () => {
+  const engine = makeEngine();
+  const r = await run(
+    engine,
+    sys({ enabled: true, progressive: { rollFormula: '' } }, 'progressive')
+  );
+  assert.equal(r.success, false, 'progressive salvage with no formula fails');
+  assert.equal(r.outcome, null);
+  assert.equal(r.misconfigured, true, 'the loud failure is flagged as a misconfiguration');
   assert.match(r.message, /requires a configured salvage check roll formula/);
 });
 

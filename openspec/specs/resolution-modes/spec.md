@@ -61,7 +61,8 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
 - Exactly one `IngredientSet`.
 - Exactly one `ResultGroup`.
-- If checks are enabled, macro must return the simple contract from `002-data-models.md`.
+- The crafting check is optional: it runs only when `craftingCheck.simple.rollFormula` is authored (the engine rolls the formula and resolves pass/fail against the DC).
+With no authored formula the attempt proceeds with no check; there is no macro-return contract.
 
 ## Routed Mode
 
@@ -138,9 +139,8 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 - Exactly one `ResultGroup`.
 - The result group contains ordered results.
 - Every referenced `Component` has `difficulty >= 1`.
-- `CraftingSystem.craftingCheck.enabled` must be true.
-- `CraftingSystem.craftingCheck.progressive` must exist.
-- Check macro must return progressive check contract with numeric `value`.
+- `CraftingSystem.craftingCheck.progressive.rollFormula` must be authored: the progressive check is required, and the engine rolls that formula to produce the numeric `value` the awarding spends against result difficulties.
+- With no authored progressive roll formula the attempt fails loudly (the required-check guard aborts with zero mutation); this surfaces as a system-level blocker, not a per-recipe validation error.
 
 ## Alchemy Mode
 

@@ -208,7 +208,10 @@ Hooks.once('fabricate.ready', async () => {
     features: { salvage: true },
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
-      macroUuid: 'Macro.salvage-check-uuid',
+      routed: {
+        rollFormula: '1d20 + @abilities.int.mod',
+        dc: 18
+      },
       consumption: {
         consumeComponentOnFail: true,
         breakToolsOnFail: false

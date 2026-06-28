@@ -307,6 +307,17 @@ export class CraftingEngine {
       ingredientSet,
       step
     );
+    // A misconfigured required check (no authored roll formula for the active mode)
+    // is a GM-side system gap, not a rolled failure: abort with ZERO mutation so the
+    // player's ingredients/currency/tools are never consumed or broken. The
+    // failure-consumption policy below applies only to genuine rolled failures.
+    if (checkResult.misconfigured) {
+      return {
+        success: false,
+        results: null,
+        message: checkResult.message,
+      };
+    }
     if (!checkResult.success) {
       const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
       let consumedOnFail = [];
@@ -323,10 +334,11 @@ export class CraftingEngine {
           usedToolPairs = toolValidation.tools;
           // The single shared `evaluateCheckBreakage` seam decides forced breakage
           // on the check-failure path too (gated by `breakToolsOnFail`, as
-          // today). Under `toolSpecific` the legacy crit/tier `data.breakTools`
-          // force-break applies; under `checkDriven` the active check's
-          // `checkBreakage` triggers decide. A macro/builtIn check never force-breaks
-          // (the `engineEvaluated` guard lives inside the seam).
+          // today). Under `toolSpecific` an engine-evaluated crit/tier
+          // `data.breakTools` force-break applies; under `checkDriven` the active
+          // check's `checkBreakage` triggers decide. The no-check passthrough
+          // result is not engine-evaluated, so it never force-breaks (the
+          // `engineEvaluated` guard lives inside the seam).
           const breakDecision = this._resolveCraftingBreakageDecision(
             this._getRecipeSystem(executionRecipe),
             executionRecipe,
@@ -484,8 +496,9 @@ export class CraftingEngine {
 
     // Apply tool usage/breakage for the recipe's resolved library Tools via the
     // single shared `evaluateCheckBreakage` seam. Under `toolSpecific` an
-    // engine-evaluated crit/tier `breakTools` forces every matched tool to break (a
-    // macro/builtIn `data.breakTools` does not); under `checkDriven` the active
+    // engine-evaluated crit/tier `breakTools` forces every matched tool to break (the
+    // no-check passthrough result is not engine-evaluated, so it does not); under
+    // `checkDriven` the active
     // check's `checkBreakage` triggers decide whether all required non-immune tools
     // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
     // gate exists here).
@@ -1488,6 +1501,7 @@ export class CraftingEngine {
     if (checkRequired) {
       return {
         success: false,
+        misconfigured: true,
         outcome: null,
         value: null,
         data: {},
@@ -1539,9 +1553,9 @@ export class CraftingEngine {
    * tiers each threshold shifts by `dc + outcome.dc`, so a flat DC would silently
    * drop the recipe tier / dynamic DC.
    *
-   * When no routed `rollFormula` is configured this method is NOT reached (the
-   * caller only dispatches here when one is set), so the legacy macro / builtIn
-   * routed path stays unchanged.
+   * When no routed `rollFormula` is configured this method is NOT reached: the
+   * caller only dispatches here when one is set, and otherwise its required-check
+   * guard fails loudly. There is no macro / adapter fallback (removed).
    *
    * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
    */
@@ -1571,9 +1585,9 @@ export class CraftingEngine {
   /**
    * Tag a check result as engine-evaluated so the craft seam knows its
    * `data.breakTools` is an authored-crit / authored-tier signal it can honour for
-   * forced tool breakage. Macro / builtIn results are NOT tagged: their `data` is
-   * passed through verbatim, and `breakTools` is not part of the macro contract, so
-   * a macro returning `data:{ breakTools:true }` must not force breakage.
+   * forced tool breakage. The no-check passthrough success (when no usable roll
+   * formula applies) is NOT tagged, so its `data` cannot force breakage; only an
+   * engine-rolled crit/tier result carries the `engineEvaluated` flag.
    * @private
    */
   _markEngineEvaluated(result) {
@@ -2157,6 +2171,19 @@ export class CraftingEngine {
     const checkResult = await this._runSalvageCraftingCheck(component, system, actor);
     const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
 
+    // A misconfigured required salvage check (routed/progressive with no authored
+    // roll formula) is a GM-side system gap, not a rolled failure: abort with ZERO
+    // mutation so the component is never consumed and no tools are broken. The
+    // failure-consumption policy below applies only to genuine rolled failures.
+    if (checkResult.misconfigured) {
+      return {
+        success: false,
+        results: null,
+        message: checkResult.message,
+        salvageRun,
+      };
+    }
+
     if (!checkResult.success) {
       let consumedOnFail = [];
       let usedTools = [];
@@ -2439,6 +2466,7 @@ export class CraftingEngine {
     if (mode === 'progressive' || mode === 'routed') {
       return {
         success: false,
+        misconfigured: true,
         outcome: null,
         value: null,
         data: {},

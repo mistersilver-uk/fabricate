@@ -295,7 +295,7 @@ When no adapter is registered for the active system, the spend fails loudly with
 Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem }`.
 A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption.
 The `increment` macro is configured and validated but reserved for a future refund flow — it is never invoked.
-The macro strategy is GM-only config with no separate feature flag (matching success/failure macros).
+The macro strategy is GM-only config with no separate feature flag (matching the property macros).
     - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
 20. `providerId` is a trimmed string (default `""`) and `macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
 Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
@@ -1379,50 +1379,24 @@ They are unrelated mechanisms.
 
 ## Macro Contracts
 
-### Crafting Check Macro Contract
+### Crafting Check Macro Contract (Removed in 1.8.0)
 
-Input context must include:
+The crafting-check macro / built-in adapter path has been removed.
+A crafting check is now usable IFF its resolution mode has an authored roll formula (`craftingCheck.simple|routed|progressive.rollFormula`); the engine rolls that formula and evaluates the outcome itself.
+There is no macro-return contract — when a required check (progressive, or routed + `check` provider) has no authored roll formula the attempt fails loudly with zero mutation (the required-check guard), and an optional simple check with no formula is a no-op.
 
-- `recipe`
-- `craftingSystem`
-- `craftingActor`
-- `componentSourceActors`
-- `ingredientPool`
-- `candidateIngredientSet`
-- `resolvedEssences`
-- `step`
+The routed `check` provider keys on the engine-evaluated outcome tier NAME produced by rolling `craftingCheck.routed.rollFormula`.
+The same outcome-name normalization the provider routing applies (engine-evaluated, not a macro return):
 
-Return by mode:
-
-- Simple and routed/alchemy (`ingredientSet`)
-
-```js
-{ success: boolean, description?: string, data?: object }
-```
-
-- Routed (`check`) and alchemy (`check`)
-
-```js
-{ success: boolean, outcome: string, description?: string, data?: object }
-```
-
-- Progressive
-
-```js
-{ success: boolean, value: number, description?: string, data?: object }
-```
-
-Normalization and interpretation rules for `outcome` in routed/alchemy `check`:
-
-1. `outcome` is required and must be interpreted using trim-normalized, case-insensitive comparison.
+1. `outcome` is interpreted using trim-normalized, case-insensitive comparison.
 2. Preferred reserved keyword:
    - `fail` (failed craft outcome)
 3. Accepted failure aliases (same normalization rules):
    - fail-family: `fail`, `failed`, `failure`, `f`
    - miss-family compatibility aliases: `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`
    - hazard-family compatibility aliases: `hazard`, `danger`, `complication`, `trap`, `oops`
-4. If normalized `outcome` matches a reserved failure keyword, it does not route to a result group and is treated as failure.
-5. Otherwise, `outcome` must equal a `ResultGroup.name` for the active recipe under the same normalization rules.
+4. If the normalized `outcome` matches a reserved failure keyword, it does not route to a result group and is treated as failure.
+5. Otherwise, `outcome` must equal a `ResultGroup.name` for the active recipe under the same normalization rules (explicit `checkOutcomeIds` tier assignment wins first; see `004-resolution-modes.md`).
 6. If a non-reserved `outcome` does not match any `ResultGroup.name`, classify as crafting-system misconfiguration error.
 
 ### Property Macro Contract
@@ -1449,43 +1423,15 @@ Return shape:
 
 Returned values are merged into created item data before document creation.
 
-### Success Macro Contract
+### Success Macro Contract (Removed in 1.8.0)
 
-Executed after a step succeeds and item consumption/creation is applied.
+The step-level success macro has been removed.
+Crafting outcomes are resolved entirely by the engine (check formula, resolution mode, and consumption policy); there is no GM-authored success-side macro hook.
 
-Input context must include:
+### Failure Macro Contract (Removed in 1.8.0)
 
-- `recipe`
-- `craftingSystem`
-- `craftingActor`
-- `componentSourceActors`
-- `step`
-- `selectedIngredientSet`
-- `consumedIngredients`
-- `consumedTools`
-- `createdResults`
-- `checkResult`
-
-Return: optional side effects only.
-
-### Failure Macro Contract
-
-Executed when a step fails.
-
-Input context must include:
-
-- `recipe`
-- `craftingSystem`
-- `craftingActor`
-- `componentSourceActors`
-- `step`
-- `selectedIngredientSet`
-- `failureReason`
-- `checkResult`
-- `consumedIngredients`
-- `consumedTools`
-
-Return: optional side effects only.
+The step-level failure macro has been removed.
+A step failure is handled entirely by the engine's failure-consumption policy; there is no GM-authored failure-side macro hook.
 
 ## Behavioural Ownership
 

@@ -119,7 +119,7 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system 
     if (PROVIDER_MODES.has(fromMode) && _hasValidProvider(recipeJSON)) {
       return { outcome: 'carry', recipe: recipeJSON, reasons: ['routing provider preserved'] };
     }
-    const provider = _chooseSeedProvider(system);
+    const provider = _chooseSeedProvider(system, toMode);
     _seedProvider(recipeJSON, provider);
     return {
       outcome: 'seeded',
@@ -144,18 +144,29 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system 
 
 /**
  * Choose the provider to seed for a provider-routed target mode. Prefer `check`
- * when the system has a usable crafting check (so name-routing resolves), else the
+ * ONLY when the target mode has an authored roll formula for the formula the
+ * check provider actually keys on (so name-routing resolves), else the
  * always-available `ingredientSet` provider. Seeding can therefore never manufacture
- * a system-level gap that would have been avoidable.
+ * an avoidable system-level gap. A check is usable IFF it has an authored roll
+ * formula for its mode — the legacy `enabled` / `features.craftingChecks` toggles
+ * do not make a check usable, so they are not consulted here (aligns with
+ * `ResolutionModeService._hasRollFormula` and `systemValidation`).
+ *
+ * The keyed formula differs by target mode: `routed` routes by the routed check's
+ * outcome tier (`routed.rollFormula`); `alchemy`'s check provider routes by the
+ * SIMPLE check outcome (`simple.rollFormula`), so the routed formula is the wrong
+ * one to consult there.
  * @param {object} system
+ * @param {string} toMode The target resolution mode (`routed` | `alchemy`).
  * @returns {'check'|'ingredientSet'}
  */
-function _chooseSeedProvider(system) {
+function _chooseSeedProvider(system, toMode) {
   const check = _isPlainObject(system?.craftingCheck) ? system.craftingCheck : {};
-  const features = _isPlainObject(system?.features) ? system.features : {};
-  const checksEnabled = features.craftingChecks === true || check.enabled === true;
-  const hasRoutedFormula = _trimmed(check.routed?.rollFormula).length > 0;
-  return checksEnabled || hasRoutedFormula ? 'check' : 'ingredientSet';
+  const hasUsableFormula =
+    toMode === 'alchemy'
+      ? _trimmed(check.simple?.rollFormula).length > 0
+      : _trimmed(check.routed?.rollFormula).length > 0;
+  return hasUsableFormula ? 'check' : 'ingredientSet';
 }
 
 /** Whether the recipe already carries one of the two valid routed providers. */

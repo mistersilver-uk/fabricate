@@ -141,7 +141,6 @@ Tool usage/breakage is tracked on owned item instances.
 2. Build result item payloads.
 3. Apply property macros per result item when enabled.
 4. Create result items.
-5. Execute success macro or failure macro.
 
 ### Run Progression
 
@@ -255,7 +254,9 @@ Salvage is a single-step operation (no multi-step salvage):
 
 1. **Validate**: Confirm the actor owns sufficient quantity of the component and all required Tools (`salvage.toolIds`).
 2. **Time Gate** (if `Component.salvage.timeRequirement` is present): Create an active salvage run in `waitingTime` status and defer completion until the required world time has elapsed.
-3. **Check** (if `salvageCraftingCheck.enabled`): Execute the salvage crafting check macro.
+3. **Check**: Roll the salvage check for the active `salvageResolutionMode`.
+A salvage check is usable only when its mode has an authored roll formula (`salvageCraftingCheck.simple|routed|progressive.rollFormula`); the optional simple check runs only when `salvageCraftingCheck.simple.rollFormula` is authored.
+Routed and progressive salvage require their roll formula and fail loudly (with zero mutation) when it is missing.
 4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `004-resolution-modes.md`, but using salvage-specific settings).
 5. **Consume**: `ingredientQuantity` is always 1 for salvage.
 Remove that many instances of the component from the actor's inventory.
@@ -270,26 +271,16 @@ If it is present, the run must resume automatically when world time reaches the 
 - **Simple**: One result group.
 Optional pass/fail check.
 On success, produce the single result group.
-- **Routed**: Check is mandatory.
+- **Routed**: Check is mandatory and requires an authored `salvageCraftingCheck.routed.rollFormula`.
   The engine-evaluated routed salvage check rolls the configured formula and maps the total onto
-  an outcome tier whose NAME is the `outcome`
-  (or the authored macro returns `outcome` when no routed formula is configured).
+  an outcome tier whose NAME is the `outcome`; with no authored formula the salvage fails loudly
+  (zero mutation).
   `Component.salvage.outcomeRouting` maps outcomes to result groups.
 - **Progressive**: One result group with ordered results.
-  Check is mandatory.
+  Check is mandatory and requires an authored `salvageCraftingCheck.progressive.rollFormula`.
   The engine-evaluated progressive salvage check rolls the configured formula to produce the
-  numeric `value` (or the authored macro returns `value`).
+  numeric `value`; with no authored formula the salvage fails loudly (zero mutation).
   Awards are evaluated using `salvageCraftingCheck.progressive.awardMode`.
-
-### Macro Contracts
-
-Salvage check macros receive the same contract shape as crafting check macros (see `openspec/specs/data-models/spec.md`, Macro Contracts), with the following substitutions:
-
-- `recipe` is replaced by `component` (the component being salvaged).
-- `candidateIngredientSet` is replaced by `salvageInput` containing `{ componentId, quantity }`.
-- `step` is omitted (salvage is single-step).
-
-Success and failure macros follow the same contracts as crafting, substituting `component` for `recipe` and omitting `step`.
 
 ### Failure Consumption Policy
 

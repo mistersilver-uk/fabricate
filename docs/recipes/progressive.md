@@ -80,5 +80,5 @@ Progressive mode is ideal when:
 ## See Also
 
 - [Multi-Step Recipes]({% link recipes/multi-step.md %}): combine multiple steps into a single recipe workflow.
-- [Crafting Checks]({% link crafting-checks.md %}): crafting check macro contracts.
+- [Crafting Checks]({% link crafting-checks.md %}): configure the progressive check roll formula.
 - [Recipes overview]({% link recipes/index.md %}): compare all resolution modes side by side.

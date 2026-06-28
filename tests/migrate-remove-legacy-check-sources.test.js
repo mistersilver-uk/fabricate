@@ -167,6 +167,7 @@ test('runs through MigrationRunner from 1.7.0, strips the fields, and lands at 1
   const settings = makeSettings({
     migrationVersion: '1.7.0', // only the 1.8.0 migration is pending
     craftingSystems: [fullyLoadedSystem()],
+    recipes: [{ id: 'r-1', resultSelection: { provider: 'check', macroUuid: 'Macro.x' } }],
   });
   const runner = new MigrationRunner({
     getSetting: settings.getSetting,
@@ -183,6 +184,11 @@ test('runs through MigrationRunner from 1.7.0, strips the fields, and lands at 1
   assert.equal(system.craftingCheck.simple.macroUuid, 'Macro.dynamicDc', 'dynamic DC macro kept');
   const setKeys = settings.calls.set.map((c) => c.key);
   assert.ok(setKeys.includes('craftingSystems'), 'the strip is persisted');
+
+  const recipe = settings.store.get('recipes')[0];
+  assert.equal('macroUuid' in recipe.resultSelection, false, 'orphaned recipe macroUuid stripped');
+  assert.equal(recipe.resultSelection.provider, 'check', 'recipe provider preserved');
+  assert.ok(setKeys.includes('recipes'), 'the recipe strip is persisted');
 });
 
 test('runner: craftingSystems left untouched (no write) when no deprecated fields are present', async () => {
