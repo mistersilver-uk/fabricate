@@ -317,6 +317,13 @@ If the folder contains no Item documents, a notification says so and nothing is 
 > Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row.
 If your Foundry version does not support this drag shape, use single-item drops instead, or import the pack through the [API]({% link api/system-manager.md %}).
 
+### Editing Components
+
+Open a component in the **Items** tab to edit it.
+The editor lets you change a component's tags, essences, and salvage setup, and replace its linked source item from the right-hand inspector.
+When the system's recipe resolution mode is Progressive, the inspector also shows a **Progressive difficulty** card for setting the value spent against the crafting roll.
+See [Setting Component Difficulty]({% link recipes/progressive.md %}#setting-component-difficulty).
+
 ---
 
 ## Requirements

@@ -16,6 +16,7 @@
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentSourceInspector from './ComponentSourceInspector.svelte';
+  import ComponentDifficultyInspector from './ComponentDifficultyInspector.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -2353,6 +2354,15 @@
   function replaceComponentSource(itemId, data) {
     if (!itemId) return;
     services?.onReplaceSource?.(itemId, data);
+  }
+
+  // Persist a component's progressive difficulty immediately, mirroring the
+  // source inspector's immediate-mutation pattern. Returns the store promise so
+  // the inspector can await it for its in-flight guard. `value` is an integer
+  // >= 1 or null to clear.
+  function setComponentDifficulty(itemId, value) {
+    if (!itemId) return;
+    return store.updateComponent(itemId, { difficulty: value });
   }
 
   function unlinkComponentSource(itemId = selectedComponent?.id) {
@@ -6111,6 +6121,12 @@
             onOpenSource={(uuid) => openComponentSource(uuid)}
             onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
           />
+          {#if selectedSystem?.resolutionMode === 'progressive'}
+            <ComponentDifficultyInspector
+              component={componentForEdit}
+              onSetDifficulty={(itemId, value) => setComponentDifficulty(itemId, value)}
+            />
+          {/if}
         {:else}
           <section class="manager-inspector-card">
             <div class="manager-inspector-copy">

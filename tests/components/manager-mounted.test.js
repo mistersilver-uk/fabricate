@@ -42,6 +42,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentSourceInspector.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentDifficultyInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
@@ -4295,6 +4296,75 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.fabricate-manager').dataset.managerView,
       'components',
       'successful save should return to the components browser'
+    );
+  });
+
+  // Mount the manager and open c1's component-edit route. Hoisted so the
+  // difficulty-inspector tests stay DRY (Sonar new-code gate).
+  async function openComponentEditor(calls, storeOptions = {}) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, storeOptions),
+        services: { openCurrentAdmin: () => {}, onDropItem: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Components').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-component-id="c1"] [aria-label="Edit Iron Ore"]').click();
+    flushSync();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  it('renders an editable progressive-difficulty inspector and persists changes for a progressive system', async () => {
+    const calls = [];
+    await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
+
+    const card = target.querySelector('[data-component-edit-section="difficulty"]');
+    assert.ok(card, 'difficulty inspector card should render for a progressive system');
+    const input = card.querySelector('input');
+    assert.ok(input, 'difficulty card should expose a number input');
+    assert.equal(input.value, '2', 'input should seed from the persisted component difficulty');
+
+    // Commit a valid integer on change.
+    input.value = '5';
+    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    const setCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(setCall, 'editing difficulty should call store.updateComponent');
+    assert.equal(setCall[1], 'c1');
+    assert.deepEqual(setCall[2], { difficulty: 5 }, 'valid value should persist a truncated integer');
+
+    // Clearing the input commits null to clear the value.
+    input.value = '';
+    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    const clearCall = calls.filter((call) => call[0] === 'updateComponent').at(-1);
+    assert.deepEqual(clearCall[2], { difficulty: null }, 'blank input should clear the difficulty');
+  });
+
+  it('hides the progressive-difficulty inspector for a non-progressive system', async () => {
+    const calls = [];
+    await openComponentEditor(calls);
+
+    assert.ok(
+      target.querySelector('[data-component-edit-section="source"]'),
+      'source inspector should still render'
+    );
+    assert.equal(
+      target.querySelector('[data-component-edit-section="difficulty"]'),
+      null,
+      'difficulty inspector should be absent when crafting resolution mode is not progressive'
     );
   });
 

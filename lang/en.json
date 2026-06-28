@@ -1247,6 +1247,8 @@
           "NoTags": "No tags",
           "NoEssences": "No essences",
           "ProgressiveDifficulty": "Progressive difficulty",
+          "ProgressiveDifficultyLabel": "Difficulty value",
+          "ProgressiveDifficultyHint": "Cost spent against the crafting roll in progressive mode. Whole number, 1 or greater; leave blank to clear.",
           "NoDifficulty": "No difficulty",
           "Salvage": "Salvage",
           "SalvageQuantity": "{count} required",

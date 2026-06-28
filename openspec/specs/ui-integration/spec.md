@@ -366,7 +366,11 @@ Folder
 - Remove managed items.
 - Edit managed item tags (if enabled).
 - Edit managed item essences (if enabled).
-- Edit managed item difficulty (progressive mode).
+- Edit managed item difficulty: the component editor's right-hand inspector exposes an editable
+  progressive-difficulty input.
+It is shown only when the system's crafting resolution mode is `progressive` (parity with the
+  read-only components-browser column).
+It accepts an integer of 1 or greater, or blank to clear the value, and persists immediately.
 - Replace associated source item by drag/drop.
 
 Component import warnings:
