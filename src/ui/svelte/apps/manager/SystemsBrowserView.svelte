@@ -195,8 +195,8 @@
                 class={`manager-status-toggle ${system.enabled === false ? 'is-off' : 'is-on'}`}
                 aria-pressed={system.enabled !== false}
                 aria-label={system.enabled === false
-                  ? text('FABRICATE.Admin.Manager.EnableSystemNamed', 'Enable {name}').replace('{name}', system.name)
-                  : text('FABRICATE.Admin.Manager.DisableSystemNamed', 'Disable {name}').replace('{name}', system.name)}
+                  ? text('FABRICATE.Admin.Manager.EnableSystemNamed', 'Enable {name}').replace('{name}', systemDisplayLabel(system, systemLabels))
+                  : text('FABRICATE.Admin.Manager.DisableSystemNamed', 'Disable {name}').replace('{name}', systemDisplayLabel(system, systemLabels))}
                 onclick={(event) => toggleEnabled(system.id, system.enabled === false, event)}
                 onkeydown={(event) => event.stopPropagation()}
               >
@@ -209,13 +209,13 @@
               </button>
             </span>
             <span role="cell" class="manager-action-group manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}>
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EditNamed', 'Edit {name}').replace('{name}', system.name)} title={text('FABRICATE.Admin.Manager.EditSystem', 'Edit system')} onclick={(event) => { event.stopPropagation(); onEditSystem(system.id); }}>
+              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EditNamed', 'Edit {name}').replace('{name}', systemDisplayLabel(system, systemLabels))} title={text('FABRICATE.Admin.Manager.EditSystem', 'Edit system')} onclick={(event) => { event.stopPropagation(); onEditSystem(system.id); }}>
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </button>
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace('{name}', system.name)} title={text('FABRICATE.Admin.Manager.ExportSystem', 'Export system')} onclick={(event) => { event.stopPropagation(); onExportSystem(system.id); }}>
+              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace('{name}', systemDisplayLabel(system, systemLabels))} title={text('FABRICATE.Admin.Manager.ExportSystem', 'Export system')} onclick={(event) => { event.stopPropagation(); onExportSystem(system.id); }}>
                 <i class="fas fa-file-export" aria-hidden="true"></i>
               </button>
-              <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace('{name}', system.name)} title={text('FABRICATE.Admin.Manager.DeleteSystem', 'Delete system')} onclick={(event) => { event.stopPropagation(); onDeleteSystem(system.id); }}>
+              <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace('{name}', systemDisplayLabel(system, systemLabels))} title={text('FABRICATE.Admin.Manager.DeleteSystem', 'Delete system')} onclick={(event) => { event.stopPropagation(); onDeleteSystem(system.id); }}>
                 <i class="fas fa-trash" aria-hidden="true"></i>
               </button>
             </span>
