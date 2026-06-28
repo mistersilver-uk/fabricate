@@ -67,6 +67,12 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
   },
   {
+    id: 'manager-components-progressive',
+    label: 'Manager components browser — progressive difficulty column (value + None)',
+    smokeLabels: ['manager-components-progressive'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+  },
+  {
     id: 'manager-component-edit',
     label: 'Manager component editor (identity card + linked-source inspector)',
     smokeLabels: ['manager-component-edit-normal'],
@@ -74,6 +80,12 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ComponentSourceInspector\.svelte$/,
     ],
+  },
+  {
+    id: 'manager-component-edit-difficulty',
+    label: 'Manager component editor — staged progressive difficulty card',
+    smokeLabels: ['manager-component-edit-difficulty'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentDifficultyInspector\.svelte$/],
   },
   {
     id: 'manager-component-edit-salvage',
@@ -170,6 +182,12 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-recipe-edit-multistep',
     label: 'Manager recipe editor — multi-step durations',
     smokeLabels: ['manager-recipe-edit-multistep'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-tools',
+    label: 'Manager recipe editor — tools (component-name fallback for unlabelled tools)',
+    smokeLabels: ['manager-recipe-edit-tools'],
     matches: RECIPE_EDIT_MATCHES,
   },
   {

@@ -2424,6 +2424,15 @@ async function main() {
                 requirement: { formula: '@tools.herbalism.value' },
                 breakage: { mode: 'limitedUses', maxUses: 5 },
                 onBreak: { mode: 'flagBroken' }
+              }, {
+                // Deliberately unlabelled: a recipe references this tool so the
+                // recipe Tools tab proves the component-name fallback (an
+                // unlabelled tool must show the backing component's name, never a
+                // raw id).
+                id: 'smoke-unlabelled-tool',
+                label: '',
+                enabled: true,
+                componentId: componentMap['Empty Vial']
               }],
               events: [{
                 id: 'smoke-bramble-event',
@@ -2449,6 +2458,10 @@ async function main() {
         await csm.updateSystem(systemId, {
           tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
         });
+
+        // Reference the deliberately-unlabelled tool from the Brew Healing Potion
+        // recipe so the recipe Tools tab demonstrates the component-name fallback.
+        await rm.updateRecipe(recipe2.id, { toolIds: ['smoke-unlabelled-tool'] });
 
         // Seed one `fabricate.interactable` Region behaviour on the Azure Grove
         // scene so the canvas interactable config panel (Link/Unlink toggle +
@@ -2506,11 +2519,14 @@ async function main() {
           description: 'A system left in a broken state to demonstrate the system overview and the system-blocker banner.'
         });
         const blockedSystemId = blockedSystem.id;
-        // Register one managed component (without a usable difficulty) so the
-        // progressive checks have something to evaluate against.
-        const blockedWorldItem = game.items.contents[0];
-        if (blockedWorldItem) {
-          await csm.addItemFromUuid(blockedSystemId, blockedWorldItem.uuid);
+        // Register two managed components so the progressive components browser
+        // shows BOTH a set difficulty and an unset ("None") value, and so the
+        // difficulty editor card has a component to author against. Difficulty is
+        // assigned after the progressive mode switch (below).
+        const blockedComponents = [];
+        for (const blockedWorldItem of game.items.contents.slice(0, 2)) {
+          const added = await csm.addItemFromUuid(blockedSystemId, blockedWorldItem.uuid);
+          if (added?.item?.id) blockedComponents.push({ id: added.item.id, name: blockedWorldItem.name });
         }
         // Progressive mode with NO progressive crafting check → blocks:'system'.
         // The aggregator's `progressiveNoCheck` blocker only fires when
@@ -2525,6 +2541,14 @@ async function main() {
           features: { gathering: true, craftingChecks: false },
           craftingCheck: { enabled: false }
         });
+        // Give the first blocked component a usable progressive difficulty so the
+        // components column renders a value next to the second component's "None"
+        // (and the difficulty editor card opens with a seeded value). This clears
+        // the progressiveNoDifficulty blocker but leaves progressiveNoCheck, so the
+        // system-overview blocker captures below are unaffected.
+        if (blockedComponents[0]) {
+          await csm.updateItem(blockedSystemId, blockedComponents[0].id, { difficulty: 4 });
+        }
         // NOTE: progressive mode with no crafting check rejects recipe creation
         // ("Progressive mode requires crafting checks enabled"), and a recipe created
         // before the mode switch would be deleted by the (pre-migration-first)
@@ -2571,6 +2595,7 @@ async function main() {
         return {
           systemId,
           blockedSystemId,
+          blockedComponentNames: blockedComponents.map((component) => component.name),
           blockedEnvironmentId: blockedEnvironment?.id ?? null,
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id],
@@ -3045,6 +3070,22 @@ async function main() {
         await assertManagerLayoutStable(page, 'recipe edit normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-normal');
+
+        // Recipe Tools tab → this recipe references a deliberately-unlabelled tool,
+        // so the row must show the backing component's name (the fallback fix),
+        // never a raw id. Guarded so a hiccup records a failed step, not an abort.
+        try {
+          await page.locator('.fabricate-manager [data-recipe-tab-button="tools"]').first().click();
+          await page.locator('.fabricate-manager [data-recipe-tab="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-recipe-tab="tools"] [data-recipe-tool-id]').first().waitFor({ state: 'visible', timeout: 5_000 });
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-recipe-edit-tools');
+          results.steps.push({ step: 'recipe-edit-tools', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'recipe-edit-tools', passed: false, error: err.message });
+          process.stderr.write(`Recipe tools capture failed: ${err.message}\n`);
+        }
+
         // Return to the recipes browser for the remaining recipe-editor captures.
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -3503,6 +3544,45 @@ async function main() {
           await assertManagerLayoutStable(page, 'system edit blocked');
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-system-edit-blocked');
+
+          // (c) Progressive difficulty UI — this system is in progressive crafting
+          // mode, so its components browser shows the difficulty column (a value
+          // for component 0, "None" for component 1) and the component editor's
+          // right inspector exposes the staged Progressive difficulty card.
+          // Guarded independently so a hiccup here does not fail the overview step.
+          try {
+            const blockedNames = craftingSetup.blockedComponentNames || [];
+            await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+            await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+            await page.locator('.fabricate-manager .manager-component-difficulty-cell').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'manager-components-progressive');
+
+            // Open the second ("None") component and stage a difficulty so the card,
+            // the Unsaved chip, and the editor Save flow are captured together. Save
+            // afterwards so the dirty draft does not trip the discard guard on exit.
+            if (blockedNames[1]) {
+              await page.locator(`.fabricate-manager .manager-component-row:has-text(${JSON.stringify(blockedNames[1])}) button:has(i.fa-edit)`)
+                .first().click();
+              await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
+                .waitFor({ state: 'visible', timeout: 5_000 });
+              const difficultyInput = page.locator('.fabricate-manager [data-component-edit-section="difficulty"] input').first();
+              await difficultyInput.waitFor({ state: 'visible', timeout: 5_000 });
+              await difficultyInput.fill('7');
+              await page.locator('.fabricate-manager .manager-header-actions .manager-chip:has-text("Unsaved")').first()
+                .waitFor({ state: 'visible', timeout: 5_000 });
+              await assertNoScreenshotOverlays(page);
+              await screenshot(page, 'manager-component-edit-difficulty');
+              await page.locator('.fabricate-manager button[form="manager-component-edit-form"]').first().click();
+              await page.locator('.fabricate-manager[data-manager-view="components"]').first()
+                .waitFor({ state: 'visible', timeout: 5_000 });
+            }
+            results.steps.push({ step: 'progressive-difficulty-captures', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'progressive-difficulty-captures', passed: false, error: err.message });
+            process.stderr.write(`Progressive difficulty capture failed: ${err.message}\n`);
+          }
 
           results.steps.push({ step: 'system-overview-and-banner', passed: true });
         } catch (err) {
