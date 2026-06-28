@@ -81,23 +81,24 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[2].smokeLabels, ['player-gathering-stacked']);
   });
 
-  it('maps a recipe editor file to all four recipe-edit frame recipes', () => {
+  it('maps a recipe editor file to all five recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',
       'manager-recipe-edit-ingredients',
       'manager-recipe-edit-validation',
       'manager-recipe-edit-multistep',
+      'manager-recipe-edit-tools',
     ];
 
     // The top-level editor view, the recipe-item inspector, and any recipe
-    // sub-component all republish all four frames.
+    // sub-component all republish all five frames.
     for (const file of [
       'src/ui/svelte/apps/manager/RecipeEditView.svelte',
       'src/ui/svelte/apps/manager/RecipeItemInspector.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
-      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all four recipe-edit frames`);
+      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all five recipe-edit frames`);
     }
 
     // Each frame carries exactly its own single smoke label.
@@ -107,16 +108,18 @@ describe('UI PR screenshot evidence', () => {
       ['manager-recipe-edit-ingredients'],
       ['manager-recipe-edit-validation'],
       ['manager-recipe-edit-multistep'],
+      ['manager-recipe-edit-tools'],
     ]);
   });
 
-  it('collects the four recipe-edit frames into four separate files', () => {
+  it('collects the five recipe-edit frames into five separate files', () => {
     withScreenshotFixtures(
       {
         'screenshot-01-manager-recipe-edit-normal.png': 'normal',
         'screenshot-02-manager-recipe-edit-ingredients.png': 'ingredients',
         'screenshot-03-manager-recipe-edit-validation.png': 'validation',
         'screenshot-04-manager-recipe-edit-multistep.png': 'multistep',
+        'screenshot-05-manager-recipe-edit-tools.png': 'tools',
       },
       (root) => {
         const result = collectScreenshotEvidence({
@@ -124,7 +127,7 @@ describe('UI PR screenshot evidence', () => {
           prNumber: 654,
           root,
         });
-        assert.equal(result.copied.length, 4);
+        assert.equal(result.copied.length, 5);
         const byName = Object.fromEntries(
           result.copied.map(item => [
             item.destination.replaceAll('\\', '/').split('/').pop(),
@@ -136,6 +139,7 @@ describe('UI PR screenshot evidence', () => {
           'manager-recipe-edit-ingredients.png': 'ingredients',
           'manager-recipe-edit-validation.png': 'validation',
           'manager-recipe-edit-multistep.png': 'multistep',
+          'manager-recipe-edit-tools.png': 'tools',
         });
       },
     );
