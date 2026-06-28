@@ -247,6 +247,14 @@ Algorithm:
    - `itemOrLearned`: grant if `hasMatchedItem || hasLearned`.
 5. Otherwise deny.
 
+### GM Access-Grant Semantics
+
+The GM grant in step 1 represents *access only* — a GM is unconditionally allowed to see and craft.
+It does NOT assert that the GM actor has learned the recipe or owns a matching recipe item.
+On this bypass path the returned `hasLearned` and `hasMatchedItem` flags are signalling "access is always granted for a GM" rather than the GM actor's real state, and the matched-items collection is empty because no inventory is scanned.
+Callers that need the actor's *actual* owned, matching recipe items — for example selecting an item to consume on learn, or deciding whether to track a limited use on craft — must not rely on the matched-items output of this evaluation for a GM.
+They must collect candidate items directly against the actor's inventory so they react to what the actor really owns.
+
 ## Limited Uses
 
 When `knowledge.item.limitUses === true`:
@@ -272,6 +280,10 @@ When a single matched instance must be mutated (increment or consume), choose:
 - The referenced recipe item definition exists.
 - Recipe is not yet learned for the selected crafting actor.
 - At least one matched, owned recipe item exists.
+
+The "at least one matched, owned recipe item exists" precondition is evaluated against the crafting actor's actual inventory for every viewer, including a GM.
+The learn operation must collect and filter candidate items directly rather than reusing the GM access-grant's matched-items output (which is empty — see GM Access-Grant Semantics).
+A GM who genuinely owns a matching recipe item can therefore learn it, while any viewer who owns none is rejected with the no-matching-item outcome.
 
 ### Learn Operation
 
