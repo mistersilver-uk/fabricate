@@ -55,6 +55,25 @@ async function main() {
   const run = join(__dirname, 'foundry-test-run.mjs');
   const down = join(__dirname, 'foundry-test-down.mjs');
 
+  // Step 0: Build the module so the smoke always exercises CURRENT source.
+  // foundry-setup-data.mjs copies dist/ into the Foundry data dir as the module, so a
+  // missing dist/ fails to activate and — worse — a STALE dist/ silently tests old
+  // code. Building here removes both failure modes. CI builds in its own dedicated
+  // cached step and sets FOUNDRY_SKIP_BUILD=1 to avoid double-building.
+  if (process.env.FOUNDRY_SKIP_BUILD !== '1') {
+    process.stdout.write('=== foundry-test: BUILD ===\n');
+    const buildResult = spawnSync('npm', ['run', 'build'], {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env: process.env,
+      shell: true // npm resolves to npm.cmd on Windows
+    });
+    if ((buildResult.status ?? 1) !== 0) {
+      process.stderr.write('Build failed. Aborting.\n');
+      process.exit(2);
+    }
+  }
+
   // Step 1: Start the environment
   process.stdout.write('=== foundry-test: UP ===\n');
   const upCode = runScript(up);
