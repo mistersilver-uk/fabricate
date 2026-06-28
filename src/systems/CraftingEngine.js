@@ -734,7 +734,22 @@ export class CraftingEngine {
   }
 
   /**
-   * Match submitted item UUIDs against all recipe signatures in the system.
+   * Match submitted items against all recipe signatures in the system.
+   *
+   * Matching is quantity-aware: an ingredient group is satisfied only when one
+   * of its options has its required quantity met. Each submission counts as one
+   * unit toward a group, because the workbench expands a stack into one
+   * submission per unit. Available units are counted by occurrence (how many
+   * submissions match an option's component IDs), NOT by reading each item's
+   * `system.quantity`. This per-unit occurrence model matches how essences are
+   * accumulated and how {@link _consumeSubmittedAlchemyItems} consumes items. It
+   * is deliberately different from {@link IngredientSet#resolveIngredientSelection},
+   * which sums `system.quantity` per item.
+   *
+   * A submission contributes at most one unit per option even if several of the
+   * option's components share its source-reference chain. Essence requirements,
+   * when the system supports essences, must also be met for a set to match.
+   *
    * Returns { matched: true, recipe, ingredientSetId } or { matched: false }.
    * @private
    */
@@ -797,9 +812,12 @@ export class CraftingEngine {
         // Check ingredient groups: a group is satisfied only when one of its
         // options has its required quantity met by the available submissions
         // matching that option's component IDs. Options are alternatives, so any
-        // single satisfied option satisfies the group (mirroring
-        // IngredientSet.resolveIngredientSelection). The signature is computed
-        // 1:1 from `set.ingredientGroups`, so they align by index.
+        // single satisfied option satisfies the group. Only that option-as-
+        // alternative semantics is shared with
+        // IngredientSet.resolveIngredientSelection; the counting differs (that
+        // method sums each item's system.quantity, whereas this counts
+        // submission occurrences per unit). The signature is computed 1:1 from
+        // `set.ingredientGroups`, so they align by index.
         const allGroupsSatisfied = signature.every((groupComponentIds, groupIndex) => {
           const group = set.ingredientGroups?.[groupIndex];
           const groupOptions = Array.isArray(group?.options) ? group.options : [];
