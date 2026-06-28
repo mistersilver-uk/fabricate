@@ -54,7 +54,7 @@ const DEAD_ROOT_FIELDS = [
 function stripDeadCheckFields(check) {
   if (!isPlainObject(check)) return;
   for (const field of DEAD_ROOT_FIELDS) {
-    if (Object.prototype.hasOwnProperty.call(check, field)) {
+    if (Object.hasOwn(check, field)) {
       delete check[field];
     }
   }
@@ -80,7 +80,7 @@ function migrateSystem(system) {
  */
 function stripResultSelectionMacroUuid(selection) {
   if (!isPlainObject(selection)) return;
-  if (Object.prototype.hasOwnProperty.call(selection, 'macroUuid')) {
+  if (Object.hasOwn(selection, 'macroUuid')) {
     delete selection.macroUuid;
   }
 }

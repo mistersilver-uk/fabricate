@@ -62,13 +62,11 @@ async function main() {
   // cached step and sets FOUNDRY_SKIP_BUILD=1 to avoid double-building.
   if (process.env.FOUNDRY_SKIP_BUILD !== '1') {
     process.stdout.write('=== foundry-test: BUILD ===\n');
-    const buildResult = spawnSync('npm', ['run', 'build'], {
-      cwd: ROOT,
-      stdio: 'inherit',
-      env: process.env,
-      shell: true // npm resolves to npm.cmd on Windows
-    });
-    if ((buildResult.status ?? 1) !== 0) {
+    // `npm run build` is `node scripts/release.js --no-zip`. Invoke it through the
+    // existing runScript helper (absolute process.execPath, no shell, no PATH lookup)
+    // rather than spawning a PATH-resolved `npm`.
+    const buildCode = runScript(join(__dirname, 'release.js'), ['--no-zip']);
+    if (buildCode !== 0) {
       process.stderr.write('Build failed. Aborting.\n');
       process.exit(2);
     }
