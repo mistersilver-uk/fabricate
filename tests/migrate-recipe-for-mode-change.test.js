@@ -52,11 +52,18 @@ function multiStep(overrides = {}) {
 }
 
 const SYSTEM_NO_CHECK = { id: 'sys-1', resolutionMode: 'routed' };
+// A system whose check is usable for BOTH provider-routed targets: the routed
+// target keys on `routed.rollFormula`, the alchemy target keys on
+// `simple.rollFormula` (alchemy's check provider routes by the SIMPLE outcome).
 const SYSTEM_WITH_CHECK = {
   id: 'sys-1',
   resolutionMode: 'routed',
   features: { craftingChecks: true },
-  craftingCheck: { enabled: true, routed: { rollFormula: '1d20' } },
+  craftingCheck: {
+    enabled: true,
+    routed: { rollFormula: '1d20' },
+    simple: { rollFormula: '1d20' },
+  },
 };
 
 // --- Matrix cells -----------------------------------------------------------
@@ -234,6 +241,68 @@ test('seeding does not clobber an existing valid provider', () => {
   const recipe = oneByOne({ resultSelection: { provider: 'check' } });
   const result = migrateRecipeForModeChange(recipe, 'progressive', 'routed', SYSTEM_NO_CHECK);
   assert.equal(result.recipe.resultSelection.provider, 'check');
+});
+
+// --- Seed provider keys on the target mode's roll formula, not enabled -------
+
+// A check is usable IFF the TARGET mode's roll formula is authored. The legacy
+// `enabled` / `features.craftingChecks` toggles must not seed `check` when the
+// keyed formula is empty (that would manufacture an avoidable system-level gap).
+
+test('routed target: enabled:true but empty routed.rollFormula seeds ingredientSet', () => {
+  const system = {
+    id: 'sys-1',
+    resolutionMode: 'routed',
+    features: { craftingChecks: true },
+    craftingCheck: { enabled: true, routed: { rollFormula: '' } },
+  };
+  const result = migrateRecipeForModeChange(oneByOne(), 'simple', 'routed', system);
+  assert.equal(result.outcome, 'seeded');
+  assert.equal(result.recipe.resultSelection.provider, 'ingredientSet');
+});
+
+test('routed target: an authored routed.rollFormula seeds check', () => {
+  const system = {
+    id: 'sys-1',
+    resolutionMode: 'routed',
+    craftingCheck: { routed: { rollFormula: '1d20' } },
+  };
+  const result = migrateRecipeForModeChange(oneByOne(), 'simple', 'routed', system);
+  assert.equal(result.recipe.resultSelection.provider, 'check');
+});
+
+test('alchemy target: enabled:true but empty simple.rollFormula seeds ingredientSet', () => {
+  const system = {
+    id: 'sys-1',
+    resolutionMode: 'alchemy',
+    features: { craftingChecks: true },
+    craftingCheck: { enabled: true, simple: { rollFormula: '' } },
+  };
+  const result = migrateRecipeForModeChange(oneByOne(), 'simple', 'alchemy', system);
+  assert.equal(result.outcome, 'seeded');
+  assert.equal(result.recipe.resultSelection.provider, 'ingredientSet');
+});
+
+test('alchemy target: an authored simple.rollFormula seeds check', () => {
+  const system = {
+    id: 'sys-1',
+    resolutionMode: 'alchemy',
+    craftingCheck: { simple: { rollFormula: '1d20' } },
+  };
+  const result = migrateRecipeForModeChange(oneByOne(), 'simple', 'alchemy', system);
+  assert.equal(result.recipe.resultSelection.provider, 'check');
+});
+
+test('alchemy target keys on simple, not routed: a routed-only formula seeds ingredientSet', () => {
+  // alchemy's check provider routes by the SIMPLE check outcome, so a system with
+  // only a routed formula is NOT usable for an alchemy target.
+  const system = {
+    id: 'sys-1',
+    resolutionMode: 'alchemy',
+    craftingCheck: { routed: { rollFormula: '1d20' }, simple: { rollFormula: '' } },
+  };
+  const result = migrateRecipeForModeChange(oneByOne(), 'simple', 'alchemy', system);
+  assert.equal(result.recipe.resultSelection.provider, 'ingredientSet');
 });
 
 // --- classifyModeChange does not mutate -------------------------------------

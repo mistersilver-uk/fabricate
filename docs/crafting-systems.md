@@ -114,7 +114,7 @@ These failures include a missing actor, missing ingredients, missing or unsatisf
 
 ### Crafting Checks
 
-If your system uses Routed mode with a macro-driven outcome, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.
+If your system uses Routed mode with the skill-check outcome option, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.
 See [Crafting Checks]({% link crafting-checks.md %}) for the settings, consumption-on-failure policies, and worked examples.
 
 ### Effect Transfer

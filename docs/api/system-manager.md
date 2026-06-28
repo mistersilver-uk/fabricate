@@ -104,12 +104,12 @@ The returned system object also includes the following top-level salvage fields,
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
-| `enabled` | `boolean` | `false` | Whether the salvage check is active. Automatically `true` when `macroUuid` is set. |
-| `macroUuid` | `string\|null` | `null` | UUID of the check macro |
-| `successMacroUuid` | `string\|null` | `null` | UUID of the macro called on salvage success |
-| `failureMacroUuid` | `string\|null` | `null` | UUID of the macro called on salvage failure |
+| `enabled` | `boolean` | `false` | Whether the optional simple-mode salvage check is active. |
+| `simple` | `object` | see below | Simple pass/fail salvage check (`simple` salvage mode). Usable only when `simple.rollFormula` is set. |
+| `routed` | `object` | see below | Routed salvage check (`routed` salvage mode). Usable only when `routed.rollFormula` is set. |
 | `consumption.consumeComponentOnFail` | `boolean` | `true` | Consume the source component even when the check fails |
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools even when the salvage check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback) |
+| `progressive.rollFormula` | `string` | `""` | Roll formula for the progressive salvage check (`progressive` salvage mode). The check is usable only when this is set. |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"` |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing |
@@ -125,15 +125,13 @@ It controls how skill/ability checks gate recipe outcomes in routed check and pr
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
-| `enabled` | `boolean` | `false` | Whether the crafting check is active. Automatically `true` when `macroUuid` is set or `checkSource` is `"builtIn"`. |
-| `checkSource` | `string` | `"macro"` | How the check is executed. `"macro"` runs the macro at `macroUuid`, while `"builtIn"` uses the game system adapter. See [Crafting Checks]({% link crafting-checks.md %}). |
-| `macroUuid` | `string\|null` | `null` | UUID of the check macro. Only used when `checkSource` is `"macro"`. |
-| `successMacroUuid` | `string\|null` | `null` | UUID of the macro called after a successful crafting step. |
-| `failureMacroUuid` | `string\|null` | `null` | UUID of the macro called after a failed crafting step. |
-| `builtIn.ability` | `string` | `""` | Ability key for the built-in check (e.g. `"int"`, `"wis"`). Used when `checkSource` is `"builtIn"`. |
-| `builtIn.skill` | `string` | `""` | Skill key for the built-in check (e.g. `"arc"`, `"nat"`). Takes precedence over `ability` when set. |
-| `builtIn.dc` | `number` | `15` | Difficulty class for the built-in check. Must be a positive integer, and invalid values fall back to `15`. |
-| `builtIn.advantage` | `string` | `"normal"` | `"advantage"`, `"disadvantage"`, or `"normal"`. |
+| `enabled` | `boolean` | `false` | Whether the optional simple-mode crafting check is active. This toggle gates the simple pass/fail check in `simple` mode only. |
+| `simple.rollFormula` | `string` | `""` | Roll formula for the simple pass/fail check (`simple` and `alchemy` modes). The check is usable only when this is set. |
+| `simple.dc` | `number` | `15` | Static difficulty class for the simple check. Roll total must meet or exceed it (or strictly exceed it when `simple.thresholdMode` is `"exceed"`). |
+| `simple.dcMode` | `string` | `"static"` | `"static"` uses `simple.dc`. `"dynamic"` computes the DC from the macro at `simple.macroUuid`. |
+| `simple.macroUuid` | `string\|null` | `null` | UUID of the dynamic-DC macro, used only when `simple.dcMode` is `"dynamic"`. The macro computes the DC. It never resolves the check outcome. |
+| `routed.rollFormula` | `string` | `""` | Roll formula for the routed check (`routed` mode with the `check` provider). The check is usable only when this is set. |
+| `progressive.rollFormula` | `string` | `""` | Roll formula for the progressive check (`progressive` mode). The check is usable only when this is set. |
 | `consumption.consumeIngredientsOnFail` | `boolean` | `true` | Remove ingredients from inventory when the check fails. |
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools when the crafting check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
@@ -142,7 +140,7 @@ It controls how skill/ability checks gate recipe outcomes in routed check and pr
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-**Example: built-in check on D&D 5e.** Configure a routed system to use an Intelligence (Arcana) check, DC 18, without writing a macro:
+**Example: routed check.** Configure a routed system to roll a check and route the result by outcome name:
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
@@ -150,12 +148,9 @@ Hooks.once('fabricate.ready', async () => {
   await mgr.updateSystem('alchemy-system-id', {
     resolutionMode: 'routed',
     craftingCheck: {
-      checkSource: 'builtIn',
-      builtIn: {
-        ability: 'int',
-        skill: 'arc',
-        dc: 18,
-        advantage: 'normal'
+      routed: {
+        rollFormula: '1d20 + @abilities.int.mod',
+        dc: 18
       },
       outcomes: ['fail', 'pass']
     }
@@ -163,15 +158,18 @@ Hooks.once('fabricate.ready', async () => {
 });
 ```
 
-**Example: macro-based check (existing behaviour).** If you already have a check macro and want to keep using it, no changes are needed.
-`checkSource` defaults to `"macro"`:
+**Example: optional simple check.** Enable an optional pass/fail check in simple mode by setting a roll formula and turning the check on:
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
   const mgr = game.fabricate.getCraftingSystemManager();
   await mgr.updateSystem('alchemy-system-id', {
     craftingCheck: {
-      macroUuid: 'Macro.my-alchemy-check-uuid'
+      enabled: true,
+      simple: {
+        rollFormula: '1d20 + @abilities.int.mod',
+        dc: 15
+      }
     }
   });
 });
@@ -210,7 +208,10 @@ Hooks.once('fabricate.ready', async () => {
     features: { salvage: true },
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
-      macroUuid: 'Macro.salvage-check-uuid',
+      routed: {
+        rollFormula: '1d20 + @abilities.int.mod',
+        dc: 18
+      },
       consumption: {
         consumeComponentOnFail: true,
         breakToolsOnFail: false
@@ -456,15 +457,9 @@ You do not call them directly, but understanding them helps when inspecting or m
 ### _normalizeCraftingCheck(check)
 
 Normalises the `craftingCheck` object on a crafting system.
-Applies defaults for all fields including `checkSource` (defaults to `"macro"`), `builtIn` (via `_normalizeBuiltInCheck`), `consumption`, `progressive`, and `outcomes`.
-`enabled` is automatically set to `true` when `macroUuid` is provided or `checkSource` is `"builtIn"`.
-
-### _normalizeBuiltInCheck(config)
-
-Normalises the `craftingCheck.builtIn` sub-object.
-Coerces `ability` and `skill` to lowercase trimmed strings.
-Validates `dc` as a positive finite integer (defaults to `15`).
-Validates `advantage` against the enum `["advantage", "disadvantage", "normal"]` (defaults to `"normal"`).
+Applies defaults for all fields including `enabled`, `consumption`, `outcomes`, and the per-mode `simple`, `routed`, and `progressive` sub-objects (each with its own `rollFormula`).
+`enabled` is the on/off toggle for the optional simple-mode check.
+A check becomes usable only when its resolution-mode sub-object carries an authored `rollFormula`.
 
 ### _normalizeSalvage(salvage)
 

@@ -186,9 +186,6 @@ function buildSystem({ id = 'sys-1', resolutionMode = 'simple', craftingCheck = 
     features: { multiStepRecipes: true, craftingChecks: !!craftingCheck?.enabled, essences: false },
     craftingCheck: craftingCheck || {
       enabled: false,
-      macroUuid: null,
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: [],
       progressive: null,
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
@@ -206,8 +203,6 @@ function buildSystem({ id = 'sys-1', resolutionMode = 'simple', craftingCheck = 
  */
 function stubEngine(engine, checkResult, createdItem = null) {
   engine._runCraftingCheck = async () => checkResult;
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   if (createdItem !== null) {
     engine._createSingleResult = async () => createdItem;
   }
@@ -306,8 +301,6 @@ test('unknown resolution mode: craft fails instead of creating all result groups
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   let createSingleResultCalled = false;
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async () => {
     createSingleResultCalled = true;
     return new FakeItem('unexpected', 'Unexpected');
@@ -382,6 +375,77 @@ test('_createSingleResult uses deterministic loot fallback type when managed sou
   }
 });
 
+test('misconfigured required check: craft aborts with ZERO mutation (no consume/spend/break)', async () => {
+  // A routed+check system whose required check has no authored roll formula is a
+  // GM-side misconfiguration, not a rolled failure. The craft must abort before any
+  // consumption even though the failure policy WOULD otherwise consume ingredients.
+  const system = buildSystem({
+    id: 'sys-misconfig',
+    resolutionMode: 'routed',
+    craftingCheck: {
+      enabled: true,
+      outcomes: [],
+      progressive: null,
+      // Policy would consume ingredients + break tools on a genuine failure.
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
+    },
+  });
+  setupGame(system);
+
+  const wood = new FakeItem('wood-mc', 'Wood', 2);
+  const ingredientSet = buildIngredientSet('set-mc', [{ componentId: 'wood-mc', quantity: 1 }]);
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-misconfig',
+    resultSelection: { provider: 'check' },
+    ingredientSets: [ingredientSet],
+    resultGroups: [{ id: 'rg-mc', name: 'pass', results: [] }],
+  });
+
+  const sourceActor = new FakeActor('Crafter', [wood]);
+  const craftingActor = new FakeActor('Crafter');
+
+  const recipeManager = buildMockRecipeManager(true);
+  const resolutionService = buildResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, null, resolutionService);
+
+  // The real required-check guard returns this shape; assert craft honours the flag.
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    misconfigured: true,
+    outcome: null,
+    value: null,
+    data: {},
+    message: 'routed mode requires a configured crafting check roll formula',
+  });
+
+  let consumeCalled = false;
+  let spendCalled = false;
+  let breakCalled = false;
+  engine._consumeIngredients = async () => {
+    consumeCalled = true;
+    return [];
+  };
+  engine._spendCraftCurrency = async () => {
+    spendCalled = true;
+  };
+  engine._applyToolBreakage = async () => {
+    breakCalled = true;
+    return [];
+  };
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'a misconfigured required check fails the craft');
+  assert.equal(result.results, null, 'no results on a misconfigured abort');
+  assert.match(result.message, /requires a configured crafting check roll formula/);
+  assert.equal(consumeCalled, false, 'ingredients must NOT be consumed on a misconfiguration');
+  assert.equal(spendCalled, false, 'currency must NOT be spent on a misconfiguration');
+  assert.equal(breakCalled, false, 'tools must NOT be broken on a misconfiguration');
+  assert.equal(wood._updates.length, 0, 'source item is untouched');
+  assert.equal(wood.system.quantity, 2, 'source quantity is unchanged');
+  assert.equal(craftingActor._createdDocs.length, 0, 'no result items are created');
+});
+
 // ===========================================================================
 // Group 2: Multistep mode integration (AC2)
 // ===========================================================================
@@ -440,8 +504,6 @@ test('multistep: start run, advance through 2 steps, complete', async () => {
   const resultItem2 = new FakeItem('ingot-1', 'Ingot', 1);
   let callCount = 0;
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async () => {
     callCount++;
     return callCount === 1 ? resultItem1 : resultItem2;
@@ -511,8 +573,6 @@ test('multistep: step failure records failure and stops run', async () => {
 
   // Crafting check fails on first step
   engine._runCraftingCheck = async () => ({ success: false, message: 'Check failed: roll too low', outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async () => null;
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -545,9 +605,6 @@ function buildLegacyOutcomeRoutingFixture() {
     resolutionMode: 'routed',
     craftingCheck: {
       enabled: true,
-      macroUuid: 'macro:check',
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: ['pass', 'fail'],
       progressive: null,
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
@@ -592,8 +649,6 @@ test("routed check: 'pass' outcome routes craft to the pass-named result group",
   const failPotion = new FakeItem('weak-potion-1', 'Weak Potion', 1);
 
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'pass', value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async (_actor, result) => {
     // Return item matching the result componentId
     if (result.componentId === 'good-potion') return passPotion;
@@ -629,8 +684,6 @@ test("routed check: reserved 'fail' outcome takes the failure path (no group awa
   const failPotion = new FakeItem('weak-potion-2', 'Weak Potion', 1);
 
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'fail', value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async (_actor, result) => {
     if (result.componentId === 'good-potion') return passPotion;
     if (result.componentId === 'weak-potion') return failPotion;
@@ -655,11 +708,8 @@ function buildProgressiveFixture() {
     resolutionMode: 'progressive',
     craftingCheck: {
       enabled: true,
-      macroUuid: 'macro:check',
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
+      progressive: { awardMode: 'equal', rollFormula: '1d20' },
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
@@ -707,8 +757,6 @@ test('progressive mode: check value 7 awards comp-a (cost 2) and comp-b (cost 3)
   const itemC = new FakeItem('result-c', 'Item C', 1);
 
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 7, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async (_actor, result) => {
     if (result.componentId === 'comp-a') return itemA;
     if (result.componentId === 'comp-b') return itemB;
@@ -742,8 +790,6 @@ test('progressive mode: zero check value awards nothing', async () => {
 
   let createCalled = 0;
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 0, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
   engine._createSingleResult = async () => { createCalled++; return new FakeItem(`prog-result-${createCalled}`, 'Result', 1); };
 
   const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});

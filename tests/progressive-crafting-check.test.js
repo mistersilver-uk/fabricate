@@ -1,8 +1,8 @@
 // Engine integration tests for the progressive crafting check
 // (CraftingEngine._runProgressiveCheck via _runCraftingCheck dispatch): the roll
 // total becomes the numeric `value` progressive result-awarding spends, per-die
-// crits force award-all/award-none, and a formula-less progressive check still
-// defers to the legacy macro path.
+// crits force award-all/award-none, and a formula-less progressive check fails
+// loudly (the legacy macro check source is gone).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -12,7 +12,6 @@ globalThis.foundry = globalThis.foundry || {
 globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
-const { MacroExecutor } = await import('../src/utils/MacroExecutor.js');
 
 function defaultProgressive(overrides = {}) {
   return {
@@ -169,36 +168,15 @@ test('a roll that throws fails the check with a message', async () => {
   assert.match(result.message, /roll failed/i);
 });
 
-// ── Formula-less progressive defers to the legacy macro path ─────────────────
+// ── Formula-less progressive fails loudly (no legacy macro path) ─────────────
 
-test('a formula-less progressive check defers to the configured macro', async () => {
+test('a formula-less progressive check fails loudly (requires a roll formula)', async () => {
   const { engine } = makeEngine({
     progressive: defaultProgressive({ rollFormula: '' }),
-    craftingCheck: { checkSource: 'macro', macroUuid: 'Macro.legacy' },
-  });
-  const orig = MacroExecutor.run;
-  let macroCalled = false;
-  MacroExecutor.run = async () => {
-    macroCalled = true;
-    return { outcome: null, value: 5 };
-  };
-  try {
-    const result = await run(engine);
-    assert.equal(macroCalled, true, 'the legacy macro ran, not the progressive check');
-    assert.equal(result.value, 5, 'the macro value is surfaced');
-  } finally {
-    MacroExecutor.run = orig;
-  }
-});
-
-test('a formula-less progressive check with no macro requires one (fails)', async () => {
-  const { engine } = makeEngine({
-    progressive: defaultProgressive({ rollFormula: '' }),
-    craftingCheck: { checkSource: 'macro', macroUuid: null },
   });
   const result = await run(engine);
-  assert.equal(result.success, false, 'progressive mode requires a check when no formula is set');
-  assert.match(result.message, /requires a crafting check macro/i);
+  assert.equal(result.success, false, 'progressive mode requires a configured roll formula');
+  assert.match(result.message, /requires a configured crafting check roll formula/i);
 });
 
 // ── checkBreakage / value-vs-total distinction (issue 419) ───────────────────

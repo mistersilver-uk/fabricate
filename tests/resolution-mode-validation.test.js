@@ -14,7 +14,8 @@ const { ResolutionModeService } = await import('../src/systems/ResolutionModeSer
 
 /**
  * Build a mock crafting system config.
- * checkEnabled is true when craftingCheck.enabled === true OR macroUuid is non-empty.
+ * A crafting check is "usable" only when its mode carries an authored roll formula
+ * (e.g. `craftingCheck.progressive.rollFormula`); `enabled` is just the on/off toggle.
  */
 function buildSystem(overrides = {}) {
   return {
@@ -23,7 +24,6 @@ function buildSystem(overrides = {}) {
     features: { multiStepRecipes: false, essences: false, craftingChecks: false },
     craftingCheck: {
       enabled: false,
-      macroUuid: null,
       outcomes: [],
       progressive: null,
     },
@@ -279,7 +279,6 @@ function buildRoutedCheckSystem(overrides = {}) {
     resolutionMode: 'routed',
     craftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: ['success', 'failure'],
       progressive: null,
     },
@@ -341,7 +340,7 @@ for (const requireComplete of [true, false]) {
   test(`routed check — valid WITHOUT a system routed formula (requireComplete: ${requireComplete})`, () => {
     const system = buildSystem({
       resolutionMode: 'routed',
-      craftingCheck: { enabled: false, macroUuid: null, outcomes: [], routed: { rollFormula: '' } },
+      craftingCheck: { enabled: false, outcomes: [], routed: { rollFormula: '' } },
     });
     const service = buildService(system);
     const recipe = buildRecipe([buildRoutedNamedStep('check')]);
@@ -427,11 +426,13 @@ for (const provider of ['ingredientSet', 'check']) {
 }
 
 // ---------------------------------------------------------------------------
-// AC 4 — Progressive mode: checks enabled, progressive config, difficulty >= 1
+// AC 4 — Progressive mode: an authored progressive roll formula, progressive
+// config, difficulty >= 1
 // ---------------------------------------------------------------------------
 
 /**
- * Build a system with progressive mode fully configured.
+ * Build a system with progressive mode fully configured. A progressive check is
+ * "usable" only when it carries an authored `progressive.rollFormula`.
  * @param {object[]} components - items with id and difficulty fields
  * @param {object} overrides
  */
@@ -440,9 +441,8 @@ function buildProgressiveSystem(components = [], overrides = {}) {
     resolutionMode: 'progressive',
     craftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
+      progressive: { awardMode: 'equal', rollFormula: '1d20' },
     },
     components,
     ...overrides,
@@ -460,7 +460,7 @@ function buildProgressiveStep(results = [], overrides = {}) {
   });
 }
 
-test('progressive mode — checks enabled, progressive config, difficulty >= 1 → valid', () => {
+test('progressive mode — authored progressive formula, progressive config, difficulty >= 1 → valid', () => {
   const system = buildProgressiveSystem([{ id: 'item-potion', difficulty: 3 }]);
   const service = buildService(system);
   const step = buildProgressiveStep([{ id: 'result-1', componentId: 'item-potion' }]);
@@ -472,13 +472,12 @@ test('progressive mode — checks enabled, progressive config, difficulty >= 1 �
   assert.equal(result.errors.length, 0);
 });
 
-test('progressive mode — crafting checks disabled → invalid', () => {
+test('progressive mode — no progressive roll formula → invalid', () => {
   const system = buildProgressiveSystem([], {
     craftingCheck: {
-      enabled: false,
-      macroUuid: null,
+      enabled: true,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
+      progressive: { awardMode: 'equal', rollFormula: '' },
     },
   });
   const service = buildService(system);
@@ -489,10 +488,8 @@ test('progressive mode — crafting checks disabled → invalid', () => {
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some(
-      (e) => /progressive.*check|check.*progressive|crafting check/i.test(e) || /check/i.test(e)
-    ),
-    `expected error about checks being disabled, got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /progressive.*roll formula|roll formula.*progressive/i.test(e)),
+    `expected error about the missing progressive roll formula, got: ${JSON.stringify(result.errors)}`
   );
 });
 
@@ -500,7 +497,6 @@ test('progressive mode — missing progressive config → invalid', () => {
   const system = buildProgressiveSystem([], {
     craftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: [],
       progressive: null, // missing config
     },
@@ -516,6 +512,28 @@ test('progressive mode — missing progressive config → invalid', () => {
     result.errors.some((e) => /progressive/i.test(e)),
     `expected error mentioning progressive config, got: ${JSON.stringify(result.errors)}`
   );
+});
+
+test('progressive mode — draft (requireComplete: false) with no progressive formula → valid', () => {
+  // Drafting a recipe in a progressive system that has not yet authored its progressive
+  // roll formula must succeed: that gap is a SYSTEM-level concern (systemValidation's
+  // `progressiveNoCheck`), not a per-recipe drafting error. It is still enforced when a
+  // complete recipe is required (see the two strict-mode tests above).
+  const system = buildProgressiveSystem([], {
+    craftingCheck: {
+      enabled: false,
+      outcomes: [],
+      progressive: null,
+    },
+  });
+  const service = buildService(system);
+  const step = buildProgressiveStep([]);
+  const recipe = buildRecipe([step]);
+
+  const result = service.validateRecipe(recipe, { requireComplete: false });
+
+  assert.equal(result.valid, true, `expected draft to be valid, got: ${JSON.stringify(result.errors)}`);
+  assert.equal(result.errors.length, 0);
 });
 
 // Validate a progressive recipe whose single result references one component with
@@ -668,9 +686,8 @@ test('progressive mode — _getDifficulty reads difficulty from system.component
     resolutionMode: 'progressive',
     craftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
+      progressive: { awardMode: 'equal', rollFormula: '1d20' },
     },
     components: [{ id: 'item-sword', difficulty: 4 }],
   });

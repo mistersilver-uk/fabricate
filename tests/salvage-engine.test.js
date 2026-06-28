@@ -445,6 +445,66 @@ test('salvage() does not consume component on failure when consumeComponentOnFai
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be deleted when consumeComponentOnFail=false');
 });
 
+test('misconfigured required salvage check: salvage aborts with ZERO mutation (no consume/break)', async () => {
+  // routed salvage with no authored roll formula is a GM-side misconfiguration. The
+  // real _runSalvageCraftingCheck flags it `misconfigured`, and salvage() must abort
+  // before any consumption even though the policy WOULD consume + break on a failure.
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [], meta: {} }),
+  };
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService });
+
+  const compItem = makeItem('comp-item', 'Test Component', 1);
+  const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
+  const actor = makeActor('actor-1', [compItem, toolItem]);
+
+  const tool = makeFakeTool('acid-vial');
+  tool.used = false;
+  engine._applyToolBreakage = async () => {
+    tool.used = true;
+    return [];
+  };
+  let consumeCalled = false;
+  engine._consumeComponentItems = async (...args) => {
+    consumeCalled = true;
+    // Defer to nothing — but flag the (unexpected) call.
+    return args.length ? [] : [];
+  };
+
+  const component = makeComponent({
+    name: 'Test Component',
+    toolIds: [tool.id],
+    resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }],
+  });
+  const system = makeSystem({
+    salvageResolutionMode: 'routed',
+    components: [component],
+    tools: [tool],
+    salvageCraftingCheck: {
+      enabled: true,
+      // No authored routed roll formula → required-check misconfiguration.
+      routed: { rollFormula: '' },
+      outcomes: [],
+      progressive: null,
+      // Policy would consume the component AND break tools on a genuine failure.
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true },
+    },
+  });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, false, 'a misconfigured required salvage check fails');
+  assert.equal(result.results, null, 'no results on a misconfigured abort');
+  assert.match(result.message, /requires a configured salvage check roll formula/);
+  assert.equal(consumeCalled, false, 'the component must NOT be consumed on a misconfiguration');
+  assert.equal(compItem.deleteCalled, false, 'source component item is untouched');
+  assert.equal(compItem.updateCalled, false, 'source component quantity is unchanged');
+  assert.equal(tool.used, false, 'tools must NOT be broken on a misconfiguration');
+  assert.equal(actor.createdItems.length, 0, 'no result items are created');
+});
+
 // ---------------------------------------------------------------------------
 // Group 5: Success path
 // ---------------------------------------------------------------------------

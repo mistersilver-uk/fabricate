@@ -312,17 +312,9 @@ export class CraftingSystemManager {
       )
       .filter(Boolean);
 
-    const checkSource = check?.checkSource === 'builtIn' ? 'builtIn' : 'macro';
-    const builtIn = this._normalizeBuiltInCheck(check?.builtIn);
-
     return {
-      enabled: check?.enabled === true || !!check?.macroUuid || checkSource === 'builtIn',
+      enabled: check?.enabled === true,
       mode,
-      macroUuid: check?.macroUuid || null,
-      successMacroUuid: check?.successMacroUuid || null,
-      failureMacroUuid: check?.failureMacroUuid || null,
-      checkSource,
-      builtIn,
       consumption: {
         consumeIngredientsOnFail: check?.consumption?.consumeIngredientsOnFail !== false,
         // Canonical key is `breakToolsOnFail` (1.7.0 rename of the legacy
@@ -660,22 +652,6 @@ export class CraftingSystemManager {
     return null;
   }
 
-  _normalizeBuiltInCheck(config = {}) {
-    const dc = Number(config?.dc);
-    return {
-      ability: String(config?.ability || '')
-        .trim()
-        .toLowerCase(),
-      skill: String(config?.skill || '')
-        .trim()
-        .toLowerCase(),
-      dc: Number.isFinite(dc) && dc >= 1 ? Math.floor(dc) : 15,
-      advantage: ['advantage', 'disadvantage', 'normal'].includes(config?.advantage)
-        ? config.advantage
-        : 'normal',
-    };
-  }
-
   _normalizeSalvageCraftingCheck(check = {}) {
     const normalizedCheck = !check || typeof check !== 'object' ? {} : check;
     const outcomes = Array.isArray(normalizedCheck.outcomes) ? normalizedCheck.outcomes : [];
@@ -688,10 +664,7 @@ export class CraftingSystemManager {
       .filter(Boolean);
 
     return {
-      enabled: normalizedCheck.enabled === true || !!normalizedCheck.macroUuid,
-      macroUuid: normalizedCheck.macroUuid || null,
-      successMacroUuid: normalizedCheck.successMacroUuid || null,
-      failureMacroUuid: normalizedCheck.failureMacroUuid || null,
+      enabled: normalizedCheck.enabled === true,
       consumption: {
         consumeComponentOnFail: normalizedCheck.consumption?.consumeComponentOnFail !== false,
         // Canonical key is `breakToolsOnFail` (1.7.0 rename); read new-then-legacy so

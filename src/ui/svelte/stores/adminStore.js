@@ -1824,7 +1824,6 @@ function _buildSelectedSystemViewData(
     craftingCheck: {
       enabled: selectedSystem.craftingCheck?.enabled === true,
       mode: selectedSystem.craftingCheck?.mode || 'passFail',
-      macroUuid: selectedSystem.craftingCheck?.macroUuid || '',
       outcomesText: Array.isArray(selectedSystem.craftingCheck?.outcomes)
         ? selectedSystem.craftingCheck.outcomes.join(', ')
         : '',
@@ -6319,39 +6318,6 @@ export function createAdminStore(services) {
 
   // --- Config save actions ---
 
-  async function saveCraftingCheckConfig(configOrMode, macroUuid, outcomesText) {
-    const systemManager = services.getCraftingSystemManager();
-    const sysId = get(selectedSystemId);
-    if (!sysId) return;
-    const system = systemManager.getSystem(sysId);
-    if (!system) return;
-
-    const existing = system.craftingCheck || {};
-    const normalizedConfig =
-      typeof configOrMode === 'object' && configOrMode !== null
-        ? configOrMode
-        : {
-            mode: configOrMode,
-            macroUuid,
-            outcomesText,
-          };
-    const mode = normalizedConfig.mode === 'namedOutcomes' ? 'namedOutcomes' : 'passFail';
-    const resolvedMacroUuid = normalizedConfig.macroUuid || null;
-    const outcomes = String(normalizedConfig.outcomesText || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    await systemManager.updateSystem(sysId, {
-      craftingCheck: {
-        ...existing,
-        mode,
-        macroUuid: resolvedMacroUuid,
-        outcomes,
-      },
-    });
-    await refresh();
-  }
-
   // Persist the structured routed crafting check (type + roll expression +
   // outcome tiers) authored in the Checks editor, preserving the rest of the
   // craftingCheck config. The manager normalizes the routed payload on write.
@@ -7224,7 +7190,6 @@ export function createAdminStore(services) {
     addGatheringEventCharacterModifier,
     updateGatheringEventCharacterModifier,
     deleteGatheringEventCharacterModifier,
-    saveCraftingCheckConfig,
     saveCraftingCheckRouted,
     saveCraftingCheckSimple,
     saveCraftingCheckProgressive,

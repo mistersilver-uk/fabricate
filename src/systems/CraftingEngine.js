@@ -11,7 +11,6 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
-import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
@@ -308,6 +307,17 @@ export class CraftingEngine {
       ingredientSet,
       step
     );
+    // A misconfigured required check (no authored roll formula for the active mode)
+    // is a GM-side system gap, not a rolled failure: abort with ZERO mutation so the
+    // player's ingredients/currency/tools are never consumed or broken. The
+    // failure-consumption policy below applies only to genuine rolled failures.
+    if (checkResult.misconfigured) {
+      return {
+        success: false,
+        results: null,
+        message: checkResult.message,
+      };
+    }
     if (!checkResult.success) {
       const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
       let consumedOnFail = [];
@@ -324,10 +334,11 @@ export class CraftingEngine {
           usedToolPairs = toolValidation.tools;
           // The single shared `evaluateCheckBreakage` seam decides forced breakage
           // on the check-failure path too (gated by `breakToolsOnFail`, as
-          // today). Under `toolSpecific` the legacy crit/tier `data.breakTools`
-          // force-break applies; under `checkDriven` the active check's
-          // `checkBreakage` triggers decide. A macro/builtIn check never force-breaks
-          // (the `engineEvaluated` guard lives inside the seam).
+          // today). Under `toolSpecific` an engine-evaluated crit/tier
+          // `data.breakTools` force-break applies; under `checkDriven` the active
+          // check's `checkBreakage` triggers decide. The no-check passthrough
+          // result is not engine-evaluated, so it never force-breaks (the
+          // `engineEvaluated` guard lives inside the seam).
           const breakDecision = this._resolveCraftingBreakageDecision(
             this._getRecipeSystem(executionRecipe),
             executionRecipe,
@@ -366,23 +377,6 @@ export class CraftingEngine {
             usedTools: usedToolsOnFail,
           }
         );
-      }
-      // Execute failure macro (spec 002 Failure Macro Contract)
-      {
-        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
-        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
-        await this._runFailureMacro(recipe, {
-          recipe: recipe?.toJSON?.() || recipe,
-          craftingSystem: _craftingSystem,
-          craftingActor,
-          componentSourceActors,
-          step,
-          selectedIngredientSet: ingredientSet,
-          failureReason: checkResult.message || 'Crafting check failed',
-          checkResult,
-          consumedIngredients: consumedOnFail,
-          consumedTools: usedToolPairs,
-        });
       }
       await this._postCraftChatMessage({
         success: false,
@@ -455,23 +449,6 @@ export class CraftingEngine {
           usedTools: usedToolsOnValidationFail,
         });
       }
-      // Execute failure macro (spec 002 Failure Macro Contract)
-      {
-        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
-        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
-        await this._runFailureMacro(recipe, {
-          recipe: recipe?.toJSON?.() || recipe,
-          craftingSystem: _craftingSystem,
-          craftingActor,
-          componentSourceActors,
-          step,
-          selectedIngredientSet: ingredientSet,
-          failureReason: message,
-          checkResult,
-          consumedIngredients: consumedOnValidationFail,
-          consumedTools: usedToolPairsOnValidationFail,
-        });
-      }
       await this._postCraftChatMessage({
         success: false,
         craftingActor,
@@ -519,8 +496,9 @@ export class CraftingEngine {
 
     // Apply tool usage/breakage for the recipe's resolved library Tools via the
     // single shared `evaluateCheckBreakage` seam. Under `toolSpecific` an
-    // engine-evaluated crit/tier `breakTools` forces every matched tool to break (a
-    // macro/builtIn `data.breakTools` does not); under `checkDriven` the active
+    // engine-evaluated crit/tier `breakTools` forces every matched tool to break (the
+    // no-check passthrough result is not engine-evaluated, so it does not); under
+    // `checkDriven` the active
     // check's `checkBreakage` triggers decide whether all required non-immune tools
     // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
     // gate exists here).
@@ -575,22 +553,6 @@ export class CraftingEngine {
           usedTools,
         });
       }
-      {
-        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
-        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
-        await this._runFailureMacro(recipe, {
-          recipe: recipe?.toJSON?.() || recipe,
-          craftingSystem: _craftingSystem,
-          craftingActor,
-          componentSourceActors,
-          step,
-          selectedIngredientSet: ingredientSet,
-          failureReason: message,
-          checkResult,
-          consumedIngredients: consumedItems,
-          consumedTools: toolValidation.tools,
-        });
-      }
       await this._postCraftChatMessage({
         success: false,
         craftingActor,
@@ -628,24 +590,6 @@ export class CraftingEngine {
           itemUuid: item.uuid,
           quantity: Number(item.system?.quantity || 1),
         })),
-      });
-    }
-
-    // Execute success macro (spec 002 Success Macro Contract)
-    {
-      const _systemManager = game.fabricate?.getCraftingSystemManager?.();
-      const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
-      await this._runSuccessMacro(recipe, {
-        recipe: recipe?.toJSON?.() || recipe,
-        craftingSystem: _craftingSystem,
-        craftingActor,
-        componentSourceActors,
-        step,
-        selectedIngredientSet: ingredientSet,
-        consumedIngredients: consumedItems,
-        consumedTools: toolValidation.tools,
-        createdResults: resultItems || [],
-        checkResult,
       });
     }
 
@@ -1402,38 +1346,6 @@ export class CraftingEngine {
     };
   }
 
-  _getSuccessFailureMacroUuids(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) return { successMacroUuid: null, failureMacroUuid: null };
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(systemId);
-    if (!system) return { successMacroUuid: null, failureMacroUuid: null };
-    return {
-      successMacroUuid: system.craftingCheck?.successMacroUuid || null,
-      failureMacroUuid: system.craftingCheck?.failureMacroUuid || null,
-    };
-  }
-
-  async _runSuccessMacro(recipe, context) {
-    const { successMacroUuid } = this._getSuccessFailureMacroUuids(recipe);
-    if (!successMacroUuid) return;
-    try {
-      await MacroExecutor.run(successMacroUuid, context);
-    } catch (error) {
-      console.error(`Fabricate | Success macro failed (${successMacroUuid}):`, error);
-    }
-  }
-
-  async _runFailureMacro(recipe, context) {
-    const { failureMacroUuid } = this._getSuccessFailureMacroUuids(recipe);
-    if (!failureMacroUuid) return;
-    try {
-      await MacroExecutor.run(failureMacroUuid, context);
-    } catch (error) {
-      console.error(`Fabricate | Failure macro failed (${failureMacroUuid}):`, error);
-    }
-  }
-
   /**
    * Check Item Piles currency cost on a recipe, if the integration is enabled.
    * @private
@@ -1537,11 +1449,9 @@ export class CraftingEngine {
     // when a roll formula is configured. Optional in simple mode (honours the
     // enabled toggle) and always-on in alchemy mode, where the check is required.
     const simpleConfig = system?.craftingCheck?.simple;
-    // An EMPTY `simple.rollFormula` intentionally defers to the legacy
-    // checkSource path below (macro / builtIn): the simple pass/fail check only
-    // takes precedence when a roll formula is actually configured. With no
-    // formula, `useSimpleCheck` is false so a configured macro/builtIn check
-    // still runs.
+    // With an EMPTY `simple.rollFormula` the simple pass/fail check is not usable,
+    // so `useSimpleCheck` is false and (in optional simple mode) the attempt
+    // proceeds with no check.
     const useSimpleCheck =
       ['simple', 'alchemy'].includes(mode) &&
       !!simpleConfig?.rollFormula &&
@@ -1549,16 +1459,15 @@ export class CraftingEngine {
 
     // Progressive check (Checks editor) for progressive mode: rolls a formula
     // whose total becomes the numeric `value` the progressive result-awarding
-    // spends against result difficulties. Only takes over when a formula is
-    // configured; with no formula the legacy macro/builtIn path below still runs
-    // (so a macro-driven progressive system is unchanged).
+    // spends against result difficulties. Usable only when a roll formula is
+    // configured; with no formula the required-check guard below fails the attempt.
     const progressiveConfig = system?.craftingCheck?.progressive;
     const useProgressiveCheck = mode === 'progressive' && !!progressiveConfig?.rollFormula;
 
     // Routed check (Checks editor) for routed mode: rolls the routed formula and
     // maps the total to an outcome tier whose NAME drives the routed `check`-provider
-    // routing. Only takes over when a routed formula is configured; with no formula
-    // the legacy macro/builtIn routed path below still runs unchanged.
+    // routing. Usable only when a routed formula is configured; with no formula a
+    // routed + check-provider attempt fails via the required-check guard below.
     const routedConfig = system?.craftingCheck?.routed;
     const useRoutedCheck = mode === 'routed' && !!routedConfig?.rollFormula;
 
@@ -1584,132 +1493,22 @@ export class CraftingEngine {
       return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor);
     }
 
-    const config = system.craftingCheck || {};
-    const checkSource = config.checkSource || 'macro';
-
-    if (checkSource === 'builtIn') {
-      const gameSystemId = typeof game === 'undefined' ? null : game.system?.id;
-      const adapter = CraftingCheckAdapterRegistry.get(gameSystemId);
-      if (!adapter) {
-        return {
-          success: false,
-          outcome: null,
-          value: null,
-          data: {},
-          message:
-            'No system adapter available for built-in checks. Switch to macro mode or install a compatible game system.',
-        };
-      }
-      let adapterResult;
-      try {
-        adapterResult = await adapter.executeCheck(craftingActor, config.builtIn || {});
-      } catch (error) {
-        console.error('Fabricate | Built-in crafting check failed', error);
-        return {
-          success: false,
-          outcome: null,
-          value: null,
-          data: {},
-          message: `Built-in crafting check failed: ${error.message}`,
-        };
-      }
-      const success = adapterResult.success !== false;
-      return {
-        success,
-        outcome: adapterResult.outcome ?? null,
-        value: adapterResult.value ?? null,
-        data: adapterResult.data || {},
-        message: success ? null : adapterResult.message || 'Built-in crafting check failed',
-      };
-    }
-
-    if (!config.macroUuid) {
-      if (checkRequired) {
-        return {
-          success: false,
-          outcome: null,
-          value: null,
-          data: {},
-          message: `${mode} mode requires a crafting check macro`,
-        };
-      }
-      return { success: true, outcome: null, value: null, data: {} };
-    }
-
-    const ingredientPool = componentSourceActors.flatMap((actor) =>
-      [...actor.items].map((item) => ({
-        actorId: actor.id,
-        actorName: actor.name,
-        item,
-      }))
-    );
-    const resolvedEssences = this._accumulateEssencesFromItems(
-      ingredientPool.map((entry) => entry.item),
-      recipe
-    );
-
-    let result;
-    try {
-      result = await MacroExecutor.run(config.macroUuid, {
-        recipe: recipe?.toJSON?.() || recipe,
-        craftingSystem: system,
-        craftingActor,
-        componentSourceActors,
-        ingredientPool,
-        candidateIngredientSet: ingredientSet,
-        resolvedEssences,
-        step,
-      });
-    } catch (error) {
-      console.error(`Fabricate | Crafting check macro failed (${config.macroUuid})`, error);
+    // No usable roll-formula check path applied. A check is only "usable" when its
+    // resolution mode has an authored roll formula (handled above). When a check is
+    // REQUIRED (progressive, or routed + check provider) but no roll formula is
+    // configured, fail loudly so the misconfiguration is visible; otherwise this is
+    // an optional check with nothing to run, so treat it as a no-op success.
+    if (checkRequired) {
       return {
         success: false,
+        misconfigured: true,
         outcome: null,
         value: null,
         data: {},
-        message: `Crafting check macro failed: ${error.message || config.macroUuid}`,
+        message: `${mode} mode requires a configured crafting check roll formula`,
       };
     }
-
-    if (!result || typeof result !== 'object') {
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: {},
-        message: 'Crafting check macro must return an object',
-      };
-    }
-
-    const outcome = result.outcome == null ? null : String(result.outcome);
-    const value = Number.isFinite(Number(result.value)) ? Number(result.value) : null;
-    const allowed = Array.isArray(config.outcomes) ? config.outcomes : [];
-    const normalizedOutcome = outcome?.trim().toLowerCase();
-    const normalizedAllowed = allowed
-      .map((entry) =>
-        String(entry || '')
-          .trim()
-          .toLowerCase()
-      )
-      .filter(Boolean);
-    if (outcome && normalizedAllowed.length > 0 && !normalizedAllowed.includes(normalizedOutcome)) {
-      return {
-        success: false,
-        outcome,
-        value,
-        data: result.data || {},
-        message: `Crafting check returned invalid outcome "${outcome}"`,
-      };
-    }
-
-    const success = result.success !== false;
-    return {
-      success,
-      outcome,
-      value,
-      data: result.data || {},
-      message: success ? null : result.message || 'Crafting check failed',
-    };
+    return { success: true, outcome: null, value: null, data: {} };
   }
 
   /**
@@ -1754,9 +1553,9 @@ export class CraftingEngine {
    * tiers each threshold shifts by `dc + outcome.dc`, so a flat DC would silently
    * drop the recipe tier / dynamic DC.
    *
-   * When no routed `rollFormula` is configured this method is NOT reached (the
-   * caller only dispatches here when one is set), so the legacy macro / builtIn
-   * routed path stays unchanged.
+   * When no routed `rollFormula` is configured this method is NOT reached: the
+   * caller only dispatches here when one is set, and otherwise its required-check
+   * guard fails loudly. There is no macro / adapter fallback (removed).
    *
    * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
    */
@@ -1786,9 +1585,9 @@ export class CraftingEngine {
   /**
    * Tag a check result as engine-evaluated so the craft seam knows its
    * `data.breakTools` is an authored-crit / authored-tier signal it can honour for
-   * forced tool breakage. Macro / builtIn results are NOT tagged: their `data` is
-   * passed through verbatim, and `breakTools` is not part of the macro contract, so
-   * a macro returning `data:{ breakTools:true }` must not force breakage.
+   * forced tool breakage. The no-check passthrough success (when no usable roll
+   * formula applies) is NOT tagged, so its `data` cannot force breakage; only an
+   * engine-rolled crit/tier result carries the `engineEvaluated` flag.
    * @private
    */
   _markEngineEvaluated(result) {
@@ -1876,8 +1675,8 @@ export class CraftingEngine {
    * Tool's own mode decides, so the seam is not consulted); under `checkDriven` the
    * active check's `checkBreakage` triggers (those opting in via `breakTools`, plus
    * the implicit routed per-tier `data.breakTools` bridge) decide whether all
-   * required tools break. Macro/builtIn checks never force-break (the legacy
-   * `engineEvaluated` guard is preserved inside `evaluateCheckBreakage`).
+   * required tools break. Only engine-evaluated roll-formula check results can
+   * force-break (the `engineEvaluated` guard is preserved inside `evaluateCheckBreakage`).
    * @private
    */
   _resolveCraftingBreakageDecision(system, recipe, checkResult) {
@@ -2369,17 +2168,24 @@ export class CraftingEngine {
       salvageRun = await salvageRunManager.markRunInProgress(actor, salvageRun);
     }
 
-    const checkResult = await this._runSalvageCraftingCheck(
-      component,
-      system,
-      actor,
-      toolValidation.tools
-    );
+    const checkResult = await this._runSalvageCraftingCheck(component, system, actor);
     const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
+
+    // A misconfigured required salvage check (routed/progressive with no authored
+    // roll formula) is a GM-side system gap, not a rolled failure: abort with ZERO
+    // mutation so the component is never consumed and no tools are broken. The
+    // failure-consumption policy below applies only to genuine rolled failures.
+    if (checkResult.misconfigured) {
+      return {
+        success: false,
+        results: null,
+        message: checkResult.message,
+        salvageRun,
+      };
+    }
 
     if (!checkResult.success) {
       let consumedOnFail = [];
-      let usedToolPairs = [];
       let usedTools = [];
       try {
         if (failurePolicy.consumeComponentOnFail) {
@@ -2390,7 +2196,6 @@ export class CraftingEngine {
           );
         }
         if (failurePolicy.breakToolsOnFail) {
-          usedToolPairs = toolValidation.tools;
           // Salvage parity (issue 419): the FAILURE path breaks required tools only
           // when `breakToolsOnFail === true` (this gate), matching crafting.
           const salvageFailBreak = this._resolveSalvageBreakageDecision(system, checkResult);
@@ -2422,18 +2227,6 @@ export class CraftingEngine {
           failureReason: checkResult.message || 'Salvage check failed',
         });
       }
-
-      await this._runSalvageFailureMacro(component, system, {
-        component,
-        craftingSystem: system,
-        craftingActor: actor,
-        salvageInput: { componentId, quantity: ingredientQuantity },
-        consumedComponents: consumedOnFail,
-        consumedTools: usedToolPairs,
-        createdResults: [],
-        checkResult,
-        failureReason: checkResult.message || 'Salvage check failed',
-      });
 
       return {
         success: false,
@@ -2497,17 +2290,6 @@ export class CraftingEngine {
         failureReason: null,
       });
     }
-
-    await this._runSalvageSuccessMacro(component, system, {
-      component,
-      craftingSystem: system,
-      craftingActor: actor,
-      salvageInput: { componentId, quantity: ingredientQuantity },
-      consumedComponents: consumedItems,
-      consumedTools: toolValidation.tools,
-      createdResults: resultItems,
-      checkResult,
-    });
 
     return {
       success: true,
@@ -2575,33 +2357,6 @@ export class CraftingEngine {
       breakToolsOnFail:
         (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
-  }
-
-  _getSalvageSuccessFailureMacroUuids(system) {
-    return {
-      successMacroUuid: system?.salvageCraftingCheck?.successMacroUuid || null,
-      failureMacroUuid: system?.salvageCraftingCheck?.failureMacroUuid || null,
-    };
-  }
-
-  async _runSalvageSuccessMacro(component, system, context) {
-    const { successMacroUuid } = this._getSalvageSuccessFailureMacroUuids(system);
-    if (!successMacroUuid) return;
-    try {
-      await MacroExecutor.run(successMacroUuid, context);
-    } catch (error) {
-      console.error(`Fabricate | Salvage success macro failed (${successMacroUuid}):`, error);
-    }
-  }
-
-  async _runSalvageFailureMacro(component, system, context) {
-    const { failureMacroUuid } = this._getSalvageSuccessFailureMacroUuids(system);
-    if (!failureMacroUuid) return;
-    try {
-      await MacroExecutor.run(failureMacroUuid, context);
-    } catch (error) {
-      console.error(`Fabricate | Salvage failure macro failed (${failureMacroUuid}):`, error);
-    }
   }
 
   /**
@@ -2682,17 +2437,20 @@ export class CraftingEngine {
   }
 
   /**
-   * Run the salvage crafting check macro when configured.
+   * Run the salvage crafting check for the active salvage resolution mode.
+   *
+   * A salvage check is usable only when its mode has an authored roll formula
+   * (simple/routed/progressive). Routed maps the rolled total onto a named outcome
+   * tier that `_resolveSalvageResultGroups` routes through
+   * `component.salvage.outcomeRouting`. When the routed mode needs a check outcome
+   * to route but no roll formula is configured, the attempt fails loudly; every
+   * other mode with no usable formula is a no-op success.
    * @private
    */
-  async _runSalvageCraftingCheck(component, system, actor, toolItems) {
+  async _runSalvageCraftingCheck(component, system, actor) {
     const check = system?.salvageCraftingCheck || {};
     const mode = system?.salvageResolutionMode || 'simple';
 
-    // Formula-based check (Checks editor) takes precedence when a roll formula is
-    // configured for the active salvage mode; otherwise fall back to the legacy
-    // macro path below. Routed maps the rolled total onto a named outcome tier that
-    // `_resolveSalvageResultGroups` routes through `component.salvage.outcomeRouting`.
     if (mode === 'progressive' && check.progressive?.rollFormula) {
       return this._runSalvageProgressiveCheck(check.progressive, actor);
     }
@@ -2703,52 +2461,20 @@ export class CraftingEngine {
       return this._runSalvageRoutedCheck(check.routed, component, actor);
     }
 
-    if (!check?.enabled && !check?.macroUuid) {
-      return { success: true, outcome: null, value: null, data: {} };
-    }
-    if (!check.macroUuid) {
-      return { success: true, outcome: null, value: null, data: {} };
-    }
-
-    let result;
-    try {
-      result = await MacroExecutor.run(check.macroUuid, {
-        component,
-        craftingSystem: system,
-        craftingActor: actor,
-        toolItems,
-      });
-    } catch (error) {
-      console.error(`Fabricate | Salvage check macro failed (${check.macroUuid})`, error);
+    // A salvage check is REQUIRED to produce an outcome in progressive mode and in
+    // routed mode (the routed result-group routing keys off the outcome tier name).
+    if (mode === 'progressive' || mode === 'routed') {
       return {
         success: false,
+        misconfigured: true,
         outcome: null,
         value: null,
         data: {},
-        message: `Salvage check macro failed: ${error.message || check.macroUuid}`,
+        message: `${mode} salvage mode requires a configured salvage check roll formula`,
       };
     }
 
-    if (!result || typeof result !== 'object') {
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: {},
-        message: 'Salvage check macro must return an object',
-      };
-    }
-
-    const outcome = result.outcome == null ? null : String(result.outcome);
-    const value = Number.isFinite(Number(result.value)) ? Number(result.value) : null;
-    const success = result.success !== false;
-    return {
-      success,
-      outcome,
-      value,
-      data: result.data || {},
-      message: success ? null : result.message || 'Salvage check failed',
-    };
+    return { success: true, outcome: null, value: null, data: {} };
   }
 
   /**

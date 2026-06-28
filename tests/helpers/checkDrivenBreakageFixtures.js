@@ -13,8 +13,8 @@
 /**
  * Build an engine-evaluated check result with the fields the breakage seam reads:
  * `value`, `data.total`, `data.diceGroups`, `data.outcomeId`, `outcome`, and the
- * legacy `data.breakTools`. `engineEvaluated: true` so the macro/builtIn guard
- * does not short-circuit it.
+ * legacy `data.breakTools`. `engineEvaluated: true` so the non-engine-evaluated
+ * guard does not short-circuit it.
  */
 export function engineCheckResult({
   total = null,

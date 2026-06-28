@@ -467,15 +467,15 @@ export class Recipe {
   _normalizeResultSelection(resultSelection) {
     if (!resultSelection || typeof resultSelection !== 'object') return null;
     // `ingredientSet` and `check` are the canonical routed providers. The legacy
-    // `macroOutcome`/`rollTableOutcome` providers were removed in 1.6.0; persisted
-    // recipes are migrated onto `check` by `migrateRemoveResultSelectionProviders`.
+    // `macroOutcome`/`rollTableOutcome` providers were removed in 1.6.0 (persisted
+    // recipes were migrated onto `check` by `migrateRemoveResultSelectionProviders`).
+    // The `macroUuid` those providers carried is now orphaned — nothing reads it —
+    // and was retired in 1.8.0 (stripped from persisted recipes by
+    // `migrateRemoveLegacyCheckSources`), so it is no longer normalized here.
     const VALID_PROVIDERS = ['ingredientSet', 'check'];
     const provider = String(resultSelection.provider || '').trim();
     if (!VALID_PROVIDERS.includes(provider)) return null;
-    return {
-      provider,
-      macroUuid: resultSelection.macroUuid || null,
-    };
+    return { provider };
   }
 
   _normalizeResultGroups(data = {}) {

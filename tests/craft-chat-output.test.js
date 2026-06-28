@@ -53,9 +53,6 @@ function buildSystem(chatOutputEnabled = true) {
     },
     craftingCheck: {
       enabled: false,
-      macroUuid: null,
-      successMacroUuid: null,
-      failureMacroUuid: null,
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     }
   };

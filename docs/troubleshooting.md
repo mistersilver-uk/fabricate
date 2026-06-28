@@ -76,34 +76,34 @@ The confirmation prompt runs a dry run first and tells you exactly what will hap
 
 ---
 
-## Crafting Check Macro Not Running
+## Crafting Check Not Running
 
-**Symptom:** The crafting check macro never fires.
+**Symptom:** The crafting check never fires.
 Recipes resolve immediately with no skill check, even though the Routed mode (with the skill-check outcome option) or Progressive mode is configured.
 
 **Likely causes:**
 
-- The crafting check is turned off and no macro is set.
-  When both are absent, the check is skipped entirely.
-- The configured macro has been deleted or no longer exists.
+- The crafting check has no roll formula authored for the system's active resolution mode.
+  A Routed check (with the skill-check outcome option) and a Progressive check each need a roll formula before they can run.
+  A required check with no roll formula now fails loudly with a validation error rather than being silently skipped.
 - The resolution mode is Simple, or Routed with the ingredient-choice option.
   In these configurations a crafting check is **optional**.
-  The check runs if configured but is not required for success.
+  The check runs if a roll formula is configured but is not required for success.
+- For an optional Simple check, the check is turned off.
+  When it is off, the check is skipped entirely.
 - The check returns something the current mode does not understand (for example, no named outcome for the skill-check outcome option, or a missing numeric value for Progressive mode).
 
 **Step-by-step checks:**
 
 1. Open the Crafting Admin panel, go to the **Systems** tab, and check the **Crafting Checks** section.
-   Is the crafting check turned on?
-2. Is a macro selected?
-   Open Foundry's macro directory and confirm that macro still exists.
-3. Check the system's **Resolution Mode**.
+   Is a roll formula configured for the system's resolution mode?
+2. Check the system's **Resolution Mode**.
    If the resolution mode is **Routed** with the skill-check outcome option, or **Progressive**, a crafting check is required.
-   Fabricate reports a validation error if one is missing.
-   For **Simple** mode or Routed with the ingredient-choice option, the check is optional and simply does not run if unconfigured.
-4. Attempt a craft and watch for any error or warning notifications from Fabricate about the macro.
-5. If a developer set up a custom macro, confirm it returns the result the current mode expects (a named outcome for the skill-check outcome option, or a numeric value for Progressive mode).
-See the API reference for the expected setup.
+   Fabricate reports a validation error when its roll formula is missing.
+   For **Simple** mode or Routed with the ingredient-choice option, the check is optional and simply does not run when no roll formula is configured.
+3. For an optional **Simple** check, confirm the check is turned on.
+   When it is off, the check is skipped.
+4. Attempt a craft and watch for any error or warning notifications from Fabricate about the check.
 
 **See also:** [Crafting Checks]({% link crafting-checks.md %}) for crafting check configuration.
 
@@ -223,11 +223,11 @@ Additional causes:
 - The salvage resolution mode is set to a mode that is not valid for salvage.
   Only Simple, Routed, and Progressive are valid.
 - **Routed salvage mode** requires:
-  - a salvage check is configured (turned on or with a macro set)
+  - a salvage check roll formula is configured
   - at least one outcome is declared (such as critical, pass, and fail)
   - the component maps every declared outcome to an existing result group
 - **Progressive salvage mode** requires:
-  - a progressive salvage check is configured
+  - a progressive salvage check roll formula is configured
   - every result component has a valid positive difficulty value
 - **Simple salvage mode** requires exactly one result group per component.
   Having none, or two or more, is rejected.
@@ -238,7 +238,7 @@ Additional causes:
 1. Check the system's salvage resolution mode.
    If it is not Simple, Routed, or Progressive, change it to one of those.
 2. For **Routed** mode:
-   - Is a salvage check macro selected?
+   - Is a routed salvage check roll formula configured?
    - Are the outcomes defined (such as critical, pass, and fail)?
    - Does the component map every declared outcome to an existing result group?
 3. For **Simple** mode: does the component have exactly one salvage result group?

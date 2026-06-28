@@ -373,6 +373,23 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
     assert.ok(report.issues.some((issue) => issue.code === 'progressiveNoCheck'));
   });
 
+  it('legacy enabled toggle cannot mask a missing progressive roll formula', () => {
+    // A check is usable IFF it has an authored roll formula. The legacy
+    // `craftingCheck.enabled` / `features.craftingChecks` toggles must NOT suppress
+    // the progressiveNoCheck blocker when no progressive formula is configured.
+    const system = makeSystem({
+      resolutionMode: 'progressive',
+      features: { craftingChecks: true },
+      craftingCheck: { enabled: true, progressive: { rollFormula: '' } },
+    });
+    const report = evaluateSystemValidation(system, { recipes: [] });
+    assert.equal(report.blocksSystem, true);
+    assert.ok(
+      report.issues.some((issue) => issue.code === 'progressiveNoCheck'),
+      'the missing formula still blocks despite the legacy enabled toggle'
+    );
+  });
+
   it('multi-step recipes left on in alchemy mode', () => {
     const system = makeSystem({
       resolutionMode: 'alchemy',

@@ -181,7 +181,7 @@ test('1.5.0 runs from 1.4.0, seeds the system gathering check, and bumps the ver
   assert.equal(systems[0].gatheringCraftingCheck.enabled, true);
   assert.equal(systems[0].gatheringCraftingCheck.progressive.rollFormula, '1d20 + @abilities.wis.mod');
   assert.equal(systems[0].gatheringCraftingCheck.progressive.awardMode, 'partial');
-  assert.equal(settings.store.get('migrationVersion'), '1.7.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.8.0');
 });
 
 test('version gate: 1.5.0 is NOT re-applied when migrationVersion is already 1.5.0', async () => {

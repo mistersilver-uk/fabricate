@@ -2083,91 +2083,6 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('config save actions', () => {
-    it('saveCraftingCheckConfig parses outcomes text and calls updateSystem', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        },
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.saveCraftingCheckConfig(
-        'namedOutcomes',
-        'macro-uuid',
-        'critical, success, failure'
-      );
-      assert.ok(updateArgs !== null);
-      assert.equal(updateArgs.updates.craftingCheck.mode, 'namedOutcomes');
-      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, [
-        'critical',
-        'success',
-        'failure',
-      ]);
-    });
-
-    it('saveCraftingCheckConfig treats empty outcomesText as empty outcomes array', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        },
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.saveCraftingCheckConfig('passFail', null, '');
-      assert.ok(updateArgs !== null);
-      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, []);
-    });
-
-    it('saveCraftingCheckConfig preserves existing canonical check fields', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.craftingCheck = {
-          enabled: true,
-          mode: 'passFail',
-          macroUuid: 'macro-old',
-          successMacroUuid: 'macro-success',
-          failureMacroUuid: 'macro-failure',
-          consumption: {
-            consumeIngredientsOnFail: false,
-            breakToolsOnFail: true,
-          },
-          progressive: {
-            awardMode: 'partial',
-            allowPlayerReorder: true,
-          },
-          outcomes: ['fail', 'pass'],
-        };
-      }
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        },
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.saveCraftingCheckConfig('namedOutcomes', 'macro-new', 'critical, success');
-      assert.ok(updateArgs !== null);
-      assert.equal(updateArgs.updates.craftingCheck.successMacroUuid, 'macro-success');
-      assert.equal(updateArgs.updates.craftingCheck.failureMacroUuid, 'macro-failure');
-      assert.equal(updateArgs.updates.craftingCheck.consumption.consumeIngredientsOnFail, false);
-      assert.equal(updateArgs.updates.craftingCheck.progressive.awardMode, 'partial');
-    });
-
     it('saveCraftingCheckRouted persists the routed config and preserves other check fields', async () => {
       let updateArgs = null;
       const services = createMockServices();
@@ -2954,7 +2869,6 @@ describe('createAdminStore', () => {
         'removeTag',
         'addEssence',
         'removeEssence',
-        'saveCraftingCheckConfig',
         'addCurrencyUnit',
         'updateCurrencyUnit',
         'deleteCurrencyUnit',

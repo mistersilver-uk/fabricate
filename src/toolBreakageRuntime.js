@@ -214,8 +214,9 @@ export function evaluateCheckBreakageCondition(condition, checkResult) {
  * a PURE decision (no side effects); the side-effect point stays in the engine /
  * runtime `apply`.
  *
- * - Macro/builtIn checks (`engineEvaluated !== true`) never force-break (the legacy
- *   guard formerly in `CraftingEngine._checkForcesToolBreak`).
+ * - Only engine-evaluated roll-formula check results (`engineEvaluated === true`) can
+ *   force-break; any other result never force-breaks (the legacy guard formerly in
+ *   `CraftingEngine._checkForcesToolBreak`).
  * - The legacy `data.breakTools` (the routed per-tier `outcome.breakTools` bridge) is
  *   honoured as an implicit always-on trigger, so existing tier flags keep working
  *   without separate persistence.
@@ -230,8 +231,8 @@ export function evaluateCheckBreakageCondition(condition, checkResult) {
  */
 export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
   const none = { forceBreak: false, triggerId: null, reason: null };
-  // Macro/builtIn results are passed through verbatim; `breakTools`/`checkBreakage`
-  // are authored-engine concepts absent from the macro contract.
+  // Only engine-evaluated roll-formula results carry the authored-engine
+  // `breakTools`/`checkBreakage` concepts; any other result is passed through verbatim.
   if (checkResult?.engineEvaluated !== true) return none;
 
   // Legacy implicit trigger: a routed per-tier `data.breakTools` flag always force-breaks.

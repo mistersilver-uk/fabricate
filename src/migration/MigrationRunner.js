@@ -19,6 +19,7 @@ import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationT
 import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
+import { migrateRemoveLegacyCheckSources } from './migrateRemoveLegacyCheckSources.js';
 import { migrateRemoveResultSelectionProviders } from './migrateRemoveResultSelectionProviders.js';
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
@@ -229,6 +230,14 @@ const MIGRATIONS = [
       'strip residual dead catalysts arrays from recipes, component salvage, and gathering tasks',
     migrate(data) {
       return migrateBreakToolsOnFail(data);
+    },
+  },
+  {
+    version: '1.8.0',
+    label:
+      'Remove deprecated check sources (root macroUuid/successMacroUuid/failureMacroUuid/checkSource/builtIn) from crafting/salvage/gathering checks, and the orphaned recipe resultSelection.macroUuid',
+    migrate(data) {
+      return migrateRemoveLegacyCheckSources(data);
     },
   },
   // Future migrations added here in version order

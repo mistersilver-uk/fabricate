@@ -176,9 +176,6 @@ function makeSystem({
     features: { multiStepRecipes: false, craftingChecks: false, essences: false, ...features },
     craftingCheck: craftingCheck || {
       enabled: false,
-      macroUuid: null,
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: [],
       progressive: null,
       consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false }
@@ -267,8 +264,6 @@ test('simple mode: successful craft consumes ingredient and creates result item'
   const recipeManager = makeRecipeManager({ ingredientItem: herb, ingredientSet });
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -353,8 +348,6 @@ test('simple mode: exact quantity match deletes ingredient item', async () => {
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -479,8 +472,6 @@ test('multi-step: craft() advances through two steps to completion', async () =>
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   // Step 1: craft creates the run and executes step 0
   const result1 = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -552,9 +543,6 @@ function makeLegacyOutcomeRoutingSystem(id = 'sys-legacy-routing') {
     resolutionMode: 'routed',
     craftingCheck: {
       enabled: true,
-      macroUuid: 'macro:check',
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: ['critical', 'pass', 'fail'],
       progressive: null,
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
@@ -612,8 +600,6 @@ test('routed check: "critical" outcome routes to the critical-named result group
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'critical', value: 20, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -648,8 +634,6 @@ test('routed check: "pass" outcome routes to the pass-named result group', async
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'pass', value: 10, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -686,8 +670,6 @@ test('routed check: check failure returns failure without creating results', asy
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: false, message: 'Roll too low', outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -706,11 +688,8 @@ function makeProgressiveSystem(id = 'sys-prog') {
     resolutionMode: 'progressive',
     craftingCheck: {
       enabled: true,
-      macroUuid: 'macro:check',
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
+      progressive: { awardMode: 'equal', rollFormula: '1d20' },
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
@@ -760,8 +739,6 @@ test('progressive mode: check value 8 awards comp-a (cost 3) and comp-b (cost 5)
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   // Value 8: covers A (cost 3, remaining=5) and B (cost 5, remaining=0), but NOT C (cost 7)
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 8, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -797,8 +774,6 @@ test('progressive mode: check value 0 awards no results', async () => {
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 0, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -842,8 +817,6 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   // Value 20 easily covers A (cost 3) and B (cost 5)
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 20, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -891,7 +864,6 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
     toolBreakage: { authority: 'checkDriven' },
     craftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: [],
       progressive: null,
       consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
@@ -946,8 +918,6 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
     data: { breakTools: true },
     engineEvaluated: true,
   });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -966,7 +936,6 @@ test('check-failure breakTools: a macro data.breakTools does NOT force-break the
     resolutionMode: 'simple',
     craftingCheck: {
       enabled: true,
-      macroUuid: null,
       outcomes: [],
       progressive: null,
       consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
@@ -1018,8 +987,6 @@ test('check-failure breakTools: a macro data.breakTools does NOT force-break the
     value: 3,
     data: { breakTools: true },
   });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
