@@ -518,6 +518,29 @@ test('progressive mode — missing progressive config → invalid', () => {
   );
 });
 
+test('progressive mode — draft (requireComplete: false) with checks disabled/unconfigured → valid', () => {
+  // Drafting a recipe in a progressive system that has not yet enabled or configured its
+  // crafting check must succeed: that gap is a SYSTEM-level concern (systemValidation's
+  // `progressiveNoCheck`), not a per-recipe drafting error. It is still enforced when a
+  // complete recipe is required (see the two strict-mode tests above).
+  const system = buildProgressiveSystem([], {
+    craftingCheck: {
+      enabled: false,
+      macroUuid: null,
+      outcomes: [],
+      progressive: null,
+    },
+  });
+  const service = buildService(system);
+  const step = buildProgressiveStep([]);
+  const recipe = buildRecipe([step]);
+
+  const result = service.validateRecipe(recipe, { requireComplete: false });
+
+  assert.equal(result.valid, true, `expected draft to be valid, got: ${JSON.stringify(result.errors)}`);
+  assert.equal(result.errors.length, 0);
+});
+
 // Validate a progressive recipe whose single result references one component with
 // the given id/difficulty.
 function validateProgressiveDifficulty(itemId, difficulty) {

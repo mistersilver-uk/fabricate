@@ -194,8 +194,13 @@ export class ResolutionModeService {
       }
 
       if (mode === 'progressive') {
-        if (!checkEnabled) errors.push('Progressive mode requires crafting checks enabled');
-        if (!system?.craftingCheck?.progressive) {
+        // A system whose progressive crafting check is not yet enabled/configured is a
+        // SYSTEM-level concern surfaced by systemValidation (`progressiveNoCheck`); waive
+        // it while drafting so an authoring shell can be created, and enforce it only when
+        // a complete recipe is required (persistence-complete / activation).
+        if (requireComplete && !checkEnabled)
+          errors.push('Progressive mode requires crafting checks enabled');
+        if (requireComplete && !system?.craftingCheck?.progressive) {
           errors.push('Progressive mode requires craftingCheck.progressive configuration');
         }
         if (requireComplete && sets.length !== 1)
