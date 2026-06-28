@@ -156,6 +156,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 - Matching is based on satisfiable signatures from ingredient groups/options.
 - A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
+- Submitted quantity is counted per submission (one submission = one unit), not by reading an item's stack `system.quantity`; the workbench is responsible for expanding a stack into one submission per unit, consistent with occurrence-based essence accumulation and submitted-ingredient consumption.
 - Signature overlap is invalid across all recipes in the system.
 - No-signature-match is treated as a failed attempt:
   - player sees a specific failure message,
@@ -181,6 +182,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 - Each unique component appears once; adding increments the badge count.
 - Supports: add from palette, remove (right-click or direct action), clear all, submit.
 - Submit triggers signature matching per existing Signature Resolution rules.
+- On submit, a quantity badge of N contributes N unit submissions (one per unit), so occurrence-based signature matching and consumption observe the displayed quantity.
 
 #### Alchemy System Selection
 
