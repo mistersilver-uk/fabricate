@@ -19,7 +19,7 @@ import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
   getSourceUuid,
   getComponentSourceReferences,
-  getItemSourceReferences,
+  getItemIdentityReferences,
 } from '../utils/sourceUuid.js';
 
 import { normalizeCurrencyConfig } from './currencyProfile.js';
@@ -1829,7 +1829,10 @@ export class CraftingSystemManager {
     if (typeof itemUuid === 'string' && itemUuid.trim()) {
       references.push(itemUuid.trim());
     }
-    for (const ref of getItemSourceReferences(source)) {
+    // Identity references only (live uuid + compendium source). Excludes the
+    // world-duplicate source so an item cloned from another world item is not
+    // de-duplicated against the original's component on import.
+    for (const ref of getItemIdentityReferences(source)) {
       if (!references.includes(ref)) references.push(ref);
     }
     const currentUuid = references[0] || null;
@@ -2202,7 +2205,10 @@ export class CraftingSystemManager {
     const refreshDescription = this._hasUpdatedItemDescription(changes);
     if (!refreshName && !refreshImg && !refreshDescription) return { updated: 0 };
 
-    const itemRefs = new Set(getItemSourceReferences(item));
+    // Identity references only: a clone carries duplicateSource → its original,
+    // so matching on the duplicate source would propagate this edit onto the
+    // original item's component as well.
+    const itemRefs = new Set(getItemIdentityReferences(item));
     if (itemRefs.size === 0) return { updated: 0 };
 
     const nextName = refreshName ? item?.name || changes.name || 'Unnamed Item' : null;

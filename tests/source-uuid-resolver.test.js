@@ -21,6 +21,7 @@ const {
   getSourceUuid,
   getDuplicateSourceUuid,
   getItemSourceReferences,
+  getItemIdentityReferences,
   getComponentSourceReferences,
   itemMatchesComponentSource,
   findStackableMatch
@@ -207,4 +208,43 @@ test('21 - findStackableMatch: no match when source refs do not overlap', () => 
 test('22 - findStackableMatch: empty source refs never match (no false positives)', () => {
   const items = [{ uuid: 'Item.x', system: { quantity: 1 } }];
   assert.equal(findStackableMatch(items, {}), null);
+});
+
+test('23 - getItemIdentityReferences returns uuid and compendium source, EXCLUDING duplicateSource', () => {
+  const item = {
+    uuid: 'Item.actor-drag-copy',
+    _stats: { compendiumSource: 'Compendium.world.items.pick', duplicateSource: 'Item.world-pick' },
+    flags: {}
+  };
+  assert.deepEqual(getItemIdentityReferences(item), [
+    'Item.actor-drag-copy',
+    'Compendium.world.items.pick'
+  ]);
+});
+
+test('24 - getItemIdentityReferences for a clone with no compendium source returns only its own uuid', () => {
+  // Mirrors the Talonvine shape: a world item cloned from another world item.
+  const item = {
+    uuid: 'Item.talonvine',
+    _stats: { compendiumSource: null, duplicateSource: 'Item.moonsilver-weed' },
+    flags: {}
+  };
+  assert.deepEqual(getItemIdentityReferences(item), ['Item.talonvine']);
+});
+
+test('25 - getItemIdentityReferences still includes the compendium source (parity with getSourceUuid)', () => {
+  const item = {
+    uuid: 'Item.actor-owned-1',
+    _stats: { compendiumSource: 'Compendium.world.items.iron-ore' },
+    flags: {}
+  };
+  assert.deepEqual(getItemIdentityReferences(item), [
+    'Item.actor-owned-1',
+    'Compendium.world.items.iron-ore'
+  ]);
+});
+
+test('26 - getItemIdentityReferences returns [] for null/non-object', () => {
+  assert.deepEqual(getItemIdentityReferences(null), []);
+  assert.deepEqual(getItemIdentityReferences('Item.x'), []);
 });

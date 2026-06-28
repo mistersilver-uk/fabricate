@@ -867,6 +867,75 @@ test('addItemFromUuid — rejects non-Item document type', async () => {
   globalThis.fromUuid = async () => null;
 });
 
+test('addItemFromUuid — a world item cloned from another (duplicateSource) imports as a NEW component', async () => {
+  // Regression: Foundry stamps _stats.duplicateSource on an item copied from
+  // another. A clone is a distinct item and must NOT be conflated with the
+  // original's component on import.
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{ id: 'comp-moonsilver', name: 'Moonsilver Weed', sourceUuid: 'Item.Xjbuj7dbkzhOPrMC' }]
+  }]);
+
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid !== 'Item.y8qq6t1F9YwRh8HH') return null;
+    return {
+      uuid,
+      documentName: 'Item',
+      name: 'Talonvine',
+      img: 'icons/consumables/plants/thorned-stem-brown.webp',
+      // Cloned from Moonsilver Weed: no compendium source, only a duplicate source.
+      _stats: { compendiumSource: null, duplicateSource: 'Item.Xjbuj7dbkzhOPrMC' }
+    };
+  };
+
+  const result = await mgr.addItemFromUuid('sys1', 'Item.y8qq6t1F9YwRh8HH');
+
+  assert.equal(result.action, 'added');
+  assert.equal(result.item.name, 'Talonvine');
+  assert.equal(result.item.sourceUuid, 'Item.y8qq6t1F9YwRh8HH');
+  const sys = mgr.getSystem('sys1');
+  assert.equal(sys.components.length, 2, 'clone must be a separate component, not merged with the original');
+  assert.ok(sys.components.some(c => c.id === 'comp-moonsilver'));
+
+  globalThis.fromUuid = async () => null;
+});
+
+test('refreshComponentMetadataForUpdatedItem — editing a clone does NOT rewrite the original item\'s component', async () => {
+  // The clone (Talonvine) itself carries duplicateSource → the original
+  // (Moonsilver). Metadata propagation must match on identity only, so editing
+  // the clone touches its own component and leaves the original's untouched.
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      { id: 'comp-moonsilver', name: 'Moonsilver Weed', sourceUuid: 'Item.Xjbuj7dbkzhOPrMC' },
+      { id: 'comp-talonvine', name: 'Talonvine', sourceUuid: 'Item.y8qq6t1F9YwRh8HH' }
+    ]
+  }]);
+  let saveCount = 0;
+  mgr.save = async () => { saveCount++; };
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    {
+      uuid: 'Item.y8qq6t1F9YwRh8HH',
+      name: 'Talonvine Renamed',
+      _stats: { compendiumSource: null, duplicateSource: 'Item.Xjbuj7dbkzhOPrMC' }
+    },
+    { name: 'Talonvine Renamed' }
+  );
+
+  assert.equal(result.updated, 1, 'only the clone\'s own component should update');
+  const sys = mgr.getSystem('sys1');
+  assert.equal(sys.components.find(c => c.id === 'comp-talonvine').name, 'Talonvine Renamed');
+  assert.equal(
+    sys.components.find(c => c.id === 'comp-moonsilver').name,
+    'Moonsilver Weed',
+    'the original component must not be renamed by editing its clone'
+  );
+  assert.equal(saveCount, 1);
+});
+
 test('createItem — rejects a duplicate source reference already used by another component', async () => {
   const mgr = buildManager([{
     id: 'sys1',
