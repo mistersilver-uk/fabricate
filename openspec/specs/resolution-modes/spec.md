@@ -155,6 +155,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 ### Signature Resolution
 
 - Matching is based on satisfiable signatures from ingredient groups/options.
+- A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
 - Signature overlap is invalid across all recipes in the system.
 - No-signature-match is treated as a failed attempt:
   - player sees a specific failure message,
