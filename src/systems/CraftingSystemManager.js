@@ -1671,6 +1671,19 @@ export class CraftingSystemManager {
     return a.some((id, index) => id !== b[index]);
   }
 
+  /**
+   * Delete a crafting system and the recipes that belong to it. GM only. An
+   * individual recipe deletion that fails (e.g. a Foundry settings write error
+   * or timeout) does not abort the teardown: the failure is logged with its
+   * recipe id, the remaining recipes are still deleted, and the system itself
+   * is still removed, saved, and cleaned up so no half-deleted system is left
+   * stranded in persisted settings. Emits one aggregated info notification on a
+   * clean delete, or a warn summary naming how many recipes could not be
+   * auto-deleted (and may need manual removal) when any recipe deletion failed.
+   * @param {string} systemId
+   * @returns {Promise<void>}
+   * @throws {Error} When the caller is not a GM, or no system matches `systemId`.
+   */
   async deleteSystem(systemId) {
     this._assertGM('delete crafting system');
     const system = this.systems.get(systemId);
