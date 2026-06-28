@@ -44,9 +44,10 @@ export default defineConfig(({ command }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
-      // 'hidden' emits dist/main.js.map for CI/debug archival but omits the
-      // //# sourceMappingURL comment from main.js, so the map ships nowhere it
-      // is referenced; the release zip also excludes *.map (see scripts/release.js).
+      // 'hidden' emits dist/main.js.map (for CI/debug archival) but suppresses
+      // the //# sourceMappingURL comment in main.js. To keep the map out of
+      // shipped artifacts, all three zip paths exclude *.map: the GitHub-release
+      // zip in scripts/release.js and the S3 cohort zip in scripts/lib/zip.js.
       sourcemap: 'hidden',
       // oxc (Vite 8 / Rolldown default) — fast minification, reasonable output size.
       minify: true,
