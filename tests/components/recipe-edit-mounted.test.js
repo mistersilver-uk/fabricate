@@ -1106,6 +1106,40 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('falls back to the component name (never a raw id) for an unlabelled tool row', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, toolIds: ['tool-blank', 'tool-orphan'] },
+        // tool-blank has no label but a resolved componentName; tool-orphan has
+        // neither (its backing component is gone).
+        toolsLibrary: [
+          { id: 'tool-blank', label: '', componentId: 'cmp-tongs', componentName: 'Iron Tongs' },
+          { id: 'tool-orphan', label: '', componentId: 'cmp-missing', componentName: '' },
+        ],
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+
+    const blankRow = target.querySelector('[data-recipe-tool-id="tool-blank"]');
+    assert.ok(blankRow, 'a row renders for the unlabelled tool');
+    assert.match(blankRow.textContent, /Iron Tongs/, 'unlabelled tool falls back to the component name');
+    assert.equal(
+      blankRow.textContent.includes('tool-blank') || blankRow.textContent.includes('cmp-tongs'),
+      false,
+      'an unlabelled tool never shows its tool id or component id'
+    );
+
+    const orphanRow = target.querySelector('[data-recipe-tool-id="tool-orphan"]');
+    assert.match(orphanRow.textContent, /Unnamed tool/, 'a tool with no label or component name shows a placeholder');
+    assert.equal(
+      orphanRow.textContent.includes('tool-orphan') || orphanRow.textContent.includes('cmp-missing'),
+      false,
+      'an orphaned tool never shows a raw id'
+    );
+    editHarness.remount();
+  });
+
   it('renders per-step ingredient groupings in a collapsible step accordion for a multi-step recipe', async () => {
     const target = await editHarness.mount(
       identityProps({

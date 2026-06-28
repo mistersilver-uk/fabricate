@@ -22,18 +22,30 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // Display a tool by its authored label, falling back to its backing
+  // component's name (resolved upstream onto `componentName`). Never surface a
+  // raw tool/component id to the GM — a tool with neither shows a generic
+  // "unnamed tool" placeholder.
+  function toolDisplayLabel(tool) {
+    return (
+      tool?.label ||
+      tool?.componentName ||
+      text('FABRICATE.Admin.Manager.Recipe.UnnamedTool', 'Unnamed tool')
+    );
+  }
+
   function toolLabel(toolId) {
     const tool = (toolsLibrary || []).find(entry => entry.id === toolId);
-    return tool?.label || tool?.componentId || toolId;
+    return toolDisplayLabel(tool);
   }
 
   // The popover lists only tools not already required by this scope; resolve each
-  // to its display label (falling back to the component id), so a tool whose label
-  // is blank still shows something pickable.
+  // to its display label so a tool whose label is blank still shows the component
+  // name (never a raw id).
   const availableToolOptions = $derived(
     (toolsLibrary || [])
       .filter(tool => !(toolIds || []).includes(tool.id))
-      .map(tool => ({ id: tool.id, label: tool.label || tool.componentId || tool.id, icon: 'fas fa-screwdriver-wrench' }))
+      .map(tool => ({ id: tool.id, label: toolDisplayLabel(tool), icon: 'fas fa-screwdriver-wrench' }))
   );
 
   // Empty when the library has no tools at all; otherwise (every tool already

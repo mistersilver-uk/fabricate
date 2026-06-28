@@ -42,6 +42,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentSourceInspector.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentDifficultyInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
@@ -446,6 +447,10 @@ function createStore(calls = [], options = {}) {
         sourceMissing: false,
         showTags: true,
         showEssences: true,
+        // Mirror the normalized component shape: the `difficulty` key is always
+        // present and set to undefined when unset, so the browser must show
+        // "None" by value (not by key absence).
+        difficulty: undefined,
       },
       ...(options.extendedComponentCards
         ? [
@@ -4142,6 +4147,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Progressive difficulty'));
     assert.ok(target.textContent.includes('Missing'));
 
+    // A set difficulty renders as a plain, borderless value (not a chip); an
+    // unset one shows a centered "None".
+    const c1DifficultyCell = target.querySelector('[data-component-id="c1"] .manager-component-difficulty-cell');
+    assert.ok(c1DifficultyCell, 'difficulty cell renders for a progressive system');
+    assert.ok(
+      c1DifficultyCell.querySelector('.manager-component-difficulty-value'),
+      'a set difficulty renders as a plain value element'
+    );
+    assert.equal(
+      c1DifficultyCell.querySelector('.manager-chip'),
+      null,
+      'the difficulty value is not boxed in a chip'
+    );
+    assert.match(c1DifficultyCell.textContent, /2/, 'the set difficulty value is shown');
+    const c2DifficultyCell = target.querySelector('[data-component-id="c2"] .manager-component-difficulty-cell');
+    assert.match(c2DifficultyCell.textContent, /None/, 'an unset difficulty shows "None"');
+
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
     flushSync();
@@ -4295,6 +4317,100 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.fabricate-manager').dataset.managerView,
       'components',
       'successful save should return to the components browser'
+    );
+  });
+
+  // Mount the manager and open c1's component-edit route. Hoisted so the
+  // difficulty-inspector tests stay DRY (Sonar new-code gate).
+  async function openComponentEditor(calls, storeOptions = {}) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, storeOptions),
+        services: { openCurrentAdmin: () => {}, onDropItem: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Components').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-component-id="c1"] [aria-label="Edit Iron Ore"]').click();
+    flushSync();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  it('stages progressive-difficulty edits into the component editor save flow', async () => {
+    const calls = [];
+    await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
+
+    const card = target.querySelector('[data-component-edit-section="difficulty"]');
+    assert.ok(card, 'difficulty inspector card should render for a progressive system');
+    const input = card.querySelector('input');
+    assert.ok(input, 'difficulty card should expose a number input');
+    assert.equal(input.value, '2', 'input should seed from the persisted component difficulty');
+
+    // Editing stages the value but must NOT write to the store immediately.
+    input.value = '5';
+    input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'updateComponent'),
+      false,
+      'editing difficulty must not persist before Save'
+    );
+
+    // Staging a change makes the editor dirty and enables Save.
+    const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
+    assert.ok(saveButton, 'component editor Save button should render');
+    assert.equal(saveButton.disabled, false, 'a staged difficulty change should enable Save');
+
+    // Saving persists the staged difficulty through the editor's save flow.
+    saveButton.click();
+    await tick();
+    flushSync();
+    const saveCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(saveCall, 'Save should call store.updateComponent');
+    assert.equal(saveCall[1], 'c1');
+    assert.equal(saveCall[2].difficulty, 5, 'the staged truncated integer should persist on Save');
+  });
+
+  it('clears a staged progressive difficulty on Save when the input is blanked', async () => {
+    const calls = [];
+    await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
+
+    const input = target.querySelector('[data-component-edit-section="difficulty"] input');
+    input.value = '';
+    input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    target.querySelector('button[form="manager-component-edit-form"]').click();
+    await tick();
+    flushSync();
+    const saveCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(saveCall, 'Save should call store.updateComponent');
+    assert.equal(saveCall[2].difficulty, null, 'blanking the input clears the difficulty on Save');
+  });
+
+  it('hides the progressive-difficulty inspector for a non-progressive system', async () => {
+    const calls = [];
+    await openComponentEditor(calls);
+
+    assert.ok(
+      target.querySelector('[data-component-edit-section="source"]'),
+      'source inspector should still render'
+    );
+    assert.equal(
+      target.querySelector('[data-component-edit-section="difficulty"]'),
+      null,
+      'difficulty inspector should be absent when crafting resolution mode is not progressive'
     );
   });
 

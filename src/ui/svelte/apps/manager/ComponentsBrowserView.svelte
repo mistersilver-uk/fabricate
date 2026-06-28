@@ -340,7 +340,7 @@
           {/if}
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Component.Origin', 'Origin')}</span>
           {#if showProgressiveDifficulty}
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}</span>
+            <span role="columnheader" class="manager-component-difficulty-head">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}</span>
           {/if}
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
@@ -385,11 +385,11 @@
               <span class={`manager-chip ${componentSourceOrigin(item).className}`}>{componentSourceOrigin(item).label}</span>
             </span>
             {#if showProgressiveDifficulty}
-              <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}>
-                {#if Object.prototype.hasOwnProperty.call(item, 'difficulty')}
-                  <span class="manager-chip">{item.difficulty}</span>
+              <span role="cell" class="manager-labeled-cell manager-component-difficulty-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}>
+                {#if Number.isFinite(Number(item.difficulty)) && Number(item.difficulty) >= 1}
+                  <span class="manager-component-difficulty-value">{item.difficulty}</span>
                 {:else}
-                  <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoDifficulty', 'No difficulty')}</span>
+                  <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None')}</span>
                 {/if}
               </span>
             {/if}

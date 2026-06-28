@@ -2442,6 +2442,17 @@
   --fab-mv2-component-grid: minmax(0, 1.58fr) minmax(0, 0.52fr) minmax(0, 0.58fr) 118px;
 }
 
+/* Progressive difficulty is a single value (like a name), not a chip/category:
+   render it borderless and centered in its column, with a centered header. */
+.fabricate-manager .manager-component-difficulty-head,
+.fabricate-manager .manager-component-difficulty-cell {
+  text-align: center;
+}
+
+.fabricate-manager .manager-component-difficulty-value {
+  font-variant-numeric: tabular-nums;
+}
+
 .fabricate-manager .manager-environments-table {
   --fab-mv2-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;
 
@@ -9254,6 +9265,12 @@
     grid-template-columns: minmax(88px, 0.35fr) minmax(0, 1fr);
     gap: var(--fab-space-2);
     align-items: center;
+  }
+
+  /* In the stacked layout the difficulty cell gains a leading label, so keep its
+     value left-aligned beside it (the centered wide-layout rule does not apply). */
+  .fabricate-manager .manager-component-difficulty-cell {
+    text-align: start;
   }
 
   .fabricate-manager .manager-labeled-cell::before {

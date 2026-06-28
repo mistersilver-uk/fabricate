@@ -67,6 +67,16 @@ See the [API reference]({% link api/recipe-manager.md %}) for the methods that c
 {: .note }
 > Each result must point to a managed component with a difficulty of at least 1.
 
+## Setting Component Difficulty
+
+A result's difficulty is a property of the managed component it points to, not of the recipe, so you set it on the component itself.
+When the system's recipe resolution mode is Progressive, you can set it from the GM admin panel without the API.
+Open the **Items** tab, open a component for edit, and use the **Progressive difficulty** card in the right-hand inspector.
+Enter a whole number of 1 or greater, or leave it blank to clear the value.
+The difficulty is staged with the rest of your edits and is written when you save the component.
+
+A component with no difficulty is excluded from progressive results, so every result component needs a difficulty of at least 1.
+
 ## When to Use Progressive Mode
 
 Progressive mode is ideal when:

@@ -16,6 +16,7 @@
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentSourceInspector from './ComponentSourceInspector.svelte';
+  import ComponentDifficultyInspector from './ComponentDifficultyInspector.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -59,6 +60,9 @@
   let componentEditDirty = $state(false);
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
+  // Staged progressive-difficulty value for the component being edited (number or
+  // null). Seeded on edit-entry; persisted with the rest of the draft on Save.
+  let componentDifficultyDraft = $state(null);
   let recipeEditSaving = $state(false);
   let recipeSaveFailed = $state(false);
   // The recipe editor stages edits in a root-held draft and commits only on Save.
@@ -971,7 +975,7 @@
   const canSaveEssenceEdit = $derived(essenceEditDirty === true
     && essenceEditDraft?.validName === true
     && essenceEditSaving !== true);
-  const canSaveComponentEdit = $derived(componentEditDirty === true
+  const canSaveComponentEdit = $derived(componentEditCombinedDirty === true
     && componentEditSaving !== true);
   const canSaveRecipeEdit = $derived(recipeEditDirty === true
     && Boolean(recipeDraft?.name?.trim())
@@ -1001,6 +1005,23 @@
   const componentEditEssenceOptions = $derived(componentEssenceOptionsFor(componentForEdit));
   const componentEditShowTags = $derived(componentShowTagsFor(componentForEdit));
   const componentEditShowEssences = $derived(componentShowEssencesFor(componentForEdit));
+  // Progressive difficulty is authored from the right inspector but STAGED into
+  // the component editor's save flow (it persists on Save, not on change). The
+  // draft is seeded on edit-entry (editComponent); these derive its visibility,
+  // dirtiness, and the combined dirty state the Save button + route guard use.
+  const componentDifficultyShown = $derived(
+    currentView === 'component-edit'
+    && selectedSystem?.resolutionMode === 'progressive'
+    && !!componentForEdit
+  );
+  const componentDifficultyDirty = $derived(
+    componentDifficultyShown
+    && normalizeComponentDifficulty(componentDifficultyDraft)
+      !== normalizeComponentDifficulty(componentForEdit?.difficulty)
+  );
+  const componentEditCombinedDirty = $derived(
+    componentEditDirty === true || componentDifficultyDirty === true
+  );
   const environmentList = $derived($viewState.environments || []);
   const environmentValidationCount = $derived(Array.isArray($viewState.environmentValidationState?.errors)
     ? $viewState.environmentValidationState.errors.length
@@ -1128,6 +1149,19 @@
   // rather than the gathering-config copy.
   const selectedGatheringSystemTools = $derived(Array.isArray($viewState.selectedSystem?.tools) ? $viewState.selectedSystem.tools : []);
   const toolsNavCount = $derived(selectedGatheringSystemTools.length);
+  // Recipe-editor tools library: enrich each tool with its backing component's
+  // name so an unlabelled tool can fall back to the component name rather than
+  // exposing a raw id, mirroring the tool inspector's `label || component.name`
+  // resolution.
+  const recipeToolsLibrary = $derived(
+    selectedGatheringSystemTools.map((tool) => ({
+      ...tool,
+      componentName:
+        (selectedSystem?.managedItemOptions || []).find(
+          (item) => String(item.id) === String(tool.componentId)
+        )?.name || ''
+    }))
+  );
   // Environments of the selected system, as { id, name } rows for the task
   // editor's optional default-environment select (the on-drop precedence middle
   // tier).
@@ -1709,7 +1743,7 @@
 
   function confirmComponentRouteExit(nextView) {
     if (activeView !== 'component-edit') return true;
-    if (componentEditDirty !== true) return true;
+    if (componentEditCombinedDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyComponentDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishComponentRouteExit);
     return finishComponentRouteExit(confirmed);
@@ -2316,6 +2350,10 @@
       selectedComponentId = itemId;
       componentEditDirty = false;
       componentEditDraft = null;
+      // Seed the staged difficulty from the component's persisted value so the
+      // right-inspector input opens in sync and starts clean.
+      const entryItem = itemCards.find((item) => String(item.id) === String(itemId));
+      componentDifficultyDraft = normalizeComponentDifficulty(entryItem?.difficulty);
       activeView = 'component-edit';
     });
   }
@@ -2337,7 +2375,13 @@
     if (componentEditSaving || !itemId) return false;
     componentEditSaving = true;
     try {
-      const result = await store.updateComponent?.(itemId, updates);
+      // Fold the staged progressive-difficulty value into the same update so it
+      // persists through the editor's Save flow (only when the difficulty input
+      // is shown for this progressive system).
+      const merged = componentDifficultyShown
+        ? { ...(updates || {}), difficulty: normalizeComponentDifficulty(componentDifficultyDraft) }
+        : updates;
+      const result = await store.updateComponent?.(itemId, merged);
       if (result === false) return false;
       componentEditDirty = false;
       componentEditDraft = null;
@@ -2353,6 +2397,23 @@
   function replaceComponentSource(itemId, data) {
     if (!itemId) return;
     services?.onReplaceSource?.(itemId, data);
+  }
+
+  // Coerce a raw difficulty value to the persisted shape: an integer >= 1, or
+  // null (cleared) for blank / sub-1 / non-integer / invalid input. Used to both
+  // stage and compare the draft against the persisted component value.
+  function normalizeComponentDifficulty(value) {
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    const numeric = Math.trunc(Number(value));
+    return Number.isFinite(numeric) && numeric >= 1 ? numeric : null;
+  }
+
+  // Stage a progressive-difficulty edit from the right inspector. This does NOT
+  // persist — the value rides along with the component editor's draft and is
+  // written on Save (see saveComponentEdit), so its dirty state and the Save
+  // button stay in sync with the rest of the editor.
+  function stageComponentDifficulty(value) {
+    componentDifficultyDraft = value;
   }
 
   function unlinkComponentSource(itemId = selectedComponent?.id) {
@@ -3833,7 +3894,7 @@
       {:else if currentView === 'components'}
         <!-- no header actions for the components list -->
       {:else if currentView === 'component-edit'}
-        {#if componentEditDirty}
+        {#if componentEditCombinedDirty}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}</span>
         {/if}
         <button type="button" class="manager-button" onclick={cancelComponentEdit} disabled={componentEditSaving}>
@@ -4416,7 +4477,7 @@
         onPickImagePath={services?.pickImagePath}
         linkedItemImage={recipeDraftLinkedItemImage}
         currencyUnits={selectedCurrencyUnits}
-        toolsLibrary={selectedGatheringSystemTools}
+        toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}
         componentTagOptions={selectedSystem?.componentTagOptions || []}
         essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
@@ -6111,6 +6172,13 @@
             onOpenSource={(uuid) => openComponentSource(uuid)}
             onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
           />
+          {#if componentDifficultyShown}
+            <ComponentDifficultyInspector
+              value={componentDifficultyDraft}
+              saving={componentEditSaving}
+              onChange={(value) => stageComponentDifficulty(value)}
+            />
+          {/if}
         {:else}
           <section class="manager-inspector-card">
             <div class="manager-inspector-copy">
