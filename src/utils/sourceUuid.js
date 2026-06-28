@@ -68,6 +68,32 @@ export function getItemSourceReferences(item) {
 }
 
 /**
+ * Collect the UUIDs that identify a Foundry item instance and its canonical
+ * compendium source — but NOT its world-duplicate source.
+ *
+ * Contributes two references: the item's live `uuid` and its compendium-source
+ * UUID ({@link getSourceUuid}). Unlike {@link getItemSourceReferences}, this
+ * deliberately omits `_stats.duplicateSource`, so a world Item cloned from
+ * another world Item is treated as a distinct identity. Use this for component
+ * *identity* decisions — import de-duplication and source-metadata propagation —
+ * where conflating a clone with its original would wrongly merge two components
+ * or rewrite the wrong one. Use {@link getItemSourceReferences} (which keeps the
+ * duplicate source) for craft-time inventory matching, where a player's
+ * drag/duplicate copy of a component's source world item must still resolve to
+ * that component.
+ *
+ * @param {Item|object|null} item - Item-like object that may expose `uuid` and source metadata
+ * @returns {string[]} Unique UUID references, ordered as [item.uuid, compendium source UUID]
+ */
+export function getItemIdentityReferences(item) {
+  const refs = [];
+  if (!item || typeof item !== 'object') return refs;
+  pushUnique(refs, item.uuid);
+  pushUnique(refs, getSourceUuid(item));
+  return refs;
+}
+
+/**
  * Collect every UUID reference that a component can use for runtime matching.
  *
  * @param {object|null} component - Component-like object with source UUID fields
