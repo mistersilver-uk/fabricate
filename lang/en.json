@@ -858,6 +858,7 @@
           "DeepConfigHint": "Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager views.",
           "FeatureHint": {
             "Gathering": "Shows gathering environments and player gathering flows for this system.",
+            "Salvage": "Enables component salvage and the salvage check configuration for this system.",
             "RecipeCategories": "Adds category organization to recipe browsing and authoring.",
             "ItemTags": "Enables managed component tags and tag-based ingredient options.",
             "Essences": "Enables essence definitions and essence requirements.",
@@ -2425,6 +2426,7 @@
         },
         "Feature": {
           "Gathering": "Gathering",
+          "Salvage": "Salvage",
           "RecipeCategories": "Recipe categories",
           "ItemTags": "Item tags",
           "Essences": "Essences",

@@ -335,6 +335,7 @@
 
   const featureDefinitions = [
     { systemKey: 'gathering', storeKey: 'gathering', labelKey: 'FABRICATE.Admin.Manager.Feature.Gathering', fallback: 'Gathering', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Gathering', hintFallback: 'Shows gathering environments and player gathering flows for this system.' },
+    { systemKey: 'salvage', storeKey: 'salvage', labelKey: 'FABRICATE.Admin.Manager.Feature.Salvage', fallback: 'Salvage', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Salvage', hintFallback: 'Enables component salvage and the salvage check configuration for this system.' },
     { systemKey: 'essences', storeKey: 'essences', labelKey: 'FABRICATE.Admin.Manager.Feature.Essences', fallback: 'Essences', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Essences', hintFallback: 'Enables essence definitions and essence requirements.' },
     { systemKey: 'multiStepRecipes', storeKey: 'multiStepRecipes', labelKey: 'FABRICATE.Admin.Manager.Feature.MultiStepRecipes', fallback: 'Multi-step recipes', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.MultiStepRecipes', hintFallback: 'Enables explicit recipe steps and step-level requirements.' },
     { systemKey: 'propertyMacros', storeKey: 'propertyMacros', labelKey: 'FABRICATE.Admin.Manager.Feature.PropertyMacros', fallback: 'Property macros', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.PropertyMacros', hintFallback: 'Allows macro-backed component property behavior.' },
@@ -464,18 +465,20 @@
             optionDataAttr="data-system-resolution-mode-option"
             onChange={handleResolutionModeChange}
           />
-          <ResolutionModeCard
-            legendKey="FABRICATE.Admin.SystemSettings.SalvageResolutionMode"
-            legendFallback="Salvage resolution mode"
-            hintKey="FABRICATE.Admin.SystemSettings.SalvageResolutionModeHint"
-            hintFallback="Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled."
-            options={salvageResolutionModeOptions}
-            selectedValue={systemSalvageResolutionModeValue}
-            groupName="manager-system-salvage-resolution-mode"
-            dataAttr="data-system-salvage-resolution-mode"
-            optionDataAttr="data-system-salvage-resolution-mode-option"
-            onChange={handleSalvageResolutionModeChange}
-          />
+          {#if selectedSystem.features?.salvage === true}
+            <ResolutionModeCard
+              legendKey="FABRICATE.Admin.SystemSettings.SalvageResolutionMode"
+              legendFallback="Salvage resolution mode"
+              hintKey="FABRICATE.Admin.SystemSettings.SalvageResolutionModeHint"
+              hintFallback="Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled."
+              options={salvageResolutionModeOptions}
+              selectedValue={systemSalvageResolutionModeValue}
+              groupName="manager-system-salvage-resolution-mode"
+              dataAttr="data-system-salvage-resolution-mode"
+              optionDataAttr="data-system-salvage-resolution-mode-option"
+              onChange={handleSalvageResolutionModeChange}
+            />
+          {/if}
         </div>
       </section>
 

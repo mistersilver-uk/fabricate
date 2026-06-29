@@ -7,33 +7,40 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { activeTab = 'crafting', onSelect = () => {} } = $props();
+  let { activeTab = 'crafting', showSalvage = true, showGathering = true, onSelect = () => {} } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
-  const TABS = [
+  const ALL_TABS = [
     { id: 'crafting', icon: 'fas fa-hammer', key: 'Crafting', fallback: 'Crafting' },
     { id: 'salvage', icon: 'fas fa-recycle', key: 'Salvage', fallback: 'Salvage' },
     { id: 'gathering', icon: 'fas fa-seedling', key: 'Gathering', fallback: 'Gathering' },
     { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
   ];
 
+  // Salvage and gathering are optional features: drop their tabs when off.
+  const tabs = $derived(
+    ALL_TABS.filter(
+      (tab) => (tab.id !== 'salvage' || showSalvage) && (tab.id !== 'gathering' || showGathering)
+    )
+  );
+
   function onKeydown(event, index) {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
     event.preventDefault();
     const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (index + delta + TABS.length) % TABS.length;
-    onSelect(TABS[nextIndex].id);
+    const nextIndex = (index + delta + tabs.length) % tabs.length;
+    onSelect(tabs[nextIndex].id);
     const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
     buttons?.[nextIndex]?.focus();
   }
 </script>
 
 <div class="manager-environment-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}>
-  {#each TABS as tab, index (tab.id)}
+  {#each tabs as tab, index (tab.id)}
     <button
       type="button"
       role="tab"

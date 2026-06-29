@@ -304,6 +304,7 @@ function createStore(calls = [], options = {}) {
     itemTags: true,
     gathering: true,
     recipeCategories: true,
+    salvage: true,
   };
   const alchemyManagedItemOptions = options.emptyComponents
     ? []
@@ -394,6 +395,7 @@ function createStore(calls = [], options = {}) {
         itemTags: false,
         recipeCategories: true,
         essences: false,
+        salvage: true,
       },
       managedItemOptions: [
         { id: 's1' },
@@ -1773,6 +1775,43 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('hides the Checks Salvage tab when the salvage feature is off', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          selectedFeatures: {
+            essences: true,
+            itemTags: true,
+            recipeCategories: true,
+            gathering: true,
+            salvage: false,
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-checks-tab-button]')).map((button) =>
+        button.textContent.trim()
+      ),
+      ['Crafting', 'Gathering', 'Validation'],
+      'the Salvage tab is dropped when salvage is off'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-tab-button="salvage"]'),
+      null,
+      'no salvage tab button renders'
+    );
+  });
+
   it('points each Checks help card at the matching documentation page', () => {
     const cases = [
       {
@@ -2706,10 +2745,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(noneSeg.classList.contains('is-selected'), 'the outcome is pinned to No effect');
   });
 
-  // ChecksView forces toolSpecific for a subsystem whose feature is off, so its
-  // editor renders the unified triggers WITHOUT the break pill even when the system
-  // authority is checkDriven. Mount ChecksView with the gathering feature off and the
-  // gathering tab active, and confirm the break pill gating.
   function mountChecksView(props) {
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2720,7 +2755,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
   }
 
-  it('checks view: a checkDriven crafting editor shows the break pill; a feature-off gathering editor hides it', () => {
+  it('checks view: a checkDriven crafting editor shows the break pill; the gathering tab is hidden when gathering is off', () => {
     mountChecksView({
       breakageAuthority: 'checkDriven',
       features: { gathering: false },
@@ -2735,22 +2770,29 @@ describe('CraftingSystemManager mounted behavior', () => {
       'crafting break pill renders under checkDriven authority'
     );
 
-    // Switch to the gathering tab: the disabled gathering subsystem forces
-    // toolSpecific, so its editor renders the triggers without the break pill.
+    // Gathering is an opt-in feature: with it off, its Checks tab is not offered at
+    // all (so there is no disabled gathering editor to reach).
+    assert.equal(
+      target.querySelector('[data-checks-tab-button="gathering"]'),
+      null,
+      'the gathering tab is hidden when the gathering feature is off'
+    );
+  });
+
+  it('checks view: the gathering tab is offered when the gathering feature is on', () => {
+    mountChecksView({
+      breakageAuthority: 'toolSpecific',
+      features: { gathering: true },
+      gatheringResolutionMode: 'routed',
+      gatheringCheckRouted: routedBreakageValue,
+    });
     const gatheringTab = target.querySelector('[data-checks-tab-button="gathering"]');
-    assert.ok(gatheringTab, 'the gathering tab renders');
+    assert.ok(gatheringTab, 'the gathering tab renders when gathering is enabled');
     gatheringTab.click();
     flushSync();
     assert.ok(
       target.querySelector('[data-checks-panel="gathering"]'),
-      'the gathering panel is shown'
-    );
-    const gatheringTriggers = target.querySelector('[data-check-triggers]');
-    assert.ok(gatheringTriggers, 'the gathering editor still renders the unified triggers');
-    assert.equal(
-      gatheringTriggers.querySelector('[data-trigger-break]'),
-      null,
-      'the disabled gathering subsystem hides the per-trigger break pill'
+      'the gathering panel is shown when the tab is selected'
     );
   });
 
@@ -10077,6 +10119,44 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       calls.some((call) => call[0] === 'setSalvageResolutionMode' && call[1] === 'routed'),
       'selecting the routed radio persists the canonical routed value'
+    );
+  });
+
+  it('renders the Salvage feature toggle and routes its change', async () => {
+    const { calls } = await mountCurrencyEditor();
+    const tile = target.querySelector('[data-feature-key="salvage"]');
+    assert.ok(tile, 'the salvage feature toggle renders in System Settings');
+    // The default fixture has salvage on, so toggling sends false.
+    tile.querySelector('.manager-status-toggle').click();
+    assert.ok(
+      calls.some(
+        (call) => call[0] === 'toggleFeature' && call[1] === 'salvage' && call[2] === false
+      ),
+      'toggling the salvage tile routes toggleFeature(salvage, false)'
+    );
+  });
+
+  it('hides the salvage resolution-mode card when the salvage feature is off (toggle stays available)', async () => {
+    await mountCurrencyEditor({
+      selectedFeatures: {
+        essences: true,
+        itemTags: true,
+        recipeCategories: true,
+        gathering: true,
+        salvage: false,
+      },
+    });
+    assert.equal(
+      target.querySelector('[data-system-salvage-resolution-mode]'),
+      null,
+      'the salvage resolution card is hidden when salvage is off'
+    );
+    const tile = target.querySelector('[data-feature-key="salvage"]');
+    assert.ok(tile, 'the salvage toggle still renders so the GM can turn salvage back on');
+    assert.equal(
+      tile.querySelector('.manager-status-toggle').getAttribute('aria-pressed'),
+      'false',
+      'the salvage toggle reads as off'
     );
   });
 

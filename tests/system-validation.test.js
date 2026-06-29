@@ -362,6 +362,30 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
     );
   });
 
+  it('routed salvage with no formula/tiers raises NO salvage warnings when the salvage feature is off', () => {
+    const component = {
+      id: 'comp-1',
+      name: 'Slain Balehound',
+      salvage: { resultGroups: [{ id: 'g1', results: [] }] },
+    };
+    // Same gap as the warning cases above, but salvage is disabled — the whole
+    // salvage subsystem is inert, so no salvage issues (system or per-component)
+    // are raised even though the config is still present on the component.
+    const system = makeSystem({ salvageResolutionMode: 'routed', features: { salvage: false } });
+    const report = evaluateSystemValidation(system, { components: [component] });
+
+    assert.equal(
+      report.issues.some(
+        (issue) =>
+          issue.kind === 'salvage' ||
+          issue.code === 'salvageRoutedNoTiers' ||
+          issue.code === 'salvageRoutedNoFormula'
+      ),
+      false,
+      'a disabled salvage feature raises no salvage validation issues'
+    );
+  });
+
   it('progressive mode with no progressive check', () => {
     const system = makeSystem({
       resolutionMode: 'progressive',
