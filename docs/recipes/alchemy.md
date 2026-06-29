@@ -45,7 +45,10 @@ See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) for t
 
 Fabricate finds a recipe match by comparing the submitted items against the ingredient groups of each recipe in the system.
 
-- Each ingredient group must be satisfied by at least one submitted item that the system recognises as one of that group's components.
+- Each ingredient group lists one or more options, and each option asks for a component in a required quantity.
+- A group is satisfied when the submitted items meet the required quantity of at least one of its options.
+- The options in a group are alternatives, so satisfying any single option satisfies the whole group.
+- Quantity is counted by how many matching items the player submits, so a stack of three counts as three units.
 - An item is recognised whether it is the original world or compendium item, a copy of it, or an item that was duplicated from it.
 - If every group in an ingredient set is satisfied, the recipe is a match and crafting proceeds using that ingredient set.
 - Recipes are checked in order, and the first match is used.
