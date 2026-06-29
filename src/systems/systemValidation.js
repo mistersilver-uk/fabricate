@@ -22,7 +22,8 @@
  *
  *  - recipes → {@link evaluateRecipeReadiness} with the projected recipe plus
  *    `{ systemComponents, routingProvider, routedOutcomeTierOptions }`, where
- *    `routingProvider = recipe.resultSelection?.provider` and
+ *    `routingProvider` is derived from the system MODE (`'check'` for
+ *    `routedByCheck`, the alchemy recipe provider for alchemy, else null) and
  *    `routedOutcomeTierOptions = routedSuccessTierOptions(system.craftingCheck?.routed)`,
  *    so #431's `unroutedResultGroup` / `unproducedOutcomeTier` warnings surface;
  *  - environments → {@link evaluateEnvironmentReadiness} with the per-environment
@@ -243,10 +244,20 @@ function tagEnvironmentIssue(issue, environment) {
  */
 function collectRecipeIssues(system, recipes, systemComponents) {
   const routedOutcomeTierOptions = routedSuccessTierOptions(system?.craftingCheck?.routed);
+  // The routing basis is the system MODE (not a per-recipe provider): a
+  // `routedByCheck` system routes every recipe by the routed-check outcome, so the
+  // #431 check-routing warnings apply to all its recipes. Alchemy keeps its
+  // per-recipe provider. Other modes route by neither, so no routed warnings fire.
+  const mode = system?.resolutionMode || 'simple';
   const issues = [];
   for (const recipe of asArray(recipes)) {
     const projected = projectRecipe(recipe);
-    const routingProvider = projected.resultSelection?.provider || null;
+    const routingProvider =
+      mode === 'routedByCheck'
+        ? 'check'
+        : mode === 'alchemy'
+          ? projected.resultSelection?.provider || null
+          : null;
     const { issues: recipeIssues } = evaluateRecipeReadiness(projected, {
       systemComponents,
       routingProvider,
@@ -378,48 +389,28 @@ function collectSystemBlockers(system, recipes, components) {
   const features = system?.features || {};
   const check = system?.craftingCheck || {};
 
-  // A routed system needs a configured routed crafting-check roll formula for any
-  // `check`-provider recipe to resolve. The only thing that makes a routed check
-  // usable is an authored `craftingCheck.routed.rollFormula` — NOT the `enabled`
-  // flag. Product decision: warn always, block when used.
-  //  - When a recipe routes by the `check` provider, a missing formula dead-ends
-  //    every such craft → a `blocks: 'system'` blocker that hides the system.
-  //  - Otherwise it is a non-blocking WARNING (same shape as #431's per-recipe
-  //    routed warnings: `severity: 'warning'`, no `blocks` field) so it counts as
-  //    `counts.warning`, never increments `counts.blockers`, and never sets
-  //    `blocksSystem`.
-  if (mode === 'routed') {
-    const usesCheckProvider = asArray(recipes).some((recipe) => {
-      const raw = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe || {};
-      return raw?.resultSelection?.provider === 'check';
-    });
+  // A `routedByCheck` system routes EVERY recipe by the routed crafting-check
+  // outcome, so it needs a configured routed crafting-check roll formula for any
+  // craft to resolve. The only thing that makes a routed check usable is an
+  // authored `craftingCheck.routed.rollFormula` — NOT the `enabled` flag. Because
+  // the routing basis is now the MODE (not a per-recipe provider), a missing
+  // formula is an UNCONDITIONAL system blocker — independent of any recipe, with
+  // NO recipe scan. `routedByIngredients` routes by the chosen ingredient set and
+  // never raises `routedCheckNoFormula` at any formula state.
+  if (mode === 'routedByCheck') {
     const hasRoutedFormula = Boolean(trimmed(check.routed?.rollFormula));
     if (!hasRoutedFormula) {
-      const entityName = trimmed(system?.name) || system?.id || 'system';
-      blockers.push(
-        usesCheckProvider
-          ? {
-              kind: 'system',
-              entityId: null,
-              entityName,
-              severity: 'critical',
-              blocks: 'system',
-              code: 'routedCheckNoFormula',
-              message:
-                'Routed check-mode recipes are configured but the system has no routed crafting check roll formula.',
-              nav: { view: 'system-overview' },
-            }
-          : {
-              kind: 'system',
-              entityId: null,
-              entityName,
-              severity: 'warning',
-              code: 'routedCheckNoFormula',
-              message:
-                'This routed system has no crafting check roll formula; recipes that route by the check provider will not resolve until one is configured.',
-              nav: { view: 'system-overview' },
-            }
-      );
+      blockers.push({
+        kind: 'system',
+        entityId: null,
+        entityName: trimmed(system?.name) || system?.id || 'system',
+        severity: 'critical',
+        blocks: 'system',
+        code: 'routedCheckNoFormula',
+        message:
+          'Routed-by-check mode requires a routed crafting check roll formula; no recipe in this system can resolve until one is configured.',
+        nav: { view: 'system-overview' },
+      });
     }
   }
 

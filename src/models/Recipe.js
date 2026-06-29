@@ -306,13 +306,14 @@ export class Recipe {
   }
 
   /**
-   * Validate a routed `resultSelection` and its `ResultGroup` names.
+   * Validate an alchemy `resultSelection` and its `ResultGroup` names.
    *
-   * Applies to the routed providers `ingredientSet` and `check`; a recipe with no
-   * `resultSelection` (simple/progressive/legacy) is unaffected. `check` routes by
-   * the system crafting-check outcome.
+   * `resultSelection.provider` survives ONLY for alchemy (the routed crafting
+   * modes derive their basis from the system mode and clear `resultSelection`), so
+   * a recipe with no `resultSelection` (simple/progressive/routed/legacy) is
+   * unaffected. The alchemy `check` provider routes by the crafting-check outcome.
    *
-   * Under EVERY routed provider, `ResultGroup.name` must be unique under
+   * Under the alchemy providers, `ResultGroup.name` must be unique under
    * trim+lowercase comparison and must not collide with a reserved routing
    * keyword (the fail/miss/hazard families in `routedOutcomeKeywords.js`). The
    * shared keyword set keeps this in lockstep with the runtime resolution path in
@@ -324,13 +325,12 @@ export class Recipe {
    */
   _validateRoutedResultSelection(resultSelection, resultGroups, errors) {
     const provider = resultSelection?.provider;
-    // Only routed providers route by ResultGroup.name; a recipe with no
-    // resultSelection (simple/progressive/legacy) is unaffected. `check` routes by
-    // the system crafting-check outcome.
+    // Only an alchemy provider routes by ResultGroup.name; a recipe with no
+    // resultSelection (simple/progressive/routed/legacy) is unaffected.
     if (!['ingredientSet', 'check'].includes(provider)) return;
 
-    // Reserved + unique ResultGroup.name rules apply under EVERY routed provider
-    // (spec 004 §Validation lines 79-80), using the shared keyword set so the
+    // Reserved + unique ResultGroup.name rules apply under the alchemy providers
+    // (spec 004 §routedByCheck Validation), using the shared keyword set so the
     // model and ResolutionModeService never drift.
     const seenNames = new Set();
     for (const group of resultGroups || []) {
@@ -466,7 +466,9 @@ export class Recipe {
 
   _normalizeResultSelection(resultSelection) {
     if (!resultSelection || typeof resultSelection !== 'object') return null;
-    // `ingredientSet` and `check` are the canonical routed providers. The legacy
+    // `ingredientSet` and `check` are the canonical providers — now ALCHEMY-only
+    // (the routed crafting modes derive their basis from the system mode and carry
+    // no `resultSelection`). The legacy
     // `macroOutcome`/`rollTableOutcome` providers were removed in 1.6.0 (persisted
     // recipes were migrated onto `check` by `migrateRemoveResultSelectionProviders`).
     // The `macroUuid` those providers carried is now orphaned — nothing reads it —

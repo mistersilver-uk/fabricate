@@ -1464,14 +1464,15 @@ export class CraftingEngine {
    * A check is REQUIRED (run even when the system has crafting checks disabled)
    * when the recipe needs a check outcome to select its result:
    *  - `progressive` mode, or
-   *  - `routed` mode with the `check` provider.
+   *  - `routedByCheck` mode.
    *
-   * The other routed provider does not need a check outcome to route:
-   * `ingredientSet` selects by the chosen ingredient set. For it, and for
-   * `simple`/`alchemy`, the check only runs when the system enables crafting
-   * checks (alchemy additionally always runs its simple pass/fail check when a
-   * roll formula is configured — see `useSimpleCheck` below). There is no legacy
-   * `tiered` branch — `tiered` is gone, replaced by `routed` + provider.
+   * `routedByIngredients` does not need a check outcome to route: it selects by
+   * the chosen ingredient set, so its check is OPTIONAL (runs only when a routed
+   * roll formula is authored). For it, and for `simple`/`alchemy`, the check only
+   * runs when the system enables crafting checks (alchemy additionally always runs
+   * its simple pass/fail check when a roll formula is configured — see
+   * `useSimpleCheck` below). There is no legacy `tiered` branch — `tiered` is gone,
+   * replaced by the two routed modes.
    *
    * @private
    * @returns {Promise<{success: boolean, outcome: ?string, value?: *, data: object}>}
@@ -1481,7 +1482,10 @@ export class CraftingEngine {
     craftingActor,
     componentSourceActors,
     ingredientSet,
-    step = null
+    // The routing basis is now a property of the system MODE, so the check no
+    // longer reads the step's `resultSelection`; the param is retained for the
+    // positional call signature.
+    _step = null
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -1496,10 +1500,8 @@ export class CraftingEngine {
     }
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
-    const selection =
-      resolutionService?.getResultSelection?.(recipe, step) || recipe?.resultSelection || null;
-    const checkRequired =
-      mode === 'progressive' || (mode === 'routed' && selection?.provider === 'check');
+    const isRoutedMode = mode === 'routedByIngredients' || mode === 'routedByCheck';
+    const checkRequired = mode === 'progressive' || mode === 'routedByCheck';
     const features = system.features || {};
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;
@@ -1523,12 +1525,14 @@ export class CraftingEngine {
     const progressiveConfig = system?.craftingCheck?.progressive;
     const useProgressiveCheck = mode === 'progressive' && !!progressiveConfig?.rollFormula;
 
-    // Routed check (Checks editor) for routed mode: rolls the routed formula and
-    // maps the total to an outcome tier whose NAME drives the routed `check`-provider
-    // routing. Usable only when a routed formula is configured; with no formula a
-    // routed + check-provider attempt fails via the required-check guard below.
+    // Routed check (Checks editor) for the routed modes: rolls the routed formula
+    // and maps the total to an outcome tier whose NAME drives `routedByCheck`
+    // routing. Usable only when a routed formula is configured. In `routedByCheck`
+    // the check is required (a missing formula fails via the required-check guard
+    // below); in `routedByIngredients` it is an optional pass/fail layer that runs
+    // only when a formula is authored.
     const routedConfig = system?.craftingCheck?.routed;
-    const useRoutedCheck = mode === 'routed' && !!routedConfig?.rollFormula;
+    const useRoutedCheck = isRoutedMode && !!routedConfig?.rollFormula;
 
     if (
       !checksEnabled &&
@@ -1687,7 +1691,8 @@ export class CraftingEngine {
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     const mode = resolutionService?.getMode?.(recipe) || system?.resolutionMode || 'simple';
     const check = system?.craftingCheck || {};
-    if (mode === 'routed') return check.routed?.checkBreakage ?? null;
+    if (mode === 'routedByIngredients' || mode === 'routedByCheck')
+      return check.routed?.checkBreakage ?? null;
     if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
     return check.simple?.checkBreakage ?? null;
   }
