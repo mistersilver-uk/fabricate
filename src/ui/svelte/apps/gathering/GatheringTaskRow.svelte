@@ -325,8 +325,10 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    /* 1.5 line-height keeps the second line's descenders inside the clamp box
+       so overflow: hidden no longer shaves g/y/p (issue 401). */
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.5;
     color: var(--fab-text-muted);
   }
 
