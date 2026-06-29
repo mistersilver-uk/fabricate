@@ -79,48 +79,13 @@
   // and writes the active type's list, so changes in one mode never touch the other.
   const outcomesKey = $derived(type === 'fixed' ? 'fixedOutcomes' : 'relativeOutcomes');
   const outcomes = $derived(Array.isArray(value?.[outcomesKey]) ? value[outcomesKey] : []);
+  // Fixed-mode tiers own a non-overlapping segment of the roll value range; the
+  // conflict set drives the per-row invalid highlight below. The textual
+  // validation messages (unnamed tier, no Success tier, range invalid/overlap)
+  // are no longer shown inline here — they are surfaced in the Checks editor's
+  // Validation tab (see ChecksValidationTab / checksReadiness), the one canonical
+  // place a GM reviews per-check issues.
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
-  // Outcome routing is keyed by tier NAME (crafting/salvage map the name to a
-  // result group; gathering matches it to a same-named result group). An unnamed
-  // tier can never be routed, so a winning roll on it silently yields nothing —
-  // surface it here so the GM names every tier.
-  const hasUnnamedOutcome = $derived(outcomes.some((outcome) => !String(outcome?.name || '').trim()));
-  // Only SUCCESS tiers can be routed to a result set (a failed check produces
-  // nothing). A tier list with no Success leaves every recipe result set
-  // unroutable — surface it here, at the source, so the GM doesn't have to
-  // discover it from the recipe editor's empty routing picker.
-  const hasNoSuccessOutcome = $derived(
-    outcomes.length > 0 && !outcomes.some((outcome) => outcome?.success === true)
-  );
-
-  const validationMessages = $derived(
-    [
-      conflicts?.invalid.size
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.RangeInvalid',
-            'Some tiers have a start greater than their end.'
-          )
-        : null,
-      conflicts?.overlapping.size
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.RangeOverlap',
-            'Some tier ranges overlap. Each value range must be unique.'
-          )
-        : null,
-      hasUnnamedOutcome
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeUnnamed',
-            'Name every outcome tier — an unnamed tier cannot be routed to a result group.'
-          )
-        : null,
-      hasNoSuccessOutcome
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeNoSuccess',
-            "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success."
-          )
-        : null,
-    ].filter(Boolean)
-  );
 
   const successOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success'));
   const successOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure'));
@@ -332,12 +297,5 @@
       </div>
     {/if}
 
-    {#if validationMessages.length > 0}
-      <ul class="manager-checks-validation" data-checks-validation>
-        {#each validationMessages as message (message)}
-          <li class="manager-chip is-danger">{message}</li>
-        {/each}
-      </ul>
-    {/if}
   </section>
 </div>
