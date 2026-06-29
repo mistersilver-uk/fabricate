@@ -84,10 +84,12 @@ Optionally consumes the recipe item.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
-| `params.viewer` | `User` | The user |
 | `params.recipe` | `Recipe` | The recipe to learn |
 | `params.craftingActor` | `Actor` | The actor who learns it |
 | `params.componentSourceActors` | `Actor[]` | Source actors (for item matching) |
+
+The crafting actor (or one of the source actors) must own a matching recipe item for learning to succeed.
+This requirement applies to every caller, including a GM.
 
 **Returns:** `Promise<{ success: boolean, message: string, messageData?: object }>`
 
