@@ -32,7 +32,8 @@
     // field when the set has no explicit name, and read-only in check mode.
     defaultName = '',
     onChange = () => {},
-    onRemove = () => {}
+    onRemove = () => {},
+    onDuplicate = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -139,6 +140,14 @@
           >{defaultName}</span
         >
       {/if}
+      <button
+        type="button"
+        class="manager-icon-button"
+        data-recipe-duplicate="ingredient-set"
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
+        title={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
+        onclick={() => onDuplicate()}
+      ><i class="fas fa-clone" aria-hidden="true"></i></button>
       <button
         type="button"
         class="manager-icon-button is-danger"
