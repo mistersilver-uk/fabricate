@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   migrateRecipeForModeChange,
   classifyModeChange,
+  chooseSeedProvider,
 } from '../src/migration/migrateRecipeForModeChange.js';
 
 const MODES = ['simple', 'routed', 'progressive', 'alchemy'];
@@ -325,4 +326,26 @@ test('every from→to mode pair returns a valid outcome', () => {
       );
     }
   }
+});
+
+// --- chooseSeedProvider (exported for the recipe editor's Complex-mode seed) --
+
+// The recipe editor seeds a routing provider when a recipe is switched to Complex
+// in a provider-routed system, reusing this exact contract so the editor default
+// and the migration never drift.
+
+test('chooseSeedProvider: routed mode with a usable routed formula returns check', () => {
+  assert.equal(chooseSeedProvider(SYSTEM_WITH_CHECK, 'routed'), 'check');
+});
+
+test('chooseSeedProvider: routed mode without a usable formula returns ingredientSet', () => {
+  assert.equal(chooseSeedProvider(SYSTEM_NO_CHECK, 'routed'), 'ingredientSet');
+});
+
+test('chooseSeedProvider: alchemy mode keys on the simple formula', () => {
+  assert.equal(chooseSeedProvider(SYSTEM_WITH_CHECK, 'alchemy'), 'check');
+  assert.equal(
+    chooseSeedProvider({ craftingCheck: { routed: { rollFormula: '1d20' } } }, 'alchemy'),
+    'ingredientSet'
+  );
 });

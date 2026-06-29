@@ -1078,6 +1078,66 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('duplicates an ingredient set (new ids, routing stripped, inserted after the original) via onUpdateRecipe', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        complex: true,
+        recipe: {
+          ...RECIPE,
+          complex: true,
+          // A routed-by-ingredient set already assigned to a result group, with a
+          // nested group whose id must NOT be carried onto the copy.
+          ingredientSets: [
+            {
+              id: 'set-1',
+              name: 'Primary',
+              resultGroupId: 'grp-out',
+              resultMapping: [{ from: 'a', to: 'b' }],
+              ingredientGroups: [
+                { id: 'grp-1', options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] },
+              ],
+            },
+            { id: 'set-2', name: 'Secondary', ingredientGroups: [] },
+          ],
+        },
+        componentOptions: COMPONENT_OPTIONS,
+        onUpdateRecipe: (patch) => patches.push(patch),
+      })
+    );
+    clickTab(target, 'ingredients');
+    await flushRender();
+    // Duplicate the FIRST set (its card carries data-recipe-set-id="set-1").
+    target
+      .querySelector('[data-recipe-set-id="set-1"] [data-recipe-duplicate="ingredient-set"]')
+      .click();
+    assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
+    const nextSets = patches[0].ingredientSets;
+    assert.equal(nextSets.length, 3, 'the ingredient set array grew by one');
+    // The copy is inserted right after its original, before the other set.
+    assert.deepEqual(
+      nextSets.map((s) => s.id !== undefined),
+      [true, true, true],
+      'every set carries an id'
+    );
+    assert.equal(nextSets[0].id, 'set-1', 'the original set is untouched at its position');
+    assert.equal(nextSets[2].id, 'set-2', 'the unrelated set stays last');
+    const copy = nextSets[1];
+    assert.ok(copy.id && copy.id !== 'set-1', 'the copy gets a fresh set id');
+    assert.equal(copy.name, 'Primary (Copy)', 'the copy name is suffixed for clarity');
+    assert.equal(copy.resultGroupId, null, 'the copy drops the result-group routing assignment');
+    assert.deepEqual(copy.resultMapping, [], 'the copy drops the result mapping');
+    assert.ok(copy.ingredientGroups[0].id && copy.ingredientGroups[0].id !== 'grp-1', 'nested group ids are re-minted');
+    assert.deepEqual(
+      copy.ingredientGroups[0].options,
+      [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
+      'the requirement content is carried verbatim'
+    );
+    // The deep clone shares no references with the original group.
+    assert.notEqual(copy.ingredientGroups[0], nextSets[0].ingredientGroups[0], 'the copy is a deep clone, not a shared reference');
+    editHarness.remount();
+  });
+
   it('appends a result set via onUpdateRecipe({ resultGroups }) when + Add result set is clicked', async () => {
     const patches = [];
     const target = await editHarness.mount(
@@ -1155,7 +1215,7 @@ describe('RecipeEditView (mounted)', () => {
     rows.forEach((row, index) => {
       const handle = row.querySelector('.manager-environment-comp-handle');
       assert.ok(handle, `row ${index} renders the shared handle`);
-      assert.equal(handle.getAttribute('draggable'), 'true', `row ${index} handle is the drag source`);
+      assert.equal(row.getAttribute('draggable'), 'true', `row ${index} card is the drag source`);
       assert.ok(handle.querySelector('.fa-grip-vertical'), `row ${index} renders the grip icon`);
       assert.ok(
         handle.querySelector('.manager-environment-comp-order').textContent.includes(String(index + 1)),
@@ -1171,8 +1231,8 @@ describe('RecipeEditView (mounted)', () => {
       { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
     ]);
     const rows = target.querySelectorAll('[data-recipe-result-row]');
-    // Drag row 0 (the grip is the source) and drop it onto row 1.
-    fireDrag(rows[0].querySelector('.manager-environment-comp-handle'), 'dragstart');
+    // Drag row 0 (the whole card is the source) and drop it onto row 1.
+    fireDrag(rows[0], 'dragstart');
     fireDrag(rows[1], 'drop');
     await flushRender();
     assert.equal(patches.length, 1, 'the reorder emits exactly one recipe patch');

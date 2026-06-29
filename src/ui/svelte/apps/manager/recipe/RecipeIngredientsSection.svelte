@@ -78,6 +78,29 @@
   function removeSet(index) {
     onChange(sets.filter((_, i) => i !== index));
   }
+
+  // Duplicate a set to speed up routed-by-ingredient recipes where alternatives
+  // differ by only a requirement or two. Deep-clone via JSON so the copy shares no
+  // references with the original, then re-mint the set + group ids (groups carry
+  // ids; options do not). The routing assignment that ties a set to a result group
+  // (`resultGroupId`/`resultMapping`) is dropped so the copy starts unassigned —
+  // it is meant to be edited and re-routed, not to silently share the original's
+  // output. The copy is inserted right after the original so it reads as related.
+  function duplicateSet(index) {
+    const source = sets[index];
+    if (!source) return;
+    const cloned = JSON.parse(JSON.stringify(source));
+    cloned.id = newId();
+    cloned.ingredientGroups = Array.isArray(cloned.ingredientGroups)
+      ? cloned.ingredientGroups.map((group) => ({ ...group, id: newId() }))
+      : [];
+    cloned.resultGroupId = null;
+    cloned.resultMapping = [];
+    cloned.name = source?.name?.trim()
+      ? `${source.name} (${text('FABRICATE.Admin.Manager.Recipe.SetCopySuffix', 'Copy')})`
+      : '';
+    onChange([...sets.slice(0, index + 1), cloned, ...sets.slice(index + 1)]);
+  }
 </script>
 
 <section class="manager-task-core-card manager-recipe-section" data-recipe-section={`${idPrefix}ingredients`}>
@@ -126,6 +149,7 @@
             defaultName={defaultSetName(index)}
             onChange={(nextSet) => updateSet(index, nextSet)}
             onRemove={() => removeSet(index)}
+            onDuplicate={() => duplicateSet(index)}
           />
         </li>
       {/each}

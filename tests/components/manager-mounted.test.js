@@ -194,6 +194,9 @@ function compileManagerRoot() {
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',
     'src/gatheringImageDefaults.js',
+    // CraftingSystemManagerRoot seeds a routing provider when a recipe enters
+    // Complex mode, reusing chooseSeedProvider from this pure migration module.
+    'src/migration/migrateRecipeForModeChange.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });

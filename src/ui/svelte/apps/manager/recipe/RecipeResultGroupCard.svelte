@@ -53,9 +53,9 @@
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
 
   // Drag-reorder state (progressive only). Local so it survives the store refresh
-  // that follows every persisted edit — rows are keyed by result id. Mirrors the
-  // native HTML5 drag pattern in RecipeStepAccordion: the grip is the drag source,
-  // the row is the drop target, and a splice emits the reordered group.
+  // that follows every persisted edit — rows are keyed by result id. Native HTML5
+  // drag: the whole card is both the drag source and the drop target, and a splice
+  // emits the reordered group.
   let dragIndex = $state(-1);
 
   function reorderItem(from, to) {
@@ -199,22 +199,25 @@
     <div class="manager-recipe-ingredient-set-groups">
       {#each results as item, index (item?.id || index)}
         {#if progressive}
-          <!-- Progressive: the grip is the drag SOURCE (so a grab inside the row's
-               component picker still selects text), the row is the drop TARGET. Drag
-               is a mouse-only enhancement. Progressive rows carry no quantity field
-               (the row hides it), so order + repetition are the only authored inputs. -->
+          <!-- Progressive: the whole card is the drag SOURCE (so the drag ghost is
+               the full row, not just the grip) and the drop TARGET; the grip + order
+               pip stay as a visual affordance. Drag is a mouse-only enhancement.
+               Progressive rows carry no quantity field (the row hides it) and no text
+               input, so dragging from anywhere on the card is safe — order +
+               repetition are the only authored inputs. -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="manager-recipe-result-row is-reorderable"
             data-recipe-result-row
+            draggable="true"
+            ondragstart={() => { dragIndex = index; }}
+            ondragend={() => { dragIndex = -1; }}
             ondragover={(event) => event.preventDefault()}
             ondrop={(event) => { event.preventDefault(); handleResultDrop(index); }}
           >
             <span
               class="manager-environment-comp-handle"
-              draggable="true"
-              ondragstart={() => { dragIndex = index; }}
-              ondragend={() => { dragIndex = -1; }}
+              aria-hidden="true"
               title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
             >
               <i class="fas fa-grip-vertical" aria-hidden="true"></i>
