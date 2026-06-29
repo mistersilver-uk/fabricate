@@ -27,19 +27,19 @@ function makeManager() {
 // Group 1: System-level salvage normalisation (4 tests)
 // ---------------------------------------------------------------------------
 
-test('features.salvage is always true (salvage is always on)', () => {
+test('features.salvage defaults to true (salvage is an opt-out feature)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 'sys-1' });
   assert.equal(system.features.salvage, true);
 });
 
-test('features.salvage stays true even when explicitly set to false', () => {
+test('features.salvage honors an explicit false (salvage is optional)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
     features: { salvage: false }
   });
-  assert.equal(system.features.salvage, true);
+  assert.equal(system.features.salvage, false);
 });
 
 test('salvageResolutionMode defaults to "simple" when not provided', () => {
@@ -129,16 +129,17 @@ test('salvageCraftingCheck.outcomes defaults to ["fail", "pass"]', () => {
 // Group 3: Component-level salvage normalisation (6 tests)
 // ---------------------------------------------------------------------------
 
-test('salvage is always on, so every normalised component has a salvage key', () => {
+test('component salvage config is preserved even when features.salvage is off (non-destructive toggle)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
-    // Even an explicit salvage:false is forced on, so the component is salvageable.
+    // Salvage off: the feature is disabled, but the component still carries its
+    // (inert) salvage config so re-enabling restores it.
     features: { salvage: false },
     components: [{ id: 'comp-1', name: 'Iron Ore' }]
   });
   const component = system.components[0];
-  assert.equal(system.features.salvage, true);
+  assert.equal(system.features.salvage, false);
   assert.equal(Object.prototype.hasOwnProperty.call(component, 'salvage'), true);
 });
 

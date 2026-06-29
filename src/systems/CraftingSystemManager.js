@@ -72,7 +72,7 @@ export class CraftingSystemManager {
         ? system.managedItems
         : system.items;
     const items = Array.isArray(rawManagedItems)
-      ? rawManagedItems.map((i) => this._normalizeComponent(i, essenceIds, features.salvage))
+      ? rawManagedItems.map((i) => this._normalizeComponent(i, essenceIds))
       : [];
     const itemIds = new Set(items.map((i) => i.id));
     const itemById = new Map(items.map((i) => [i.id, i]));
@@ -292,10 +292,12 @@ export class CraftingSystemManager {
       outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false,
       effectTransfer: has('effectTransfer') ? features.effectTransfer === true : false,
       gathering: has('gathering') ? features.gathering === true : false,
-      // Salvage is always on: every crafting system can author component salvage.
-      // (Whether a component is actually salvageable is per-component, via its
-      // own salvage config and the system salvage resolution mode.)
-      salvage: true,
+      // Salvage is an optional feature, defaulting ON for backward compatibility
+      // (existing systems persisted `salvage: true`). When off, the salvage
+      // subsystem — its Checks tab, resolution-mode card, component editor,
+      // validation, and runtime — is hidden/skipped, but authored component salvage
+      // config is preserved (see `_normalizeComponent`) so the toggle is reversible.
+      salvage: has('salvage') ? features.salvage === true : true,
       chatOutput: has('chatOutput') ? features.chatOutput === true : true,
       itemPiles: has('itemPiles') ? features.itemPiles === true : false,
     };
@@ -1068,7 +1070,7 @@ export class CraftingSystemManager {
     return [...fallbackSet];
   }
 
-  _normalizeComponent(item = {}, validEssenceIds = null, salvageEnabled = false) {
+  _normalizeComponent(item = {}, validEssenceIds = null) {
     const difficulty = Number(item.difficulty);
     const sourceItemUuid = item.sourceItemUuid || item.sourceUuid || null;
     const sourceUuid = item.sourceUuid || item.sourceItemUuid || null;
@@ -1099,7 +1101,11 @@ export class CraftingSystemManager {
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
       difficulty:
         Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined,
-      ...(salvageEnabled ? { salvage: this._normalizeSalvage(item.salvage) } : {}),
+      // Salvage config is always normalized and preserved on the component so the
+      // `features.salvage` toggle is non-destructive: turning salvage off hides and
+      // skips it (UI/validation/runtime gate on the flag) but never deletes authored
+      // salvage; toggling back on restores it.
+      salvage: this._normalizeSalvage(item.salvage),
     };
   }
 
@@ -1846,7 +1852,7 @@ export class CraftingSystemManager {
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
-    const item = this._normalizeComponent(data, validEssenceIds, system.features?.salvage === true);
+    const item = this._normalizeComponent(data, validEssenceIds);
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
     await this.save();
@@ -2090,8 +2096,7 @@ export class CraftingSystemManager {
       {
         ...nextSnapshot,
       },
-      validEssenceIds,
-      system.features?.salvage === true
+      validEssenceIds
     );
 
     this._assertUniqueComponentSources(system, item);
@@ -2154,8 +2159,7 @@ export class CraftingSystemManager {
         ),
         id: itemId,
       },
-      validEssenceIds,
-      system.features?.salvage === true
+      validEssenceIds
     );
 
     system.components[idx] = updatedItem;
@@ -2292,8 +2296,7 @@ export class CraftingSystemManager {
     const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
     const updatedItem = this._normalizeComponent(
       { ...system.components[idx], ...updates, id: itemId },
-      validEssenceIds,
-      system.features?.salvage === true
+      validEssenceIds
     );
     if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {
       this._assertUniqueComponentSources(system, updatedItem, itemId);

@@ -259,7 +259,7 @@ test('GM notification sent when components are disabled by mode change', async (
 // Group 2: Feature disable cleans up salvage runs
 // ---------------------------------------------------------------------------
 
-test('Salvage is always on: attempting to disable it keeps it enabled and preserves run history', async () => {
+test('Disabling salvage takes effect and cleans up this system\'s salvage runs', async () => {
   const systemId = 'sys-cleanup';
   const runForThisSystem = { id: 'run-1', craftingSystemId: systemId, componentId: 'comp-1', status: 'succeeded' };
   const actor = makeActor('actor-1', [runForThisSystem]);
@@ -281,19 +281,18 @@ test('Salvage is always on: attempting to disable it keeps it enabled and preser
   });
   mgr.systems.set(normalized.id, normalized);
 
-  // Salvage is always on, so an attempt to disable it is a no-op: the feature
-  // stays true and no salvage-run cleanup is triggered.
+  // Salvage is an optional feature: disabling it now takes effect and triggers
+  // cleanup of this system's in-flight salvage runs.
   const updated = await mgr.updateSystem(systemId, { features: { salvage: false } });
-  assert.equal(updated.features.salvage, true, 'salvage cannot be disabled');
+  assert.equal(updated.features.salvage, false, 'salvage can now be disabled');
 
   const stored = actor.getFlag('fabricate', 'fabricate.salvageRuns');
-  assert.ok(stored, 'salvageRuns flag should be present');
-  const history = stored.history || [];
+  const history = stored?.history || [];
   const remaining = history.filter(r => r.craftingSystemId === systemId);
-  assert.equal(remaining.length, 1, 'Run history is preserved because salvage stays enabled');
+  assert.equal(remaining.length, 0, 'Disabling salvage cleans up this system\'s run history');
 });
 
-test('Salvage is always on, so a feature update never removes runs from other systems', async () => {
+test('Disabling salvage on one system never removes runs from other systems', async () => {
   const systemId = 'sys-a';
   const otherSystemId = 'sys-b';
   const runForA = { id: 'run-a', craftingSystemId: systemId, componentId: 'comp-1', status: 'succeeded' };

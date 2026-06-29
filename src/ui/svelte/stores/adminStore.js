@@ -83,6 +83,7 @@ const FEATURE_MAP = {
   effectTransfer: 'effectTransfer',
   gathering: 'gathering',
   chatOutput: 'chatOutput',
+  salvage: 'salvage',
 };
 
 const RESOLUTION_MODE_LABEL_KEYS = {
@@ -1797,8 +1798,7 @@ function _buildSelectedSystemViewData(
       outcomeRouting: selectedSystem.features?.outcomeRouting === true,
       effectTransfer: selectedSystem.features?.effectTransfer === true,
       gathering: selectedSystem.features?.gathering === true,
-      // Salvage is always on (every system can author component salvage).
-      salvage: true,
+      salvage: selectedSystem.features?.salvage === true,
     },
 
     categories: selectedSystem.categories || [],

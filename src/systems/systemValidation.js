@@ -291,6 +291,9 @@ function collectEnvironmentIssues(environments) {
  * @returns {SystemValidationIssue[]}
  */
 function collectSalvageIssues(system, components) {
+  // Salvage is an optional feature: when off, its config is preserved on components
+  // but inert, so it raises no validation issues (mirrors the runtime/UI gating).
+  if (system?.features?.salvage === false) return [];
   const service = new ResolutionModeService();
   // `validateSalvage` reads `system.components` for progressive difficulty; merge
   // the passed component list so the check resolves difficulties purely.
@@ -429,7 +432,7 @@ function collectSystemBlockers(system, recipes, components) {
   // whole system, so these carry no `blocks` field — they surface as a single
   // actionable issue rather than N per-component criticals (`validateSalvage` defers
   // the no-tiers gap here precisely so this is the one place it is reported).
-  if (system?.salvageResolutionMode === 'routed') {
+  if (features.salvage !== false && system?.salvageResolutionMode === 'routed') {
     const salvageCheck = system?.salvageCraftingCheck || {};
     const hasSalvageFormula = Boolean(trimmed(salvageCheck.routed?.rollFormula));
     const hasSalvageTiers = routedOutcomeTierNames(salvageCheck.routed).length > 0;

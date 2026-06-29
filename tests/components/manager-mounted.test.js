@@ -304,6 +304,7 @@ function createStore(calls = [], options = {}) {
     itemTags: true,
     gathering: true,
     recipeCategories: true,
+    salvage: true,
   };
   const alchemyManagedItemOptions = options.emptyComponents
     ? []
@@ -394,6 +395,7 @@ function createStore(calls = [], options = {}) {
         itemTags: false,
         recipeCategories: true,
         essences: false,
+        salvage: true,
       },
       managedItemOptions: [
         { id: 's1' },
@@ -1770,6 +1772,43 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-body > .manager-inspector'),
       null,
       'Checks view owns its own context menu, so the shared inspector is skipped'
+    );
+  });
+
+  it('hides the Checks Salvage tab when the salvage feature is off', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          selectedFeatures: {
+            essences: true,
+            itemTags: true,
+            recipeCategories: true,
+            gathering: true,
+            salvage: false,
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-checks-tab-button]')).map((button) =>
+        button.textContent.trim()
+      ),
+      ['Crafting', 'Gathering', 'Validation'],
+      'the Salvage tab is dropped when salvage is off'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-tab-button="salvage"]'),
+      null,
+      'no salvage tab button renders'
     );
   });
 
@@ -10077,6 +10116,44 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       calls.some((call) => call[0] === 'setSalvageResolutionMode' && call[1] === 'routed'),
       'selecting the routed radio persists the canonical routed value'
+    );
+  });
+
+  it('renders the Salvage feature toggle and routes its change', async () => {
+    const { calls } = await mountCurrencyEditor();
+    const tile = target.querySelector('[data-feature-key="salvage"]');
+    assert.ok(tile, 'the salvage feature toggle renders in System Settings');
+    // The default fixture has salvage on, so toggling sends false.
+    tile.querySelector('.manager-status-toggle').click();
+    assert.ok(
+      calls.some(
+        (call) => call[0] === 'toggleFeature' && call[1] === 'salvage' && call[2] === false
+      ),
+      'toggling the salvage tile routes toggleFeature(salvage, false)'
+    );
+  });
+
+  it('hides the salvage resolution-mode card when the salvage feature is off (toggle stays available)', async () => {
+    await mountCurrencyEditor({
+      selectedFeatures: {
+        essences: true,
+        itemTags: true,
+        recipeCategories: true,
+        gathering: true,
+        salvage: false,
+      },
+    });
+    assert.equal(
+      target.querySelector('[data-system-salvage-resolution-mode]'),
+      null,
+      'the salvage resolution card is hidden when salvage is off'
+    );
+    const tile = target.querySelector('[data-feature-key="salvage"]');
+    assert.ok(tile, 'the salvage toggle still renders so the GM can turn salvage back on');
+    assert.equal(
+      tile.querySelector('.manager-status-toggle').getAttribute('aria-pressed'),
+      'false',
+      'the salvage toggle reads as off'
     );
   });
 

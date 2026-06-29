@@ -85,11 +85,20 @@
   const gatheringProgressive = $derived(gatheringResolutionMode === 'progressive');
   const gatheringRouted = $derived(gatheringResolutionMode === 'routed');
 
-  // Subsystem-gated breakage authority. Crafting + salvage (salvage always on) honour
-  // the system authority; gathering only exposes the per-trigger break-tools control
-  // when the gathering feature is enabled — otherwise it stays toolSpecific.
+  // Salvage is an optional feature: its tab is hidden and its check is not validated
+  // when off. The system keeps its salvage config for when it is re-enabled.
+  const salvageEnabled = $derived(features?.salvage !== false);
+  // If salvage is disabled while its tab is open (or a salvage-off system loads), fall
+  // back to the crafting tab so no empty panel shows.
+  $effect(() => {
+    if (!salvageEnabled && activeTab === 'salvage') activeTab = 'crafting';
+  });
+
+  // Subsystem-gated breakage authority. Crafting honours the system authority;
+  // salvage and gathering only do so when their feature is enabled — otherwise they
+  // stay toolSpecific.
   const craftingBreakageAuthority = $derived(breakageAuthority);
-  const salvageBreakageAuthority = $derived(features?.salvage === false ? 'toolSpecific' : breakageAuthority);
+  const salvageBreakageAuthority = $derived(salvageEnabled ? breakageAuthority : 'toolSpecific');
   const gatheringBreakageAuthority = $derived(
     features?.gathering === true ? breakageAuthority : 'toolSpecific'
   );
@@ -145,7 +154,7 @@
 </script>
 
 <div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
-  <ChecksEditorTabs {activeTab} onSelect={(tab) => { activeTab = tab; onTabChange(tab); }} />
+  <ChecksEditorTabs {activeTab} showSalvage={salvageEnabled} onSelect={(tab) => { activeTab = tab; onTabChange(tab); }} />
 
   <div class="manager-environment-workspace" class:is-inspector-hidden={!hasMenu}>
     <div

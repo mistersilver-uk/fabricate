@@ -3002,15 +3002,15 @@ describe('createAdminStore', () => {
       }
     });
 
-    it('viewState.selectedSystem.features.salvage is always true (salvage is always on)', async () => {
+    it('viewState.selectedSystem.features.salvage reflects the stored value (salvage is optional)', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
-      // Even an explicit salvage:false projects as on.
-      if (sys) sys.features = { salvage: false };
+      // Salvage is now an opt-out feature: an explicit salvage:false projects as off.
+      if (sys) sys.features = { ...sys.features, salvage: false };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
-      assert.equal(vs.selectedSystem?.features.salvage, true);
+      assert.equal(vs.selectedSystem?.features.salvage, false);
     });
 
     it('viewState.selectedSystem.salvageCraftingCheck surfaces the routed config so editors read it back', async () => {
