@@ -2124,6 +2124,26 @@
     return globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`;
   }
 
+  // Mint an id for a recipe sub-entity (ingredient set / result group). Mirrors the
+  // section cards' eager-id pattern; routing keys these by id.
+  function recipeEntityId() {
+    return globalThis.foundry?.utils?.randomID?.() || `id-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function ensureEntityId(entry) {
+    return entry && !entry.id ? { ...entry, id: recipeEntityId() } : entry;
+  }
+
+  // Backfill ids on a scope's ingredient sets / result groups. A Simple-mode
+  // placeholder can be staged id-less; switching to Complex routes by id, so heal
+  // any id-less entry up front (returns only the keys that exist on the scope).
+  function backfillScopeIds(scope) {
+    const out = {};
+    if (Array.isArray(scope?.ingredientSets)) out.ingredientSets = scope.ingredientSets.map(ensureEntityId);
+    if (Array.isArray(scope?.resultGroups)) out.resultGroups = scope.resultGroups.map(ensureEntityId);
+    return out;
+  }
+
   function handleEnterMultiStep() {
     if (!recipeDraft) return false;
     const seeded = {
@@ -2158,7 +2178,16 @@
   async function handleSetRecipeComplexity(complex) {
     if (!recipeDraft) return false;
     if (complex === true) {
-      patchRecipeDraft({ complex: true });
+      // Entering Complex exposes per-set/per-group routing, so heal any id-less
+      // Simple-authored entry now (across every scope) rather than waiting for save.
+      const complexSteps = Array.isArray(recipeDraft.steps) ? recipeDraft.steps : [];
+      const patch = { complex: true };
+      if (complexSteps.length > 0) {
+        patch.steps = complexSteps.map((step) => ({ ...step, ...backfillScopeIds(step) }));
+      } else {
+        Object.assign(patch, backfillScopeIds(recipeDraft));
+      }
+      patchRecipeDraft(patch);
       return true;
     }
 

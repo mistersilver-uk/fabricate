@@ -59,8 +59,12 @@
   // the whole single-element array back so the scope materializes a real set.
   const simpleSet = $derived(sets[0] || { ingredientGroups: [] });
 
+  // Materialize the single Simple set with a stable id (eager, like addSet), so it
+  // is immediately routable in the Results tab. Spread the existing set so its
+  // id/unknown fields survive; only mint a fresh id when none exists yet.
   function updateSimpleSet(nextSet) {
-    onChange([nextSet]);
+    const base = sets[0] || {};
+    onChange([{ ...base, ...nextSet, id: base.id || nextSet?.id || newId() }]);
   }
 
   function updateSet(index, nextSet) {
