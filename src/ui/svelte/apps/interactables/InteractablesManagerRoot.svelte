@@ -21,6 +21,11 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import {
+    buildSystemLabelMap,
+    systemDisplayLabel,
+    pickDefaultSystemId
+  } from '../../util/systemDisambiguation.js';
 
   let { services = null } = $props();
 
@@ -97,15 +102,30 @@
     }))
   );
 
-  let selectedSystemId = $state('');
-  $effect(() => {
-    if (!selectedSystemId && systems.length > 0) {
-      selectedSystemId = systems[0].id;
-    }
-  });
+  // Same-named systems are indistinguishable in the picker; build a label map that
+  // appends a short id disambiguator ONLY to colliding names (issue 346).
+  const systemLabels = $derived(buildSystemLabelMap(systems));
 
   // 'tool' | 'gatheringTask'
   let sourceType = $state('tool');
+
+  // True when a system has a selectable source of the CURRENT source type, so the
+  // default selection prefers a source-bearing system over an empty same-named
+  // duplicate (the "No sources in this system." footgun — issue 346).
+  function systemHasSources(systemId) {
+    if (!systemId) return false;
+    const list = sourceType === 'tool'
+      ? services?.listToolsForSystem?.(systemId) ?? []
+      : services?.listTasksForSystem?.(systemId) ?? [];
+    return list.length > 0;
+  }
+
+  let selectedSystemId = $state('');
+  $effect(() => {
+    if (!selectedSystemId && systems.length > 0) {
+      selectedSystemId = pickDefaultSystemId(systems, systemHasSources);
+    }
+  });
   let selectedReferenceId = $state('');
   let selectedRegionId = $state('');
   let promoteName = $state('');
@@ -212,7 +232,7 @@
         <span class="fab-im-field-label">{text('FABRICATE.Canvas.Manage.PromoteSystem', 'Crafting system')}</span>
         <select bind:value={selectedSystemId}>
           {#each systems as system (system.id)}
-            <option value={system.id}>{system.name}</option>
+            <option value={system.id}>{systemDisplayLabel(system, systemLabels)}</option>
           {/each}
         </select>
       </label>
