@@ -356,7 +356,7 @@ The `1.7.0` migration (`src/migration/migrateBreakToolsOnFail.js`) is pure, idem
 - Unit tests for GM prompt defaults: `Keep existing data` is pre-selected/default.
 - Unit tests for write-on-change: verify no setting writes occur when data is unchanged.
 - Unit tests for pending migration selection: only migrations newer than `migrationVersion` are selected, ordered by ascending semver.
-- Unit tests for pre-release mode migration (`mapped`/`tiered` -> `routed`) and provider assignment.
+- Unit tests for pre-release mode migration (`mapped -> routedByIngredients`, `tiered -> routedByCheck`; no per-recipe provider seeded) and the one-time `routed -> routedByIngredients`/`routedByCheck` split (majority-provider system mode, ties → `routedByIngredients`, minority reconciliation).
 - Unit tests for pre-release recipe-item migration (`linkedRecipeItemUuid` -> `recipeItemDefinitions` + `recipeItemId`).
 - Unit tests for unmigratable recipe deletion with cascade cleanup and JSON logging output.
 - Unit tests for provider-switch stale-config cleanup.

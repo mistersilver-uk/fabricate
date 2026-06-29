@@ -98,22 +98,25 @@ Tool usage/breakage is tracked on owned item instances.
    `breakTools` flag.
    - **Simple / alchemy**: roll the simple pass/fail formula and compare against the resolved DC
      (meet-or-exceed / exceed), yielding `success`.
-   - **Routed (`check` provider)**: roll the routed formula and map the total onto a configured
+   - **Routed by check (`routedByCheck` mode)**: roll the routed formula and map the total onto a configured
      outcome tier (relative DC deltas or fixed value ranges);
      the matched tier's NAME is the `outcome` that drives result routing.
      The base DC is resolved the SAME way as the simple check
      (the recipe's selected tier or a dynamic-DC macro, not a flat configured DC),
      so a recipe tier or dynamic DC shifts every relative threshold.
+   - **Routed by ingredients (`routedByIngredients` mode)**: the result group is selected by the chosen
+     ingredient set, so the check is OPTIONAL — when `craftingCheck.routed.rollFormula` is authored it runs
+     as a pass/fail layer that never changes which result group is produced; with no formula no check runs.
    - **Progressive**: roll the progressive formula;
      its total is the numeric `value` spent against ordered result difficulties.
 
    A crafting check is not optional-by-absence.
    Simple mode always carries a system-level check that is either active or deactivated;
-   routed and progressive modes REQUIRE a configured check.
+   `routedByCheck` and progressive modes REQUIRE a configured check, while `routedByIngredients` (like simple) has an OPTIONAL check.
    A check is **usable** iff the active mode's check config carries an authored roll formula
    (`simple.rollFormula` / `routed.rollFormula` / `progressive.rollFormula`), in which case it is
    engine-evaluated as above; `craftingCheck.enabled` is only the on/off toggle for optional
-   simple/alchemy checks, not a proxy for "the check works".
+   simple/`routedByIngredients`/alchemy checks, not a proxy for "the check works".
    The deprecated macro / built-in adapter check sources (root `macroUuid`, `successMacroUuid`,
    `failureMacroUuid`, `checkSource`, and the `builtIn` adapter config) were removed in 1.8.0;
    there is no longer a `checkSource` axis. (The dynamic-DC macro on `simple.macroUuid` is a
@@ -129,7 +132,7 @@ Tool usage/breakage is tracked on owned item instances.
    assignment) are defined in `004-resolution-modes.md`.
 
 2. Resolve the result group by active mode rules in `004-resolution-modes.md`.
-   For the routed `check` provider, an authored success-outcome tier that resolves by name but
+   For `routedByCheck` mode, an authored success-outcome tier that resolves by name but
    that no result group assigns via `checkOutcomeIds` (when the recipe otherwise uses tier
    assignment) yields a distinct **unrouted-tier** diagnostic rather than silently falling back
    to outcome-name matching;
@@ -374,7 +377,7 @@ If recipe-level sets are absent, display the active step's sets or a step overvi
   - OR across ingredient sets
   - AND across groups within a set
   - OR within group options
-- Unit tests for routed provider resolution (`ingredientSet`, `check`).
+- Unit tests for routed resolution per mode (`routedByIngredients`, `routedByCheck`) and the alchemy providers (`ingredientSet`, `check`).
 - Unit tests for time/currency gate checks.
 - Integration tests for end-to-end multistep crafting, resume, and completion.
 - Unit tests for alchemy no-signature handling (failure + ingredient consumption + history entry).
