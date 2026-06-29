@@ -32,6 +32,7 @@
     describeVisualStatus,
     describeActivationGate
   } from '../../interactableConfigView.js';
+  import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js';
 
   let { services = null } = $props();
 
@@ -79,6 +80,9 @@
   });
 
   const systemOptions = $derived.by(() => { void tick; return services?.listSystems?.() ?? []; });
+  // Same-named systems are indistinguishable in the picker; disambiguate colliding
+  // display names with a short id suffix (issue 346).
+  const systemLabels = $derived(buildSystemLabelMap(systemOptions));
   const sourceOptions = $derived.by(() => {
     void tick;
     if (!selSystemId) return [];
@@ -268,7 +272,7 @@
             <select value={selSystemId} onchange={(e) => onSelectSystem(e.currentTarget.value)} data-interactable-identity-system>
               <option value="">{text('FABRICATE.Canvas.Interactable.Config.Identity.SelectSystem', 'Select a crafting system…')}</option>
               {#each systemOptions as option (option.id)}
-                <option value={option.id}>{option.name}</option>
+                <option value={option.id}>{systemDisplayLabel(option, systemLabels)}</option>
               {/each}
             </select>
           </label>
