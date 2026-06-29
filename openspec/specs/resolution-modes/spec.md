@@ -108,16 +108,22 @@ No other result groups are awarded.**
 - The crafting check is **required**.
 The outcome is produced by the system's configured routed crafting check, whose required field is an authored `craftingCheck.routed.rollFormula`.
 - `outcome` is trim-normalized and case-insensitive.
-- Resolution rules:
+- **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
+A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
+Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.
+- Resolution rules (applied per step/scope; "exactly one result group" is evaluated per step for multi-step recipes):
   1. Explicit tier assignment wins: when the outcome resolves to a routed-check outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
   2. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes the failure path.
-  3. Otherwise, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
-  4. If no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
+  3. If the scope has exactly one result group, that single group is produced for any non-failure outcome (no mapping required).
+  4. Otherwise, with multiple result groups, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
+  5. If multiple result groups are present and no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
 
 ### Validation
 
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
+- **One result group → no mapping required:** a step with exactly one result group needs no outcome/tier mapping; it is produced on any non-failure outcome and yields nothing on a failure keyword.
+Outcome/tier mapping is required only when a step has multiple result groups (each success outcome must route to a group), and the `recipe-visibility` readiness warnings (`unroutedResultGroup`, `unproducedOutcomeTier`) do not fire for single-result-group steps.
 - Reference integrity (always applies): `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison, and may not be any reserved failure keyword.
 - A missing routed crafting check (`craftingCheck.routed.rollFormula` unauthored) is an **unconditional system-level blocker** (`routedCheckNoFormula`), independent of any recipe — every recipe in this mode routes by the check, so no craft can resolve without it (see `recipe-visibility`).
 A `routedByCheck` recipe is otherwise structurally valid regardless of the check configuration; the formula requirement is a system-level concern, not a per-recipe validation error.

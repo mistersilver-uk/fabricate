@@ -501,8 +501,8 @@ export class ResolutionModeService {
 
   /**
    * `routedByCheck` mode resolution: route the routed crafting-check outcome to a
-   * result group by explicit tier→result-set assignment first, then by outcome
-   * name.
+   * result group by explicit tier→result-set assignment first, then (for a single
+   * result group) the no-mapping-required exemption, then by outcome name.
    * @returns {{groups: Array, meta: object}}
    */
   _resolveRoutedByCheckResultGroups({ checkResult, system, allGroups }) {
@@ -517,9 +517,21 @@ export class ResolutionModeService {
     // to name matching, which would mask the missing assignment.
     if (assigned?.meta?.disposition === 'unrouted-tier') return assigned;
     if (assigned) return assigned;
-    // Fallback for recipes without an explicit tier match (no success tier of that
-    // name): fail/miss keywords, then match the outcome name to a result group of
-    // that name.
+    // Single-result-group exemption (mirrors routedByIngredients' "one result group
+    // → mapping may be omitted"): with exactly one group in scope, no outcome/tier
+    // mapping is required. A non-failure outcome produces the single group; a
+    // fail/miss keyword yields nothing (failure path). Never a misconfiguration.
+    if (allGroups.length === 1) {
+      const normalized = this._normalizeName(outcome);
+      if (this._isFailKeyword(normalized))
+        return { groups: [], meta: { outcome, disposition: 'fail' } };
+      if (this._isMissKeyword(normalized))
+        return { groups: [], meta: { outcome, disposition: 'miss' } };
+      return { groups: allGroups.slice(0, 1), meta: { outcome, disposition: 'success' } };
+    }
+    // Multiple result groups: fall back to fail/miss keywords, then match the
+    // outcome name to a result group of that name. An unmatched success outcome is
+    // a misconfiguration the author must fix by mapping each outcome to a group.
     return this._routeByOutcomeName(outcome, allGroups);
   }
 

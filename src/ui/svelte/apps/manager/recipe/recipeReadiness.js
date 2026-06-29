@@ -292,7 +292,9 @@ function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComp
  * Routed check-mode authoring warnings. Only meaningful for a recipe whose result
  * routing is the routed `check` provider: the result groups route by the system's
  * routed-check outcome tiers via `ResultGroup.checkOutcomeIds`. Two soft (warning)
- * misconfigurations are surfaced:
+ * misconfigurations are surfaced, BUT only for steps with MULTIPLE result groups —
+ * a step with exactly one result group needs no mapping (the single-group exemption,
+ * mirroring routedByIngredients), so it raises neither warning:
  *  - a result group that lists no VALID assigned outcome tier (empty or only
  *    references to since-deleted tiers) — it can never be routed to, so a check
  *    success silently produces nothing;
@@ -312,10 +314,17 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
   );
   const issues = [];
 
+  // A step with exactly one result group needs no outcome/tier mapping (mirrors
+  // routedByIngredients): the single group is produced on any non-failure outcome,
+  // so it is never "unrouted" and never demands a tier be produced.
+  const isMultiGroupStep = (step) => asArray(step.resultGroups).length > 1;
+
   // An unrouted check-mode group: a group whose `checkOutcomeIds` contains no
   // currently-valid tier id (empty, or only stale references to deleted tiers).
+  // Only multi-result-group steps need mapping, so single-group steps are skipped.
   let hasUnroutedGroup = false;
   for (const step of executionSteps) {
+    if (!isMultiGroupStep(step)) continue;
     const stepHasUnroutedGroup = asArray(step.resultGroups).some((group) => {
       const assigned = asArray(group?.checkOutcomeIds).filter((id) => validTierIds.has(id));
       return assigned.length === 0;
@@ -332,7 +341,9 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
   }
 
   // An unproduced success tier: an authored success tier id that no result group
-  // lists in its `checkOutcomeIds`.
+  // lists in its `checkOutcomeIds`. Only required when at least one step has
+  // MULTIPLE result groups — a recipe whose every step has a single result group
+  // routes on the single-group exemption and needs no tiers produced.
   const producedTierIds = new Set();
   for (const step of executionSteps) {
     for (const group of asArray(step.resultGroups)) {
@@ -341,7 +352,9 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
       }
     }
   }
-  const hasUnproducedTier = [...validTierIds].some((id) => !producedTierIds.has(id));
+  const hasMultiGroupStep = executionSteps.some(isMultiGroupStep);
+  const hasUnproducedTier =
+    hasMultiGroupStep && [...validTierIds].some((id) => !producedTierIds.has(id));
   if (hasUnproducedTier) {
     issues.push({ id: 'unproducedOutcomeTier', severity: 'warning', target: 'results' });
   }
