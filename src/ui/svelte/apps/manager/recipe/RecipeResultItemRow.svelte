@@ -9,6 +9,11 @@
   and owns the option list; this row emits the whole updated item via
   `onChange(nextItem)` (spreading the existing item so a normalized id and any
   unknown fields survive the first edit).
+
+  In `progressive` mode the quantity input is hidden: the progressive award loop
+  ignores `quantity` and awards each ordered entry once, so the GM expresses "more
+  of X" by listing X again (and prioritises via drag-reorder) rather than via a
+  count. The component picker and remove control stay.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -17,6 +22,9 @@
   let {
     item = {},
     componentOptions = [],
+    // Hide the quantity input — progressive results are an ordered, quantity-less
+    // list (see the parent RecipeResultGroupCard's addItem/reorder handling).
+    progressive = false,
     onChange = () => {},
     onRemove = () => {}
   } = $props();
@@ -78,16 +86,18 @@
   </div>
 
   <div class="manager-recipe-option-controls">
-    <input
-      type="number"
-      min="1"
-      max="9999"
-      class="manager-recipe-option-quantity"
-      data-recipe-option-quantity
-      aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-      value={quantity}
-      onchange={(e) => setQuantity(e.target.value)}
-    />
+    {#if !progressive}
+      <input
+        type="number"
+        min="1"
+        max="9999"
+        class="manager-recipe-option-quantity"
+        data-recipe-option-quantity
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+        value={quantity}
+        onchange={(e) => setQuantity(e.target.value)}
+      />
+    {/if}
 
     <button
       type="button"

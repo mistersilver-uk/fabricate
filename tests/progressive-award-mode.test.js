@@ -585,3 +585,62 @@ test('edge case — result with missing componentId is skipped, valid results st
   assert.deepEqual(result.meta.awardedResultIds, ['result-A', 'result-C']);
   assert.equal(result.meta.remaining, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Quantity-less awards — progressive results grant one item per ordered entry
+// ---------------------------------------------------------------------------
+
+test('awarded results are forced to quantity 1, ignoring any legacy authored quantity', () => {
+  // A recipe authored before the editor dropped the quantity field may still carry
+  // quantity > 1 on a progressive result. Each entry must grant a single item.
+  const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 2 }], 'equal');
+  const service = buildService(system);
+  const step = buildStep([{ id: 'result-A', componentId: 'item-A', quantity: 3 }]);
+  const recipe = buildRecipe();
+
+  const result = service.resolveResultGroups({
+    recipe,
+    step,
+    ingredientSet: null,
+    checkResult: buildCheckResult(2),
+  });
+
+  assert.equal(result.groups[0].results.length, 1);
+  assert.equal(result.groups[0].results[0].quantity, 1, 'the legacy quantity is normalized to 1');
+  assert.equal(result.groups[0].results[0].componentId, 'item-A', 'the component reference survives');
+});
+
+test('duplicate components award in order as separate quantity-1 entries', () => {
+  // The GM expresses "two of item-A" by listing it twice; each costs the same
+  // difficulty and is awarded as its own single-item entry, in order.
+  const system = buildProgressiveSystem(
+    [{ id: 'item-A', difficulty: 2 }, { id: 'item-B', difficulty: 3 }],
+    'equal'
+  );
+  const service = buildService(system);
+  const step = buildStep([
+    makeResult('result-A1', 'item-A'),
+    makeResult('result-B', 'item-B'),
+    makeResult('result-A2', 'item-A'),
+  ]);
+  const recipe = buildRecipe();
+
+  // budget = 7. A1 (2) → 5, B (3) → 2, A2 (2) → 0. All three awarded in order.
+  const result = service.resolveResultGroups({
+    recipe,
+    step,
+    ingredientSet: null,
+    checkResult: buildCheckResult(7),
+  });
+
+  assert.deepEqual(
+    result.groups[0].results.map((r) => r.componentId),
+    ['item-A', 'item-B', 'item-A'],
+    'duplicate entries are awarded in their authored order'
+  );
+  assert.deepEqual(result.meta.awardedResultIds, ['result-A1', 'result-B', 'result-A2']);
+  assert.ok(
+    result.groups[0].results.every((r) => r.quantity === 1),
+    'every awarded entry grants a single item'
+  );
+});

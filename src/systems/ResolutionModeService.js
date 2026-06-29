@@ -621,8 +621,13 @@ export class ResolutionModeService {
       zeroRemainingOnPartial: true,
     });
 
+    // Progressive results are a quantity-less ordered list: each entry is awarded
+    // once and the GM expresses "more of X" by listing X again. Force `quantity: 1`
+    // so the grant path (CraftingEngine._createResultItem reads `result.quantity`)
+    // produces one item per awarded entry, even for legacy recipes still carrying a
+    // `quantity > 1` authored before the editor dropped the field.
     return {
-      groups: [{ ...group, results: awarded }],
+      groups: [{ ...group, results: awarded.map((result) => ({ ...result, quantity: 1 })) }],
       meta: { awardedResultIds: awarded.map((r) => r.id), remaining },
     };
   }

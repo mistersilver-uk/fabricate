@@ -1163,6 +1163,62 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('progressive: re-adding a component appends a duplicate quantity-less entry (no merge)', async () => {
+    const { target, patches } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+    ]);
+    // Re-pick the component the group already holds.
+    await pickPopoverOption(
+      target,
+      '[data-recipe-result-set-id="grp-1"] .manager-recipe-add-component-trigger',
+      /Mountain Herb/
+    );
+    assert.equal(patches.length, 1, 'adding the duplicate patches the recipe once');
+    const results = patches.at(-1).resultGroups[0].results;
+    assert.equal(results.length, 2, 'the duplicate is appended as a second entry, not merged');
+    assert.deepEqual(
+      results.map((r) => r.componentId),
+      ['cmp-herb', 'cmp-herb'],
+      'both ordered entries reference the same component'
+    );
+    assert.equal(
+      results[0].quantity,
+      1,
+      'the existing entry is untouched (no quantity bump)'
+    );
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(results[1], 'quantity'),
+      false,
+      'the appended progressive entry carries no quantity'
+    );
+    assert.ok(results[1].id, 'the appended entry carries an eager id');
+    editHarness.remount();
+  });
+
+  it('progressive: result rows render no quantity input', async () => {
+    const { target } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+    ]);
+    assert.equal(
+      target.querySelector('[data-recipe-section="results"] [data-recipe-option-quantity]'),
+      null,
+      'progressive result rows hide the quantity field'
+    );
+    // Sanity: the same rows DO expose a quantity field outside progressive mode.
+    const nonProgressive = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      { progressive: false }
+    );
+    assert.ok(
+      nonProgressive.target.querySelector(
+        '[data-recipe-section="results"] [data-recipe-option-quantity]'
+      ),
+      'non-progressive result rows still render the quantity field'
+    );
+    editHarness.remount();
+  });
+
   it('opens the recipe-level tools popover on the Tools tab, lists the library, and adds a chosen tool', async () => {
     const patches = [];
     const target = await editHarness.mount(

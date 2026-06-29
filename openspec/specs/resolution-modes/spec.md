@@ -111,6 +111,8 @@ No other result groups are awarded.**
 
 - Exactly one ingredient set and one result group.
 - The result order is meaningful.
+- Result entries carry no quantity: awarding spends the budget against each entry once, so the same `Component` may appear multiple times and repetition is how a recipe asks for more of a result.
+Each awarded entry grants a single item (any legacy authored quantity is normalized to 1).
 - Each result references a `Component` with `difficulty >= 1`.
 - Check is mandatory and returns numeric `value`.
 - Awarding evaluates ordered results using `awardMode`.
