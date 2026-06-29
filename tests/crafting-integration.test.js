@@ -699,6 +699,114 @@ test("routed check: reserved 'fail' outcome takes the failure path (no group awa
 });
 
 // ===========================================================================
+// Group 3b: Routed-check misconfiguration disposition (issue 95 / T-275)
+//
+// A routed+`check` craft whose check outcome matches NO result group name (and
+// is not a reserved fail/miss keyword) resolves to disposition:'misconfiguration'
+// in ResolutionModeService._routeByOutcomeName. _createResultItems propagates
+// that meta and craft() must turn it into an error result rather than reporting
+// success. The fixture's groups are named "pass" / "Weak Brew", so the outcome
+// "partial" is genuinely unroutable.
+// ===========================================================================
+
+test('_createResultItems: an unmatched routed outcome returns no items and a misconfiguration meta', async () => {
+  const { system, ingredientSet, step, recipe } = buildLegacyOutcomeRoutingFixture();
+  setupGame(system);
+
+  const craftingActor = new FakeActor('BrewerDirect');
+  const resolutionService = buildResolutionService(system);
+  const engine = new CraftingEngine(buildMockRecipeManager(true), null, resolutionService);
+
+  let createSingleResultCalled = false;
+  engine._createSingleResult = async () => {
+    createSingleResultCalled = true;
+    return new FakeItem('unexpected', 'Unexpected', 1);
+  };
+
+  const { items, resolutionMeta } = await engine._createResultItems(
+    craftingActor,
+    recipe,
+    step,
+    ingredientSet,
+    [],
+    [],
+    { success: true, outcome: 'partial', value: null, data: {} },
+    null
+  );
+
+  assert.deepEqual(items, [], 'no result items are created for an unmatched outcome');
+  assert.equal(
+    resolutionMeta.disposition,
+    'misconfiguration',
+    'resolution meta carries the misconfiguration disposition'
+  );
+  assert.match(resolutionMeta.error, /No result group matches outcome "partial"/);
+  assert.equal(createSingleResultCalled, false, 'no result is created when resolution yields no groups');
+});
+
+test('routed check: a misconfiguration disposition fails the craft and returns an error result', async () => {
+  const { system, recipe } = buildLegacyOutcomeRoutingFixture();
+  setupGame(system);
+
+  const herb = new FakeItem('herb-mc', 'Herb', 5);
+  const sourceActor = new FakeActor('BrewerMc', [herb]);
+  const craftingActor = new FakeActor('BrewerMc');
+
+  const recipeManager = buildMockRecipeManager(true);
+  const resolutionService = buildResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, null, resolutionService);
+
+  let createSingleResultCalled = false;
+  engine._runCraftingCheck = async () => ({ success: true, outcome: 'partial', value: null, data: {} });
+  engine._createSingleResult = async () => {
+    createSingleResultCalled = true;
+    return new FakeItem('unexpected', 'Unexpected', 1);
+  };
+
+  const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(craftResult.success, false, 'a misconfiguration disposition must fail the craft');
+  assert.equal(craftResult.results, null, 'no results are returned on a misconfiguration');
+  assert.match(
+    craftResult.message,
+    /No result group matches outcome "partial"/,
+    'the resolver error surfaces as the failure message'
+  );
+  assert.equal(createSingleResultCalled, false, 'no result item is created for a misconfigured outcome');
+  assert.equal(craftingActor._createdDocs.length, 0, 'the actor receives no created documents');
+});
+
+test('routed check: a misconfiguration records step failure and never reports success', async () => {
+  const { system, recipe } = buildLegacyOutcomeRoutingFixture();
+  setupGame(system);
+
+  const herb = new FakeItem('herb-mc2', 'Herb', 5);
+  const sourceActor = new FakeActor('BrewerMc2', [herb]);
+  const craftingActor = new FakeActor('BrewerMc2');
+
+  const recipeManager = buildMockRecipeManager(true);
+  const runManager = new CraftingRunManager();
+  const resolutionService = buildResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
+
+  engine._runCraftingCheck = async () => ({ success: true, outcome: 'partial', value: null, data: {} });
+  engine._createSingleResult = async () => new FakeItem('unexpected', 'Unexpected', 1);
+
+  const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(craftResult.success, false, 'a misconfiguration must not report success');
+  assert.equal(craftResult.results, null, 'no results are returned on a misconfiguration');
+
+  const activeRuns = runManager.getActiveRuns(craftingActor);
+  assert.equal(activeRuns.length, 0, 'the run is closed out, not left active');
+
+  const history = runManager.getRunHistory(craftingActor);
+  assert.equal(history.length, 1, 'the misconfigured craft records exactly one run in history');
+  assert.equal(history[0].status, 'failed', 'the run is recorded as a step failure');
+  assert.equal(craftingActor._createdDocs.length, 0, 'no items are created on the misconfigured craft');
+});
+
+// ===========================================================================
 // Group 4: Progressive mode integration (AC4)
 // ===========================================================================
 
