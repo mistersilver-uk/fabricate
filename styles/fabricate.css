@@ -5073,6 +5073,28 @@
   min-width: 0;
 }
 
+/* A required-tool row leads with the backing component's image (a small rounded
+   thumbnail) so the tool is recognisable at a glance, matching the system Tools
+   library browser rather than a generic wrench glyph. */
+.fabricate-manager .manager-recipe-tool-thumb {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-recipe-tool-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Nested ingredient editor: sets -> groups -> options + per-set essences. */
 .fabricate-manager .manager-recipe-ingredient-sets {
   display: flex;
@@ -5289,12 +5311,18 @@
    drag handle (reusing the shared .manager-environment-comp-handle grip + order
    pip). The wrapper lays the handle beside the row and lets the option row fill
    the rest; the handle's step-header translateY nudge is dropped so the grip
-   centres on this single-line row. */
+   centres on this single-line row. Each row carries card chrome (border + raised
+   surface, mirroring .manager-recipe-tool-row) so an ordered result reads as a
+   discrete, draggable card. */
 .fabricate-manager .manager-recipe-result-row.is-reorderable {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
 }
 
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-environment-comp-handle {

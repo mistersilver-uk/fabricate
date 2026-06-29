@@ -1153,17 +1153,17 @@
   const selectedGatheringSystemTools = $derived(Array.isArray($viewState.selectedSystem?.tools) ? $viewState.selectedSystem.tools : []);
   const toolsNavCount = $derived(selectedGatheringSystemTools.length);
   // Recipe-editor tools library: enrich each tool with its backing component's
-  // name so an unlabelled tool can fall back to the component name rather than
+  // name (so an unlabelled tool can fall back to the component name rather than
   // exposing a raw id, mirroring the tool inspector's `label || component.name`
-  // resolution.
+  // resolution) and image (so the recipe Tools section and picker show the
+  // component thumbnail instead of a generic tool glyph).
   const recipeToolsLibrary = $derived(
-    selectedGatheringSystemTools.map((tool) => ({
-      ...tool,
-      componentName:
-        (selectedSystem?.managedItemOptions || []).find(
-          (item) => String(item.id) === String(tool.componentId)
-        )?.name || ''
-    }))
+    selectedGatheringSystemTools.map((tool) => {
+      const component = (selectedSystem?.managedItemOptions || []).find(
+        (item) => String(item.id) === String(tool.componentId)
+      );
+      return { ...tool, componentName: component?.name || '', componentImg: component?.img || '' };
+    })
   );
   // Environments of the selected system, as { id, name } rows for the task
   // editor's optional default-environment select (the on-drop precedence middle

@@ -39,13 +39,25 @@
     return toolDisplayLabel(tool);
   }
 
+  // A tool is shown by its backing component's image (enriched upstream onto
+  // `componentImg`), falling back to the generic bag icon when the tool has no
+  // component — same fallback the system Tools library browser uses.
+  function toolImage(tool) {
+    return tool?.componentImg || 'icons/svg/item-bag.svg';
+  }
+
+  function toolImageById(toolId) {
+    const tool = (toolsLibrary || []).find(entry => entry.id === toolId);
+    return toolImage(tool);
+  }
+
   // The popover lists only tools not already required by this scope; resolve each
   // to its display label so a tool whose label is blank still shows the component
-  // name (never a raw id).
+  // name (never a raw id), and to its component image so options read at a glance.
   const availableToolOptions = $derived(
     (toolsLibrary || [])
       .filter(tool => !(toolIds || []).includes(tool.id))
-      .map(tool => ({ id: tool.id, label: toolDisplayLabel(tool), icon: 'fas fa-screwdriver-wrench' }))
+      .map(tool => ({ id: tool.id, label: toolDisplayLabel(tool), img: toolImage(tool) }))
   );
 
   // Empty when the library has no tools at all; otherwise (every tool already
@@ -85,7 +97,7 @@
     <ul class="manager-recipe-tool-rows">
       {#each toolIds as toolId (toolId)}
         <li class="manager-recipe-tool-row" data-recipe-tool-id={toolId}>
-          <span class="manager-recipe-tool-label"><i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>{toolLabel(toolId)}</span>
+          <span class="manager-recipe-tool-label"><span class="manager-recipe-tool-thumb" aria-hidden="true"><img src={toolImageById(toolId)} alt="" /></span>{toolLabel(toolId)}</span>
           <button
             type="button"
             class="manager-icon-button is-danger"
