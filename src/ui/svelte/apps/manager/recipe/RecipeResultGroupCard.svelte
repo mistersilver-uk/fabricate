@@ -113,7 +113,17 @@
   // Adding a component the group already produces bumps that item's quantity by 1
   // (capped) rather than appending a duplicate item. Spread the existing item so a
   // normalized id (and any unknown fields) survive the bump.
+  //
+  // Progressive is the exception: its award loop spends the check budget down an
+  // ORDERED list, awarding each entry once (cost = the component's difficulty) and
+  // ignoring `quantity` entirely. There, repeating a component IS how the GM asks
+  // for more of it and prioritises it, so we always append a fresh, quantity-less
+  // entry — never merge.
   function addItem(id) {
+    if (progressive) {
+      onChange({ ...group, results: [...results, { id: newId(), componentId: id }] });
+      return;
+    }
     const existingIndex = results.findIndex((item) => item?.componentId === id);
     if (existingIndex !== -1) {
       const existing = results[existingIndex];
@@ -190,8 +200,9 @@
       {#each results as item, index (item?.id || index)}
         {#if progressive}
           <!-- Progressive: the grip is the drag SOURCE (so a grab inside the row's
-               quantity input / component picker still selects text), the row is the
-               drop TARGET. Drag is a mouse-only enhancement. -->
+               component picker still selects text), the row is the drop TARGET. Drag
+               is a mouse-only enhancement. Progressive rows carry no quantity field
+               (the row hides it), so order + repetition are the only authored inputs. -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="manager-recipe-result-row is-reorderable"
@@ -212,6 +223,7 @@
             <RecipeResultItemRow
               {item}
               {componentOptions}
+              {progressive}
               onChange={(nextItem) => updateItem(index, nextItem)}
               onRemove={() => removeItem(index)}
             />
