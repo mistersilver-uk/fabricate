@@ -24,6 +24,7 @@ import {
 
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
+import { SignatureValidator } from './SignatureValidator.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
@@ -1544,6 +1545,21 @@ export class CraftingSystemManager {
     const toMode = merged.resolutionMode || 'simple';
     const resolutionModeChanged = fromMode !== toMode;
 
+    // #99 / spec 007 §"Alchemy Uniqueness Revalidation": an edit to an ALREADY-alchemy
+    // system (components, essences, recipe items, ...) that introduces an ingredient
+    // signature collision must BLOCK the save globally ("Any detected collision blocks
+    // saves globally until resolved, including saves from unrelated recipe edits").
+    // Validate the PROPOSED merged system BEFORE persisting it, so a rejected update
+    // never leaves the colliding state in the in-memory `systems` map or settings —
+    // no revert is needed because nothing has been committed yet. A resolution-mode
+    // CHANGE into alchemy is intentionally excluded here: that follows migration
+    // policy below, which migrates recipes and DISABLES any that collide (gating
+    // visibility, per the destructive-changes migration spec), rather than hard-
+    // blocking the mode switch.
+    if (toMode === 'alchemy' && !resolutionModeChanged) {
+      this._assertNoAlchemySignatureCollisions(merged);
+    }
+
     // Persist the merged system FIRST so recipe migration/validation reads the NEW
     // mode through the in-memory `systems` map (e.g. `RecipeManager` activation and
     // routed-provider validation consult the current system).
@@ -1578,11 +1594,12 @@ export class CraftingSystemManager {
       await this._cleanupSalvageRunsForSystem(systemId);
     }
 
-    // Re-run alchemy signature reconciliation when the system is in alchemy mode and
-    // either the mode just changed to alchemy or the component list changed (the #99
-    // trigger). The helper self-guards non-alchemy systems.
-    const componentsChanged = this._systemComponentsChanged(current, merged);
-    if (toMode === 'alchemy' && (resolutionModeChanged || componentsChanged)) {
+    // Re-run alchemy signature reconciliation only when the mode just CHANGED to
+    // alchemy: migration policy disables colliding recipes to gate visibility (it
+    // must not delete or hard-block on the switch). A no-mode-change component/recipe
+    // edit that would introduce a collision is BLOCKED above before persisting, so it
+    // never reaches this disable path. The helper self-guards non-alchemy systems.
+    if (toMode === 'alchemy' && resolutionModeChanged) {
       await this._reconcileAlchemySignaturesAfterDeletion(merged);
     }
 
@@ -1648,29 +1665,55 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Whether the system's component-list identity changed between two snapshots
-   * (used to trigger the alchemy signature re-check on component edits — the #99
-   * trigger). Compares the set of component ids.
-   * @param {object} before
-   * @param {object} after
-   * @returns {boolean}
+   * Block an alchemy-system update that would introduce (or leave unresolved) an
+   * ingredient signature collision. Validates the PROPOSED merged system — its
+   * components against the system's CURRENT recipes — via the pure
+   * {@link SignatureValidator}, and throws an Error naming the conflicting
+   * recipes/sets when any collision is detected. No-op for non-alchemy systems.
+   *
+   * Called BEFORE the merged system is persisted (see {@link updateSystem}) so a
+   * rejected update never commits the colliding state. Mirrors the per-recipe block
+   * in {@link RecipeManager} so component/system edits and recipe edits enforce the
+   * same alchemy uniqueness invariant (spec 007 §"Alchemy Uniqueness Revalidation").
+   * @param {object} system The proposed (merged, normalized) crafting system.
    * @private
    */
-  _systemComponentsChanged(before, after) {
-    const ids = (system) => {
-      const components = Array.isArray(system?.components)
-        ? system.components
-        : Array.isArray(system?.items)
-          ? system.items
-          : [];
-      return components.map((c) => String(c?.id ?? c?.componentId ?? '')).sort();
-    };
-    const a = ids(before);
-    const b = ids(after);
-    if (a.length !== b.length) return true;
-    return a.some((id, index) => id !== b[index]);
+  _assertNoAlchemySignatureCollisions(system) {
+    if (system?.resolutionMode !== 'alchemy') return;
+    const systemId = system.id;
+    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
+    const recipeJson = recipes.map((recipe) =>
+      typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
+    );
+    const components = Array.isArray(system.components) ? system.components : [];
+    const validator = new SignatureValidator({
+      getSystem: (id) => (id === systemId ? system : null),
+      getRecipesForSystem: (id) => (id === systemId ? recipeJson : []),
+      getComponentsForSystem: (id) => (id === systemId ? components : []),
+    });
+    const { conflicts } = validator.validateSystem(systemId);
+    if (conflicts.length === 0) return;
+    const details = conflicts.map((conflict) => conflict.message).join('; ');
+    throw new Error(
+      `Cannot update crafting system "${system.name || systemId}": the change would introduce ` +
+        `${conflicts.length} alchemy ingredient signature collision(s). ` +
+        `Resolve the conflicting recipes before saving. ${details}`
+    );
   }
 
+  /**
+   * Delete a crafting system and the recipes that belong to it. GM only. An
+   * individual recipe deletion that fails (e.g. a Foundry settings write error
+   * or timeout) does not abort the teardown: the failure is logged with its
+   * recipe id, the remaining recipes are still deleted, and the system itself
+   * is still removed, saved, and cleaned up so no half-deleted system is left
+   * stranded in persisted settings. Emits one aggregated info notification on a
+   * clean delete, or a warn summary naming how many recipes could not be
+   * auto-deleted (and may need manual removal) when any recipe deletion failed.
+   * @param {string} systemId
+   * @returns {Promise<void>}
+   * @throws {Error} When the caller is not a GM, or no system matches `systemId`.
+   */
   async deleteSystem(systemId) {
     this._assertGM('delete crafting system');
     const system = this.systems.get(systemId);
@@ -1678,10 +1721,24 @@ export class CraftingSystemManager {
       throw new Error(`Crafting system not found: ${systemId}`);
     }
 
-    // Delete recipes that belong to this crafting system.
+    // Delete recipes that belong to this crafting system. A single failed
+    // recipe deletion (e.g. a Foundry settings write error or timeout) must not
+    // abort the teardown: collect the failures, keep deleting the rest, and
+    // still remove the system itself below so we never leave a half-deleted
+    // system stranded in persisted settings.
     const affected = this.recipeManager.getRecipes({ craftingSystemId: systemId });
+    const failedRecipeIds = [];
     for (const recipe of affected) {
-      await this.recipeManager.deleteRecipe(recipe.id, { notify: false });
+      try {
+        await this.recipeManager.deleteRecipe(recipe.id, { notify: false });
+      } catch (error) {
+        failedRecipeIds.push(recipe.id);
+        console.error(
+          'Fabricate | failed to delete recipe while deleting crafting system; remove its orphaned data manually',
+          recipe.id,
+          error
+        );
+      }
     }
 
     this.systems.delete(systemId);
@@ -1704,9 +1761,15 @@ export class CraftingSystemManager {
       : 0;
     const relatedCount = affected.length + componentCount + essenceCount + recipeItemCount;
     const entityLabel = relatedCount === 1 ? 'entity' : 'entities';
-    ui?.notifications?.info?.(
-      `Deleted crafting system "${system.name || systemId}" and ${relatedCount} related ${entityLabel}.`
-    );
+    const summary = `Deleted crafting system "${system.name || systemId}" and ${relatedCount} related ${entityLabel}.`;
+    if (failedRecipeIds.length > 0) {
+      const recipeLabel = failedRecipeIds.length === 1 ? 'recipe' : 'recipes';
+      ui?.notifications?.warn?.(
+        `${summary} ${failedRecipeIds.length} ${recipeLabel} could not be auto-deleted and may need manual removal (see the console for ids).`
+      );
+    } else {
+      ui?.notifications?.info?.(summary);
+    }
   }
 
   /**

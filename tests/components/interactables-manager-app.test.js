@@ -217,6 +217,16 @@ describe('InteractablesManagerRoot body', () => {
     ]);
   });
 
+  it('disambiguates same-named systems and defaults to a source-bearing one (issue 346)', () => {
+    expectAll([
+      ["from '../../util/systemDisambiguation.js'", 'uses the shared disambiguation helper'],
+      ['buildSystemLabelMap(systems)', 'builds the disambiguated label map'],
+      ['systemDisplayLabel(system, systemLabels)', 'renders the disambiguated label in the promote system picker'],
+      ['pickDefaultSystemId(systems, systemHasSources)', 'default selection prefers a source-bearing system'],
+      ['function systemHasSources(systemId)', 'tests for selectable sources of the current source type'],
+    ]);
+  });
+
   it('renders an empty state when the scene has no interactables', () => {
     expectAll([
       ['{#if rows.length === 0}', 'empty branch'],

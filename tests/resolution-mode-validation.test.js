@@ -532,7 +532,11 @@ test('progressive mode — draft (requireComplete: false) with no progressive fo
 
   const result = service.validateRecipe(recipe, { requireComplete: false });
 
-  assert.equal(result.valid, true, `expected draft to be valid, got: ${JSON.stringify(result.errors)}`);
+  assert.equal(
+    result.valid,
+    true,
+    `expected draft to be valid, got: ${JSON.stringify(result.errors)}`
+  );
   assert.equal(result.errors.length, 0);
 });
 
@@ -754,5 +758,112 @@ test('alchemy mode — missing provider waived when incomplete, required under t
   assert.ok(
     strict.errors.some((e) => /Alchemy recipe requires resultSelection\.provider/.test(e)),
     `expected the alchemy missing-provider error, got: ${JSON.stringify(strict.errors)}`
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Alchemy mode — the simple/routed/progressive step-level loop NEVER runs for
+// alchemy (issue 88 / T-268). Every step-loop block is mode-gated, so alchemy
+// is validated only by its own top-level checks (>=1 set, >=1 group, no explicit
+// steps, provider VALUE). These tests guard against the per-step cardinality
+// checks leaking onto alchemy if a step ever materializes.
+// ---------------------------------------------------------------------------
+
+// Matches the spurious step-loop cardinality messages that must never appear for
+// an alchemy recipe ("...in simple/routed/progressive mode", "ordered results").
+const STEP_LOOP_CARDINALITY = /in (simple|routed|progressive) mode|requires ordered results/i;
+
+test('alchemy mode — an implicit step carrying multiple sets/groups is NOT subjected to step-level cardinality checks', () => {
+  const system = buildSystem({ resolutionMode: 'alchemy' });
+  const service = buildService(system);
+  // The implicit step (id 'implicit-step') carries 2 sets + 2 groups — counts that
+  // would trip the simple ("exactly 1") and progressive cardinality rules if the
+  // step loop ran for alchemy. Top-level recipe data satisfies alchemy's own checks.
+  const implicitStep = buildStep({
+    id: 'implicit-step',
+    ingredientSets: [
+      { id: 'set-1', ingredientGroups: [] },
+      { id: 'set-2', ingredientGroups: [] },
+    ],
+    resultGroups: [
+      { id: 'rg-1', results: [] },
+      { id: 'rg-2', results: [] },
+    ],
+  });
+  const recipe = buildRecipe([implicitStep], {
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+    resultSelection: { provider: 'ingredientSet' },
+  });
+
+  const result = service.validateRecipe(recipe);
+
+  assert.equal(result.valid, true, result.errors.join(', '));
+  assert.ok(
+    !result.errors.some((e) => STEP_LOOP_CARDINALITY.test(e)),
+    `alchemy must not emit step-level cardinality errors, got: ${JSON.stringify(result.errors)}`
+  );
+});
+
+test('alchemy mode — multiple top-level sets and groups are valid (alchemy requires >=1, not exactly 1)', () => {
+  const system = buildSystem({ resolutionMode: 'alchemy' });
+  const service = buildService(system);
+  const recipe = buildRecipe([], {
+    ingredientSets: [
+      { id: 'set-1', ingredientGroups: [] },
+      { id: 'set-2', ingredientGroups: [] },
+    ],
+    resultGroups: [
+      { id: 'rg-1', results: [] },
+      { id: 'rg-2', results: [] },
+    ],
+    resultSelection: { provider: 'ingredientSet' },
+  });
+
+  const result = service.validateRecipe(recipe);
+
+  assert.equal(result.valid, true, result.errors.join(', '));
+  assert.equal(result.errors.length, 0);
+});
+
+test('alchemy mode — explicit (non-implicit) steps fail alchemy own check, not the step loop', () => {
+  const system = buildSystem({ resolutionMode: 'alchemy' });
+  const service = buildService(system);
+  // A real (non-implicit) step whose cardinality would trip the simple-mode rule.
+  const explicitStep = buildStep({ id: 'step-1', ingredientSets: [], resultGroups: [] });
+  const recipe = buildRecipe([explicitStep], {
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+    resultSelection: { provider: 'ingredientSet' },
+  });
+
+  const result = service.validateRecipe(recipe);
+
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /Alchemy recipe must not have explicit steps/.test(e)),
+    `expected the alchemy explicit-steps error, got: ${JSON.stringify(result.errors)}`
+  );
+  assert.ok(
+    !result.errors.some((e) => STEP_LOOP_CARDINALITY.test(e)),
+    `alchemy must not emit step-level cardinality errors, got: ${JSON.stringify(result.errors)}`
+  );
+});
+
+test('alchemy mode — an invalid provider VALUE errors even when requireComplete is false', () => {
+  const system = buildSystem({ resolutionMode: 'alchemy' });
+  const service = buildService(system);
+  const recipe = buildRecipe([], {
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+    resultSelection: { provider: 'bogus' },
+  });
+
+  const result = service.validateRecipe(recipe, { requireComplete: false });
+
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /Invalid result selection provider/.test(e)),
+    `expected the invalid-provider error, got: ${JSON.stringify(result.errors)}`
   );
 });

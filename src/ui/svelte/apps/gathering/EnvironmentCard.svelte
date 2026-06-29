@@ -396,13 +396,17 @@
   }
 
   .gathering-env-card-description {
-    /* Full-width copy beneath the main row, clamped to ~2 lines. */
+    /* Full-width copy beneath the main row, clamped to ~2 lines. The 1.5
+       line-height plus a small bottom padding give the second line's
+       descenders (g, y, p) room to clear the clamp box and the card border
+       instead of being shaved by overflow: hidden (issue 401). */
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    padding-bottom: var(--fab-space-1);
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.5;
     color: var(--fab-text-muted);
   }
 

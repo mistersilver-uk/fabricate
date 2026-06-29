@@ -561,6 +561,37 @@ test('AC4.4 - applyRecipeItemUseOnCraft increments timesUsed and destroys item w
   assert.equal(item.deleted, true);
 });
 
+test('AC4.5 - applyRecipeItemUseOnCraft skips use-tracking when no actual matching item is present (even for a GM actor)', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'item',
+        item: { limitUses: true, maxUses: 3, destroyWhenExhausted: true },
+        learn: { consumeOnLearn: false }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ linkedRecipeItemUuid: 'recipe-item-uuid' });
+  // GM actor owns a non-matching item only — no real matched recipe item.
+  const nonMatchingItem = new FakeItem({ uuid: 'different-uuid' });
+  const craftingActor = new FakeActor({ id: 'gm-actor', items: [nonMatchingItem] });
+  craftingActor.isGM = true;
+  const service = buildService({ system });
+
+  let usageWrites = 0;
+  const originalSetUsage = service._setRecipeItemUsage.bind(service);
+  service._setRecipeItemUsage = async (item, timesUsed) => {
+    usageWrites += 1;
+    return originalSetUsage(item, timesUsed);
+  };
+
+  await service.applyRecipeItemUseOnCraft({ recipe, craftingActor });
+
+  assert.equal(usageWrites, 0, 'no use-tracking write should occur when no matching item exists');
+  assert.equal(nonMatchingItem.deleted, false);
+});
+
 // ---------------------------------------------------------------------------
 // AC5 — Deterministic item selection
 // ---------------------------------------------------------------------------
@@ -715,6 +746,61 @@ test('AC6.4 - learnRecipe rejects when no matching recipe item exists', async ()
 
   assert.equal(result.success, false);
   assert.equal(result.message, 'FABRICATE.Knowledge.NoMatchingItem');
+});
+
+test('AC6.4a - learnRecipe for a GM succeeds when the GM owns a matching item (despite evaluateKnowledgeAccess matchedItems:[])', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'itemOrLearned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const item = new FakeItem({ uuid: 'recipe-item-uuid' });
+  const craftingActor = new FakeActor({ id: 'gm-actor', items: [item] });
+  const viewer = { isGM: true, id: 'gm-1' };
+  const service = buildService({ system });
+
+  // Sanity: the GM bypass returns an empty matchedItems array — the bug the fix guards against.
+  const access = service.evaluateKnowledgeAccess({ recipe, viewer, craftingActor });
+  assert.equal(access.reason, 'gm');
+  assert.deepEqual(access.matchedItems, []);
+
+  const result = await service.learnRecipe({ viewer, recipe, craftingActor });
+
+  assert.equal(result.success, true);
+  assert.equal(result.message, 'FABRICATE.Knowledge.LearnedRecipe');
+  const learned = craftingActor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.ok(learned['recipe-1']);
+  assert.equal(learned['recipe-1'].sourceItemUuid, 'recipe-item-uuid');
+});
+
+test('AC6.4b - learnRecipe for a GM rejects with noMatchingItem when the GM owns no matching item', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'itemOrLearned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const craftingActor = new FakeActor({ id: 'gm-actor', items: [] });
+  const viewer = { isGM: true, id: 'gm-1' };
+  const service = buildService({ system });
+
+  const result = await service.learnRecipe({ viewer, recipe, craftingActor });
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.NoMatchingItem');
+  const learned = craftingActor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.ok(!learned || !learned['recipe-1']);
 });
 
 test('AC6.5 - learnRecipe rejects when knowledge mode does not support learning', async () => {

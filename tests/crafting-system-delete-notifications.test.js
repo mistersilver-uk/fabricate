@@ -55,6 +55,32 @@ function makeRecipeManager() {
   };
 }
 
+function makeFailingRecipeManager(failingId) {
+  let recipes = [
+    { id: 'recipe-1', name: 'First Recipe', craftingSystemId: 'sys-delete' },
+    { id: 'recipe-2', name: 'Second Recipe', craftingSystemId: 'sys-delete' }
+  ];
+  const deleteCalls = [];
+
+  return {
+    getRecipes(filters = {}) {
+      if (filters.craftingSystemId) {
+        return recipes.filter(recipe => recipe.craftingSystemId === filters.craftingSystemId);
+      }
+      return recipes;
+    },
+    async deleteRecipe(recipeId, options = {}) {
+      deleteCalls.push({ recipeId, options });
+      if (recipeId === failingId) {
+        throw new Error('settings write failed');
+      }
+      recipes = recipes.filter(entry => entry.id !== recipeId);
+    },
+    deleteCalls,
+    remainingRecipes: () => recipes
+  };
+}
+
 test('CraftingSystemManager.deleteSystem emits one summary and suppresses per-recipe delete notices', async () => {
   notifications.length = 0;
   const recipeManager = makeRecipeManager();
@@ -88,4 +114,53 @@ test('CraftingSystemManager.deleteSystem emits one summary and suppresses per-re
   assert.deepEqual(notifications, [
     'Deleted crafting system "Alchemy" and 6 related entities.'
   ]);
+});
+
+test('CraftingSystemManager.deleteSystem stays resilient when one recipe deletion fails', async () => {
+  notifications.length = 0;
+  const warnings = [];
+  const errors = [];
+  const originalWarn = ui.notifications.warn;
+  const originalError = console.error;
+  ui.notifications.warn = message => warnings.push(message);
+  console.error = (...args) => errors.push(args);
+
+  try {
+    const recipeManager = makeFailingRecipeManager('recipe-1');
+    const manager = new CraftingSystemManager(recipeManager);
+    manager.initialized = true;
+    let saved = 0;
+    manager.save = async () => {
+      saved += 1;
+    };
+
+    manager.systems.set('sys-delete', manager._normalizeSystem({
+      id: 'sys-delete',
+      name: 'Alchemy'
+    }));
+
+    await manager.deleteSystem('sys-delete');
+
+    // (a) the system is still removed from the map despite the failure
+    assert.equal(manager.getSystem('sys-delete'), null);
+    // (b) the other recipe's deletion was still attempted (loop did not abort)
+    assert.deepEqual(recipeManager.deleteCalls.map(call => call.recipeId), [
+      'recipe-1',
+      'recipe-2'
+    ]);
+    // (c) save still ran
+    assert.equal(saved, 1);
+    // (d) the failure was logged with its recipe id and the underlying error
+    const recipeFailureLogs = errors.filter(
+      args => args.includes('recipe-1') && args.some(arg => arg instanceof Error)
+    );
+    assert.equal(recipeFailureLogs.length, 1, 'the failing recipe deletion is logged exactly once');
+    // the summary reflects the partial failure via the themed warn path
+    assert.equal(notifications.length, 0, 'no info notification when a deletion failed');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /1 recipe could not be auto-deleted/);
+  } finally {
+    ui.notifications.warn = originalWarn;
+    console.error = originalError;
+  }
 });

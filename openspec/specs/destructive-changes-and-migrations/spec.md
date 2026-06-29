@@ -24,10 +24,12 @@ When `CraftingSystem.resolutionMode` changes:
 3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `004-resolution-modes.md § Mode Invariant` (seed a result-selection provider, clear the routed selection, or carry it verbatim).
    Migrated recipes are persisted on structural validity alone.
 4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met by seed/clear: narrowing into `simple`/`progressive` from a recipe that is not 1×1, or moving a multi-step recipe into `alchemy`.
-5. System-level gaps (a target mode whose required check is unconfigured, an alchemy signature collision, ...) never delete or disable a recipe here; they are surfaced as system-validation issues that gate visibility (see `recipe-visibility`), not deletions.
+5. System-level gaps other than alchemy signature collisions (for example a target mode whose required check is unconfigured) never delete or disable a recipe here; they are surfaced as system-validation issues that gate visibility (see `recipe-visibility`), not deletions.
+   An alchemy signature collision is the exception, handled by item 7 below: migrating *into* `alchemy` disables (`enabled = false`) the colliding recipes rather than deleting them or hard-blocking the switch.
    Migrating into routed `check` seeds the provider but does NOT author outcome tiers or mark any tier `success`, so a migrated routed system produces no result until a GM authors at least one Success outcome tier and routes a result group to it; this is surfaced as a validation issue, never auto-healed.
 6. Apply the standard clean-up for any recipes that were deleted: remove in-progress runs, learned-recipe entries, and per-user progressive ordering preferences referencing them.
-7. When the new mode is `alchemy`, re-run the alchemy signature reconciliation (also re-run it on alchemy component-list edits) so signature collisions are surfaced rather than silently broken.
+7. When the new mode is `alchemy`, re-run the alchemy signature reconciliation: colliding migrated recipes are disabled (`enabled = false`) to gate them out of craftable visibility rather than blocking the mode switch.
+   Disabling does not resolve the collision in the persisted data (disabled recipes still participate in signature validation), so any later edit to the now-`alchemy` system remains blocked per §"Alchemy Uniqueness Revalidation" until the GM deletes or de-collides those recipes — there is no separate reconciliation on alchemy component-list edits, which are handled by that revalidation block, not here.
 8. Emit aggregated notifications: one summary of migrated recipes, one warning listing deleted recipes only when any were deleted, and a single `recipesChanged` emission for the whole pass (never one notification per recipe).
 
 ### Delete Crafting System
@@ -36,6 +38,8 @@ When `CraftingSystem.resolutionMode` changes:
 2. Apply the same clean-up as mode change.
 3. Remove the system from persisted settings.
 4. Emit one summary notification that includes the deleted crafting system name and the number of related entities removed; do not emit one notification per deleted recipe.
+5. A failure to delete an individual recipe must not abort the deletion: the remaining recipes are still deleted, the system is still removed from persisted settings, and clean-up still runs.
+   Each failed recipe deletion is logged with its recipe id so a GM can locate and manually remove orphaned recipe data, and the summary notification reflects how many recipes could not be auto-deleted.
 
 ### Delete Recipe
 
@@ -95,6 +99,11 @@ For systems in `alchemy` mode:
 
 1. Signature uniqueness is validated across all recipes in the system.
 2. Any detected collision blocks saves globally until resolved, including saves from unrelated recipe edits.
+3. Editing an already-`alchemy` system (for example changing its component list, essences, or recipe-item definitions) revalidates signature uniqueness against the proposed system before persisting, and blocks the update with actionable diagnostics naming the conflicting recipes when a collision is detected, so a rejected update never persists the colliding state.
+4. This system-level revalidation applies only to edits of a system that is already in `alchemy` mode; a resolution-mode change *into* `alchemy` instead follows the resolution-mode migration policy in §"Change Crafting System Resolution Mode" (recipes are migrated and colliding recipes are disabled — `enabled = false` — to gate them out of craftable visibility, rather than hard-blocking the mode switch).
+5. Disabling colliding recipes on a mode change gates visibility but does NOT resolve the collision: the disabled recipes still participate in signature validation, so the next edit covered by clause 3 (or any colliding-recipe edit) stays blocked until the GM deletes or de-collides them.
+   This is how the mode-change disable path and clause 2's "blocks saves globally until resolved" reconcile — the mode switch is the one save permitted to land a collision (a mode switch cannot be refused wholesale), after which the global block resumes.
+6. Non-`alchemy` system updates are not signature-validated.
 
 ## Clean-up Rules
 

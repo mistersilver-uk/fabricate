@@ -150,6 +150,22 @@ describe('InteractableBrowserRoot body', () => {
     assert.ok(rootSource.includes('services?.listTasksForSystem?.('), 'tasks via services');
   });
 
+  it('disambiguates same-named systems and defaults to a source-bearing one (issue 346)', () => {
+    assert.ok(
+      rootSource.includes("from '../util/systemDisambiguation.js'"),
+      'uses the shared system-disambiguation helper'
+    );
+    assert.ok(rootSource.includes('buildSystemLabelMap(systems)'), 'builds the disambiguated label map');
+    assert.ok(
+      rootSource.includes('systemDisplayLabel(system, systemLabels)'),
+      'renders the disambiguated label in the system picker'
+    );
+    assert.ok(
+      rootSource.includes('pickDefaultSystemId(systems, systemHasSources)'),
+      'default selection prefers a source-bearing system over an empty duplicate'
+    );
+  });
+
   it('each row is a drag source emitting the dropCanvasData-compatible payload', () => {
     assert.ok(rootSource.includes("import { dragSource }"), 'imports the net-new drag-source action');
     assert.ok(rootSource.includes('use:dragSource={{ getPayload: () => dragPayload(') , 'rows are drag sources');
