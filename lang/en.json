@@ -2874,7 +2874,28 @@
           },
           "Validation": {
             "EmptyTitle": "Nothing to validate yet",
-            "EmptyHint": "Issues across the crafting, salvage, and gathering checks will be listed here."
+            "EmptyHint": "Issues across the crafting, salvage, and gathering checks will be listed here.",
+            "Title": "Validation",
+            "Issues": "Issues",
+            "NoIssues": "No issues detected.",
+            "SubsystemCrafting": "Crafting check",
+            "SubsystemSalvage": "Salvage check",
+            "SubsystemGathering": "Gathering check",
+            "Severity": {
+              "critical": "Critical",
+              "warning": "Warning",
+              "info": "Info"
+            },
+            "CheckHasRollFormula": "Has a roll formula",
+            "CheckOutcomesNamed": "Every outcome tier is named",
+            "CheckHasSuccessOutcome": "At least one outcome is a Success",
+            "CheckRangesValid": "Every tier range is valid",
+            "CheckRangesNoOverlap": "No tier ranges overlap",
+            "IssueNoRollFormula": "This check has no roll formula; it will not resolve until one is set.",
+            "IssueUnnamedOutcome": "Name every outcome tier — an unnamed tier cannot be routed to a result group.",
+            "IssueNoSuccessOutcome": "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
+            "IssueRangeInvalid": "Some tiers have a start greater than their end.",
+            "IssueRangeOverlap": "Some tier ranges overlap. Each value range must be unique."
           },
           "Breakage": {
             "Title": "Check triggers",

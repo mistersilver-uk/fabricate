@@ -54,6 +54,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
@@ -189,6 +190,7 @@ function compileManagerRoot() {
     'src/utils/recipeCategories.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
+    'src/ui/svelte/apps/manager/checks/checksReadiness.js',
     'src/config/flags.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
@@ -1756,7 +1758,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     const validationPanel = target.querySelector('[data-checks-panel="validation"]');
     assert.ok(validationPanel);
-    assert.equal(validationPanel.querySelector('h3').textContent.trim(), 'Nothing to validate yet');
+    // The Validation tab now renders a per-check readiness section for every
+    // in-play subsystem (alchemy fixture: crafting + salvage), replacing the old
+    // "Nothing to validate yet" placeholder.
+    assert.ok(
+      validationPanel.querySelector('[data-checks-validation-section="crafting"]'),
+      'the Validation tab renders a per-check section for the crafting check'
+    );
+    assert.ok(
+      validationPanel.querySelector(
+        '[data-checks-validation-section="crafting"] [data-check="hasRollFormula"]'
+      ),
+      'the crafting section lists the roll-formula readiness check'
+    );
     assert.equal(
       target.querySelector('[data-checks-help]'),
       null,
@@ -2336,18 +2350,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'no value range is computed (the roll may reference actor data)'
     );
-    assert.ok(
+    // Inline textual validation moved to the Checks Validation tab; the editor
+    // keeps only the per-row invalid highlight as a localized affordance.
+    assert.equal(
       target.querySelector('[data-checks-validation]'),
-      'overlapping ranges surface a validation message'
+      null,
+      'the editor no longer renders inline validation messages'
     );
     assert.equal(
       target.querySelectorAll('.manager-checks-outcome-row.is-invalid').length,
       2,
-      'both overlapping tiers are flagged'
+      'both overlapping tiers still get the per-row invalid highlight'
     );
   });
 
-  it('crafting check editor: flags an unnamed outcome tier (cannot be routed by name)', () => {
+  it('crafting check editor: no longer surfaces tier validation inline (moved to the Validation tab)', () => {
     const value = {
       type: 'relative',
       rollFormula: '1d20',
@@ -2363,12 +2380,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = mount(CraftingCheckEditorComponent, { target, props: { value, onChange: () => {} } });
     flushSync();
 
-    const validation = target.querySelector('[data-checks-validation]');
-    assert.ok(validation, 'an unnamed (blank) outcome tier surfaces a validation message');
-    assert.match(
-      validation.textContent,
-      /unnamed tier cannot be routed|name every outcome tier/i,
-      'the message tells the GM to name the tier'
+    // The unnamed-tier (and no-Success) messages are surfaced by the Checks
+    // Validation tab now; the editor itself renders no inline validation list.
+    assert.equal(
+      target.querySelector('[data-checks-validation]'),
+      null,
+      'the editor no longer renders the inline unnamed-tier validation message'
     );
   });
 

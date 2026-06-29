@@ -3220,6 +3220,21 @@ async function main() {
         await page.evaluate(async () => {
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         });
+
+        // Checks → Validation tab (#485): the per-check readiness checklist plus
+        // severity-grouped issues for the in-play subsystem checks. With the economy
+        // back to d100 the gathering check is omitted, so the rollup frames the
+        // crafting and salvage check sections.
+        await page.locator('.fabricate-manager [data-checks-tab-button="validation"]').first().click();
+        await page.locator('.fabricate-manager [data-checks-panel="validation"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-checks-validation-section="crafting"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await assertManagerLayoutStable(page, 'checks validation tab');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-checks-validation');
+        process.stdout.write('  D0: checks validation tab screenshotted\n');
+
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 

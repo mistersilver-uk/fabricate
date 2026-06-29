@@ -21,6 +21,7 @@
   import CraftingCheckEditor from './CraftingCheckEditor.svelte';
   import SimpleCraftingCheckEditor from './SimpleCraftingCheckEditor.svelte';
   import ProgressiveCraftingCheckEditor from './ProgressiveCraftingCheckEditor.svelte';
+  import ChecksValidationTab from './ChecksValidationTab.svelte';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
   // which crafting check editor renders: routed → the outcome-tier editor;
@@ -142,13 +143,43 @@
     }
   };
 
-  const validation = {
-    title: text('FABRICATE.Admin.Manager.Checks.Validation.EmptyTitle', 'Nothing to validate yet'),
-    hint: text(
-      'FABRICATE.Admin.Manager.Checks.Validation.EmptyHint',
-      'Issues across the crafting, salvage, and gathering checks will be listed here.'
-    )
-  };
+  // The Validation tab aggregates per-check validation: one section per in-play
+  // subsystem, each evaluated against its active draft and resolution mode. Salvage
+  // is omitted when its feature is off; gathering when off or in the read-only d100
+  // roll (which has nothing to author). The active draft per subsystem matches the
+  // editor selection above, so the tab validates exactly what the GM is editing.
+  const validationSections = $derived.by(() => {
+    const list = [
+      {
+        subsystem: 'crafting',
+        mode: resolutionMode,
+        check: craftingRouted
+          ? craftingCheck
+          : craftingProgressive
+            ? craftingCheckProgressive
+            : craftingCheckSimple
+      }
+    ];
+    if (salvageEnabled) {
+      list.push({
+        subsystem: 'salvage',
+        mode: salvageResolutionMode,
+        check: salvageRouted
+          ? salvageCheckRouted
+          : salvageProgressive
+            ? salvageCheckProgressive
+            : salvageCheckSimple
+      });
+    }
+    if (gatheringEnabled && !gatheringD100) {
+      list.push({
+        subsystem: 'gathering',
+        mode: gatheringResolutionMode,
+        check: gatheringProgressive ? gatheringCheckProgressive : gatheringCheckRouted
+      });
+    }
+    return list;
+  });
 
   const configTitle = text('FABRICATE.Admin.Manager.Checks.Configuration', 'Configuration');
   const pageKicker = text('FABRICATE.Admin.Manager.Checks.PageKicker', 'One per system');
@@ -167,13 +198,7 @@
       aria-labelledby={`checks-tab-${activeTab}`}
     >
       {#if activeTab === 'validation'}
-        <div class="manager-empty" data-checks-panel="validation">
-          <div>
-            <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-            <h3>{validation.title}</h3>
-            <p>{validation.hint}</p>
-          </div>
-        </div>
+        <ChecksValidationTab sections={validationSections} />
       {:else if activeTab === 'crafting' && craftingRouted}
         <div data-checks-panel="crafting">
           <CraftingCheckEditor value={craftingCheck} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
