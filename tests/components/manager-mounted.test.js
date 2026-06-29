@@ -391,7 +391,7 @@ function createStore(calls = [], options = {}) {
       id: 'smithing',
       name: 'Smithing',
       description: 'Heavy equipment work',
-      resolutionMode: 'routed',
+      resolutionMode: 'routedByCheck',
       features: {
         gathering: false,
         itemTags: false,
@@ -703,7 +703,7 @@ function createStore(calls = [], options = {}) {
             name: 'Smithing',
             description: 'Heavy equipment work',
             enabled: false,
-            resolutionMode: 'routed',
+            resolutionMode: 'routedByCheck',
             features: systemDetails.smithing.features,
             featureCount: 1,
             componentCount: 6,
@@ -1867,7 +1867,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target,
       props: {
         store: createStore(calls, {
-          alchemyResolutionMode: 'routed',
+          alchemyResolutionMode: 'routedByCheck',
           craftingCheck: {
             routed: {
               type: 'fixed',
@@ -9921,8 +9921,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     const modeRows = [...modeCard.querySelectorAll('[data-system-resolution-mode-option]')];
     assert.deepEqual(
       modeRows.map((row) => row.dataset.systemResolutionModeOption),
-      ['simple', 'routed', 'progressive', 'alchemy'],
-      'the card lists all four modes in order'
+      ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'],
+      'the card lists all five modes in order'
     );
     assert.ok(
       modeRows.every(
@@ -9943,7 +9943,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     const routedRadio = modeCard.querySelector(
-      '[data-system-resolution-mode-option="routed"] input[type="radio"]'
+      '[data-system-resolution-mode-option="routedByCheck"] input[type="radio"]'
     );
     routedRadio.checked = true;
     routedRadio.dispatchEvent(new Event('change', { bubbles: true }));
@@ -9953,8 +9953,8 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(
       activeMode(modeCard),
-      'routed',
-      'selecting the routed radio moves the active highlight to routed'
+      'routedByCheck',
+      'selecting the routed-by-check radio moves the active highlight'
     );
 
     target.querySelector('[data-feature-key="gathering"] .manager-status-toggle').click();
@@ -9967,7 +9967,7 @@ describe('CraftingSystemManager mounted behavior', () => {
           call[2] === 'Updated potion work'
       )
     );
-    assert.ok(calls.some((call) => call[0] === 'setResolutionMode' && call[1] === 'routed'));
+    assert.ok(calls.some((call) => call[0] === 'setResolutionMode' && call[1] === 'routedByCheck'));
     assert.ok(
       calls.some(
         (call) => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false

@@ -125,16 +125,17 @@ test('changing resolutionMode migrates 1×1 recipes instead of deleting them (in
     resolutionMode: 'simple'
   }));
 
-  // The legacy `tiered` token normalizes to canonical `routed`; the mode still
-  // changes (simple → routed). Migration-first: the 1×1 recipe-1 is now SEEDED, not
-  // deleted (intended behavior change for issue 429), and recipe-2 belongs to a
-  // different system so it is untouched.
+  // The legacy `tiered` token normalizes to `routedByCheck`; the mode still
+  // changes (simple → routedByCheck). Migration-first: the 1×1 recipe-1 is now
+  // CARRIED, not deleted (intended behavior change for issue 429), and recipe-2
+  // belongs to a different system so it is untouched.
   await manager.updateSystem('sys-1', { resolutionMode: 'tiered' });
 
-  assert.equal(manager.getSystem('sys-1').resolutionMode, 'routed');
+  assert.equal(manager.getSystem('sys-1').resolutionMode, 'routedByCheck');
   assert.deepEqual(recipeManager.getDeletedRecipeIds(), []);
   assert.deepEqual(recipeManager.getUpdatedRecipeIds(), ['recipe-1']);
-  assert.equal(recipeManager.getUpdate('recipe-1').resultSelection.provider, 'ingredientSet');
+  // The routed modes carry no resultSelection (the routing basis is the mode).
+  assert.equal(recipeManager.getUpdate('recipe-1').resultSelection ?? null, null);
   // Preferences cleanup still runs on a mode change.
   assert.equal(settingsStore.get('lastManagedCraftingSystem'), 'sys-1');
 });
@@ -249,10 +250,10 @@ test('the merged system (with its new mode) is saved BEFORE recipes are migrated
     resolutionMode: 'simple'
   }));
 
-  await manager.updateSystem('sys-1', { resolutionMode: 'routed' });
+  await manager.updateSystem('sys-1', { resolutionMode: 'routedByIngredients' });
 
-  const firstSave = events.indexOf('save:routed');
-  const firstMigrate = events.indexOf('migrate:routed');
+  const firstSave = events.indexOf('save:routedByIngredients');
+  const firstMigrate = events.indexOf('migrate:routedByIngredients');
   assert.ok(firstSave >= 0, 'system saved with the new mode');
   assert.ok(firstMigrate >= 0, 'recipe migrated reading the new mode');
   assert.ok(firstSave < firstMigrate, 'system save must precede recipe migration');

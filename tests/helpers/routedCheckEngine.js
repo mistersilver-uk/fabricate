@@ -104,7 +104,11 @@ export const ROUTED_ACTOR = { id: 'a1', name: 'Crafter', items: [] };
  */
 export function makeRoutedEngine({
   routed,
-  resolutionMode = 'routed',
+  // The routed crafting-check engine path is driven by the `routedByCheck` mode now
+  // (the routing basis is a property of the mode, not a per-recipe provider). The
+  // legacy `provider` param is retained for call-site compat but no longer read by
+  // the engine's `_runCraftingCheck`.
+  resolutionMode = 'routedByCheck',
   provider = 'check',
   enabled = true,
   features = {},

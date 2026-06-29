@@ -48,7 +48,7 @@ const { ResolutionModeService } = await import('../src/systems/ResolutionModeSer
 function buildMappedSystem(overrides = {}) {
   return {
     id: 'test-system',
-    resolutionMode: 'routed',
+    resolutionMode: 'routedByIngredients',
     features: { multiStepRecipes: false, essences: false, craftingChecks: false },
     craftingCheck: {
       enabled: false,

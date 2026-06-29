@@ -19,16 +19,14 @@ const { Recipe } = await import('../src/models/Recipe.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
-function buildSystem(overrides = {}) {
+// The routing basis is now a property of the system MODE, not a per-recipe
+// `resultSelection.provider`: `routedByIngredients` routes by the chosen ingredient
+// set's `resultGroupId`, `routedByCheck` routes by the routed crafting-check outcome.
+function buildSystem(mode = 'routedByCheck', overrides = {}) {
   return {
     id: 'sys-routed',
-    resolutionMode: 'routed',
-    craftingCheck: {
-      enabled: true,
-      macroUuid: 'Macro.check',
-      outcomes: ['flawed', 'standard', 'fine', 'masterwork', 'mythic'],
-      progressive: null,
-    },
+    resolutionMode: mode,
+    craftingCheck: { enabled: true, progressive: null },
     components: [],
     ...overrides,
   };
@@ -40,21 +38,9 @@ function buildService(system = buildSystem()) {
 
 function groups() {
   return [
-    {
-      id: 'flawed',
-      name: 'Flawed',
-      results: [{ id: 'r1', componentId: 'flawed-item', quantity: 1 }],
-    },
-    {
-      id: 'standard',
-      name: 'Standard',
-      results: [{ id: 'r2', componentId: 'standard-item', quantity: 1 }],
-    },
-    {
-      id: 'mythic',
-      name: 'Mythic',
-      results: [{ id: 'r3', componentId: 'mythic-item', quantity: 1 }],
-    },
+    { id: 'flawed', name: 'Flawed', results: [{ id: 'r1', componentId: 'flawed-item', quantity: 1 }] },
+    { id: 'standard', name: 'Standard', results: [{ id: 'r2', componentId: 'standard-item', quantity: 1 }] },
+    { id: 'mythic', name: 'Mythic', results: [{ id: 'r3', componentId: 'mythic-item', quantity: 1 }] },
   ];
 }
 
@@ -86,8 +72,16 @@ function recipeWithStep(activeStep) {
       },
     ],
     resultGroups: groups(),
-    resultSelection: { provider: 'ingredientSet' },
     steps: [activeStep],
+  });
+}
+
+function resolve(service, recipe, checkResult) {
+  return service.resolveResultGroups({
+    recipe,
+    step: recipe.steps[0],
+    ingredientSet: recipe.steps[0].ingredientSets[0],
+    checkResult,
   });
 }
 
@@ -96,24 +90,18 @@ describe('routed recipe resolution', () => {
     mockFromUuidResult = null;
   });
 
-  it('CraftingSystemManager preserves canonical routed resolution mode', () => {
+  it('CraftingSystemManager normalizes the bare routed token to routedByIngredients', () => {
     const manager = new CraftingSystemManager(null);
     const system = manager._normalizeSystem({ id: 'sys-routed', resolutionMode: 'routed' });
-
-    assert.equal(system.resolutionMode, 'routed');
+    assert.equal(system.resolutionMode, 'routedByIngredients');
   });
 
-  it('Recipe preserves step.resultSelection.provider and drops the retired macroUuid', () => {
-    const activeStep = step({
-      // Legacy data may still carry the retired resultSelection.macroUuid (a 1.6.0
-      // macroOutcome vestige); normalization drops it.
-      resultSelection: { provider: 'check', macroUuid: 'Macro.step' },
-    });
-    const recipe = recipeWithStep(activeStep);
-
-    assert.equal(recipe.steps[0].resultSelection.provider, 'check');
-    assert.equal(recipe.toJSON().steps[0].resultSelection.provider, 'check');
-    assert.equal('macroUuid' in recipe.toJSON().steps[0].resultSelection, false);
+  it('CraftingSystemManager preserves the two routed modes', () => {
+    const manager = new CraftingSystemManager(null);
+    for (const mode of ['routedByIngredients', 'routedByCheck']) {
+      const system = manager._normalizeSystem({ id: 'sys-routed', resolutionMode: mode });
+      assert.equal(system.resolutionMode, mode);
+    }
   });
 
   it('Recipe.validate accepts explicit-step recipes with no top-level result groups', () => {
@@ -121,74 +109,32 @@ describe('routed recipe resolution', () => {
       id: 'step-only-recipe',
       name: 'Step Only Recipe',
       craftingSystemId: 'sys-routed',
-      steps: [step({ resultSelection: { provider: 'ingredientSet' } })],
+      steps: [step()],
     });
-
-    const result = recipe.validate();
-
-    assert.equal(result.valid, true, result.errors.join(', '));
+    assert.equal(recipe.validate().valid, true, recipe.validate().errors.join(', '));
   });
 
-  it('step.resultSelection overrides recipe-level resultSelection for check routing', () => {
-    const activeStep = step({ resultSelection: { provider: 'check' } });
-    const recipe = recipeWithStep(activeStep);
-    const service = buildService();
-
-    const result = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'mythic' },
-    });
-
-    assert.equal(result.meta.disposition, 'success');
-    assert.equal(result.groups.length, 1);
-    assert.equal(result.groups[0].name, 'Mythic');
-  });
-
-  it('routed ingredientSet provider resolves by ingredientSet.resultGroupId', () => {
-    const activeStep = step({ resultSelection: { provider: 'ingredientSet' } });
-    const recipe = recipeWithStep(activeStep);
-    const service = buildService();
-
-    const result = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: null,
-    });
-
+  it('routedByIngredients resolves by ingredientSet.resultGroupId', () => {
+    const service = buildService(buildSystem('routedByIngredients'));
+    const recipe = recipeWithStep(step());
+    const result = resolve(service, recipe, null);
     assert.equal(result.groups.length, 1);
     assert.equal(result.groups[0].name, 'Standard');
   });
 
-  it('routed check provider resolves by the crafting-check outcome name', () => {
-    const activeStep = step({ resultSelection: { provider: 'check' } });
-    const recipe = recipeWithStep(activeStep);
-    const service = buildService();
-
-    assert.equal(recipe.steps[0].resultSelection.provider, 'check', 'check is a valid provider');
-
-    const success = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'mythic' },
-    });
+  it('routedByCheck resolves by the crafting-check outcome name', () => {
+    const service = buildService(buildSystem('routedByCheck'));
+    const recipe = recipeWithStep(step());
+    const success = resolve(service, recipe, { outcome: 'mythic' });
     assert.equal(success.meta.disposition, 'success');
-    assert.equal(
-      success.groups[0].name,
-      'Mythic',
-      'check routes by the crafting-check outcome name'
-    );
+    assert.equal(success.groups[0].name, 'Mythic');
+  });
 
-    const failed = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'fail' },
-    });
-    assert.equal(failed.meta.disposition, 'fail', 'check honors fail keywords');
+  it('routedByCheck honors fail keywords (no group awarded)', () => {
+    const service = buildService(buildSystem('routedByCheck'));
+    const recipe = recipeWithStep(step());
+    const failed = resolve(service, recipe, { outcome: 'fail' });
+    assert.equal(failed.meta.disposition, 'fail');
     assert.deepEqual(failed.groups, []);
   });
 
@@ -204,15 +150,14 @@ describe('routed recipe resolution', () => {
         step({ resultGroups: [{ id: 'sg1', name: 'SG1', checkOutcomeIds: ['t-c'], results: [] }] }),
       ],
     });
-    // Deduped, trimmed, empties dropped.
     assert.deepEqual(recipe.resultGroups[0].checkOutcomeIds, ['t-a', 't-b']);
     const json = recipe.toJSON();
     assert.deepEqual(json.resultGroups[0].checkOutcomeIds, ['t-a', 't-b']);
     assert.deepEqual(json.steps[0].resultGroups[0].checkOutcomeIds, ['t-c']);
   });
 
-  it('check mode routes by explicit tier assignment (checkOutcomeIds), overriding name matching', () => {
-    const system = buildSystem({
+  it('routedByCheck routes by explicit tier assignment (checkOutcomeIds), overriding name matching', () => {
+    const system = buildSystem('routedByCheck', {
       craftingCheck: {
         enabled: true,
         routed: {
@@ -227,100 +172,56 @@ describe('routed recipe resolution', () => {
       },
     });
     const service = buildService(system);
-    // Assign the 'Mythic' tier to the result group NAMED 'Standard' to prove
-    // routing follows the assignment (by id), not the same-named group.
     const assigned = groups();
     assigned[1].checkOutcomeIds = ['t-myth'];
-    const recipe = recipeWithStep(
-      step({ resultGroups: assigned, resultSelection: { provider: 'check' } })
-    );
-
-    const result = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'Mythic' },
-    });
-
+    const recipe = recipeWithStep(step({ resultGroups: assigned }));
+    const result = resolve(service, recipe, { outcome: 'Mythic' });
     assert.equal(result.meta.disposition, 'success');
-    assert.equal(
-      result.groups[0].id,
-      'standard',
-      'routed to the assigned group, not the same-named one'
-    );
+    assert.equal(result.groups[0].id, 'standard', 'routed to the assigned group, not the same-named one');
   });
 
-  it('check mode: a success:false tier in checkOutcomeIds does NOT route as success', () => {
-    const system = buildSystem({
+  it('routedByCheck: a success:false tier in checkOutcomeIds does NOT route as success', () => {
+    const system = buildSystem('routedByCheck', {
       craftingCheck: {
         enabled: true,
         routed: {
           type: 'relative',
           rollExpression: '1d20',
-          relativeOutcomes: [
-            // A FAILURE tier (success: false) — must not produce a success result
-            // even when a result group lists its id in checkOutcomeIds.
-            { id: 't-botch', name: 'Botch', success: false, breakTools: true, dc: -5 },
-          ],
+          relativeOutcomes: [{ id: 't-botch', name: 'Botch', success: false, breakTools: true, dc: -5 }],
           fixedOutcomes: [],
         },
       },
     });
     const service = buildService(system);
-    // Assign the failure tier to a result group; there is NO 'Botch'-named group,
-    // and 'botch' is not a fail keyword, so name fallback misconfigures.
     const assigned = groups();
     assigned[1].checkOutcomeIds = ['t-botch'];
-    const recipe = recipeWithStep(
-      step({ resultGroups: assigned, resultSelection: { provider: 'check' } })
-    );
-
-    const result = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'Botch' },
-    });
-
-    assert.notEqual(
-      result.meta.disposition,
-      'success',
-      'a failure tier must not route via the assignment as success'
-    );
-    assert.deepEqual(result.groups, [], 'no result group is produced for the failure tier');
+    const recipe = recipeWithStep(step({ resultGroups: assigned }));
+    const result = resolve(service, recipe, { outcome: 'Botch' });
+    assert.notEqual(result.meta.disposition, 'success');
+    assert.deepEqual(result.groups, []);
   });
 
-  it('check mode falls back to outcome-name matching when no tier is assigned', () => {
-    const system = buildSystem({
+  it('routedByCheck falls back to outcome-name matching when no tier is assigned', () => {
+    const system = buildSystem('routedByCheck', {
       craftingCheck: {
         enabled: true,
         routed: {
           type: 'relative',
           rollExpression: '1d20',
-          relativeOutcomes: [
-            { id: 't-myth', name: 'Mythic', success: true, breakTools: false, dc: 10 },
-          ],
+          relativeOutcomes: [{ id: 't-myth', name: 'Mythic', success: true, breakTools: false, dc: 10 }],
           fixedOutcomes: [],
         },
       },
     });
     const service = buildService(system);
-    // No group carries checkOutcomeIds, so name matching still applies.
-    const recipe = recipeWithStep(step({ resultSelection: { provider: 'check' } }));
-
-    const result = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'Mythic' },
-    });
-
+    const recipe = recipeWithStep(step());
+    const result = resolve(service, recipe, { outcome: 'Mythic' });
     assert.equal(result.meta.disposition, 'success');
     assert.equal(result.groups[0].name, 'Mythic');
   });
 
-  it('check mode: a tier-routed recipe with no group assigned to the resolved tier reports unrouted-tier', () => {
-    const system = buildSystem({
+  it('routedByCheck: a tier-routed recipe with no group for the resolved tier reports unrouted-tier', () => {
+    const system = buildSystem('routedByCheck', {
       craftingCheck: {
         enabled: true,
         routed: {
@@ -335,43 +236,22 @@ describe('routed recipe resolution', () => {
       },
     });
     const service = buildService(system);
-    // The recipe OPTS INTO tier routing (a group declares checkOutcomeIds), but only
-    // for 't-std' — nothing lists 't-myth'. The outcome 'Mythic' resolves to a tier,
-    // yet no group claims it: a distinct unrouted-tier misconfiguration, NOT a silent
-    // fall-through to name matching (which would route to the 'Mythic'-named group).
     const assigned = groups();
     assigned[1].checkOutcomeIds = ['t-std'];
-    const recipe = recipeWithStep(
-      step({ resultGroups: assigned, resultSelection: { provider: 'check' } })
-    );
-
-    const result = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'Mythic' },
-    });
-
+    const recipe = recipeWithStep(step({ resultGroups: assigned }));
+    const result = resolve(service, recipe, { outcome: 'Mythic' });
     assert.equal(result.meta.disposition, 'unrouted-tier');
-    assert.notEqual(result.meta.disposition, 'success');
-    assert.deepEqual(result.groups, [], 'no result group is produced for the unrouted tier');
+    assert.deepEqual(result.groups, []);
   });
 
-  it('check mode: a checkOutcomeIds for a since-deleted tier falls back to name-matching without crash or spurious group', () => {
-    // The system's routed config no longer offers a 'Mythic' tier (it was deleted),
-    // so the outcome resolves to no tier id. The recipe still carries a stale
-    // `checkOutcomeIds: ['t-deleted']` on its 'Mythic'-named group. Resolution must
-    // not crash and must not produce a group via the dangling tier id; it falls back
-    // to outcome-name matching, routing to the like-named group.
-    const system = buildSystem({
+  it('routedByCheck: a checkOutcomeIds for a since-deleted tier falls back to name-matching', () => {
+    const system = buildSystem('routedByCheck', {
       craftingCheck: {
         enabled: true,
         routed: {
           type: 'relative',
           rollExpression: '1d20',
-          relativeOutcomes: [
-            { id: 't-std', name: 'Standard', success: true, breakTools: false, dc: 0 },
-          ],
+          relativeOutcomes: [{ id: 't-std', name: 'Standard', success: true, breakTools: false, dc: 0 }],
           fixedOutcomes: [],
         },
       },
@@ -379,79 +259,44 @@ describe('routed recipe resolution', () => {
     const service = buildService(system);
     const assigned = groups();
     assigned[2].checkOutcomeIds = ['t-deleted'];
-    const recipe = recipeWithStep(
-      step({ resultGroups: assigned, resultSelection: { provider: 'check' } })
-    );
-
-    const result = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'Mythic' },
-    });
-
+    const recipe = recipeWithStep(step({ resultGroups: assigned }));
+    const result = resolve(service, recipe, { outcome: 'Mythic' });
     assert.equal(result.meta.disposition, 'success', 'falls back to name-matching');
     assert.equal(result.groups.length, 1, 'no spurious group from the dangling tier id');
     assert.equal(result.groups[0].name, 'Mythic');
   });
 
-  it('routed check returns no output for fail keywords', () => {
-    const activeStep = step({ resultSelection: { provider: 'check' } });
-    const recipe = recipeWithStep(activeStep);
-    const service = buildService();
-
-    const result = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'fail' },
-    });
-
-    assert.equal(result.meta.disposition, 'fail');
-    assert.deepEqual(result.groups, []);
-  });
-
   // The legacy `macroOutcome` / `rollTableOutcome` providers were removed in 1.6.0
-  // (issue 424). They no longer normalize onto a recipe, so a recipe authored with
-  // one carries no `resultSelection` and falls through to the first-group fallback.
+  // (issue 424). They no longer normalize onto a recipe.
   for (const legacy of ['macroOutcome', 'rollTableOutcome']) {
     it(`removed legacy provider ${legacy} does not normalize onto the recipe`, () => {
       const activeStep = step({ resultSelection: { provider: legacy } });
       const recipe = recipeWithStep(activeStep);
-
       assert.equal(recipe.steps[0].resultSelection, null);
     });
   }
 
   // Back-compat regression guard: legacy persisted `mapped`/`tiered` data still
   // resolves correctly AFTER the canonical pipeline (manager token-normalizer +
-  // 1.4.0 migration). The legacy routing algorithms are gone from the service;
-  // canonical `routed` + a seeded provider (and, for tiered, reconciled group
-  // names) reproduce the old behavior.
-  it('legacy mapped token normalizes to routed and resolves by ingredientSet', () => {
+  // 1.4.0 migration). `mapped → routedByIngredients`, `tiered → routedByCheck`.
+  it('legacy mapped token normalizes to routedByIngredients and resolves by ingredientSet', () => {
     const manager = new CraftingSystemManager(null);
     const system = manager._normalizeSystem({ id: 'sys-routed', resolutionMode: 'mapped' });
-    assert.equal(system.resolutionMode, 'routed');
+    assert.equal(system.resolutionMode, 'routedByIngredients');
 
-    const service = buildService({ ...buildSystem(), id: 'sys-routed', resolutionMode: 'routed' });
-    const activeStep = step({ resultSelection: { provider: 'ingredientSet' } });
-    const recipe = recipeWithStep(activeStep);
-    const mapped = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-    });
+    const service = buildService(buildSystem('routedByIngredients'));
+    const recipe = recipeWithStep(step());
+    const mapped = resolve(service, recipe, null);
     assert.equal(mapped.groups[0].name, 'Standard');
   });
 
-  it('legacy tiered token normalizes to routed and resolves by check name matching', async () => {
+  it('legacy tiered token normalizes to routedByCheck and resolves by check name matching', async () => {
     const manager = new CraftingSystemManager(null);
     const system = manager._normalizeSystem({ id: 'sys-routed', resolutionMode: 'tiered' });
-    assert.equal(system.resolutionMode, 'routed');
+    assert.equal(system.resolutionMode, 'routedByCheck');
 
-    // The 1.4.0 migration renames the routed group to the outcome ('pass') and
-    // seeds the canonical `check` provider, so canonical name-matching reproduces
-    // the legacy outcomeRouting { pass: 'mythic' } behavior.
+    // The 1.4.0 migration renames the routed group to the outcome ('pass') so
+    // canonical name-matching reproduces the legacy outcomeRouting { pass: 'mythic' }.
     const { migrateLegacyResolutionModes } =
       await import('../src/migration/migrateLegacyResolutionModes.js');
     const migrated = migrateLegacyResolutionModes({
@@ -466,23 +311,14 @@ describe('routed recipe resolution', () => {
       ],
     });
     const migratedRecipe = migrated.recipes[0];
-    assert.equal(migratedRecipe.resultSelection.provider, 'check');
+    // routedByCheck carries no resultSelection; routing is by group name.
+    assert.equal(migratedRecipe.resultSelection, undefined);
     const passGroup = migratedRecipe.resultGroups.find((g) => g.id === 'mythic');
     assert.equal(passGroup.name, 'pass');
 
-    const service = buildService({ ...buildSystem(), id: 'sys-routed', resolutionMode: 'routed' });
-    const recipe = recipeWithStep(
-      step({
-        resultGroups: migratedRecipe.resultGroups,
-        resultSelection: { provider: 'check' },
-      })
-    );
-    const tiered = service.resolveResultGroups({
-      recipe,
-      step: recipe.steps[0],
-      ingredientSet: recipe.steps[0].ingredientSets[0],
-      checkResult: { outcome: 'pass' },
-    });
+    const service = buildService(buildSystem('routedByCheck'));
+    const recipe = recipeWithStep(step({ resultGroups: migratedRecipe.resultGroups }));
+    const tiered = resolve(service, recipe, { outcome: 'pass' });
     assert.equal(tiered.groups[0].id, 'mythic');
   });
 });

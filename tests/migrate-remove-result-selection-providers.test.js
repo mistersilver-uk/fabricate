@@ -210,7 +210,7 @@ test('non-array recipes / non-object gatheringConfig pass through unchanged', ()
 // Chained 1.4.0 → 1.6.0 (former-tiered + upgrading-world catch-up)
 // ---------------------------------------------------------------------------
 
-test('a tiered system seeded by 1.4.0 ends at check after 1.6.0', () => {
+test('a tiered system migrated by 1.4.0 to routedByCheck has no resultSelection for 1.6.0 to touch', () => {
   const systems = [{ id: 'sys-1', name: 'Tiered', resolutionMode: 'tiered' }];
   const recipes = [
     recipe('tiered-recipe', {
@@ -218,13 +218,16 @@ test('a tiered system seeded by 1.4.0 ends at check after 1.6.0', () => {
       outcomeRouting: { success: 'g1' },
     }),
   ];
-  // 1.4.0 seeds the canonical `check` provider directly now.
+  // 1.4.0 now lands a tiered system on `routedByCheck` and carries no provider; the
+  // group is reconciled (renamed to the outcome) so name-routing reproduces it.
   const after14 = migrateLegacyResolutionModes({ systems, recipes });
-  assert.equal(after14.recipes[0].resultSelection.provider, 'check');
+  assert.equal(after14.systems[0].resolutionMode, 'routedByCheck');
+  assert.equal(after14.recipes[0].resultSelection, undefined);
+  assert.equal(after14.recipes[0].resultGroups[0].name, 'success');
 
-  // 1.6.0 over the 1.4.0 output is a no-op for the provider (already `check`).
+  // 1.6.0 over the 1.4.0 output has no resultSelection provider to rewrite.
   const after16 = migrate({ recipes: after14.recipes });
-  assert.equal(after16.recipes[0].resultSelection.provider, 'check');
+  assert.equal(after16.recipes[0].resultSelection, undefined);
   assert.deepEqual(after16._removedResultSelectionProviders.droppedRollTableRecipes, []);
 });
 
