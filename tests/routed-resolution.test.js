@@ -138,6 +138,47 @@ describe('routed recipe resolution', () => {
     assert.deepEqual(failed.groups, []);
   });
 
+  // Single-result-group exemption (mirrors routedByIngredients' "one group → no
+  // mapping required"). One group whose name does NOT match the outcome and which
+  // carries no checkOutcomeIds must still be produced on a non-failure outcome.
+  function singleGroupStep() {
+    return step({
+      resultGroups: [
+        { id: 'only', name: 'Anything', results: [{ id: 'r-only', componentId: 'x', quantity: 1 }] },
+      ],
+    });
+  }
+
+  it('routedByCheck: a single, unnamed/unmapped result group is produced on a non-failure outcome', () => {
+    const service = buildService(buildSystem('routedByCheck'));
+    const recipe = recipeWithStep(singleGroupStep());
+    const result = resolve(service, recipe, { outcome: 'partial' });
+    assert.equal(result.meta.disposition, 'success', 'no misconfiguration for one group');
+    assert.equal(result.groups.length, 1);
+    assert.equal(result.groups[0].id, 'only');
+  });
+
+  it('routedByCheck: a single result group yields nothing on a failure keyword', () => {
+    const service = buildService(buildSystem('routedByCheck'));
+    const recipe = recipeWithStep(singleGroupStep());
+    const failed = resolve(service, recipe, { outcome: 'fail' });
+    assert.equal(failed.meta.disposition, 'fail');
+    assert.deepEqual(failed.groups, []);
+  });
+
+  it('routedByCheck: MULTIPLE result groups still misconfigure on an unmatched success outcome', () => {
+    const service = buildService(buildSystem('routedByCheck'));
+    // groups() has three named groups (Flawed/Standard/Mythic); `partial` matches none.
+    const recipe = recipeWithStep(step());
+    const result = resolve(service, recipe, { outcome: 'partial' });
+    assert.equal(
+      result.meta.disposition,
+      'misconfiguration',
+      'multi-group still requires the outcome to map to a group'
+    );
+    assert.deepEqual(result.groups, []);
+  });
+
   it('Recipe normalizes/serializes result-group checkOutcomeIds (recipe + step)', () => {
     const recipe = new Recipe({
       id: 'recipe-co',
@@ -154,6 +195,32 @@ describe('routed recipe resolution', () => {
     const json = recipe.toJSON();
     assert.deepEqual(json.resultGroups[0].checkOutcomeIds, ['t-a', 't-b']);
     assert.deepEqual(json.steps[0].resultGroups[0].checkOutcomeIds, ['t-c']);
+  });
+
+  it('a stray leftover resultSelection.provider does not raise a STRUCTURAL name error', () => {
+    // The model is mode-unaware. A routed recipe should never carry a
+    // resultSelection (the migration drops it), but a stray leftover `check`
+    // provider on result groups with colliding/reserved names must NOT block
+    // persistence — structural validation (the persistence gate) waives the
+    // alchemy name check.
+    const recipe = new Recipe({
+      id: 'stray',
+      name: 'Stray',
+      craftingSystemId: 'sys-routed',
+      ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'g', options: [{ componentId: 'ore', quantity: 1 }] }] }],
+      resultGroups: [
+        { id: 'g1', name: 'Hazard', results: [] },
+        { id: 'g2', name: 'hazard', results: [] },
+      ],
+      resultSelection: { provider: 'check' },
+    });
+    const structural = recipe.validateStructure();
+    assert.equal(structural.valid, true, structural.errors.join(', '));
+    assert.equal(
+      structural.errors.some((e) => /reserved routing keyword|unique names/.test(e)),
+      false,
+      'no structural name error from a stray provider'
+    );
   });
 
   it('routedByCheck routes by explicit tier assignment (checkOutcomeIds), overriding name matching', () => {

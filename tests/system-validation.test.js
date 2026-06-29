@@ -124,10 +124,11 @@ describe('evaluateSystemValidation — composition', () => {
   });
 
   it('surfaces the #431 routed warnings for a check-mode recipe (projection + routing context)', () => {
-    // A routed check system with two success tiers; the recipe routes its single
-    // result group to tier "hit" only — so tier "crit" is unproduced AND nothing
-    // would surface these warnings unless the aggregator passes the routing
-    // context (routingProvider:'check' + the success-filtered tier options).
+    // A routed check system with two success tiers; the recipe has TWO result
+    // groups (so mapping is required) both routed to tier "hit" only — so tier
+    // "crit" is unproduced AND nothing would surface these warnings unless the
+    // aggregator passes the routing context (routingProvider:'check' + the
+    // success-filtered tier options).
     const system = makeSystem({
       resolutionMode: 'routedByCheck',
       craftingCheck: {
@@ -144,7 +145,10 @@ describe('evaluateSystemValidation — composition', () => {
     const recipe = makeRecipe({
       id: 'r-routed',
       routedCheck: true,
-      checkOutcomeIds: ['tier-hit'],
+      resultGroups: [
+        { id: 'rg-a', name: 'A', checkOutcomeIds: ['tier-hit'], results: [] },
+        { id: 'rg-b', name: 'B', checkOutcomeIds: ['tier-hit'], results: [] },
+      ],
     });
 
     const report = evaluateSystemValidation(system, { recipes: [recipe] });
@@ -167,17 +171,50 @@ describe('evaluateSystemValidation — composition', () => {
         },
       },
     });
-    // The result group lists only a since-deleted tier id → unrouted.
+    // TWO result groups (mapping required): one routes a valid tier, the other
+    // lists only a since-deleted tier id → unrouted.
     const recipe = makeRecipe({
       id: 'r-unrouted',
       routedCheck: true,
-      checkOutcomeIds: ['tier-gone'],
+      resultGroups: [
+        { id: 'rg-ok', name: 'OK', checkOutcomeIds: ['tier-hit'], results: [] },
+        { id: 'rg-gone', name: 'Gone', checkOutcomeIds: ['tier-gone'], results: [] },
+      ],
     });
 
     const report = evaluateSystemValidation(system, { recipes: [recipe] });
     assert.ok(
       report.issues.some((issue) => issue.code === 'unroutedResultGroup'),
       'expected the #431 unrouted-result-group warning to surface'
+    );
+  });
+
+  it('does not surface #431 routed warnings for a single-result-group check-mode recipe', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: {
+        routed: {
+          type: 'relative',
+          rollFormula: '1d20',
+          relativeOutcomes: [
+            { id: 'tier-hit', name: 'Hit', success: true },
+            { id: 'tier-crit', name: 'Crit', success: true },
+          ],
+        },
+      },
+    });
+    // One result group, no mapping — the single-group exemption suppresses both
+    // the unrouted-group and unproduced-tier warnings.
+    const recipe = makeRecipe({ id: 'r-one', routedCheck: true });
+
+    const report = evaluateSystemValidation(system, { recipes: [recipe] });
+    assert.equal(
+      report.issues.some(
+        (issue) =>
+          issue.code === 'unroutedResultGroup' || issue.code === 'unproducedOutcomeTier'
+      ),
+      false,
+      'a single-result-group routedByCheck recipe needs no mapping'
     );
   });
 
