@@ -24,6 +24,7 @@ import { migrateRemoveResultSelectionProviders } from './migrateRemoveResultSele
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
+import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
@@ -238,6 +239,15 @@ const MIGRATIONS = [
       'Remove deprecated check sources (root macroUuid/successMacroUuid/failureMacroUuid/checkSource/builtIn) from crafting/salvage/gathering checks, and the orphaned recipe resultSelection.macroUuid',
     migrate(data) {
       return migrateRemoveLegacyCheckSources(data);
+    },
+  },
+  {
+    version: '1.9.0',
+    label:
+      'Split the crafting routed resolution mode into routedByIngredients/routedByCheck ' +
+      '(majority provider wins, ties → routedByIngredients; minority recipes reconciled)',
+    migrate(data) {
+      return migrateSplitRoutedResolutionModes(data);
     },
   },
   // Future migrations added here in version order
