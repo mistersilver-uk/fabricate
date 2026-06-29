@@ -8,12 +8,15 @@
  * PowerShell `Compress-Archive` on Windows and `zip` on Unix so local
  * dry-runs produce installable zips; CI (Ubuntu) takes the `zip` path.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, cpSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 /**
  * Zip the contents of `srcDir` into `outZipPath`. Excludes any nested
- * `*.zip` and LevelDB `LOCK` files.
+ * `*.zip`, LevelDB `LOCK`, and `*.map` sourcemap files (the production
+ * sourcemap is emitted for CI/debug but kept out of every published zip).
  *
  * @param {string} srcDir - Absolute path to the directory to zip
  * @param {string} outZipPath - Absolute path of the zip to create
@@ -24,7 +27,7 @@ export function zipDirectory(srcDir, outZipPath) {
       ? 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
       : 'powershell.exe';
     // Compress-Archive can't filter on input, so stage to a temp dir first,
-    // drop LOCK/`*.zip`, then archive the staged copy.
+    // drop LOCK/`*.zip`/`*.map`, then archive the staged copy.
     const script = [
       `$ErrorActionPreference = 'Stop'`,
       `$src = '${srcDir.replace(/'/g, "''")}'`,
@@ -34,7 +37,7 @@ export function zipDirectory(srcDir, outZipPath) {
       `try {`,
       `  Copy-Item -Path (Join-Path $src '*') -Destination $staging -Recurse`,
       `  Get-ChildItem -Path $staging -Recurse -File |`,
-      `    Where-Object { $_.Name -eq 'LOCK' -or $_.Name -like '*.zip' } |`,
+      `    Where-Object { $_.Name -eq 'LOCK' -or $_.Name -like '*.zip' -or $_.Name -like '*.map' } |`,
       `    Remove-Item -Force`,
       `  if (Test-Path $zipPath) { Remove-Item $zipPath -Force }`,
       `  Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zipPath`,
@@ -44,9 +47,16 @@ export function zipDirectory(srcDir, outZipPath) {
     ].join('\n');
     execFileSync(pwsh, ['-NoProfile', '-Command', script], { stdio: 'inherit' });
   } else {
+    // `zip` can exclude *.zip/LOCK by glob, but to also drop sourcemaps we stage
+    // a copy without *.map first (mirroring the win32 staging above) and zip that,
+    // then clean the staging up. Reassigning srcDir keeps the zip call unchanged.
+    const staging = mkdtempSync(join(tmpdir(), 'zipmod-'));
+    cpSync(srcDir, staging, { recursive: true, filter: src => !src.endsWith('.map') });
+    srcDir = staging;
     execFileSync('zip', ['-r', outZipPath, '.', '--exclude', '*.zip', '--exclude', '*/LOCK'], {
       cwd: srcDir,
       stdio: 'inherit'
     });
+    rmSync(staging, { recursive: true, force: true });
   }
 }

@@ -235,6 +235,10 @@ GM only.
 Deleting a system emits one summary notification naming the crafting system and counting related entities deleted with it.
 It does not emit one notification per deleted recipe.
 
+Deletion is resilient to a recipe that cannot be removed.
+If an individual recipe deletion fails, that failure is logged to the console with the recipe id, the remaining recipes are still deleted, and the system itself is still removed.
+In that case the summary is a warning that also reports how many recipes could not be auto-deleted and may need manual removal.
+
 ---
 
 ## Component Methods

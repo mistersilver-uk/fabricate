@@ -734,16 +734,59 @@ export class CraftingEngine {
   }
 
   /**
-   * Match submitted item UUIDs against all recipe signatures in the system.
+   * Match submitted items against all recipe signatures in the system.
+   *
+   * Matching is quantity-aware: an ingredient group is satisfied only when one
+   * of its options has its required quantity met. Each submission counts as one
+   * unit toward a group, because the workbench expands a stack into one
+   * submission per unit. Available units are counted by occurrence (how many
+   * submissions match an option's component IDs), NOT by reading each item's
+   * `system.quantity`. This per-unit occurrence model matches how essences are
+   * accumulated and how {@link _consumeSubmittedAlchemyItems} consumes items. It
+   * is deliberately different from {@link IngredientSet#resolveIngredientSelection},
+   * which sums `system.quantity` per item.
+   *
+   * A submission contributes at most one unit per option even if several of the
+   * option's components share its source-reference chain. Essence requirements,
+   * when the system supports essences, must also be met for a set to match.
+   *
    * Returns { matched: true, recipe, ingredientSetId } or { matched: false }.
    * @private
    */
   _matchAlchemySignature(submittedItems, recipes, components, signatureValidator, options = {}) {
-    const submittedRefs = new Set();
-    for (const item of submittedItems) {
-      for (const ref of getItemSourceReferences(item)) submittedRefs.add(ref);
-      if (item?.sourceUuid) submittedRefs.add(item.sourceUuid);
-    }
+    // Retain each submission's source references so group satisfaction can be
+    // quantity-aware. Each submission counts as one unit toward a group: the
+    // workbench expands a stack into one submission per unit (mirroring essence
+    // accumulation and {@link _consumeSubmittedAlchemyItems}, which both count
+    // occurrences rather than reading `system.quantity`).
+    const submittedEntries = submittedItems.map((item) => {
+      const refs = new Set(getItemSourceReferences(item));
+      if (item?.sourceUuid) refs.add(item.sourceUuid);
+      return { refs };
+    });
+
+    // Count submissions whose source references match ANY of the given component
+    // IDs. A submission contributes at most once even if several of the group's
+    // components share its reference chain.
+    const availableForComponentIds = (componentIds) => {
+      const groupRefs = new Set();
+      for (const componentId of componentIds) {
+        const comp = components.find((c) => c.id === componentId);
+        if (!comp) continue;
+        for (const ref of getComponentSourceReferences(comp)) groupRefs.add(ref);
+      }
+      if (groupRefs.size === 0) return 0;
+      let available = 0;
+      for (const entry of submittedEntries) {
+        for (const ref of entry.refs) {
+          if (groupRefs.has(ref)) {
+            available += 1;
+            break;
+          }
+        }
+      }
+      return available;
+    };
 
     // Check whether the system supports essences
     const system = options?.system;
@@ -766,15 +809,31 @@ export class CraftingEngine {
         // Skip sets that have neither ingredient groups nor essence requirements
         if (signature.length === 0 && !hasEssences) continue;
 
-        // Check ingredient groups (existing logic)
-        const allGroupsSatisfied = signature.every((groupComponentIds) => {
-          for (const componentId of groupComponentIds) {
-            const comp = components.find((c) => c.id === componentId);
-            if (!comp) continue;
-            if (getComponentSourceReferences(comp).some((ref) => submittedRefs.has(ref)))
-              return true;
+        // Check ingredient groups: a group is satisfied only when one of its
+        // options has its required quantity met by the available submissions
+        // matching that option's component IDs. Options are alternatives, so any
+        // single satisfied option satisfies the group. Only that option-as-
+        // alternative semantics is shared with
+        // IngredientSet.resolveIngredientSelection; the counting differs (that
+        // method sums each item's system.quantity, whereas this counts
+        // submission occurrences per unit). The signature is computed 1:1 from
+        // `set.ingredientGroups`, so they align by index.
+        const allGroupsSatisfied = signature.every((groupComponentIds, groupIndex) => {
+          const group = set.ingredientGroups?.[groupIndex];
+          const groupOptions = Array.isArray(group?.options) ? group.options : [];
+          if (groupOptions.length === 0) {
+            // No structured options (defensive): fall back to mere presence in
+            // the merged component-ID set for this group.
+            return availableForComponentIds(groupComponentIds) > 0;
           }
-          return false;
+          return groupOptions.some((option) => {
+            const optionComponentIds = signatureValidator.expandIngredientToComponentIds(
+              option,
+              components
+            );
+            const required = Math.max(1, Number(option?.quantity) || 1);
+            return availableForComponentIds(optionComponentIds) >= required;
+          });
         });
 
         // Check essences

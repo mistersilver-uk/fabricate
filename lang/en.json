@@ -3604,6 +3604,11 @@
     },
     "Tool": {
       "BrokenNameSuffix": " (broken)"
+    },
+    "System": {
+      "Disambiguation": {
+        "Suffix": "{name} (id: {hint})"
+      }
     }
   }
 }

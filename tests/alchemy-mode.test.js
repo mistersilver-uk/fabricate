@@ -963,6 +963,138 @@ test('_consumeSubmittedAlchemyItems consumes correct quantity when same item sub
   assert.equal(updateCalls[0].data['system.quantity'], 2);
 });
 
+// ============================================================================
+// CraftingEngine._matchAlchemySignature: ingredient quantity enforcement (T-260)
+// ============================================================================
+
+// An ingredient group whose single option requires `quantity` of `componentId`.
+function buildIngredientGroupQty(componentId, quantity) {
+  return {
+    id: `g-${Math.random().toString(36).slice(2)}`,
+    options: [{ match: { type: 'component', componentId }, quantity }]
+  };
+}
+
+// The workbench expands a stack into one submission per unit; mirror that here by
+// returning `count` discrete submissions that all resolve to the same source.
+function buildIngotSubmissions(sourceUuid, count) {
+  return Array.from({ length: count }, () => ({
+    uuid: sourceUuid,
+    _stats: { compendiumSource: sourceUuid },
+    system: { quantity: 1 },
+    flags: {}
+  }));
+}
+
+function buildQuantityRecipe(componentId, requiredQty) {
+  return buildRecipe(
+    'forge-blade',
+    [buildIngredientSet([buildIngredientGroupQty(componentId, requiredQty)])],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+}
+
+test('_matchAlchemySignature matches when submitted quantity equals the required ingredient quantity', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [buildComponent('iron', 'Item.iron-ingot')];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  const result = engine._matchAlchemySignature(
+    buildIngotSubmissions('Item.iron-ingot', 5), [recipe], components, validator
+  );
+
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'forge-blade');
+});
+
+test('_matchAlchemySignature does NOT match when submitted quantity is below the required ingredient quantity', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [buildComponent('iron', 'Item.iron-ingot')];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  // The headline defect: one ingot must NOT satisfy a five-ingot group.
+  const single = engine._matchAlchemySignature(
+    buildIngotSubmissions('Item.iron-ingot', 1), [recipe], components, validator
+  );
+  assert.equal(single.matched, false, 'one ingot must not satisfy a five-ingot group');
+
+  // Boundary: one short of the requirement still fails.
+  const oneShort = engine._matchAlchemySignature(
+    buildIngotSubmissions('Item.iron-ingot', 4), [recipe], components, validator
+  );
+  assert.equal(oneShort.matched, false, 'four ingots must not satisfy a five-ingot group');
+});
+
+test('_matchAlchemySignature matches when submitted quantity exceeds the required ingredient quantity', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [buildComponent('iron', 'Item.iron-ingot')];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  const result = engine._matchAlchemySignature(
+    buildIngotSubmissions('Item.iron-ingot', 6), [recipe], components, validator
+  );
+
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'forge-blade');
+});
+
+test('craftAlchemy reaches the no-match disposition (and consumes) when ingredient quantity is insufficient', async () => {
+  const sourceUuid = 'Item.iron-ingot';
+  const components = [buildComponent('iron', sourceUuid)];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const system = buildAlchemySystem({
+    id: 'alchemy-sys',
+    components,
+    alchemy: { learnOnCraft: false, consumeOnFail: true, showAttemptHistoryToPlayers: false }
+  });
+  game.fabricate.getCraftingSystemManager = () => ({
+    getSystem: (id) => (id === 'alchemy-sys' ? system : null)
+  });
+  const validator = new SignatureValidator({
+    getSystem: () => system,
+    getRecipesForSystem: () => [recipe],
+    getComponentsForSystem: () => components
+  });
+  const engine = new CraftingEngine({ getRecipes: () => [recipe] });
+
+  const deleted = [];
+  const actorItem = {
+    uuid: sourceUuid,
+    system: { quantity: 1 },
+    async delete() { deleted.push(this.uuid); },
+    async update() {}
+  };
+  const sourceActor = { items: [actorItem] };
+  // Submit only one of the five required ingots.
+  const submitted = buildIngotSubmissions(sourceUuid, 1);
+
+  const result = await engine.craftAlchemy({ id: 'pc' }, [sourceActor], submitted, {
+    craftingSystemId: 'alchemy-sys',
+    signatureValidator: validator
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.disposition, 'no-match');
+  assert.equal(result.consumed, true);
+  assert.equal(deleted.length, 1, 'insufficient submission is still consumed on the no-match path');
+});
+
 test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals item quantity', async () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
 
