@@ -29,6 +29,9 @@
     routingProvider = null,
     outcomeTierOptions = [],
     outcomeTiersDefined = false,
+    // Progressive systems award results in order; forwarded to each result section
+    // so its rows get drag-reorder handles.
+    progressive = false,
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {}
@@ -65,6 +68,7 @@
             {complex}
             {componentOptions}
             {routingProvider}
+            {progressive}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
             {outcomeTiersDefined}
@@ -81,6 +85,7 @@
       {complex}
       {componentOptions}
       {routingProvider}
+      {progressive}
       {ingredientSets}
       {outcomeTierOptions}
       {outcomeTiersDefined}

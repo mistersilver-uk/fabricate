@@ -43,6 +43,9 @@
     routingProvider = null,
     routedOutcomeTierOptions = [],
     routedOutcomeTiersDefined = false,
+    // Progressive systems award a recipe's results in order, so the Results tab
+    // exposes drag-reorder on the result rows. Other modes ignore result order.
+    progressive = false,
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
     onAddStep = () => {},
@@ -252,6 +255,7 @@
             {isMultiStep}
             {componentOptions}
             {routingProvider}
+            {progressive}
             outcomeTierOptions={routedOutcomeTierOptions}
             outcomeTiersDefined={routedOutcomeTiersDefined}
             onAssignIngredientSet={assignIngredientSet}

@@ -5285,6 +5285,27 @@
   gap: var(--fab-space-2);
 }
 
+/* Progressive recipes award results in order, so each result row grows a leading
+   drag handle (reusing the shared .manager-environment-comp-handle grip + order
+   pip). The wrapper lays the handle beside the row and lets the option row fill
+   the rest; the handle's step-header translateY nudge is dropped so the grip
+   centres on this single-line row. */
+.fabricate-manager .manager-recipe-result-row.is-reorderable {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-environment-comp-handle {
+  transform: none;
+}
+
+.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-ingredient-option-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* Two-button add row: "Add component" (popover) + "Add tag requirement". */
 .fabricate-manager .manager-recipe-ingredient-set-add {
   display: flex;

@@ -36,6 +36,9 @@
     ingredientSets = [],
     outcomeTierOptions = [],
     outcomeTiersDefined = false,
+    // Progressive systems award this group's results in order; forwarded to the
+    // group card so it renders drag-reorder handles on the result rows.
+    progressive = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
     idPrefix = ''
@@ -138,6 +141,7 @@
         group={simpleGroup}
         chromeless={true}
         {componentOptions}
+        {progressive}
         onChange={(nextGroup) => updateSimpleGroup(nextGroup)}
       />
     </div>
@@ -163,6 +167,7 @@
             {group}
             {componentOptions}
             {routingProvider}
+            {progressive}
             ingredientSetOptions={ingredientOptionsFor(group)}
             assignedIngredientSetIds={assignedSetIdsFor(group)}
             outcomeTierOptions={tierOptionsFor(index)}

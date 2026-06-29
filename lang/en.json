@@ -1011,6 +1011,7 @@
           "DeleteStepAlsoAll": "its ingredients, results, and tools are deleted too",
           "UnnamedStep": "this step",
           "DragStep": "Drag to reorder",
+          "DragResult": "Drag to reorder",
           "Instantaneous": "Instantaneous",
           "Duration": "Duration",
           "DurationHint": "How long this recipe takes to craft. Leave blank for an instant craft.",
