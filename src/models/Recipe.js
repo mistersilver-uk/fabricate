@@ -234,7 +234,8 @@ export class Recipe {
       this._validateRoutedResultSelection(
         container.resultSelection,
         container.resultGroups,
-        errors
+        errors,
+        { requireComplete }
       );
     }
 
@@ -322,8 +323,20 @@ export class Recipe {
    * @param {{provider?: string}} resultSelection
    * @param {Array<{id?: string, name?: string}>} resultGroups
    * @param {string[]} errors push-target for validation messages
+   * @param {{requireComplete?: boolean}} [options] When `requireComplete` is false
+   *   (structural-only validation / the persistence gate) the name check is waived.
+   *   The model is mode-unaware, so a routed-mode recipe carrying a STRAY leftover
+   *   `resultSelection.provider` (routed modes ignore `resultSelection`) must not
+   *   block persistence with a name error; full `validate()` still flags genuine
+   *   alchemy name collisions.
    */
-  _validateRoutedResultSelection(resultSelection, resultGroups, errors) {
+  _validateRoutedResultSelection(
+    resultSelection,
+    resultGroups,
+    errors,
+    { requireComplete = true } = {}
+  ) {
+    if (!requireComplete) return;
     const provider = resultSelection?.provider;
     // Only an alchemy provider routes by ResultGroup.name; a recipe with no
     // resultSelection (simple/progressive/routed/legacy) is unaffected.

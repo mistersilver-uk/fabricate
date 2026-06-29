@@ -1558,9 +1558,9 @@ export class CraftingEngine {
 
     // No usable roll-formula check path applied. A check is only "usable" when its
     // resolution mode has an authored roll formula (handled above). When a check is
-    // REQUIRED (progressive, or routed + check provider) but no roll formula is
-    // configured, fail loudly so the misconfiguration is visible; otherwise this is
-    // an optional check with nothing to run, so treat it as a no-op success.
+    // REQUIRED (progressive, or routedByCheck) but no roll formula is configured,
+    // fail loudly so the misconfiguration is visible; otherwise this is an optional
+    // check with nothing to run, so treat it as a no-op success.
     if (checkRequired) {
       return {
         success: false,
