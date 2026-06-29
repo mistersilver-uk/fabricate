@@ -85,13 +85,16 @@
   const gatheringProgressive = $derived(gatheringResolutionMode === 'progressive');
   const gatheringRouted = $derived(gatheringResolutionMode === 'routed');
 
-  // Salvage is an optional feature: its tab is hidden and its check is not validated
-  // when off. The system keeps its salvage config for when it is re-enabled.
+  // Salvage and gathering are optional features: their tabs are hidden when off (and
+  // salvage is not validated when off). The system keeps its config for when each is
+  // re-enabled. Salvage defaults on; gathering is opt-in (defaults off).
   const salvageEnabled = $derived(features?.salvage !== false);
-  // If salvage is disabled while its tab is open (or a salvage-off system loads), fall
-  // back to the crafting tab so no empty panel shows.
+  const gatheringEnabled = $derived(features?.gathering === true);
+  // If a feature is disabled while its tab is open (or a system without it loads),
+  // fall back to the crafting tab so no empty panel shows.
   $effect(() => {
     if (!salvageEnabled && activeTab === 'salvage') activeTab = 'crafting';
+    if (!gatheringEnabled && activeTab === 'gathering') activeTab = 'crafting';
   });
 
   // Subsystem-gated breakage authority. Crafting honours the system authority;
@@ -154,7 +157,7 @@
 </script>
 
 <div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
-  <ChecksEditorTabs {activeTab} showSalvage={salvageEnabled} onSelect={(tab) => { activeTab = tab; onTabChange(tab); }} />
+  <ChecksEditorTabs {activeTab} showSalvage={salvageEnabled} showGathering={gatheringEnabled} onSelect={(tab) => { activeTab = tab; onTabChange(tab); }} />
 
   <div class="manager-environment-workspace" class:is-inspector-hidden={!hasMenu}>
     <div

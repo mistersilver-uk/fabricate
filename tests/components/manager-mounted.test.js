@@ -2745,10 +2745,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(noneSeg.classList.contains('is-selected'), 'the outcome is pinned to No effect');
   });
 
-  // ChecksView forces toolSpecific for a subsystem whose feature is off, so its
-  // editor renders the unified triggers WITHOUT the break pill even when the system
-  // authority is checkDriven. Mount ChecksView with the gathering feature off and the
-  // gathering tab active, and confirm the break pill gating.
   function mountChecksView(props) {
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2759,7 +2755,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
   }
 
-  it('checks view: a checkDriven crafting editor shows the break pill; a feature-off gathering editor hides it', () => {
+  it('checks view: a checkDriven crafting editor shows the break pill; the gathering tab is hidden when gathering is off', () => {
     mountChecksView({
       breakageAuthority: 'checkDriven',
       features: { gathering: false },
@@ -2774,22 +2770,29 @@ describe('CraftingSystemManager mounted behavior', () => {
       'crafting break pill renders under checkDriven authority'
     );
 
-    // Switch to the gathering tab: the disabled gathering subsystem forces
-    // toolSpecific, so its editor renders the triggers without the break pill.
+    // Gathering is an opt-in feature: with it off, its Checks tab is not offered at
+    // all (so there is no disabled gathering editor to reach).
+    assert.equal(
+      target.querySelector('[data-checks-tab-button="gathering"]'),
+      null,
+      'the gathering tab is hidden when the gathering feature is off'
+    );
+  });
+
+  it('checks view: the gathering tab is offered when the gathering feature is on', () => {
+    mountChecksView({
+      breakageAuthority: 'toolSpecific',
+      features: { gathering: true },
+      gatheringResolutionMode: 'routed',
+      gatheringCheckRouted: routedBreakageValue,
+    });
     const gatheringTab = target.querySelector('[data-checks-tab-button="gathering"]');
-    assert.ok(gatheringTab, 'the gathering tab renders');
+    assert.ok(gatheringTab, 'the gathering tab renders when gathering is enabled');
     gatheringTab.click();
     flushSync();
     assert.ok(
       target.querySelector('[data-checks-panel="gathering"]'),
-      'the gathering panel is shown'
-    );
-    const gatheringTriggers = target.querySelector('[data-check-triggers]');
-    assert.ok(gatheringTriggers, 'the gathering editor still renders the unified triggers');
-    assert.equal(
-      gatheringTriggers.querySelector('[data-trigger-break]'),
-      null,
-      'the disabled gathering subsystem hides the per-trigger break pill'
+      'the gathering panel is shown when the tab is selected'
     );
   });
 

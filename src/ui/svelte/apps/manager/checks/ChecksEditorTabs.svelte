@@ -7,7 +7,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { activeTab = 'crafting', showSalvage = true, onSelect = () => {} } = $props();
+  let { activeTab = 'crafting', showSalvage = true, showGathering = true, onSelect = () => {} } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -21,8 +21,12 @@
     { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
   ];
 
-  // Salvage is an optional feature: drop its tab when the feature is off.
-  const tabs = $derived(ALL_TABS.filter((tab) => tab.id !== 'salvage' || showSalvage));
+  // Salvage and gathering are optional features: drop their tabs when off.
+  const tabs = $derived(
+    ALL_TABS.filter(
+      (tab) => (tab.id !== 'salvage' || showSalvage) && (tab.id !== 'gathering' || showGathering)
+    )
+  );
 
   function onKeydown(event, index) {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
