@@ -109,10 +109,10 @@
   // never write a freshly-synthesized group over an existing one.
   function updateSimpleGroup(nextGroup) {
     if (groups.length > 0) {
-      onChange([{ ...groups[0], ...nextGroup }]);
+      onChange([{ ...groups[0], ...nextGroup, id: groups[0].id || nextGroup?.id || newId() }]);
       return;
     }
-    onChange([nextGroup]);
+    onChange([{ ...nextGroup, id: nextGroup?.id || newId() }]);
   }
 
   function updateGroup(index, nextGroup) {

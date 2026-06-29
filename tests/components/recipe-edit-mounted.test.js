@@ -443,6 +443,59 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // Regression: a set first authored in Simple mode used to be materialized
+  // without an id, so its routing-picker option carried id `undefined` and the
+  // assign guard silently dropped it — the first ingredient set was unselectable
+  // in the Results tab. The Simple-set write-back now mints a stable id.
+  it('ingredient mode: the first set authored in Simple mode gets a stable id (routable)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, ingredientSets: [] },
+        onUpdateRecipe: (patch) => patches.push(patch),
+      })
+    );
+    clickTab(target, 'ingredients');
+    await flushRender();
+
+    // Author the (id-less placeholder) first set with any requirement.
+    target.querySelector('[data-recipe-add="tag-requirement"]').click();
+    await flushRender();
+
+    const patch = patches.at(-1);
+    assert.ok(patch.ingredientSets, 'the first edit materializes the ingredient sets');
+    const id = patch.ingredientSets[0]?.id;
+    assert.equal(typeof id, 'string', 'the materialized first set carries an id');
+    assert.ok(id.length > 0, 'the id is non-empty so routing can bind it');
+    editHarness.remount();
+  });
+
+  // Regression twin: a result group first authored in Simple mode used to be
+  // materialized id-less, which would block ALL ingredient-set routing to it via
+  // the `(assigned && !groupId)` guard. The Simple-group write-back now mints an id.
+  it('a result group authored in Simple mode gets a stable id (routable target)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: { ...RECIPE, resultGroups: [] },
+        onUpdateRecipe: (patch) => patches.push(patch),
+      })
+    );
+    clickTab(target, 'results');
+    await flushRender();
+
+    // Author the (id-less placeholder) first group by adding a result item.
+    await pickPopoverOption(target, '[data-recipe-add="result-item"]', /Mountain Herb/);
+
+    const patch = patches.at(-1);
+    assert.ok(patch.resultGroups, 'the first edit materializes the result groups');
+    const id = patch.resultGroups[0]?.id;
+    assert.equal(typeof id, 'string', 'the materialized first group carries an id');
+    assert.ok(id.length > 0, 'the id is non-empty so routing can target it');
+    editHarness.remount();
+  });
+
   it('check mode: result sets assign outcome tiers, disabling tiers used elsewhere', async () => {
     const groups = [
       {
