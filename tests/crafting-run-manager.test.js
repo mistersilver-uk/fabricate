@@ -2,6 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import {
+  insertTerminalRuns,
+  assertCappedMostRecentFirst,
+  RETENTION_LIMIT
+} from './helpers/run-history-retention.js';
+
+function singleStepRecipe(suffix) {
+  return {
+    id: `recipe-${suffix}`,
+    craftingSystemId: 'system-cap',
+    getExecutionSteps: () => [{ id: `step-${suffix}`, name: 'Only Step' }]
+  };
+}
 
 class FakeActor {
   constructor(name = 'Test Actor') {
@@ -148,4 +161,64 @@ test('CraftingRunManager.removeRunsForSystem is a no-op when no runs match', asy
   await manager.removeRunsForSystem('sys-other');
 
   assert.deepEqual(manager.getActiveRuns(actor).map(r => r.id), [run.id]);
+});
+
+test('CraftingRunManager: retention limit caps craftingRuns.history at 50, discarding the oldest (most-recent-first)', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('CraftCap');
+
+  const insertedIds = await insertTerminalRuns(RETENTION_LIMIT + 1, async (i) => {
+    const run = await manager.createRun(actor, singleStepRecipe(i), [actor], 'user-1');
+    await manager.cancelRun(actor, run.id);
+    return run.id;
+  });
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, RETENTION_LIMIT);
+  // The 51st insertion discards the oldest entry.
+  assert.equal(history.some((run) => run.id === insertedIds[0]), false);
+  assertCappedMostRecentFirst(assert, history, insertedIds);
+});
+
+test('CraftingRunManager: retention limit does not truncate craftingRuns.history at exactly 50', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('CraftExact');
+
+  const insertedIds = await insertTerminalRuns(RETENTION_LIMIT, async (i) => {
+    const run = await manager.createRun(actor, singleStepRecipe(i), [actor], 'user-1');
+    await manager.cancelRun(actor, run.id);
+    return run.id;
+  });
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, RETENTION_LIMIT);
+  // The 50th insertion does NOT truncate: the oldest entry is retained.
+  assert.equal(history.some((run) => run.id === insertedIds[0]), true);
+  assertCappedMostRecentFirst(assert, history, insertedIds);
+});
+
+test('CraftingRunManager: retention cap holds across completeStepSuccess and completeStepFailure terminal paths', async () => {
+  const terminalPaths = {
+    completeStepSuccess: (manager, actor, run) => manager.completeStepSuccess(actor, run, 0, {}),
+    completeStepFailure: (manager, actor, run) =>
+      manager.completeStepFailure(actor, run, 0, 'check failed')
+  };
+
+  for (const [label, finish] of Object.entries(terminalPaths)) {
+    setupGlobals();
+    const manager = new CraftingRunManager();
+    const actor = new FakeActor(`Craft-${label}`);
+
+    const insertedIds = await insertTerminalRuns(RETENTION_LIMIT + 1, async (i) => {
+      const run = await manager.createRun(actor, singleStepRecipe(i), [actor], 'user-1');
+      await finish(manager, actor, run);
+      return run.id;
+    });
+
+    const history = manager.getRunHistory(actor);
+    assert.equal(history.length, RETENTION_LIMIT, `${label} should cap history at ${RETENTION_LIMIT}`);
+    assertCappedMostRecentFirst(assert, history, insertedIds);
+  }
 });
