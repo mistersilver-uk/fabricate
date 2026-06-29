@@ -24,7 +24,7 @@ CraftingSystem = {
 
   // System-level invariant for all recipes in this crafting system.
   // Mode semantics and validation are defined in 004.
-  resolutionMode: "simple" | "routed" | "progressive" | "alchemy",
+  resolutionMode: "simple" | "routedByIngredients" | "routedByCheck" | "progressive" | "alchemy",
 
   // Tool-breakage authority for the whole system.
   // "toolSpecific" (default): each Tool's own breakage.mode decides whether it
@@ -249,7 +249,7 @@ Legacy persisted `features.recipeCategories`, `features.categories`, and `enable
 5. Item tags are always enabled.
 Legacy persisted `features.itemTags` and `enableTags` values are compatibility inputs only; normalization must emit enabled item-tag aliases.
 6. `categories` and `itemTags` should be normalized to unique, trimmed strings.
-7. `resolutionMode` must be one of `"simple"`, `"routed"`, `"progressive"`, or `"alchemy"`.
+7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, or `"alchemy"`.
 8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
@@ -362,13 +362,16 @@ Requirements:
    Most are `blocks: 'system'` (a progressive system with no progressive check or
    no component with a difficulty of 1 or more; multi-step recipes left on in
    alchemy mode; an alchemy ingredient-signature collision).
-   The routed crafting-check formula check is keyed ONLY off
-   `craftingCheck.routed.rollFormula`: a routed system with no formula always emits
-   a `routedCheckNoFormula` issue, which is a non-blocking `severity: 'warning'`
-   with no `blocks` field while no recipe routes by the `check` provider and
-   escalates to `severity: 'critical', blocks: 'system'` once one does.
-   These warnings are distinct from the per-recipe routed-authoring warnings,
-   which also stay `severity: 'warning'` with no `blocks`.
+   The routed crafting-check formula check is keyed ONLY off the system MODE plus
+   `craftingCheck.routed.rollFormula`: a `routedByCheck` system with no formula
+   emits a `routedCheckNoFormula` issue that is `severity: 'critical', blocks:
+   'system'` **unconditionally** — every recipe in the mode routes by the check, so
+   the gap is a whole-system blocker independent of any recipe, computed with NO
+   recipe scan.
+   A `routedByIngredients` system never emits `routedCheckNoFormula` (its check is
+   optional).
+   These blockers are distinct from the per-recipe routed-authoring warnings, which
+   stay `severity: 'warning'` with no `blocks`.
    Routed SALVAGE adds the parallel `salvageRoutedNoFormula` and
    `salvageRoutedNoTiers` checks, keyed off `salvageCraftingCheck.routed.rollFormula`
    and its active-type outcome tiers.
@@ -595,10 +598,11 @@ Recipe = {
    Persistence gates only on structural validity (`validateStructure()`), never on completeness; structural-integrity errors (duplicate result-group/result IDs, invalid results, invalid step time/currency values, reserved-name, variable result-mapping and outcome-routing integrity) still block persistence.
    Incompleteness is *derived* from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
 3. Resolution-mode constraints are defined in `004-resolution-modes.md`.
-4. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `alchemy`.
-5. `resultSelection.provider` value constraints (the provider enum is `ingredientSet | check`):
+4. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `alchemy` (the only mode that routes via a per-recipe provider).
+   The routed crafting modes derive their routing basis from the system mode and carry no `resultSelection`: `routedByIngredients` routes by `IngredientSet.resultGroupId` and `routedByCheck` routes by `ResultGroup.name`/`checkOutcomeIds` against the system routed check.
+5. `resultSelection.provider` value constraints for alchemy (the provider enum is `ingredientSet | check`):
    - `ingredientSet`: each `IngredientSet` must resolve deterministically to exactly one `ResultGroup` (via `IngredientSet.resultGroupId`, or implicitly when only one result group exists).
-   - `check`: the system crafting-check outcome routes to the `ResultGroup` of the same name; crafting checks must be enabled on the system.
+   - `check`: the system crafting-check outcome routes to the `ResultGroup` of the same name.
 6. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
 7. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
@@ -1042,7 +1046,7 @@ CraftingRunStepState = {
   lastCheckResult?: {
     success: boolean,
     reason: string,   // user-friendly text returned by the macro explaining the result
-    outcome?: string, // routed/alchemy check provider
+    outcome?: string, // routedByCheck mode / alchemy check provider
     value?: number,   // progressive mode
     data?: object,
   },
@@ -1073,7 +1077,7 @@ CraftingRunStepState = {
 2. `timeGate` is only valid when the corresponding recipe step has `timeRequirement`.
 3. `timeGate.availableAt` must be `> initiatedAt` when both are present.
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
-5. `lastCheckResult.outcome` is only valid in routed/alchemy when provider is `check`; `lastCheckResult.value` is only valid in progressive mode.
+5. `lastCheckResult.outcome` is only valid in `routedByCheck` mode (and in alchemy when the provider is `check`); `lastCheckResult.value` is only valid in progressive mode.
 6. `failureReason` is required when `status` is `failed`.
 
 ## Actor Flags
@@ -1383,9 +1387,9 @@ They are unrelated mechanisms.
 
 The crafting-check macro / built-in adapter path has been removed.
 A crafting check is now usable IFF its resolution mode has an authored roll formula (`craftingCheck.simple|routed|progressive.rollFormula`); the engine rolls that formula and evaluates the outcome itself.
-There is no macro-return contract — when a required check (progressive, or routed + `check` provider) has no authored roll formula the attempt fails loudly with zero mutation (the required-check guard), and an optional simple check with no formula is a no-op.
+There is no macro-return contract — when a required check (progressive, or `routedByCheck` mode) has no authored roll formula the attempt fails loudly with zero mutation (the required-check guard), and an optional check (simple or `routedByIngredients`) with no formula is a no-op.
 
-The routed `check` provider keys on the engine-evaluated outcome tier NAME produced by rolling `craftingCheck.routed.rollFormula`.
+`routedByCheck` mode keys on the engine-evaluated outcome tier NAME produced by rolling `craftingCheck.routed.rollFormula`.
 The same outcome-name normalization the provider routing applies (engine-evaluated, not a macro return):
 
 1. `outcome` is interpreted using trim-normalized, case-insensitive comparison.

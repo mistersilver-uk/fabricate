@@ -13,41 +13,48 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   `007-destructive-changes-and-migrations.md`:
   recipes are migrated to fit the new mode wherever possible and a recipe is
   deleted only when a per-recipe *structural* constraint of the target mode cannot
-  be satisfied by seeding a result-selection provider or clearing the routed
-  selection.
+  be satisfied by seeding the alchemy provider or clearing the result selection.
   System-level gaps (a target mode that needs a check the system has not
   configured, an alchemy signature collision, ...) never delete a recipe; they are
   surfaced as system-validation issues that gate visibility, not deletion.
 - **Migratability matrix (normative).**
   The columns are the *target* mode and the rows the *source* mode.
-  "seed" seeds the recipe-level `resultSelection.provider`
-  (`check` when the system has a usable crafting check, otherwise `ingredientSet`);
+  RI = `routedByIngredients`, RC = `routedByCheck`.
+  "seed" seeds the alchemy `resultSelection.provider` — `ingredientSet`/`check`
+  when the source is the matching routed mode, otherwise `check` when the system
+  has a usable crafting check, else `ingredientSet`
+  (alchemy is the only mode that still routes via a recipe-level provider);
   "clear" sets `resultSelection` to `null`;
-  "carry" keeps the recipe (and its routing provider) verbatim;
+  "carry" keeps the recipe verbatim;
+  "reconcile" means the recipe survives but its stale routing is surfaced as a
+  re-authoring validation issue, never silently mis-routed;
   "1×1" means the recipe has exactly one ingredient set and one result group.
 
-  | From \ To     | `simple`                       | `routed` | `progressive`                  | `alchemy`                            |
-  |---------------|--------------------------------|----------|--------------------------------|--------------------------------------|
-  | `simple`      | —                              | seed     | clear                          | seed                                 |
-  | `routed`      | clear if 1×1 else **delete**   | —        | clear if 1×1 else **delete**   | carry if single-step else **delete** |
-  | `progressive` | clear                          | seed     | —                              | seed                                 |
-  | `alchemy`     | clear if 1×1 else **delete**   | carry    | clear if 1×1 else **delete**   | —                                    |
+  | From \ To             | `simple`                     | `routedByIngredients`        | `routedByCheck`                          | `progressive`                | `alchemy`                                                           |
+  |-----------------------|------------------------------|------------------------------|------------------------------------------|------------------------------|--------------------------------------------------------------------|
+  | `simple`              | —                            | clear                        | clear; reconcile                         | clear                        | seed                                                               |
+  | `routedByIngredients` | clear if 1×1 else **delete** | —                            | carry; reconcile                         | clear if 1×1 else **delete** | seed provider=`ingredientSet`, carry if single-step else **delete** |
+  | `routedByCheck`       | clear if 1×1 else **delete** | carry; reconcile             | —                                        | clear if 1×1 else **delete** | seed provider=`check`, carry if single-step else **delete**         |
+  | `progressive`         | clear                        | clear                        | clear; reconcile                         | —                            | seed                                                               |
+  | `alchemy`             | clear if 1×1 else **delete** | clear (drop provider), carry | clear (drop provider), carry; reconcile  | clear if 1×1 else **delete** | —                                                                  |
 
   The only structural delete causes are: narrowing into `simple`/`progressive`
   (which require 1×1) from a recipe with more than one ingredient set or result
   group, and moving a multi-step recipe into `alchemy` (which has no multi-step
   support).
-  Re-running a `lossless`/`carry` migration is a no-op (idempotent).
-- Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks (routed invalid/missing provider, routed invalid `resultGroupId` for the `ingredientSet` provider, routed reserved/duplicate `ResultGroup.name`) always apply. (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `007-destructive-changes-and-migrations.md §Resolution-Model Migration`, which hard-migrates them to `routed`.)
+  `RI↔RC` never deletes (`carry`); it reconciles stale routing.
+  Re-running a `carry` migration with no reconcile pending is a no-op (idempotent).
+- Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks always apply, per mode: `routedByIngredients` checks the invalid `resultGroupId` integrity, and `routedByCheck` checks the reserved/duplicate `ResultGroup.name`. (The routed modes carry no `resultSelection.provider`, so there is no provider value to validate.) (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `007-destructive-changes-and-migrations.md §Resolution-Model Migration`, which hard-migrates `mapped → routedByIngredients` and `tiered → routedByCheck`.)
 
 ## Mode Matrix
 
-| Mode          | Ingredient Sets | Result Groups               | Check Requirement                       | Routing Basis                           |
-|---------------|-----------------|-----------------------------|-----------------------------------------|-----------------------------------------|
-| `simple`      | exactly 1       | exactly 1                   | optional                                | single result group                     |
-| `routed`      | one or more     | one or more                 | provider-dependent                      | recipe `resultSelection.provider`       |
-| `progressive` | exactly 1       | exactly 1 (ordered results) | required                                | numeric value spending                  |
-| `alchemy`     | one or more     | one or more                 | provider-dependent                      | recipe `resultSelection.provider`       |
+| Mode                  | Ingredient Sets | Result Groups               | Check Requirement  | Routing Basis                       |
+|-----------------------|-----------------|-----------------------------|--------------------|-------------------------------------|
+| `simple`              | exactly 1       | exactly 1                   | optional           | single result group                 |
+| `routedByIngredients` | one or more     | one or more                 | optional           | `IngredientSet.resultGroupId`       |
+| `routedByCheck`       | one or more     | one or more                 | required           | system routed-check outcome         |
+| `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
+| `alchemy`             | one or more     | one or more                 | provider-dependent | recipe `resultSelection.provider`   |
 
 ## Simple Mode
 
@@ -64,29 +71,42 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - The crafting check is optional: it runs only when `craftingCheck.simple.rollFormula` is authored (the engine rolls the formula and resolves pass/fail against the DC).
 With no authored formula the attempt proceeds with no check; there is no macro-return contract.
 
-## Routed Mode
+## Routed by Ingredients Mode (`routedByIngredients`)
 
 ### Semantics
 
 - Multiple ingredient sets and result groups are allowed.
-- Result-group resolution is recipe-level via `Recipe.resultSelection.provider`.
-- **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the check outcome or provider.
+- The routing basis is a property of the **mode** (not a per-recipe provider): routing uses `IngredientSet.resultGroupId`.
+The mode carries no `resultSelection`.
+- **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the chosen ingredient set.
 No other result groups are awarded.**
-- Supported providers:
-  - `ingredientSet`
-  - `check`
+- The crafting check is **optional**, matching `simple` mode: it runs only when `craftingCheck.routed.rollFormula` is authored; with no authored formula the attempt proceeds with no check.
+The check never changes which result group is produced.
 
-### Provider: `ingredientSet`
+### Routing
 
 - Routing uses `IngredientSet.resultGroupId`.
 - If there is only one result group, explicit mapping may be omitted.
 - If there are multiple result groups, every satisfiable ingredient set must resolve to exactly one group.
 
-### Provider: `check`
+### Validation
 
-- The system-level crafting-check outcome name routes to the `ResultGroup` of the same name.
-- The outcome is produced by the system's configured routed crafting check, whose only required field is an authored `craftingCheck.routed.rollFormula`.
-- A recipe that routes by the `check` provider is structurally valid regardless of the system's check configuration; whether the system has a usable routed check is a system-level concern, not a per-recipe validation error.
+- At least one `IngredientSet`.
+- At least one `ResultGroup`.
+- Reference integrity (always applies): each `IngredientSet.resultGroupId` must point at a real `ResultGroup` in scope.
+- This mode never raises `routedCheckNoFormula`: a missing routed roll formula simply means no check runs.
+
+## Routed by Check Mode (`routedByCheck`)
+
+### Semantics
+
+- Multiple ingredient sets and result groups are allowed.
+- The routing basis is a property of the **mode** (not a per-recipe provider): the system-level routed crafting-check outcome routes to a `ResultGroup`.
+The mode carries no `resultSelection`.
+- **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the check outcome.
+No other result groups are awarded.**
+- The crafting check is **required**.
+The outcome is produced by the system's configured routed crafting check, whose required field is an authored `craftingCheck.routed.rollFormula`.
 - `outcome` is trim-normalized and case-insensitive.
 - Resolution rules:
   1. Explicit tier assignment wins: when the outcome resolves to a routed-check outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
@@ -98,12 +118,9 @@ No other result groups are awarded.**
 
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
-- `resultSelection.provider` must be one of the two supported values (`ingredientSet`, `check`).
-- The `check` provider does not require crafting checks to be "enabled" on the system; a `check`-provider recipe is structurally valid regardless of the system's check configuration.
-- An unconfigured routed check (no `craftingCheck.routed.rollFormula`) surfaces as a system-level overview warning that escalates to a system-blocker once a recipe routes by the `check` provider (see `recipe-visibility`).
-- Provider-specific required fields must be present.
-- `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison.
-- `ResultGroup.name` may not be any reserved failure keyword.
+- Reference integrity (always applies): `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison, and may not be any reserved failure keyword.
+- A missing routed crafting check (`craftingCheck.routed.rollFormula` unauthored) is an **unconditional system-level blocker** (`routedCheckNoFormula`), independent of any recipe — every recipe in this mode routes by the check, so no craft can resolve without it (see `recipe-visibility`).
+A `routedByCheck` recipe is otherwise structurally valid regardless of the check configuration; the formula requirement is a system-level concern, not a per-recipe validation error.
 
 ## Progressive Mode
 
@@ -117,7 +134,7 @@ Each awarded entry grants a single item (any legacy authored quantity is normali
 - Check is mandatory and returns numeric `value`.
 - Awarding evaluates ordered results using `awardMode`.
 - **All result groups whose difficulty threshold is met or exceeded are awarded, not just the highest matching group.
-This is the key distinction from `routed` mode, which selects exactly one result group.**
+This is the key distinction from the routed modes, which select exactly one result group.**
 
 ### Award Modes
 
@@ -150,7 +167,8 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 - Player submits ingredient combinations directly instead of selecting a visible recipe.
 - Recipes remain hidden by default for non-GM users (see `006` for `learnOnCraft` semantics).
-- Result-group selection uses recipe-level providers (`ingredientSet`, `check`) with the same provider contracts as routed mode.
+- Result-group selection uses recipe-level providers (`ingredientSet`, `check`); alchemy is the only mode that retains a per-recipe `resultSelection.provider`.
+The `ingredientSet` provider routes by `IngredientSet.resultGroupId` and the `check` provider routes by the crafting-check outcome name (the same routing contracts the `routedByIngredients`/`routedByCheck` modes apply at the mode level).
 - Multi-step recipes are not supported.
 - `consumeOnFail` defaults to true for failed attempts.
 
@@ -215,7 +233,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 ## Testing Requirements
 
 - Unit tests per mode for cardinality and routing validation.
-- Unit tests for provider-specific routed behavior (`ingredientSet`, `check`).
+- Unit tests for mode-specific routed behavior (`routedByIngredients`, `routedByCheck`) and the alchemy providers (`ingredientSet`, `check`).
 - Unit tests for reserved failure keyword handling and result-group name matching normalization.
 - Unit tests for progressive award modes (`partial`, `equal`, `exceed`).
 - Integration tests validating mode-specific behavior in full crafting flow.

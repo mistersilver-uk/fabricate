@@ -221,24 +221,37 @@ This does not invalidate migration correctness.
 
 ### Resolution-Model Migration (Pre-Release)
 
-The pre-release migration path removes legacy crafting modes `mapped` and `tiered`.
+The pre-release migration path retires the legacy crafting modes `mapped`/`tiered`
+AND the interim single `routed` mode, landing every system on the two first-class
+routed modes `routedByIngredients` / `routedByCheck`.
+The routing basis is now a property of the system MODE (not a per-recipe
+`resultSelection.provider`), so the migration — not the read-time normalizer — must
+make the system-level basis decision.
+`routed` is no longer a landing token for the read-time normalizer.
 
-1. System migration:
-   - `mapped` -> `routed`
-   - `tiered` -> `routed`
-2. Recipe migration:
-   - legacy mapped recipes -> `resultSelection.provider = "ingredientSet"`
-   - legacy tiered recipes -> `resultSelection.provider = "check"`
+1. Legacy `mapped`/`tiered` system migration (the clean, per-system tokens):
+   - `mapped` -> `routedByIngredients`
+   - `tiered` -> `routedByCheck`
+2. Legacy `mapped`/`tiered` recipe migration:
+   - former mapped recipes are carried verbatim (mapped routing is byte-identical to `IngredientSet.resultGroupId` ingredient routing — no provider, no reshaping).
+   - former tiered recipes run the group-name reconciliation below, then carry.
 2a.
-For former `tiered` recipes, each `outcomeRouting[outcome] -> groupId` entry is reconciled by renaming the target `ResultGroup.name` to `outcome` (so canonical `check` name-matching reproduces the legacy routing), then `outcomeRouting` is removed.
-Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones; an outcome with no resolvable group is logged and left as a craft-time misconfiguration; an unroutable group keeps its name; a reserved-keyword outcome drops to the failure path without renaming any group; an unavoidable normalized `ResultGroup.name` collision makes the recipe unmigratable (hard cleanup per item 3).
-3. Mode and recipe migration is best-effort with hard cleanup on invalid documents:
+For former `tiered` recipes, each `outcomeRouting[outcome] -> groupId` entry is reconciled by renaming the target `ResultGroup.name` to `outcome` (so canonical check name-matching reproduces the legacy routing), then `outcomeRouting` is removed.
+Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones; an outcome with no resolvable group is logged and left as a craft-time misconfiguration; an unroutable group keeps its name; a reserved-keyword outcome drops to the failure path without renaming any group; an unavoidable normalized `ResultGroup.name` collision makes the recipe unmigratable (hard cleanup per item 4).
+3. One-time `routed` system migration (a `routed` system has no system-level provider constraint and may mix `ingredientSet`- and `check`-routed recipes, so a per-system mode is chosen and disagreeing recipes reconciled):
+   - **Majority provider wins.** The system becomes the mode matching the provider used by the majority of its recipes; ties — including a system with NO routed recipes — break to `routedByIngredients` (the optional-check, lower-friction mode).
+   - **Minority reconciliation.** Recipes whose old provider disagrees with the chosen system mode keep their result data but have their now-meaningless `resultSelection` dropped; the stale routing is surfaced by system validation as a re-authoring issue — never silently mis-routed.
+   - **Provider drop.** Every recipe of a migrated system has its `resultSelection` cleared (agreeing recipes lose only a redundant field); the routed modes derive their basis from the system mode.
+   - A `routedByCheck` system that lacks `craftingCheck.routed.rollFormula` is the new unconditional system blocker (visibility), not a recipe deletion.
+4. Mode and recipe migration is best-effort with hard cleanup on invalid documents:
    - recipes that cannot be migrated are deleted,
    - cascading cleanup is applied immediately (runs, learned flags, UI prefs, and stale references),
    - migration logs JSON for removed objects to console.
-4. Provider-switch behavior:
-   - when provider is changed, stale provider-specific config from the previous provider is cleared.
 5. Because this is pre-release, legacy-mode compatibility shims are not retained.
+
+The salvage `salvageResolutionMode: "routed"` and the gathering economy
+`resolutionMode: "routed"` are unrelated routing concepts on separate enums and are
+explicitly untouched by this split — they keep the `routed` token.
 
 ### Recipe Item Library Migration (Pre-Release)
 
