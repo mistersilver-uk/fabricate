@@ -27,7 +27,7 @@ Every recipe brings together a few things.
 - Whether the recipe is locked, which lets players see it exists but stops anyone other than the GM from crafting it.
 - Who can see it, which is set by the crafting system's visibility settings.
 - For a recipe that teaches itself through an in-world item, the item that unlocks it for knowledge-based visibility.
-- For a routed recipe, how the result is chosen when more than one outcome is possible.
+- In a routed system, the result groups it can produce when more than one outcome is possible.
 
 {: .note }
 > For multi-step recipes, the ingredients and results are defined on each individual step rather than on the recipe as a whole.
@@ -77,12 +77,13 @@ The resolution mode determines how ingredients map to results:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Mode                                             | Sets | Result Groups | Check Required     | Use When                                                      |
-|:-------------------------------------------------|:-----|:--------------|:-------------------|:--------------------------------------------------------------|
-| [Simple]({% link recipes/simple.md %})           | 1    | 1             | Optional           | Basic A + B = C crafting                                      |
-| [Routed]({% link recipes/routed.md %})           | 1+   | 1+            | Provider-dependent | Ingredient choice or skill check selects the result           |
-| [Progressive]({% link recipes/progressive.md %}) | 1    | 1 (ordered)   | **Yes**            | Skill check value "buys" results in order                     |
-| [Alchemy]({% link recipes/alchemy.md %})         | 1+   | 1+            | Optional           | Players experiment with ingredients. Recipe names are hidden  |
+| Mode                                                          | Sets | Result Groups | Check Required | Use When                                                     |
+|:--------------------------------------------------------------|:-----|:--------------|:---------------|:-------------------------------------------------------------|
+| [Simple]({% link recipes/simple.md %})                        | 1    | 1             | Optional       | Basic A + B = C crafting                                     |
+| [Routed by ingredients]({% link recipes/routed.md %})         | 1+   | 1+            | Optional       | The ingredients used select the result                      |
+| [Routed by check]({% link recipes/routed.md %})               | 1+   | 1+            | **Yes**        | A skill-check outcome selects the result                    |
+| [Progressive]({% link recipes/progressive.md %})              | 1    | 1 (ordered)   | **Yes**        | Skill check value "buys" results in order                   |
+| [Alchemy]({% link recipes/alchemy.md %})                      | 1+   | 1+            | Optional       | Players experiment with ingredients. Recipe names are hidden |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 

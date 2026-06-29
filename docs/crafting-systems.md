@@ -27,7 +27,7 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 |:-----------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Name**                     | Display name shown in the UI                                                                                                                       |
 | **Description**              | Optional flavour text                                                                                                                              |
-| **Recipe resolution mode**   | How recipes produce results: Simple, Routed, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
+| **Recipe resolution mode**   | How recipes produce results: Simple, Routed by ingredients, Routed by check, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
 | **Salvage resolution mode**  | How salvaging a component awards results: Simple (default), Progressive, or Routed by check. See [Salvage]({% link salvage.md %}#salvage-resolution-mode) |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -70,7 +70,7 @@ This happens in two cases: narrowing into Simple or Progressive mode (which each
 Every other recipe is kept and adjusted to suit the new mode.
 
 A missing setup at the system level never deletes a recipe.
-For example, switching to Progressive mode without a progressive crafting check, or to a check-routed mode without a roll formula, does not remove recipes.
+For example, switching to Progressive mode without a progressive crafting check, or to Routed by check mode without a roll formula, does not remove recipes.
 Those gaps are reported in the System Overview instead, and they hide recipes from players until you fix them rather than deleting anything.
 See [System Overview](#system-overview).
 
@@ -114,7 +114,7 @@ These failures include a missing actor, missing ingredients, missing or unsatisf
 
 ### Crafting Checks
 
-If your system uses Routed mode with the skill-check outcome option, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.
+If your system uses Routed by check mode, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.
 See [Crafting Checks]({% link crafting-checks.md %}) for the settings, consumption-on-failure policies, and worked examples.
 
 ### Effect Transfer
@@ -175,7 +175,7 @@ When a system has no issues, the Overview says everything is ready to use.
 A **system blocker** is a problem serious enough to make the entire system unusable until you fix it.
 Examples include:
 
-- Routed check-mode recipes are configured but the system has no routed crafting check.
+- The system is in Routed by check mode but has no routed crafting check, so no recipe can resolve.
 - Progressive mode with no progressive crafting check, or no component with a difficulty of 1 or more.
 - Multi-step recipes are still enabled while the system is in Alchemy mode.
 - Two recipes share an ingredient signature in Alchemy mode, so attempts are ambiguous.
