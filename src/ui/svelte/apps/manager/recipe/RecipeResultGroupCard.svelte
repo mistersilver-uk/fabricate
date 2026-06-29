@@ -35,6 +35,11 @@
     // success-filtered `outcomeTierOptions` is empty this disambiguates "no tiers
     // authored yet" from "tiers exist but none is a Success" for the empty hint.
     outcomeTiersDefined = false,
+    // Progressive systems award the group's results in ORDER (the award loop spends
+    // the check budget down the list), so the GM needs to reorder them. When set,
+    // each result row grows a drag handle wired to drag-and-drop reorder; other
+    // resolution modes ignore result order and render the list unchanged.
+    progressive = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
     onRemove = () => {}
@@ -46,6 +51,25 @@
   }
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
+
+  // Drag-reorder state (progressive only). Local so it survives the store refresh
+  // that follows every persisted edit — rows are keyed by result id. Mirrors the
+  // native HTML5 drag pattern in RecipeStepAccordion: the grip is the drag source,
+  // the row is the drop target, and a splice emits the reordered group.
+  let dragIndex = $state(-1);
+
+  function reorderItem(from, to) {
+    if (from === to || from < 0 || to < 0 || from >= results.length || to >= results.length) return;
+    const next = results.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange({ ...group, results: next });
+  }
+
+  function handleResultDrop(targetIndex) {
+    if (dragIndex >= 0 && dragIndex !== targetIndex) reorderItem(dragIndex, targetIndex);
+    dragIndex = -1;
+  }
 
   // Mirror RecipeItemInspector: 'ingredientSet' is Ingredient routing; 'check'
   // routes by the system crafting-check outcome.
@@ -163,13 +187,43 @@
     <p class="manager-muted manager-recipe-ingredient-set-empty">{text('FABRICATE.Admin.Manager.Recipe.ResultSetEmptyHint', 'Add an item this recipe produces.')}</p>
   {:else}
     <div class="manager-recipe-ingredient-set-groups">
-      {#each results as item, index (index)}
-        <RecipeResultItemRow
-          {item}
-          {componentOptions}
-          onChange={(nextItem) => updateItem(index, nextItem)}
-          onRemove={() => removeItem(index)}
-        />
+      {#each results as item, index (item?.id || index)}
+        {#if progressive}
+          <!-- Progressive: the grip is the drag SOURCE (so a grab inside the row's
+               quantity input / component picker still selects text), the row is the
+               drop TARGET. Drag is a mouse-only enhancement. -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="manager-recipe-result-row is-reorderable"
+            data-recipe-result-row
+            ondragover={(event) => event.preventDefault()}
+            ondrop={(event) => { event.preventDefault(); handleResultDrop(index); }}
+          >
+            <span
+              class="manager-environment-comp-handle"
+              draggable="true"
+              ondragstart={() => { dragIndex = index; }}
+              ondragend={() => { dragIndex = -1; }}
+              title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
+            >
+              <i class="fas fa-grip-vertical" aria-hidden="true"></i>
+              <span class="manager-environment-comp-order">{index + 1}</span>
+            </span>
+            <RecipeResultItemRow
+              {item}
+              {componentOptions}
+              onChange={(nextItem) => updateItem(index, nextItem)}
+              onRemove={() => removeItem(index)}
+            />
+          </div>
+        {:else}
+          <RecipeResultItemRow
+            {item}
+            {componentOptions}
+            onChange={(nextItem) => updateItem(index, nextItem)}
+            onRemove={() => removeItem(index)}
+          />
+        {/if}
       {/each}
     </div>
   {/if}

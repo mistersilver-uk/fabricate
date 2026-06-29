@@ -1057,6 +1057,112 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // Progressive systems award a recipe's results in order, so the Results tab grows
+  // a drag handle on each result row. A progressive recipe holds a single result
+  // group (multi-set is forbidden), rendered chromeless. `progressive` is threaded
+  // from the system resolution mode through the editor shell to the group card.
+  function mountProgressiveResults(results, { progressive = true } = {}) {
+    const patches = [];
+    return editHarness
+      .mount(
+        identityProps({
+          complex: false,
+          progressive,
+          componentOptions: COMPONENT_OPTIONS,
+          recipe: {
+            ...RECIPE,
+            complex: false,
+            resultGroups: [{ id: 'grp-1', name: '', results }],
+          },
+          onUpdateRecipe: (patch) => patches.push(patch),
+        })
+      )
+      .then(async (target) => {
+        clickTab(target, 'results');
+        await flushRender();
+        return { target, patches };
+      });
+  }
+
+  // Fire a native drag lifecycle event (the handlers read no dataTransfer, so a
+  // plain bubbling Event suffices, mirroring dispatchDrop above).
+  function fireDrag(node, type) {
+    node.dispatchEvent(
+      new globalThis.window.Event(type, { bubbles: true, cancelable: true })
+    );
+  }
+
+  it('progressive: result rows render a drag handle with grip + order pip', async () => {
+    const { target } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+    ]);
+    const rows = target.querySelectorAll('[data-recipe-result-row]');
+    assert.equal(rows.length, 2, 'both result rows render reorderable wrappers');
+    rows.forEach((row, index) => {
+      const handle = row.querySelector('.manager-environment-comp-handle');
+      assert.ok(handle, `row ${index} renders the shared handle`);
+      assert.equal(handle.getAttribute('draggable'), 'true', `row ${index} handle is the drag source`);
+      assert.ok(handle.querySelector('.fa-grip-vertical'), `row ${index} renders the grip icon`);
+      assert.ok(
+        handle.querySelector('.manager-environment-comp-order').textContent.includes(String(index + 1)),
+        `row ${index} renders its 1-based order pip`
+      );
+    });
+    editHarness.remount();
+  });
+
+  it('progressive: dragging a result onto another reorders the group via onUpdateRecipe', async () => {
+    const { target, patches } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+    ]);
+    const rows = target.querySelectorAll('[data-recipe-result-row]');
+    // Drag row 0 (the grip is the source) and drop it onto row 1.
+    fireDrag(rows[0].querySelector('.manager-environment-comp-handle'), 'dragstart');
+    fireDrag(rows[1], 'drop');
+    await flushRender();
+    assert.equal(patches.length, 1, 'the reorder emits exactly one recipe patch');
+    assert.deepEqual(
+      patches.at(-1).resultGroups[0].results.map((r) => r.componentId),
+      ['cmp-water', 'cmp-herb'],
+      'the dragged result moves after its drop target'
+    );
+    assert.equal(
+      patches.at(-1).resultGroups[0].id,
+      'grp-1',
+      'the group id survives the reorder'
+    );
+    editHarness.remount();
+  });
+
+  it('non-progressive: result rows render no drag handle', async () => {
+    const { target } = await mountProgressiveResults(
+      [
+        { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+        { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+      ],
+      { progressive: false }
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-result-row]'),
+      null,
+      'no reorderable wrapper outside progressive mode'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-section="results"] .manager-environment-comp-handle'),
+      null,
+      'no drag handle on result rows outside progressive mode'
+    );
+    // The result rows themselves still render, just without the handle chrome.
+    assert.equal(
+      target.querySelectorAll('[data-recipe-result-item]').length,
+      2,
+      'both result item rows still render'
+    );
+    editHarness.remount();
+  });
+
   it('opens the recipe-level tools popover on the Tools tab, lists the library, and adds a chosen tool', async () => {
     const patches = [];
     const target = await editHarness.mount(

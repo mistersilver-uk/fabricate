@@ -954,6 +954,9 @@
   // editor, inspector, and header chip all track unsaved staged edits.
   const recipeComplex = $derived(recipeDraft?.complex === true);
   const recipeRoutingProvider = $derived(recipeDraft?.resultSelection?.provider || null);
+  // Progressive systems award a recipe's results in order, so the Results tab
+  // enables drag-reorder of the result rows (resolution mode is a system setting).
+  const recipeProgressive = $derived(selectedSystem?.resolutionMode === 'progressive');
   const recipeEditDirty = $derived(Boolean(recipeDraft)
     && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline));
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
@@ -4472,6 +4475,7 @@
       <RecipeEditView
         recipe={recipeDraft}
         complex={recipeComplex}
+        progressive={recipeProgressive}
         saving={recipeEditSaving}
         saveFailed={recipeSaveFailed}
         onPickImagePath={services?.pickImagePath}
