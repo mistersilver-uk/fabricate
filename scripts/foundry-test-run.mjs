@@ -1069,7 +1069,11 @@ async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('.fabricate-manager #manager-system-name').first().fill('The Herbalist');
   await page.locator('.fabricate-manager #manager-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
-  await page.locator('.fabricate-manager [data-system-resolution-mode-option="routed"]').first().click();
+  // The fixture system is `routedByCheck`; click a DIFFERENT mode so the
+  // change-mode confirm dialog fires (then cancelled below). The crafting enum now
+  // carries `routedByIngredients` / `routedByCheck` (the legacy `routed` option is
+  // gone — see SystemEditView.resolutionModeOptions).
+  await page.locator('.fabricate-manager [data-system-resolution-mode-option="routedByIngredients"]').first().click();
   // Changing resolution mode may raise a confirm dialog; its buttons differ
   // across manager revisions. Dismiss it resiliently and never leave a modal open.
   const cancelDialog = page.locator('.dialog button:has-text("No"), .dialog button:has-text("Cancel"), .dialog button:has-text("Keep")').first();
@@ -1938,12 +1942,16 @@ async function main() {
         }
 
         await csm.updateSystem(systemId, {
-          // 'mapped' resolution allows multiple ingredient/result sets, so the recipe
-          // editor unlocks Complex mode (recipeMultiSetAllowed gates on a mode NOT in
-          // ['simple','progressive']). multiStepRecipes unlocks the step-mode toggle and
-          // the per-step duration controls; itemTags unlocks the tag-requirement picker;
+          // `routedByCheck` resolution allows multiple ingredient/result sets, so the
+          // recipe editor unlocks Complex mode (recipeMultiSetAllowed gates on a mode
+          // NOT in ['simple','progressive']). Under this system mode every recipe routes
+          // by the routed crafting-check outcome, and a single-result-group recipe is
+          // produced on any non-failure outcome (the single-group exemption). The
+          // authored `craftingCheck.routed.rollFormula` below means no missing-formula
+          // blocker. multiStepRecipes unlocks the step-mode toggle and the per-step
+          // duration controls; itemTags unlocks the tag-requirement picker;
           // recipeCategories unlocks the category selector.
-          resolutionMode: 'mapped',
+          resolutionMode: 'routedByCheck',
           features: {
             essences: true,
             gathering: true,
@@ -2083,9 +2091,9 @@ async function main() {
           description: 'Hammer iron ore into a sturdy blade.',
           craftingSystemId: systemId,
           img: 'icons/weapons/swords/sword-guard-brass-worn.webp',
-          // System normalizes mapped -> routed, so recipes need a canonical provider.
-          // ingredientSet is mapped's equivalent; a single result group needs no resultGroupId.
-          resultSelection: { provider: 'ingredientSet' },
+          // routedByCheck routes by the check outcome; this single-result-group recipe
+          // is produced on any non-failure outcome (the single-group exemption), so no
+          // outcome/tier mapping is needed. The routed modes ignore `resultSelection`.
           ingredientSets: [{
             ingredientGroups: [{
               name: 'Iron Ore',
@@ -2109,7 +2117,9 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
-          resultSelection: { provider: 'ingredientSet' },
+          // Single result group → produced on any non-failure outcome. The Phase-E
+          // craft rolls `1d20 + 20` (always Masterwork), so this craft deterministically
+          // succeeds and yields the single "Brewed Potion" group.
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -2142,7 +2152,8 @@ async function main() {
           description: 'Forge dragon scales with iron ore into legendary armor.',
           craftingSystemId: systemId,
           img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp',
-          resultSelection: { provider: 'ingredientSet' },
+          // Single result group → produced on any non-failure outcome (single-group
+          // exemption); the routed modes ignore `resultSelection`.
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -2174,14 +2185,14 @@ async function main() {
         // type so the Ingredients tab renders: a plain component, an OR group (one
         // group with two component options), a tag requirement, and a currency cost.
         // complex:true forces the full set-card render; allowIncomplete persists it as a
-        // structurally-valid editor shell without tripping mapped-mode craftability.
+        // structurally-valid editor shell. Single result group → produced on any
+        // non-failure outcome (single-group exemption); routed modes ignore resultSelection.
         const showcaseRecipe = await rm.createRecipe({
           name: 'Showcase Requirements',
           description: 'Demonstrates every ingredient requirement row: component, OR group, tag, and currency cost.',
           craftingSystemId: systemId,
           img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
           complex: true,
-          resultSelection: { provider: 'ingredientSet' },
           ingredientSets: [{
             name: 'Primary',
             ingredientGroups: [
@@ -2238,7 +2249,9 @@ async function main() {
           description: 'A two-step recipe to showcase the steps accordion and per-step durations.',
           craftingSystemId: systemId,
           img: 'icons/commodities/metal/ingot-stack-steel.webp',
-          resultSelection: { provider: 'ingredientSet' },
+          // Each step has a single result group → produced on any non-failure outcome
+          // (the single-group exemption is evaluated per step); routed modes ignore
+          // `resultSelection`.
           steps: [
             {
               name: 'Smelt Ore',
@@ -2279,21 +2292,21 @@ async function main() {
           ]
         }, { allowIncomplete: true });
 
-        // Check-routed recipe deliberately authored with two routed-readiness gaps so
-        // the Validation tab shows BOTH new warnings (issue 431 PR-2):
+        // Check-routed recipe deliberately authored with MULTIPLE result groups and
+        // two routed-readiness gaps so the Validation tab shows BOTH new warnings
+        // (issue 431 PR-2). The warnings now gate on the SYSTEM mode (routedByCheck),
+        // not a per-recipe provider, and fire only for multi-result-group steps:
         //  - 'Reject Pile' carries no assigned outcome tier (empty checkOutcomeIds) →
         //    `unroutedResultGroup` (a result set the check can never route to);
         //  - the system's 'Masterwork' success tier is produced by no group →
         //    `unproducedOutcomeTier` (a check outcome that yields nothing).
-        // resultSelection.provider:'check' is what gates the routed warnings on
-        // (routingProvider === 'check'); allowIncomplete keeps the gappy draft savable.
+        // allowIncomplete keeps the gappy draft savable; routed modes ignore resultSelection.
         const routedReadinessRecipe = await rm.createRecipe({
           name: 'Routed Check Readiness',
           description: 'A check-routed recipe with an unrouted result set and an unproduced outcome tier.',
           craftingSystemId: systemId,
           img: 'icons/skills/trades/smithing-anvil-silver-red.webp',
           complex: true,
-          resultSelection: { provider: 'check' },
           ingredientSets: [{
             name: 'Stock',
             ingredientGroups: [{
