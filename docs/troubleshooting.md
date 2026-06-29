@@ -79,28 +79,28 @@ The confirmation prompt runs a dry run first and tells you exactly what will hap
 ## Crafting Check Not Running
 
 **Symptom:** The crafting check never fires.
-Recipes resolve immediately with no skill check, even though the Routed mode (with the skill-check outcome option) or Progressive mode is configured.
+Recipes resolve immediately with no skill check, even though the Routed by check mode or Progressive mode is configured.
 
 **Likely causes:**
 
 - The crafting check has no roll formula authored for the system's active resolution mode.
-  A Routed check (with the skill-check outcome option) and a Progressive check each need a roll formula before they can run.
+  Routed by check mode and Progressive mode each need a roll formula before their check can run.
   A required check with no roll formula now fails loudly with a validation error rather than being silently skipped.
-- The resolution mode is Simple, or Routed with the ingredient-choice option.
+- The resolution mode is Simple, or Routed by ingredients.
   In these configurations a crafting check is **optional**.
   The check runs if a roll formula is configured but is not required for success.
 - For an optional Simple check, the check is turned off.
   When it is off, the check is skipped entirely.
-- The check returns something the current mode does not understand (for example, no named outcome for the skill-check outcome option, or a missing numeric value for Progressive mode).
+- The check returns something the current mode does not understand (for example, no named outcome in Routed by check mode, or a missing numeric value for Progressive mode).
 
 **Step-by-step checks:**
 
 1. Open the Crafting Admin panel, go to the **Systems** tab, and check the **Crafting Checks** section.
    Is a roll formula configured for the system's resolution mode?
 2. Check the system's **Resolution Mode**.
-   If the resolution mode is **Routed** with the skill-check outcome option, or **Progressive**, a crafting check is required.
+   If the resolution mode is **Routed by check** or **Progressive**, a crafting check is required.
    Fabricate reports a validation error when its roll formula is missing.
-   For **Simple** mode or Routed with the ingredient-choice option, the check is optional and simply does not run when no roll formula is configured.
+   For **Simple** mode or **Routed by ingredients**, the check is optional and simply does not run when no roll formula is configured.
 3. For an optional **Simple** check, confirm the check is turned on.
    When it is off, the check is skipped.
 4. Attempt a craft and watch for any error or warning notifications from Fabricate about the check.
@@ -131,7 +131,7 @@ Recipes resolve immediately with no skill check, even though the Routed mode (wi
    Re-open the affected recipes and assign the result sets to a current outcome tier.
 4. If you rely on name matching instead of explicit assignment, confirm each result set name matches the outcome tier name once case and surrounding spaces are ignored.
 
-**See also:** [Routed Mode]({% link recipes/routed.md %}) for how outcomes match results, including explicit outcome assignment and name matching.
+**See also:** [Routed Modes]({% link recipes/routed.md %}) for how outcomes match results, including explicit outcome assignment and name matching.
 [Crafting Checks]({% link crafting-checks.md %}) for how a routed check rolls and resolves its difficulty.
 
 ---

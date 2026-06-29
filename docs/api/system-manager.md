@@ -117,7 +117,7 @@ The returned system object also includes the following top-level salvage fields,
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The `craftingCheck` field is always present on the returned system object.
-It controls how skill/ability checks gate recipe outcomes in routed check and progressive modes.
+It controls how skill/ability checks gate recipe outcomes in routed-by-check and progressive modes.
 
 `craftingCheck` shape:
 
@@ -130,7 +130,7 @@ It controls how skill/ability checks gate recipe outcomes in routed check and pr
 | `simple.dc` | `number` | `15` | Static difficulty class for the simple check. Roll total must meet or exceed it (or strictly exceed it when `simple.thresholdMode` is `"exceed"`). |
 | `simple.dcMode` | `string` | `"static"` | `"static"` uses `simple.dc`. `"dynamic"` computes the DC from the macro at `simple.macroUuid`. |
 | `simple.macroUuid` | `string\|null` | `null` | UUID of the dynamic-DC macro, used only when `simple.dcMode` is `"dynamic"`. The macro computes the DC. It never resolves the check outcome. |
-| `routed.rollFormula` | `string` | `""` | Roll formula for the routed check (`routed` mode with the `check` provider). The check is usable only when this is set. |
+| `routed.rollFormula` | `string` | `""` | Roll formula for the routed crafting check. Required in `routedByCheck` mode and optional in `routedByIngredients` mode. The check is usable only when this is set. |
 | `progressive.rollFormula` | `string` | `""` | Roll formula for the progressive check (`progressive` mode). The check is usable only when this is set. |
 | `consumption.consumeIngredientsOnFail` | `boolean` | `true` | Remove ingredients from inventory when the check fails. |
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools when the crafting check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback). |
@@ -140,13 +140,13 @@ It controls how skill/ability checks gate recipe outcomes in routed check and pr
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-**Example: routed check.** Configure a routed system to roll a check and route the result by outcome name:
+**Example: routed-by-check.** Configure a `routedByCheck` system to roll a check and route the result by outcome name:
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
   const mgr = game.fabricate.getCraftingSystemManager();
   await mgr.updateSystem('alchemy-system-id', {
-    resolutionMode: 'routed',
+    resolutionMode: 'routedByCheck',
     craftingCheck: {
       routed: {
         rollFormula: '1d20 + @abilities.int.mod',

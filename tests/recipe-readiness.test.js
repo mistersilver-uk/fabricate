@@ -469,8 +469,12 @@ describe('evaluateRecipeReadiness routed check-mode warnings', () => {
       name: 'Routed',
       enabled: true,
       ingredientSets: [{ id: 's1' }],
-      // Only 't-good' is produced; 't-great' is unproduced.
-      resultGroups: [{ id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] }]
+      // MULTIPLE groups (so mapping is required), both routing 't-good'; 't-great'
+      // is left unproduced. Neither group is unrouted (both carry a valid tier).
+      resultGroups: [
+        { id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] },
+        { id: 'g-good2', name: 'Good Too', checkOutcomeIds: ['t-good'] }
+      ]
     }, { routingProvider: 'check', routedOutcomeTierOptions });
 
     const unproduced = issues.filter(i => i.id === 'unproducedOutcomeTier');
@@ -478,8 +482,26 @@ describe('evaluateRecipeReadiness routed check-mode warnings', () => {
     assert.equal(unproduced[0].severity, 'warning');
     assert.equal(unproduced[0].target, 'results', 'deep-links to the results tab');
     assert.equal('blocks' in unproduced[0], false, 'never blocks enabling');
+    assert.equal(issues.some(i => i.id === 'unroutedResultGroup'), false, 'both groups are routed');
     assert.equal(check(checks, 'routedOutcomeTiersProduced').satisfied, false);
     assert.equal(blocksEnable(issues), false);
+  });
+
+  // Single-result-group exemption: a routedByCheck recipe (or step) with exactly
+  // one result group needs no outcome/tier mapping, so it raises NEITHER warning.
+  it('does not warn for a single-result-group check-routed recipe (no mapping required)', () => {
+    const { checks, issues } = evaluateRecipeReadiness({
+      name: 'OneGroup',
+      enabled: true,
+      ingredientSets: [{ id: 's1' }],
+      // One group, no checkOutcomeIds, and 't-good'/'t-great' both authored.
+      resultGroups: [{ id: 'g-only', name: 'Only', checkOutcomeIds: [] }]
+    }, { routingProvider: 'check', routedOutcomeTierOptions });
+
+    assert.equal(issues.some(i => i.id === 'unroutedResultGroup'), false, 'single group is never unrouted');
+    assert.equal(issues.some(i => i.id === 'unproducedOutcomeTier'), false, 'single group needs no tiers produced');
+    assert.equal(check(checks, 'routedResultGroupsRouted').satisfied, true);
+    assert.equal(check(checks, 'routedOutcomeTiersProduced').satisfied, true);
   });
 
   it('does not fire routed warnings when the recipe is not check-routed', () => {

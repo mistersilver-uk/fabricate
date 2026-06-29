@@ -47,5 +47,5 @@ See [Crafting Checks]({% link crafting-checks.md %}) for how checks work.
 
 ## See Also
 
-- [Routed Mode]({% link recipes/routed.md %}): produce different results from one recipe, chosen by ingredients or a skill check.
+- [Routed Modes]({% link recipes/routed.md %}): produce different results from one recipe, chosen by ingredients or a skill check.
 - [Crafting Checks]({% link crafting-checks.md %}): how crafting checks are configured.

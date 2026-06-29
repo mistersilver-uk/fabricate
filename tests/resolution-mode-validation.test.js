@@ -162,268 +162,182 @@ test('simple mode — zero result groups → invalid', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC 2 — Routed + ingredientSet: resultGroupId references must be valid
-// (the former `mapped` reference-integrity contract, now canonical)
+// AC 2 — routedByIngredients: resultGroupId reference integrity (the former
+// `mapped` reference-integrity contract, now a property of the mode). The routing
+// basis is the MODE — there is no per-recipe provider to author.
 // ---------------------------------------------------------------------------
 
-const INGREDIENT_SET = { provider: 'ingredientSet' };
-
-test('routed ingredientSet — each set has resultGroupId matching a result group → valid', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
+test('routedByIngredients — each set has resultGroupId matching a result group → valid', () => {
+  const system = buildSystem({ resolutionMode: 'routedByIngredients' });
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [{ id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
-    resultSelection: INGREDIENT_SET,
   });
-  const recipe = buildRecipe([step]);
-
-  const result = service.validateRecipe(recipe);
-
+  const result = service.validateRecipe(buildRecipe([step]));
   assert.equal(result.valid, true);
   assert.equal(result.errors.length, 0);
 });
 
-test('routed ingredientSet — resultGroupId references non-existent group → invalid', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
+test('routedByIngredients — resultGroupId references non-existent group → invalid', () => {
+  const system = buildSystem({ resolutionMode: 'routedByIngredients' });
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [{ id: 'set-1', resultGroupId: 'rg-does-not-exist', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
-    resultSelection: INGREDIENT_SET,
   });
-  const recipe = buildRecipe([step]);
-
-  const result = service.validateRecipe(recipe);
-
+  const result = service.validateRecipe(buildRecipe([step]));
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /invalid resultGroupId/i.test(e) || /resultGroupId/i.test(e)),
+    result.errors.some((e) => /resultGroupId/i.test(e)),
     `expected error about invalid resultGroupId, got: ${JSON.stringify(result.errors)}`
   );
 });
 
-test('routed ingredientSet — resultGroupId is null → valid (null is treated as unset, not an error)', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
+test('routedByIngredients — resultGroupId is null → valid (null is treated as unset)', () => {
+  const system = buildSystem({ resolutionMode: 'routedByIngredients' });
   const service = buildService(system);
   const step = buildStep({
     ingredientSets: [{ id: 'set-1', resultGroupId: null, ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
-    resultSelection: INGREDIENT_SET,
   });
-  const recipe = buildRecipe([step]);
-
-  const result = service.validateRecipe(recipe);
-
-  assert.equal(result.valid, true);
+  assert.equal(service.validateRecipe(buildRecipe([step])).valid, true);
 });
 
-test('routed ingredientSet — multiple sets with valid mappings → valid', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
+test('routedByIngredients — zero ingredient sets → invalid', () => {
+  const system = buildSystem({ resolutionMode: 'routedByIngredients' });
+  const service = buildService(system);
+  const result = service.validateRecipe(buildRecipe([buildStep({ ingredientSets: [] })]));
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.length > 0);
+});
+
+test('routedByIngredients — zero result groups → invalid', () => {
+  const system = buildSystem({ resolutionMode: 'routedByIngredients' });
+  const service = buildService(system);
+  const result = service.validateRecipe(buildRecipe([buildStep({ resultGroups: [] })]));
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.length > 0);
+});
+
+test('routedByIngredients — check optional (no checks enabled still valid)', () => {
+  const system = buildSystem({ resolutionMode: 'routedByIngredients' });
   const service = buildService(system);
   const step = buildStep({
-    ingredientSets: [
-      { id: 'set-1', resultGroupId: 'rg-1', ingredientGroups: [] },
-      { id: 'set-2', resultGroupId: 'rg-2', ingredientGroups: [] },
-    ],
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [
-      { id: 'rg-1', results: [] },
-      { id: 'rg-2', results: [] },
+      { id: 'rg-fine', name: 'Fine', results: [] },
+      { id: 'rg-superb', name: 'Superb', results: [] },
     ],
-    resultSelection: INGREDIENT_SET,
   });
-  const recipe = buildRecipe([step]);
-
-  const result = service.validateRecipe(recipe);
-
-  assert.equal(result.valid, true);
-  assert.equal(result.errors.length, 0);
-});
-
-test('routed ingredientSet — zero ingredient sets → invalid', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
-  const service = buildService(system);
-  const step = buildStep({ ingredientSets: [], resultSelection: INGREDIENT_SET });
-  const recipe = buildRecipe([step]);
-
-  const result = service.validateRecipe(recipe);
-
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.length > 0);
-});
-
-test('routed ingredientSet — zero result groups → invalid', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
-  const service = buildService(system);
-  const step = buildStep({ resultGroups: [], resultSelection: INGREDIENT_SET });
-  const recipe = buildRecipe([step]);
-
-  const result = service.validateRecipe(recipe);
-
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.length > 0);
+  assert.equal(service.validateRecipe(buildRecipe([step])).valid, true);
 });
 
 // ---------------------------------------------------------------------------
-// AC 3 — Routed mode: provider-dependent check requirement + reserved/duplicate
-// ResultGroup.name rules under EVERY routed provider (the legacy tiered
-// outcomeRouting validation is gone; its behavior is reproduced by migrated
-// `check` data).
+// AC 3 — routedByCheck: reserved/duplicate ResultGroup.name rules (check routing
+// keys on the group name). A routedByCheck recipe is structurally valid regardless
+// of the system check configuration; the missing-formula gap is a SYSTEM-level
+// blocker surfaced by systemValidation, never a per-recipe error.
 // ---------------------------------------------------------------------------
 
-/**
- * Build a routed system with crafting checks enabled (the `check` contract).
- */
 function buildRoutedCheckSystem(overrides = {}) {
   return buildSystem({
-    resolutionMode: 'routed',
-    craftingCheck: {
-      enabled: true,
-      outcomes: ['success', 'failure'],
-      progressive: null,
-    },
+    resolutionMode: 'routedByCheck',
+    craftingCheck: { enabled: true, outcomes: ['success', 'failure'], progressive: null },
     ...overrides,
   });
 }
 
-/**
- * Build a routed step with two distinctly-named result groups and the given provider.
- */
-function buildRoutedNamedStep(provider, overrides = {}) {
+function buildRoutedNamedStep(overrides = {}) {
   return buildStep({
     ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [
       { id: 'rg-fine', name: 'Fine', results: [] },
       { id: 'rg-superb', name: 'Superb', results: [] },
     ],
-    resultSelection: { provider },
     ...overrides,
   });
 }
 
-test('routed check — distinct group names with a configured routed formula → valid', () => {
-  const system = buildRoutedCheckSystem({
-    craftingCheck: { routed: { rollFormula: '1d20' } },
-  });
+test('routedByCheck — distinct group names with a configured routed formula → valid', () => {
+  const system = buildRoutedCheckSystem({ craftingCheck: { routed: { rollFormula: '1d20' } } });
   const service = buildService(system);
-  const recipe = buildRecipe([buildRoutedNamedStep('check')]);
-
-  const result = service.validateRecipe(recipe);
-
+  const result = service.validateRecipe(buildRecipe([buildRoutedNamedStep()]));
   assert.equal(result.valid, true, result.errors.join(', '));
   assert.equal(result.errors.length, 0);
 });
 
-// A `check`-provider recipe is structurally valid regardless of the system's
-// check configuration. Whether the system has a usable routed crafting check
-// (a configured `routed.rollFormula`) is a SYSTEM-level concern surfaced by
-// systemValidation, NOT a per-recipe validation error. Verify both a complete
-// save and a draft (`requireComplete: false`) save, with and without a formula.
+// A routedByCheck recipe is structurally valid regardless of the system's check
+// configuration (the missing routed formula is a SYSTEM-level blocker, not a
+// per-recipe error). Verify a complete save and a draft, with and without a formula.
 for (const requireComplete of [true, false]) {
-  test(`routed check — valid WITH a system routed formula (requireComplete: ${requireComplete})`, () => {
-    const system = buildRoutedCheckSystem({
-      craftingCheck: { routed: { rollFormula: '1d20' } },
-    });
+  test(`routedByCheck — valid WITH a system routed formula (requireComplete: ${requireComplete})`, () => {
+    const system = buildRoutedCheckSystem({ craftingCheck: { routed: { rollFormula: '1d20' } } });
     const service = buildService(system);
-    const recipe = buildRecipe([buildRoutedNamedStep('check')]);
-
-    const result = service.validateRecipe(recipe, { requireComplete });
-
+    const result = service.validateRecipe(buildRecipe([buildRoutedNamedStep()]), { requireComplete });
     assert.equal(result.valid, true, result.errors.join(', '));
-    assert.equal(
-      result.errors.some((e) => /crafting checks enabled/i.test(e)),
-      false,
-      'no per-recipe check-enabled error should be produced'
-    );
   });
 
-  test(`routed check — valid WITHOUT a system routed formula (requireComplete: ${requireComplete})`, () => {
+  test(`routedByCheck — valid WITHOUT a system routed formula (requireComplete: ${requireComplete})`, () => {
     const system = buildSystem({
-      resolutionMode: 'routed',
+      resolutionMode: 'routedByCheck',
       craftingCheck: { enabled: false, outcomes: [], routed: { rollFormula: '' } },
     });
     const service = buildService(system);
-    const recipe = buildRecipe([buildRoutedNamedStep('check')]);
-
-    const result = service.validateRecipe(recipe, { requireComplete });
-
-    assert.equal(result.valid, true, result.errors.join(', '));
+    const result = service.validateRecipe(buildRecipe([buildRoutedNamedStep()]), { requireComplete });
     assert.equal(
-      result.errors.some((e) => /crafting checks enabled/i.test(e)),
-      false,
-      'an unconfigured routed check is a system-level concern, not a per-recipe error'
+      result.valid,
+      true,
+      `an unconfigured routed check is a system-level concern, not a per-recipe error: ${result.errors.join(', ')}`
     );
   });
 }
 
-test('routed ingredientSet — check optional (no checks enabled still valid)', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
-  const service = buildService(system);
-  const recipe = buildRecipe([buildRoutedNamedStep('ingredientSet')]);
+// Reserved-name + duplicate-name rules apply under routedByCheck (check routing
+// keys on the group name).
+function validateRoutedCheckNamedGroups(resultGroups) {
+  const service = buildService(buildRoutedCheckSystem());
+  return service.validateRecipe(buildRecipe([buildRoutedNamedStep({ resultGroups })]));
+}
 
-  const result = service.validateRecipe(recipe);
-
-  assert.equal(result.valid, true, result.errors.join(', '));
+test('routedByCheck — reserved ResultGroup.name (hazard family) → invalid', () => {
+  const result = validateRoutedCheckNamedGroups([
+    { id: 'rg-ok', name: 'Fine', results: [] },
+    { id: 'rg-bad', name: 'Hazard', results: [] },
+  ]);
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /reserved routing keyword/i.test(e)),
+    `expected reserved-name error, got: ${JSON.stringify(result.errors)}`
+  );
 });
 
-// The legacy `macroOutcome` / `rollTableOutcome` providers were removed in 1.6.0
-// (issue 424); they are no longer valid provider VALUES.
-for (const legacy of ['macroOutcome', 'rollTableOutcome']) {
-  test(`routed ${legacy} — removed legacy provider is INVALID`, () => {
-    const system = buildRoutedCheckSystem();
-    const service = buildService(system);
-    const recipe = buildRecipe([buildRoutedNamedStep(legacy)]);
-
-    const result = service.validateRecipe(recipe);
-
-    assert.equal(result.valid, false);
-    assert.ok(
-      result.errors.some((e) => /Invalid result selection provider/i.test(e)),
-      `expected invalid-provider error for ${legacy}, got: ${JSON.stringify(result.errors)}`
-    );
-  });
-}
-
-// Validate a routed recipe whose single step carries the given result groups.
-function validateRoutedNamedGroups(provider, resultGroups) {
-  const service = buildService(buildRoutedCheckSystem());
-  const recipe = buildRecipe([
-    buildRoutedNamedStep(provider, {
-      resultGroups,
-      resultSelection: { provider },
-    }),
+test('routedByCheck — duplicate ResultGroup.name (case-insensitive) → invalid', () => {
+  const result = validateRoutedCheckNamedGroups([
+    { id: 'rg-1', name: 'Fine', results: [] },
+    { id: 'rg-2', name: 'fine', results: [] },
   ]);
-  return service.validateRecipe(recipe);
-}
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /unique names/i.test(e) || /Duplicate result group name/i.test(e)),
+    `expected duplicate-name error, got: ${JSON.stringify(result.errors)}`
+  );
+});
 
-// Reserved-name + duplicate-name rules apply under EVERY routed provider.
-for (const provider of ['ingredientSet', 'check']) {
-  test(`routed ${provider} — reserved ResultGroup.name (hazard family) → invalid`, () => {
-    const result = validateRoutedNamedGroups(provider, [
-      { id: 'rg-ok', name: 'Fine', results: [] },
-      { id: 'rg-bad', name: 'Hazard', results: [] },
-    ]);
-
-    assert.equal(result.valid, false);
-    assert.ok(
-      result.errors.some((e) => /reserved routing keyword/i.test(e)),
-      `expected reserved-name error under ${provider}, got: ${JSON.stringify(result.errors)}`
-    );
-  });
-
-  test(`routed ${provider} — duplicate ResultGroup.name (case-insensitive) → invalid`, () => {
-    const result = validateRoutedNamedGroups(provider, [
+// routedByIngredients keys on the resultGroupId, NOT the group name, so reserved/
+// duplicate names are not a routedByIngredients concern (no name validation fires).
+test('routedByIngredients — reserved/duplicate group names are not a per-recipe error', () => {
+  const system = buildSystem({ resolutionMode: 'routedByIngredients' });
+  const service = buildService(system);
+  const step = buildStep({
+    ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
+    resultGroups: [
       { id: 'rg-1', name: 'Fine', results: [] },
       { id: 'rg-2', name: 'fine', results: [] },
-    ]);
-
-    assert.equal(result.valid, false);
-    assert.ok(
-      result.errors.some((e) => /unique names/i.test(e) || /Duplicate result group name/i.test(e)),
-      `expected duplicate-name error under ${provider}, got: ${JSON.stringify(result.errors)}`
-    );
+    ],
   });
-}
+  assert.equal(service.validateRecipe(buildRecipe([step])).valid, true);
+});
 
 // ---------------------------------------------------------------------------
 // AC 4 — Progressive mode: an authored progressive roll formula, progressive
@@ -706,46 +620,40 @@ test('progressive mode — _getDifficulty reads difficulty from system.component
 });
 
 // ---------------------------------------------------------------------------
-// Incomplete authoring shells — a not-yet-chosen provider is COMPLETENESS
-// (waived under requireComplete:false so "Create recipe" can persist a shell),
-// while an invalid provider VALUE is reference integrity and always errors.
+// Incomplete authoring shells — the routed modes derive their basis from the
+// system mode and carry no per-recipe provider, so there is no missing/invalid
+// provider to author: a routed shell waives only its completeness (cardinality).
 // ---------------------------------------------------------------------------
 
-test('routed mode — missing provider is waived when requireComplete is false (shell persists)', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
-  const service = buildService(system);
-  // The shape a freshly created shell has: no sets, no groups, no provider.
-  const step = buildStep({ ingredientSets: [], resultGroups: [], resultSelection: null });
-  const recipe = buildRecipe([step]);
+for (const mode of ['routedByIngredients', 'routedByCheck']) {
+  test(`${mode} — an empty shell is waived when requireComplete is false`, () => {
+    const system = buildSystem({ resolutionMode: mode });
+    const service = buildService(system);
+    const step = buildStep({ ingredientSets: [], resultGroups: [], resultSelection: null });
+    assert.equal(service.validateRecipe(buildRecipe([step]), { requireComplete: false }).valid, true);
+  });
 
-  assert.equal(service.validateRecipe(recipe, { requireComplete: false }).valid, true);
-});
+  test(`${mode} — an empty shell still fails the cardinality check under the strict default`, () => {
+    const system = buildSystem({ resolutionMode: mode });
+    const service = buildService(system);
+    const result = service.validateRecipe(buildRecipe([buildStep({ ingredientSets: [], resultGroups: [] })]));
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.length > 0);
+  });
 
-test('routed mode — missing provider still errors under the strict default', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
-  const service = buildService(system);
-  const recipe = buildRecipe([buildStep({ resultSelection: null })]);
-
-  const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((e) => /requires resultSelection\.provider/.test(e)),
-    `expected the missing-provider error, got: ${JSON.stringify(result.errors)}`
-  );
-});
-
-test('routed mode — an invalid provider VALUE errors even when requireComplete is false', () => {
-  const system = buildSystem({ resolutionMode: 'routed' });
-  const service = buildService(system);
-  const recipe = buildRecipe([buildStep({ resultSelection: { provider: 'bogus' } })]);
-
-  const result = service.validateRecipe(recipe, { requireComplete: false });
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((e) => /Invalid result selection provider/.test(e)),
-    `expected the invalid-provider error, got: ${JSON.stringify(result.errors)}`
-  );
-});
+  test(`${mode} — a stray resultSelection.provider is ignored (mode drives routing)`, () => {
+    const system = buildSystem({ resolutionMode: mode });
+    const service = buildService(system);
+    // A leftover provider on the recipe must not produce a per-recipe error: the
+    // routed modes never read resultSelection.
+    const step = buildStep({
+      ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
+      resultGroups: [{ id: 'rg-1', name: 'Only', results: [] }],
+      resultSelection: { provider: 'bogus' },
+    });
+    assert.equal(service.validateRecipe(buildRecipe([step])).valid, true);
+  });
+}
 
 test('alchemy mode — missing provider waived when incomplete, required under the strict default', () => {
   const system = buildSystem({ resolutionMode: 'alchemy' });
@@ -771,7 +679,8 @@ test('alchemy mode — missing provider waived when incomplete, required under t
 
 // Matches the spurious step-loop cardinality messages that must never appear for
 // an alchemy recipe ("...in simple/routed/progressive mode", "ordered results").
-const STEP_LOOP_CARDINALITY = /in (simple|routed|progressive) mode|requires ordered results/i;
+const STEP_LOOP_CARDINALITY =
+  /in (simple|routedByIngredients|routedByCheck|progressive) mode|requires ordered results/i;
 
 test('alchemy mode — an implicit step carrying multiple sets/groups is NOT subjected to step-level cardinality checks', () => {
   const system = buildSystem({ resolutionMode: 'alchemy' });

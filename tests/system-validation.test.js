@@ -124,12 +124,13 @@ describe('evaluateSystemValidation — composition', () => {
   });
 
   it('surfaces the #431 routed warnings for a check-mode recipe (projection + routing context)', () => {
-    // A routed check system with two success tiers; the recipe routes its single
-    // result group to tier "hit" only — so tier "crit" is unproduced AND nothing
-    // would surface these warnings unless the aggregator passes the routing
-    // context (routingProvider:'check' + the success-filtered tier options).
+    // A routed check system with two success tiers; the recipe has TWO result
+    // groups (so mapping is required) both routed to tier "hit" only — so tier
+    // "crit" is unproduced AND nothing would surface these warnings unless the
+    // aggregator passes the routing context (routingProvider:'check' + the
+    // success-filtered tier options).
     const system = makeSystem({
-      resolutionMode: 'routed',
+      resolutionMode: 'routedByCheck',
       craftingCheck: {
         routed: {
           type: 'relative',
@@ -144,7 +145,10 @@ describe('evaluateSystemValidation — composition', () => {
     const recipe = makeRecipe({
       id: 'r-routed',
       routedCheck: true,
-      checkOutcomeIds: ['tier-hit'],
+      resultGroups: [
+        { id: 'rg-a', name: 'A', checkOutcomeIds: ['tier-hit'], results: [] },
+        { id: 'rg-b', name: 'B', checkOutcomeIds: ['tier-hit'], results: [] },
+      ],
     });
 
     const report = evaluateSystemValidation(system, { recipes: [recipe] });
@@ -158,7 +162,7 @@ describe('evaluateSystemValidation — composition', () => {
 
   it('flags an unrouted result group (no valid assigned tier) for a check-mode recipe', () => {
     const system = makeSystem({
-      resolutionMode: 'routed',
+      resolutionMode: 'routedByCheck',
       craftingCheck: {
         routed: {
           type: 'relative',
@@ -167,17 +171,50 @@ describe('evaluateSystemValidation — composition', () => {
         },
       },
     });
-    // The result group lists only a since-deleted tier id → unrouted.
+    // TWO result groups (mapping required): one routes a valid tier, the other
+    // lists only a since-deleted tier id → unrouted.
     const recipe = makeRecipe({
       id: 'r-unrouted',
       routedCheck: true,
-      checkOutcomeIds: ['tier-gone'],
+      resultGroups: [
+        { id: 'rg-ok', name: 'OK', checkOutcomeIds: ['tier-hit'], results: [] },
+        { id: 'rg-gone', name: 'Gone', checkOutcomeIds: ['tier-gone'], results: [] },
+      ],
     });
 
     const report = evaluateSystemValidation(system, { recipes: [recipe] });
     assert.ok(
       report.issues.some((issue) => issue.code === 'unroutedResultGroup'),
       'expected the #431 unrouted-result-group warning to surface'
+    );
+  });
+
+  it('does not surface #431 routed warnings for a single-result-group check-mode recipe', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: {
+        routed: {
+          type: 'relative',
+          rollFormula: '1d20',
+          relativeOutcomes: [
+            { id: 'tier-hit', name: 'Hit', success: true },
+            { id: 'tier-crit', name: 'Crit', success: true },
+          ],
+        },
+      },
+    });
+    // One result group, no mapping — the single-group exemption suppresses both
+    // the unrouted-group and unproduced-tier warnings.
+    const recipe = makeRecipe({ id: 'r-one', routedCheck: true });
+
+    const report = evaluateSystemValidation(system, { recipes: [recipe] });
+    assert.equal(
+      report.issues.some(
+        (issue) =>
+          issue.code === 'unroutedResultGroup' || issue.code === 'unproducedOutcomeTier'
+      ),
+      false,
+      'a single-result-group routedByCheck recipe needs no mapping'
     );
   });
 
@@ -232,9 +269,9 @@ describe('evaluateSystemValidation — composition', () => {
 // ---------------------------------------------------------------------------
 
 describe('evaluateSystemValidation — system blockers set blocksSystem', () => {
-  it('routed check provider in use with no routed formula blocks the system', () => {
+  it('routedByCheck with no routed formula blocks the system unconditionally (with a recipe)', () => {
     const system = makeSystem({
-      resolutionMode: 'routed',
+      resolutionMode: 'routedByCheck',
       features: { craftingChecks: false },
       craftingCheck: { routed: { rollFormula: '' } },
     });
@@ -248,38 +285,44 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
     assert.equal(blocker.blocks, 'system');
     assert.equal(blocker.kind, 'system');
     assert.equal(blocker.nav.view, 'system-overview');
-    assert.ok(report.counts.blockers >= 1, 'the critical variant counts as a blocker');
+    assert.ok(report.counts.blockers >= 1, 'the critical blocker counts as a blocker');
   });
 
-  it('routed system with no formula and NO check-provider recipe warns without blocking', () => {
+  it('routedByCheck with no routed formula blocks the system with ZERO recipes (unconditional)', () => {
     const system = makeSystem({
-      resolutionMode: 'routed',
+      resolutionMode: 'routedByCheck',
       features: { craftingChecks: false },
       craftingCheck: { routed: { rollFormula: '' } },
     });
-    // An ingredientSet-provider recipe never routes by the check, so the missing
-    // formula is only a warning, not a system blocker.
-    const recipe = makeRecipe({ resultSelection: { provider: 'ingredientSet' } });
-    const report = evaluateSystemValidation(system, { recipes: [recipe] });
+    // The routing basis is the MODE, so the missing formula blocks the whole system
+    // independent of any recipe — verified here with no recipes at all.
+    const report = evaluateSystemValidation(system, { recipes: [] });
 
-    const warnings = report.issues.filter((issue) => issue.code === 'routedCheckNoFormula');
-    assert.equal(warnings.length, 1, 'exactly one routedCheckNoFormula issue');
-    assert.equal(warnings[0].severity, 'warning');
-    assert.equal(warnings[0].blocks, undefined, 'a warning carries no blocks field');
-    assert.equal(warnings[0].kind, 'system');
-    assert.equal(warnings[0].nav.view, 'system-overview');
-    assert.equal(report.blocksSystem, false, 'the warning never sets blocksSystem');
-    assert.equal(report.counts.warning >= 1, true, 'the warning increments counts.warning');
-    assert.equal(
-      report.counts.blockers,
-      0,
-      'the warning does NOT increment counts.blockers'
-    );
+    const blocker = report.issues.find((issue) => issue.code === 'routedCheckNoFormula');
+    assert.ok(blocker, 'the blocker is computed with no recipe scan');
+    assert.equal(blocker.blocks, 'system');
+    assert.equal(report.blocksSystem, true);
   });
 
-  it('does NOT warn or block a routed check system once a routed formula is configured', () => {
+  it('routedByIngredients never raises routedCheckNoFormula at any formula state', () => {
     const system = makeSystem({
-      resolutionMode: 'routed',
+      resolutionMode: 'routedByIngredients',
+      features: { craftingChecks: false },
+      craftingCheck: { routed: { rollFormula: '' } },
+    });
+    const report = evaluateSystemValidation(system, { recipes: [makeRecipe({})] });
+
+    assert.equal(
+      report.issues.some((issue) => issue.code === 'routedCheckNoFormula'),
+      false,
+      'routedByIngredients carries no routedCheckNoFormula pressure'
+    );
+    assert.equal(report.blocksSystem, false);
+  });
+
+  it('does NOT block a routedByCheck system once a routed formula is configured', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
       craftingCheck: { routed: { rollFormula: '1d20' } },
     });
     const recipe = makeRecipe({ routedCheck: true });
@@ -462,10 +505,10 @@ describe('two-tier visibility gate — recipes', () => {
   }
 
   beforeEach(() => {
-    // A routed system whose recipes use the check provider but which has NO
-    // routed formula and checks disabled → blocksSystem.
+    // A routedByCheck system with NO routed formula and checks disabled →
+    // blocksSystem unconditionally.
     blockedSystem = makeSystem({
-      resolutionMode: 'routed',
+      resolutionMode: 'routedByCheck',
       features: { craftingChecks: false },
       craftingCheck: { routed: { rollFormula: '' } },
     });

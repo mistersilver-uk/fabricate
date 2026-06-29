@@ -42,7 +42,7 @@ new Recipe({
   resultGroups,          // object[]
   toolIds,               // string[] (library Tool ids required for crafting)
   transferEffects,       // boolean (default false)
-  resultSelection: {     // object (routed mode only)
+  resultSelection: {     // object (alchemy mode only)
     provider             // "ingredientSet" | "check"
   },
   metadata               // object (created, modified, author, version)
@@ -50,9 +50,11 @@ new Recipe({
 ```
 
 {: .note }
-> The legacy `outcomeRouting` field and the legacy `mapped`/`tiered` modes have been replaced by `resultSelection` with a `provider` field.
-> Legacy recipes are automatically normalised on load.
-> Use `resultSelection` for all new routed recipes.
+> `resultSelection.provider` now applies to alchemy recipes only.
+> The two routed crafting modes (`routedByIngredients` and `routedByCheck`) derive their routing basis from the system mode and carry no `resultSelection`.
+> `routedByIngredients` routes by each `IngredientSet.resultGroupId`, and `routedByCheck` routes by the system's routed crafting-check outcome.
+> The legacy `outcomeRouting` field and the legacy `mapped`/`tiered` and single `routed` modes are normalised on load.
+> `mapped` becomes `routedByIngredients` and `tiered` becomes `routedByCheck`.
 
 **Key methods:**
 
@@ -77,7 +79,7 @@ new Recipe({
   ingredientGroups,  // IngredientGroup[] -- all must be satisfied (AND)
   essences,          // { [essenceId]: quantity }
   toolIds,           // string[] (library Tool ids required for this set)
-  resultGroupId      // string | null (routed ingredientSet provider routing)
+  resultGroupId      // string | null (routedByIngredients routing target)
 }
 ```
 

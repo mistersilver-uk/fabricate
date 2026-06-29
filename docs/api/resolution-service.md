@@ -20,18 +20,21 @@ Validates recipes against their resolution mode rules and resolves which result 
 Returns the resolution mode for a recipe (derived from its crafting system).
 
 **Returns:** `string`.
-One of "simple", "routed", or "progressive".
+One of "simple", "routedByIngredients", "routedByCheck", "progressive", or "alchemy".
 
 {: .note }
-> The legacy modes "mapped" and "tiered" are normalised to "routed" on load.
-> `getMode()` always returns "routed" for recipes that were previously "mapped" or "tiered".
+> The legacy modes "mapped" and "tiered" are normalised on load.
+> "mapped" becomes "routedByIngredients" and "tiered" becomes "routedByCheck".
+> The single legacy "routed" token is also retired.
+> A persisted "routed" system is migrated to one of the two routed modes by the data migration, and an un-migrated "routed" token read at runtime falls back to "routedByIngredients".
 
 ### getProvider(recipe)
 
-Returns the result-selection provider for a routed recipe.
+Returns the result-selection provider for an alchemy recipe.
 
 **Returns:** `string`.
-One of "ingredientSet" or "check", or `null` for non-routed recipes.
+One of "ingredientSet" or "check", or `null` for non-alchemy recipes.
+The routed crafting modes derive their routing basis from the system mode and carry no provider, so `getProvider()` is `null` for them.
 
 ### validateRecipe(recipe)
 
@@ -51,18 +54,26 @@ Hooks.once('fabricate.ready', () => {
 
 **Validation rules by mode:**
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Mode | Rules |
 |:-----|:------|
 | Simple | Exactly 1 ingredient set, exactly 1 result group |
-| Routed (`ingredientSet`) | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid, result group names are unique (case-insensitive) and do not use reserved keywords |
-| Routed (`check`) | 1+ ingredient sets, 1+ result groups, checks enabled on the system, result group names are unique and do not use reserved keywords |
+| `routedByIngredients` | 1+ ingredient sets, 1+ result groups, each `IngredientSet.resultGroupId` references a real result group. The crafting check is optional. |
+| `routedByCheck` | 1+ ingredient sets, 1+ result groups, result group names are unique (case-insensitive) and do not use reserved keywords. The routed crafting check roll formula is required at the system level, surfaced as a system blocker rather than a per-recipe error. |
+| Progressive | Exactly 1 ingredient set, exactly 1 result group, checks enabled, progressive config exists, all result difficulties >= 1 |
 
-The unique-name and reserved-keyword rules apply under every routed provider, not just `check`.
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The routing basis is a property of the mode, not a per-recipe provider.
+`routedByIngredients` routes by `IngredientSet.resultGroupId`, and `routedByCheck` routes by the system's routed crafting-check outcome.
+The unique-name and reserved-keyword rules apply under `routedByCheck` (and the alchemy `check` provider), which route by result group name.
 Reserved keywords cover three families.
 The fail family is `fail`, `failed`, `failure`, `f`.
 The hazard family is `hazard`, `danger`, `complication`, `trap`, `oops`, and it also routes a check outcome to the failure path.
 The miss family is `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`.
-| Progressive | Exactly 1 ingredient set, exactly 1 result group, checks enabled, progressive config exists, all result difficulties >= 1 |
+A `routedByCheck` recipe (or step) with exactly one result group needs no outcome mapping.
+The single group is produced on any non-failure outcome and yields nothing on a reserved failure keyword.
 
 ### validateSalvage(component, system)
 
@@ -120,7 +131,9 @@ Hooks.once('fabricate.ready', () => {
 ### resolveResultGroups(params)
 
 Determines which result groups to create based on the resolution mode and crafting check result.
-For routed recipes, this dispatches on `recipe.resultSelection.provider`.
+This dispatches on the system's resolution mode.
+`routedByIngredients` routes by the chosen ingredient set's `resultGroupId`, and `routedByCheck` routes by the crafting-check outcome.
+Alchemy still dispatches on `recipe.resultSelection.provider`.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -128,7 +141,7 @@ For routed recipes, this dispatches on `recipe.resultSelection.provider`.
 | `params.step` | `object` | The current step |
 | `params.ingredientSet` | `IngredientSet` | The selected ingredient set |
 | `params.checkResult` | `object` | The crafting check result |
-| `params.selectedResultGroupId` | `string` | Player-selected result group (routed `ingredientSet` provider only) |
+| `params.selectedResultGroupId` | `string` | Player-selected result group (`routedByIngredients` mode only) |
 
 **Returns:** `{ groups: object[], meta: object }`
 

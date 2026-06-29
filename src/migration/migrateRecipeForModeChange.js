@@ -18,39 +18,56 @@
  * system-validation aggregator (`src/systems/systemValidation.js`) and gate
  * visibility, not deletion.
  *
- * Migratability matrix (per the `004-resolution-modes` Mode Invariant):
+ * Migratability matrix (per the `004-resolution-modes` normative 5×5). RI =
+ * `routedByIngredients`, RC = `routedByCheck`:
  *
- *   | From \ To   | simple                  | routed | progressive             | alchemy                 |
- *   |-------------|-------------------------|--------|-------------------------|-------------------------|
- *   | simple      | —                       | seed   | clear                   | seed                    |
- *   | routed      | clear if 1×1 else delete | —      | clear if 1×1 else delete | carry if single-step else delete |
- *   | progressive | clear                   | seed   | —                       | seed                    |
- *   | alchemy     | clear if 1×1 else delete | carry  | clear if 1×1 else delete | —                       |
+ *   | From \ To  | simple              | RI                       | RC                       | progressive         | alchemy                              |
+ *   |------------|---------------------|--------------------------|--------------------------|---------------------|--------------------------------------|
+ *   | simple     | —                   | clear                    | clear; reconcile         | clear               | seed                                 |
+ *   | RI         | clear if 1×1 else del| —                        | carry; reconcile         | clear if 1×1 else del| seed=ingredientSet, single-step else del |
+ *   | RC         | clear if 1×1 else del| carry; reconcile         | —                        | clear if 1×1 else del| seed=check, single-step else del     |
+ *   | progressive| clear               | clear                    | clear; reconcile         | —                   | seed                                 |
+ *   | alchemy    | clear if 1×1 else del| clear (drop), carry      | clear (drop), carry; recon| clear if 1×1 else del| —                                   |
  *
- *   - "seed": the target mode routes via a recipe-level provider, so seed
- *     `resultSelection.provider` (`check` when the system has a usable crafting
- *     check, otherwise `ingredientSet`) if one is not already present.
+ *   - "seed": ALCHEMY is the only provider-routed target, so seed its
+ *     `resultSelection.provider` — `ingredientSet`/`check` when the source is the
+ *     matching routed mode, otherwise {@link chooseSeedProvider}'s choice.
  *   - "clear": the target mode does not route via a recipe-level provider, so
- *     `resultSelection` is set to `null`.
- *   - "carry": the recipe is already shaped for the target mode; it is carried
- *     verbatim.
+ *     `resultSelection` is set to `null` (a no-op for routed modes, which never
+ *     carry one).
+ *   - "carry": the recipe is already structurally shaped for the target mode; it is
+ *     carried verbatim.
+ *   - "reconcile": the recipe survives (`carry`/`clear`) but its routing data is
+ *     stale for the new basis (group names under check routing, or ingredient-set
+ *     `resultGroupId` mappings under ingredient routing). It is FLAGGED via
+ *     `reconcile: true` and surfaces as a re-authoring validation issue — never
+ *     silently mis-routed. Re-running a `carry` with no reconcile pending is
+ *     idempotent.
+ *   - "delete": a structural constraint cannot be met (narrowing a >1×1 recipe into
+ *     `simple`/`progressive`, or moving a multi-step recipe into `alchemy`).
  *
- * Reuses the `_seedProvider`/`_clone` idiom from `migrateLegacyResolutionModes.js`.
- * The provider set is `['ingredientSet', 'check']` (post-#424 / post-1.6.0).
+ * `RI↔RC` never deletes (`carry`); it reconciles stale routing. Reuses the
+ * `_seedProvider`/`_clone` idiom from `migrateLegacyResolutionModes.js`. The
+ * alchemy provider set is `['ingredientSet', 'check']`.
  *
  * @module migrateRecipeForModeChange
  */
 
-const PROVIDER_MODES = new Set(['routed', 'alchemy']);
+// Only ALCHEMY routes via a recipe-level `resultSelection.provider` now; the two
+// routed crafting modes derive their basis from the system mode.
+const ROUTED_MODES = new Set(['routedByIngredients', 'routedByCheck']);
 const SINGLE_GROUP_MODES = new Set(['simple', 'progressive']);
 
 /**
  * @typedef {object} ModeChangeResult
  * @property {'lossless'|'seeded'|'cleared'|'carry'|'delete'} outcome
  *   Classification of what happened: `lossless` (no-op carry, already conforming),
- *   `seeded` (a provider was seeded), `cleared` (routed `resultSelection` cleared),
- *   `carry` (carried verbatim into a provider mode that keeps existing routing), or
+ *   `seeded` (an alchemy provider was seeded), `cleared` (`resultSelection` cleared),
+ *   `carry` (carried verbatim into a mode that keeps existing routing), or
  *   `delete` (a structural constraint cannot be met — caller must delete).
+ * @property {boolean} [reconcile] When true, the recipe survives but its routing
+ *   data is stale for the new basis and must be re-authored (surfaced as a
+ *   validation issue, never silently mis-routed).
  * @property {object|null} recipe The migrated recipe JSON, or `null` when `delete`.
  * @property {string[]} reasons Human-readable notes describing the decision.
  */
@@ -112,24 +129,62 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system 
     };
   }
 
-  // Target mode routes via a recipe-level provider (routed/alchemy).
-  if (PROVIDER_MODES.has(toMode)) {
-    // routed → alchemy and alchemy → routed keep the same provider contract, so a
-    // recipe that already has a valid provider is carried verbatim.
-    if (PROVIDER_MODES.has(fromMode) && _hasValidProvider(recipeJSON)) {
-      return { outcome: 'carry', recipe: recipeJSON, reasons: ['routing provider preserved'] };
-    }
-    const provider = chooseSeedProvider(system, toMode);
+  // Alchemy is the only provider-routed target: seed its provider. A routed source
+  // pins the matching provider (RI → ingredientSet, RC → check); other sources use
+  // the system-aware default. Seeding never clobbers an existing valid provider.
+  if (toMode === 'alchemy') {
+    const provider =
+      fromMode === 'routedByIngredients'
+        ? 'ingredientSet'
+        : fromMode === 'routedByCheck'
+          ? 'check'
+          : chooseSeedProvider(system, 'alchemy');
     _seedProvider(recipeJSON, provider);
     return {
       outcome: 'seeded',
       recipe: recipeJSON,
-      reasons: [`seeded resultSelection.provider = "${provider}" for ${toMode} mode`],
+      reasons: [`seeded resultSelection.provider = "${provider}" for alchemy mode`],
+    };
+  }
+
+  // A routed crafting target derives its basis from the system mode and never
+  // carries a `resultSelection`. RI↔RC is carried verbatim; every other source has
+  // its `resultSelection` dropped. Stale routing data (group names for check
+  // routing, ingredient-set `resultGroupId` for ingredient routing) is surfaced as
+  // a re-authoring validation issue via `reconcile`, never silently mis-routed.
+  if (ROUTED_MODES.has(toMode)) {
+    const reconcile =
+      toMode === 'routedByCheck' ||
+      (toMode === 'routedByIngredients' && fromMode === 'routedByCheck');
+    const fromRouted = ROUTED_MODES.has(fromMode);
+    if (fromRouted) {
+      // RI↔RC: structurally identical, carry verbatim (and reconcile stale routing).
+      return {
+        outcome: 'carry',
+        recipe: recipeJSON,
+        reconcile,
+        reasons: reconcile
+          ? [`carried into ${toMode}; routing data must be re-authored for the new basis`]
+          : ['routing carried for the new mode'],
+      };
+    }
+    const cleared = recipeJSON.resultSelection != null;
+    if (cleared) recipeJSON.resultSelection = null;
+    return {
+      outcome: cleared ? 'cleared' : 'carry',
+      recipe: recipeJSON,
+      reconcile,
+      reasons: [
+        cleared
+          ? `cleared resultSelection for ${toMode} mode`
+          : `no resultSelection to clear for ${toMode} mode`,
+        ...(reconcile ? [`routing data must be re-authored for ${toMode}`] : []),
+      ],
     };
   }
 
   // Target mode does not route via a recipe-level provider (simple/progressive):
-  // clear any routed selection so the recipe conforms to the new mode.
+  // clear any selection so the recipe conforms to the new mode.
   if (recipeJSON.resultSelection != null) {
     recipeJSON.resultSelection = null;
     return {
@@ -143,24 +198,21 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system 
 }
 
 /**
- * Choose the provider to seed for a provider-routed target mode. Prefer `check`
- * ONLY when the target mode has an authored roll formula for the formula the
- * check provider actually keys on (so name-routing resolves), else the
- * always-available `ingredientSet` provider. Seeding can therefore never manufacture
- * an avoidable system-level gap. A check is usable IFF it has an authored roll
- * formula for its mode — the legacy `enabled` / `features.craftingChecks` toggles
- * do not make a check usable, so they are not consulted here (aligns with
+ * Choose the provider to seed for the ALCHEMY target mode (the only mode that still
+ * routes via a recipe-level provider). Prefer `check` ONLY when the system has an
+ * authored SIMPLE check roll formula (alchemy's check provider routes by the simple
+ * check outcome), else the always-available `ingredientSet` provider. Seeding can
+ * therefore never manufacture an avoidable system-level gap. A check is usable IFF
+ * it has an authored roll formula — the legacy `enabled` / `features.craftingChecks`
+ * toggles do not make a check usable, so they are not consulted here (aligns with
  * `ResolutionModeService._hasRollFormula` and `systemValidation`).
  *
- * The keyed formula differs by target mode: `routed` routes by the routed check's
- * outcome tier (`routed.rollFormula`); `alchemy`'s check provider routes by the
- * SIMPLE check outcome (`simple.rollFormula`), so the routed formula is the wrong
- * one to consult there.
- * Also used by the recipe editor to seed a provider when a recipe is switched to
- * Complex in a provider-routed system (so the routing control is never left
+ * Also used by the recipe editor to seed an alchemy provider when a recipe is
+ * switched to Complex in an alchemy system (so the routing basis is never left
  * unselected), keeping that default in lockstep with this migration's contract.
+ * The `toMode` param is retained for call-site clarity; only `alchemy` reaches here.
  * @param {object} system
- * @param {string} toMode The target resolution mode (`routed` | `alchemy`).
+ * @param {string} toMode The target resolution mode (`alchemy`).
  * @returns {'check'|'ingredientSet'}
  */
 export function chooseSeedProvider(system, toMode) {

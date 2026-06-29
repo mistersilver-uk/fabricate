@@ -103,12 +103,26 @@ export class CraftingSystemManager {
       enabled: system.enabled !== false,
       resolutionMode: (function _normalizeResolutionMode(raw) {
         if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
-        // Legacy mode TOKEN aliases for un-migrated/imported data (the 1.4.0
-        // migration hard-converts persisted data + reconciles routing). This is a
-        // token rename only — the legacy routing algorithms are gone; canonical
-        // `routed` + a seeded provider reproduces the old behavior.
-        if (raw === 'mapped' || raw === 'tiered') return 'routed';
-        return ['simple', 'routed', 'progressive', 'alchemy'].includes(raw) ? raw : 'simple';
+        // Legacy mode TOKEN aliases for un-migrated/imported data (the 1.4.0 and
+        // 1.9.0 migrations hard-convert persisted data + reconcile routing). These
+        // are token renames only — the legacy routing algorithms are gone.
+        //  - `mapped` routed by the chosen ingredient set → `routedByIngredients`.
+        //  - `tiered` routed by the check outcome → `routedByCheck`.
+        //  - bare `routed` predates the split and cannot pick a basis on read; the
+        //    1.9.0 migration resolves it by majority provider, so an un-migrated/
+        //    imported `routed` token falls back to the optional-check default
+        //    `routedByIngredients` (matching the migration's tie/zero-recipe break).
+        if (raw === 'mapped' || raw === 'routed') return 'routedByIngredients';
+        if (raw === 'tiered') return 'routedByCheck';
+        return [
+          'simple',
+          'routedByIngredients',
+          'routedByCheck',
+          'progressive',
+          'alchemy',
+        ].includes(raw)
+          ? raw
+          : 'simple';
       })(system.resolutionMode),
       // New spec-first shape
       features,

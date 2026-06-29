@@ -12,18 +12,27 @@ import {
 /**
  * Handles mode-specific validation and result resolution logic.
  *
- * Canonical resolution modes are `simple`, `routed`, `progressive`, and
- * `alchemy`. `routed` is the only non-simple selection model and dispatches on
- * `resultSelection.provider`:
- *  - `ingredientSet` — the chosen ingredient set's `resultGroupId` selects the
- *    result group (the former `mapped` behavior, now canonical).
- *  - `check` — the system-level crafting-check outcome name routes to the
- *    `ResultGroup` of the same name. This is the canonical check-driven provider.
+ * Canonical crafting resolution modes are `simple`, `routedByIngredients`,
+ * `routedByCheck`, `progressive`, and `alchemy`. The two routed modes are the
+ * non-simple selection models, and the routing basis is a property of the MODE
+ * (not a per-recipe `resultSelection.provider`):
+ *  - `routedByIngredients` — the chosen ingredient set's `resultGroupId` selects
+ *    the result group (the former `routed` + `ingredientSet` provider behavior).
+ *    The crafting check is OPTIONAL (runs only when a routed roll formula is
+ *    authored), matching `simple` mode.
+ *  - `routedByCheck` — the system-level routed crafting-check outcome routes to a
+ *    `ResultGroup` (by explicit tier assignment, then by name). The crafting
+ *    check is REQUIRED.
+ *
+ * `resultSelection.provider` survives ONLY for alchemy, which keeps a genuine
+ * per-recipe routing basis (`_resolveAlchemyResultGroups`). The routed crafting
+ * modes ignore `resultSelection` entirely.
  *
  * Legacy `mapped`/`tiered` are NOT live modes. They are accepted only as
  * one-time inputs to the 1.4.0 migration (`migrateLegacyResolutionModes`), and
  * the manager's token normalizer maps any un-migrated/imported `mapped`/`tiered`
- * token to `routed`. No `mapped`/`tiered` resolution branch survives here.
+ * token to `routedByIngredients`/`routedByCheck` respectively. No `mapped`/`tiered`
+ * resolution branch survives here.
  */
 export class ResolutionModeService {
   constructor(craftingSystemManager) {
@@ -69,8 +78,8 @@ export class ResolutionModeService {
   // ---------------------------------------------------------------------------
   // Routed name-normalization + reserved-keyword helpers. Shared with Recipe.js
   // via ../utils/routedOutcomeKeywords.js so runtime resolution and authoring-time
-  // validation use one source of truth. They apply under every routed provider
-  // (ingredientSet / check).
+  // validation use one source of truth. They apply to `routedByCheck` mode and the
+  // alchemy `check` provider (both key on the crafting-check outcome name).
   // ---------------------------------------------------------------------------
 
   _normalizeName(name) {
@@ -90,9 +99,10 @@ export class ResolutionModeService {
   }
 
   /**
-   * Reserved/duplicate routed `ResultGroup.name` validation, applied under every
-   * routed provider. Reserved names (fail/miss/hazard families) may not name a
-   * result group; names must be unique under trim-normalized comparison.
+   * Reserved/duplicate routed `ResultGroup.name` validation, applied under
+   * `routedByCheck` mode (check routing keys on the group name). Reserved names
+   * (fail/miss/hazard families) may not name a result group; names must be unique
+   * under trim-normalized comparison.
    * @param {Array<{id?: string, name?: string}>} groups
    * @param {{name?: string, id?: string}} step
    * @param {string[]} errors
@@ -123,13 +133,14 @@ export class ResolutionModeService {
    * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
    *   false, mode COMPLETENESS checks (e.g. "must have exactly/at least N
    *   ingredient set/result group", progressive "requires ordered results", and a
-   *   not-yet-chosen routed/alchemy `resultSelection.provider`) are waived so an
+   *   not-yet-chosen alchemy `resultSelection.provider`) are waived so an
    *   incomplete authoring shell can persist. Mode REFERENCE-INTEGRITY checks
-   *   (an invalid provider VALUE, an invalid routed `ingredientSet` resultGroupId,
-   *   reserved/duplicate routed `ResultGroup.name`) always apply. Legacy `mapped`
-   *   and `tiered` are not live modes — they are accepted only as one-time
-   *   migration inputs (see `migrateLegacyResolutionModes`) and the manager's
-   *   token normalizer maps un-migrated tokens to `routed`.
+   *   (an invalid alchemy provider VALUE, an invalid `routedByIngredients`
+   *   resultGroupId, reserved/duplicate `routedByCheck` `ResultGroup.name`) always
+   *   apply. Legacy `mapped` and `tiered` are not live modes — they are accepted
+   *   only as one-time migration inputs (see `migrateLegacyResolutionModes`) and
+   *   the manager's token normalizer maps un-migrated tokens to
+   *   `routedByIngredients`/`routedByCheck`.
    * @returns {{valid: boolean, errors: string[]}}
    */
   validateRecipe(recipe, { requireComplete = true } = {}) {
@@ -155,34 +166,23 @@ export class ResolutionModeService {
           );
       }
 
-      if (mode === 'routed') {
+      if (mode === 'routedByIngredients' || mode === 'routedByCheck') {
         if (requireComplete && sets.length === 0)
           errors.push(
-            `Step "${step.name || step.id}" must have at least 1 ingredient set in routed mode`
+            `Step "${step.name || step.id}" must have at least 1 ingredient set in ${mode} mode`
           );
         if (requireComplete && groups.length === 0)
           errors.push(
-            `Step "${step.name || step.id}" must have at least 1 result group in routed mode`
+            `Step "${step.name || step.id}" must have at least 1 result group in ${mode} mode`
           );
 
-        const provider = this.getProviderForStep(recipe, step);
-        if (!provider) {
-          // A not-yet-chosen provider is a completeness gap (an authoring shell),
-          // not a reference-integrity error — waive it while drafting.
-          if (requireComplete)
-            errors.push(
-              `Step "${step.name || step.id}" in routed mode requires resultSelection.provider`
-            );
-        } else if (!['ingredientSet', 'check'].includes(provider)) {
-          errors.push('Invalid result selection provider: ' + provider);
-        }
-        // A recipe that routes by the `check` provider is structurally valid
-        // regardless of the system's check configuration. Whether the system has
-        // a usable routed crafting check (a configured `routed.rollFormula`) is a
-        // SYSTEM-level concern surfaced by `systemValidation`, not a per-recipe
-        // validation error.
-        if (provider === 'ingredientSet') {
-          // Reference integrity: an ingredientSet resultGroupId must point at a
+        // The routing basis is the MODE (no per-recipe provider). A
+        // `routedByCheck` recipe is structurally valid regardless of the system's
+        // check configuration — whether the system has a usable routed crafting
+        // check (`routed.rollFormula`) is a SYSTEM-level concern surfaced by
+        // `systemValidation`, not a per-recipe validation error.
+        if (mode === 'routedByIngredients') {
+          // Reference integrity: an ingredient set's resultGroupId must point at a
           // real group in the step (the former `mapped` invariant, now canonical).
           const groupIds = new Set(groups.map((g) => g.id));
           for (const set of sets) {
@@ -193,10 +193,11 @@ export class ResolutionModeService {
               );
             }
           }
+        } else {
+          // Reserved/duplicate ResultGroup.name applies under check routing, which
+          // keys on the group name (spec 004 §routedByCheck Validation).
+          this._validateRoutedGroupNames(groups, step, errors);
         }
-        // Reserved/duplicate ResultGroup.name applies under EVERY routed provider
-        // (spec 004 §Validation lines 79-80).
-        this._validateRoutedGroupNames(groups, step, errors);
       }
 
       if (mode === 'progressive') {
@@ -424,16 +425,11 @@ export class ResolutionModeService {
     if (mode === 'simple') {
       return { groups: allGroups.slice(0, 1), meta: {} };
     }
-    if (mode === 'routed') {
-      return this._resolveRoutedResultGroups({
-        recipe,
-        step,
-        ingredientSet,
-        checkResult,
-        selectedResultGroupId,
-        system,
-        allGroups,
-      });
+    if (mode === 'routedByIngredients') {
+      return this._routeByIngredientSet(ingredientSet, allGroups, selectedResultGroupId);
+    }
+    if (mode === 'routedByCheck') {
+      return this._resolveRoutedByCheckResultGroups({ checkResult, system, allGroups });
     }
     if (mode === 'progressive') {
       return this._resolveProgressiveResultGroups({ checkResult, system, allGroups });
@@ -449,8 +445,9 @@ export class ResolutionModeService {
   }
 
   /**
-   * Route a normalized check `outcome` to a result group by NAME, shared by the
-   * routed and alchemy `check` providers (both key on the crafting-check outcome).
+   * Route a normalized check `outcome` to a result group by NAME, shared by
+   * `routedByCheck` mode and the alchemy `check` provider (both key on the
+   * crafting-check outcome).
    * Order: fail keyword → miss keyword → exact name match → misconfiguration.
    * @param {string|null} outcome raw outcome string (already coerced to string|null)
    * @param {Array} allGroups candidate result groups
@@ -481,7 +478,8 @@ export class ResolutionModeService {
   /**
    * Route by the chosen ingredient set's `resultGroupId` (the former `mapped`
    * behavior), with the legacy `resultMapping` fallback, then first-group
-   * fallback. Shared by routed and alchemy `ingredientSet` providers.
+   * fallback. Shared by `routedByIngredients` mode and the alchemy `ingredientSet`
+   * provider.
    * @param {{resultGroupId?: string, resultMapping?: string[]}} ingredientSet
    * @param {Array} allGroups
    * @param {string|null} selectedResultGroupId explicit override (routed only)
@@ -502,41 +500,39 @@ export class ResolutionModeService {
   }
 
   /**
-   * Routed mode resolution: `ingredientSet` routes by mapping; `check` routes by
-   * explicit tier→result-set assignment first, then by outcome name.
+   * `routedByCheck` mode resolution: route the routed crafting-check outcome to a
+   * result group by explicit tier→result-set assignment first, then (for a single
+   * result group) the no-mapping-required exemption, then by outcome name.
    * @returns {{groups: Array, meta: object}}
    */
-  _resolveRoutedResultGroups({
-    recipe,
-    step,
-    ingredientSet,
-    checkResult,
-    selectedResultGroupId,
-    system,
-    allGroups,
-  }) {
-    const provider = this.getProviderForStep(recipe, step);
-    if (provider === 'ingredientSet') {
-      return this._routeByIngredientSet(ingredientSet, allGroups, selectedResultGroupId);
+  _resolveRoutedByCheckResultGroups({ checkResult, system, allGroups }) {
+    const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
+    // Explicit tier→result-set assignment (authored in the recipe editor) wins:
+    // resolve the outcome to a routed-check tier id, then route to the result
+    // group that lists it in `checkOutcomeIds`.
+    const assigned = this._routeByTierAssignment(system, outcome, allGroups);
+    // A resolved-but-unassigned tier (the outcome matched an authored success tier
+    // but no result group lists its id) is a DISTINCT misconfiguration from "no
+    // tier resolved": surface `unrouted-tier` rather than silently falling through
+    // to name matching, which would mask the missing assignment.
+    if (assigned?.meta?.disposition === 'unrouted-tier') return assigned;
+    if (assigned) return assigned;
+    // Single-result-group exemption (mirrors routedByIngredients' "one result group
+    // → mapping may be omitted"): with exactly one group in scope, no outcome/tier
+    // mapping is required. A non-failure outcome produces the single group; a
+    // fail/miss keyword yields nothing (failure path). Never a misconfiguration.
+    if (allGroups.length === 1) {
+      const normalized = this._normalizeName(outcome);
+      if (this._isFailKeyword(normalized))
+        return { groups: [], meta: { outcome, disposition: 'fail' } };
+      if (this._isMissKeyword(normalized))
+        return { groups: [], meta: { outcome, disposition: 'miss' } };
+      return { groups: allGroups.slice(0, 1), meta: { outcome, disposition: 'success' } };
     }
-    if (provider === 'check') {
-      const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
-      // Explicit tier→result-set assignment (authored in the recipe editor) wins:
-      // resolve the outcome to a routed-check tier id, then route to the result
-      // group that lists it in `checkOutcomeIds`.
-      const assigned = this._routeByTierAssignment(system, outcome, allGroups);
-      // A resolved-but-unassigned tier (the outcome matched an authored success tier
-      // but no result group lists its id) is a DISTINCT misconfiguration from "no
-      // tier resolved": surface `unrouted-tier` rather than silently falling through
-      // to name matching, which would mask the missing assignment.
-      if (assigned?.meta?.disposition === 'unrouted-tier') return assigned;
-      if (assigned) return assigned;
-      // Fallback for recipes without an explicit tier match (no success tier of that
-      // name): fail/miss keywords, then match the outcome name to a result group of
-      // that name.
-      return this._routeByOutcomeName(outcome, allGroups);
-    }
-    return { groups: allGroups.slice(0, 1), meta: {} };
+    // Multiple result groups: fall back to fail/miss keywords, then match the
+    // outcome name to a result group of that name. An unmatched success outcome is
+    // a misconfiguration the author must fix by mapping each outcome to a group.
+    return this._routeByOutcomeName(outcome, allGroups);
   }
 
   /**
@@ -634,12 +630,11 @@ export class ResolutionModeService {
 
   validateCheckResult({ recipe, checkResult }) {
     const mode = this.getMode(recipe);
-    if (mode === 'routed') {
-      const provider = this.getProvider(recipe);
-      return (
-        provider !== 'check' ||
-        !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0)
-      );
+    if (mode === 'routedByCheck') {
+      // Check routing is required: it needs a non-empty outcome to route by.
+      // `routedByIngredients` routes by the chosen ingredient set, so it never
+      // requires a check outcome.
+      return !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
     }
     if (mode === 'progressive') {
       return Number.isFinite(Number(checkResult?.value));

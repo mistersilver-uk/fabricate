@@ -1,28 +1,29 @@
 /**
- * 1.4.0 — Hard-migrate legacy crafting resolution modes `mapped`/`tiered` to
- * canonical `routed` + a seeded result-selection provider (pure, idempotent,
- * version-gated). Per `007-destructive-changes-and-migrations §Resolution-Model
- * Migration (Pre-Release)`, this is a TRUE one-time read-legacy → write-canonical
- * migration: no permanent live `tiered` branch and no permanent `outcomeRouting`
- * read-shim are retained anywhere in the active runtime.
+ * 1.4.0 — Hard-migrate legacy crafting resolution modes `mapped`/`tiered` to the
+ * canonical routed modes (pure, idempotent, version-gated). Per
+ * `007-destructive-changes-and-migrations §Resolution-Model Migration
+ * (Pre-Release)`, this is a TRUE one-time read-legacy → write-canonical migration:
+ * no permanent live `tiered` branch and no permanent `outcomeRouting` read-shim
+ * are retained anywhere in the active runtime.
  *
  * Operates on the runner's `systems` and `recipes` payload keys.
  *
  * System migration (for each system whose `resolutionMode` is `mapped`/`tiered`):
- *  - `resolutionMode`: `mapped`/`tiered` → `routed`.
+ *  - `resolutionMode`: `mapped → routedByIngredients`, `tiered → routedByCheck`.
+ *    (Before the routed split this landed on `routed` + a seeded provider; with the
+ *    routing basis now a property of the mode, the per-recipe provider is gone and
+ *    each legacy token lands directly on the matching first-class mode.)
  *  - `salvageResolutionMode`: `tiered` → `routed` (token only; salvage keeps its
- *    own `outcomeRouting` model at runtime, so salvage routing data is untouched).
+ *    own `routed` token and `outcomeRouting` model at runtime, so salvage routing
+ *    data is untouched).
  *
  * Recipe migration (for each recipe belonging to a former mapped/tiered system):
- *  - former `mapped` → seed `resultSelection.provider = 'ingredientSet'`
- *    (the mapped routing is byte-identical to the canonical `ingredientSet`
- *    contract — no data reshaping beyond provider seeding).
- *  - former `tiered` → seed `resultSelection.provider = 'check'` (the canonical
- *    routed provider) and run the GROUP-NAME RECONCILIATION below so canonical
- *    name-matching reproduces the legacy `outcomeRouting` behavior, then DELETE
- *    `outcomeRouting`. (Originally seeded the now-removed `macroOutcome` alias; the
- *    1.6.0 migration folded that alias into `check`, so this seed targets `check`
- *    directly and an upgrading world's persisted `macroOutcome` is caught up by 1.6.0.)
+ *  - former `mapped` (→ `routedByIngredients`): the mapped routing is byte-identical
+ *    to ingredient-set routing (`IngredientSet.resultGroupId`), so the recipe is
+ *    carried verbatim — no provider to seed and no reshaping.
+ *  - former `tiered` (→ `routedByCheck`): run the GROUP-NAME RECONCILIATION below so
+ *    canonical name-matching reproduces the legacy `outcomeRouting` behavior, then
+ *    DELETE `outcomeRouting`. No provider is seeded.
  *
  * Tiered group-name reconciliation (recipe-level and per-step, deterministic):
  *  For each `outcomeRouting[outcome] → groupId`, rename the target
@@ -52,7 +53,7 @@
  */
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 
-const LEGACY_MODES = new Set(['mapped', 'tiered']);
+const LEGACY_MODE_TARGETS = { mapped: 'routedByIngredients', tiered: 'routedByCheck' };
 
 export function migrateLegacyResolutionModes(data = {}) {
   const systems = _clone(data.systems);
@@ -62,74 +63,71 @@ export function migrateLegacyResolutionModes(data = {}) {
     return { systems: data.systems, recipes: data.recipes };
   }
 
-  // Map each system id to the provider its recipes should be seeded with, derived
-  // from the legacy mode BEFORE the system mode token is rewritten.
-  const providerBySystemId = _migrateSystems(systems);
+  // Map each migrated system id to the routed mode its recipes now belong to,
+  // derived from the legacy mode BEFORE the system mode token is rewritten.
+  const modeBySystemId = _migrateSystems(systems);
 
-  if (providerBySystemId.size === 0 || !Array.isArray(recipes)) {
+  if (modeBySystemId.size === 0 || !Array.isArray(recipes)) {
     return {
       systems,
       recipes: Array.isArray(recipes) ? recipes : data.recipes,
     };
   }
 
-  return { systems, recipes: _migrateRecipes(recipes, providerBySystemId) };
+  return { systems, recipes: _migrateRecipes(recipes, modeBySystemId) };
 }
 
 /**
  * Rewrite every legacy system mode token in place and return the map of system id
- * → provider its recipes should be seeded with (derived from the legacy mode
- * BEFORE the token was rewritten).
+ * → the routed mode its recipes now belong to (derived from the legacy mode BEFORE
+ * the token was rewritten).
  * @param {Array<object>} systems
  * @returns {Map<string, string>}
  */
 function _migrateSystems(systems) {
-  const providerBySystemId = new Map();
+  const modeBySystemId = new Map();
   for (const system of systems) {
     if (!_isPlainObject(system)) continue;
-    const legacyMode = system.resolutionMode;
-    if (LEGACY_MODES.has(legacyMode)) {
-      providerBySystemId.set(
-        String(system.id),
-        legacyMode === 'mapped' ? 'ingredientSet' : 'check'
-      );
-      system.resolutionMode = 'routed';
+    const target = LEGACY_MODE_TARGETS[system.resolutionMode];
+    if (target) {
+      modeBySystemId.set(String(system.id), target);
+      system.resolutionMode = target;
     }
     if (system.salvageResolutionMode === 'tiered') {
       system.salvageResolutionMode = 'routed';
     }
   }
-  return providerBySystemId;
+  return modeBySystemId;
 }
 
 /**
  * Migrate every recipe belonging to a former mapped/tiered system, returning the
  * surviving recipes (unmigratable former-tiered recipes are dropped + logged).
  * @param {Array<object>} recipes
- * @param {Map<string, string>} providerBySystemId
+ * @param {Map<string, string>} modeBySystemId
  * @returns {Array<object>}
  */
-function _migrateRecipes(recipes, providerBySystemId) {
+function _migrateRecipes(recipes, modeBySystemId) {
   const survivors = [];
   for (const recipe of recipes) {
-    const provider = _isPlainObject(recipe)
-      ? providerBySystemId.get(String(recipe.craftingSystemId))
+    const mode = _isPlainObject(recipe)
+      ? modeBySystemId.get(String(recipe.craftingSystemId))
       : undefined;
-    if (!provider) {
+    if (!mode) {
       survivors.push(recipe);
       continue;
     }
 
-    if (provider === 'ingredientSet') {
-      _seedProvider(recipe, 'ingredientSet');
+    if (mode === 'routedByIngredients') {
+      // mapped routing is byte-identical to ingredient-set routing
+      // (`IngredientSet.resultGroupId`): carry verbatim, no provider, no reshaping.
       survivors.push(recipe);
       continue;
     }
 
-    // Former tiered → check with group-name reconciliation across the recipe-level
-    // container and every step container. (`check` is the canonical routed provider;
-    // the legacy `macroOutcome` alias this once seeded was removed in 1.6.0.)
-    _seedProvider(recipe, 'check');
+    // Former tiered → routedByCheck with group-name reconciliation across the
+    // recipe-level container and every step container, so canonical check
+    // name-matching reproduces the legacy `outcomeRouting` behavior.
     if (_reconcileTieredRecipe(recipe)) {
       survivors.push(recipe);
     } else {
@@ -137,14 +135,6 @@ function _migrateRecipes(recipes, providerBySystemId) {
     }
   }
   return survivors;
-}
-
-function _seedProvider(recipe, provider) {
-  if (!_isPlainObject(recipe.resultSelection)) {
-    recipe.resultSelection = { provider };
-    return;
-  }
-  recipe.resultSelection.provider = provider;
 }
 
 /**

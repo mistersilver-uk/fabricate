@@ -176,7 +176,7 @@ Display list + detail editor for crafting systems.
 
 - Name
 - Description
-- Recipe resolution mode (`simple`, `routed`, `progressive`, `alchemy`)
+- Recipe resolution mode (`simple`, `routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`)
 - Salvage resolution mode
 
 Changing recipe resolution mode is destructive and must follow `007` confirmation/cleanup rules.
@@ -719,21 +719,21 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 
 ### Routed UI
 
-- Result selection provider selector:
-  - `ingredientSet`
-  - `check`
-- `ingredientSet` provider UI:
+The routing basis is the system **mode**, not a per-recipe provider: the recipe inspector carries NO result-selection provider selector (it was removed in the routed split — the basis is derived from `routedByIngredients` / `routedByCheck`).
+
+- `routedByIngredients` UI:
   - Ingredient sets map to result groups via `resultGroupId`.
   - Validation enforces deterministic mapping for all satisfiable sets.
-- `check` provider UI:
-  - Routes by the system crafting-check outcome; crafting checks must be enabled on the system.
-  - Optional per-recipe macro override field.
+  - The crafting check is optional (no provider toggle, no check requirement surfaced here).
+- `routedByCheck` UI:
+  - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
   - Result groups carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
+  - A step with exactly one result group needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
 
 ### Alchemy Recipe UI (GM Editor)
 
-- Uses the same provider selector as routed mode.
+- Provides the `resultSelection.provider` selector (`ingredientSet` / `check`) — alchemy is the only mode that still routes via a per-recipe provider.
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
 - Save remains blocked until all collisions are resolved.
 

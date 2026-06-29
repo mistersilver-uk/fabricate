@@ -540,7 +540,7 @@ test('multi-step: craft() returns failure when step ingredient is insufficient',
 function makeLegacyOutcomeRoutingSystem(id = 'sys-legacy-routing') {
   return makeSystem({
     id,
-    resolutionMode: 'routed',
+    resolutionMode: 'routedByCheck',
     craftingCheck: {
       enabled: true,
       outcomes: ['critical', 'pass', 'fail'],

@@ -3166,85 +3166,15 @@ describe('RecipeItemInspector (mounted)', () => {
     inspectorHarness.remount();
   });
 
-  it('shows the Check/Ingredient routing toggle only for routed, complex recipes', async () => {
-    const routedTarget = await inspectorHarness.mount(
-      inspectorProps({
-        routed: true,
-        complex: true,
-        routingProvider: 'ingredientSet',
-      })
-    );
-    const card = routedTarget.querySelector('[data-recipe-section="recipe-routing"]');
-    assert.ok(card, 'routed complex recipes show the result-routing toggle');
-    assert.ok(card.querySelector('[data-recipe-routing-option="check"]'), 'a Check option renders');
-    assert.ok(
-      card
-        .querySelector('[data-recipe-routing-option="ingredient"]')
-        .classList.contains('is-selected'),
-      'the ingredientSet provider selects the Ingredient option'
-    );
-    inspectorHarness.remount();
-
-    const nonRoutedTarget = await inspectorHarness.mount(
-      inspectorProps({ routed: false, complex: true })
-    );
+  // The per-recipe Check/Ingredient routing sub-selector was removed when the
+  // routing basis became a property of the system MODE (routedByIngredients /
+  // routedByCheck). The inspector no longer renders a routing toggle.
+  it('does not render a per-recipe routing toggle (routing basis is the system mode)', async () => {
+    const target = await inspectorHarness.mount(inspectorProps({ complex: true }));
     assert.equal(
-      nonRoutedTarget.querySelector('[data-recipe-section="recipe-routing"]'),
+      target.querySelector('[data-recipe-section="recipe-routing"]'),
       null,
-      'non-routed systems do not show the routing toggle'
-    );
-    inspectorHarness.remount();
-
-    // A Simple recipe crafts one set into one result, so there is no result
-    // group to route — the routing toggle is hidden even on a routed system.
-    const simpleTarget = await inspectorHarness.mount(
-      inspectorProps({ routed: true, complex: false, routingProvider: 'ingredientSet' })
-    );
-    assert.equal(
-      simpleTarget.querySelector('[data-recipe-section="recipe-routing"]'),
-      null,
-      'a simple recipe hides the routing toggle even in a routed system'
-    );
-    inspectorHarness.remount();
-  });
-
-  it('selects Check for an outcome-driven provider and writes the provider on toggle', async () => {
-    const calls = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        routed: true,
-        complex: true,
-        routingProvider: 'check',
-        onSetRoutingProvider: (provider) => calls.push(provider),
-      })
-    );
-    assert.ok(
-      target
-        .querySelector('[data-recipe-routing-option="check"]')
-        .classList.contains('is-selected'),
-      'the check provider selects the Check option'
-    );
-    target.querySelector('[data-recipe-routing-option="ingredient"]').click();
-    assert.deepEqual(
-      calls,
-      ['ingredientSet'],
-      'clicking Ingredient requests the ingredientSet provider'
-    );
-
-    inspectorHarness.remount();
-    const target2 = await inspectorHarness.mount(
-      inspectorProps({
-        routed: true,
-        complex: true,
-        routingProvider: 'ingredientSet',
-        onSetRoutingProvider: (provider) => calls.push(provider),
-      })
-    );
-    target2.querySelector('[data-recipe-routing-option="check"]').click();
-    assert.deepEqual(
-      calls,
-      ['ingredientSet', 'check'],
-      'clicking Check requests the check provider'
+      'the routing sub-selector is gone'
     );
     inspectorHarness.remount();
   });

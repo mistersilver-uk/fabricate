@@ -56,7 +56,8 @@
   function resolutionModeLabel(mode) {
     const labels = {
       simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
-      routed: text('FABRICATE.Admin.Manager.ResolutionRouted', 'Routed'),
+      routedByIngredients: text('FABRICATE.Admin.Manager.ResolutionRoutedByIngredients', 'Routed by ingredients'),
+      routedByCheck: text('FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'),
       progressive: text('FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'),
       alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy')
     };

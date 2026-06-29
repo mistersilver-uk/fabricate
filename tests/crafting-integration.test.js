@@ -381,7 +381,7 @@ test('misconfigured required check: craft aborts with ZERO mutation (no consume/
   // consumption even though the failure policy WOULD otherwise consume ingredients.
   const system = buildSystem({
     id: 'sys-misconfig',
-    resolutionMode: 'routed',
+    resolutionMode: 'routedByCheck',
     craftingCheck: {
       enabled: true,
       outcomes: [],
@@ -602,7 +602,7 @@ test('multistep: step failure records failure and stops run', async () => {
 function buildLegacyOutcomeRoutingFixture() {
   const system = buildSystem({
     id: 'sys-legacy-routing',
-    resolutionMode: 'routed',
+    resolutionMode: 'routedByCheck',
     craftingCheck: {
       enabled: true,
       outcomes: ['pass', 'fail'],

@@ -163,9 +163,9 @@ function makeSettings(initial = {}) {
   return { store, calls, getSetting, setSetting };
 }
 
-test('runs through MigrationRunner from 1.7.0, strips the fields, and lands at 1.8.0', async () => {
+test('runs through MigrationRunner from 1.7.0, strips the fields, and lands at the highest version', async () => {
   const settings = makeSettings({
-    migrationVersion: '1.7.0', // only the 1.8.0 migration is pending
+    migrationVersion: '1.7.0', // the 1.8.0 + 1.9.0 migrations are pending
     craftingSystems: [fullyLoadedSystem()],
     recipes: [{ id: 'r-1', resultSelection: { provider: 'check', macroUuid: 'Macro.x' } }],
   });
@@ -176,7 +176,7 @@ test('runs through MigrationRunner from 1.7.0, strips the fields, and lands at 1
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.8.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.9.0', 'advances to the new highest version');
   const system = settings.store.get('craftingSystems')[0];
   assert.equal('macroUuid' in system.craftingCheck, false);
   assert.equal('builtIn' in system.salvageCraftingCheck, false);
@@ -210,5 +210,5 @@ test('runner: craftingSystems left untouched (no write) when no deprecated field
 
   const setKeys = settings.calls.set.map((c) => c.key);
   assert.equal(setKeys.includes('craftingSystems'), false, 'no rewrite when already clean');
-  assert.equal(settings.store.get('migrationVersion'), '1.8.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.9.0');
 });

@@ -18,10 +18,7 @@
     multiStepEnabled = false,
     complex = false,
     multiSetAllowed = false,
-    routed = false,
-    routingProvider = null,
     onSetComplexity = () => {},
-    onSetRoutingProvider = () => {},
     onAddRecipeItem = () => {},
     onSetRecipeItem = () => {},
     onSetCategory = () => {},
@@ -120,17 +117,6 @@
     if (next === complex) return;
     if (next && !complexAllowed) return;
     onSetComplexity(next);
-  }
-
-  // Routed result routing: a routed system selects its result group either by the
-  // chosen ingredient set ("Ingredient", provider `ingredientSet`) or by the
-  // system-level crafting-check outcome ("Check", provider `check`).
-  const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
-  const isCheckRouting = $derived(routingProvider === 'check');
-
-  function selectRouting(provider) {
-    if (provider === routingProvider) return;
-    onSetRoutingProvider(provider);
   }
 
   // Drop a Foundry Item to link/replace it. Item-only: an unpersisted item drop
@@ -297,47 +283,6 @@
     <p class="manager-muted manager-environment-mode-hint">{complex
       ? text('FABRICATE.Admin.Manager.Recipe.ComplexHint', 'Author multiple ingredient sets and result sets.')
       : text('FABRICATE.Admin.Manager.Recipe.SimpleHint', 'One set of ingredients makes one result.')}</p>
-  </section>
-  {/if}
-
-  {#if routed && complex}
-  <!-- Routed systems pick how a result group is selected: by the chosen
-       ingredient set, or by the system-level crafting-check outcome. The toggle
-       only appears for routed resolution AND Complex recipes — a Simple recipe
-       crafts one set into one result, so there is no result group to route. -->
-  <section class="manager-inspector-card" data-recipe-section="recipe-routing">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Routing', 'Result routing')}</h3>
-    <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Recipe.Routing', 'Result routing')}>
-      <button
-        type="button"
-        role="radio"
-        class={`manager-environment-mode-option ${isCheckRouting ? 'is-selected' : ''}`}
-        aria-checked={isCheckRouting}
-        data-recipe-routing-option="check"
-        onclick={() => selectRouting('check')}
-      >
-        <span class="manager-environment-mode-head">
-          <i class="fas fa-dice-d20" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.CheckRouting', 'Check')}</span>
-        </span>
-      </button>
-      <button
-        type="button"
-        role="radio"
-        class={`manager-environment-mode-option ${isIngredientRouting ? 'is-selected' : ''}`}
-        aria-checked={isIngredientRouting}
-        data-recipe-routing-option="ingredient"
-        onclick={() => selectRouting('ingredientSet')}
-      >
-        <span class="manager-environment-mode-head">
-          <i class="fas fa-flask-vial" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.IngredientRouting', 'Ingredient')}</span>
-        </span>
-      </button>
-    </div>
-    <p class="manager-muted manager-environment-mode-hint">{isIngredientRouting
-      ? text('FABRICATE.Admin.Manager.Recipe.IngredientRoutingHint', 'The chosen ingredient set selects which result group is produced.')
-      : text('FABRICATE.Admin.Manager.Recipe.CheckRoutingHint', "The crafting check's outcome selects which result group is produced.")}</p>
   </section>
   {/if}
 {/if}

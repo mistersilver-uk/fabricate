@@ -1,8 +1,9 @@
 /**
  * Tests for the 1.4.0 migration
  * (src/migration/migrateLegacyResolutionModes.js): hard-migrating legacy
- * `mapped`/`tiered` resolution modes to canonical `routed` + a seeded
- * result-selection provider, with the tiered group-name reconciliation
+ * `mapped`/`tiered` resolution modes to the first-class routed modes
+ * (`mapped → routedByIngredients`, `tiered → routedByCheck`), with the tiered
+ * group-name reconciliation
  * (rename + fan-in split + drop `outcomeRouting`), orphan/unrouted/reserved-keyword
  * edge cases, the post-rename collision hard-delete + JSON log, idempotency, and
  * purity.
@@ -55,25 +56,27 @@ function groupsByName(groups) {
 // System + mapped recipes
 // ---------------------------------------------------------------------------
 
-test('mapped system → routed; its recipes get ingredientSet provider', () => {
+test('mapped system → routedByIngredients; its recipes carry verbatim (no provider)', () => {
   const out = migrate([mappedSystem()], [recipe('sys-mapped')]);
-  assert.equal(out.systems[0].resolutionMode, 'routed');
-  assert.equal(out.recipes[0].resultSelection.provider, 'ingredientSet');
-  // No data reshaping beyond provider seeding.
+  assert.equal(out.systems[0].resolutionMode, 'routedByIngredients');
+  // The routed modes carry no resultSelection; mapped routing is byte-identical to
+  // ingredient-set routing, so nothing is seeded or reshaped.
+  assert.equal(out.recipes[0].resultSelection, undefined);
   assert.deepEqual(out.recipes[0].resultGroups, [group('g1', 'Output')]);
 });
 
-test('tiered system → routed; salvageResolutionMode token tiered → routed', () => {
+test('tiered system → routedByCheck; salvageResolutionMode token tiered → routed', () => {
   const out = migrate([tieredSystem()], []);
-  assert.equal(out.systems[0].resolutionMode, 'routed');
+  assert.equal(out.systems[0].resolutionMode, 'routedByCheck');
+  // Salvage keeps its own `routed` token and outcomeRouting model.
   assert.equal(out.systems[0].salvageResolutionMode, 'routed');
 });
 
 test('non-legacy systems and their recipes are left untouched', () => {
-  const systems = [{ id: 'sys-r', resolutionMode: 'routed' }];
-  const recipes = [recipe('sys-r', { resultSelection: { provider: 'ingredientSet' } })];
+  const systems = [{ id: 'sys-r', resolutionMode: 'routedByIngredients' }];
+  const recipes = [recipe('sys-r')];
   const out = migrate(systems, recipes);
-  assert.equal(out.systems[0].resolutionMode, 'routed');
+  assert.equal(out.systems[0].resolutionMode, 'routedByIngredients');
   assert.equal(out.recipes.length, 1);
 });
 
@@ -81,7 +84,7 @@ test('non-legacy systems and their recipes are left untouched', () => {
 // Tiered group-name reconciliation
 // ---------------------------------------------------------------------------
 
-test('tiered recipe → check; routed groups renamed to outcome, outcomeRouting dropped', () => {
+test('tiered recipe → routedByCheck; routed groups renamed to outcome, outcomeRouting dropped', () => {
   const recipes = [
     recipe('sys-tiered', {
       resultGroups: [group('g1', 'Old A'), group('g2', 'Old B')],
@@ -90,7 +93,8 @@ test('tiered recipe → check; routed groups renamed to outcome, outcomeRouting 
   ];
   const out = migrate([tieredSystem()], recipes);
   const r = out.recipes[0];
-  assert.equal(r.resultSelection.provider, 'check');
+  // routedByCheck carries no resultSelection; routing is by group name.
+  assert.equal(r.resultSelection, undefined);
   assert.equal('outcomeRouting' in r, false, 'outcomeRouting removed');
   const byId = Object.fromEntries(r.resultGroups.map((g) => [g.id, g.name]));
   assert.equal(byId.g1, 'success');

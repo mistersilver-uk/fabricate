@@ -72,7 +72,9 @@
 
   let activeTab = $state('crafting');
 
-  const craftingRouted = $derived(resolutionMode === 'routed');
+  const craftingRouted = $derived(
+    resolutionMode === 'routedByIngredients' || resolutionMode === 'routedByCheck'
+  );
   const craftingSimple = $derived(resolutionMode === 'simple' || resolutionMode === 'alchemy');
   const craftingProgressive = $derived(resolutionMode === 'progressive');
   const salvageRouted = $derived(salvageResolutionMode === 'routed');

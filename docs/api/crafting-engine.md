@@ -76,14 +76,15 @@ A check is only "usable" when its resolution-mode sub-object carries an authored
 | Resolution mode | Sub-object | Usable when |
 |:----------------|:-----------|:------------|
 | `simple` / `alchemy` | `system.craftingCheck.simple` | `simple.rollFormula` is set |
-| `routed` (with the `check` provider) | `system.craftingCheck.routed` | `routed.rollFormula` is set |
+| `routedByCheck` | `system.craftingCheck.routed` | `routed.rollFormula` is set |
+| `routedByIngredients` | `system.craftingCheck.routed` | `routed.rollFormula` is set (the check is optional and does not select the result) |
 | `progressive` | `system.craftingCheck.progressive` | `progressive.rollFormula` is set |
 
 In simple mode the check is optional.
 It runs only when `simple.rollFormula` is set and the system enables crafting checks (`craftingCheck.enabled` is `true` or the system's `craftingChecks` feature is on).
 In alchemy mode the check is always on whenever `simple.rollFormula` is set.
 
-The routed `check` provider and progressive mode both require a usable check.
+Routed-by-check and progressive modes both require a usable check.
 When the resolution mode requires a check but no roll formula is configured, the engine fails loudly with `success: false` and a message of the form `<mode> mode requires a configured crafting check roll formula`, so the misconfiguration is visible.
 When an optional check has no roll formula to run, the engine treats it as a no-op success.
 

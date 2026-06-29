@@ -242,14 +242,15 @@ describe('RecipeManager incomplete recipe shells', () => {
     }
   });
 
-  it('creates a shell in a routed-mode system without the not-yet-chosen provider blocking it', async () => {
-    // Repro: clicking "Create recipe" in a routed-mode system errored with
-    // 'Step "Step 1" in routed mode requires resultSelection.provider'. A brand-new
-    // shell has no provider yet — that is a completeness gap, waived by allowIncomplete.
+  it('creates a shell in a routed-mode system; cardinality completeness is waived by allowIncomplete', async () => {
+    // A brand-new shell has no ingredient sets / result groups yet — a completeness
+    // gap waived by allowIncomplete. The routed modes derive their routing basis
+    // from the system mode and carry no per-recipe provider, so there is no
+    // provider requirement to surface.
     const manager = makeManager();
     const csm = {
       getSystem: (id) =>
-        id === 'sys-routed' ? { id: 'sys-routed', resolutionMode: 'routed' } : null,
+        id === 'sys-routed' ? { id: 'sys-routed', resolutionMode: 'routedByCheck' } : null,
     };
     game.fabricate.getCraftingSystemManager = () => csm;
     game.fabricate.getResolutionModeService = () => new ResolutionModeService(csm);
@@ -262,10 +263,10 @@ describe('RecipeManager incomplete recipe shells', () => {
       assert.ok(shell, 'a shell must persist in a routed-mode system');
       assert.equal(manager.getRecipe(shell.id)?.craftingSystemId, 'sys-routed');
 
-      // Strict create (no allowIncomplete) still surfaces the provider requirement.
+      // Strict create (no allowIncomplete) still surfaces a completeness gap.
       await assert.rejects(
         () => manager.createRecipe({ craftingSystemId: 'sys-routed' }),
-        /requires resultSelection\.provider/
+        /ingredient set|result group/
       );
     } finally {
       delete game.fabricate.getCraftingSystemManager;

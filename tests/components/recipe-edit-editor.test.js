@@ -196,11 +196,11 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(/\n[ \t]*confirmRecipeAction,/.test(storeSource), 'store exports confirmRecipeAction');
   });
 
-  it('seeds a routing provider when a recipe is switched to Complex (so the routing control is never left unselected)', () => {
-    // A freshly-created recipe carries no resultSelection. Complex is only offered
-    // for provider-routed systems (routed/alchemy), so entering Complex must seed a
-    // provider — otherwise the Result routing toggle renders unselected and the
-    // Results panel falls back to the defunct result-set-name input.
+  it('seeds an alchemy routing provider when a recipe is switched to Complex (so the basis is never left unselected)', () => {
+    // A freshly-created recipe carries no resultSelection. ALCHEMY is the only mode
+    // that still routes via a recipe-level provider, so entering Complex in an
+    // alchemy system must seed a provider. The routed crafting modes derive their
+    // basis from the system mode and carry no resultSelection.
     assert.ok(
       rootSource.includes(
         "import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js'"
@@ -210,6 +210,10 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     const start = rootSource.indexOf('async function handleSetRecipeComplexity(');
     assert.ok(start !== -1, 'handleSetRecipeComplexity defined');
     const body = rootSource.slice(start, rootSource.indexOf('\n  }', start));
+    assert.ok(
+      body.includes("=== 'alchemy'"),
+      'the provider seed is gated on alchemy (the routed modes carry no provider)'
+    );
     assert.ok(
       body.includes("existingProvider !== 'check' && existingProvider !== 'ingredientSet'"),
       'only seeds when the draft has no valid provider (never clobbers an authored choice)'
