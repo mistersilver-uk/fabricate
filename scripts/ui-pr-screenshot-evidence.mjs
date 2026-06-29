@@ -103,6 +103,16 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
+    id: 'manager-checks-validation',
+    label: 'Manager Checks tab — per-check Validation tab (readiness + issues)',
+    smokeLabels: ['manager-checks-validation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksValidationTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checksReadiness\.js$/,
+    ],
+  },
+  {
     id: 'manager-tags-categories',
     label: 'Manager tags and categories',
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
