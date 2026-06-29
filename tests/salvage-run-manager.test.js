@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
+import {
+  insertTerminalRuns,
+  assertCappedMostRecentFirst,
+  RETENTION_LIMIT
+} from './helpers/run-history-retention.js';
 
 class FakeActor {
   constructor(name = 'Test Actor') {
@@ -144,4 +149,89 @@ test('SalvageRunManager: removeRunsForSystem and removeRunsForComponent cancel a
     removeHistory: true
   });
   assert.equal(manager.getRunHistory(actor).some(run => run.componentId === 'component-b'), false);
+});
+
+test('SalvageRunManager: retention limit caps salvageRuns.history at 50, discarding the oldest (most-recent-first)', async () => {
+  const actor = new FakeActor('SalvageCap');
+  setupGlobals(1000, [actor]);
+  const manager = new SalvageRunManager();
+
+  const insertedIds = await insertTerminalRuns(RETENTION_LIMIT + 1, async (i) => {
+    const run = await manager.createRun(actor, {
+      craftingSystemId: 'system-cap',
+      componentId: `component-${i}`
+    });
+    const completed = await manager.completeRun(actor, run, 'succeeded');
+    return completed.id;
+  });
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, RETENTION_LIMIT);
+  // The 51st insertion discards the oldest entry.
+  assert.equal(history.some((run) => run.id === insertedIds[0]), false);
+  assertCappedMostRecentFirst(assert, history, insertedIds);
+});
+
+test('SalvageRunManager: retention limit does not truncate salvageRuns.history at exactly 50', async () => {
+  const actor = new FakeActor('SalvageExact');
+  setupGlobals(1000, [actor]);
+  const manager = new SalvageRunManager();
+
+  const insertedIds = await insertTerminalRuns(RETENTION_LIMIT, async (i) => {
+    const run = await manager.createRun(actor, {
+      craftingSystemId: 'system-cap',
+      componentId: `component-${i}`
+    });
+    const completed = await manager.completeRun(actor, run, 'succeeded');
+    return completed.id;
+  });
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, RETENTION_LIMIT);
+  // The 50th insertion does NOT truncate: the oldest entry is retained.
+  assert.equal(history.some((run) => run.id === insertedIds[0]), true);
+  assertCappedMostRecentFirst(assert, history, insertedIds);
+});
+
+test('SalvageRunManager: retention cap holds across completeRun, cancelRun, and terminal createRun paths', async () => {
+  const terminalPaths = {
+    completeRun: async (manager, actor, i) => {
+      const run = await manager.createRun(actor, {
+        craftingSystemId: 'system-cap',
+        componentId: `component-${i}`
+      });
+      const completed = await manager.completeRun(actor, run, 'succeeded');
+      return completed.id;
+    },
+    cancelRun: async (manager, actor, i) => {
+      const run = await manager.createRun(actor, {
+        craftingSystemId: 'system-cap',
+        componentId: `component-${i}`
+      });
+      const cancelled = await manager.cancelRun(actor, run.id);
+      return cancelled.id;
+    },
+    terminalCreate: async (manager, actor, i) => {
+      const run = await manager.createRun(actor, {
+        craftingSystemId: 'system-cap',
+        componentId: `component-${i}`,
+        status: 'cancelled'
+      });
+      return run.id;
+    }
+  };
+
+  for (const [label, insertOne] of Object.entries(terminalPaths)) {
+    const actor = new FakeActor(`Salvage-${label}`);
+    setupGlobals(1000, [actor]);
+    const manager = new SalvageRunManager();
+
+    const insertedIds = await insertTerminalRuns(RETENTION_LIMIT + 1, (i) =>
+      insertOne(manager, actor, i)
+    );
+
+    const history = manager.getRunHistory(actor);
+    assert.equal(history.length, RETENTION_LIMIT, `${label} should cap history at ${RETENTION_LIMIT}`);
+    assertCappedMostRecentFirst(assert, history, insertedIds);
+  }
 });
