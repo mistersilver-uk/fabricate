@@ -280,9 +280,12 @@
   // Complex recipes need a resolution mode that allows multiple ingredient/result
   // sets; simple/progressive systems craft exactly one set into one result.
   const recipeMultiSetAllowed = $derived(!['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple'));
-  // Routed systems route a result group by check outcome or by ingredient set; the
-  // recipe inspector exposes that choice as a Check/Ingredient toggle.
-  const recipeRouted = $derived((selectedSystem?.resolutionMode || 'simple') === 'routed');
+  // Both routed modes route a result group across multiple result groups (by the
+  // ingredient set in routedByIngredients, by the check outcome in routedByCheck);
+  // the routing basis is a property of the system mode, not a per-recipe choice.
+  const recipeRouted = $derived(
+    ['routedByIngredients', 'routedByCheck'].includes(selectedSystem?.resolutionMode || 'simple')
+  );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
@@ -305,7 +308,10 @@
   const checkActivation = $derived({
     crafting: {
       mode: selectedSystem?.resolutionMode || 'simple',
-      optional: (selectedSystem?.resolutionMode || 'simple') === 'simple',
+      // The crafting check is optional in simple and routedByIngredients (it runs
+      // only when a roll formula is authored); routedByCheck and progressive REQUIRE
+      // it, so they are non-optional.
+      optional: ['simple', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
       enabled: selectedSystem?.craftingCheck?.enabled === true
     },
     salvage: {
@@ -954,7 +960,19 @@
   // Recipe-edit deriveds read the live draft (not the persisted record) so the
   // editor, inspector, and header chip all track unsaved staged edits.
   const recipeComplex = $derived(recipeDraft?.complex === true);
-  const recipeRoutingProvider = $derived(recipeDraft?.resultSelection?.provider || null);
+  // The routing basis is a property of the system MODE for the routed crafting
+  // modes (routedByCheck → 'check', routedByIngredients → 'ingredientSet'), so the
+  // downstream results/validation consumers read a derived provider rather than a
+  // per-recipe field. Alchemy keeps its genuine per-recipe provider.
+  const recipeRoutingProvider = $derived(
+    (() => {
+      const mode = selectedSystem?.resolutionMode || 'simple';
+      if (mode === 'routedByCheck') return 'check';
+      if (mode === 'routedByIngredients') return 'ingredientSet';
+      if (mode === 'alchemy') return recipeDraft?.resultSelection?.provider || null;
+      return null;
+    })()
+  );
   // Progressive systems award a recipe's results in order, so the Results tab
   // enables drag-reorder of the result rows (resolution mode is a system setting).
   const recipeProgressive = $derived(selectedSystem?.resolutionMode === 'progressive');
@@ -1428,7 +1446,8 @@
   function resolutionModeLabel(mode) {
     const labels = {
       simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
-      routed: text('FABRICATE.Admin.Manager.ResolutionRouted', 'Routed'),
+      routedByIngredients: text('FABRICATE.Admin.Manager.ResolutionRoutedByIngredients', 'Routed by ingredients'),
+      routedByCheck: text('FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'),
       progressive: text('FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'),
       alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy')
     };
@@ -2188,18 +2207,16 @@
       } else {
         Object.assign(patch, backfillScopeIds(recipeDraft));
       }
-      // Complex recipes route their result groups via a recipe-level provider
-      // (Check or Ingredient). A freshly-created recipe carries none, which leaves
-      // the routing control unselected and the Results panel falling back to the
-      // defunct result-set-name input. Seed a default the same way a resolution-mode
-      // change does — Check when the system has a usable check formula, else
-      // Ingredient — so the routing control is always selected. Complex is only
-      // offered for provider-routed modes (routed/alchemy), so a seed always applies.
-      const existingProvider = recipeDraft.resultSelection?.provider;
-      if (existingProvider !== 'check' && existingProvider !== 'ingredientSet') {
-        patch.resultSelection = {
-          provider: chooseSeedProvider(selectedSystem, selectedSystem?.resolutionMode || 'routed')
-        };
+      // ALCHEMY is the only mode that still routes via a recipe-level provider, so
+      // only alchemy seeds a default `resultSelection.provider` on entering Complex
+      // (Check when the system has a usable simple check formula, else Ingredient)
+      // so the alchemy routing basis is never left unselected. The routed crafting
+      // modes derive their basis from the system mode and carry no resultSelection.
+      if ((selectedSystem?.resolutionMode || 'simple') === 'alchemy') {
+        const existingProvider = recipeDraft.resultSelection?.provider;
+        if (existingProvider !== 'check' && existingProvider !== 'ingredientSet') {
+          patch.resultSelection = { provider: chooseSeedProvider(selectedSystem, 'alchemy') };
+        }
       }
       patchRecipeDraft(patch);
       return true;
@@ -2246,18 +2263,6 @@
       patch.resultGroups = trimmed.resultGroups;
     }
     patchRecipeDraft(patch);
-    return true;
-  }
-
-  // Routed result routing: stage the chosen provider on the draft's
-  // resultSelection (persisted on save), preserving any existing selection fields.
-  function handleSetRoutingProvider(provider) {
-    if (!recipeDraft) return false;
-    if (!['check', 'ingredientSet'].includes(provider)) return false;
-    const current = recipeDraft.resultSelection && typeof recipeDraft.resultSelection === 'object'
-      ? recipeDraft.resultSelection
-      : {};
-    patchRecipeDraft({ resultSelection: { ...current, provider } });
     return true;
   }
 
@@ -6242,10 +6247,7 @@
           multiStepEnabled={recipeMultiStepEnabled}
           complex={recipeComplex}
           multiSetAllowed={recipeMultiSetAllowed}
-          routed={recipeRouted}
-          routingProvider={recipeRoutingProvider}
           onSetComplexity={handleSetRecipeComplexity}
-          onSetRoutingProvider={handleSetRoutingProvider}
           onAddRecipeItem={handleAddRecipeItem}
           onSetRecipeItem={handleSetRecipeItem}
           onSetCategory={handleSetRecipeCategory}
