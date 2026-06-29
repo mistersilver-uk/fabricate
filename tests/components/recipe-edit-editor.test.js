@@ -196,6 +196,34 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(/\n[ \t]*confirmRecipeAction,/.test(storeSource), 'store exports confirmRecipeAction');
   });
 
+  it('seeds a routing provider when a recipe is switched to Complex (so the routing control is never left unselected)', () => {
+    // A freshly-created recipe carries no resultSelection. Complex is only offered
+    // for provider-routed systems (routed/alchemy), so entering Complex must seed a
+    // provider — otherwise the Result routing toggle renders unselected and the
+    // Results panel falls back to the defunct result-set-name input.
+    assert.ok(
+      rootSource.includes(
+        "import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js'"
+      ),
+      'root reuses the migration provider-choice contract (no drift)'
+    );
+    const start = rootSource.indexOf('async function handleSetRecipeComplexity(');
+    assert.ok(start !== -1, 'handleSetRecipeComplexity defined');
+    const body = rootSource.slice(start, rootSource.indexOf('\n  }', start));
+    assert.ok(
+      body.includes("existingProvider !== 'check' && existingProvider !== 'ingredientSet'"),
+      'only seeds when the draft has no valid provider (never clobbers an authored choice)'
+    );
+    assert.ok(
+      body.includes('chooseSeedProvider(selectedSystem'),
+      'seeds via the shared chooseSeedProvider using the selected system'
+    );
+    assert.ok(
+      /patch\.resultSelection = \{\s*provider: chooseSeedProvider/.test(body),
+      'the seeded provider is staged onto the draft resultSelection'
+    );
+  });
+
   it('sources the destructive recipe confirm titles + content from lang keys', () => {
     // Keys exist with the expected English copy and HTML-preserving interpolation.
     assert.equal(recipeLang.RevertToSingleStepTitle, 'Switch to single-step?');

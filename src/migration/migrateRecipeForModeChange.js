@@ -119,7 +119,7 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system 
     if (PROVIDER_MODES.has(fromMode) && _hasValidProvider(recipeJSON)) {
       return { outcome: 'carry', recipe: recipeJSON, reasons: ['routing provider preserved'] };
     }
-    const provider = _chooseSeedProvider(system, toMode);
+    const provider = chooseSeedProvider(system, toMode);
     _seedProvider(recipeJSON, provider);
     return {
       outcome: 'seeded',
@@ -156,11 +156,14 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system 
  * outcome tier (`routed.rollFormula`); `alchemy`'s check provider routes by the
  * SIMPLE check outcome (`simple.rollFormula`), so the routed formula is the wrong
  * one to consult there.
+ * Also used by the recipe editor to seed a provider when a recipe is switched to
+ * Complex in a provider-routed system (so the routing control is never left
+ * unselected), keeping that default in lockstep with this migration's contract.
  * @param {object} system
  * @param {string} toMode The target resolution mode (`routed` | `alchemy`).
  * @returns {'check'|'ingredientSet'}
  */
-function _chooseSeedProvider(system, toMode) {
+export function chooseSeedProvider(system, toMode) {
   const check = _isPlainObject(system?.craftingCheck) ? system.craftingCheck : {};
   const hasUsableFormula =
     toMode === 'alchemy'

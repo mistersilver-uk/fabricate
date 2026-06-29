@@ -11,6 +11,7 @@
     routedHasOutcomeTiers,
     routedOutcomeTierNames
   } from '../../../../utils/routedOutcomeKeywords.js';
+  import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
@@ -2186,6 +2187,19 @@
         patch.steps = complexSteps.map((step) => ({ ...step, ...backfillScopeIds(step) }));
       } else {
         Object.assign(patch, backfillScopeIds(recipeDraft));
+      }
+      // Complex recipes route their result groups via a recipe-level provider
+      // (Check or Ingredient). A freshly-created recipe carries none, which leaves
+      // the routing control unselected and the Results panel falling back to the
+      // defunct result-set-name input. Seed a default the same way a resolution-mode
+      // change does — Check when the system has a usable check formula, else
+      // Ingredient — so the routing control is always selected. Complex is only
+      // offered for provider-routed modes (routed/alchemy), so a seed always applies.
+      const existingProvider = recipeDraft.resultSelection?.provider;
+      if (existingProvider !== 'check' && existingProvider !== 'ingredientSet') {
+        patch.resultSelection = {
+          provider: chooseSeedProvider(selectedSystem, selectedSystem?.resolutionMode || 'routed')
+        };
       }
       patchRecipeDraft(patch);
       return true;
