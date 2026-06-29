@@ -1701,6 +1701,19 @@ export class CraftingSystemManager {
     );
   }
 
+  /**
+   * Delete a crafting system and the recipes that belong to it. GM only. An
+   * individual recipe deletion that fails (e.g. a Foundry settings write error
+   * or timeout) does not abort the teardown: the failure is logged with its
+   * recipe id, the remaining recipes are still deleted, and the system itself
+   * is still removed, saved, and cleaned up so no half-deleted system is left
+   * stranded in persisted settings. Emits one aggregated info notification on a
+   * clean delete, or a warn summary naming how many recipes could not be
+   * auto-deleted (and may need manual removal) when any recipe deletion failed.
+   * @param {string} systemId
+   * @returns {Promise<void>}
+   * @throws {Error} When the caller is not a GM, or no system matches `systemId`.
+   */
   async deleteSystem(systemId) {
     this._assertGM('delete crafting system');
     const system = this.systems.get(systemId);
@@ -1708,10 +1721,24 @@ export class CraftingSystemManager {
       throw new Error(`Crafting system not found: ${systemId}`);
     }
 
-    // Delete recipes that belong to this crafting system.
+    // Delete recipes that belong to this crafting system. A single failed
+    // recipe deletion (e.g. a Foundry settings write error or timeout) must not
+    // abort the teardown: collect the failures, keep deleting the rest, and
+    // still remove the system itself below so we never leave a half-deleted
+    // system stranded in persisted settings.
     const affected = this.recipeManager.getRecipes({ craftingSystemId: systemId });
+    const failedRecipeIds = [];
     for (const recipe of affected) {
-      await this.recipeManager.deleteRecipe(recipe.id, { notify: false });
+      try {
+        await this.recipeManager.deleteRecipe(recipe.id, { notify: false });
+      } catch (error) {
+        failedRecipeIds.push(recipe.id);
+        console.error(
+          'Fabricate | failed to delete recipe while deleting crafting system; remove its orphaned data manually',
+          recipe.id,
+          error
+        );
+      }
     }
 
     this.systems.delete(systemId);
@@ -1734,9 +1761,15 @@ export class CraftingSystemManager {
       : 0;
     const relatedCount = affected.length + componentCount + essenceCount + recipeItemCount;
     const entityLabel = relatedCount === 1 ? 'entity' : 'entities';
-    ui?.notifications?.info?.(
-      `Deleted crafting system "${system.name || systemId}" and ${relatedCount} related ${entityLabel}.`
-    );
+    const summary = `Deleted crafting system "${system.name || systemId}" and ${relatedCount} related ${entityLabel}.`;
+    if (failedRecipeIds.length > 0) {
+      const recipeLabel = failedRecipeIds.length === 1 ? 'recipe' : 'recipes';
+      ui?.notifications?.warn?.(
+        `${summary} ${failedRecipeIds.length} ${recipeLabel} could not be auto-deleted and may need manual removal (see the console for ids).`
+      );
+    } else {
+      ui?.notifications?.info?.(summary);
+    }
   }
 
   /**

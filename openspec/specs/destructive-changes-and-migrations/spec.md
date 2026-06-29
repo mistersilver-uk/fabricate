@@ -38,6 +38,8 @@ When `CraftingSystem.resolutionMode` changes:
 2. Apply the same clean-up as mode change.
 3. Remove the system from persisted settings.
 4. Emit one summary notification that includes the deleted crafting system name and the number of related entities removed; do not emit one notification per deleted recipe.
+5. A failure to delete an individual recipe must not abort the deletion: the remaining recipes are still deleted, the system is still removed from persisted settings, and clean-up still runs.
+   Each failed recipe deletion is logged with its recipe id so a GM can locate and manually remove orphaned recipe data, and the summary notification reflects how many recipes could not be auto-deleted.
 
 ### Delete Recipe
 
