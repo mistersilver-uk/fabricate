@@ -1,9 +1,8 @@
+<!--- Foundry version and download counts badges --->
 ![Supported Foundry version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2Fmistersilver-uk%2Ffabricate%2Freleases%2Flatest%2Fdownload%2Fmodule.json&query=%24.compatibility%5Bminimum%2Cverified%5D&label=foundry-vtt&prefix=v&style=for-the-badge&color=fe6a1f)
-<!--- Downloads @ Latest Badge -->
 ![Latest Release Download Count](https://img.shields.io/github/downloads/mistersilver-uk/fabricate/latest/total?sort=semver&style=for-the-badge&cacheSeconds=3600)
-<!--- Downloads @ Total Badge -->
 ![Total Release Download Count](https://img.shields.io/github/downloads/mistersilver-uk/fabricate/total?label=total%20downloads&style=for-the-badge&cacheSeconds=3600)
-<!--- Social badges -->
+<!--- Social badges --->
 [![Support me on Patreon](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%3Fusername%3Dmistersilver%26type%3Dpatrons&style=for-the-badge)](https://patreon.com/mistersilver)
 [![Discord](https://dcbadge.limes.pink/api/server/APHyMzhPTk)](https://discord.gg/APHyMzhPTk)
 
