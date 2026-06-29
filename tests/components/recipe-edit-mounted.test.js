@@ -1155,7 +1155,7 @@ describe('RecipeEditView (mounted)', () => {
     rows.forEach((row, index) => {
       const handle = row.querySelector('.manager-environment-comp-handle');
       assert.ok(handle, `row ${index} renders the shared handle`);
-      assert.equal(handle.getAttribute('draggable'), 'true', `row ${index} handle is the drag source`);
+      assert.equal(row.getAttribute('draggable'), 'true', `row ${index} card is the drag source`);
       assert.ok(handle.querySelector('.fa-grip-vertical'), `row ${index} renders the grip icon`);
       assert.ok(
         handle.querySelector('.manager-environment-comp-order').textContent.includes(String(index + 1)),
@@ -1171,8 +1171,8 @@ describe('RecipeEditView (mounted)', () => {
       { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
     ]);
     const rows = target.querySelectorAll('[data-recipe-result-row]');
-    // Drag row 0 (the grip is the source) and drop it onto row 1.
-    fireDrag(rows[0].querySelector('.manager-environment-comp-handle'), 'dragstart');
+    // Drag row 0 (the whole card is the source) and drop it onto row 1.
+    fireDrag(rows[0], 'dragstart');
     fireDrag(rows[1], 'drop');
     await flushRender();
     assert.equal(patches.length, 1, 'the reorder emits exactly one recipe patch');

@@ -5323,6 +5323,7 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-04);
+  cursor: grab;
 }
 
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-environment-comp-handle {
