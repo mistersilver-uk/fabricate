@@ -166,6 +166,7 @@ function compileManagerRoot() {
     'recipeImageIcons.js',
     'recipeDuration.js',
     'recipeCurrency.js',
+    'systemDisambiguation.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });

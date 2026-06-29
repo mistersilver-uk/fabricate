@@ -147,6 +147,20 @@ export class RecipeVisibilityService {
     return sorted[0] || null;
   }
 
+  /**
+   * Evaluate whether a viewer has knowledge access to a recipe.
+   *
+   * GM bypass: a GM is always granted access (`reason: 'gm'`). The returned
+   * `hasLearned: true` / `hasMatchedItem: true` flags signal "access is always
+   * granted for a GM" — they do NOT represent the GM actor's actual learned
+   * state or item ownership, and `matchedItems` is intentionally left empty
+   * because no real items are collected on this path. Callers that need the
+   * actual set of owned, matching recipe items (e.g. `learnRecipe` selecting an
+   * item to consume, or `applyRecipeItemUseOnCraft` deciding whether to track a
+   * use) must NOT read `matchedItems` from this result for a GM; they must
+   * collect candidate items directly via `_collectCandidateItems` /
+   * `_filterNonExhausted` so they react to what the actor really owns.
+   */
   evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors = [] }) {
     const system = this._getCraftingSystem(recipe);
     const knowledge = this._getKnowledgeConfig(system);
@@ -426,7 +440,7 @@ export class RecipeVisibilityService {
     return this.evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors });
   }
 
-  async learnRecipe({ viewer, recipe, craftingActor, componentSourceActors = [] }) {
+  async learnRecipe({ recipe, craftingActor, componentSourceActors = [] }) {
     const system = this._getCraftingSystem(recipe);
     if (!system) return { success: false, message: LEARN_RECIPE_MESSAGES.systemNotFound };
 
@@ -444,13 +458,15 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
     }
 
-    const access = this.evaluateKnowledgeAccess({
-      recipe,
-      viewer,
-      craftingActor,
-      componentSourceActors,
-    });
-    const selected = this._selectDeterministic(access.matchedItems || []);
+    // Learning consumes/anchors a real owned recipe item, so we must evaluate
+    // the actor's actual inventory directly rather than trusting
+    // `evaluateKnowledgeAccess().matchedItems` — that array is empty on the GM
+    // bypass path, which would make a GM who genuinely owns a matching item fail
+    // with `noMatchingItem`. Collecting candidates here means a GM (or player)
+    // who owns a match can learn, while one who owns none still cannot.
+    const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
+    const matchedItems = this._filterNonExhausted(allMatches, knowledge?.item || {});
+    const selected = this._selectDeterministic(matchedItems);
     if (!selected) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
     }

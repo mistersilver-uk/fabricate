@@ -296,6 +296,18 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(/\.fab-ic-identity\.is-unconfigured\s*\{[\s\S]*?var\(--fab-accent/.test(rootSource), 'unconfigured treatment uses themed accent token');
   });
 
+  it('disambiguates same-named systems in the source picker (issue 346)', () => {
+    assert.ok(
+      rootSource.includes("import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js'"),
+      'uses the shared system-disambiguation helper'
+    );
+    assert.ok(rootSource.includes('buildSystemLabelMap(systemOptions)'), 'builds the disambiguated label map');
+    assert.ok(
+      rootSource.includes('systemDisplayLabel(option, systemLabels)'),
+      'renders the disambiguated label in the system picker'
+    );
+  });
+
   it('rewords the prompt placeholder away from "toast" jargon', () => {
     assert.ok(!/PromptPlaceholder[^)]*toast/i.test(rootSource), 'no "toast" jargon in the prompt placeholder fallback');
     assert.ok(rootSource.includes('Shown to players in the interaction prompt'), 'plain-language prompt placeholder fallback');
