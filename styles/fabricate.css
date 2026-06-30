@@ -846,6 +846,19 @@
   outline-offset: 2px;
 }
 
+/* Focus ring for <select> controls. A select can sit flush against the edge of
+   an overflow-clipped container (the Journal left column's two 50% list halves),
+   where an OUTSET outline (offset 2px) is clipped on that side and reads as a
+   one-sided "flash" when the control gains :focus-visible after its popup closes;
+   an inset outline does not track the border-radius cleanly on the rounded
+   corners. An inset box-shadow ring follows the border-radius exactly and is
+   drawn entirely inside the border box, so it is never clipped and looks correct
+   on every edge and corner while staying accessible. */
+.fabricate-app select:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--fab-accent);
+}
+
 /* Theme player-app <select> controls (and their open option list) so they read
    as Fabricate dropdowns instead of Foundry's default yellow-on-light text. The
    solid --fab-bg-1 background matches the GM manager selects (which use
