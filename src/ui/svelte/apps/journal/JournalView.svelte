@@ -8,16 +8,14 @@
   The grid is cloned from GatheringView: a container-query 3-column layout
   (minmax(280px,1fr) / 1.5fr / 1fr) that reflows to a single column below 900px of
   app width. Left column = active runs + history; centre = the selected run's
-  detail; right = recent results + about/what-to-expect/tips.
+  detail; right column (mockup order) = about this run → what to expect →
+  recent results → tips. World-time guidance lives in the Tips card.
 
   This view HOSTS the re-fetch effects (so the store stays Foundry-global-free):
   an actor-selection change re-loads; a scene change quietly re-loads; a
   world-time change quietly re-loads AND ticks (recomputing countdowns/progress).
   The shell also registers world-time/scene refreshes so the badge stays fresh
   while the tab is closed; the duplicate quiet loads are harmless.
-
-  A required world-time footer states all times are world time, so the static
-  countdown does not read as a frozen wall clock.
 -->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
@@ -121,11 +119,11 @@
         <RunDetail run={selectedRun} {now} {services} />
       </section>
       <div class="journal-view-column journal-view-column-right">
-        <RecentResults runs={recentTerminalRuns} onViewFullHistory={viewFullHistory} />
         {#if selectedRun}
           <AboutThisRun run={selectedRun} {services} />
           <WhatToExpect runType={expectRunType} />
         {/if}
+        <RecentResults runs={recentTerminalRuns} onViewFullHistory={viewFullHistory} />
         <JournalTips />
       </div>
     </div>

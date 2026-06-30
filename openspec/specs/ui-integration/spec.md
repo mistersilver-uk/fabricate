@@ -1155,7 +1155,7 @@ Those per-activity sections remain authoritative for their own tab, and the Jour
 - The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
 - Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface; each row presents the run's title, run type, status pill, step progress (crafting), and a time-remaining/countdown where a `timeGate` exists.
 - Each run's status pill reflects the projection's `derivedStatus` (`waiting` | `ready` | `inProgress` | `succeeded` | `failed` | `cancelled`), which is derived from the active step/run time gate against world time, not the persisted status (see `002-data-models.md`).
-- Selecting a run opens a detail panel (steps, requirements, results, "about this run", "what to expect").
+- Selecting a run opens a centre detail panel (steps, requirements, and — for a succeeded run — its crafted items, titled `FABRICATE.App.Journal.Results.Title` so it does not collide with the right column's "Recent results" card) plus a right column ordered "about this run" → "what to expect" → "recent results" → "tips".
 - All countdowns and timestamps are world-time based.
 
 ### Run-Type-Aware Actions Panel
@@ -1167,9 +1167,9 @@ It is DISABLED until the active step's time gate has matured — readiness is de
 Triggering invokes the crafting advance contract in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*).
 - **Gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because matured gathering and salvage runs auto-resolve on world time.
 
-### World-Time Disclosure Footer
+### World-Time Disclosure
 
-The Journal renders a persistent footer stating that all displayed times use the game world's world time (`FABRICATE.App.Journal.Footer.WorldTime`), so a static countdown is not misread as a frozen real-time wall clock.
+The Journal discloses that all displayed times use the game world's world time — so a static countdown is not misread as a frozen real-time wall clock — through the right column's Tips card (`FABRICATE.App.Journal.Tips.WorldTime`) rather than a dedicated footer.
 
 ### Crafting / Alchemy Viewer Redaction
 

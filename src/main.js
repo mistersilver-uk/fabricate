@@ -20,7 +20,8 @@ import { isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
-import { secondsPerUnitFromCalendar } from './systems/foundryCalendar.js';
+import { secondsPerUnitFromCalendar, daysPerYearFromCalendar } from './systems/foundryCalendar.js';
+import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
@@ -1395,10 +1396,12 @@ class Fabricate {
   }
 
   /**
-   * Calendar components (`{ day, hour, minute, … }`) for an absolute world time,
-   * via the V13 calendar's `timeToComponents`. Returns null when no calendar is
-   * configured. Used by the Journal's world-time label seam so the store/util
-   * never touch `game.*`.
+   * Calendar components (`{ year, day, hour, minute, … }`) for an absolute world
+   * time, via the V13 calendar's `timeToComponents`. Augmented with `daysPerYear`
+   * (when derivable) so the pure {@link worldTimeLabel} util can compose a
+   * monotonic, 1-based absolute campaign day from the within-year `day` (which
+   * resets each year) without itself touching `game.*`. Returns null when no
+   * calendar is configured.
    *
    * @param {number} [worldTime] Defaults to the current world time.
    * @returns {object|null}
@@ -1407,7 +1410,11 @@ class Fabricate {
     const calendar = game.time?.calendar ?? null;
     if (typeof calendar?.timeToComponents !== 'function') return null;
     try {
-      return calendar.timeToComponents(Number(worldTime) || 0);
+      const components = calendar.timeToComponents(Number(worldTime) || 0);
+      if (!components || typeof components !== 'object') return null;
+      const daysPerYear = daysPerYearFromCalendar(calendar);
+      if (daysPerYear !== null) components.daysPerYear = daysPerYear;
+      return components;
     } catch {
       return null;
     }
@@ -1509,21 +1516,15 @@ class Fabricate {
   async advanceCraftingRun({ actorId, runId, recipeId } = {}) {
     this._requireReady();
     const actor = game.actors?.get(actorId);
-    if (!actor) {
+    const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
+    const resolved = resolveAdvanceSources({ actor, run, fromUuid: globalThis.fromUuidSync });
+    if (resolved.blocked) {
       return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner') };
     }
-    const run = this.craftingRunManager?.getActiveRun(actor, runId) ?? null;
-    const resolve = globalThis.fromUuidSync;
-    const sources = Array.isArray(run?.componentSourceActorUuids)
-      ? run.componentSourceActorUuids
-          .map((uuid) => (typeof resolve === 'function' ? resolve(uuid) : null))
-          .filter(Boolean)
-      : [];
-    const componentSourceActors = sources.length > 0 ? sources : [actor];
-    if (componentSourceActors.some((source) => source?.isOwner !== true)) {
-      return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner') };
-    }
-    return this.craft(actor, recipeId, { runId, componentSourceActors });
+    return this.craft(actor, recipeId, {
+      runId,
+      componentSourceActors: resolved.componentSourceActors,
+    });
   }
 
   /**

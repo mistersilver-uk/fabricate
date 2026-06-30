@@ -219,6 +219,13 @@ export class RunJournalBuilder {
     const derivedStatus = this._deriveCraftingStatus({ status, activeStep, worldTime });
     const multiStep = Array.isArray(recipe?.steps) && recipe.steps.length > 1;
     const failureReason = redacted ? null : this._craftingFailureReason(runSteps);
+    // The step whose name annotates the label: the active step for a live run,
+    // else the final step for a terminal run.
+    const labelStep = terminal
+      ? runSteps[stepCount - 1]
+      : Number.isFinite(currentStepIndex)
+        ? runSteps[currentStepIndex]
+        : runSteps[0];
 
     return {
       id: stringOrNull(run.id),
@@ -237,7 +244,12 @@ export class RunJournalBuilder {
       img: redacted ? DEFAULT_RUN_IMAGE : stringOrNull(recipe?.img) || DEFAULT_RUN_IMAGE,
       stepIndex: Number.isFinite(currentStepIndex) ? currentStepIndex : null,
       stepCount,
-      stepLabel: this._stepLabel({ stepCount, currentStepIndex, terminal }),
+      stepLabel: this._stepLabel({
+        stepCount,
+        currentStepIndex,
+        terminal,
+        stepName: stringOrEmpty(labelStep?.stepName),
+      }),
       steps,
       currentStep,
       timeGate: plainObjectOrNull(activeStep?.timeGate),
@@ -255,7 +267,9 @@ export class RunJournalBuilder {
       flavor: '',
       failureReason,
       ...this._craftingResults(runSteps, redacted),
-      manualAdvance: true,
+      // A redacted run hides its recipe identity, so it cannot offer a manual
+      // "Trigger Next Step" advance — only a discovered crafting run can.
+      manualAdvance: !redacted,
     };
   }
 
@@ -387,13 +401,21 @@ export class RunJournalBuilder {
     return { createdResults, createdResultCount: createdResults.length };
   }
 
-  _stepLabel({ stepCount, currentStepIndex, terminal }) {
+  _stepLabel({ stepCount, currentStepIndex, terminal, stepName = '' }) {
     if (stepCount <= 0) return '';
     const displayIndex = terminal
       ? stepCount
       : Number.isFinite(currentStepIndex)
         ? Math.min(stepCount, currentStepIndex + 1)
         : 1;
+    const name = stringOrEmpty(stepName).trim();
+    if (name) {
+      return this.localize('FABRICATE.App.Journal.Step.LabelNamed', {
+        index: displayIndex,
+        count: stepCount,
+        name,
+      });
+    }
     return this.localize('FABRICATE.App.Journal.Step.Label', {
       index: displayIndex,
       count: stepCount,

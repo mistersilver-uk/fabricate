@@ -128,6 +128,10 @@ export function createJournalStore({ services } = {}) {
    * surfaces the engine result message, then quietly re-fetches so the run's new
    * step / terminal state (and the selected-run fallback) reflect immediately.
    *
+   * Threads the loaded listing's `selectedActorId` (the world-actor `.id` the
+   * runs are keyed to) so the Foundry edge can resolve the crafting actor via
+   * `game.actors.get` — without it the advance always returns NeedsOwner.
+   *
    * @param {object} run The crafting RunModel to advance.
    * @returns {Promise<void>}
    */
@@ -136,6 +140,7 @@ export function createJournalStore({ services } = {}) {
     busyRunId = run.id;
     try {
       const result = await services?.advanceCraftingRun?.({
+        actorId: listing?.selectedActorId ?? null,
         runId: run.id,
         recipeId: run.recipeId,
       });

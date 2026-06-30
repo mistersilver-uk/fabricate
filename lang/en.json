@@ -408,7 +408,7 @@
         "Error": "Couldn't load your runs.",
         "Step": {
           "Label": "Step {index} of {count}",
-          "LabelNamed": "Step {index} of {count}: {name}"
+          "LabelNamed": "Step {index} of {count} • {name}"
         },
         "Status": {
           "waiting": "Waiting",
@@ -490,6 +490,12 @@
           "Title": "Recent results",
           "Empty": "No completed runs yet.",
           "ViewFullHistory": "View full history"
+        },
+        "Results": {
+          "Title": "Crafted items"
+        },
+        "Progress": {
+          "Label": "Step progress"
         },
         "Tips": {
           "Title": "Tips",

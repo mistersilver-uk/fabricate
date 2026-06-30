@@ -160,8 +160,9 @@ The player-facing Journal screen exposes this as a "Trigger Next Step" action (s
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
 - On step success the engine advances `currentStepIndex` to the next step, or marks the run `succeeded` and cleans up run state when the last step succeeds.
 - On step failure the engine fails the WHOLE run (`failed`) and cleans up run state; there is no per-step retry.
-- Advancing requires ownership of the run's component-source actors (resolved from the run's persisted `componentSourceActorUuids`).
-A non-owner is told to ask an owner or GM rather than the run advancing silently, because the craft writes directly to the source actors with no socket-to-GM relay.
+- Advancing requires ownership of BOTH the crafting actor (the craft writes results to it via `createEmbeddedDocuments`) AND every component-source actor (resolved from the run's persisted `componentSourceActorUuids`; an empty resolution falls back to the crafting actor's own inventory).
+An unknown crafting actor is likewise blocked.
+A non-owner is told to ask an owner or GM rather than the run advancing silently, because the craft writes directly to the actors with no socket-to-GM relay.
 
 #### Maturity Asymmetry Between Run Types
 

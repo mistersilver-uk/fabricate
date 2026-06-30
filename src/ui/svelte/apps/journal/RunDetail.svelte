@@ -77,7 +77,7 @@
 
       {#if isSucceeded && createdResults.length > 0}
         <section class="journal-detail-results" data-journal-results>
-          <h3 class="journal-detail-results-title">{localize('FABRICATE.App.Journal.RecentResults.Title')}</h3>
+          <h3 class="journal-detail-results-title">{localize('FABRICATE.App.Journal.Results.Title')}</h3>
           <ul class="journal-detail-results-list">
             {#each createdResults as result, index (result.itemUuid ?? result.componentId ?? index)}
               <li class="journal-detail-result" data-journal-result>

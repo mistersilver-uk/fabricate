@@ -1,27 +1,30 @@
 <!-- Svelte 5 runes mode -->
 <!--
   StepTimeline renders a crafting/salvage run's steps as a horizontal node strip:
-  a succeeded step shows a check, a failed step an x, the current step a filled
-  ring, and a not-yet-reached step a grey dot. The step name sits under each node.
-  State is conveyed by icon + data-step-state, never colour alone.
+  a succeeded step shows a check, a failed step an x, a time-gated step a warning
+  hourglass, the in-progress step a filled ring, and a not-yet-reached step a grey
+  dot. The step name sits under each node. State is conveyed by icon +
+  data-step-state, never colour alone.
 -->
 <script>
   let { steps = [], currentIndex = null } = $props();
 
-  // Resolve each node's visual state. A step's own status wins; the active index
-  // is highlighted as "current" when it has not already resolved.
+  // Resolve each node's visual state. A step's own status wins; a time-gated
+  // step gets the warning tone (parity with the waiting run pill) even when it is
+  // the active step, and the active index is otherwise highlighted as "current".
   function nodeState(step, index) {
     const status = String(step?.status ?? 'pending');
     if (status === 'succeeded') return 'succeeded';
     if (status === 'failed') return 'failed';
-    if (index === currentIndex) return 'current';
-    if (status === 'inProgress' || status === 'waitingTime') return 'current';
+    if (status === 'waitingTime') return 'waiting';
+    if (index === currentIndex || status === 'inProgress') return 'current';
     return 'pending';
   }
 
   const NODE_ICON = {
     succeeded: 'fa-circle-check',
     failed: 'fa-circle-xmark',
+    waiting: 'fa-hourglass-half',
     current: 'fa-circle-dot',
     pending: 'fa-circle'
   };
@@ -89,6 +92,12 @@
     background: var(--fab-danger-soft);
   }
 
+  .journal-step-node.is-waiting .journal-step-node-marker {
+    color: var(--fab-warning-text);
+    border-color: var(--fab-warning-border);
+    background: var(--fab-warning-soft);
+  }
+
   .journal-step-node.is-current .journal-step-node-marker {
     color: var(--fab-accent);
     border-color: var(--fab-accent);
@@ -105,7 +114,8 @@
     color: var(--fab-text-muted);
   }
 
-  .journal-step-node.is-current .journal-step-node-name {
+  .journal-step-node.is-current .journal-step-node-name,
+  .journal-step-node.is-waiting .journal-step-node-name {
     color: var(--fab-text);
     font-weight: 600;
   }

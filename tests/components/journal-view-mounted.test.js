@@ -129,6 +129,13 @@ describe('JournalView mounted behavior', () => {
     assert.ok(target.querySelector('[data-journal-detail]'), 'the run detail renders in the centre');
     assert.ok(target.querySelector('[data-journal-card="recent"]'), 'recent results render on the right');
     assert.ok(target.querySelector('[data-journal-card="about"]'), 'about-this-run renders when a run is selected');
+    // Right-column order (mockup): about → recent (about now precedes recent).
+    const about = target.querySelector('[data-journal-card="about"]');
+    const recent = target.querySelector('[data-journal-card="recent"]');
+    assert.ok(
+      about.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'about-this-run is ordered before recent results in the right column'
+    );
   });
 
   it('shows per-column empty states when there are no active or history runs', async () => {

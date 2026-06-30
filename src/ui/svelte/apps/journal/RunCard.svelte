@@ -97,6 +97,7 @@
       <div
         class="journal-run-card-progress"
         role="progressbar"
+        aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
         aria-valuemin="0"
         aria-valuemax="100"
         aria-valuenow={progressPercent}

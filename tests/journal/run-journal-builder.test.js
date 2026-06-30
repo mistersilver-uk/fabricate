@@ -100,20 +100,29 @@ function makeBuilder({
   worldTime = 200,
   recipeVisibility = null,
   gatheringActive = [],
+  salvageActive = [],
+  salvageHistory = [],
+  mode = 'simple',
+  system = SYSTEM,
+  recipe = RECIPE,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
       getActiveRuns: () => active,
       getRunHistory: () => history,
     },
+    salvageRunManager: {
+      getActiveRuns: () => salvageActive,
+      getRunHistory: () => salvageHistory,
+    },
     gatheringRunSource: {
       getActiveRuns: () => gatheringActive,
       getRunHistory: () => [],
     },
-    recipeManager: { getRecipe: (id) => (id === RECIPE.id ? RECIPE : null) },
-    resolutionModeService: { getMode: () => 'simple' },
+    recipeManager: { getRecipe: (id) => (id === recipe.id ? recipe : null) },
+    resolutionModeService: { getMode: () => mode },
     recipeVisibility,
-    getSystem: (id) => (id === SYSTEM.id ? SYSTEM : null),
+    getSystem: (id) => (id === system.id ? system : null),
     getTool: (systemId, toolId) => {
       if (systemId !== SYSTEM.id) return null;
       const tool = SYSTEM.tools.find((entry) => entry.id === toolId);
@@ -142,7 +151,8 @@ test('projects a crafting RunModel with stepLabel, per-step timeGate, and stepNa
   assert.equal(run.manualAdvance, true);
   assert.equal(run.stepCount, 2);
   assert.equal(run.stepIndex, 1);
-  assert.equal(run.stepLabel, 'FABRICATE.App.Journal.Step.Label|{"index":2,"count":2}');
+  // The active step (s1 "Temper") name annotates the label via LabelNamed.
+  assert.equal(run.stepLabel, 'FABRICATE.App.Journal.Step.LabelNamed|{"index":2,"count":2,"name":"Temper"}');
   // Per-step gate: the run-level timeGate is the CURRENT step's gate.
   assert.deepEqual(run.timeGate, { requiredSeconds: 3600, initiatedAt: 150, availableAt: 3750 });
   assert.equal(run.steps[0].stepName, 'Forge');
@@ -222,7 +232,8 @@ test('aggregates createdResults across steps', () => {
   });
   const run = listing.history[0];
   assert.equal(run.derivedStatus, 'succeeded');
-  assert.equal(run.stepLabel, 'FABRICATE.App.Journal.Step.Label|{"index":1,"count":1}');
+  // Terminal run: the final step (s0 "Forge") name annotates the label.
+  assert.equal(run.stepLabel, 'FABRICATE.App.Journal.Step.LabelNamed|{"index":1,"count":1,"name":"Forge"}');
   assert.equal(run.createdResultCount, 1);
   assert.equal(run.createdResults[0].itemUuid, 'Item.z');
   assert.equal(run.createdResults[0].quantity, 1);
@@ -239,6 +250,8 @@ test('redacts an undiscovered recipe for a non-GM viewer but not for a GM', () =
   assert.equal(redacted.recipeId, null);
   assert.deepEqual(redacted.steps, []);
   assert.deepEqual(redacted.createdResults, []);
+  // A hidden-identity run offers no "Trigger Next Step" advance.
+  assert.equal(redacted.manualAdvance, false);
 
   const visible = makeBuilder({ active: [activeCraftingRun()], recipeVisibility })
     .buildListing({ actor: ACTOR, viewer: GM })
@@ -283,4 +296,126 @@ test('gathering runs pass through with null steps and re-mapped *WorldTime field
   assert.equal(run.updatedAt, 150);
   assert.equal(run.derivedStatus, 'waiting');
   assert.equal(run.taskId, 'task-a');
+});
+
+test('salvage runs pass through with crafting-named time fields, runType salvage, no manual advance', () => {
+  const salvageRun = {
+    id: 'salvage-1',
+    craftingSystemId: 'sys-1',
+    status: 'succeeded',
+    label: 'Salvage Sword',
+    startedAt: 200,
+    updatedAt: 260,
+    finishedAt: 260,
+    createdResults: [{ itemUuid: 'Item.scrap', quantity: 4, name: 'Scrap' }],
+  };
+  const run = makeBuilder({ salvageHistory: [salvageRun], worldTime: 300 }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).history[0];
+
+  assert.equal(run.runType, 'salvage');
+  assert.equal(run.manualAdvance, false);
+  assert.deepEqual(run.steps, []);
+  // Salvage already uses the crafting startedAt/updatedAt/finishedAt names — no re-map.
+  assert.equal(run.startedAt, 200);
+  assert.equal(run.updatedAt, 260);
+  assert.equal(run.finishedAt, 260);
+  assert.equal(run.derivedStatus, 'succeeded');
+  assert.equal(run.createdResultCount, 1);
+  assert.equal(run.createdResults[0].itemUuid, 'Item.scrap');
+});
+
+test('aggregates createdResults across multiple result-bearing steps', () => {
+  const multi = terminalCraftingRun({
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'succeeded',
+        createdResults: [{ itemUuid: 'Item.a', quantity: 2 }],
+      },
+      {
+        stepId: 's1',
+        stepName: 'Temper',
+        index: 1,
+        status: 'succeeded',
+        createdResults: [
+          { itemUuid: 'Item.b', quantity: 1 },
+          { itemUuid: 'Item.c', quantity: 3 },
+        ],
+      },
+    ],
+  });
+  const run = makeBuilder({ history: [multi] }).buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+  assert.equal(run.createdResultCount, 3);
+  assert.deepEqual(
+    run.createdResults.map((result) => result.itemUuid),
+    ['Item.a', 'Item.b', 'Item.c']
+  );
+});
+
+test('progressive mode surfaces a bare roll formula with no DC', () => {
+  const progressiveSystem = {
+    ...SYSTEM,
+    craftingCheck: { progressive: { rollFormula: '2d6', dc: 99, tiers: [] } },
+  };
+  const detail = makeBuilder({
+    active: [activeCraftingRun()],
+    mode: 'progressive',
+    system: progressiveSystem,
+  })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .activeRuns[0].steps[1].detail;
+  // Progressive is a value-budget check: the formula shows without a DC number.
+  assert.equal(detail.checkLabel, '2d6');
+});
+
+test('routedByCheck reads check.routed.rollFormula and the RoutedByCheck label', () => {
+  const routedSystem = {
+    ...SYSTEM,
+    resolutionMode: 'routedByCheck',
+    craftingCheck: { routed: { rollFormula: '1d20+4', dc: 18, tiers: [] } },
+  };
+  const run = makeBuilder({
+    active: [activeCraftingRun()],
+    mode: 'routedByCheck',
+    system: routedSystem,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.equal(
+    run.steps[1].detail.checkLabel,
+    'FABRICATE.App.Journal.StepDetails.CheckWithDc|{"formula":"1d20+4","dc":18}'
+  );
+  assert.equal(run.resolutionModeLabel, 'FABRICATE.App.Journal.Mode.RoutedByCheck');
+});
+
+test('routedByIngredients reads check.routed and the RoutedByIngredients label', () => {
+  const routedSystem = {
+    ...SYSTEM,
+    resolutionMode: 'routedByIngredients',
+    craftingCheck: { routed: { rollFormula: '1d12', dc: 9, tiers: [] } },
+  };
+  const run = makeBuilder({
+    active: [activeCraftingRun()],
+    mode: 'routedByIngredients',
+    system: routedSystem,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.equal(
+    run.steps[1].detail.checkLabel,
+    'FABRICATE.App.Journal.StepDetails.CheckWithDc|{"formula":"1d12","dc":9}'
+  );
+  assert.equal(run.resolutionModeLabel, 'FABRICATE.App.Journal.Mode.RoutedByIngredients');
+});
+
+test('a dynamic-DC check surfaces the formula without a DC number', () => {
+  const dynamicSystem = {
+    ...SYSTEM,
+    craftingCheck: { simple: { rollFormula: '1d20', dc: 15, dcMode: 'dynamic', tiers: [] } },
+  };
+  const detail = makeBuilder({ active: [activeCraftingRun()], system: dynamicSystem })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .activeRuns[0].steps[1].detail;
+  assert.equal(detail.checkLabel, '1d20');
 });

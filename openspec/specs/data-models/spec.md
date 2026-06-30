@@ -1219,7 +1219,7 @@ RunModel = {
   failureReason: string | null,
   createdResults: Array<{ componentId, itemUuid, quantity, name, img }>,
   createdResultCount: number,
-  manualAdvance: boolean,                // true only for crafting (the Trigger Next Step gate)
+  manualAdvance: boolean,                // true only for non-redacted crafting (the Trigger Next Step gate)
 }
 ```
 
@@ -1260,7 +1260,7 @@ StepModel = {
    For gathering and salvage runs, they come from the RUN-level `timeGate`.
    Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
 3. **Viewer redaction (`redacted`).**
-   A crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe for a non-GM viewer — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` are blanked, and `img` falls back to the default run image.
+   A crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe for a non-GM viewer — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` are blanked, `manualAdvance` is `false` (a hidden-identity run offers no Trigger Next Step), and `img` falls back to the default run image.
    A GM viewer and globally-visible recipes are never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
    Gathering and salvage runs are not redacted by this projection (`redacted: false`); gathering's own blind-task redaction is applied upstream by its listing builder.
@@ -1268,7 +1268,7 @@ StepModel = {
    `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, and each step's `detail.checkLabel` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, and empty structure/mode labels.
    A redacted crafting run also projects `steps: []`.
 5. **`manualAdvance` is the Trigger Next Step gate.**
-   It is `true` only for crafting runs; the player-facing advance contract is defined in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*).
+   It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*).
 6. **`resolutionModeLabel` uses the player-facing label map.**
    It resolves through the localized mode-label map defined in `004-resolution-modes.md` (*Player-Facing Mode Labels*) and never emits the raw `resolutionMode` token.
 7. **`counts.active` feeds the nav badge.**

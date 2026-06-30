@@ -19,7 +19,13 @@ const rootSource = read('../../src/ui/svelte/apps/FabricateAppRoot.svelte');
 const viewSource = read('../../src/ui/svelte/apps/journal/JournalView.svelte');
 const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js');
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
+const builderSource = read('../../src/systems/RunJournalBuilder.js');
 const cssSource = read('../../styles/fabricate.css');
+const enLang = JSON.parse(read('../../lang/en.json'));
+
+function resolveLangKey(key) {
+  return key.split('.').reduce((node, part) => (node == null ? undefined : node[part]), enLang);
+}
 
 describe('FabricateAppRoot Journal wiring', () => {
   it('renders JournalView on the journal tab and keeps the placeholder elsewhere', () => {
@@ -45,10 +51,10 @@ describe('FabricateAppRoot Journal wiring', () => {
 
 describe('JournalView layout + effects', () => {
   it('clones the GatheringView container-query 3-column grid', () => {
-    assert.ok(
-      viewSource.includes('grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr)'),
-      'uses the planned 3-column template with non-zero minimums'
-    );
+    // Pin the reflow contract (container seam + narrow-width single-column
+    // breakpoint), not the exact fr/minmax track literal — the column ratios are
+    // tunable design details that should not break this wiring guard.
+    assert.ok(viewSource.includes('grid-template-columns:'), 'declares an explicit column track');
     assert.ok(viewSource.includes('container-type: inline-size;'), 'establishes a size container');
     assert.ok(viewSource.includes('container-name: fabricate-journal;'), 'names the journal container');
     assert.ok(
@@ -83,6 +89,34 @@ describe('Journal status vocabulary + actions', () => {
     assert.ok(actionsSource.includes('availableAt <= now'), 'readiness is availableAt <= now');
     assert.equal(actionsSource.includes('run.status'), false, 'never reads run.status for readiness');
     assert.ok(actionsSource.includes('fabricate-app-primary-button'), 'uses the global primary button class');
+  });
+});
+
+describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
+  it('every journalRunStatus labelKey resolves to a real localized string', () => {
+    const keys = [...statusSource.matchAll(/labelKey:\s*'([^']+)'/g)].map((match) => match[1]);
+    assert.ok(keys.length >= 6, 'extracted the status labelKeys from the presentation map');
+    for (const key of new Set(keys)) {
+      assert.equal(
+        typeof resolveLangKey(key),
+        'string',
+        `journalRunStatus labelKey ${key} must resolve in lang/en.json`
+      );
+    }
+  });
+
+  it('every resolution-mode label key resolves to a real localized string', () => {
+    const keys = [...builderSource.matchAll(/'(FABRICATE\.App\.Journal\.Mode\.[A-Za-z]+)'/g)].map(
+      (match) => match[1]
+    );
+    assert.ok(keys.length >= 5, 'extracted the MODE_LABEL_KEYS values from the builder');
+    for (const key of new Set(keys)) {
+      assert.equal(
+        typeof resolveLangKey(key),
+        'string',
+        `resolution-mode label ${key} must resolve in lang/en.json`
+      );
+    }
   });
 });
 

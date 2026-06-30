@@ -51,6 +51,11 @@ describe('RunCard mounted behavior', () => {
     assert.ok(countdown.textContent.includes('8m 20s'), 'countdown formats availableAt - now (1000 - 500 = 500s)');
     const progress = target.querySelector('[data-run-progress]');
     assert.equal(progress.getAttribute('data-run-progress'), '50', 'progress is 50% at the halfway point');
+    assert.equal(progress.getAttribute('role'), 'progressbar', 'progress bar exposes the progressbar role');
+    assert.ok(
+      String(progress.getAttribute('aria-label')).includes('Progress.Label'),
+      'progress bar carries a localized aria-label'
+    );
   });
 
   it('shows "ready to continue" once the gate has matured', async () => {

@@ -60,8 +60,9 @@ describe('RunDetail mounted behavior', () => {
       'primary tool fact rendered'
     );
     assert.ok(target.querySelector('[data-journal-trigger]'), 'Trigger button rendered for a crafting run');
-    // The current node (index 0) is highlighted; index 1 is pending.
-    assert.equal(target.querySelector('[data-step-index="0"]').getAttribute('data-step-state'), 'current');
+    // The active node (index 0) is time-gated, so it takes the distinct "waiting"
+    // (warning) tone rather than the accent "current" tone; index 1 is pending.
+    assert.equal(target.querySelector('[data-step-index="0"]').getAttribute('data-step-state'), 'waiting');
     assert.equal(target.querySelector('[data-step-index="1"]').getAttribute('data-step-state'), 'pending');
   });
 
@@ -79,6 +80,68 @@ describe('RunDetail mounted behavior', () => {
     const run = makeCraftingRun({ timeGate: null, derivedStatus: 'inProgress' });
     const target = await harness.mount({ run, now: 0, services: services() });
     assert.equal(target.querySelector('[data-journal-trigger]').disabled, false, 'no gate → triggerable now');
+  });
+
+  it('disables Trigger while the run is busy even after the gate has matured', async () => {
+    const run = makeCraftingRun();
+    // Matured gate (now past availableAt) would normally enable the button, but a
+    // busy advance for this run id keeps it disabled to block re-entrancy.
+    const svc = { journal: { busyRunId: run.id, advance() {} }, getWorldTimeComponents: () => null };
+    const target = await harness.mount({ run, now: 2000, services: svc });
+    assert.equal(target.querySelector('[data-journal-trigger]').disabled, true, 'busy → disabled');
+  });
+
+  it('marks a failed step node with the failed state', async () => {
+    const run = makeCraftingRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      stepIndex: 0,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: 'Botched' },
+          lastCheckResult: null
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 0, services: services() });
+    assert.equal(target.querySelector('[data-step-index="0"]').getAttribute('data-step-state'), 'failed');
+    assert.equal(target.querySelector('[data-journal-actions]'), null, 'terminal run shows no actions panel');
+  });
+
+  it('falls back to the last step detail for a terminal run with no currentStep', async () => {
+    const run = makeSucceededRun({
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'succeeded',
+          timeGate: null,
+          detail: { requiredSeconds: 600, primaryToolName: 'Mortar & Pestle', toolNames: ['Mortar & Pestle'], checkLabel: null, failureText: null },
+          lastCheckResult: null
+        },
+        {
+          stepId: 's2',
+          stepName: 'Bottle',
+          index: 1,
+          status: 'succeeded',
+          timeGate: null,
+          detail: { requiredSeconds: 300, primaryToolName: 'Flask', toolNames: ['Flask'], checkLabel: null, failureText: null },
+          lastCheckResult: null
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details, 'step details render for a terminal run without a currentStep');
+    // detailStep falls back to the LAST step (Flask), not the first.
+    assert.ok(details.textContent.includes('Flask'), 'shows the final step tool via the fallback');
   });
 
   it('calls store.advance when the enabled Trigger button is clicked', async () => {

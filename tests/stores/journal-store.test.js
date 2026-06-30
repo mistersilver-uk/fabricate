@@ -49,6 +49,7 @@ function baseListing(overrides = {}) {
   const hist = overrides.history ?? history();
   const active = overrides.activeRuns ?? ACTIVE;
   return {
+    selectedActorId: overrides.selectedActorId ?? 'actor-1',
     counts: { active: active.length, history: hist.length },
     activeRuns: active,
     history: hist
@@ -161,9 +162,66 @@ describe('journalStore', () => {
     await store.advance({ id: 'b', recipeId: 'r-b' });
     flushSync();
 
-    assert.deepEqual(setup.calls.advance, [{ runId: 'b', recipeId: 'r-b' }]);
+    assert.deepEqual(setup.calls.advance, [{ actorId: 'actor-1', runId: 'b', recipeId: 'r-b' }]);
     assert.deepEqual(setup.calls.notify, ['You must own the source character.']);
     assert.equal(setup.calls.list, 2, 'refetched after advance');
     assert.equal(store.busyRunId, '', 'busy flag cleared');
+  });
+
+  it('breaks soonest-ready ties by ascending availableAt', async () => {
+    // Both runs are waiting at now=200, so readiness ties: ascending availableAt
+    // orders the sooner-maturing run first.
+    const active = [
+      { id: 'late', recipeId: 'r', startedAt: 10, timeGate: { availableAt: 800 } },
+      { id: 'soon', recipeId: 'r', startedAt: 10, timeGate: { availableAt: 300 } },
+    ];
+    const setup = makeServices({ listing: baseListing({ activeRuns: active }) });
+    const store = await loadedStore(setup);
+    assert.deepEqual(
+      store.activeRuns.map((run) => run.id),
+      ['soon', 'late']
+    );
+  });
+
+  it('setHistorySort("oldest") reverses the finished order and resets the page', async () => {
+    const store = await loadedStore(makeServices());
+    assert.equal(store.historySort, 'newest');
+    assert.deepEqual(store.historyPageItems[0].id, 'h1', 'newest first by default');
+
+    store.setHistoryPage(1);
+    flushSync();
+    store.setHistorySort('oldest');
+    flushSync();
+    assert.equal(store.historySort, 'oldest');
+    assert.equal(store.historyPage, 0, 'changing the sort resets to the first page');
+    // history finishedAt runs 100..30 (h1..h8); oldest → h8 (30) first.
+    assert.deepEqual(
+      store.historyPageItems.slice(0, 3).map((run) => run.id),
+      ['h8', 'h7', 'h6']
+    );
+  });
+
+  it('tickWorldTime recomputes the world-time-derived active runs', async () => {
+    let clock = 200;
+    const { services, calls } = makeServices();
+    services.getWorldTime = () => clock;
+    const store = createJournalStore({ services });
+    await store.load();
+    flushSync();
+
+    const before = store.activeRuns;
+    // Reading again without any dependency change returns the memoized derived.
+    assert.equal(store.activeRuns, before, 'derived is memoized between reads');
+
+    clock = 5000;
+    store.tickWorldTime();
+    flushSync();
+    assert.equal(store.worldTime, 5000, 'reactive world time reflects the advanced clock');
+    assert.notEqual(
+      store.activeRuns,
+      before,
+      'the worldTimeTick nudge re-ran the active-runs derived'
+    );
+    assert.equal(calls.list, 1, 'a tick does not refetch');
   });
 });

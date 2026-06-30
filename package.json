@@ -25,7 +25,7 @@
     "screenshots:ui:collect": "node scripts/ui-pr-screenshot-evidence.mjs collect",
     "screenshots:ui:publish": "node scripts/ui-pr-screenshot-evidence.mjs publish",
     "screenshots:ui:clean": "node scripts/ui-pr-screenshot-evidence.mjs clean",
-    "test": "node --test --test-timeout=30000 tests/*.test.js tests/journal/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js tests/util/*.test.js tests/canvas/*.test.js tests/canvas/regions/*.test.js",
+    "test": "node --test --test-timeout=30000 tests/*.test.js tests/journal/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js tests/util/*.test.js tests/systems/*.test.js tests/canvas/*.test.js tests/canvas/regions/*.test.js",
     "test:foundry:install": "playwright install chromium --with-deps",
     "test:foundry:up": "node scripts/foundry-test-up.mjs",
     "test:foundry:run": "node scripts/foundry-test-run.mjs",
