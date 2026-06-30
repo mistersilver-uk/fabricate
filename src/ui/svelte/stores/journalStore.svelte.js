@@ -185,6 +185,12 @@ export function createJournalStore({ services } = {}) {
     get loadedOnce() {
       return loadedOnce;
     },
+    // Reactive current world time: reads the `worldTimeTick` nudge so consumers
+    // (RunCard countdowns, ActionsPanel readiness) recompute when world time
+    // advances. The value itself comes from the (non-reactive) services seam.
+    get worldTime() {
+      return worldTime();
+    },
     get activeRuns() {
       return activeRuns;
     },

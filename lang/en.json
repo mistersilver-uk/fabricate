@@ -430,12 +430,77 @@
           "SingleStep": "Single-Step Recipe"
         },
         "StepDetails": {
+          "Title": "Step requirements",
+          "RequiresTime": "Requires time",
+          "PrimaryTool": "Primary tool",
+          "Check": "Check",
+          "Failure": "Failure",
           "CheckWithDc": "{formula} vs DC {dc}",
           "FailureGeneric": "The crafting attempt failed."
         },
         "Redacted": {
           "Title": "Hidden recipe"
         },
+        "Empty": {
+          "NoActor": "Select a character to see their crafting, gathering, and salvage runs.",
+          "Active": "No active runs.",
+          "History": "No completed runs yet.",
+          "Detail": "Select a run to see its details."
+        },
+        "ActiveRuns": {
+          "Title": "Active Runs",
+          "Count": "({count})",
+          "Sort": {
+            "Label": "Sort",
+            "SoonestReady": "Soonest Ready",
+            "Newest": "Newest"
+          }
+        },
+        "History": {
+          "Title": "History",
+          "Sort": {
+            "Label": "Sort",
+            "Newest": "Newest",
+            "Oldest": "Oldest"
+          }
+        },
+        "Countdown": {
+          "ReadyToContinue": "Ready to continue",
+          "Remaining": "{time} remaining"
+        },
+        "TimeRemaining": {
+          "Title": "Time remaining",
+          "AvailableAt": "Available at {when}",
+          "WhenPassed": "Ready to continue once enough world time has passed."
+        },
+        "About": {
+          "Title": "About this run",
+          "Started": "Started",
+          "RunId": "Run ID",
+          "Recipe": "Recipe",
+          "Mode": "Mode"
+        },
+        "WhatToExpect": {
+          "Title": "What to expect",
+          "Crafting": "This is a crafting run. Trigger the next step when its time gate has passed; each step rolls its crafting check and the run completes (or fails) once the final step resolves.",
+          "Gathering": "This is a gathering run. It resolves automatically as world time advances — no action is needed from you.",
+          "Salvage": "This is a salvage run. It resolves automatically as world time advances — no action is needed from you."
+        },
+        "RecentResults": {
+          "Title": "Recent results",
+          "Empty": "No completed runs yet.",
+          "ViewFullHistory": "View full history"
+        },
+        "Tips": {
+          "Title": "Tips",
+          "WorldTime": "Countdowns use world time, not real time — they only move when your GM advances the game clock.",
+          "Trigger": "Crafting steps are triggered manually once their time gate has passed.",
+          "History": "Completed runs and their results stay in your history."
+        },
+        "Footer": {
+          "WorldTime": "All times use world time from your game world."
+        },
+        "Quantity": "×{n}",
         "Time": {
           "DayWithPhase": "Day {day}, {phase}",
           "DayWithClock": "Day {day} {time}"
@@ -446,6 +511,10 @@
           "DaysAgo": "{days} days ago"
         },
         "Actions": {
+          "TriggerNextStep": "Trigger Next Step",
+          "TriggerHint": "Advance this run to roll the next step's crafting check.",
+          "AutoResolve": "Resolves automatically when the world time advances.",
+          "WaitingHint": "Waiting for enough world time to pass before the next step can be triggered.",
           "NeedsOwner": "You must own the source character (or ask your GM) to advance this run."
         }
       },

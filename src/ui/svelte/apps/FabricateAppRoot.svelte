@@ -10,8 +10,9 @@
   `activeTab`, so this component stays a pure projection of host state.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import { localize, subscribeSceneChange, subscribeWorldTime } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
+  import JournalView from './journal/JournalView.svelte';
   import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
 
   let {
@@ -55,7 +56,26 @@
     { id: 'inventory', icon: 'fa-boxes-stacked', label: 'FABRICATE.App.Nav.Inventory' }
   ];
 
-  const tabs = $derived(ALL_TABS.filter(tab => tab.requires !== 'alchemy' || showAlchemy));
+  // The Journal nav entry carries a live active-run count badge fed by the shared
+  // journal store's reactive `navCount` rune getter.
+  const journalNavCount = $derived(Number(services?.journal?.navCount ?? 0));
+  const tabs = $derived(
+    ALL_TABS
+      .filter(tab => tab.requires !== 'alchemy' || showAlchemy)
+      .map(tab => (tab.id === 'journal' ? { ...tab, count: journalNavCount } : tab))
+  );
+
+  // Shell-level Journal refresh: keep the store (and thus the nav badge) fresh
+  // even while the Journal tab is closed. A scene change or world-time advance
+  // quietly re-fetches; the store guards its own one-time initial load via
+  // `loadedOnce`. JournalView registers its own (tab-open) effects too; the extra
+  // quiet loads are harmless. READ-only — no side effects published here.
+  $effect(() => {
+    const store = services?.journal;
+    if (store && !store.loadedOnce) store.load();
+  });
+  $effect(() => subscribeWorldTime(() => services?.journal?.load?.(true)));
+  $effect(() => subscribeSceneChange(() => services?.journal?.load?.(true)));
 </script>
 
 <div class="fabricate-app-shell">
@@ -71,6 +91,9 @@
       >
         <i class="fas {tab.icon}" aria-hidden="true"></i>
         <span class="fabricate-app-nav-label">{localize(tab.label)}</span>
+        {#if tab.count > 0}
+          <span class="fabricate-app-nav-count" data-nav-count={tab.id}>{tab.count}</span>
+        {/if}
       </button>
     {/each}
   </div>
@@ -87,6 +110,8 @@
         {#if activeTab === tab.id}
           {#if tab.id === 'gathering'}
             <GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />
+          {:else if tab.id === 'journal'}
+            <JournalView {services} />
           {:else}
             <!-- Shared placeholder for the Crafting, (future) Alchemy, Journal,
                  and Inventory tabs. FORWARD-COMPAT NOTE: when the Crafting and
@@ -130,6 +155,7 @@
   }
 
   .fabricate-app-nav-item {
+    position: relative;
     box-sizing: border-box;
     flex: 0 0 auto;
     display: flex;

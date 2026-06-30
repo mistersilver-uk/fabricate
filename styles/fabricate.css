@@ -839,6 +839,66 @@
   outline-offset: 2px;
 }
 
+/* Journal "Trigger Next Step" primary button. The player app has no .is-primary
+   (that class is .fabricate-manager-only), so this is the player-scoped green
+   primary treatment. It mirrors the manager .is-primary success palette
+   (--fab-success / --fab-success-strong) and must override Foundry's global
+   `button` rules, which center content and pin a fixed height: height:auto +
+   min-height + flex justify-content keep the icon+label row laid out correctly.
+   Kept in the global stylesheet (not a scoped Svelte block) because the Foundry
+   core button override is unreliable from a component-scoped rule. */
+.fabricate-app .fabricate-app-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2);
+  height: auto;
+  min-height: 36px;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-success-border);
+  border-radius: 6px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--fab-on-success);
+  background: var(--fab-success);
+  cursor: pointer;
+}
+
+.fabricate-app .fabricate-app-primary-button:not(:disabled):hover {
+  border-color: var(--fab-success-border);
+  color: var(--fab-on-success);
+  background: var(--fab-success-strong);
+}
+
+.fabricate-app .fabricate-app-primary-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Active-run count badge on the Journal nav rail entry. The player nav rail is a
+   fixed-width column of square icon buttons (no collapsible rail, unlike the
+   manager's .manager-nav-count), so the badge floats in the button's top-right
+   corner. Tokenized green to match the run-ready/active semantics. */
+.fabricate-app .fabricate-app-nav-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 1px solid var(--fab-success-border);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--fab-on-success);
+  background: var(--fab-success);
+}
+
 
 /* ==========================================
    Image path picker (environment editor)
