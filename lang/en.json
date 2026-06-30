@@ -403,6 +403,52 @@
           "None": "No current realm"
         }
       },
+      "Journal": {
+        "Loading": "Loading runs…",
+        "Error": "Couldn't load your runs.",
+        "Step": {
+          "Label": "Step {index} of {count}",
+          "LabelNamed": "Step {index} of {count}: {name}"
+        },
+        "Status": {
+          "waiting": "Waiting",
+          "ready": "Ready",
+          "inProgress": "In progress",
+          "succeeded": "Succeeded",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        },
+        "Mode": {
+          "Standard": "Standard (DC)",
+          "RoutedByIngredients": "Routed by Ingredients",
+          "RoutedByCheck": "Routed by Check",
+          "Progressive": "Progressive",
+          "Alchemy": "Alchemy"
+        },
+        "Structure": {
+          "MultiStep": "Multi-Step Recipe",
+          "SingleStep": "Single-Step Recipe"
+        },
+        "StepDetails": {
+          "CheckWithDc": "{formula} vs DC {dc}",
+          "FailureGeneric": "The crafting attempt failed."
+        },
+        "Redacted": {
+          "Title": "Hidden recipe"
+        },
+        "Time": {
+          "DayWithPhase": "Day {day}, {phase}",
+          "DayWithClock": "Day {day} {time}"
+        },
+        "RelativeTime": {
+          "Today": "Today",
+          "Yesterday": "Yesterday",
+          "DaysAgo": "{days} days ago"
+        },
+        "Actions": {
+          "NeedsOwner": "You must own the source character (or ask your GM) to advance this run."
+        }
+      },
       "Gathering": {
         "Loading": "Loading gathering environments…",
         "Error": "Couldn't load gathering environments.",

@@ -8,6 +8,7 @@ import { CompendiumImporter } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
+import { RunJournalBuilder } from './systems/RunJournalBuilder.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
@@ -442,6 +443,7 @@ class Fabricate {
     this.craftingSystemManager = null;
     this.craftingRunManager = null;
     this.salvageRunManager = null;
+    this._runJournalBuilder = null;
     this.gatheringEnvironmentStore = null;
     this.gatheringRichStateService = null;
     this.gatheringRunManager = null;
@@ -1380,6 +1382,148 @@ class Fabricate {
 
   _requireGM() {
     if (game.user?.isGM !== true) throw new Error('Gathering rich state changes require a GM user');
+  }
+
+  /**
+   * Current world time in seconds (the Foundry-facing read seam). Lives on this
+   * edge so the Journal store and pure UI utils stay free of `game.*`.
+   *
+   * @returns {number}
+   */
+  getWorldTime() {
+    return Number(game.time?.worldTime || 0);
+  }
+
+  /**
+   * Calendar components (`{ day, hour, minute, … }`) for an absolute world time,
+   * via the V13 calendar's `timeToComponents`. Returns null when no calendar is
+   * configured. Used by the Journal's world-time label seam so the store/util
+   * never touch `game.*`.
+   *
+   * @param {number} [worldTime] Defaults to the current world time.
+   * @returns {object|null}
+   */
+  getWorldTimeComponents(worldTime = this.getWorldTime()) {
+    const calendar = game.time?.calendar ?? null;
+    if (typeof calendar?.timeToComponents !== 'function') return null;
+    try {
+      return calendar.timeToComponents(Number(worldTime) || 0);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Lazily construct the singleton {@link RunJournalBuilder}, wired to the real
+   * run managers and services. Held on the instance so a fresh builder is not
+   * rebuilt per listing call.
+   * @private
+   * @returns {RunJournalBuilder}
+   */
+  _getRunJournalBuilder() {
+    if (!this._runJournalBuilder) {
+      this._runJournalBuilder = new RunJournalBuilder({
+        craftingRunManager: this.craftingRunManager,
+        salvageRunManager: this.salvageRunManager,
+        gatheringRunSource: this.gatheringRunManager,
+        recipeManager: this.recipeManager,
+        resolutionModeService: this.resolutionModeService,
+        recipeVisibility: this.recipeVisibilityService,
+        getSystem: (systemId) => this.craftingSystemManager?.getSystem(systemId) ?? null,
+        getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
+        getViewer: () => game.user,
+        localize: (key, data) => localizeGathering(key, data),
+        nowWorldTime: () => this.getWorldTime(),
+      });
+    }
+    return this._runJournalBuilder;
+  }
+
+  /**
+   * Resolve a system library tool to `{ id, name, img }` for the Journal step
+   * detail. The display name prefers the tool's authored label, falling back to
+   * the referenced component's name, then the raw id.
+   * @private
+   */
+  _resolveJournalTool(systemId, toolId) {
+    const system = this.craftingSystemManager?.getSystem(systemId);
+    if (!system || !toolId) return null;
+    const tool = (system.tools || []).find((entry) => entry?.id === toolId);
+    if (!tool) return null;
+    const component = (system.components || []).find((entry) => entry?.id === tool.componentId);
+    return {
+      id: tool.id,
+      name: tool.label || component?.name || tool.id,
+      img: component?.img || null,
+    };
+  }
+
+  /**
+   * Resolve the selected actor for the Journal against the bar-selectable list,
+   * preferring a remembered id (by `id` or `uuid`), then the first selectable.
+   * Mirrors the gathering listing's remembered-actor seam.
+   * @private
+   */
+  _resolveJournalActor(rememberedActorId) {
+    const selectable = getBarSelectableActors({ viewer: game.user });
+    if (selectable.length === 0) return null;
+    if (rememberedActorId) {
+      const wanted = String(rememberedActorId);
+      const match = selectable.find((actor) => actor?.id === wanted || actor?.uuid === wanted);
+      if (match) return match;
+    }
+    return selectable[0];
+  }
+
+  /**
+   * Build the unified Journal listing (active + terminal runs) for the current
+   * user's selected actor. Resolves the actor via the same remembered-actor seam
+   * as {@link Fabricate#listGatheringForActor}.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.rememberedActorId] Actor id to list for.
+   * @returns {object} The JournalListing.
+   */
+  listJournalForActor(options = {}) {
+    this._requireReady();
+    const { rememberedActorId } = this._withRememberedActorDefault(options);
+    const actor = this._resolveJournalActor(rememberedActorId);
+    return this._getRunJournalBuilder().buildListing({ actor, viewer: game.user });
+  }
+
+  /**
+   * Advance a crafting run's current step — the single player-triggerable run
+   * advance boundary. The run's persisted `componentSourceActorUuids` are UUIDs
+   * (NOT ids), so they resolve via `fromUuidSync` (falsy entries filtered, with an
+   * `[actor]` fallback when none resolve). Because `craft()` writes directly to
+   * the source actors (no socket-to-GM relay), a non-owner of any source actor
+   * cannot advance the run — that case returns a clear "needs owner" message
+   * instead of throwing.
+   *
+   * @param {object} options
+   * @param {string} options.actorId World-actor id the run is keyed to.
+   * @param {string} options.runId Active run id.
+   * @param {string} options.recipeId Recipe id to craft.
+   * @returns {Promise<object>} The craft result, or a `{ success: false, message }`.
+   */
+  async advanceCraftingRun({ actorId, runId, recipeId } = {}) {
+    this._requireReady();
+    const actor = game.actors?.get(actorId);
+    if (!actor) {
+      return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner') };
+    }
+    const run = this.craftingRunManager?.getActiveRun(actor, runId) ?? null;
+    const resolve = globalThis.fromUuidSync;
+    const sources = Array.isArray(run?.componentSourceActorUuids)
+      ? run.componentSourceActorUuids
+          .map((uuid) => (typeof resolve === 'function' ? resolve(uuid) : null))
+          .filter(Boolean)
+      : [];
+    const componentSourceActors = sources.length > 0 ? sources : [actor];
+    if (componentSourceActors.some((source) => source?.isOwner !== true)) {
+      return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner') };
+    }
+    return this.craft(actor, recipeId, { runId, componentSourceActors });
   }
 
   /**
