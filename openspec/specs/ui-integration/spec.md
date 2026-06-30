@@ -773,6 +773,38 @@ Each
   row shows actor image and name.
 - Persist last selections in client settings
 - Actor/source selection is shared across both tabs (rendered above tab content)
+- The Component Sources header is **owner-scoped** for a non-GM viewer: a non-GM
+  can only craft from and into actors they own, because `CraftingEngine.craft`
+  mutates Items directly with no GM relay.
+- A GM sees all actors; a non-GM sees only owned actors in both the crafting-actor
+  picker and the component-source picker.
+- The selected crafting actor is force-included as a non-removable component
+  source only when the viewer owns it; a non-owned acting actor forces nothing.
+- Accessibility: each source avatar is a focusable button with an always-present
+  `aria-label` (the actor name, with an "always included" suffix on the required
+  actor); the name reveals on hover and focus; removal is available by a
+  keyboard-reachable, visible control as well as right-click; the add/remove
+  picker is an in-place popover.
+- Persist the selected crafting actor in the `LAST_CRAFTING_ACTOR` client setting
+  and the component-source ids in `fabricate.lastComponentSources`.
+
+### Craft Execution
+
+- The Crafting tab crafts through the existing `game.fabricate.craft` engine path
+  (via the `craftRecipe` facade seam); the engine returns `{ success, message }`
+  and does NOT throw, so a failed craft surfaces its message rather than an error.
+- A non-GM crafts directly against owned actors; there is no GM relay for player
+  crafting.
+- Time-based countdowns are driven by world time only: a new `subscribeWorldTime`
+  bridge refreshes calendar-aware durations and re-fetches the listing quietly when
+  the GM advances the clock.
+
+### Deferred (this iteration)
+
+- The learn affordance renders (the control plus its consume-on-learn warning), but
+  its execution flow is NOT wired in this iteration.
+- The Alchemy tab and the Journal cross-link remain out of scope for the player
+  Crafting tab.
 
 ### Top-Level Tabs
 
@@ -783,20 +815,106 @@ Each
 
 ### Crafting Tab
 
+#### Player Crafting Projection
+
+- The Crafting tab reads a redaction-safe `RecipeListingModel` listing built by
+  the `CraftingListingBuilder` (the crafting analogue of the gathering listing
+  builder).
+- The builder is a one-directional, read-only collaborator over the existing
+  crafting backend (`RecipeManager`, `RecipeVisibilityService`,
+  `ResolutionModeService`, `CraftingSystemManager`); it never mutates state and
+  never imports Foundry globals.
+- GM and player viewers resolve through the one code path, so a GM bypass is
+  honoured everywhere the visibility service honours it.
+- Only recipes the visibility service marks `access.visible === true` are
+  projected; everything else is filtered out upstream.
+- Each `RecipeListingModel` carries `modeToken` plus a localized `modeLabel`
+  (resolved through the resolution-mode label keys — the raw `simple` token is
+  never surfaced to the UI), `browseStatus`, per-set `ingredientSets[].craftability`,
+  an optional `check` descriptor, `outcomeTiers`, and `result`.
+- The listing exposes `counts.available` / `counts.total` for header summaries.
+
+##### Browse Status
+
+- Each projected recipe carries exactly one `browseStatus` from the vocabulary:
+  `available`, `locked`, `unknown`, `exhausted`, `missingMaterials`, `discovery`.
+- `discovery` is the Discovery-Mode redacted state for an undiscovered recipe (a
+  player-facing "Undiscovered" badge).
+- `incomplete` is intentionally NOT a player badge: a recipe is either visible
+  (and projected) or filtered out, so a player never sees an "incomplete"
+  authoring state.
+- Status precedence (highest first): Discovery-Mode teaser → `discovery`, locked →
+  `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted →
+  `exhausted`, materials missing → `missingMaterials`, otherwise `available`.
+
+##### Discovery-Mode Redaction
+
+- When `listMode === 'teaser'` and an undiscovered recipe is shown to a non-GM
+  viewer (`access.reason === 'teaser'`), the builder redacts every field named in
+  `teaserState.hiddenFields` (default `['ingredients', 'results', 'description']`).
+- A redacted recipe surfaces only a generic name/image and the `discovery` status;
+  no ingredient, result, or check detail is computed or leaked.
+- A GM bypasses redaction and sees the full recipe.
+- The "exhausted" status uses the read-only
+  `RecipeVisibilityService.isKnowledgeItemExhausted` probe, which agrees with what
+  the engine would refuse to consume (item-limited knowledge owned but every
+  matching item at its `maxUses` cap); owning no matching item is `unknown`, not
+  `exhausted`.
+
+##### Per-Set Craftability
+
+- Each ingredient set carries its own `craftability`, evaluated against just that
+  set rather than the recipe-wide satisfiable set.
+- A set's craftability folds in its essence requirements, its **per-set** Tool
+  requirements (Tools are per-set, not recipe-global), and the actor-bound
+  currency probe, reusing the recipe manager's `evaluateCraftability` per-set pass.
+
+##### Check Descriptor
+
+- The `check` descriptor is optional for `simple` and `routedByIngredients` modes
+  and mandatory for `routedByCheck` and `progressive` modes.
+- It is `null` when the system configures no check block for the recipe's mode.
+- `usable` is derived from an authored, non-empty `rollFormula` — NOT the legacy
+  `enabled` flag.
+
+##### Outcome Tiers
+
+- `outcomeTiers` is populated ONLY for `routedByCheck` mode and is `null` for
+  every other mode.
+- Each tier carries its `awardedResults`, resolved through the resolution-mode
+  service so success-only routing, the single-result-group exemption, and the
+  `checkOutcomeIds → name-match → unrouted` precedence are honoured identically to
+  a real attempt.
+- A failure tier (`success === false`) never routes and awards nothing (empty
+  `awardedResults`).
+
 #### Recipe List
 
 - Filter/search controls (category/tags if enabled)
-- Row status badges from `006` evaluation, including:
+- Row status badges from `006` evaluation, drawn from the `browseStatus`
+  vocabulary:
   - Available
   - Locked
   - Unknown or missing knowledge
   - Exhausted recipe item uses
   - Missing materials
+  - Undiscovered (Discovery-Mode teaser-redacted recipe)
 
 #### Recipe Detail
 
-- Show blocking reasons when not craftable.
-- Show learn action when applicable.
+- The detail body is keyed on the recipe's `modeToken` (simple,
+  routedByIngredients, routedByCheck, progressive), so each resolution mode renders
+  its own body (ingredient sets, routed-by-check outcome-tier table, progressive
+  body, etc.).
+- Show the `modeLabel` rather than the raw mode token.
+- Show an ingredient-set selector when the recipe has more than one set; the
+  detail reflects the chosen set's per-set craftability.
+- Show the `check` descriptor (DC / skill / roll formula) when present, marking it
+  optional or mandatory per mode and unusable when no roll formula is authored.
+- Show the outcome-tier table for `routedByCheck` recipes, with each tier's
+  awarded results (success tiers only).
+- Show blocking reasons when not craftable (derived from `browseStatus`).
+- Show the learn action when applicable.
 - Show consume-on-learn warning text when applicable.
 
 #### Shopping List Panel
@@ -808,9 +926,23 @@ Each
 
 - Recently crafted recipes for quick access.
 
-#### Run Summary
+#### Right Rail (Run Summary or Shopping List)
 
-- Active and historical crafting runs.
+- The right rail is a single keyed body that shows exactly one of two panels for
+  the current selection.
+- It shows the **Run Summary** when the selection has an active or just-completed
+  crafting run — in this iteration, a craft outcome recorded for the selection in
+  session state and not yet dismissed; otherwise it shows the **Shopping List**.
+- The Run Summary is **self-contained**: it surfaces the latest outcome and hosts
+  the multi-step **advance** action for the same recipe (advancing the active step
+  of a progressive run, time-gated), plus a keyboard- and pointer-accessible Back
+  affordance that returns the rail to the Shopping List without losing the recorded
+  outcome.
+- Advancing re-invokes the craft seam for the same recipe and ingredient set (it
+  carries no separate run id; the engine advances the active step).
+- The **Journal cross-link is deferred** in this iteration because the Journal app
+  is not yet on `main`; the Run Summary and Shopping List coexist in the rail
+  without it.
 
 ### Alchemy Tab
 
