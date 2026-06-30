@@ -71,6 +71,49 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/portal.js'
 ]);
 
+// The raw `.js` modules the player Crafting tab tree needs in a mounted test.
+// Hoisted (mirroring SEARCHABLE_POPOVER_RAW_MODULES) so every crafting component
+// test references one source of truth — a component referencing a `.svelte`/`.js`
+// missing from the allowlist does not fail, it HANGS (reported as `# cancelled`).
+export const CRAFTING_APP_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/craftingImageDefaults.js',
+  'src/ui/svelte/util/craftingRecipeStatus.js',
+  'src/systems/CraftingListingBuilder.js',
+  'src/ui/svelte/actions/dismissOnOutsideClick.js'
+]);
+
+// Every transitive `.svelte` module in the player Crafting tab tree (plus the
+// shared Pagination component RecipeBrowser reuses). A mounted test compiles the
+// whole set and imports only its component under test, so any crafting component
+// can be mounted from one shared list.
+export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Pagination.svelte',
+  'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+  'src/ui/svelte/apps/crafting/QuantityTag.svelte',
+  'src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte',
+  'src/ui/svelte/apps/crafting/RecipeRecents.svelte',
+  'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
+  'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
+  'src/ui/svelte/apps/crafting/CraftButton.svelte',
+  'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',
+  'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
+  'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
+  'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+  'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
+  'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
+  'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
+  'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
+  'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
+  'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
+  'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
+  'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
+  'src/ui/svelte/apps/crafting/ShoppingList.svelte',
+  'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  'src/ui/svelte/apps/crafting/CraftingView.svelte'
+]);
+
 /**
  * Full lifecycle harness for a single mounted Svelte component test file. Wraps
  * the temp-dir + node_modules symlink + DOM/globals setup, writes the requested

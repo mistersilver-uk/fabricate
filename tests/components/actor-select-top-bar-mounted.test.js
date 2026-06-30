@@ -100,6 +100,10 @@ describe('ActorSelectTopBar mounted behavior', () => {
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
     copyModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
 
+    // The Crafting tab renders ComponentSourcesBar in the bar's right slot, so the
+    // bar's compiled tree imports it — compile it too or the mounted suite hangs
+    // (reported as `# cancelled`, never `# fail`).
+    writeCompiledSvelte('src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte');
     writeCompiledSvelte('src/ui/svelte/components/ActorSelectTopBar.svelte');
 
     ActorSelectTopBar = (await import(pathToFileURL(join(
@@ -445,15 +449,17 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.Unknown'), 'unknown label');
   });
 
-  it('hides the gathering-only context on non-gathering tabs', async () => {
+  it('hides the gathering-only context on tabs with no right-side context', async () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       conditions: { weather: 'clear', timeOfDay: 'day' }
     });
-    await mountBar({ store, activeTab: 'crafting' });
+    // The Journal tab carries no right-side context (the Crafting tab now hosts
+    // the component-sources bar, so it is no longer an "empty right" tab).
+    await mountBar({ store, activeTab: 'journal' });
 
-    assert.equal(target.querySelector('.actor-bar-right'), null, 'no right-side context off the gathering tab');
+    assert.equal(target.querySelector('.actor-bar-right'), null, 'no right-side context on a tab without it');
   });
 
   it('exposes data-actor-bar-state=ready once loaded with conditions', async () => {

@@ -18,8 +18,15 @@
     getTimeOfDayLabelKey,
     getWeatherLabelKey
   } from '../util/gatheringConditionIcons.js';
+  import ComponentSourcesBar from '../apps/crafting/ComponentSourcesBar.svelte';
 
-  let { store = null, activeTab = 'crafting', onActorChange = null, activeCanvasTool = null } = $props();
+  let {
+    store = null,
+    services = null,
+    activeTab = 'crafting',
+    onActorChange = null,
+    activeCanvasTool = null
+  } = $props();
 
   const FALLBACK_PORTRAIT_ICON = 'fas fa-user';
 
@@ -32,6 +39,7 @@
   const selectedActor = $derived(store?.selectedActor ?? null);
   const hasActors = $derived(selectableActors.length > 0);
   const isGathering = $derived(activeTab === 'gathering');
+  const isCrafting = $derived(activeTab === 'crafting');
 
   // The active station tool's display name, shown in a status chip in the
   // right-side context cluster when the GM granted activation of a Tool-station
@@ -46,10 +54,10 @@
       : ''
   );
 
-  // The right-side context cluster renders when there is gathering context to
-  // show OR an active station tool chip to surface (forward-compatible: the chip
-  // appears on whatever tab is active, e.g. crafting's otherwise-empty right).
-  const hasRightContext = $derived(isGathering || Boolean(activeCanvasTool));
+  // The right-side context cluster renders when there is gathering context, the
+  // crafting tab's component-sources bar, OR an active station tool chip to
+  // surface (forward-compatible: the chip appears on whatever tab is active).
+  const hasRightContext = $derived(isGathering || isCrafting || Boolean(activeCanvasTool));
 
   // The bar is "ready" once its selectable list and conditions have loaded, so
   // the smoke harness can wait on a mounted, conditions-loaded bar.
@@ -282,6 +290,11 @@
             </span>
           {/if}
         </span>
+      {/if}
+      {#if isCrafting}
+        <!-- The Crafting tab surfaces the component-source actor picker (whose
+             inventories the listing pulls ingredients from) in the right slot. -->
+        <ComponentSourcesBar {services} />
       {/if}
     </div>
   {/if}

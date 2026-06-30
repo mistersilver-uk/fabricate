@@ -405,6 +405,10 @@
       },
       "Crafting": {
         "IngredientSetFallback": "Option {index}",
+        "Loading": "Loading recipes…",
+        "Error": "Couldn't load your recipes.",
+        "NoActor": "Select a character to see what they can craft.",
+        "Empty": "No recipes are available for this character yet.",
         "Status": {
           "Available": "Ready to craft",
           "Locked": "Locked",
@@ -419,6 +423,74 @@
           "Exhausted": "This recipe's source has no uses left.",
           "Discovery": "Discover this recipe to reveal its details.",
           "MissingMaterials": "You're missing some required materials."
+        },
+        "Browser": {
+          "Title": "Recipes",
+          "SearchPlaceholder": "Search recipes…",
+          "SearchLabel": "Search recipes",
+          "Empty": "No recipes to show.",
+          "NoMatches": "No recipes match your search.",
+          "RecentsTitle": "Recent"
+        },
+        "Detail": {
+          "SelectHint": "Select a recipe to see how to craft it.",
+          "IngredientSetsTitle": "Ingredient options",
+          "OutcomesTitle": "Outcomes",
+          "NoOutcomes": "This recipe has no routable outcomes configured.",
+          "TierSuccess": "Awards on this result",
+          "TierNoAward": "No award",
+          "Learn": "Learn this recipe",
+          "ConsumeOnLearnWarning": "Learning this recipe consumes the source item.",
+          "IngredientRoutingHint": "The ingredient option you choose determines what you craft.",
+          "ProgressiveHint": "This recipe is crafted over multiple steps."
+        },
+        "Check": {
+          "Title": "Crafting check",
+          "DcLabel": "DC {dc}",
+          "Optional": "Optional",
+          "Mandatory": "Required",
+          "NoFormula": "No roll formula is configured for this check."
+        },
+        "Io": {
+          "Ingredients": "Ingredients",
+          "Essences": "Essences",
+          "Tools": "Tools",
+          "Output": "Produces",
+          "Have": "Have",
+          "Need": "Need",
+          "Missing": "Missing",
+          "Available": "Available",
+          "Unavailable": "Unavailable"
+        },
+        "Shopping": {
+          "Title": "Shopping list",
+          "MaterialsTitle": "Materials needed",
+          "Empty": "Add recipes to plan the materials you'll need.",
+          "Clear": "Clear",
+          "Remove": "Remove from list",
+          "AddToList": "Add to shopping list",
+          "AllSatisfied": "You have everything you need."
+        },
+        "Run": {
+          "Title": "Crafting run",
+          "Completed": "Craft complete",
+          "Failed": "Craft failed",
+          "Advance": "Craft next step",
+          "Dismiss": "Back to shopping list"
+        },
+        "Button": {
+          "Craft": "Craft 1 item",
+          "CraftAnother": "Craft another",
+          "Crafting": "Crafting…",
+          "MissingMaterials": "You're missing some required materials."
+        },
+        "Sources": {
+          "Label": "Component sources",
+          "Edit": "Edit component sources",
+          "Add": "Add a component source",
+          "Remove": "Remove {name} from component sources",
+          "AlwaysIncluded": "always included",
+          "Empty": "No other owned characters to add."
         }
       },
       "Gathering": {
