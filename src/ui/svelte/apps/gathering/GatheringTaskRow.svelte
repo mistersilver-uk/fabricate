@@ -172,6 +172,13 @@
   .gathering-task-summary {
     display: flex;
     flex-direction: column;
+    /* Bottom whitespace for the row lives here, NOT as a padding-bottom on the
+       clamped description below: a padding-bottom on a -webkit-line-clamp box
+       makes Chromium paint a sliver of the clamped-away third line into that
+       padding band, which then bleeds under the row border (most visible with
+       Foundry's tall Signika metrics). Keeping the gap on the summary wrapper
+       preserves the whitespace without the sliver. */
+    padding-bottom: var(--fab-space-2);
   }
 
   .gathering-task-summary.is-toggle {
@@ -320,7 +327,9 @@
      the requirements drop-down used, but compact and never toggled. */
   .gathering-task-description {
     margin: 0;
-    padding: 0 var(--fab-space-2) var(--fab-space-2);
+    /* No padding-bottom here — it would reintroduce the line-clamp sliver (see
+       .gathering-task-summary). The bottom gap is owned by the summary. */
+    padding: 0 var(--fab-space-2);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
