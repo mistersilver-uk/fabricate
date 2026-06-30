@@ -1166,6 +1166,114 @@ Discovery writes validate this before persisting.
 Reads accept the legacy `discoveredGatheringRegions` flag as a fallback and every write persists only the new `discoveredGatheringRealms` key, upgrading each actor lazily.
 6. Discovery semantics are defined in `gathering-and-harvesting` (*Actor Realm Discovery*).
 
+## Run Journal Projection
+
+### Purpose
+
+Define the unified, UI-safe projection the player-facing Journal screen reads (see `003-ui-integration.md` *Journal App*).
+It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
+`RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see *CraftingRun* / *CraftingRunStepState*), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
+Crafting runs populate the step fields; gathering and salvage carry no steps.
+Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors and (crafting only) advances *existing* runs without creating them.
+
+### JournalListing
+
+```js
+JournalListing = {
+  selectedActorId: string | null,
+  actor: object | null,                 // UI-safe actor option (image, name, id)
+  worldTime: number,                    // current world time used for readiness derivation
+  activeRuns: RunModel[],               // projected non-terminal runs
+  history: RunModel[],                  // projected terminal runs
+  counts: { active: number, history: number },
+}
+```
+
+### RunModel
+
+```js
+RunModel = {
+  id: string,
+  runType: "crafting" | "salvage" | "gathering",
+  status: string,                        // the native persisted status, passed through verbatim
+  derivedStatus: "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
+  craftingSystemId: string | null,
+  craftingSystemName: string,
+  names: { title: string, subtitle: string },
+  redacted: boolean,
+  img: string,
+  stepIndex: number | null,
+  stepCount: number,
+  stepLabel: string,
+  steps: StepModel[],                    // [] for gathering/salvage and for redacted crafting runs
+  currentStep: StepModel | null,
+  timeGate: object | null,               // per-runType source (see Requirements)
+  startedAt: number | null,
+  updatedAt: number | null,
+  finishedAt: number | null,
+  structureLabel: string,                // localized single-step vs multi-step label (crafting only)
+  resolutionModeLabel: string,           // localized player-facing mode label (crafting only)
+  recipeId: string | null,               // null for non-crafting and redacted runs
+  taskId: string | null,                 // gathering/salvage task reference
+  flavor: string,
+  failureReason: string | null,
+  createdResults: Array<{ componentId, itemUuid, quantity, name, img }>,
+  createdResultCount: number,
+  manualAdvance: boolean,                // true only for crafting (the Trigger Next Step gate)
+}
+```
+
+### StepModel
+
+```js
+StepModel = {
+  stepId: string | null,
+  stepName: string,
+  index: number,
+  status: "pending" | "inProgress" | "waitingTime" | "succeeded" | "failed",
+  timeGate: object | null,
+  detail: {
+    requiredSeconds: number | null,
+    primaryToolName: string | null,
+    toolNames: string[],
+    checkLabel: string | null,           // rollFormula + resolved DC; no skill name (none is stored)
+    failureText: string | null,
+  },
+  lastCheckResult: {
+    success: boolean,
+    outcome: string | null,
+    value: number | null,
+    reason: string | null,
+  } | null,
+}
+```
+
+### Requirements
+
+1. **`derivedStatus` is computed, never the persisted status.**
+   A terminal `status` (`succeeded`, `failed`, `cancelled`) passes through to `derivedStatus` unchanged.
+   For a non-terminal run, readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
+   A non-terminal run with no armed gate is `inProgress`.
+   The persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips to `inProgress` asynchronously off the same world-time hook) is NEVER consulted for the active-run derivation — only the gate's `availableAt` against `worldTime` — so the readiness read is race-free.
+2. **Per-runType `timeGate` source.**
+   For a crafting run, `timeGate` and the readiness derivation come from the ACTIVE step's gate (the step at `currentStepIndex`).
+   For gathering and salvage runs, they come from the RUN-level `timeGate`.
+   Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
+3. **Viewer redaction (`redacted`).**
+   A crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe for a non-GM viewer — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` are blanked, and `img` falls back to the default run image.
+   A GM viewer and globally-visible recipes are never redacted; with no recipe-visibility service available no redaction occurs.
+   This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
+   Gathering and salvage runs are not redacted by this projection (`redacted: false`); gathering's own blind-task redaction is applied upstream by its listing builder.
+4. **Step projection is crafting-only.**
+   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, and each step's `detail.checkLabel` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, and empty structure/mode labels.
+   A redacted crafting run also projects `steps: []`.
+5. **`manualAdvance` is the Trigger Next Step gate.**
+   It is `true` only for crafting runs; the player-facing advance contract is defined in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*).
+6. **`resolutionModeLabel` uses the player-facing label map.**
+   It resolves through the localized mode-label map defined in `004-resolution-modes.md` (*Player-Facing Mode Labels*) and never emits the raw `resolutionMode` token.
+7. **`counts.active` feeds the nav badge.**
+   It is the count of active (non-terminal) runs the Journal navigation surfaces as its active-run count badge.
+
 ## Item Flags
 
 ### Recipe Item Usage Flag

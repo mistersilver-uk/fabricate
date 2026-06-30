@@ -811,6 +811,7 @@ Each
 #### Run Summary
 
 - Active and historical crafting runs.
+- The unified player-facing Journal screen (see *Journal App*) is the cross-activity home for monitoring and advancing these runs.
 
 ### Alchemy Tab
 
@@ -849,6 +850,7 @@ Each
 #### Active Runs and History
 
 - Filtered to alchemy systems only.
+- The unified Journal screen (see *Journal App*) also surfaces these runs alongside crafting, gathering, and salvage runs; an alchemy run is redacted there for a viewer who has not discovered its recipe.
 
 #### Excluded from Alchemy Tab
 
@@ -1052,6 +1054,7 @@ If `task.timeRequirement` is present:
 ### Active Runs
 
 The Gathering App must include a dedicated active-runs section.
+These runs also appear in the unified player Journal (see *Journal App*), which monitors gathering, crafting, and salvage runs together; the Gathering App remains the place to START a gather.
 
 Each active run entry shows:
 
@@ -1127,6 +1130,54 @@ When stamina economy is enabled:
 - Chat message settings should be grouped with automation or feedback settings and should expose event-level toggles.
 - Chat preview should show player-safe output and GM-only diagnostic output separately when possible.
 - Provider diagnostics from expressions, macros, hooks, APIs, and chat generation must be visible to GMs in validation/evidence panels.
+
+## Journal App (Player)
+
+The **Journal** is the unified player-facing home for monitoring runs.
+It is a tab in the unified Fabricate window (`Crafting`, `Alchemy`, `Gathering`, `Journal`, `Inventory`), rendered beneath the shared Actor selection top bar, and reads the selected player-character's existing crafting, gathering, and salvage runs through one UI-safe projection (the `RunModel` / `StepModel` shapes defined in `002-data-models.md` *Run Journal Projection*).
+
+Scope:
+
+- The Journal **monitors** active and historical runs and, for crafting only, **advances** them.
+- It never CREATES runs; run creation stays in the Crafting, Alchemy, and Gathering flows.
+- It is the unified player home for the per-activity run views described elsewhere in this spec — the Crafting tab *Run Summary*, the Alchemy tab *Active Runs and History*, and the Gathering App *Active Runs* / *History*.
+Those per-activity sections remain authoritative for their own tab, and the Journal cross-references rather than replaces them.
+
+### Navigation and Active-Run Count Badge
+
+- The `Journal` nav tab uses the `fa-book-open` icon and the `FABRICATE.App.Nav.Journal` label.
+- The nav entry carries a live **active-run count badge** showing the number of active (non-terminal) runs for the selected actor (`JournalListing.counts.active`).
+- The badge is hidden when the count is zero.
+- The badge stays fresh even while the Journal tab is closed: the shell re-fetches the listing on world-time advance and scene change, so another open tab still shows an accurate count.
+
+### Run Monitoring
+
+- The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
+- Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface; each row presents the run's title, run type, status pill, step progress (crafting), and a time-remaining/countdown where a `timeGate` exists.
+- Each run's status pill reflects the projection's `derivedStatus` (`waiting` | `ready` | `inProgress` | `succeeded` | `failed` | `cancelled`), which is derived from the active step/run time gate against world time, not the persisted status (see `002-data-models.md`).
+- Selecting a run opens a detail panel (steps, requirements, results, "about this run", "what to expect").
+- All countdowns and timestamps are world-time based.
+
+### Run-Type-Aware Actions Panel
+
+The run detail's actions area is keyed on the projection's `manualAdvance` flag:
+
+- **Crafting (`manualAdvance: true`)** shows a primary **"Trigger Next Step"** button.
+It is DISABLED until the active step's time gate has matured — readiness is derived from `timeGate.availableAt <= worldTime` (race-free), NOT from the run's persisted status — and while an advance is in flight.
+Triggering invokes the crafting advance contract in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*).
+- **Gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because matured gathering and salvage runs auto-resolve on world time.
+
+### World-Time Disclosure Footer
+
+The Journal renders a persistent footer stating that all displayed times use the game world's world time (`FABRICATE.App.Journal.Footer.WorldTime`), so a static countdown is not misread as a frozen real-time wall clock.
+
+### Crafting / Alchemy Viewer Redaction
+
+Runs of recipes the viewer cannot see are redacted, mirroring the gathering blind-run redaction (*Rich Gathering Disclosure*):
+
+- A crafting or alchemy run whose recipe is undiscovered or knowledge-gated for the viewer, or whose recipe no longer resolves, is shown with a generic localized title (`FABRICATE.App.Journal.Redacted.Title`), a default image, and no recipe id, steps, results, or failure detail.
+- GM viewers and globally-visible recipes are never redacted.
+- The redaction is enforced in the projection (`002-data-models.md` *Run Journal Projection*), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
 
 ## Data Storage (UI-relevant)
 
