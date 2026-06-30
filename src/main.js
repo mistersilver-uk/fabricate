@@ -26,6 +26,7 @@ import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessa
 import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
+import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
@@ -448,6 +449,9 @@ class Fabricate {
     this.gatheringGateAndCheckEvaluator = null;
     this.recipeVisibilityService = null;
     this.resolutionModeService = null;
+    // Lazily-built player-facing crafting listing projector (issue: player
+    // Crafting tab). Constructed on first read once the managers exist.
+    this._craftingListingBuilder = null;
     this.itemPilesIntegration = null;
     this.actorInventoryCoinSpender = null;
     this.actorPropertyCoinSpender = null;
@@ -1164,6 +1168,198 @@ class Fabricate {
    */
   setSelectedGatheringActorId(id) {
     return setSetting(SETTING_KEYS.LAST_GATHERING_ACTOR, id ?? '');
+  }
+
+  /**
+   * Lazily build (and cache) the {@link CraftingListingBuilder} that projects the
+   * crafting backend into redaction-safe player listing models. Mirrors the
+   * gathering listing path: a one-directional read-side collaborator wired with
+   * the existing managers/services so GM and player viewers resolve through one
+   * code path. The builder imports no Foundry globals — `localize` and
+   * `nowWorldTime` are injected here.
+   *
+   * @returns {CraftingListingBuilder}
+   * @private
+   */
+  _getCraftingListingBuilder() {
+    if (this._craftingListingBuilder) return this._craftingListingBuilder;
+    this._craftingListingBuilder = new CraftingListingBuilder({
+      recipeManager: this.recipeManager,
+      recipeVisibility: this.recipeVisibilityService,
+      resolutionModeService: this.resolutionModeService,
+      craftingSystemManager: this.craftingSystemManager,
+      localize: (key, data) =>
+        data !== undefined
+          ? (game.i18n?.format?.(key, data) ?? key)
+          : (game.i18n?.localize?.(key) ?? key),
+      nowWorldTime: () => game.time?.worldTime ?? 0,
+    });
+    return this._craftingListingBuilder;
+  }
+
+  /**
+   * Resolve a stored crafting actor preference against Foundry's actor
+   * collection. Returns null when the id is empty or stale.
+   *
+   * @param {string|null} actorId
+   * @returns {Actor|null}
+   * @private
+   */
+  _resolveCraftingActor(actorId) {
+    return actorId ? (game.actors?.get?.(actorId) ?? null) : null;
+  }
+
+  /**
+   * Resolve the effective crafting actor + component-source actors for a listing
+   * or craft, applying the persisted defaults. A truthy `rememberedActorId`
+   * overrides the persisted selection; component-source ids default to the
+   * persisted set. Stale/non-extant ids resolve to nothing.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.rememberedActorId]
+   * @param {string[]|null} [options.componentSourceActorIds]
+   * @returns {{ craftingActor: Actor|null, componentSourceActors: Actor[] }}
+   * @private
+   */
+  _resolveCraftingSources({ rememberedActorId = null, componentSourceActorIds = null } = {}) {
+    const actorId = rememberedActorId || this.getSelectedCraftingActorId() || null;
+    const craftingActor = this._resolveCraftingActor(actorId);
+    const sourceIds = Array.isArray(componentSourceActorIds)
+      ? componentSourceActorIds
+      : this.getCraftingComponentSourceIds();
+    const componentSourceActors = sourceIds
+      .map((id) => this._resolveCraftingActor(id))
+      .filter(Boolean);
+    return { craftingActor, componentSourceActors };
+  }
+
+  /**
+   * Build the player-facing Crafting listing for the current user and selected
+   * crafting actor + component sources. The current Foundry user is always the
+   * viewer (GM bypass is honoured by the visibility service), regardless of any
+   * caller-supplied viewer.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.rememberedActorId] Crafting actor id; defaults
+   *   to the persisted last-crafting selection when omitted.
+   * @param {string[]|null} [options.componentSourceActorIds] Additional inventory
+   *   source actor ids; defaults to the persisted component-source set.
+   * @returns {object} Redaction-safe crafting listing model.
+   */
+  listCraftingForActor(options = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
+    return this._getCraftingListingBuilder().buildListing({
+      craftingActor,
+      componentSourceActors,
+      viewer: game.user,
+    });
+  }
+
+  /**
+   * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.
+   * Resolves the crafting actor + component sources from the supplied ids (or the
+   * persisted defaults) so the attempt uses the same inventory scope the listing
+   * was computed for.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id.
+   * @param {string} options.recipeId Recipe id.
+   * @param {string|null} [options.ingredientSetId] Chosen ingredient set id.
+   * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
+   * @returns {Promise<{success: boolean, results: Array|null, message: string}>}
+   */
+  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    if (!craftingActor) {
+      return { success: false, results: null, message: 'No crafting actor selected' };
+    }
+    const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
+    return await this.craft(craftingActor, recipeId, {
+      componentSourceActors: sources,
+      ingredientSetId,
+    });
+  }
+
+  /**
+   * List the actors the current user may select as crafting/component-source
+   * actors. OWNER-scoped (the player owns them; a GM sees all), reusing the same
+   * ownership predicate as the gathering attempt path. Returns redaction-safe
+   * display data only — each record carries `{ id, uuid, name, img }` and no
+   * other actor internals.
+   *
+   * @returns {Array<{id: string|null, uuid: string|null, name: string, img: string|null}>}
+   */
+  listCraftingSourceActors() {
+    this._requireReady();
+    const actors = Array.from(game.actors ?? []).filter((actor) =>
+      isGatheringActorSelectableByUser(actor, game.user)
+    );
+    return actors.map((actor) => ({
+      id: actor?.id ?? actor?.uuid ?? null,
+      uuid: actor?.uuid ?? null,
+      name: actor?.name ?? '',
+      img: actor?.img ?? null,
+    }));
+  }
+
+  /**
+   * Resolve the current selection's component-source actors as real Foundry actor
+   * objects (crafting actor + persisted sources), for the pure shopping-list
+   * aggregator. Owner-scoped via the persisted ids only — no widening of access.
+   *
+   * @returns {Actor[]}
+   */
+  getCraftingSourceActors() {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources();
+    const actors = componentSourceActors.length > 0 ? componentSourceActors : [];
+    if (craftingActor && !actors.includes(craftingActor)) actors.unshift(craftingActor);
+    return actors;
+  }
+
+  /**
+   * Read the persisted remembered crafting-actor selection (`LAST_CRAFTING_ACTOR`
+   * client setting). Returns an empty string when unset.
+   *
+   * @returns {string}
+   */
+  getSelectedCraftingActorId() {
+    return getSetting(SETTING_KEYS.LAST_CRAFTING_ACTOR) || '';
+  }
+
+  /**
+   * Persist the remembered crafting-actor selection (`LAST_CRAFTING_ACTOR`).
+   *
+   * @param {string} id Actor id to persist.
+   * @returns {*}
+   */
+  setSelectedCraftingActorId(id) {
+    return setSetting(SETTING_KEYS.LAST_CRAFTING_ACTOR, id ?? '');
+  }
+
+  /**
+   * Read the persisted component-source actor ids (`LAST_COMPONENT_SOURCES`).
+   *
+   * @returns {string[]}
+   */
+  getCraftingComponentSourceIds() {
+    const ids = getSetting(SETTING_KEYS.LAST_COMPONENT_SOURCES);
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  /**
+   * Persist the component-source actor ids (`LAST_COMPONENT_SOURCES`).
+   *
+   * @param {string[]} ids Actor ids to persist.
+   * @returns {*}
+   */
+  setCraftingComponentSourceIds(ids) {
+    return setSetting(SETTING_KEYS.LAST_COMPONENT_SOURCES, Array.isArray(ids) ? ids : []);
   }
 
   /**

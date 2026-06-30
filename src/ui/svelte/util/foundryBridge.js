@@ -151,6 +151,23 @@ export function subscribeSceneChange(handler) {
 }
 
 /**
+ * Subscribe to world-time advancement so callers can refresh time-sensitive
+ * views (e.g. the player Crafting list's calendar-aware durations) when the GM
+ * advances the clock. Foundry fires `updateWorldTime` whenever `game.time.worldTime`
+ * changes. Returns an unsubscribe function; no-ops gracefully when the Foundry
+ * `Hooks` global is absent (e.g. unit tests).
+ *
+ * @param {Function} handler Invoked (no args) on each world-time change.
+ * @returns {Function} Unsubscribe callback.
+ */
+export function subscribeWorldTime(handler) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const id = hooks.on('updateWorldTime', () => handler());
+  return () => { hooks.off?.('updateWorldTime', id); };
+}
+
+/**
  * Subscribe to token movement (and token creation/removal) so callers can refresh
  * the live travel current-region view when a party's travel-marker token moves.
  * Fires `handler(actorUuid)` — the base Actor uuid of the moved token. `updateToken`

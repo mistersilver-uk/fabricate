@@ -3,6 +3,9 @@ import FabricateAppRoot from './svelte/apps/FabricateAppRoot.svelte';
 import { registerFabricateApp } from './appFactory.js';
 import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
+import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
+import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
+import { notifyWarn } from './svelte/util/foundryBridge.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -190,6 +193,19 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         ...opts
       }) ?? null,
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
+      // Player Crafting tab seams. The listing/craft/source reads mirror the
+      // gathering seams: every Foundry-facing call routes through the
+      // `game.fabricate` facade so the stores stay Foundry-free.
+      listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
+      craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      listCraftingSourceActors: () => game?.fabricate?.listCraftingSourceActors?.() ?? [],
+      getCraftingSourceActors: () => game?.fabricate?.getCraftingSourceActors?.() ?? [],
+      getSelectedCraftingActorId: () => game?.fabricate?.getSelectedCraftingActorId?.() ?? '',
+      setSelectedCraftingActorId: (id) => game?.fabricate?.setSelectedCraftingActorId?.(id),
+      getCraftingComponentSourceIds: () => game?.fabricate?.getCraftingComponentSourceIds?.() ?? [],
+      setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
+      // Player-facing notification seam (a failed craft surfaces as a warning).
+      notify: (message) => notifyWarn(message),
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
@@ -214,6 +230,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // One shared actor-bar store instance, reused across renders, so the shell
     // and the gathering tab read/write the same reactive selection state.
     services.actorBar = createActorBarStore({ services });
+    // Player Crafting tab stores. The component-sources store is created first so
+    // the crafting store can read the current source ids off it when it loads.
+    services.craftingSources = createCraftingSourcesStore({ services });
+    services.crafting = createCraftingStore({ services });
     return services;
   }
 

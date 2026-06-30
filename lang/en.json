@@ -403,6 +403,24 @@
           "None": "No current realm"
         }
       },
+      "Crafting": {
+        "IngredientSetFallback": "Option {index}",
+        "Status": {
+          "Available": "Ready to craft",
+          "Locked": "Locked",
+          "Unknown": "Not yet known",
+          "Exhausted": "Out of uses",
+          "MissingMaterials": "Missing materials",
+          "Discovery": "Undiscovered"
+        },
+        "Blocking": {
+          "Locked": "This recipe is locked by your GM.",
+          "Unknown": "You haven't learned this recipe yet.",
+          "Exhausted": "This recipe's source has no uses left.",
+          "Discovery": "Discover this recipe to reveal its details.",
+          "MissingMaterials": "You're missing some required materials."
+        }
+      },
       "Gathering": {
         "Loading": "Loading gathering environments…",
         "Error": "Couldn't load gathering environments.",
