@@ -799,6 +799,13 @@
   color: var(--fab-text);
   background: var(--fab-bg-1);
 
+  /* Every Fabricate theme is dark, so render native controls (and crucially the
+     browser-drawn <select> option popup, which CSS on the option only partially
+     reaches) in the dark UA scheme. Without this the native dropdown list paints
+     in the light UA scheme, so the player Journal sort dropdowns looked pale
+     where the GM selects render dark. */
+  color-scheme: dark;
+
   /* Minimum window size for the resizable Fabricate window (issue 330). The
      drag-resize handle cannot shrink the window below this floor, so the
      gathering view's three 280px-floored columns can never be clipped. Derived
@@ -841,18 +848,20 @@
 
 /* Theme player-app <select> controls (and their open option list) so they read
    as Fabricate dropdowns instead of Foundry's default yellow-on-light text. The
-   option rule themes the popup list (mirrors the manager's select option
-   treatment). Tokenized; namespaced under .fabricate-app. */
+   solid --fab-bg-1 background matches the GM manager selects (which use
+   --fab-mv2-bg, itself --fab-bg-1); the option rule themes the popup list. The
+   app root's `color-scheme: dark` makes the native popup chrome + highlight dark
+   too. Tokenized; namespaced under .fabricate-app. */
 .fabricate-app select {
   color: var(--fab-text);
-  background: var(--fab-surface-soft);
+  background: var(--fab-bg-1);
   border: 1px solid var(--fab-border);
   border-radius: 6px;
 }
 
 .fabricate-app select option {
   color: var(--fab-text);
-  background: var(--fab-surface);
+  background: var(--fab-bg-1);
 }
 
 /* Journal "Trigger Next Step" primary button. The player app has no .is-primary
