@@ -1,3 +1,6 @@
+const HISTORY_PAGE_SIZES = Object.freeze([6, 12, 25]);
+const RECENT_TERMINAL_LIMIT = 3;
+
 /**
  * journalStore — shared Svelte 5 runes store for the player-facing Journal
  * screen (active + terminal run monitoring, crafting "Trigger Next Step").
@@ -18,9 +21,6 @@
  * @param {object} deps.services Injected services bag.
  * @returns {object} The reactive journal store.
  */
-const HISTORY_PAGE_SIZES = Object.freeze([6, 12, 25]);
-const RECENT_TERMINAL_LIMIT = 3;
-
 export function createJournalStore({ services } = {}) {
   let listing = $state(null);
   let loading = $state(false);
