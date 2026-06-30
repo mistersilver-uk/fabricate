@@ -190,6 +190,10 @@ See the "Foundry vs Fabricate CSS overrides" section in `CONTRIBUTING.md`.
   It compiles `macro.command` into an `AsyncFunction` invoked with `(context, args, game, foundry, ui, fromUuid)` — so a Fabricate macro receives `context` (also aliased as `args`) and the explicit globals, and does **not** get Foundry's `Macro#execute` locals (`actor`/`token`/`speaker`/`character`/`scope`).
   A thrown error propagates to the caller (no Foundry notification-swallow), which is why a currency payment-gate macro that throws aborts the craft loudly instead of silently passing.
 - `CraftingSystemManager` uses `getSystems()` and `getItems(systemId)`.
+- V13 `CalendarData#timeToComponents().day` is the day-*of-year* (0-based, and it resets every year), NOT a cumulative campaign day.
+Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam) before showing it — see `daysPerYearFromCalendar` (`src/systems/foundryCalendar.js`) and `worldTimeLabel` (`src/ui/svelte/util/worldTimeLabel.js`).
+- A run's persisted `componentSourceActorUuids` are UUIDs (not ids) — resolve them with `fromUuid`/`fromUuidSync`, never `game.actors.get`.
+See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
