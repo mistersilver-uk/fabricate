@@ -839,6 +839,22 @@
   outline-offset: 2px;
 }
 
+/* Theme player-app <select> controls (and their open option list) so they read
+   as Fabricate dropdowns instead of Foundry's default yellow-on-light text. The
+   option rule themes the popup list (mirrors the manager's select option
+   treatment). Tokenized; namespaced under .fabricate-app. */
+.fabricate-app select {
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+}
+
+.fabricate-app select option {
+  color: var(--fab-text);
+  background: var(--fab-surface);
+}
+
 /* Journal "Trigger Next Step" primary button. The player app has no .is-primary
    (that class is .fabricate-manager-only), so this is the player-scoped green
    primary treatment. It mirrors the manager .is-primary success palette

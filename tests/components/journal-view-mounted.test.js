@@ -129,11 +129,6 @@ describe('JournalView mounted behavior', () => {
     assert.ok(target.querySelector('[data-journal-detail]'), 'the run detail renders in the centre');
     assert.ok(target.querySelector('[data-journal-card="recent"]'), 'recent results render on the right');
     assert.ok(target.querySelector('[data-journal-card="about"]'), 'about-this-run renders when a run is selected');
-    assert.ok(target.querySelector('[data-journal-footer]'), 'world-time footer rendered');
-    assert.ok(
-      target.querySelector('[data-journal-footer]').textContent.includes('Footer.WorldTime'),
-      'footer uses the localized world-time line'
-    );
   });
 
   it('shows per-column empty states when there are no active or history runs', async () => {

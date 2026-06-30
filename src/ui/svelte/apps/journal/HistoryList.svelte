@@ -139,10 +139,5 @@
     gap: var(--fab-space-2);
   }
 
-  .journal-history-body :global(.manager-pagination-size select) {
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-  }
+  /* The per-page <select> chrome is themed globally (.fabricate-app select). */
 </style>

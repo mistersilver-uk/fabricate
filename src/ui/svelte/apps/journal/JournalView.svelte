@@ -129,7 +129,6 @@
         <JournalTips />
       </div>
     </div>
-    <p class="journal-view-footer" data-journal-footer>{localize('FABRICATE.App.Journal.Footer.WorldTime')}</p>
   </div>
 {/if}
 
@@ -183,20 +182,18 @@
     overflow-y: auto;
   }
 
+  /* The left column hosts two equal-height list halves (Active Runs / History);
+     it must not scroll as a whole — each half scrolls internally — so the 50/50
+     split holds instead of the sections collapsing. */
+  .journal-view-column-left {
+    overflow: hidden;
+  }
+
   .journal-view-column-center {
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
     overflow: hidden;
-  }
-
-  .journal-view-footer {
-    flex: 0 0 auto;
-    margin: 0;
-    padding: var(--fab-space-2) var(--fab-space-4);
-    font-size: 11px;
-    color: var(--fab-text-muted);
-    text-align: center;
   }
 
   .journal-view-state {

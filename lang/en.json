@@ -497,9 +497,6 @@
           "Trigger": "Crafting steps are triggered manually once their time gate has passed.",
           "History": "Completed runs and their results stay in your history."
         },
-        "Footer": {
-          "WorldTime": "All times use world time from your game world."
-        },
         "Quantity": "×{n}",
         "Time": {
           "DayWithPhase": "Day {day}, {phase}",

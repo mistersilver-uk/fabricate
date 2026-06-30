@@ -43,22 +43,42 @@
     </label>
   </header>
 
-  {#if isEmpty}
-    <div class="journal-list-empty" data-journal-empty={kind}>
-      <i class={`fas ${emptyIcon}`} aria-hidden="true"></i>
-      <p>{emptyText}</p>
-    </div>
-  {:else}
-    {@render children?.()}
-  {/if}
+  <div class="journal-list-body" class:is-empty={isEmpty}>
+    {#if isEmpty}
+      <div class="journal-list-empty" data-journal-empty={kind}>
+        <i class={`fas ${emptyIcon}`} aria-hidden="true"></i>
+        <p>{emptyText}</p>
+      </div>
+    {:else}
+      {@render children?.()}
+    {/if}
+  </div>
 </section>
 
 <style>
+  /* Each list region takes an equal half of the left column (flex: 1 1 0) so the
+     Active Runs and History sections are always the same height regardless of
+     content, and the empty state stays vertically centered in its half rather
+     than collapsing the section to the top third. */
   .journal-list-section {
+    flex: 1 1 0;
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
     min-height: 0;
+  }
+
+  .journal-list-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .journal-list-body.is-empty {
+    justify-content: center;
+    overflow: hidden;
   }
 
   .journal-list-header {
@@ -91,14 +111,11 @@
     color: var(--fab-text-muted);
   }
 
-  .journal-sort select {
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-  }
+  /* The closed/open select chrome is themed globally (.fabricate-app select +
+     option) so every player-app dropdown is consistent. */
 
   .journal-list-empty {
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;

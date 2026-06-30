@@ -57,10 +57,8 @@ describe('JournalView layout + effects', () => {
     );
   });
 
-  it('reads the shared store and renders the required world-time footer', () => {
+  it('reads the shared store', () => {
     assert.ok(viewSource.includes('services?.journal'), 'reads the shared journal store');
-    assert.ok(viewSource.includes('data-journal-footer'), 'renders the world-time footer');
-    assert.ok(viewSource.includes('FABRICATE.App.Journal.Footer.WorldTime'), 'footer copy is localized');
   });
 
   it('hosts the re-fetch effects (actor change, scene, world-time tick)', () => {
