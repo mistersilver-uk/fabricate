@@ -335,7 +335,7 @@ test('TC6: evaluateCraftability matches managed-component ingredients by sourceU
   });
 
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: compId, sourceUuid, name: 'Iron Ingot' }
+    { id: compId, sourceUuid, name: 'Iron Ingot', img: 'icons/iron-ingot.webp' }
   ]);
 
   const actor = makeActor([actorItem]);
@@ -343,7 +343,40 @@ test('TC6: evaluateCraftability matches managed-component ingredients by sourceU
 
   assert.equal(result.canCraft, true, 'managed-component ingredient should match by sourceUuid');
   assert.equal(result.ingredientStates.length, 1);
-  assert.equal(result.ingredientStates[0].satisfied, true);
+  const state = result.ingredientStates[0];
+  assert.equal(state.satisfied, true);
+  // The ingredient state carries the component visuals for the player image grid.
+  assert.equal(state.componentId, compId, 'ingredient state exposes its component id');
+  assert.equal(state.name, 'Iron Ingot', 'ingredient state exposes the component name');
+  assert.equal(state.img, 'icons/iron-ingot.webp', 'ingredient state exposes the component image');
+});
+
+test('TC6b: a missing managed-component ingredient still exposes its component image', () => {
+  const systemId = 'sys-tc6b';
+  const compId = 'comp-mithril';
+  const sourceUuid = 'Item.mithril-source';
+
+  const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 2)])]);
+  const recipe = new Recipe({
+    name: 'Missing Component Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }]
+  });
+
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compId, sourceUuid, name: 'Mithril', img: 'icons/mithril.webp' }
+  ]);
+
+  // Actor has none of the component.
+  const result = manager.evaluateCraftability([makeActor([])], recipe);
+
+  assert.equal(result.canCraft, false);
+  const state = result.ingredientStates[0];
+  assert.equal(state.satisfied, false);
+  assert.equal(state.componentId, compId);
+  assert.equal(state.name, 'Mithril');
+  assert.equal(state.img, 'icons/mithril.webp', 'missing ingredient still resolves its image');
 });
 
 // ---------------------------------------------------------------------------

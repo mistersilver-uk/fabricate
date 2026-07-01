@@ -29,6 +29,10 @@ import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 
 const DEFAULT_PAGE_SIZE = 12;
 const MAX_RECENTS = 8;
+// Mirrors CRAFTING_BROWSE_STATUS.AVAILABLE (systems/CraftingListingBuilder.js). A
+// local copy keeps the store free of the builder import so its unit-test compiler
+// need not resolve that module graph.
+const RECIPE_STATUS_AVAILABLE = 'available';
 
 export function createCraftingStore({ services } = {}) {
   let listing = $state(null);
@@ -47,6 +51,11 @@ export function createCraftingStore({ services } = {}) {
   let lastRollResult = $state({});
   let recents = $state([]);
   let worldTimeTick = $state(0);
+  // Left-column filters (client-local browse state, alongside search/pagination).
+  let favouriteIds = $state([]);
+  let favouritesOnly = $state(false);
+  let craftableOnly = $state(false);
+  let systemFilter = $state(null);
 
   /** Resolve the current component-source actor ids, preferring the sibling store. */
   function currentSourceIds() {
@@ -64,18 +73,39 @@ export function createCraftingStore({ services } = {}) {
   const visibleRecipes = $derived.by(() => {
     const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
     const query = search.trim().toLowerCase();
-    const filtered =
-      query.length === 0
-        ? recipes
-        : recipes.filter((recipe) =>
-            String(recipe?.name ?? '')
-              .toLowerCase()
-              .includes(query)
-          );
+    const favourites = new Set(favouriteIds);
+    const filtered = recipes.filter((recipe) => {
+      if (
+        query.length > 0 &&
+        !String(recipe?.name ?? '')
+          .toLowerCase()
+          .includes(query)
+      ) {
+        return false;
+      }
+      if (favouritesOnly && !favourites.has(recipe?.id)) return false;
+      if (craftableOnly && recipe?.browseStatus !== RECIPE_STATUS_AVAILABLE) return false;
+      if (systemFilter && recipe?.systemId !== systemFilter) return false;
+      return true;
+    });
     // Explicit comparator (never a bare `.sort()`): stable A→Z by display name.
     return [...filtered].sort((left, right) =>
       String(left?.name ?? '').localeCompare(String(right?.name ?? ''))
     );
+  });
+
+  // The distinct crafting systems present in the listing, for the system-filter
+  // dropdown. Derived from the visible-across-systems listing (not the global
+  // system library) so the dropdown only offers systems the player actually has
+  // recipes in. De-duped by id, sorted A→Z by name.
+  const availableSystems = $derived.by(() => {
+    const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
+    const byId = new Map();
+    for (const recipe of recipes) {
+      const id = recipe?.systemId;
+      if (id && !byId.has(id)) byId.set(id, { id, name: String(recipe?.systemName ?? '') });
+    }
+    return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name));
   });
 
   const pageCount = $derived.by(() => {
@@ -132,6 +162,7 @@ export function createCraftingStore({ services } = {}) {
         componentSourceActorIds: currentSourceIds(),
       });
       listing = result ?? null;
+      favouriteIds = services?.getFavouriteRecipeIds?.() ?? [];
       loadedOnce = true;
     } catch (err) {
       error = err?.message ?? String(err);
@@ -150,6 +181,31 @@ export function createCraftingStore({ services } = {}) {
   function setSearch(value) {
     search = typeof value === 'string' ? value : '';
     page = 0;
+  }
+
+  /** Toggle the favourites-only filter (jumps back to the first page). */
+  function setFavouritesOnly(value) {
+    favouritesOnly = value === true;
+    page = 0;
+  }
+
+  /** Toggle the craftable-only filter (jumps back to the first page). */
+  function setCraftableOnly(value) {
+    craftableOnly = value === true;
+    page = 0;
+  }
+
+  /** Filter to a single crafting system id, or clear it with a falsy value. */
+  function setSystemFilter(systemId) {
+    systemFilter = systemId ? String(systemId) : null;
+    page = 0;
+  }
+
+  /** Toggle a recipe's favourite state, persisting through the services seam. */
+  function toggleFavourite(recipeId) {
+    if (!recipeId) return;
+    const next = services?.toggleFavouriteRecipe?.(recipeId);
+    favouriteIds = Array.isArray(next) ? next : favouriteIds;
   }
 
   function setPage(next) {
@@ -290,6 +346,21 @@ export function createCraftingStore({ services } = {}) {
     get worldTimeTick() {
       return worldTimeTick;
     },
+    get favouriteIds() {
+      return favouriteIds;
+    },
+    get favouritesOnly() {
+      return favouritesOnly;
+    },
+    get craftableOnly() {
+      return craftableOnly;
+    },
+    get systemFilter() {
+      return systemFilter;
+    },
+    get availableSystems() {
+      return availableSystems;
+    },
     get visibleRecipes() {
       return visibleRecipes;
     },
@@ -311,6 +382,10 @@ export function createCraftingStore({ services } = {}) {
     load,
     select,
     setSearch,
+    setFavouritesOnly,
+    setCraftableOnly,
+    setSystemFilter,
+    toggleFavourite,
     setPage,
     setPageSize,
     chooseIngredientSet,

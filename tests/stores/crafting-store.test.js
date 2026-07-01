@@ -8,7 +8,9 @@ let compiler;
 let createCraftingStore;
 
 function makeServices(overrides = {}) {
-  const calls = { listCraftingForActor: [], craftRecipe: [], notify: [] };
+  const calls = { listCraftingForActor: [], craftRecipe: [], notify: [], toggleFavourite: [] };
+  // Stateful favourites fake so toggleFavourite round-trips like the real setting.
+  let favourites = Array.isArray(overrides.favourites) ? [...overrides.favourites] : [];
   const services = {
     listCraftingForActor: async (opts) => {
       calls.listCraftingForActor.push(opts);
@@ -26,6 +28,16 @@ function makeServices(overrides = {}) {
     getCraftingSourceActors: () => overrides.sourceActors ?? [],
     getSelectedCraftingActorId: () => overrides.actorId ?? 'actor-1',
     getCraftingComponentSourceIds: () => overrides.sourceIds ?? [],
+    getFavouriteRecipeIds: () => [...favourites],
+    toggleFavouriteRecipe: (id) => {
+      calls.toggleFavourite.push(id);
+      if (id) {
+        favourites = favourites.includes(id)
+          ? favourites.filter((entry) => entry !== id)
+          : [...favourites, id];
+      }
+      return [...favourites];
+    },
   };
   return { services, calls };
 }
@@ -130,6 +142,100 @@ describe('craftingStore', () => {
       store.pageItems.map((entry) => entry.name),
       ['Charlie', 'Delta']
     );
+  });
+
+  it('filters the visible list to favourites and resets the page', async () => {
+    const listing = {
+      recipes: [recipe('r1', 'Iron Sword'), recipe('r2', 'Bronze Shield'), recipe('r3', 'Oak Bow')],
+    };
+    const { services } = makeServices({ listing, favourites: ['r3', 'r1'] });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.setPage(2);
+    flushSync();
+
+    store.setFavouritesOnly(true);
+    flushSync();
+
+    assert.equal(store.page, 0, 'toggling a filter resets to the first page');
+    assert.deepEqual(
+      store.visibleRecipes.map((entry) => entry.id),
+      ['r1', 'r3'],
+      'only favourited recipes remain, sorted A→Z'
+    );
+  });
+
+  it('filters the visible list to craftable (available) recipes only', async () => {
+    const listing = {
+      recipes: [
+        recipe('r1', 'Iron Sword', { browseStatus: 'available' }),
+        recipe('r2', 'Bronze Shield', { browseStatus: 'missingMaterials' }),
+        recipe('r3', 'Oak Bow', { browseStatus: 'available' }),
+      ],
+    };
+    const { services } = makeServices({ listing });
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    store.setCraftableOnly(true);
+    flushSync();
+
+    assert.deepEqual(
+      store.visibleRecipes.map((entry) => entry.id),
+      ['r1', 'r3'],
+      'only available recipes remain'
+    );
+  });
+
+  it('filters the visible list by crafting system and exposes the system options', async () => {
+    const listing = {
+      recipes: [
+        recipe('r1', 'Iron Sword', { systemId: 'sys-a', systemName: 'Smithing' }),
+        recipe('r2', 'Bronze Shield', { systemId: 'sys-b', systemName: 'Armoury' }),
+        recipe('r3', 'Oak Bow', { systemId: 'sys-a', systemName: 'Smithing' }),
+      ],
+    };
+    const { services } = makeServices({ listing });
+    const store = createCraftingStore({ services });
+    await store.load();
+    flushSync();
+
+    assert.deepEqual(
+      store.availableSystems,
+      [
+        { id: 'sys-b', name: 'Armoury' },
+        { id: 'sys-a', name: 'Smithing' },
+      ],
+      'de-duped system options sorted A→Z by name'
+    );
+
+    store.setSystemFilter('sys-a');
+    flushSync();
+    assert.deepEqual(
+      store.visibleRecipes.map((entry) => entry.id),
+      ['r1', 'r3'],
+      'only the selected system remains'
+    );
+
+    store.setSystemFilter(null);
+    flushSync();
+    assert.equal(store.visibleRecipes.length, 3, 'clearing the system filter restores all');
+  });
+
+  it('toggles a recipe favourite through the services seam and updates the id list', async () => {
+    const listing = { recipes: [recipe('r1', 'Iron Sword')] };
+    const { services, calls } = makeServices({ listing });
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    store.toggleFavourite('r1');
+    flushSync();
+    assert.deepEqual(store.favouriteIds, ['r1'], 'favourite persisted and reflected');
+    assert.deepEqual(calls.toggleFavourite, ['r1']);
+
+    store.toggleFavourite('r1');
+    flushSync();
+    assert.deepEqual(store.favouriteIds, [], 'toggling again removes it');
   });
 
   it('selects a recipe and resets the chosen ingredient set', async () => {

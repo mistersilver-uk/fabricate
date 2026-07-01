@@ -561,7 +561,7 @@ export class RecipeManager {
    * @param {IngredientSet} ingredientSet
    * @param {Object} selection - result from resolveIngredientSelection
    * @param {Item[]} availableItems
-   * @returns {Array<{ description: string, need: number, have: number, satisfied: boolean }>}
+   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have: number, satisfied: boolean }>}
    * @private
    */
   _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
@@ -596,7 +596,9 @@ export class RecipeManager {
         const description =
           this._resolveIngredientDescription(recipe, ingredient) ||
           options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
+        const visual = this._resolveIngredientVisual(recipe, ingredient);
         return {
+          ...visual,
           description,
           need: Number(missingEntry?.need || ingredient?.quantity || 1),
           have: Number(missingEntry?.have || 0),
@@ -618,6 +620,7 @@ export class RecipeManager {
         );
         const totalQty = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
         return {
+          ingredient: ing,
           description: this._resolveIngredientDescription(recipe, ing) || '',
           need: ing.quantity,
           have: totalQty,
@@ -626,7 +629,12 @@ export class RecipeManager {
       });
 
       const satisfiedOption = optionStates.find((s) => s.satisfied) || optionStates[0];
+      const visual = this._resolveIngredientVisual(
+        recipe,
+        satisfiedOption?.ingredient || options[0]
+      );
       return {
+        ...visual,
         description: optionStates.map((s) => s.description).join(' OR '),
         need: satisfiedOption?.need || 1,
         have: satisfiedOption?.have || 0,
@@ -652,6 +660,30 @@ export class RecipeManager {
       return `${ingredient.quantity || 1}x ${name}`;
     }
     return ingredient.getDescription?.() || '';
+  }
+
+  /**
+   * Resolve the tile visuals (component id, display name, icon image) for an
+   * ingredient, so the player detail can render an image grid. Component-typed
+   * matches resolve through the managed component library; anything else falls
+   * back to a null image (the UI thumbnail then shows its default) and the
+   * ingredient's own description as the name.
+   *
+   * @param {Recipe} recipe
+   * @param {Ingredient|null} ingredient
+   * @returns {{ componentId: string|null, name: string, img: string|null }}
+   * @private
+   */
+  _resolveIngredientVisual(recipe, ingredient) {
+    const match = ingredient?.match || null;
+    if (match?.type === 'component' && match.componentId) {
+      return {
+        componentId: match.componentId,
+        name: this.resolveComponentName(recipe, match.componentId),
+        img: this.resolveComponentImg(recipe, match.componentId),
+      };
+    }
+    return { componentId: null, name: ingredient?.getDescription?.() || '', img: null };
   }
 
   /**

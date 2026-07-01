@@ -81,6 +81,18 @@
   function onAddToShoppingList(id) {
     store?.addToShoppingList(id, 1);
   }
+  function onToggleFavourite(id) {
+    store?.toggleFavourite(id);
+  }
+  function onToggleFavourites() {
+    store?.setFavouritesOnly(!(store?.favouritesOnly === true));
+  }
+  function onToggleCraftable() {
+    store?.setCraftableOnly(!(store?.craftableOnly === true));
+  }
+  function onSystemChange(systemId) {
+    store?.setSystemFilter(systemId);
+  }
   function onChoose(setId) {
     store?.chooseIngredientSet(setId);
   }
@@ -151,9 +163,18 @@
           totalCount={store?.visibleRecipes?.length ?? 0}
           pageIndex={store?.page ?? 0}
           pageSize={store?.pageSize ?? 12}
+          favouritesOnly={store?.favouritesOnly ?? false}
+          craftableOnly={store?.craftableOnly ?? false}
+          systemFilter={store?.systemFilter ?? null}
+          systems={store?.availableSystems ?? []}
+          favouriteIds={store?.favouriteIds ?? []}
           {onSelect}
           {onSearch}
           {onAddToShoppingList}
+          {onToggleFavourite}
+          {onToggleFavourites}
+          {onToggleCraftable}
+          {onSystemChange}
           onPageChange={(index) => store?.setPage(index)}
           onPageSizeChange={(size) => store?.setPageSize(size)}
         />

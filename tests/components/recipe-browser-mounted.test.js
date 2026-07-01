@@ -147,6 +147,89 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.deepEqual(added, ['r1'], 'onAddToShoppingList called with the recipe id');
   });
 
+  it('renders the favourites/craftable toggles and reflects their active state', async () => {
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      favouritesOnly: true,
+      craftableOnly: false,
+    });
+
+    const fav = target.querySelector('[data-filter="favourites"]');
+    const craft = target.querySelector('[data-filter="craftable"]');
+    assert.ok(fav && craft, 'both filter toggles render on one row');
+    assert.ok(fav.classList.contains('is-active'), 'favourites toggle reflects the active filter');
+    assert.equal(fav.getAttribute('aria-pressed'), 'true');
+    assert.equal(craft.classList.contains('is-active'), false, 'craftable toggle is inactive');
+  });
+
+  it('forwards the filter toggle and system-change callbacks', async () => {
+    let favToggles = 0;
+    let craftToggles = 0;
+    const systems = [];
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      systems: [
+        { id: 'sys-a', name: 'Smithing' },
+        { id: 'sys-b', name: 'Armoury' },
+      ],
+      onToggleFavourites: () => (favToggles += 1),
+      onToggleCraftable: () => (craftToggles += 1),
+      onSystemChange: (id) => systems.push(id),
+    });
+
+    target.querySelector('[data-filter="favourites"]').click();
+    target.querySelector('[data-filter="craftable"]').click();
+    flushSync();
+    assert.equal(favToggles, 1, 'favourites toggle callback fired');
+    assert.equal(craftToggles, 1, 'craftable toggle callback fired');
+
+    const select = target.querySelector('.crafting-browser-filter-system select');
+    assert.ok(select, 'system dropdown renders on its own line');
+    assert.equal(
+      select.querySelectorAll('option').length,
+      3,
+      'all-systems + one option per system'
+    );
+    select.value = 'sys-b';
+    select.dispatchEvent(new window.Event('change', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(systems, ['sys-b'], 'system change forwards the selected id');
+  });
+
+  it('marks favourited rows and forwards the row favourite toggle', async () => {
+    const toggled = [];
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' }), recipe({ id: 'r2', name: 'Antitoxin' })],
+      totalCount: 2,
+      favouriteIds: ['r2'],
+      onToggleFavourite: (id) => toggled.push(id),
+    });
+
+    const r1Fav = target.querySelector('[data-recipe-id="r1"] .crafting-recipe-row-fav');
+    const r2Fav = target.querySelector('[data-recipe-id="r2"] .crafting-recipe-row-fav');
+    assert.equal(r1Fav.classList.contains('is-active'), false, 'unfavourited row star is inactive');
+    assert.ok(r2Fav.classList.contains('is-active'), 'favourited row star is active');
+
+    r1Fav.click();
+    flushSync();
+    assert.deepEqual(toggled, ['r1'], 'row star forwards onToggleFavourite with the recipe id');
+  });
+
+  it('hides the system dropdown when no systems are supplied', async () => {
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      systems: [],
+    });
+    assert.equal(
+      target.querySelector('.crafting-browser-filter-system'),
+      null,
+      'no system dropdown without systems'
+    );
+  });
+
   it('shows a no-matches message while searching with no results', async () => {
     const target = await harness.mount({ recipes: [], totalCount: 0, search: 'zzz' });
     const empty = target.querySelector('[data-crafting-browser-empty]');

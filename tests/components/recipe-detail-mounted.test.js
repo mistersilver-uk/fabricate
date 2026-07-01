@@ -118,6 +118,53 @@ describe('RecipeDetail mounted behavior', () => {
     });
   }
 
+  it('renders ingredients as an image grid with sufficiency-coloured tiles and pips', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ modeToken: 'simple', modeLabel: 'Simple' }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({
+        canCraft: false,
+        ingredientStates: [
+          {
+            componentId: 'c1',
+            name: 'Iron',
+            img: 'icons/iron.webp',
+            description: '2x Iron',
+            need: 2,
+            have: 2,
+            satisfied: true,
+          },
+          {
+            componentId: 'c2',
+            name: 'Oak',
+            img: 'icons/oak.webp',
+            description: '3x Oak',
+            need: 3,
+            have: 1,
+            satisfied: false,
+          },
+        ],
+      }),
+    });
+
+    const tiles = target.querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    assert.equal(tiles.length, 2, 'one image tile per ingredient');
+
+    const [sufficient, short] = tiles;
+    assert.ok(sufficient.classList.contains('is-sufficient'), 'satisfied ingredient tile is green');
+    assert.ok(short.classList.contains('is-insufficient'), 'short ingredient tile is red');
+
+    assert.ok(sufficient.querySelector('.crafting-thumb img'), 'tile renders the component image');
+    assert.equal(
+      sufficient.querySelector('.crafting-io-pip').textContent.trim(),
+      '2/2',
+      'pip shows have/need'
+    );
+    const shortPip = short.querySelector('.crafting-io-pip');
+    assert.equal(shortPip.textContent.trim(), '1/3', 'short pip shows have/need');
+    assert.ok(shortPip.classList.contains('is-insufficient'), 'short pip is red');
+  });
+
   it('renders only the teaser header for a redaction-redacted recipe — no ingredient/result detail', async () => {
     const teaser = recipe({
       redaction: { redacted: true, hiddenFields: ['ingredients', 'results', 'description'] },

@@ -429,8 +429,14 @@
           "SearchPlaceholder": "Search recipes…",
           "SearchLabel": "Search recipes",
           "Empty": "No recipes to show.",
-          "NoMatches": "No recipes match your search.",
-          "RecentsTitle": "Recent"
+          "NoMatches": "No recipes match your filters.",
+          "RecentsTitle": "Recent",
+          "FavouritesOnly": "Favourites",
+          "CraftableOnly": "Craftable",
+          "SystemFilterLabel": "Crafting system",
+          "AllSystems": "All systems",
+          "Favourite": "Add to favourites",
+          "Unfavourite": "Remove from favourites"
         },
         "Detail": {
           "SelectHint": "Select a recipe to see how to craft it.",
@@ -459,6 +465,7 @@
           "Have": "Have",
           "Need": "Need",
           "Missing": "Missing",
+          "HaveOfNeed": "{have} of {need} in inventory",
           "Available": "Available",
           "Unavailable": "Unavailable"
         },

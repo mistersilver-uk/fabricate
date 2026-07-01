@@ -205,6 +205,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       setSelectedCraftingActorId: (id) => game?.fabricate?.setSelectedCraftingActorId?.(id),
       getCraftingComponentSourceIds: () => game?.fabricate?.getCraftingComponentSourceIds?.() ?? [],
       setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
+      getFavouriteRecipeIds: () => game?.fabricate?.getFavouriteRecipeIds?.() ?? [],
+      toggleFavouriteRecipe: (id) => game?.fabricate?.toggleFavouriteRecipe?.(id) ?? [],
       // Player-facing notification seam (a failed craft surfaces as a warning).
       notify: (message) => notifyWarn(message),
       // Localized generic craft-failure message for a thrown craft (the engine can

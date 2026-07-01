@@ -1374,6 +1374,32 @@ class Fabricate {
   }
 
   /**
+   * The player's favourite recipe ids (client-scoped, `FAVOURITE_RECIPES`).
+   *
+   * @returns {string[]}
+   */
+  getFavouriteRecipeIds() {
+    const ids = getSetting(SETTING_KEYS.FAVOURITE_RECIPES);
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  /**
+   * Toggle a recipe's favourite state and persist the updated id list.
+   *
+   * @param {string} recipeId The recipe id to add/remove.
+   * @returns {string[]} The updated favourite id list (unchanged if `recipeId` is falsy).
+   */
+  toggleFavouriteRecipe(recipeId) {
+    const current = this.getFavouriteRecipeIds();
+    if (!recipeId) return current;
+    const next = current.includes(recipeId)
+      ? current.filter((id) => id !== recipeId)
+      : [...current, recipeId];
+    setSetting(SETTING_KEYS.FAVOURITE_RECIPES, next);
+    return next;
+  }
+
+  /**
    * Start a gathering attempt for the current user.
    *
    * The raw GatheringEngine remains module-internal so all public attempts use

@@ -19,18 +19,37 @@
     totalCount = 0,
     pageIndex = 0,
     pageSize = 12,
+    favouritesOnly = false,
+    craftableOnly = false,
+    systemFilter = null,
+    systems = [],
+    favouriteIds = [],
     onSelect = null,
     onSearch = null,
     onAddToShoppingList = null,
+    onToggleFavourite = null,
+    onToggleFavourites = null,
+    onToggleCraftable = null,
+    onSystemChange = null,
     onPageChange = null,
     onPageSizeChange = null
   } = $props();
 
   const hasResults = $derived(Array.isArray(recipes) && recipes.length > 0);
   const isSearching = $derived(String(search ?? '').trim() !== '');
+  // Any active filter (search or the three controls) switches the empty state to
+  // the "no matches" copy rather than the "no recipes at all" copy.
+  const isFiltering = $derived(
+    isSearching || favouritesOnly === true || craftableOnly === true || Boolean(systemFilter)
+  );
+  const favouriteSet = $derived(new Set(Array.isArray(favouriteIds) ? favouriteIds : []));
 
   function onInput(event) {
     onSearch?.(event.currentTarget.value);
+  }
+  function onSystemInput(event) {
+    const value = event.currentTarget.value;
+    onSystemChange?.(value === '' ? null : value);
   }
 </script>
 
@@ -47,6 +66,50 @@
         oninput={onInput}
       />
     </div>
+
+    <div class="crafting-browser-filters" data-crafting-filters>
+      <div class="crafting-browser-filter-toggles">
+        <button
+          type="button"
+          class="crafting-browser-toggle"
+          class:is-active={favouritesOnly}
+          data-filter="favourites"
+          aria-pressed={favouritesOnly}
+          onclick={() => onToggleFavourites?.()}
+        >
+          <i class="fas fa-star" aria-hidden="true"></i>
+          <span>{localize('FABRICATE.App.Crafting.Browser.FavouritesOnly')}</span>
+        </button>
+        <button
+          type="button"
+          class="crafting-browser-toggle"
+          class:is-active={craftableOnly}
+          data-filter="craftable"
+          aria-pressed={craftableOnly}
+          onclick={() => onToggleCraftable?.()}
+        >
+          <i class="fas fa-hammer" aria-hidden="true"></i>
+          <span>{localize('FABRICATE.App.Crafting.Browser.CraftableOnly')}</span>
+        </button>
+      </div>
+      {#if systems.length > 0}
+        <label class="crafting-browser-filter-system">
+          <span class="crafting-browser-filter-label"
+            >{localize('FABRICATE.App.Crafting.Browser.SystemFilterLabel')}</span
+          >
+          <select
+            value={systemFilter ?? ''}
+            aria-label={localize('FABRICATE.App.Crafting.Browser.SystemFilterLabel')}
+            onchange={onSystemInput}
+          >
+            <option value="">{localize('FABRICATE.App.Crafting.Browser.AllSystems')}</option>
+            {#each systems as system (system.id)}
+              <option value={system.id}>{system.name}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+    </div>
   </header>
 
   <RecipeRecents {recents} {onSelect} />
@@ -57,8 +120,10 @@
         <RecipeListRow
           {recipe}
           selected={recipe.id === selectedRecipeId}
+          favourite={favouriteSet.has(recipe.id)}
           {onSelect}
           {onAddToShoppingList}
+          {onToggleFavourite}
         />
       {/each}
     </div>
@@ -74,7 +139,7 @@
     </div>
   {:else}
     <p class="crafting-browser-empty" data-crafting-browser-empty>
-      {isSearching
+      {isFiltering
         ? localize('FABRICATE.App.Crafting.Browser.NoMatches')
         : localize('FABRICATE.App.Crafting.Browser.Empty')}
     </p>
@@ -124,6 +189,80 @@
 
   .crafting-browser-search input:focus-visible {
     outline: none;
+  }
+
+  /* Filters: the two toggles share a row; the system dropdown sits on its own line. */
+  .crafting-browser-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .crafting-browser-filter-toggles {
+    display: flex;
+    gap: 8px;
+  }
+
+  .crafting-browser-toggle {
+    flex: 1 1 0;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 4px 10px;
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-surface-soft);
+    color: var(--fab-text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .crafting-browser-toggle:hover {
+    background: var(--fab-surface-raised);
+    color: var(--fab-text);
+  }
+
+  .crafting-browser-toggle:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .crafting-browser-toggle.is-active {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
+  }
+
+  .crafting-browser-filter-system {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .crafting-browser-filter-label {
+    font-size: 11px;
+    color: var(--fab-text-muted);
+  }
+
+  .crafting-browser-filter-system select {
+    box-sizing: border-box;
+    width: 100%;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-surface);
+    color: var(--fab-text);
+    font-size: 12px;
+  }
+
+  .crafting-browser-filter-system select:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 
   .crafting-browser-list {

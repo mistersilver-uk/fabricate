@@ -6,7 +6,17 @@
 export function craftability(overrides = {}) {
   return {
     canCraft: true,
-    ingredientStates: [{ description: 'Spring Water', need: 2, have: 2, satisfied: true }],
+    ingredientStates: [
+      {
+        componentId: 'c-water',
+        name: 'Spring Water',
+        img: 'icons/consumables/potions/potion-tube-blue.webp',
+        description: '2x Spring Water',
+        need: 2,
+        have: 2,
+        satisfied: true
+      }
+    ],
     essenceStates: [],
     toolStates: [],
     missing: [],
@@ -72,6 +82,11 @@ export function fakeCraftingStore(overrides = {}) {
     lastRollResult: {},
     recents: [],
     worldTimeTick: 0,
+    favouriteIds: overrides.favouriteIds ?? [],
+    favouritesOnly: overrides.favouritesOnly ?? false,
+    craftableOnly: overrides.craftableOnly ?? false,
+    systemFilter: overrides.systemFilter ?? null,
+    availableSystems: overrides.availableSystems ?? [],
     visibleRecipes: recipes,
     pageItems: recipes,
     selectedRecipe: selected,
@@ -81,6 +96,10 @@ export function fakeCraftingStore(overrides = {}) {
     load() {},
     select() {},
     setSearch() {},
+    setFavouritesOnly() {},
+    setCraftableOnly() {},
+    setSystemFilter() {},
+    toggleFavourite() {},
     setPage() {},
     setPageSize() {},
     chooseIngredientSet() {},

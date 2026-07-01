@@ -22,11 +22,6 @@
   const tools = $derived(Array.isArray(craftability?.toolStates) ? craftability.toolStates : []);
   const outputs = $derived(Array.isArray(result?.items) ? result.items : []);
 
-  function missingOf(state) {
-    const need = Number(state?.need ?? 0);
-    const have = Number(state?.have ?? 0);
-    return Math.max(0, need - have);
-  }
   function essenceLabel(state) {
     return String(state?.label ?? state?.type ?? state?.essenceType ?? '');
   }
@@ -36,28 +31,28 @@
   {#if ingredients.length > 0}
     <div class="crafting-io-group" data-io-group="ingredients">
       <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Io.Ingredients')}</p>
-      <ul class="crafting-io-list">
+      <ul class="crafting-io-grid">
         {#each ingredients as state, index (state.componentId ?? state.description ?? index)}
-          <li class="crafting-io-row" data-io-satisfied={state.satisfied ? 'true' : 'false'}>
-            <span class="crafting-io-name">{state.description}</span>
-            <span class="crafting-io-tags">
-              <QuantityTag
-                label={localize('FABRICATE.App.Crafting.Io.Have')}
-                value={state.have ?? 0}
-                tone={state.satisfied ? 'success' : 'neutral'}
-              />
-              <QuantityTag
-                label={localize('FABRICATE.App.Crafting.Io.Need')}
-                value={state.need ?? 0}
-                tone="neutral"
-              />
-              {#if !state.satisfied}
-                <QuantityTag
-                  label={localize('FABRICATE.App.Crafting.Io.Missing')}
-                  value={missingOf(state)}
-                  tone="danger"
-                />
-              {/if}
+          <li
+            class="crafting-io-tile"
+            class:is-sufficient={state.satisfied}
+            class:is-insufficient={!state.satisfied}
+            data-io-ingredient
+            data-io-satisfied={state.satisfied ? 'true' : 'false'}
+            title={state.description}
+            aria-label={`${state.name ?? state.description ?? ''} — ${localize(
+              'FABRICATE.App.Crafting.Io.HaveOfNeed',
+              { have: state.have ?? 0, need: state.need ?? 0 }
+            )}`}
+          >
+            <CraftingThumb src={state.img} alt="" size={48} />
+            <span
+              class="crafting-io-pip"
+              class:is-sufficient={state.satisfied}
+              class:is-insufficient={!state.satisfied}
+              aria-hidden="true"
+            >
+              {state.have ?? 0}/{state.need ?? 0}
             </span>
           </li>
         {/each}
@@ -147,6 +142,72 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  /* Ingredients render as an inventory-style image grid: each tile is a component
+     icon with a top-right have/need pip; the tile border + pip colour signal
+     sufficiency (green = enough, red = short). */
+  .crafting-io-grid {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-2);
+  }
+
+  .crafting-io-tile {
+    position: relative;
+    flex: 0 0 auto;
+    border: 2px solid var(--fab-border);
+    border-radius: 8px;
+    padding: 2px;
+    background: var(--fab-surface-soft);
+    line-height: 0;
+  }
+
+  .crafting-io-tile.is-sufficient {
+    border-color: var(--fab-success-border);
+    background: var(--fab-success-soft);
+  }
+
+  .crafting-io-tile.is-insufficient {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
+  /* Corner pip. Solid fill for legibility over the artwork; on-success / on-accent
+     are dark-enough foregrounds over the mid-tone success/danger fills in every
+     theme (there is no --fab-on-danger token). */
+  .crafting-io-pip {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    box-shadow: var(--fab-shadow-sm);
+  }
+
+  .crafting-io-pip.is-sufficient {
+    background: var(--fab-success);
+    color: var(--fab-on-success);
+    border: 1px solid var(--fab-success-border);
+  }
+
+  .crafting-io-pip.is-insufficient {
+    background: var(--fab-danger);
+    color: var(--fab-on-accent);
+    border: 1px solid var(--fab-danger-border);
   }
 
   .crafting-io-row {

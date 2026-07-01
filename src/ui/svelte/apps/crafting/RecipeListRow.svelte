@@ -20,8 +20,10 @@
   let {
     recipe = null,
     selected = false,
+    favourite = false,
     onSelect = null,
-    onAddToShoppingList = null
+    onAddToShoppingList = null,
+    onToggleFavourite = null
   } = $props();
 
   const id = $derived(String(recipe?.id ?? ''));
@@ -48,6 +50,10 @@
   function addToList(event) {
     event.stopPropagation();
     onAddToShoppingList?.(id);
+  }
+  function toggleFavourite(event) {
+    event.stopPropagation();
+    onToggleFavourite?.(id);
   }
 </script>
 
@@ -96,15 +102,36 @@
       </span>
     </span>
     {#if !redacted}
-      <button
-        type="button"
-        class="crafting-recipe-row-add"
-        title={localize('FABRICATE.App.Crafting.Shopping.AddToList')}
-        aria-label={localize('FABRICATE.App.Crafting.Shopping.AddToList')}
-        onclick={addToList}
-      >
-        <i class="fas fa-cart-plus" aria-hidden="true"></i>
-      </button>
+      <div class="crafting-recipe-row-actions">
+        <button
+          type="button"
+          class="crafting-recipe-row-fav"
+          class:is-active={favourite}
+          aria-pressed={favourite}
+          title={localize(
+            favourite
+              ? 'FABRICATE.App.Crafting.Browser.Unfavourite'
+              : 'FABRICATE.App.Crafting.Browser.Favourite'
+          )}
+          aria-label={localize(
+            favourite
+              ? 'FABRICATE.App.Crafting.Browser.Unfavourite'
+              : 'FABRICATE.App.Crafting.Browser.Favourite'
+          )}
+          onclick={toggleFavourite}
+        >
+          <i class="fas fa-star" aria-hidden="true"></i>
+        </button>
+        <button
+          type="button"
+          class="crafting-recipe-row-add"
+          title={localize('FABRICATE.App.Crafting.Shopping.AddToList')}
+          aria-label={localize('FABRICATE.App.Crafting.Shopping.AddToList')}
+          onclick={addToList}
+        >
+          <i class="fas fa-cart-plus" aria-hidden="true"></i>
+        </button>
+      </div>
     {/if}
   </div>
 </div>
@@ -239,6 +266,14 @@
     color: var(--fab-text-muted);
   }
 
+  .crafting-recipe-row-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-1);
+  }
+
+  .crafting-recipe-row-fav,
   .crafting-recipe-row-add {
     box-sizing: border-box;
     flex: 0 0 auto;
@@ -256,13 +291,26 @@
     cursor: pointer;
   }
 
+  .crafting-recipe-row-fav:hover,
   .crafting-recipe-row-add:hover {
     background: var(--fab-surface-raised);
     color: var(--fab-text);
   }
 
+  .crafting-recipe-row-fav:focus-visible,
   .crafting-recipe-row-add:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+  }
+
+  /* An active favourite reads as a filled gold star. */
+  .crafting-recipe-row-fav.is-active {
+    border-color: var(--fab-warning-border);
+    background: var(--fab-warning-soft);
+    color: var(--fab-warning-text);
+  }
+
+  .crafting-recipe-row-fav.is-active:hover {
+    color: var(--fab-warning-text);
   }
 </style>
