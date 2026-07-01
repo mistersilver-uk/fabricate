@@ -222,6 +222,31 @@ describe('ActorSelectTopBar mounted behavior', () => {
     outside.remove();
   });
 
+  it('closes the popover when clicking elsewhere in the bar (outside the picker)', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+
+    target.querySelector('.actor-bar-trigger').click();
+    flushSync();
+    await tick();
+    flushSync();
+    assert.ok(document.querySelector('.actor-bar-popover'), 'popover open');
+
+    // The full-width bar is outside the picker region (.actor-bar-left); a click on
+    // it (its empty area / right-side cluster) must dismiss the dropdown.
+    const bar = target.querySelector('.fabricate-app-actor-bar');
+    bar.dispatchEvent(new globalThis.MouseEvent('mousedown', { bubbles: true }));
+    flushSync();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      document.querySelector('.actor-bar-popover'),
+      null,
+      'clicking the bar outside the picker closes the dropdown'
+    );
+  });
+
   it('filters options case-insensitively by name', async () => {
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });

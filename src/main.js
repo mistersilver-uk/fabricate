@@ -1300,19 +1300,17 @@ class Fabricate {
 
   /**
    * List the actors the current user may select as crafting/component-source
-   * actors. OWNER-scoped (the player owns them; a GM sees all), reusing the same
-   * ownership predicate as the gathering attempt path. Returns redaction-safe
-   * display data only — each record carries `{ id, uuid, name, img }` and no
-   * other actor internals.
+   * actors. Filtered exactly like the actor-selection bar
+   * (`getBarSelectableActors` → owned player characters; a GM sees all) so the
+   * component-source picker offers the same characters as the crafting-actor
+   * selector — not owned non-character actors. Returns redaction-safe display data
+   * only — each record carries `{ id, uuid, name, img }`.
    *
    * @returns {Array<{id: string|null, uuid: string|null, name: string, img: string|null}>}
    */
   listCraftingSourceActors() {
     this._requireReady();
-    const actors = Array.from(game.actors ?? []).filter((actor) =>
-      isGatheringActorSelectableByUser(actor, game.user)
-    );
-    return actors.map((actor) => ({
+    return getBarSelectableActors({ viewer: game.user }).map((actor) => ({
       id: actor?.id ?? actor?.uuid ?? null,
       uuid: actor?.uuid ?? null,
       name: actor?.name ?? '',

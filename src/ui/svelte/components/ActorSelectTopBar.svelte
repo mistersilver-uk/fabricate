@@ -152,16 +152,18 @@
   });
 </script>
 
-<div
-  bind:this={pickerRoot}
-  class="fabricate-app-actor-bar"
-  data-actor-bar-state={barState}
-  use:dismissOnOutsideClick={{
-    enabled: pickerOpen,
-    onDismiss: closePicker
-  }}
->
-  <div class="actor-bar-left">
+<div class="fabricate-app-actor-bar" data-actor-bar-state={barState}>
+  <!-- The dismiss region is the picker (trigger + popover) itself, NOT the whole
+       full-width bar — otherwise clicking the bar's empty area or its right-side
+       component-sources cluster would count as "inside" and leave the dropdown open. -->
+  <div
+    bind:this={pickerRoot}
+    class="actor-bar-left"
+    use:dismissOnOutsideClick={{
+      enabled: pickerOpen,
+      onDismiss: closePicker
+    }}
+  >
     <button
       type="button"
       class="actor-bar-trigger"
