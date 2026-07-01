@@ -256,13 +256,15 @@
     gap: 8px;
   }
 
+  /* Rounded rectangle matching the tier award pills + the rounded-square item image
+     it wraps (not a full capsule). */
   .crafting-io-output {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     padding: 4px 10px 4px 4px;
     border: 1px solid var(--fab-border);
-    border-radius: 999px;
+    border-radius: 8px;
     background: var(--fab-surface-soft);
   }
 
