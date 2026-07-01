@@ -62,14 +62,16 @@
         />
       {/each}
     </div>
-    <Pagination
-      {totalCount}
-      {pageSize}
-      {pageIndex}
-      pageSizeOptions={[12, 24, 48]}
-      onPageChange={(index) => onPageChange?.(index)}
-      onPageSizeChange={(size) => onPageSizeChange?.(size)}
-    />
+    <div class="crafting-browser-pagination">
+      <Pagination
+        {totalCount}
+        {pageSize}
+        {pageIndex}
+        pageSizeOptions={[12, 24, 48]}
+        onPageChange={(index) => onPageChange?.(index)}
+        onPageSizeChange={(size) => onPageSizeChange?.(size)}
+      />
+    </div>
   {:else}
     <p class="crafting-browser-empty" data-crafting-browser-empty>
       {isSearching
@@ -140,5 +142,87 @@
     text-align: center;
     font-size: 13px;
     color: var(--fab-text-muted);
+  }
+
+  .crafting-browser-pagination {
+    flex: 0 0 auto;
+  }
+
+  /*
+    Pagination.svelte renders .manager-pagination* + .manager-icon-button markup
+    that is .fabricate-manager-scoped in the GM app and therefore UNSTYLED in the
+    player app. Theme it here with base --fab-* tokens as a single compact inline
+    row (mirrors the gathering environment list), rather than the unstyled block
+    that stacks the summary, nav, and per-page controls onto separate lines.
+  */
+  .crafting-browser-pagination :global(.manager-pagination) {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) 0 0;
+    border-top: 1px solid var(--fab-border);
+    font-size: 12px;
+    color: var(--fab-text-muted);
+  }
+
+  .crafting-browser-pagination :global(.manager-pagination-summary) {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .crafting-browser-pagination :global(.manager-pagination-nav) {
+    flex: 0 0 auto;
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .crafting-browser-pagination :global(.manager-pagination-page) {
+    color: var(--fab-text);
+    white-space: nowrap;
+  }
+
+  .crafting-browser-pagination :global(.manager-pagination-size) {
+    flex: 0 0 auto;
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  .crafting-browser-pagination :global(.manager-pagination-size select) {
+    height: 26px;
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+    background: var(--fab-surface);
+    color: var(--fab-text);
+  }
+
+  .crafting-browser-pagination :global(.manager-icon-button) {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+    background: var(--fab-surface);
+    color: var(--fab-text);
+    cursor: pointer;
+  }
+
+  .crafting-browser-pagination :global(.manager-icon-button:disabled) {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .crafting-browser-pagination :global(.manager-icon-button:hover:not(:disabled)) {
+    background: var(--fab-surface-raised);
   }
 </style>

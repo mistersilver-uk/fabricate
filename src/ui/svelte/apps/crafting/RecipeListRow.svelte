@@ -81,6 +81,10 @@
 <style>
   .crafting-recipe-row {
     box-sizing: border-box;
+    /* Keep natural row height inside the scrolling list flex column: without this
+       the row shrinks to fit and its overflow:hidden clips the content, collapsing
+       the rows instead of letting .crafting-browser-list scroll. */
+    flex: 0 0 auto;
     width: 100%;
     border: 1px solid var(--fab-border);
     border-radius: 8px;
