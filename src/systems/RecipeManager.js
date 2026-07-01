@@ -993,10 +993,16 @@ export class RecipeManager {
 
       if (itemMatchesComponentSource(item, managedItem)) return true;
 
-      const byName =
-        !managedItem.sourceUuid && managedItem.name
-          ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
-          : false;
+      // Source-UUID matching failed — fall back to an exact (case-insensitive) name
+      // match, even when the component carries a sourceUuid. Foundry's transitive
+      // `_stats.duplicateSource` points at the ORIGINAL template rather than the
+      // component's own source item, so an inventory copy of a component that was
+      // built by copying another item as a template (a common GM workflow) has no
+      // ref back to the component's source and would otherwise never match despite
+      // being the right, identically-named component.
+      const byName = managedItem.name
+        ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
+        : false;
       if (!byName) return false;
     } else if (!this._matchesIngredient(ingredient, item, features)) {
       return false;
@@ -1019,21 +1025,16 @@ export class RecipeManager {
    * @returns {boolean}
    */
   toolMatchesItem(recipe, tool, item) {
-    if (tool.componentId || tool.systemItemId) {
-      const managedItem = this._getComponent(recipe, tool.componentId || tool.systemItemId);
-      if (!managedItem) return false;
-      if (
-        managedItem.sourceUuid ||
-        managedItem.sourceItemUuid ||
-        managedItem.fallbackItemIds?.length
-      ) {
-        if (itemMatchesComponentSource(item, managedItem)) return true;
-        return false;
-      }
-      return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
-    }
-    // No componentId means the tool cannot be matched; treat as no match.
-    return false;
+    const componentId = tool.componentId || tool.systemItemId;
+    if (!componentId) return false; // No componentId means the tool cannot be matched.
+    const managedItem = this._getComponent(recipe, componentId);
+    if (!managedItem) return false;
+    // Prefer a source-UUID (or component-id flag) match; fall back to an exact,
+    // case-insensitive name match — mirroring ingredientMatchesItem — so a
+    // template-copied tool item (whose transitive `_stats.duplicateSource` points at
+    // the original template rather than this component's source) still satisfies it.
+    if (itemMatchesComponentSource(item, managedItem)) return true;
+    return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
   }
 
   _matchesIngredient(ingredient, item, features) {

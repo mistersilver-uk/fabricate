@@ -379,6 +379,65 @@ test('TC6b: a missing managed-component ingredient still exposes its component i
   assert.equal(state.img, 'icons/mithril.webp', 'missing ingredient still resolves its image');
 });
 
+test('TC6c: an identically-named item satisfies a sourced component even when source UUIDs differ', () => {
+  const systemId = 'sys-tc6c';
+  const compId = 'comp-embercap';
+  // Owned copy whose only source ref is a TEMPLATE (its _stats.duplicateSource),
+  // NOT the component's source item — the transitive-duplicateSource GM workflow.
+  const templatedItem = {
+    uuid: 'Actor.a.Item.owned-embercap',
+    id: 'owned-embercap',
+    name: 'Embercap Mushroom',
+    system: { quantity: 1 },
+    _stats: { duplicateSource: 'Item.SomeTemplate' },
+    flags: {},
+    getFlag: () => undefined,
+  };
+  const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 1)])]);
+  const recipe = new Recipe({
+    name: 'Templated Component Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compId, sourceUuid: 'Item.EmbercapSource', sourceItemUuid: 'Item.EmbercapSource', name: 'Embercap Mushroom' },
+  ]);
+
+  const result = manager.evaluateCraftability([makeActor([templatedItem])], recipe);
+  assert.equal(result.canCraft, true, 'name fallback matches a same-named component');
+  assert.equal(result.ingredientStates[0].satisfied, true);
+  assert.equal(result.ingredientStates[0].have, 1);
+});
+
+test('TC6d: the name fallback does NOT match a differently-named item', () => {
+  const systemId = 'sys-tc6d';
+  const compId = 'comp-embercap-d';
+  const wrongItem = {
+    uuid: 'Actor.a.Item.owned-other',
+    id: 'owned-other',
+    name: 'Foraged Greens',
+    system: { quantity: 1 },
+    _stats: { duplicateSource: 'Item.SomeTemplate' },
+    flags: {},
+    getFlag: () => undefined,
+  };
+  const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 1)])]);
+  const recipe = new Recipe({
+    name: 'Templated Component Recipe D',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compId, sourceUuid: 'Item.EmbercapSource', sourceItemUuid: 'Item.EmbercapSource', name: 'Embercap Mushroom' },
+  ]);
+
+  const result = manager.evaluateCraftability([makeActor([wrongItem])], recipe);
+  assert.equal(result.canCraft, false, 'a different name is not a false positive');
+  assert.equal(result.ingredientStates[0].satisfied, false);
+});
+
 // ---------------------------------------------------------------------------
 // TC7: Shared items across groups — remaining-quantity tracking consistent
 // ---------------------------------------------------------------------------
