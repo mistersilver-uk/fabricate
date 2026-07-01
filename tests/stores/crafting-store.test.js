@@ -21,6 +21,7 @@ function makeServices(overrides = {}) {
         return { success: true, results: [] };
       }),
     notify: (message) => calls.notify.push(message),
+    craftErrorMessage: () => 'Crafting failed.',
     getRecipeManager: () => overrides.recipeManager ?? null,
     getCraftingSourceActors: () => overrides.sourceActors ?? [],
     getSelectedCraftingActorId: () => overrides.actorId ?? 'actor-1',
@@ -230,6 +231,28 @@ describe('craftingStore', () => {
     assert.equal(result.success, false);
     assert.deepEqual(calls.notify, ['Missing materials']);
     assert.equal(calls.listCraftingForActor.length, 0, 'failed craft does not refetch');
+  });
+
+  it('surfaces a thrown craftRecipe as a notification and clears craftInFlight', async () => {
+    const craftRecipe = async () => {
+      throw new Error('macro exploded');
+    };
+    const { services, calls } = makeServices({ craftRecipe });
+    const store = createCraftingStore({ services });
+    await store.load();
+    const loadsAfterInitial = calls.listCraftingForActor.length;
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.success, false, 'a thrown craft resolves to a failure result');
+    assert.deepEqual(calls.notify, ['Crafting failed.'], 'the generic craft-error message is notified');
+    assert.equal(store.craftInFlight, false, 'a thrown craft never leaves craftInFlight stuck');
+    assert.equal(
+      calls.listCraftingForActor.length,
+      loadsAfterInitial,
+      'a thrown craft does not refresh the listing'
+    );
   });
 
   it('on success records the roll result, marks the recipe recent, and refreshes', async () => {

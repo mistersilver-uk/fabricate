@@ -94,11 +94,15 @@
     dismissedRunFor = selectedRecipe?.id ?? null;
   }
 
-  // Refetch on mount and whenever the shared actor selection changes. Re-point the
-  // required component source to the newly selected crafting actor first so the
-  // listing resolves against the right inventory.
+  // Refetch on mount and whenever the shared actor selection changes. The shared
+  // top bar is the single source of truth for the selected character, so persist
+  // its selection into the crafting setting (LAST_CRAFTING_ACTOR) BEFORE loading —
+  // the listing resolves its crafting actor from that setting, so persist-before-
+  // load keeps the browse list pinned to the same actor the bar shows. Re-point the
+  // required component source to that actor too so its inventory is included.
   $effect(() => {
     const actorId = actorBar?.selectedActorId ?? null;
+    services?.setSelectedCraftingActorId?.(actorId ?? '');
     sourcesStore?.load();
     sourcesStore?.setCraftingActor(actorId);
     store?.load();
@@ -172,6 +176,7 @@
           <RunSummaryPanel
             recipe={selectedRecipe}
             {rollResult}
+            canCraft={craftability?.canCraft === true}
             busy={craftInFlight}
             onCraftNext={onCraft}
             onDismiss={onDismissRun}

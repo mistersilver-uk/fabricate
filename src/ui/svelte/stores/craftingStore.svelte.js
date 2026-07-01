@@ -18,7 +18,8 @@
  * @param {object} deps.services Injected services bag exposing
  *   `listCraftingForActor({ rememberedActorId, componentSourceActorIds })`,
  *   `craftRecipe({ actorId, recipeId, ingredientSetId, componentSourceActorIds })`,
- *   `notify(message)`, `getRecipeManager()`, `getCraftingSourceActors()`,
+ *   `notify(message)`, `craftErrorMessage()` (localized generic craft-failure
+ *   text for a thrown craft), `getRecipeManager()`, `getCraftingSourceActors()`,
  *   `getSelectedCraftingActorId()`, `getCraftingComponentSourceIds()`, and the
  *   optional sibling `craftingSources` store.
  * @returns {object} The reactive crafting store.
@@ -200,6 +201,12 @@ export function createCraftingStore({ services } = {}) {
    * and leaves the listing untouched; on success it records the roll outcome,
    * marks the recipe recent, and quietly refreshes the listing.
    *
+   * The `services.craftRecipe` call is wrapped: the underlying crafting engine can
+   * throw (e.g. on the currency-payment macro path), so a thrown error is caught
+   * and surfaced as a localized generic failure notification rather than an
+   * unhandled rejection. `craftInFlight` is always cleared in `finally` so a throw
+   * never leaves the craft action stuck.
+   *
    * @param {object|null} recipe The recipe model (or null to use the selection).
    * @returns {Promise<object|null>} The craft result.
    */
@@ -223,6 +230,10 @@ export function createCraftingStore({ services } = {}) {
       markRecent(recipeId);
       await load(true);
       return result ?? null;
+    } catch (err) {
+      const message = services?.craftErrorMessage?.() ?? '';
+      services?.notify?.(message);
+      return { success: false, results: null, message: err?.message ?? String(err) };
     } finally {
       craftInFlight = false;
     }

@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSyn
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compile } from 'svelte/compiler';
+import { compile, compileModule } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
 
@@ -58,7 +58,18 @@ export function createSvelteCompiler(repoRoot, getTempRoot) {
     writeFileSync(destination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
   }
 
-  return { writeCompiledSvelte, writeRawModule };
+  // Compile a runes `.svelte.js` store/module (which cannot run un-compiled) into
+  // the SAME temp tree as the mounted component, so a real store instance shares
+  // the component's Svelte signal runtime.
+  function writeCompiledModule(modulePath) {
+    const source = readFileSync(resolve(repoRoot, modulePath), 'utf8');
+    const compiled = compileModule(source, { filename: modulePath, generate: 'client', dev: true });
+    const destination = join(getTempRoot(), `${modulePath}.js`);
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, rewriteClientImports(compiled.js.code));
+  }
+
+  return { writeCompiledSvelte, writeRawModule, writeCompiledModule };
 }
 
 // The raw `.js` modules + compiled `.svelte` modules a `SearchablePopover`-based
@@ -130,12 +141,12 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
  * @param {string} args.componentPath   repo-relative `.svelte` of the component under test
  * @returns {{ setup: () => Promise<void>, teardown: () => void, mount: (props?: object) => Promise<HTMLElement>, remount: () => void, readonly target: HTMLElement|null }}
  */
-export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], componentPath }) {
+export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath }) {
   let tempRoot = null;
   let mounted = null;
   let target = null;
   let Component = null;
-  const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, () => tempRoot);
+  const { writeCompiledSvelte, writeRawModule, writeCompiledModule } = createSvelteCompiler(repoRoot, () => tempRoot);
 
   return {
     async setup() {
@@ -144,9 +155,16 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       tempRoot = mkdtempSync(join(tmpdir(), tmpPrefix));
       symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
       for (const modulePath of rawModules) writeRawModule(modulePath);
+      for (const runeModule of runeModules) writeCompiledModule(runeModule);
       for (const componentModule of compiledModules) writeCompiledSvelte(componentModule);
       const imported = await import(pathToFileURL(join(tempRoot, `${componentPath}.js`)).href);
       Component = imported.default;
+    },
+    // Import a compiled runes `.svelte.js` module from the harness temp tree so a
+    // test can build a REAL store that shares the mounted component's signal
+    // runtime. Only valid for a module listed in `runeModules`.
+    async loadRuneModule(modulePath) {
+      return import(pathToFileURL(join(tempRoot, `${modulePath}.js`)).href);
     },
     teardown() {
       if (mounted) { unmount(mounted); mounted = null; }

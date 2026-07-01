@@ -79,6 +79,7 @@ function makeBuilder({
   system = makeSystem(),
   craftability = makeCraftability(),
   exhausted = false,
+  isSystemBlockedForRecipes = null,
 } = {}) {
   const craftingSystemManager = { getSystem: (id) => (id === system.id ? system : null) };
   const resolutionModeService = new ResolutionModeService(craftingSystemManager);
@@ -94,6 +95,7 @@ function makeBuilder({
     craftingSystemManager,
     localize: (key) => key,
     nowWorldTime: () => 1000,
+    ...(isSystemBlockedForRecipes ? { isSystemBlockedForRecipes } : {}),
   });
 }
 
@@ -188,6 +190,20 @@ describe('CraftingListingBuilder — browse status per reason', () => {
   });
 });
 
+describe('CraftingListingBuilder — system blocked for recipes', () => {
+  it('drops a recipe whose system is blocked for a non-GM player', () => {
+    const { listing } = buildOne({ isSystemBlockedForRecipes: (id) => id === 'sys-1' });
+    assert.equal(listing.recipes.length, 0, 'a blocked system exposes no recipes to a player');
+    assert.deepEqual(listing.counts, { available: 0, total: 0 });
+  });
+
+  it('retains a recipe from a blocked system for a GM (bypass)', () => {
+    const { listing } = buildOne({ isSystemBlockedForRecipes: (id) => id === 'sys-1' }, GM);
+    assert.equal(listing.recipes.length, 1, 'a GM is never gated by the block predicate');
+    assert.equal(listing.recipes[0].id, 'recipe-1');
+  });
+});
+
 describe('CraftingListingBuilder — teaser redaction (non-leak)', () => {
   const teaserEntry = {
     recipe: makeRecipe({ description: 'SECRET blade of fire.' }),
@@ -216,6 +232,26 @@ describe('CraftingListingBuilder — teaser redaction (non-leak)', () => {
     assert.equal(recipe.ingredientSets.length, 1);
     assert.equal(recipe.result.items.length, 1);
     assert.notEqual(recipe.check, null);
+  });
+
+  it('a partial teaser hides only the listed field, still surfacing the rest', () => {
+    // hiddenFields names ONLY ingredients: results, check, and description still
+    // surface, exercising the showResults / showDescription true branches while
+    // ingredientSets is redacted to empty.
+    const { recipe } = buildOne({
+      entries: [
+        {
+          recipe: makeRecipe({ description: 'A partly hidden brew.' }),
+          access: { reason: 'teaser', teaserState: { hiddenFields: ['ingredients'] } },
+        },
+      ],
+    });
+    assert.equal(recipe.redaction.redacted, true);
+    assert.equal(recipe.browseStatus, CRAFTING_BROWSE_STATUS.DISCOVERY);
+    assert.deepEqual(recipe.ingredientSets, [], 'the named ingredients field is still redacted');
+    assert.equal(recipe.flavor, 'A partly hidden brew.', 'description surfaces (not hidden)');
+    assert.equal(recipe.result.items.length, 1, 'results surface (not hidden)');
+    assert.notEqual(recipe.check, null, 'the check surfaces (not hidden)');
   });
 });
 

@@ -1201,12 +1201,20 @@ class Fabricate {
    * Resolve a stored crafting actor preference against Foundry's actor
    * collection. Returns null when the id is empty or stale.
    *
+   * Defense-in-depth: for a non-GM viewer the resolved actor must pass the same
+   * ownership predicate the gathering attempt path uses, so a stale or
+   * console-supplied id the current user does not own can never have its
+   * inventory read by the listing projection. A GM resolves any extant actor.
+   *
    * @param {string|null} actorId
    * @returns {Actor|null}
    * @private
    */
   _resolveCraftingActor(actorId) {
-    return actorId ? (game.actors?.get?.(actorId) ?? null) : null;
+    const actor = actorId ? (game.actors?.get?.(actorId) ?? null) : null;
+    if (!actor) return null;
+    if (game.user?.isGM === true) return actor;
+    return isGatheringActorSelectableByUser(actor, game.user) ? actor : null;
   }
 
   /**

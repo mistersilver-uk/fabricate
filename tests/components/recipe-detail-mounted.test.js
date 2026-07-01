@@ -81,6 +81,10 @@ describe('RecipeDetail mounted behavior', () => {
       // The header renders for every mode; the body is keyed to the mode token.
       assert.ok(target.querySelector('[data-recipe-header]'), 'shared header rendered');
       assert.ok(
+        target.querySelector('.crafting-detail-mode-chip'),
+        'a non-redacted recipe still shows its mode chip'
+      );
+      assert.ok(
         target.querySelector(`[data-recipe-detail-mode="${testCase.mode}"]`),
         `detail wrapper carries the ${testCase.mode} mode`
       );
@@ -112,6 +116,13 @@ describe('RecipeDetail mounted behavior', () => {
     const target = await harness.mount({ recipe: teaser, selectedSetId: null, craftability: null, rollResult: null });
 
     assert.ok(target.querySelector('[data-recipe-teaser]'), 'teaser hint rendered');
+    // The mode chip reveals the crafting mechanism, so it must NOT render for a
+    // redacted teaser (which still carries a modeLabel in the model).
+    assert.equal(
+      target.querySelector('.crafting-detail-mode-chip'),
+      null,
+      'no mode chip leaks the crafting mechanism on a discovery teaser'
+    );
     // None of the body detail (sections, IO, outcome tiers, craft button) leaks.
     assert.equal(target.querySelector('[data-recipe-section]'), null, 'no detail sections rendered');
     assert.equal(target.querySelector('[data-io-group]'), null, 'no IO rows rendered');

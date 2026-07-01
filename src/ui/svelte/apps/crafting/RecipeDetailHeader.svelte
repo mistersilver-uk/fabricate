@@ -31,7 +31,13 @@
     <div class="crafting-detail-header-copy">
       <h2 class="crafting-detail-name" title={name}>{name}</h2>
       <div class="crafting-detail-header-meta">
-        <span class="crafting-detail-mode-chip">{modeLabel}</span>
+        <!-- The mode chip reveals the crafting mechanism, so it is suppressed for a
+             redacted (discovery) teaser — only the generic identity + status show.
+             The {#if modeLabel} guard also avoids painting an empty bordered pill
+             when no label resolved. -->
+        {#if !redacted && modeLabel}
+          <span class="crafting-detail-mode-chip">{modeLabel}</span>
+        {/if}
         <CraftingStatusBadge {status} />
       </div>
     </div>

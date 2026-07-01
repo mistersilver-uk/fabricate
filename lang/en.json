@@ -484,6 +484,9 @@
           "Crafting": "Crafting…",
           "MissingMaterials": "You're missing some required materials."
         },
+        "Notify": {
+          "CraftFailed": "Something went wrong while crafting. Nothing was consumed."
+        },
         "Sources": {
           "Label": "Component sources",
           "Edit": "Edit component sources",

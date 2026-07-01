@@ -7,7 +7,7 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES
 } from '../helpers/svelte-component-harness.js';
-import { fakeCraftingStore, listing, recipe } from '../helpers/crafting-fixtures.js';
+import { fakeCraftingStore, listing, recipe, craftability } from '../helpers/crafting-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -84,5 +84,45 @@ describe('CraftingView mounted behavior', () => {
     const target = await harness.mount({ services: services(store) });
     assert.ok(target.querySelector('[data-crafting-run-summary]'), 'run summary rendered for a completed run');
     assert.equal(target.querySelector('[data-crafting-shopping]'), null, 'shopping list hidden while the run summary is shown');
+  });
+
+  it('disables the run summary "Craft another" when the selection is no longer craftable (non-progressive)', async () => {
+    const built = recipe({
+      ingredientSets: [{ id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) }]
+    });
+    const store = fakeCraftingStore({
+      recipes: [built],
+      selectedCraftability: craftability({ canCraft: false }),
+      lastRollResult: { 'recipe-1': { success: true, items: [] } }
+    });
+    const target = await harness.mount({ services: services(store) });
+    const button = target.querySelector('[data-crafting-run-summary] [data-crafting-craft]');
+    assert.ok(button, 'run summary craft button present');
+    assert.equal(
+      button.getAttribute('data-crafting-craft-disabled'),
+      'true',
+      '"Craft another" is disabled while materials are insufficient'
+    );
+  });
+
+  it('keeps the progressive run summary "Craft next step" enabled even when materials are insufficient', async () => {
+    const built = recipe({
+      modeToken: 'progressive',
+      modeLabel: 'Progressive',
+      ingredientSets: [{ id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) }]
+    });
+    const store = fakeCraftingStore({
+      recipes: [built],
+      selectedCraftability: craftability({ canCraft: false }),
+      lastRollResult: { 'recipe-1': { success: true, items: [] } }
+    });
+    const target = await harness.mount({ services: services(store) });
+    const button = target.querySelector('[data-crafting-run-summary] [data-crafting-craft]');
+    assert.ok(button, 'run summary craft button present');
+    assert.equal(
+      button.getAttribute('data-crafting-craft-disabled'),
+      'false',
+      'the time-gated progressive advance stays enabled'
+    );
   });
 });

@@ -5,7 +5,7 @@ import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
 import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
 import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
-import { notifyWarn } from './svelte/util/foundryBridge.js';
+import { notifyWarn, localize } from './svelte/util/foundryBridge.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -206,6 +206,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
       // Player-facing notification seam (a failed craft surfaces as a warning).
       notify: (message) => notifyWarn(message),
+      // Localized generic craft-failure message for a thrown craft (the engine can
+      // throw on the currency-payment macro path, producing no result message).
+      craftErrorMessage: () => localize('FABRICATE.App.Crafting.Notify.CraftFailed'),
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),

@@ -16,6 +16,7 @@
   let {
     recipe = null,
     rollResult = null,
+    canCraft = true,
     busy = false,
     onCraftNext = null,
     onDismiss = null
@@ -27,6 +28,14 @@
     progressive
       ? localize('FABRICATE.App.Crafting.Run.Advance')
       : localize('FABRICATE.App.Crafting.Button.CraftAnother')
+  );
+  // A progressive run's "Craft next step" is time-gated (advancing to the next
+  // step), never material-gated, so it stays enabled. The non-progressive "Craft
+  // another" repeats the whole craft and needs materials again — disable it when
+  // the current selection is no longer craftable.
+  const advanceDisabled = $derived(!progressive && canCraft !== true);
+  const disabledReason = $derived(
+    advanceDisabled ? localize('FABRICATE.App.Crafting.Button.MissingMaterials') : ''
   );
 </script>
 
@@ -56,7 +65,8 @@
   <div class="crafting-run-action">
     <CraftButton
       label={advanceLabel}
-      disabled={false}
+      disabled={advanceDisabled}
+      {disabledReason}
       {busy}
       onCraft={() => onCraftNext?.()}
     />
