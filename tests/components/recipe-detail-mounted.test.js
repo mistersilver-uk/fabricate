@@ -165,6 +165,69 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(shortPip.classList.contains('is-insufficient'), 'short pip is red');
   });
 
+  it('shows the check formula resolved against the selected actor', async () => {
+    const target = await harness.mount({
+      recipe: recipe({
+        check: {
+          dc: 15,
+          rollFormula: '1d20 + @prof',
+          skill: null,
+          optional: true,
+          mandatory: false,
+          usable: true,
+          resolvedFormula: '1d20 + 2',
+          formulaResolved: true,
+        },
+      }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
+    });
+
+    const formula = target.querySelector('[data-check-formula]');
+    assert.ok(formula, 'check formula rendered');
+    assert.equal(formula.getAttribute('data-check-formula-resolved'), 'true');
+    const code = formula.querySelector('code');
+    assert.equal(code.textContent.trim(), '1d20 + 2', 'shows resolved numbers, not @placeholders');
+    assert.equal(code.getAttribute('title'), '1d20 + @prof', 'raw formula kept as the tooltip');
+    assert.equal(
+      target.querySelector('[data-check-formula-error]'),
+      null,
+      'no error note when resolved'
+    );
+  });
+
+  it('shows an error state when the check formula does not resolve for the actor', async () => {
+    const target = await harness.mount({
+      recipe: recipe({
+        check: {
+          dc: 15,
+          rollFormula: '1d20 + @prof',
+          skill: null,
+          optional: true,
+          mandatory: false,
+          usable: true,
+          resolvedFormula: '1d20 + NaN',
+          formulaResolved: false,
+        },
+      }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
+    });
+
+    const formula = target.querySelector('[data-check-formula]');
+    assert.equal(formula.getAttribute('data-check-formula-resolved'), 'false');
+    assert.equal(
+      formula.querySelector('code').textContent.trim(),
+      '1d20 + @prof',
+      'the raw formula stays visible in the error state'
+    );
+    assert.ok(target.querySelector('[data-check-formula-error]'), 'error note rendered');
+    assert.ok(
+      target.querySelector('.crafting-check-card.is-formula-error'),
+      'the check card is marked as an error'
+    );
+  });
+
   it('renders only the teaser header for a redaction-redacted recipe — no ingredient/result detail', async () => {
     const teaser = recipe({
       redaction: { redacted: true, hiddenFields: ['ingredients', 'results', 'description'] },

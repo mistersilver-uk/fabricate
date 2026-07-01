@@ -455,7 +455,8 @@
           "DcLabel": "DC {dc}",
           "Optional": "Optional",
           "Mandatory": "Required",
-          "NoFormula": "No roll formula is configured for this check."
+          "NoFormula": "No roll formula is configured for this check.",
+          "FormulaUnresolved": "This check can't be resolved to a number for the selected character."
         },
         "Io": {
           "Ingredients": "Ingredients",

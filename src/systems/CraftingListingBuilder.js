@@ -105,6 +105,7 @@ export class CraftingListingBuilder {
     localize = (key) => key,
     nowWorldTime = () => 0,
     isSystemBlockedForRecipes = null,
+    resolveCheckFormula = null,
   } = {}) {
     this.recipeManager = recipeManager;
     this.recipeVisibility = recipeVisibility;
@@ -115,6 +116,10 @@ export class CraftingListingBuilder {
     this._nowWorldTime = typeof nowWorldTime === 'function' ? nowWorldTime : () => 0;
     this._isSystemBlockedForRecipes =
       typeof isSystemBlockedForRecipes === 'function' ? isSystemBlockedForRecipes : () => false;
+    // Injected so the builder stays free of Foundry's `Roll` global; wired to
+    // resolveCheckFormulaDisplay in main.js. Default no-op → resolvedFormula null.
+    this._resolveCheckFormula =
+      typeof resolveCheckFormula === 'function' ? resolveCheckFormula : () => null;
   }
 
   /**
@@ -289,7 +294,7 @@ export class CraftingListingBuilder {
       blockingReasons,
       ingredientSets,
       defaultSetId,
-      check: this._buildCheck(system, mode),
+      check: this._buildCheck(system, mode, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
       result: this._buildResult({ recipe, system, mode, defaultSet }),
     };
@@ -382,7 +387,7 @@ export class CraftingListingBuilder {
    * authored, non-empty roll formula exists — NOT the legacy `enabled` flag.
    * @private
    */
-  _buildCheck(system, mode) {
+  _buildCheck(system, mode, craftingActor = null) {
     const checks = system?.craftingCheck ?? {};
     let config;
     switch (mode) {
@@ -408,9 +413,19 @@ export class CraftingListingBuilder {
 
     const rollFormula = typeof config.rollFormula === 'string' ? config.rollFormula.trim() : '';
     const mandatory = MANDATORY_CHECK_MODES.has(mode);
+    // Resolve the formula's @-placeholders against the acting character for display
+    // (e.g. "1d20 + 3 + 2"). `resolvedFormula` is null when not attempted (no actor /
+    // no dice engine), so the UI falls back to the raw formula; `formulaResolved` is
+    // false when the formula does not reduce to a number for this actor (error state).
+    const resolution =
+      rollFormula.length > 0 && craftingActor
+        ? this._resolveCheckFormula(rollFormula, craftingActor)
+        : null;
     return {
       dc: config.dc ?? null,
       rollFormula: rollFormula.length > 0 ? rollFormula : null,
+      resolvedFormula: resolution?.display ?? null,
+      formulaResolved: resolution ? resolution.resolved === true : null,
       skill: stringOrNull(config.skill),
       optional: !mandatory,
       mandatory,

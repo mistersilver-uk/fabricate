@@ -15,6 +15,17 @@
   const hasDc = $derived(check?.dc !== null && check?.dc !== undefined);
   const hasFormula = $derived(typeof check?.rollFormula === 'string' && check.rollFormula !== '');
   const hasSkill = $derived(typeof check?.skill === 'string' && check.skill !== '');
+  // The formula couldn't be reduced to a number for the selected actor.
+  const formulaError = $derived(check?.formulaResolved === false);
+  // A resolved (substituted) formula to show in place of the raw @-placeholder form.
+  const hasResolvedFormula = $derived(
+    typeof check?.resolvedFormula === 'string' && check.resolvedFormula !== ''
+  );
+  // Prefer the resolved formula unless resolution errored (then keep the raw form,
+  // which surfaces the unresolved placeholders alongside the error note).
+  const shownFormula = $derived(
+    !formulaError && hasResolvedFormula ? check.resolvedFormula : check?.rollFormula
+  );
 </script>
 
 {#if check}
@@ -22,6 +33,7 @@
     class="crafting-check-card"
     class:is-mandatory={mandatory}
     class:is-unusable={check.usable !== true}
+    class:is-formula-error={formulaError}
     data-recipe-section="check"
     data-check-mandatory={mandatory ? 'true' : 'false'}
     data-check-usable={check.usable === true ? 'true' : 'false'}
@@ -50,14 +62,27 @@
         </span>
       {/if}
       {#if hasFormula}
-        <span class="crafting-check-fact crafting-check-formula" data-check-formula>
+        <span
+          class="crafting-check-fact crafting-check-formula"
+          data-check-formula
+          data-check-formula-resolved={hasResolvedFormula
+            ? formulaError
+              ? 'false'
+              : 'true'
+            : undefined}
+        >
           <i class="fas fa-dice-d20" aria-hidden="true"></i>
-          <code>{check.rollFormula}</code>
+          <code title={check.rollFormula}>{shownFormula}</code>
         </span>
       {/if}
     </div>
     {#if check.usable !== true}
       <p class="crafting-check-note">{localize('FABRICATE.App.Crafting.Check.NoFormula')}</p>
+    {:else if formulaError}
+      <p class="crafting-check-note crafting-check-error" data-check-formula-error>
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        {localize('FABRICATE.App.Crafting.Check.FormulaUnresolved')}
+      </p>
     {/if}
   </section>
 {/if}
@@ -130,6 +155,20 @@
     font-size: 11px;
     font-style: italic;
     color: var(--fab-text-muted);
+  }
+
+  /* An unresolvable formula for the selected actor reads as an error. */
+  .crafting-check-card.is-formula-error {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
+  .crafting-check-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-style: normal;
+    color: var(--fab-danger-text);
   }
 
   .crafting-detail-section-title {

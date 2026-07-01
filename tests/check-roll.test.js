@@ -8,6 +8,7 @@ const {
   rolledDiceGroups,
   resolveForcedOutcome,
   evaluateCheckRoll,
+  resolveCheckFormulaDisplay,
   runFormulaPassFail,
   runFormulaProgressive,
   runFormulaRouted,
@@ -107,6 +108,49 @@ test('rolledDiceGroups results are active-only raw faces (drops dropped dice)', 
 test('rolledDiceGroups falls back to summing per-die results when total is absent', () => {
   const groups = rolledDiceGroups({ dice: [{ number: 2, faces: 6, results: [{ result: 3 }, { result: 4 }] }] });
   assert.deepEqual(groups, [{ groupId: 0, group: '2d6', sum: 7, results: [3, 4] }]);
+});
+
+// ── resolveCheckFormulaDisplay ──────────────────────────────────────────────
+// A minimal Roll stub mirroring Foundry's static replaceFormulaData/validate: it
+// substitutes @paths from the roll data and inserts the `missing` sentinel for
+// unmatched keys (so the resolver can flag a non-numeric result).
+function stubResolvingRoll() {
+  const Roll = class {};
+  Roll.replaceFormulaData = (formula, data, { missing } = {}) =>
+    String(formula).replace(/@([\w.]+)/g, (_m, path) => {
+      const value = path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data);
+      return value === undefined || value === null ? (missing ?? `@${path}`) : String(value);
+    });
+  Roll.validate = (formula) => !/NaN/.test(formula) && !/@/.test(formula);
+  globalThis.Roll = Roll;
+}
+
+test('resolveCheckFormulaDisplay substitutes @-placeholders inline against the actor', () => {
+  stubResolvingRoll();
+  const actor = { getRollData: () => ({ abilities: { str: { mod: 3 } }, prof: 2 }) };
+  const result = resolveCheckFormulaDisplay('1d20 + @abilities.str.mod + @prof', actor);
+  assert.deepEqual(result, { display: '1d20 + 3 + 2', resolved: true });
+});
+
+test('resolveCheckFormulaDisplay flags an unresolved key as not resolved', () => {
+  stubResolvingRoll();
+  const actor = { getRollData: () => ({}) }; // no @prof on this actor
+  const result = resolveCheckFormulaDisplay('1d20 + @prof', actor);
+  assert.equal(result.resolved, false, 'a missing key does not resolve to a number');
+  assert.match(result.display, /NaN/, 'the unresolved key becomes the NaN sentinel');
+});
+
+test('resolveCheckFormulaDisplay returns null for a blank formula or absent engine', () => {
+  stubResolvingRoll();
+  assert.equal(resolveCheckFormulaDisplay('', { getRollData: () => ({}) }), null, 'blank formula');
+  assert.equal(resolveCheckFormulaDisplay('   ', {}), null, 'whitespace-only formula');
+
+  delete globalThis.Roll;
+  assert.equal(
+    resolveCheckFormulaDisplay('1d20 + @prof', { getRollData: () => ({}) }),
+    null,
+    'no dice engine → null so the caller shows the raw formula'
+  );
 });
 
 test('rolledDiceGroups fallback sums only active results: false excluded, absent included', () => {

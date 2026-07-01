@@ -118,6 +118,38 @@ export async function evaluateCheckRoll(formula, actor) {
 }
 
 /**
+ * Resolve a check formula's `@` placeholders against an actor's roll data for
+ * DISPLAY — substituting each placeholder with its numeric value inline
+ * (e.g. `1d20 + @abilities.str.mod + @prof` → `1d20 + 3 + 2`) WITHOUT rolling any
+ * dice (no evaluation, so no randomness / side effects).
+ *
+ * Returns `null` when there is no formula or no dice engine (the caller then shows
+ * the raw formula). Otherwise `{ display, resolved }` where `resolved` is false when
+ * the formula does not reduce to a number for this actor (unknown/missing `@` keys
+ * or a non-numeric substitution) — `missing: 'NaN'` makes those detectable, since
+ * Foundry would otherwise silently leave or zero an unmatched key.
+ *
+ * @param {string} formula
+ * @param {object|null} actor
+ * @returns {{ display: string, resolved: boolean }|null}
+ */
+export function resolveCheckFormulaDisplay(formula, actor) {
+  if (typeof formula !== 'string' || formula.trim() === '') return null;
+  const Roll = globalThis.Roll;
+  if (typeof Roll?.replaceFormulaData !== 'function') return null;
+  const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  const display = Roll.replaceFormulaData(String(formula), rollData, {
+    missing: 'NaN',
+    warn: false,
+  });
+  const resolved =
+    !/NaN/.test(display) &&
+    !/@/.test(display) &&
+    (typeof Roll.validate !== 'function' || Roll.validate(display) === true);
+  return { display, resolved };
+}
+
+/**
  * Run a pass/fail formula check: roll the formula, compare the total against `dc`
  * (met-or-exceeded or strictly exceeded), honouring the unified per-check trigger
  * list's forced outcomes (issue 419). Returns

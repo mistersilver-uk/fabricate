@@ -82,6 +82,7 @@ function makeBuilder({
   exhausted = false,
   isSystemBlockedForRecipes = null,
   recipeItemDefinition = null,
+  resolveCheckFormula = null,
 } = {}) {
   const craftingSystemManager = {
     getSystem: (id) => (id === system.id ? system : null),
@@ -101,6 +102,7 @@ function makeBuilder({
     localize: (key) => key,
     nowWorldTime: () => 1000,
     ...(isSystemBlockedForRecipes ? { isSystemBlockedForRecipes } : {}),
+    ...(resolveCheckFormula ? { resolveCheckFormula } : {}),
   });
 }
 
@@ -337,6 +339,41 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(recipe.check.mandatory, true);
     assert.equal(recipe.check.optional, false);
     assert.equal(recipe.check.usable, false);
+  });
+
+  it('resolves the check formula against the actor via the injected resolver', () => {
+    const system = makeSystem({
+      craftingCheck: {
+        simple: { rollFormula: '1d20 + @prof', dc: 15 },
+        routed: {},
+        progressive: {},
+      },
+    });
+    const seen = [];
+    const { recipe } = buildOne({
+      system,
+      resolveCheckFormula: (formula, actor) => {
+        seen.push({ formula, actorId: actor?.id });
+        return { display: formula.replace('@prof', '2'), resolved: true };
+      },
+    });
+    assert.equal(recipe.check.resolvedFormula, '1d20 + 2');
+    assert.equal(recipe.check.formulaResolved, true);
+    assert.deepEqual(seen, [{ formula: '1d20 + @prof', actorId: 'actor-1' }]);
+  });
+
+  it('flags an unresolvable check formula as a formula error', () => {
+    const { recipe } = buildOne({
+      resolveCheckFormula: () => ({ display: '1d20 + NaN', resolved: false }),
+    });
+    assert.equal(recipe.check.resolvedFormula, '1d20 + NaN');
+    assert.equal(recipe.check.formulaResolved, false);
+  });
+
+  it('leaves the check unresolved (null) when no resolver is wired', () => {
+    const { recipe } = buildOne();
+    assert.equal(recipe.check.resolvedFormula, null);
+    assert.equal(recipe.check.formulaResolved, null);
   });
 });
 

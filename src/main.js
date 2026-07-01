@@ -29,6 +29,7 @@ import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
+import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
@@ -1196,6 +1197,7 @@ class Fabricate {
           ? (game.i18n?.format?.(key, data) ?? key)
           : (game.i18n?.localize?.(key) ?? key),
       nowWorldTime: () => game.time?.worldTime ?? 0,
+      resolveCheckFormula: (formula, actor) => resolveCheckFormulaDisplay(formula, actor),
     });
     return this._craftingListingBuilder;
   }
