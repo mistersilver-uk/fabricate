@@ -28,7 +28,7 @@
 
   const id = $derived(String(recipe?.id ?? ''));
   const name = $derived(String(recipe?.name ?? ''));
-  const modeLabel = $derived(String(recipe?.modeLabel ?? ''));
+  const systemName = $derived(String(recipe?.systemName ?? ''));
   const status = $derived(String(recipe?.browseStatus ?? ''));
   const redacted = $derived(recipe?.redaction?.redacted === true);
   const descriptor = $derived(craftingRecipeStatus(status));
@@ -66,7 +66,6 @@
   data-selected={selected ? 'true' : 'false'}
   data-recipe-status={status}
 >
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="crafting-recipe-row-main is-toggle"
     role="button"
@@ -95,7 +94,7 @@
     <span class="crafting-recipe-row-copy">
       <span class="crafting-recipe-row-name" title={name}>{name}</span>
       <span class="crafting-recipe-row-meta">
-        <span class="crafting-recipe-row-mode">{modeLabel}</span>
+        <span class="crafting-recipe-row-system">{systemName}</span>
         {#if !uncraftable}
           <CraftingStatusBadge {status} compact />
         {/if}
@@ -257,7 +256,7 @@
     min-width: 0;
   }
 
-  .crafting-recipe-row-mode {
+  .crafting-recipe-row-system {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
