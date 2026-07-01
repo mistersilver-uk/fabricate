@@ -8,7 +8,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatRespawnDuration } from '../../src/ui/svelte/util/formatDuration.js';
+import {
+  formatRespawnDuration,
+  formatDurationHMS,
+  formatRelativeWorldTime
+} from '../../src/ui/svelte/util/formatDuration.js';
 
 const HOUR = 3600;
 const DAY = 86400;
@@ -52,4 +56,36 @@ test('day/week thresholds follow a CUSTOM calendar (10-hour days)', () => {
   assert.equal(formatRespawnDuration(customDay, calendar), '1 day');
   // 5 custom days == one custom week.
   assert.equal(formatRespawnDuration(5 * customDay, calendar), '1 week');
+});
+
+test('formatDurationHMS renders a compact countdown, dropping leading zero units', () => {
+  assert.equal(formatDurationHMS(HOUR + 27 * 60 + 42), '1h 27m 42s');
+  assert.equal(formatDurationHMS(27 * 60 + 42), '27m 42s');
+  assert.equal(formatDurationHMS(42), '42s');
+  assert.equal(formatDurationHMS(2 * HOUR), '2h 0m 0s');
+});
+
+test('formatDurationHMS floors non-positive / non-finite input to 0s', () => {
+  assert.equal(formatDurationHMS(0), '0s');
+  assert.equal(formatDurationHMS(-5), '0s');
+  assert.equal(formatDurationHMS(NaN), '0s');
+});
+
+test('formatRelativeWorldTime labels today / yesterday / N days ago', () => {
+  const now = 10 * DAY;
+  assert.equal(formatRelativeWorldTime(now, now), 'Today');
+  assert.equal(formatRelativeWorldTime(now - 3600, now), 'Today', 'same day');
+  assert.equal(formatRelativeWorldTime(now - DAY, now), 'Yesterday');
+  assert.equal(formatRelativeWorldTime(now - 4 * DAY, now), '4 days ago');
+});
+
+test('formatRelativeWorldTime honors injected labels + calendar day length', () => {
+  const labels = { today: 'Hoy', yesterday: 'Ayer', daysAgo: (n) => `hace ${n} dias` };
+  const customDay = 36000;
+  assert.equal(
+    formatRelativeWorldTime(0, 3 * customDay, { secondsPerDay: customDay, labels }),
+    'hace 3 dias'
+  );
+  assert.equal(formatRelativeWorldTime(5, 5, { labels }), 'Hoy');
+  assert.equal(formatRelativeWorldTime(NaN, 5), '', 'non-finite input → empty');
 });

@@ -51,6 +51,9 @@ You'll see three new header buttons:
 
 When no crafting systems are enabled, players do not see the **Craft Item** or **Gathering** buttons.
 
+The unified Fabricate window also has a **Journal** tab where players monitor the runs their characters have started across crafting, gathering, and salvage, and continue crafting runs.
+See [Journal]({% link journal.md %}).
+
 ## Step 2: Create a Crafting System
 
 {: .gm }

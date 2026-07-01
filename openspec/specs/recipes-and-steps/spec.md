@@ -151,6 +151,25 @@ Tool usage/breakage is tracked on owned item instances.
 - When the last step succeeds, mark run complete and clean up run state.
 - On step failure, mark run failed and clean up run state.
 
+#### Player-Initiated Advance ("Trigger Next Step")
+
+Crafting is the only player-triggerable run type.
+A matured crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
+The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `003-ui-integration.md` *Journal App*).
+
+- Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
+- On step success the engine advances `currentStepIndex` to the next step, or marks the run `succeeded` and cleans up run state when the last step succeeds.
+- On step failure the engine fails the WHOLE run (`failed`) and cleans up run state; there is no per-step retry.
+- Advancing requires ownership of BOTH the crafting actor (the craft writes results to it via `createEmbeddedDocuments`) AND every component-source actor (resolved from the run's persisted `componentSourceActorUuids`; an empty resolution falls back to the crafting actor's own inventory).
+An unknown crafting actor is likewise blocked.
+A non-owner is told to ask an owner or GM rather than the run advancing silently, because the craft writes directly to the actors with no socket-to-GM relay.
+
+#### Maturity Asymmetry Between Run Types
+
+A matured crafting step waits for the manual trigger above.
+By contrast, matured gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `009-gathering-and-harvesting.md`).
+The Journal therefore presents gathering and salvage runs as auto-resolving and offers them no trigger button.
+
 ## Alchemy Execution Lifecycle
 
 Applies only when `CraftingSystem.resolutionMode === "alchemy"`.

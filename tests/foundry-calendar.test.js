@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   secondsPerDayFromCalendar,
   secondsPerWeekFromCalendar,
-  secondsPerUnitFromCalendar
+  secondsPerUnitFromCalendar,
+  daysPerYearFromCalendar
 } from '../src/systems/foundryCalendar.js';
 
 describe('foundryCalendar — deriving interval lengths from a world calendar', () => {
@@ -52,5 +53,21 @@ describe('foundryCalendar — deriving interval lengths from a world calendar', 
     assert.equal(secondsPerUnitFromCalendar('hours', null), 3600);
     assert.equal(secondsPerUnitFromCalendar('days', null), 86400);
     assert.equal(secondsPerUnitFromCalendar('weeks', null), 604800);
+  });
+
+  it('daysPerYearFromCalendar prefers explicit days.daysPerYear config', () => {
+    assert.equal(daysPerYearFromCalendar({ days: { daysPerYear: 360 } }), 360);
+  });
+
+  it('daysPerYearFromCalendar sums month day counts when no explicit config', () => {
+    const cal = { months: { values: [{ days: 30 }, { days: 31 }, { days: 28 }] } };
+    assert.equal(daysPerYearFromCalendar(cal), 89);
+  });
+
+  it('daysPerYearFromCalendar returns null when neither source is resolvable', () => {
+    assert.equal(daysPerYearFromCalendar(null), null);
+    assert.equal(daysPerYearFromCalendar({}), null);
+    assert.equal(daysPerYearFromCalendar({ days: { daysPerYear: 0 } }), null);
+    assert.equal(daysPerYearFromCalendar({ months: { values: [] } }), null);
   });
 });

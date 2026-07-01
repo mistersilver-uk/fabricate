@@ -56,6 +56,23 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 | `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
 | `alchemy`             | one or more     | one or more                 | provider-dependent | recipe `resultSelection.provider`   |
 
+## Player-Facing Mode Labels
+
+The `resolutionMode` token is system-internal and must never surface raw in player UI.
+The player-facing Journal screen (see `003-ui-integration.md` *Journal App*) maps each mode to a localized display label through a frozen label-key map (`RunJournalBuilder.MODE_LABEL_KEYS`), resolved against the `FABRICATE.App.Journal.Mode.*` localization keys.
+
+| Mode                  | Localization key                                 | Player label          |
+|-----------------------|--------------------------------------------------|-----------------------|
+| `simple`              | `FABRICATE.App.Journal.Mode.Standard`            | Standard (DC)         |
+| `routedByIngredients` | `FABRICATE.App.Journal.Mode.RoutedByIngredients` | Routed by Ingredients |
+| `routedByCheck`       | `FABRICATE.App.Journal.Mode.RoutedByCheck`       | Routed by Check       |
+| `progressive`         | `FABRICATE.App.Journal.Mode.Progressive`         | Progressive           |
+| `alchemy`             | `FABRICATE.App.Journal.Mode.Alchemy`             | Alchemy               |
+
+- There is no canonical "Standard" resolution mode.
+`simple` (a DC pass/fail check) renders as "Standard (DC)" for players, even though its internal token stays `simple`.
+- A run whose recipe resolves to an unknown or absent mode falls back to the `simple` ("Standard (DC)") label rather than emitting a raw token.
+
 ## Simple Mode
 
 ### Semantics

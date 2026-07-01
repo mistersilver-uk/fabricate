@@ -3,6 +3,8 @@ import FabricateAppRoot from './svelte/apps/FabricateAppRoot.svelte';
 import { registerFabricateApp } from './appFactory.js';
 import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
+import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
+import { notifyInfo } from './svelte/util/foundryBridge.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -194,6 +196,14 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
       getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null,
+      // Player-facing Journal seams. The store/components never touch Foundry
+      // globals; these wrappers are the single Foundry-facing edge.
+      listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
+      advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
+      getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
+      getWorldTimeComponents: (worldTime) =>
+        game?.fabricate?.getWorldTimeComponents?.(worldTime) ?? null,
+      notify: (message) => notifyInfo(message),
       // GM economy authoring + manual state controls (Manager app).
       getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
       setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
@@ -214,6 +224,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // One shared actor-bar store instance, reused across renders, so the shell
     // and the gathering tab read/write the same reactive selection state.
     services.actorBar = createActorBarStore({ services });
+    // One shared journal store instance so the nav badge (shell) and the Journal
+    // tab read the same reactive run state.
+    services.journal = createJournalStore({ services });
     return services;
   }
 

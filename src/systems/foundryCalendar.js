@@ -69,6 +69,29 @@ export function secondsPerWeekFromCalendar(
 }
 
 /**
+ * Number of days in one calendar year, derived from a Foundry V13 world calendar.
+ * Prefers explicit config (`days.daysPerYear`), then the sum of each configured
+ * month's day count (`months.values[].days`). Returns null when neither is
+ * resolvable, so callers can fall back to a 1-based within-year day.
+ *
+ * Kept free of `game.*` so it is unit-testable with a plain fake calendar;
+ * `main.js` injects the lookup into the Journal's world-time-components seam.
+ *
+ * @param {object|null} calendar
+ * @returns {number|null}
+ */
+export function daysPerYearFromCalendar(calendar) {
+  const explicit = Number(calendar?.days?.daysPerYear);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const months = calendar?.months?.values;
+  if (Array.isArray(months) && months.length > 0) {
+    const total = months.reduce((sum, month) => sum + (Number(month?.days) || 0), 0);
+    if (total > 0) return total;
+  }
+  return null;
+}
+
+/**
  * Resolve seconds for one regen/respawn unit against a calendar object. Minutes
  * and hours are fixed; days and weeks are calendar-derived. With no calendar,
  * returns the Earth-table values, reproducing the pre-calendar behavior.
