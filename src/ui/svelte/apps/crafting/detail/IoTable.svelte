@@ -91,7 +91,10 @@
       <ul class="crafting-io-list">
         {#each tools as tool, index (tool.componentId ?? tool.name ?? index)}
           <li class="crafting-io-row" data-io-satisfied={tool.available ? 'true' : 'false'}>
-            <span class="crafting-io-name">{tool.name}</span>
+            <span class="crafting-io-tool-label">
+              <CraftingThumb src={tool.img} alt="" size={28} />
+              <span class="crafting-io-name">{tool.name}</span>
+            </span>
             <QuantityTag
               label={tool.available
                 ? localize('FABRICATE.App.Crafting.Io.Available')
@@ -227,6 +230,15 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 13px;
+  }
+
+  /* Tool row: image tile to the left of the tool name. */
+  .crafting-io-tool-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .crafting-io-tags {

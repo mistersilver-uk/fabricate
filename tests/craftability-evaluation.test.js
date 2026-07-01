@@ -447,7 +447,7 @@ test('TC8: evaluateCraftability toolStates show available when tool present', ()
   ]);
 
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: compId, sourceUuid, name: 'Mortar' }
+    { id: compId, sourceUuid, name: 'Mortar', img: 'icons/mortar.webp' }
   ], [{ id: 'tool-mortar', componentId: compId, enabled: true }]);
 
   const recipe = new Recipe({
@@ -464,6 +464,8 @@ test('TC8: evaluateCraftability toolStates show available when tool present', ()
   assert.equal(result.canCraft, true, 'should be craftable with tool present');
   assert.equal(result.toolStates.length, 1);
   assert.equal(result.toolStates[0].available, true, 'tool should be marked available');
+  assert.equal(result.toolStates[0].name, 'Mortar', 'tool state carries the component name');
+  assert.equal(result.toolStates[0].img, 'icons/mortar.webp', 'tool state carries the component image');
 });
 
 test('TC8b: evaluateCraftability toolStates show unavailable when tool missing', () => {

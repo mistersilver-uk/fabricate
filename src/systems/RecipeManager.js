@@ -351,7 +351,7 @@ export class RecipeManager {
    *   missing: { ingredients: Array, essences: Array, tools: Array },
    *   ingredientStates: Array<{ description: string, need: number, have: number, satisfied: boolean }>,
    *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean }>,
-   *   toolStates: Array<{ name: string, available: boolean, virtual?: boolean }>
+   *   toolStates: Array<{ name: string, img: string|null, available: boolean, virtual?: boolean }>
    * }}
    */
   evaluateCraftability(
@@ -543,8 +543,10 @@ export class RecipeManager {
     const matchedByTool = new Map(matched.items.map((entry) => [entry.tool, entry]));
     return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
+      const toolId = tool?.componentId || tool?.systemItemId;
       const state = {
-        name: this.resolveComponentName(recipe, tool?.componentId || tool?.systemItemId),
+        name: this.resolveComponentName(recipe, toolId),
+        img: this.resolveComponentImg(recipe, toolId),
         available: entry !== null,
       };
       if (entry?.virtual === true) state.virtual = true;

@@ -165,6 +165,29 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(shortPip.classList.contains('is-insufficient'), 'short pip is red');
   });
 
+  it('shows the tool image to the left of the tool name', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ modeToken: 'simple', modeLabel: 'Simple' }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({
+        toolStates: [{ name: 'Mortar & Pestle', img: 'icons/mortar.webp', available: true }],
+      }),
+    });
+
+    const label = target.querySelector(
+      '[data-io-group="tools"] .crafting-io-row .crafting-io-tool-label'
+    );
+    assert.ok(label, 'tool label wrapper rendered');
+    const thumb = label.querySelector('.crafting-thumb img');
+    const name = label.querySelector('.crafting-io-name');
+    assert.ok(thumb, 'tool image rendered');
+    assert.equal(name.textContent.trim(), 'Mortar & Pestle');
+    assert.ok(
+      thumb.compareDocumentPosition(name) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the image comes before the name in document order'
+    );
+  });
+
   it('shows the check formula resolved against the selected actor', async () => {
     const target = await harness.mount({
       recipe: recipe({
