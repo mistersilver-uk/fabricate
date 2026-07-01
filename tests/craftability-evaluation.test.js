@@ -466,6 +466,42 @@ test('TC8: evaluateCraftability toolStates show available when tool present', ()
   assert.equal(result.toolStates[0].available, true, 'tool should be marked available');
   assert.equal(result.toolStates[0].name, 'Mortar', 'tool state carries the component name');
   assert.equal(result.toolStates[0].img, 'icons/mortar.webp', 'tool state carries the component image');
+  assert.equal(result.toolStates[0].needsRepair, false, 'a present tool does not need repair');
+});
+
+test('TC8d: a present-but-broken tool is unavailable and needs repair', () => {
+  const systemId = 'sys-tc8d';
+  const compId = 'comp-mortar-d';
+  const sourceUuid = 'Item.mortar-d-source';
+
+  // A matching item that carries the fabricate toolBroken flag → damaged (repair).
+  const brokenTool = {
+    uuid: 'broken-mortar-uuid',
+    id: 'broken-mortar-uuid',
+    system: { quantity: 1 },
+    flags: { core: { sourceId: sourceUuid }, fabricate: { toolBroken: true } },
+    getFlag: (scope, key) => (scope === 'fabricate' && key === 'toolBroken' ? true : undefined)
+  };
+  const ingredientItem = makeItem('item-a', 1);
+
+  const set = makeIngredientSet([makeGroupData([makeIngredientData('item-a', 1)])]);
+  const manager = makeRecipeManagerWithSystem(
+    systemId,
+    [{ id: compId, sourceUuid, name: 'Mortar D' }],
+    [{ id: 'tool-mortar-d', componentId: compId, enabled: true }]
+  );
+  const recipe = new Recipe({
+    name: 'Broken Tool Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    toolIds: ['tool-mortar-d'],
+    resultGroups: [{ id: 'rg-1', results: [] }]
+  });
+
+  const result = manager.evaluateCraftability([makeActor([ingredientItem, brokenTool])], recipe);
+
+  assert.equal(result.toolStates[0].available, false, 'a broken tool is unavailable');
+  assert.equal(result.toolStates[0].needsRepair, true, 'a broken tool needs repair');
 });
 
 test('TC8b: evaluateCraftability toolStates show unavailable when tool missing', () => {

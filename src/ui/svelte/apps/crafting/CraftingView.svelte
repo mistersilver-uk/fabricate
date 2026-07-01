@@ -206,6 +206,8 @@
           <ShoppingList
             aggregate={store?.shoppingAggregate ?? null}
             entries={shoppingEntries}
+            onIncrement={(id) => store?.addToShoppingList(id, 1)}
+            onDecrement={(id) => store?.decrementShoppingList(id)}
             onRemove={(id) => store?.removeFromShoppingList(id)}
             onClear={() => store?.clearShoppingList()}
           />

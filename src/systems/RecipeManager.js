@@ -1,6 +1,6 @@
 import { getFabricateFlag } from '../config/flags.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { matchGatheringTools } from '../gatheringToolRuntime.js';
+import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
@@ -529,14 +529,21 @@ export class RecipeManager {
     // `matchGatheringTools` scopes the virtual-present set to the system passed
     // here (the recipe's crafting system), so a present tool from a different
     // system never satisfies this recipe's tool prerequisites.
-    const matched = matchGatheringTools({
+    const matchArgs = {
       actor: { items: availableItems },
       system: { id: recipe?.craftingSystemId ?? null },
       task: { id: recipe?.id ?? null, craftingSystemId: recipe?.craftingSystemId ?? null },
       tools,
       craftingSystemManager: { recipeManager: this },
       presentTools,
-    });
+    };
+    const matched = matchGatheringTools(matchArgs);
+    // The same matcher, split into present/damaged/missing so the UI can show
+    // "Repair" (present-but-broken) vs "Acquire" (absent) — `matched` alone
+    // collapses both broken and absent into unavailable.
+    const stateByTool = new Map(
+      classifyGatheringToolStates(matchArgs).map((entry) => [entry.tool, entry.state])
+    );
     // Index by tool so the per-tool state can carry the virtual flag (a
     // virtual-present match has no owned item and must be excluded from
     // breakage/usage by the caller).
@@ -548,6 +555,7 @@ export class RecipeManager {
         name: this.resolveComponentName(recipe, toolId),
         img: this.resolveComponentImg(recipe, toolId),
         available: entry !== null,
+        needsRepair: stateByTool.get(tool) === 'damaged',
       };
       if (entry?.virtual === true) state.virtual = true;
       return state;
@@ -705,8 +713,30 @@ export class RecipeManager {
     const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
     return Object.entries(essences).map(([type, need]) => {
       const have = accumulatedEssences[type] || 0;
-      return { type, need, have, satisfied: have >= need };
+      return {
+        type,
+        name: this._resolveEssenceName(recipe, type),
+        need,
+        have,
+        satisfied: have >= need,
+      };
     });
+  }
+
+  /**
+   * Resolve an essence's display label from the system's essence definitions,
+   * falling back to the raw type id when no definition/name is configured.
+   * @private
+   */
+  _resolveEssenceName(recipe, type) {
+    const systemId = recipe?.craftingSystemId;
+    const system = systemId
+      ? game.fabricate?.getCraftingSystemManager?.()?.getSystem(systemId)
+      : null;
+    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definition = definitions.find((def) => def?.id === type);
+    const name = definition?.name;
+    return typeof name === 'string' && name.trim() ? name : String(type ?? '');
   }
 
   /**

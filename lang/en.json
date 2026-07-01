@@ -482,7 +482,16 @@
           "Clear": "Clear",
           "Remove": "Remove from list",
           "AddToList": "Add to shopping list",
-          "AllSatisfied": "You have everything you need."
+          "AllSatisfied": "You have everything you need.",
+          "PlannedRecipes": "Planned recipes",
+          "MissingComponents": "Missing components",
+          "UnavailableTools": "Unavailable tools",
+          "RecipesTitle": "Recipes",
+          "AcquireComponents": "Acquire these components",
+          "AcquireTools": "Acquire or repair these tools",
+          "Owned": "{have} / {need} owned",
+          "Acquire": "Acquire",
+          "Repair": "Repair"
         },
         "Run": {
           "Title": "Crafting run",

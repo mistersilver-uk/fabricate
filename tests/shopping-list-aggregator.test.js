@@ -421,4 +421,25 @@ describe('aggregateShoppingList', () => {
     assert.equal(result.ingredients.length, 1);
     assert.equal(result.ingredients[0].description, 'Any Metal');
   });
+
+  it('carries name/img onto ingredients and essences, and img/needsRepair onto tools', () => {
+    const recipe = makeRecipe('r1');
+    const manager = makeRecipeManager([recipe], () => ({
+      ingredientStates: [
+        makeIngredientState({ componentId: 'c1', name: 'Iron', img: 'icons/iron.webp', need: 2, have: 0 })
+      ],
+      essenceStates: [makeEssenceState({ type: 'fire', name: 'Fire', need: 2, have: 0 })],
+      toolStates: [
+        makeToolState({ name: 'Anvil', img: 'icons/anvil.webp', available: false, needsRepair: true })
+      ]
+    }));
+
+    const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
+
+    assert.equal(result.ingredients[0].name, 'Iron');
+    assert.equal(result.ingredients[0].img, 'icons/iron.webp');
+    assert.equal(result.essences[0].name, 'Fire');
+    assert.equal(result.tools[0].img, 'icons/anvil.webp');
+    assert.equal(result.tools[0].needsRepair, true, 'a broken tool carries needsRepair');
+  });
 });

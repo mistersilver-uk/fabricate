@@ -237,6 +237,16 @@ export function createCraftingStore({ services } = {}) {
     shoppingEntries = [...shoppingEntries, { recipeId, quantity: qty }];
   }
 
+  /** Decrement a shopping-list recipe's quantity by one, dropping it at zero. */
+  function decrementShoppingList(recipeId) {
+    if (!recipeId) return;
+    shoppingEntries = shoppingEntries
+      .map((entry) =>
+        entry.recipeId === recipeId ? { ...entry, quantity: entry.quantity - 1 } : entry
+      )
+      .filter((entry) => entry.quantity > 0);
+  }
+
   function removeFromShoppingList(recipeId) {
     shoppingEntries = shoppingEntries.filter((entry) => entry.recipeId !== recipeId);
   }
@@ -390,6 +400,7 @@ export function createCraftingStore({ services } = {}) {
     setPageSize,
     chooseIngredientSet,
     addToShoppingList,
+    decrementShoppingList,
     removeFromShoppingList,
     clearShoppingList,
     craft,
