@@ -9,6 +9,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import RecipeDetailHeader from './RecipeDetailHeader.svelte';
+  import CraftButton from './CraftButton.svelte';
   import SimpleRecipeBody from './detail/SimpleRecipeBody.svelte';
   import IngredientRoutedBody from './detail/IngredientRoutedBody.svelte';
   import RoutedByCheckBody from './detail/RoutedByCheckBody.svelte';
@@ -27,6 +28,17 @@
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
   const mode = $derived(String(recipe?.modeToken ?? 'simple'));
+
+  // Craft-button gating (the button is a fixed footer below the scrolling body).
+  const canCraft = $derived(craftability?.canCraft === true);
+  const craftLabel = $derived(
+    rollResult
+      ? localize('FABRICATE.App.Crafting.Button.CraftAnother')
+      : localize('FABRICATE.App.Crafting.Button.Craft')
+  );
+  const disabledReason = $derived(
+    canCraft ? '' : localize('FABRICATE.App.Crafting.Button.MissingMaterials')
+  );
 
   // Resolve the mode body once. Alchemy is handled by its own tab; an unknown
   // mode falls back to the simple body so a misconfigured system still renders.
@@ -48,8 +60,17 @@
   <div class="crafting-detail" data-crafting-detail-state="selected" data-recipe-detail-mode={mode}>
     <RecipeDetailHeader {recipe} {onLearn} />
     {#if !redacted}
-      <div class="crafting-detail-body-scroll">
-        <Body {recipe} {selectedSetId} {craftability} {rollResult} {busy} {onChoose} {onCraft} />
+      <div class="crafting-detail-body" data-crafting-detail-scroll>
+        <Body {recipe} {selectedSetId} {craftability} {rollResult} {onChoose} />
+      </div>
+      <div class="crafting-detail-footer">
+        <CraftButton
+          label={craftLabel}
+          disabled={!canCraft}
+          {disabledReason}
+          {busy}
+          {onCraft}
+        />
       </div>
     {/if}
   </div>
@@ -67,11 +88,19 @@
     overflow: hidden;
   }
 
-  .crafting-detail-body-scroll {
+  /* The detail content scrolls here; the craft-button footer below stays fixed and
+     always visible without overlapping the content. */
+  .crafting-detail-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding-right: 2px;
+  }
+
+  .crafting-detail-footer {
+    flex: 0 0 auto;
+    padding-top: var(--fab-space-3);
+    border-top: 1px solid var(--fab-border);
   }
 
   .crafting-detail-empty {

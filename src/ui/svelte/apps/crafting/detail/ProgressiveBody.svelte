@@ -16,9 +16,7 @@
     selectedSetId = null,
     craftability = null,
     rollResult = null,
-    busy = false,
-    onChoose = null,
-    onCraft = null
+    onChoose = null
   } = $props();
 </script>
 
@@ -27,7 +25,7 @@
     <i class="fas fa-list-ol" aria-hidden="true"></i>
     {localize('FABRICATE.App.Crafting.Detail.ProgressiveHint')}
   </p>
-  <RecipeBodyShell {recipe} {selectedSetId} {craftability} {rollResult} {busy} {onChoose} {onCraft}>
+  <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet results()}
       <IoTable {craftability} result={recipe?.result} />
     {/snippet}

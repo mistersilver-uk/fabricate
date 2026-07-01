@@ -183,9 +183,12 @@
   }
 
   .crafting-shopping-empty {
+    /* Fill the space under the title and center the icon + hint vertically. */
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 10px;
     margin: 0;
     padding: var(--fab-space-4);

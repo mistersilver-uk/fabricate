@@ -15,9 +15,7 @@
     selectedSetId = null,
     craftability = null,
     rollResult = null,
-    busy = false,
-    onChoose = null,
-    onCraft = null
+    onChoose = null
   } = $props();
 
   // The chosen ingredient set determines the output, so the "Produces" list must
@@ -39,7 +37,7 @@
 </script>
 
 <div data-recipe-mode="routedByIngredients">
-  <RecipeBodyShell {recipe} {selectedSetId} {craftability} {rollResult} {busy} {onChoose} {onCraft}>
+  <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet selectorIntro()}
       <p class="crafting-routing-hint" data-recipe-section="routing-hint">
         {localize('FABRICATE.App.Crafting.Detail.IngredientRoutingHint')}

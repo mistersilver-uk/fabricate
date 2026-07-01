@@ -116,6 +116,15 @@ describe('RecipeDetail mounted behavior', () => {
         );
       }
       assert.ok(target.querySelector('[data-crafting-craft]'), 'craft button present');
+      // The craft button is a fixed footer OUTSIDE the scrolling detail region, so it
+      // stays visible without overlapping the recipe details.
+      const scroll = target.querySelector('[data-crafting-detail-scroll]');
+      assert.ok(scroll, 'the detail content has a dedicated scroll region');
+      assert.equal(
+        scroll.querySelector('[data-crafting-craft]'),
+        null,
+        'the craft button is not inside the scroll region'
+      );
     });
   }
 
