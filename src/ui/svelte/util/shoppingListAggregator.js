@@ -87,8 +87,13 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
     totalRecipes += 1;
     totalQuantity += quantity;
 
+    // Prefer the shopping requirement (materials to craft once via ANY ingredient
+    // set — max need per component across sets), falling back to single-set
+    // craftability when the manager does not expose it (e.g. test stubs).
     const evaluation = componentSourceActors && componentSourceActors.length > 0
-      ? recipeManager.evaluateCraftability(componentSourceActors, recipe)
+      ? (typeof recipeManager.evaluateShoppingRequirement === 'function'
+          ? recipeManager.evaluateShoppingRequirement(componentSourceActors, recipe)
+          : recipeManager.evaluateCraftability(componentSourceActors, recipe))
       : { ingredientStates: [], essenceStates: [], toolStates: [] };
 
     const ingredientStates = evaluation?.ingredientStates ?? [];

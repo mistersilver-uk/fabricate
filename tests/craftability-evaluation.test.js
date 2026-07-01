@@ -855,3 +855,37 @@ test('TC10b (regression): evaluateCraftability returns all states unsatisfied wh
   assert.equal(allSatisfied, false,
     'not all ingredientStates can be satisfied when canCraft is false (no false positive)');
 });
+
+// ---------------------------------------------------------------------------
+// evaluateShoppingRequirement: union across ingredient sets, max need per component
+// ---------------------------------------------------------------------------
+
+test('evaluateShoppingRequirement unions all ingredient sets with the max need per component', () => {
+  const systemId = 'sys-shop';
+  const setA = makeIngredientSet([makeGroupData([makeComponentIngredientData('c-iron', 2)])]);
+  const setB = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData('c-iron', 3)]),
+    makeGroupData([makeComponentIngredientData('c-wood', 1)])
+  ]);
+  const recipe = new Recipe({
+    name: 'Routed Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [setA.toJSON(), setB.toJSON()],
+    resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }]
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: 'c-iron', sourceUuid: 'Item.iron', name: 'Iron', img: 'icons/iron.webp' },
+    { id: 'c-wood', sourceUuid: 'Item.wood', name: 'Wood', img: 'icons/wood.webp' }
+  ]);
+
+  // Owns nothing — the shopping requirement is the full union.
+  const result = manager.evaluateShoppingRequirement([makeActor([])], recipe);
+
+  assert.equal(result.ingredientStates.length, 2, 'union of components across both sets');
+  const byName = Object.fromEntries(result.ingredientStates.map((s) => [s.name, s]));
+  assert.equal(byName.Iron.need, 3, 'iron need is the max across sets (2 vs 3), not the sum');
+  assert.equal(byName.Iron.img, 'icons/iron.webp', 'carries the component image');
+  assert.equal(byName.Wood.need, 1, 'wood from the second set is included');
+  assert.equal(byName.Iron.satisfied, false);
+  assert.equal(byName.Iron.have, 0);
+});

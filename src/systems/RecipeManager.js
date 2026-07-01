@@ -512,6 +512,104 @@ export class RecipeManager {
   }
 
   /**
+   * The material requirement to craft a recipe ONCE via ANY ingredient set, for the
+   * shopping list. Unlike {@link evaluateCraftability} (which reports a single
+   * chosen set), this unions every set: per component / per essence the `need` is
+   * the MAXIMUM across sets, and tools are the union of every set's tools. That is
+   * exactly enough to craft the recipe once whichever set the player picks — NOT
+   * enough to craft every set at once.
+   *
+   * Same `{ ingredientStates, essenceStates, toolStates }` shape as
+   * evaluateCraftability (with `have` re-derived against the merged max `need`), so
+   * the shopping aggregator consumes it identically.
+   *
+   * @param {Actor[]} componentSourceActors
+   * @param {Recipe} recipe
+   * @param {object} [options]
+   * @param {object|null} [options.craftingActor]
+   * @returns {{ ingredientStates: Array, essenceStates: Array, toolStates: Array }}
+   */
+  evaluateShoppingRequirement(componentSourceActors, recipe, { craftingActor = null } = {}) {
+    const sourceActors = Array.isArray(componentSourceActors)
+      ? componentSourceActors
+      : componentSourceActors
+        ? [componentSourceActors]
+        : [];
+
+    const empty = { ingredientStates: [], essenceStates: [], toolStates: [] };
+    if (sourceActors.length === 0 || !Array.isArray(recipe?.ingredientSets)) return empty;
+    if (recipe.ingredientSets.length === 0) return empty;
+
+    const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
+    const features = this._getSystemFeatures(recipe);
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+
+    const ingredientByKey = new Map();
+    const essenceByType = new Map();
+    const toolByKey = new Map();
+
+    for (const set of recipe.ingredientSets) {
+      const selection =
+        typeof set.resolveIngredientSelection === 'function'
+          ? set.resolveIngredientSelection(
+              availableItems,
+              (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item),
+              { affordCurrency }
+            )
+          : {
+              success: true,
+              missingGroups: [],
+              selectedIngredients: [],
+              plan: [],
+              currencySpends: [],
+            };
+
+      // Keep the highest-need state per component (need = worst-case single set).
+      for (const state of this._buildIngredientStates(recipe, set, selection, availableItems)) {
+        const key = state.componentId ?? state.description ?? state.name;
+        const existing = ingredientByKey.get(key);
+        if (!existing || (state.need ?? 0) > (existing.need ?? 0)) {
+          ingredientByKey.set(key, { ...state });
+        }
+      }
+
+      for (const essence of this._buildEssenceStates(recipe, set, availableItems, features)) {
+        const existing = essenceByType.get(essence.type);
+        if (!existing || (essence.need ?? 0) > (existing.need ?? 0)) {
+          essenceByType.set(essence.type, { ...essence });
+        }
+      }
+
+      // A tool is needed if ANY set requires it; prefer an unavailable/repair reading.
+      const toolStates = this._buildToolStates(
+        recipe,
+        this.getToolsForSet(recipe, set),
+        availableItems,
+        null
+      );
+      for (const tool of toolStates) {
+        const key = tool.componentId ?? tool.name;
+        const existing = toolByKey.get(key);
+        if (!existing || (existing.available === true && tool.available !== true)) {
+          toolByKey.set(key, tool);
+        }
+      }
+    }
+
+    // Re-derive satisfaction against the merged max need.
+    const ingredientStates = [...ingredientByKey.values()].map((state) => ({
+      ...state,
+      satisfied: (state.have ?? 0) >= (state.need ?? 0),
+    }));
+    const essenceStates = [...essenceByType.values()].map((essence) => ({
+      ...essence,
+      satisfied: (essence.have ?? 0) >= (essence.need ?? 0),
+    }));
+
+    return { ingredientStates, essenceStates, toolStates: [...toolByKey.values()] };
+  }
+
+  /**
    * Build per-tool display/presence states for a recipe's resolved library
    * Tools. Each entry is
    * `{ name, available }` where `available` is true when at least one of the
