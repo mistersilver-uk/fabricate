@@ -1676,6 +1676,7 @@ class Fabricate {
         getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
         getGatheringTask: (environmentId, taskId) =>
           this._resolveJournalGatheringTask(environmentId, taskId),
+        getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
         nowWorldTime: () => this.getWorldTime(),
@@ -1717,6 +1718,24 @@ class Fabricate {
     const tasks = Array.isArray(environment?.tasks) ? environment.tasks : [];
     const task = tasks.find((entry) => entry?.id === taskId);
     return task ? { name: task.name, img: task.img } : null;
+  }
+
+  /**
+   * Resolve a run's awarded/created result item to `{ name, img }` by its recorded
+   * uuid, so the Journal can label produced items — including history recorded
+   * before name/img were captured at award time. Best-effort + synchronous
+   * (`fromUuidSync`); returns null when the item is gone or unresolvable.
+   * @private
+   */
+  _resolveJournalResultItem(itemUuid) {
+    if (!itemUuid || typeof fromUuidSync !== 'function') return null;
+    let doc = null;
+    try {
+      doc = fromUuidSync(itemUuid);
+    } catch {
+      doc = null;
+    }
+    return doc ? { name: doc.name ?? null, img: doc.img ?? null } : null;
   }
 
   /**

@@ -106,6 +106,7 @@ function makeBuilder({
   system = SYSTEM,
   recipe = RECIPE,
   getGatheringTask = null,
+  getResultItem = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -130,6 +131,7 @@ function makeBuilder({
       return tool ? { id: tool.id, name: tool.label } : null;
     },
     getGatheringTask,
+    getResultItem,
     localize,
     nowWorldTime: () => worldTime,
   });
@@ -444,6 +446,30 @@ test('gathering created results project the recorded name/img (not just a count)
   assert.equal(run.createdResults[0].name, 'Iron Ore');
   assert.equal(run.createdResults[0].img, 'icons/ore.webp');
   assert.equal(run.createdResults[0].quantity, 3);
+});
+
+test('created results without stored name/img resolve them by uuid (legacy history)', () => {
+  const gatheringRun = {
+    id: 'gather-legacy',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    status: 'succeeded',
+    taskId: 'task-a',
+    startedAtWorldTime: 100,
+    // Legacy record: only actorUuid/itemUuid/quantity, no name/img.
+    createdResults: [{ actorUuid: 'Actor.x', itemUuid: 'Item.legacy-ore', quantity: 2 }],
+  };
+  const getResultItem = (uuid) =>
+    uuid === 'Item.legacy-ore' ? { name: 'Iron Ore', img: 'icons/ore.webp' } : null;
+
+  const run = makeBuilder({ gatheringActive: [gatheringRun], getResultItem }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+
+  assert.equal(run.createdResults[0].name, 'Iron Ore', 'name resolved via uuid fallback');
+  assert.equal(run.createdResults[0].img, 'icons/ore.webp', 'img resolved via uuid fallback');
+  assert.equal(run.createdResults[0].quantity, 2);
 });
 
 test('salvage runs pass through with crafting-named time fields, runType salvage, no manual advance', () => {

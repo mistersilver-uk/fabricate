@@ -84,6 +84,9 @@ export class RunJournalBuilder {
    * @param {Function} [deps.getGatheringTask] `(environmentId, taskId) => { name, img }|null`
    *   — resolves a gathering run's task to its authored name/image (from the COMPOSED
    *   environment), mirroring how `getRecipe` resolves a crafting run's name/image.
+   * @param {Function} [deps.getResultItem] `(itemUuid) => { name, img }|null` — resolves
+   *   an awarded/created result item by its recorded uuid, so the journal can label a
+   *   run's produced items even for records that predate name/img capture.
    * @param {Function} [deps.getViewer] `() => viewer` (current Foundry user) for redaction.
    * @param {Function} [deps.localize] `(key, data?) => string`.
    * @param {Function} [deps.nowWorldTime] `() => number` current world time.
@@ -98,6 +101,7 @@ export class RunJournalBuilder {
     getSystem = null,
     getTool = null,
     getGatheringTask = null,
+    getResultItem = null,
     getViewer = null,
     localize = (key) => key,
     nowWorldTime = () => 0,
@@ -111,6 +115,7 @@ export class RunJournalBuilder {
     this._getSystem = typeof getSystem === 'function' ? getSystem : () => null;
     this._getTool = typeof getTool === 'function' ? getTool : () => null;
     this._getGatheringTask = typeof getGatheringTask === 'function' ? getGatheringTask : () => null;
+    this._getResultItem = typeof getResultItem === 'function' ? getResultItem : () => null;
     this._getViewer = typeof getViewer === 'function' ? getViewer : () => null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
     this._nowWorldTime = typeof nowWorldTime === 'function' ? nowWorldTime : () => 0;
@@ -399,16 +404,33 @@ export class RunJournalBuilder {
    * Returns `createdResults: []` + `createdResultCount: 0` for a redacted run.
    * @private
    */
+  /**
+   * Map a persisted created-result to the UI shape, resolving name/img by uuid when
+   * the record does not carry them (records that predate name/img capture).
+   * @private
+   */
+  _mapResult(result) {
+    const itemUuid = stringOrNull(result?.itemUuid);
+    let name = stringOrNull(result?.name);
+    let img = stringOrNull(result?.img);
+    if ((!name || !img) && itemUuid) {
+      const doc = this._getResultItem(itemUuid);
+      name = name || stringOrNull(doc?.name);
+      img = img || stringOrNull(doc?.img);
+    }
+    return {
+      componentId: stringOrNull(result?.componentId),
+      itemUuid,
+      quantity: numberOrNull(result?.quantity) ?? 1,
+      name,
+      img,
+    };
+  }
+
   _craftingResults(runSteps, redacted) {
     if (redacted) return { createdResults: [], createdResultCount: 0 };
     const createdResults = normalizeList(runSteps).flatMap((step) =>
-      normalizeList(step?.createdResults).map((result) => ({
-        componentId: stringOrNull(result?.componentId),
-        itemUuid: stringOrNull(result?.itemUuid),
-        quantity: numberOrNull(result?.quantity) ?? 1,
-        name: stringOrNull(result?.name),
-        img: stringOrNull(result?.img),
-      }))
+      normalizeList(step?.createdResults).map((result) => this._mapResult(result))
     );
     return { createdResults, createdResultCount: createdResults.length };
   }
@@ -550,13 +572,7 @@ export class RunJournalBuilder {
    * @private
    */
   _passthroughResults(createdResults) {
-    const results = normalizeList(createdResults).map((result) => ({
-      componentId: stringOrNull(result?.componentId),
-      itemUuid: stringOrNull(result?.itemUuid),
-      quantity: numberOrNull(result?.quantity) ?? 1,
-      name: stringOrNull(result?.name),
-      img: stringOrNull(result?.img),
-    }));
+    const results = normalizeList(createdResults).map((result) => this._mapResult(result));
     return { createdResults: results, createdResultCount: results.length };
   }
 
