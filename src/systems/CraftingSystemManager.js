@@ -2084,6 +2084,97 @@ export class CraftingSystemManager {
     }
   }
 
+  /**
+   * Repair a single source item against the known components: if it is the source
+   * of a component (matched by IDENTITY — its own uuid / compendium source, NOT the
+   * transitive duplicateSource), strip a lingering `_stats.duplicateSource` so future
+   * copies link to THIS item, and stamp `flags.fabricate.componentId`. If it carries
+   * a stale component flag but sources no component, clear it. Compendium/locked and
+   * non-writable items are skipped by the callers.
+   *
+   * @private
+   * @param {object} item - a Foundry Item document
+   * @param {object[]} components - all managed components across systems
+   * @param {{stamped:number, stripped:number, cleared:number}} summary - mutated in place
+   */
+  async _repairSourceItem(item, components, summary) {
+    if (!item || typeof item.update !== 'function') return;
+    const identityRefs = new Set(getItemIdentityReferences(item));
+    const owner =
+      identityRefs.size > 0
+        ? components.find((component) =>
+            getComponentSourceReferences(component).some((ref) => identityRefs.has(ref))
+          )
+        : null;
+    const currentFlag = getFabricateFlag(item, 'componentId', null);
+
+    if (owner) {
+      if (item._stats?.duplicateSource) {
+        await item.update({ '_stats.duplicateSource': null });
+        summary.stripped += 1;
+      }
+      if (currentFlag !== owner.id) {
+        await setFabricateFlag(item, 'componentId', owner.id);
+        summary.stamped += 1;
+      }
+    } else if (currentFlag && typeof item.unsetFlag === 'function') {
+      await item.unsetFlag(FABRICATE_FLAG_NAMESPACE, 'fabricate.componentId');
+      summary.cleared += 1;
+    }
+  }
+
+  /**
+   * GM maintenance: reconcile every component's source item so craft-time matching
+   * is durable. For each source item this strips a transitive `_stats.duplicateSource`
+   * (so future inventory copies link back to it) and stamps a transferable
+   * `flags.fabricate.componentId`. World-directory items are always processed;
+   * compendium items are processed only when the pack is writable (unlocked world
+   * pack) — locked/module packs are counted and skipped (their copies already match
+   * via `_stats.compendiumSource`, so no repair is needed).
+   *
+   * @param {{ includeCompendiums?: boolean }} [options]
+   * @returns {Promise<{scanned:number, stamped:number, stripped:number, cleared:number, skippedLocked:number}>}
+   */
+  async repairComponentSourceFlags({ includeCompendiums = true } = {}) {
+    this._assertGM('repair component sources');
+
+    const components = [];
+    for (const system of this.getSystems()) {
+      for (const component of system.components || []) components.push(component);
+    }
+
+    const summary = { scanned: 0, stamped: 0, stripped: 0, cleared: 0, skippedLocked: 0 };
+
+    const worldItems = globalThis.game?.items ? [...globalThis.game.items] : [];
+    for (const item of worldItems) {
+      summary.scanned += 1;
+      await this._repairSourceItem(item, components, summary);
+    }
+
+    if (includeCompendiums) {
+      const packs = globalThis.game?.packs ? [...globalThis.game.packs] : [];
+      for (const pack of packs) {
+        if (pack?.documentName !== 'Item') continue;
+        if (pack.locked) {
+          summary.skippedLocked += 1;
+          continue;
+        }
+        let docs;
+        try {
+          docs = await pack.getDocuments();
+        } catch {
+          docs = [];
+        }
+        for (const item of docs) {
+          summary.scanned += 1;
+          await this._repairSourceItem(item, components, summary);
+        }
+      }
+    }
+
+    return summary;
+  }
+
   async addItemFromUuid(systemId, itemUuid) {
     this._assertGM('add component from uuid');
     const system = this.getSystem(systemId);
