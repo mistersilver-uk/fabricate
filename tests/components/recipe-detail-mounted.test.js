@@ -188,6 +188,49 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
+  it('colours tiered outcomes green for success and red for failure', async () => {
+    const target = await harness.mount({
+      recipe: recipe({
+        modeToken: 'routedByCheck',
+        modeLabel: 'Routed by check',
+        check: {
+          dc: 15,
+          rollFormula: '1d20',
+          skill: null,
+          optional: false,
+          mandatory: true,
+          usable: true,
+        },
+        result: { items: [], time: null, timeLabel: null, xp: null },
+        outcomeTiers: [
+          {
+            id: 't-success',
+            name: 'Success',
+            success: true,
+            awardedResults: [{ name: 'Elixir', img: null, qty: 1 }],
+          },
+          { id: 't-fail', name: 'Failure', success: false, awardedResults: [] },
+        ],
+      }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
+    });
+
+    const section = target.querySelector('[data-recipe-section="outcome-tiers"]');
+    const successRow = section.querySelector('[data-tier-success="true"]');
+    const failureRow = section.querySelector('[data-tier-success="false"]');
+    assert.ok(successRow.classList.contains('is-success'), 'success tier reads green');
+    assert.ok(failureRow.classList.contains('is-failure'), 'failure tier reads red');
+    assert.ok(
+      successRow.querySelector('.crafting-tier-flag.tone-success'),
+      'success flag uses the success tone'
+    );
+    assert.ok(
+      failureRow.querySelector('.crafting-tier-flag.tone-danger'),
+      'failure flag uses the danger tone'
+    );
+  });
+
   it('shows the check formula resolved against the selected actor', async () => {
     const target = await harness.mount({
       recipe: recipe({

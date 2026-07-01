@@ -21,12 +21,13 @@
         <li
           class="crafting-tier-row"
           class:is-success={tier.success}
+          class:is-failure={!tier.success}
           data-tier-success={tier.success ? 'true' : 'false'}
         >
           <div class="crafting-tier-head">
             <span class="crafting-tier-name">{tier.name}</span>
-            <span class={`crafting-tier-flag tone-${tier.success ? 'success' : 'neutral'}`}>
-              <i class={`fas ${tier.success ? 'fa-circle-check' : 'fa-circle-minus'}`} aria-hidden="true"></i>
+            <span class={`crafting-tier-flag tone-${tier.success ? 'success' : 'danger'}`}>
+              <i class={`fas ${tier.success ? 'fa-circle-check' : 'fa-circle-xmark'}`} aria-hidden="true"></i>
               {tier.success
                 ? localize('FABRICATE.App.Crafting.Detail.TierSuccess')
                 : localize('FABRICATE.App.Crafting.Detail.TierNoAward')}
@@ -82,6 +83,11 @@
     background: var(--fab-success-soft);
   }
 
+  .crafting-tier-row.is-failure {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
   .crafting-tier-head {
     display: flex;
     align-items: center;
@@ -107,6 +113,10 @@
     color: var(--fab-success-text);
   }
 
+  .crafting-tier-flag.tone-danger {
+    color: var(--fab-danger-text);
+  }
+
   .crafting-tier-awards {
     margin: 0;
     padding: 0;
@@ -116,13 +126,15 @@
     gap: 6px;
   }
 
+  /* Rectangular pill with rounded corners, matching the rounded-square item image
+     (CraftingThumb) it wraps. */
   .crafting-tier-award {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 2px 8px 2px 2px;
     border: 1px solid var(--fab-border);
-    border-radius: 999px;
+    border-radius: 8px;
     background: var(--fab-surface);
     font-size: 12px;
   }
