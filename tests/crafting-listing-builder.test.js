@@ -447,3 +447,55 @@ describe('CraftingListingBuilder — default result projection', () => {
     assert.equal(model.result.items[0].name, 'FABRICATE.Labels.UnknownComponent');
   });
 });
+
+describe('CraftingListingBuilder — per-option products', () => {
+  it('projects each ingredient set to the products of its routed result group', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByIngredients',
+      components: [
+        { id: 'c1', name: 'Iron Sword', img: 'icons/iron.webp' },
+        { id: 'c2', name: 'Steel Sword', img: 'icons/steel.webp' },
+      ],
+    });
+    const recipe = makeRecipe({
+      ingredientSets: [
+        { id: 'set-1', name: 'Iron route', resultGroupId: 'g1' },
+        { id: 'set-2', name: 'Steel route', resultGroupId: 'g2' },
+      ],
+      resultGroups: [
+        {
+          id: 'g1',
+          name: 'Iron',
+          checkOutcomeIds: [],
+          results: [{ componentId: 'c1', quantity: 2 }],
+        },
+        {
+          id: 'g2',
+          name: 'Steel',
+          checkOutcomeIds: [],
+          results: [{ componentId: 'c2', quantity: 1 }],
+        },
+      ],
+    });
+
+    const { recipe: model } = buildOne({
+      system,
+      entries: [{ recipe, access: { reason: 'ok' } }],
+    });
+
+    const [iron, steel] = model.ingredientSets;
+    assert.deepEqual(iron.products, [{ name: 'Iron Sword', img: 'icons/iron.webp', qty: 2 }]);
+    assert.deepEqual(steel.products, [{ name: 'Steel Sword', img: 'icons/steel.webp', qty: 1 }]);
+  });
+
+  it('leaves per-option products empty for routedByCheck (output is per tier)', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: { simple: {}, routed: { rollFormula: '1d20' }, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    for (const set of recipe.ingredientSets) {
+      assert.deepEqual(set.products, [], 'a routed-by-check set advertises no per-option products');
+    }
+  });
+});

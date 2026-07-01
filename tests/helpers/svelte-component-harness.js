@@ -90,6 +90,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
+  'src/ui/svelte/util/ingredientOptionStatus.js',
   'src/systems/CraftingListingBuilder.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);

@@ -448,7 +448,12 @@
           "Learn": "Learn this recipe",
           "ConsumeOnLearnWarning": "Learning this recipe consumes the source item.",
           "IngredientRoutingHint": "The ingredient option you choose determines what you craft.",
-          "ProgressiveHint": "This recipe is crafted over multiple steps."
+          "ProgressiveHint": "This recipe is crafted over multiple steps.",
+          "OptionCraftable": "Craftable",
+          "OptionBlocked": "Blocked",
+          "OptionMissing": "Missing {count}",
+          "SelectedRoute": "Selected route",
+          "OptionProduces": "Produces"
         },
         "Check": {
           "Title": "Crafting check",

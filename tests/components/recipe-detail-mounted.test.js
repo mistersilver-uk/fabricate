@@ -1,6 +1,7 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import {
   createMountedComponentHarness,
@@ -186,6 +187,82 @@ describe('RecipeDetail mounted behavior', () => {
       thumb.compareDocumentPosition(name) & window.Node.DOCUMENT_POSITION_FOLLOWING,
       'the image comes before the name in document order'
     );
+  });
+
+  it('renders routed ingredient options as cards under the check with status + products', async () => {
+    const onChoose = [];
+    const target = await harness.mount({
+      recipe: recipe({
+        modeToken: 'routedByIngredients',
+        modeLabel: 'Routed by ingredients',
+        defaultSetId: 'set-a',
+        check: {
+          dc: 12,
+          rollFormula: '1d20',
+          skill: null,
+          optional: true,
+          mandatory: false,
+          usable: true,
+          resolvedFormula: '1d20',
+          formulaResolved: true,
+        },
+        ingredientSets: [
+          {
+            id: 'set-a',
+            label: 'Verdant Warding',
+            craftability: craftability({ canCraft: true }),
+            products: [{ name: 'Warding Shield Boss', img: 'icons/shield.webp', qty: 1 }],
+          },
+          {
+            id: 'set-b',
+            label: 'Graveward Binding',
+            craftability: craftability({
+              canCraft: false,
+              toolStates: [{ name: 'Anvil', available: false }],
+            }),
+            products: [{ name: 'Warding Shield Boss', img: 'icons/shield.webp', qty: 2 }],
+          },
+        ],
+      }),
+      selectedSetId: 'set-a',
+      craftability: craftability({ canCraft: true }),
+      onChoose: (id) => onChoose.push(id),
+    });
+
+    const section = target.querySelector('[data-recipe-section="ingredient-sets"]');
+    assert.ok(section, 'ingredient options section rendered');
+    const cards = section.querySelectorAll('.crafting-option-card');
+    assert.equal(cards.length, 2, 'one card per option');
+
+    const cardA = section.querySelector('[data-set-id="set-a"]');
+    const cardB = section.querySelector('[data-set-id="set-b"]');
+    assert.equal(cardA.getAttribute('aria-pressed'), 'true', 'selected option marked');
+    assert.equal(cardA.getAttribute('data-option-status'), 'craftable');
+    assert.equal(cardB.getAttribute('data-option-status'), 'blocked', 'missing tool → blocked');
+    assert.ok(
+      cardA.querySelector('.crafting-option-status.tone-success'),
+      'craftable status is green'
+    );
+    assert.ok(cardB.querySelector('.crafting-option-status.tone-danger'), 'blocked status is red');
+
+    // Product tile with a quantity pip.
+    assert.ok(cardA.querySelector('.crafting-option-product .crafting-thumb img'), 'product image');
+    assert.equal(
+      cardA.querySelector('.crafting-option-product-pip').textContent.trim(),
+      '×1',
+      'quantity pip'
+    );
+
+    // The options render AFTER the crafting check in document order.
+    const check = target.querySelector('[data-recipe-section="check"]');
+    assert.ok(
+      check.compareDocumentPosition(section) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'ingredient options come after the crafting check'
+    );
+
+    cardB.click();
+    flushSync();
+    assert.deepEqual(onChoose, ['set-b'], 'clicking a card selects that route');
   });
 
   it('colours tiered outcomes green for success and red for failure', async () => {

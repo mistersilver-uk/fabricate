@@ -39,7 +39,7 @@ export function recipe(overrides = {}) {
     browseStatus: 'available',
     learn: { canLearn: false, consumeOnLearn: false },
     blockingReasons: [],
-    ingredientSets: [{ id: setId, label: 'Option A', craftability: craftability() }],
+    ingredientSets: [{ id: setId, label: 'Option A', craftability: craftability(), products: [] }],
     defaultSetId: setId,
     check: null,
     outcomeTiers: null,

@@ -22,10 +22,12 @@
 </script>
 
 <div data-recipe-mode="routedByIngredients">
-  <p class="crafting-routing-hint" data-recipe-section="routing-hint">
-    {localize('FABRICATE.App.Crafting.Detail.IngredientRoutingHint')}
-  </p>
   <RecipeBodyShell {recipe} {selectedSetId} {craftability} {rollResult} {busy} {onChoose} {onCraft}>
+    {#snippet selectorIntro()}
+      <p class="crafting-routing-hint" data-recipe-section="routing-hint">
+        {localize('FABRICATE.App.Crafting.Detail.IngredientRoutingHint')}
+      </p>
+    {/snippet}
     {#snippet results()}
       <IoTable {craftability} result={recipe?.result} />
     {/snippet}
@@ -34,7 +36,7 @@
 
 <style>
   .crafting-routing-hint {
-    margin: 0 0 var(--fab-space-3);
+    margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);
   }

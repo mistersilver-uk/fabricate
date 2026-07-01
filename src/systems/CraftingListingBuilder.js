@@ -257,6 +257,9 @@ export class CraftingListingBuilder {
           index: idx + 1,
         }),
       craftability: this._evaluateSet({ recipe, set, craftSources, craftingActor }),
+      // The products this set routes to (routed-by-ingredients). Empty for
+      // routedByCheck, whose output is per outcome tier, not per set.
+      products: mode === 'routedByCheck' ? [] : this._productsForSet({ recipe, system, set }),
     }));
 
     const fullCraftability =
@@ -474,20 +477,31 @@ export class CraftingListingBuilder {
    * @private
    */
   _buildResult({ recipe, system, mode, defaultSet }) {
-    let items = [];
-    if (mode !== 'routedByCheck') {
-      const step = this._firstStep(recipe);
-      const resolved = this.resolutionModeService?.resolveResultGroups?.({
-        recipe,
-        step,
-        ingredientSet: defaultSet,
-        checkResult: null,
-      });
-      items = this._resultItemsFromGroups(resolved?.groups, system);
-    }
+    // routedByCheck output is per outcome tier (see outcomeTiers), so the top-level
+    // item list is empty.
+    const items =
+      mode === 'routedByCheck' ? [] : this._productsForSet({ recipe, system, set: defaultSet });
     // timeLabel is calendar-aware and deferred to the UI slice; the raw duration
     // requirement is surfaced for that formatting step.
     return { items, time: recipe.timeRequirement ?? null, timeLabel: null, xp: null };
+  }
+
+  /**
+   * The product rows (`{ name, img, qty }`) a single ingredient set routes to,
+   * resolved through the resolution-mode service (routed-by-ingredients maps a set
+   * to one result group via `IngredientSet.resultGroupId`). Used both for the
+   * per-option product grid and the default set's expected output.
+   * @private
+   */
+  _productsForSet({ recipe, system, set }) {
+    const step = this._firstStep(recipe);
+    const resolved = this.resolutionModeService?.resolveResultGroups?.({
+      recipe,
+      step,
+      ingredientSet: set,
+      checkResult: null,
+    });
+    return this._resultItemsFromGroups(resolved?.groups, system);
   }
 
   _firstStep(recipe) {

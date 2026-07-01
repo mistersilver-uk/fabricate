@@ -22,7 +22,8 @@
     busy = false,
     onChoose = null,
     onCraft = null,
-    results = null
+    results = null,
+    selectorIntro = null
   } = $props();
 
   const sets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
@@ -40,8 +41,11 @@
 </script>
 
 <div class="crafting-body" data-crafting-body>
-  <IngredientSetSelector {sets} {selectedSetId} {onChoose} />
   <CraftingCheckCard {check} />
+  {#if selectorIntro}
+    {@render selectorIntro()}
+  {/if}
+  <IngredientSetSelector {sets} {selectedSetId} {onChoose} />
   {#if results}
     {@render results()}
   {/if}
