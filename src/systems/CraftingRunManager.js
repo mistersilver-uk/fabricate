@@ -262,6 +262,25 @@ export class CraftingRunManager {
     return this.completeRun(actor, run, 'cancelled');
   }
 
+  /**
+   * Discard an active run WITHOUT recording it in history — for a run that was
+   * created but never legitimately started (e.g. a craft rejected before its check
+   * ran, such as insufficient components). Unlike {@link cancelRun}, which archives
+   * to history as `cancelled`, this leaves no trace: the attempt never began.
+   *
+   * @param {Actor} actor
+   * @param {string} runId
+   * @returns {Promise<object|null>} the discarded run, or null if not active
+   */
+  async discardRun(actor, runId) {
+    const container = this._getContainer(actor);
+    const run = container.active?.[runId];
+    if (!run) return null;
+    delete container.active[runId];
+    await this._persist(actor, container);
+    return run;
+  }
+
   async processWorldTime(worldTime = this._nowWorldTime()) {
     for (const actor of game.actors || []) {
       const container = this._getContainer(actor);
@@ -342,5 +361,44 @@ export class CraftingRunManager {
         await this._persist(actor, container);
       }
     }
+  }
+
+  /**
+   * Prune legacy phantom active runs: a crafting run whose recipe is single-step
+   * AND whose only step has no time requirement can never legitimately persist as
+   * active (it only ever rejects, fails, or succeeds atomically), so any such run
+   * left in the active container is a phantom stranded by an old pre-validation
+   * early-return. Multi-step recipes (persist between "Trigger Next Step") and
+   * single-step time-gated recipes (persist a waiting run) are excluded.
+   *
+   * Unknown recipes are left alone here — {@link cleanupInvalidRuns} owns those.
+   *
+   * @param {(recipeId: string) => (object|null)} resolveRecipe
+   * @returns {Promise<number>} the number of phantom runs pruned
+   */
+  async pruneInstantaneousActiveRuns(resolveRecipe) {
+    if (typeof resolveRecipe !== 'function') return 0;
+    let pruned = 0;
+    for (const actor of game.actors || []) {
+      const container = this._getContainer(actor);
+      let dirty = false;
+
+      for (const [runId, run] of Object.entries(container.active || {})) {
+        const recipe = run?.recipeId ? resolveRecipe(run.recipeId) : null;
+        if (!recipe) continue;
+        const steps =
+          typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
+        if (steps.length === 1 && !steps[0]?.timeRequirement) {
+          delete container.active[runId];
+          dirty = true;
+          pruned += 1;
+        }
+      }
+
+      if (dirty) {
+        await this._persist(actor, container);
+      }
+    }
+    return pruned;
   }
 }

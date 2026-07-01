@@ -105,6 +105,7 @@ function makeBuilder({
   mode = 'simple',
   system = SYSTEM,
   recipe = RECIPE,
+  getGatheringTask = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -128,6 +129,7 @@ function makeBuilder({
       const tool = SYSTEM.tools.find((entry) => entry.id === toolId);
       return tool ? { id: tool.id, name: tool.label } : null;
     },
+    getGatheringTask,
     localize,
     nowWorldTime: () => worldTime,
   });
@@ -296,6 +298,71 @@ test('gathering runs pass through with null steps and re-mapped *WorldTime field
   assert.equal(run.updatedAt, 150);
   assert.equal(run.derivedStatus, 'waiting');
   assert.equal(run.taskId, 'task-a');
+});
+
+test('gathering run resolves task name + image via getGatheringTask (no persisted label)', () => {
+  const gatheringRun = {
+    id: 'gather-2',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    status: 'waitingTime',
+    taskId: 'mwTaskMineIronOre', // raw id, no label
+    startedAtWorldTime: 100,
+  };
+  const getGatheringTask = (environmentId, taskId) =>
+    environmentId === 'env-1' && taskId === 'mwTaskMineIronOre'
+      ? { name: 'Mine Iron Ore', img: 'icons/tools/pick.webp' }
+      : null;
+
+  const run = makeBuilder({ gatheringActive: [gatheringRun], getGatheringTask }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+
+  assert.equal(run.names.title, 'Mine Iron Ore', 'friendly task name, not the raw id');
+  assert.equal(run.img, 'icons/tools/pick.webp', 'task image, not the generic default');
+});
+
+test('gathering run falls back to the raw taskId + default image when the task is unresolved', () => {
+  const gatheringRun = {
+    id: 'gather-3',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-x',
+    status: 'waitingTime',
+    taskId: 'mwTaskUnknown',
+    startedAtWorldTime: 100,
+  };
+  const run = makeBuilder({
+    gatheringActive: [gatheringRun],
+    getGatheringTask: () => null,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.names.title, 'mwTaskUnknown');
+  assert.equal(run.img, 'icons/svg/item-bag.svg');
+});
+
+test('gathering run with a blind/null taskId does not consult the task resolver', () => {
+  let consulted = false;
+  const getGatheringTask = () => {
+    consulted = true;
+    return { name: 'Should Not Appear', img: 'nope.webp' };
+  };
+  const blindRun = {
+    id: 'gather-blind',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    status: 'waitingTime',
+    taskId: 'blind',
+    startedAtWorldTime: 100,
+  };
+  const run = makeBuilder({ gatheringActive: [blindRun], getGatheringTask }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+
+  assert.equal(consulted, false, 'resolver not called for a blind task');
+  assert.equal(run.names.title, 'blind');
+  assert.equal(run.img, 'icons/svg/item-bag.svg');
 });
 
 test('salvage runs pass through with crafting-named time fields, runType salvage, no manual advance', () => {

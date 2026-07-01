@@ -654,6 +654,12 @@ class Fabricate {
       ])
     );
     await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
+    // Prune legacy phantom crafting runs: a single-step recipe with no time
+    // requirement can never legitimately persist an active run, so any such run left
+    // in the active store predates the craft() cleanup guard and is stranded.
+    await this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
+      this.recipeManager.getRecipe(id)
+    );
     await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
     await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
@@ -1668,6 +1674,8 @@ class Fabricate {
         recipeVisibility: this.recipeVisibilityService,
         getSystem: (systemId) => this.craftingSystemManager?.getSystem(systemId) ?? null,
         getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
+        getGatheringTask: (environmentId, taskId) =>
+          this._resolveJournalGatheringTask(environmentId, taskId),
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
         nowWorldTime: () => this.getWorldTime(),
@@ -1693,6 +1701,22 @@ class Fabricate {
       name: tool.label || component?.name || tool.id,
       img: component?.img || null,
     };
+  }
+
+  /**
+   * Resolve a gathering run's task to `{ name, img }` for the Journal, via the
+   * COMPOSED environment (`_findEnvironment`), which carries the authored task
+   * name/image — the raw environment store does not. Mirrors how a crafting run
+   * resolves its recipe name/image. Returns null when the environment or task
+   * cannot be resolved (the Journal then falls back to the raw task id + default).
+   * @private
+   */
+  _resolveJournalGatheringTask(environmentId, taskId) {
+    if (!environmentId || !taskId) return null;
+    const environment = gatheringEngine?._findEnvironment?.(environmentId);
+    const tasks = Array.isArray(environment?.tasks) ? environment.tasks : [];
+    const task = tasks.find((entry) => entry?.id === taskId);
+    return task ? { name: task.name, img: task.img } : null;
   }
 
   /**

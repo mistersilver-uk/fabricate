@@ -82,6 +82,9 @@ export class RunJournalBuilder {
    * @param {object} [deps.recipeVisibility] RecipeVisibilityService for viewer redaction.
    * @param {Function} [deps.getSystem] `(systemId) => system|null`.
    * @param {Function} [deps.getTool] `(systemId, toolId) => { name }|null`.
+   * @param {Function} [deps.getGatheringTask] `(environmentId, taskId) => { name, img }|null`
+   *   — resolves a gathering run's task to its authored name/image (from the COMPOSED
+   *   environment), mirroring how `getRecipe` resolves a crafting run's name/image.
    * @param {Function} [deps.getViewer] `() => viewer` (current Foundry user) for redaction.
    * @param {Function} [deps.localize] `(key, data?) => string`.
    * @param {Function} [deps.nowWorldTime] `() => number` current world time.
@@ -95,6 +98,7 @@ export class RunJournalBuilder {
     recipeVisibility = null,
     getSystem = null,
     getTool = null,
+    getGatheringTask = null,
     getViewer = null,
     localize = (key) => key,
     nowWorldTime = () => 0,
@@ -107,6 +111,7 @@ export class RunJournalBuilder {
     this._recipeVisibility = recipeVisibility;
     this._getSystem = typeof getSystem === 'function' ? getSystem : () => null;
     this._getTool = typeof getTool === 'function' ? getTool : () => null;
+    this._getGatheringTask = typeof getGatheringTask === 'function' ? getGatheringTask : () => null;
     this._getViewer = typeof getViewer === 'function' ? getViewer : () => null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
     this._nowWorldTime = typeof nowWorldTime === 'function' ? nowWorldTime : () => 0;
@@ -480,6 +485,24 @@ export class RunJournalBuilder {
         ? numberOrNull(run.completedAtWorldTime)
         : numberOrNull(run.finishedAt);
 
+    // Gathering runs persist only a `taskId`; resolve it to the task's authored
+    // name/image (mirroring how crafting resolves recipe name/img). Guard blind
+    // runs — a null/`'blind'` taskId is not resolvable — and fall back to the raw
+    // id + default image when the task cannot be resolved.
+    let title = stringOrEmpty(run.label) || stringOrEmpty(run.taskId);
+    let img = DEFAULT_RUN_IMAGE;
+    if (runType === 'gathering') {
+      const taskId = stringOrNull(run.taskId);
+      const task =
+        taskId && taskId !== 'blind'
+          ? this._getGatheringTask(stringOrNull(run.environmentId), taskId)
+          : null;
+      if (task) {
+        title = stringOrEmpty(task.name) || title;
+        img = stringOrNull(task.img) || DEFAULT_RUN_IMAGE;
+      }
+    }
+
     return {
       id: stringOrNull(run.id),
       runType,
@@ -488,11 +511,11 @@ export class RunJournalBuilder {
       craftingSystemId: stringOrNull(run.craftingSystemId),
       craftingSystemName: stringOrEmpty(system?.name),
       names: {
-        title: stringOrEmpty(run.label) || stringOrEmpty(run.taskId),
+        title,
         subtitle: stringOrEmpty(system?.name),
       },
       redacted: false,
-      img: DEFAULT_RUN_IMAGE,
+      img,
       stepIndex: null,
       stepCount: 0,
       stepLabel: '',

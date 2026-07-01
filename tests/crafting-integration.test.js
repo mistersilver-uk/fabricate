@@ -906,3 +906,87 @@ test('progressive mode: zero check value awards nothing', async () => {
   assert.equal(craftResult.results.length, 0, 'no results should be awarded when check value is 0');
   assert.equal(createCalled, 0, '_createSingleResult should never be called when value is 0');
 });
+
+// ===========================================================================
+// Run lifecycle: no phantom active runs on reject/fail; kept on arm/multi-step
+// ===========================================================================
+
+function singleStep(id = 'step-1') {
+  return {
+    id,
+    name: 'Step 1',
+    ingredientSets: [],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+    toolIds: [],
+    outcomeRouting: null,
+    timeRequirement: null,
+  };
+}
+
+test('run lifecycle: a rejected craft (missing components) leaves NO active run and NO history', async () => {
+  const system = buildSystem({ id: 'sys-reject', resolutionMode: 'simple' });
+  setupGame(system);
+
+  const set = buildIngredientSet('set-r', [{ componentId: 'wood', quantity: 1 }]);
+  const step = { ...singleStep(), ingredientSets: [set] };
+  const recipe = buildRecipe({ craftingSystemId: 'sys-reject', ingredientSets: [set], steps: [step] });
+
+  const craftingActor = new FakeActor('Rejecter');
+  const sourceActor = new FakeActor('Rejecter', []); // owns nothing
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildMockRecipeManager(false), runManager, buildResolutionService(system));
+  stubEngine(engine, { success: true }, null);
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'craft is rejected');
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'phantom run discarded — never began');
+  assert.equal(runManager.getRunHistory(craftingActor).length, 0, 'no history entry for a craft that never started');
+});
+
+test('run lifecycle: a single-step rolled failure moves to history, leaving no active run', async () => {
+  const system = buildSystem({ id: 'sys-fail1', resolutionMode: 'simple' });
+  setupGame(system);
+
+  const set = buildIngredientSet('set-f', [{ componentId: 'wood', quantity: 1 }]);
+  const step = { ...singleStep(), ingredientSets: [set] };
+  const recipe = buildRecipe({ craftingSystemId: 'sys-fail1', ingredientSets: [set], steps: [step] });
+
+  const wood = new FakeItem('wood', 'Wood', 2);
+  const craftingActor = new FakeActor('Failer');
+  const sourceActor = new FakeActor('Failer', [wood]);
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildMockRecipeManager(true), runManager, buildResolutionService(system));
+  stubEngine(engine, { success: false, message: 'Bad roll', outcome: null, value: null, data: {} }, null);
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'rolled failure');
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run remains');
+  const history = runManager.getRunHistory(craftingActor);
+  assert.equal(history.length, 1, 'the failed run is archived to history');
+  assert.equal(history[0].status, 'failed');
+});
+
+test('run lifecycle: a time-gated single-step craft keeps exactly one active (waiting) run', async () => {
+  const system = buildSystem({ id: 'sys-timed', resolutionMode: 'simple' });
+  setupGame(system);
+
+  const set = buildIngredientSet('set-t', [{ componentId: 'wood', quantity: 1 }]);
+  const step = { ...singleStep(), ingredientSets: [set], timeRequirement: { hours: 1 } };
+  const recipe = buildRecipe({ craftingSystemId: 'sys-timed', ingredientSets: [set], steps: [step] });
+
+  const wood = new FakeItem('wood', 'Wood', 2);
+  const craftingActor = new FakeActor('Waiter');
+  const sourceActor = new FakeActor('Waiter', [wood]);
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildMockRecipeManager(true), runManager, buildResolutionService(system));
+  stubEngine(engine, { success: true }, null);
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'craft returns "still in progress" while the gate matures');
+  assert.match(result.message, /in progress/i);
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 1, 'the waiting run is legitimately kept active');
+  assert.equal(runManager.getRunHistory(craftingActor).length, 0, 'not archived — still armed');
+});
