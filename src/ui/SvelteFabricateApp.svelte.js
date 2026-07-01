@@ -5,7 +5,8 @@ import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
 import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
 import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
-import { notifyWarn, localize } from './svelte/util/foundryBridge.js';
+import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
+import { notifyWarn, notifyInfo, localize } from './svelte/util/foundryBridge.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -213,6 +214,14 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
       getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null,
+      // Player-facing Journal seams. The store/components never touch Foundry
+      // globals; these wrappers are the single Foundry-facing edge.
+      listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
+      advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
+      getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
+      getWorldTimeComponents: (worldTime) =>
+        game?.fabricate?.getWorldTimeComponents?.(worldTime) ?? null,
+      notify: (message) => notifyInfo(message),
       // GM economy authoring + manual state controls (Manager app).
       getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
       setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
@@ -237,6 +246,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // the crafting store can read the current source ids off it when it loads.
     services.craftingSources = createCraftingSourcesStore({ services });
     services.crafting = createCraftingStore({ services });
+    // One shared journal store instance so the nav badge (shell) and the Journal
+    // tab read the same reactive run state.
+    services.journal = createJournalStore({ services });
     return services;
   }
 

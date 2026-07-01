@@ -63,6 +63,7 @@ const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
 const RC_SCREENSHOT_BUDGET = new Set([
   'world-loaded',
   'fabricate-app-shell',
+  'fabricate-journal',
   'post-craft',
   'crafter-post-craft-inventory'
 ]);
@@ -4400,6 +4401,81 @@ async function main() {
           const crafter = game.actors.get(crafterId);
           if (crafter) crafter.sheet.close();
         }, cleanup.crafterId);
+
+        // ── Player Journal capture ────────────────────────────────────────────
+        // The Phase E craft above produced at least one terminal crafting run for
+        // the crafter, so the player Journal screen has a populated, selectable run
+        // to render. Captured under its own label so changes under
+        // src/ui/svelte/apps/journal/ map to a real screenshot (see the
+        // 'fabricate-journal' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
+        // Wrapped in its own try/catch (mirroring the gathering robustness) so a
+        // navigation hiccup records a failed player-journal step + a journal-failure
+        // frame instead of failing the rest of Phase E.
+        try {
+          process.stdout.write('  Capturing the player Journal screen...\n');
+          await closeOpenApplications(page);
+          // Ensure the crafter (the actor that owns the terminal run) is the
+          // persisted bar selection so the Journal lists ITS runs even though the
+          // harness runs as GM. JournalView.load() reads this remembered-actor seam
+          // directly via services.getSelectedActorId().
+          await page.evaluate(async (crafterId) => {
+            await game.fabricate.setSelectedGatheringActorId(crafterId);
+          }, cleanup.crafterId);
+
+          // Re-open the shared Fabricate app via the same "Craft Item" sidebar
+          // action used earlier in this phase.
+          const journalItemsTab = page.locator('#sidebar [data-tab="items"]').first();
+          await journalItemsTab.click({ force: true });
+          const journalCraftButton = page.locator('button[data-fabricate-action="craft"]').first();
+          await journalCraftButton.waitFor({ state: 'visible', timeout: 10_000 });
+          await journalCraftButton.evaluate(button => button.click());
+
+          await appShell.waitFor({ state: 'visible', timeout: 10_000 });
+          await appShell.locator('[data-actor-bar-state="ready"]')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+
+          // Switch to the Journal tab (click via .evaluate to bypass any overlay,
+          // matching the sidebar-action pattern above) and wait for it to activate.
+          await appShell.locator('.fabricate-app-nav-item:has-text("Journal")')
+            .first().evaluate(el => el.click());
+          await appShell.locator('.fabricate-app-nav-item.active:has-text("Journal")')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+
+          // JournalView mounts and fires an async listJournalForActor() fetch,
+          // rendering a [data-journal-state] container ("loading" -> "populated"/
+          // "empty"/"error"). Wait for it to settle off loading, then for the
+          // populated 3-column layout (guaranteed by the crafter's terminal run).
+          await appShell.locator('[data-journal-state]:not([data-journal-state="loading"])')
+            .first().waitFor({ state: 'visible', timeout: 15_000 });
+          await appShell.locator('[data-journal-state="populated"]')
+            .first().waitFor({ state: 'visible', timeout: 15_000 });
+
+          // Render the centre detail for a concrete run: prefer an active run card,
+          // else the first terminal history row. The centre detail article carries
+          // both [data-journal-detail] and [data-run-id] only when a run is
+          // selected (the unselected placeholder is [data-journal-empty="detail"]).
+          const journalActiveCard = appShell.locator('.journal-run-card[data-run-id]').first();
+          if (await journalActiveCard.count() > 0) {
+            await journalActiveCard.click();
+          } else {
+            const journalHistoryRow = appShell.locator('.journal-history-row[data-history-run-id]').first();
+            if (await journalHistoryRow.count() > 0) {
+              await journalHistoryRow.scrollIntoViewIfNeeded();
+              await journalHistoryRow.click();
+            }
+          }
+          await appShell.locator('[data-journal-detail][data-run-id]')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'fabricate-journal');
+          results.steps.push({ step: 'player-journal', passed: true });
+          process.stdout.write('  Screenshotted the player Journal screen.\n');
+        } catch (journalErr) {
+          results.steps.push({ step: 'player-journal', passed: false, error: journalErr.message });
+          process.stderr.write(`Player Journal capture failed: ${journalErr.message}\n`);
+          await screenshot(page, 'journal-failure');
+        }
 
         results.steps.push({ step: 'craft-item-phase', passed: true });
         process.stdout.write('Phase E complete.\n');

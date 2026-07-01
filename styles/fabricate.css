@@ -799,6 +799,13 @@
   color: var(--fab-text);
   background: var(--fab-bg-1);
 
+  /* Every Fabricate theme is dark, so render native controls (and crucially the
+     browser-drawn <select> option popup, which CSS on the option only partially
+     reaches) in the dark UA scheme. Without this the native dropdown list paints
+     in the light UA scheme, so the player Journal sort dropdowns looked pale
+     where the GM selects render dark. */
+  color-scheme: dark;
+
   /* Minimum window size for the resizable Fabricate window (issue 330). The
      drag-resize handle cannot shrink the window below this floor, so the
      gathering view's three 280px-floored columns can never be clipped. Derived
@@ -837,6 +844,97 @@
 .fabricate-app [tabindex]:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* Focus ring for <select> controls. A select can sit flush against the edge of
+   an overflow-clipped container (the Journal left column's two 50% list halves),
+   where an OUTSET outline (offset 2px) is clipped on that side and reads as a
+   one-sided "flash" when the control gains :focus-visible after its popup closes;
+   an inset outline does not track the border-radius cleanly on the rounded
+   corners. An inset box-shadow ring follows the border-radius exactly and is
+   drawn entirely inside the border box, so it is never clipped and looks correct
+   on every edge and corner while staying accessible. */
+.fabricate-app select:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--fab-accent);
+}
+
+/* Theme player-app <select> controls (and their open option list) so they read
+   as Fabricate dropdowns instead of Foundry's default yellow-on-light text. The
+   solid --fab-bg-1 background matches the GM manager selects (which use
+   --fab-mv2-bg, itself --fab-bg-1); the option rule themes the popup list. The
+   app root's `color-scheme: dark` makes the native popup chrome + highlight dark
+   too. Tokenized; namespaced under .fabricate-app. */
+.fabricate-app select {
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+}
+
+.fabricate-app select option {
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+/* Journal "Trigger Next Step" primary button. The player app has no .is-primary
+   (that class is .fabricate-manager-only), so this is the player-scoped green
+   primary treatment. It mirrors the manager .is-primary success palette
+   (--fab-success / --fab-success-strong) and must override Foundry's global
+   `button` rules, which center content and pin a fixed height: height:auto +
+   min-height + flex justify-content keep the icon+label row laid out correctly.
+   Kept in the global stylesheet (not a scoped Svelte block) because the Foundry
+   core button override is unreliable from a component-scoped rule. */
+.fabricate-app .fabricate-app-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2);
+  height: auto;
+  min-height: 36px;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-success-border);
+  border-radius: 6px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--fab-on-success);
+  background: var(--fab-success);
+  cursor: pointer;
+}
+
+.fabricate-app .fabricate-app-primary-button:not(:disabled):hover {
+  border-color: var(--fab-success-border);
+  color: var(--fab-on-success);
+  background: var(--fab-success-strong);
+}
+
+.fabricate-app .fabricate-app-primary-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Active-run count badge on the Journal nav rail entry. The player nav rail is a
+   fixed-width column of square icon buttons (no collapsible rail, unlike the
+   manager's .manager-nav-count), so the badge floats in the button's top-right
+   corner. Tokenized green to match the run-ready/active semantics. */
+.fabricate-app .fabricate-app-nav-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 1px solid var(--fab-success-border);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--fab-on-success);
+  background: var(--fab-success);
 }
 
 

@@ -100,6 +100,16 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[1].smokeLabels, ['player-crafting-stacked']);
   });
 
+  it('maps player journal app files to the fabricate-journal recipe', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/journal/JournalView.svelte',
+      'src/ui/svelte/apps/journal/RunDetail.svelte',
+    ]);
+
+    assert.deepEqual(views.map(view => view.id), ['fabricate-journal']);
+    assert.deepEqual(views[0].smokeLabels, ['fabricate-journal']);
+  });
+
   it('maps a recipe editor file to all five recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',
