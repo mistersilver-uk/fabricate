@@ -6,6 +6,7 @@ import {
   CRAFTING_BROWSE_STATUS,
 } from '../src/systems/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
+import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
 
 const PLAYER = { id: 'user-1', isGM: false };
 const GM = { id: 'gm-1', isGM: true };
@@ -80,8 +81,12 @@ function makeBuilder({
   craftability = makeCraftability(),
   exhausted = false,
   isSystemBlockedForRecipes = null,
+  recipeItemDefinition = null,
 } = {}) {
-  const craftingSystemManager = { getSystem: (id) => (id === system.id ? system : null) };
+  const craftingSystemManager = {
+    getSystem: (id) => (id === system.id ? system : null),
+    getRecipeItemDefinition: () => recipeItemDefinition,
+  };
   const resolutionModeService = new ResolutionModeService(craftingSystemManager);
   const recipeManager = { evaluateCraftability: () => craftability };
   const recipeVisibility = {
@@ -252,6 +257,47 @@ describe('CraftingListingBuilder — teaser redaction (non-leak)', () => {
     assert.equal(recipe.flavor, 'A partly hidden brew.', 'description surfaces (not hidden)');
     assert.equal(recipe.result.items.length, 1, 'results surface (not hidden)');
     assert.notEqual(recipe.check, null, 'the check surfaces (not hidden)');
+  });
+});
+
+describe('CraftingListingBuilder — recipe image (matches GM Manager precedence)', () => {
+  it('resolves a linked recipe item image when img is the default placeholder', () => {
+    // The reported bug: a recipe whose icon lives on a linked item keeps the default
+    // `recipe.img`, so the row showed the blueprint placeholder. Mirror the Manager and
+    // resolve the linked recipe-item definition's image.
+    const recipe = makeRecipe({ img: DEFAULT_RECIPE_IMAGE, recipeItemId: 'ri-1' });
+    const { recipe: model } = buildOne({
+      entries: [{ recipe, access: { reason: 'ok' } }],
+      recipeItemDefinition: { img: 'icons/weapons/club.webp' },
+    });
+    assert.equal(model.img, 'icons/weapons/club.webp');
+  });
+
+  it('falls back to the default placeholder for an unlinked, image-less recipe', () => {
+    const recipe = makeRecipe({ img: DEFAULT_RECIPE_IMAGE, recipeItemId: null });
+    const { recipe: model } = buildOne({ entries: [{ recipe, access: { reason: 'ok' } }] });
+    assert.equal(model.img, DEFAULT_RECIPE_IMAGE);
+  });
+
+  it('passes through a custom recipe img when there is no linked item', () => {
+    const { recipe } = buildOne();
+    assert.equal(recipe.img, 'icons/sword.webp');
+  });
+
+  it('does not leak a linked item image through a redacted teaser', () => {
+    const recipe = makeRecipe({ img: DEFAULT_RECIPE_IMAGE, recipeItemId: 'ri-1' });
+    const { recipe: model } = buildOne({
+      entries: [
+        {
+          recipe,
+          access: { reason: 'teaser', teaserState: { hiddenFields: ['ingredients'] } },
+        },
+      ],
+      recipeItemDefinition: { img: 'icons/weapons/club.webp' },
+    });
+    assert.equal(model.redaction.redacted, true);
+    assert.notEqual(model.img, 'icons/weapons/club.webp', 'the linked item icon must not leak');
+    assert.equal(model.img, DEFAULT_RECIPE_IMAGE);
   });
 });
 

@@ -213,10 +213,24 @@ export class CraftingListingBuilder {
       : [];
     const hidden = new Set(hiddenFields);
 
+    // Match the GM Manager's icon precedence (recipeItemImg || img || default): a recipe
+    // whose icon lives on a linked recipe item keeps the default `recipe.img`, so resolve
+    // the linked item definition's image the same way adminStore does. `recipe.img` is
+    // itself model-defaulted to DEFAULT_RECIPE_IMAGE, so it already supplies the Manager's
+    // trailing default fallback without importing the heavy models/Recipe.js graph here.
+    // Skip the resolved item image for a redacted teaser so an undiscovered recipe's item
+    // icon never leaks.
+    const recipeItemImg = recipe.recipeItemId
+      ? this.craftingSystemManager?.getRecipeItemDefinition?.(
+          recipe.craftingSystemId,
+          recipe.recipeItemId
+        )?.img || ''
+      : '';
+
     const base = {
       id: stringOrNull(recipe.id),
       name: stringOrEmpty(recipe.name),
-      img: stringOrNull(recipe.img),
+      img: stringOrNull(redacted ? recipe.img : recipeItemImg || recipe.img),
       systemId: stringOrNull(recipe.craftingSystemId),
       systemName: stringOrEmpty(system?.name),
       modeToken: mode,

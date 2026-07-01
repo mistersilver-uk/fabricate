@@ -5,11 +5,17 @@
   craftingRecipeStatus). Clicking it selects the recipe (drives the centre detail)
   and highlights the row. An "add to shopping list" affordance is exposed via a
   trailing button so a player can queue materials without opening the detail.
+
+  An uncraftable recipe (the danger tone — missing materials) is called out more
+  emphatically: the whole row takes a theme-appropriate error tint and the status
+  icon moves onto the (dimmed) thumbnail as a pip, rather than sitting as a small
+  meta chip. Warning/neutral/info blockers keep the compact meta badge.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import CraftingThumb from './CraftingThumb.svelte';
   import CraftingStatusBadge from './CraftingStatusBadge.svelte';
+  import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
 
   let {
     recipe = null,
@@ -23,6 +29,12 @@
   const modeLabel = $derived(String(recipe?.modeLabel ?? ''));
   const status = $derived(String(recipe?.browseStatus ?? ''));
   const redacted = $derived(recipe?.redaction?.redacted === true);
+  const descriptor = $derived(craftingRecipeStatus(status));
+  // Danger tone === the player cannot craft this (missing materials). Gate the
+  // emphatic error treatment on the tone so the presentation map stays the single
+  // source of truth for which statuses read as an error.
+  const uncraftable = $derived(descriptor.tone === 'danger');
+  const statusLabel = $derived(localize(descriptor.labelKey));
 
   function select() {
     onSelect?.(id);
@@ -42,6 +54,7 @@
 <div
   class="crafting-recipe-row"
   class:is-selected={selected}
+  class:is-uncraftable={uncraftable}
   role="listitem"
   data-recipe-id={id}
   data-selected={selected ? 'true' : 'false'}
@@ -56,12 +69,30 @@
     onclick={select}
     onkeydown={onRowKey}
   >
-    <CraftingThumb src={recipe?.img} alt="" size={44} />
+    <span class="crafting-recipe-row-thumb" class:is-uncraftable={uncraftable}>
+      <span class="crafting-recipe-row-thumb-media">
+        <CraftingThumb src={recipe?.img} alt="" size={44} />
+      </span>
+      {#if uncraftable}
+        <span class="crafting-recipe-row-thumb-scrim" aria-hidden="true"></span>
+        <span
+          class="crafting-recipe-row-pip"
+          data-crafting-status={status}
+          role="img"
+          aria-label={statusLabel}
+          title={statusLabel}
+        >
+          <i class={descriptor.icon} aria-hidden="true"></i>
+        </span>
+      {/if}
+    </span>
     <span class="crafting-recipe-row-copy">
       <span class="crafting-recipe-row-name" title={name}>{name}</span>
       <span class="crafting-recipe-row-meta">
         <span class="crafting-recipe-row-mode">{modeLabel}</span>
-        <CraftingStatusBadge {status} compact />
+        {#if !uncraftable}
+          <CraftingStatusBadge {status} compact />
+        {/if}
       </span>
     </span>
     {#if !redacted}
@@ -98,6 +129,17 @@
     background: var(--fab-accent-soft);
   }
 
+  /* Uncraftable (missing materials): tint the whole row with the error family.
+     Declared after .is-selected so the error identity survives selection. */
+  .crafting-recipe-row.is-uncraftable {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
+  .crafting-recipe-row.is-uncraftable.is-selected {
+    border-color: var(--fab-danger);
+  }
+
   .crafting-recipe-row-main {
     display: flex;
     align-items: center;
@@ -113,6 +155,56 @@
   .crafting-recipe-row-main.is-toggle:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: -2px;
+  }
+
+  /* Thumbnail wrapper: a positioning context for the uncraftable scrim + pip. */
+  .crafting-recipe-row-thumb {
+    position: relative;
+    flex: 0 0 auto;
+    display: inline-flex;
+  }
+
+  .crafting-recipe-row-thumb-media {
+    display: inline-flex;
+  }
+
+  /* Fade the artwork so the error pip reads as the focal point. */
+  .crafting-recipe-row-thumb.is-uncraftable .crafting-recipe-row-thumb-media {
+    opacity: 0.4;
+  }
+
+  /* Flat error wash over the dimmed thumbnail (matches CraftingThumb's radius). */
+  .crafting-recipe-row-thumb-scrim {
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background: var(--fab-danger-soft);
+    pointer-events: none;
+  }
+
+  /* The status icon, moved onto the thumbnail as a solid error pip. on-accent is a
+     near-black foreground in every theme, legible over the mid-tone danger fill. */
+  .crafting-recipe-row-pip {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 1px solid var(--fab-danger-border);
+    background: var(--fab-danger);
+    color: var(--fab-on-accent);
+    box-shadow: var(--fab-shadow-sm);
+    pointer-events: none;
+  }
+
+  .crafting-recipe-row-pip i {
+    font-size: 11px;
+    line-height: 1;
   }
 
   .crafting-recipe-row-copy {

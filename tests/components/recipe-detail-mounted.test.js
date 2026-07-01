@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
-  CRAFTING_APP_COMPILED_MODULES
+  CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { recipe, craftability } from '../helpers/crafting-fixtures.js';
 
@@ -16,10 +16,17 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-detail-',
   rawModules: CRAFTING_APP_RAW_MODULES,
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
-  componentPath: 'src/ui/svelte/apps/crafting/RecipeDetail.svelte'
+  componentPath: 'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
 });
 
-const CHECK = { dc: 15, rollFormula: '1d20', skill: null, optional: false, mandatory: true, usable: true };
+const CHECK = {
+  dc: 15,
+  rollFormula: '1d20',
+  skill: null,
+  optional: false,
+  mandatory: true,
+  usable: true,
+};
 
 // One table row per resolution mode: the fixture recipe + the data-recipe-section
 // markers its mode body must render. Parameterized (not copy-pasted blocks) so a
@@ -28,7 +35,7 @@ const MODE_CASES = [
   {
     mode: 'simple',
     fixture: recipe({ modeToken: 'simple', modeLabel: 'Simple' }),
-    expectedSections: ['io']
+    expectedSections: ['io'],
   },
   {
     mode: 'routedByIngredients',
@@ -37,10 +44,10 @@ const MODE_CASES = [
       modeLabel: 'Routed by ingredients',
       ingredientSets: [
         { id: 'set-a', label: 'Option A', craftability: craftability() },
-        { id: 'set-b', label: 'Option B', craftability: craftability({ canCraft: false }) }
-      ]
+        { id: 'set-b', label: 'Option B', craftability: craftability({ canCraft: false }) },
+      ],
     }),
-    expectedSections: ['routing-hint', 'ingredient-sets', 'io']
+    expectedSections: ['routing-hint', 'ingredient-sets', 'io'],
   },
   {
     mode: 'routedByCheck',
@@ -50,17 +57,26 @@ const MODE_CASES = [
       check: CHECK,
       result: { items: [], time: null, timeLabel: null, xp: null },
       outcomeTiers: [
-        { id: 't-success', name: 'Success', success: true, awardedResults: [{ name: 'Elixir', img: null, qty: 1 }] },
-        { id: 't-fail', name: 'Failure', success: false, awardedResults: [] }
-      ]
+        {
+          id: 't-success',
+          name: 'Success',
+          success: true,
+          awardedResults: [{ name: 'Elixir', img: null, qty: 1 }],
+        },
+        { id: 't-fail', name: 'Failure', success: false, awardedResults: [] },
+      ],
     }),
-    expectedSections: ['check', 'io', 'outcome-tiers']
+    expectedSections: ['check', 'io', 'outcome-tiers'],
   },
   {
     mode: 'progressive',
-    fixture: recipe({ modeToken: 'progressive', modeLabel: 'Progressive', check: { ...CHECK, dc: 12 } }),
-    expectedSections: ['progressive-hint', 'check', 'io']
-  }
+    fixture: recipe({
+      modeToken: 'progressive',
+      modeLabel: 'Progressive',
+      check: { ...CHECK, dc: 12 },
+    }),
+    expectedSections: ['progressive-hint', 'check', 'io'],
+  },
 ];
 
 describe('RecipeDetail mounted behavior', () => {
@@ -75,7 +91,7 @@ describe('RecipeDetail mounted behavior', () => {
         selectedSetId: testCase.fixture.defaultSetId,
         craftability: testCase.fixture.ingredientSets[0].craftability,
         rollResult: null,
-        busy: false
+        busy: false,
       });
 
       // The header renders for every mode; the body is keyed to the mode token.
@@ -111,9 +127,14 @@ describe('RecipeDetail mounted behavior', () => {
       defaultSetId: null,
       check: null,
       outcomeTiers: null,
-      result: { items: [], time: null, timeLabel: null, xp: null }
+      result: { items: [], time: null, timeLabel: null, xp: null },
     });
-    const target = await harness.mount({ recipe: teaser, selectedSetId: null, craftability: null, rollResult: null });
+    const target = await harness.mount({
+      recipe: teaser,
+      selectedSetId: null,
+      craftability: null,
+      rollResult: null,
+    });
 
     assert.ok(target.querySelector('[data-recipe-teaser]'), 'teaser hint rendered');
     // The mode chip reveals the crafting mechanism, so it must NOT render for a
@@ -124,10 +145,22 @@ describe('RecipeDetail mounted behavior', () => {
       'no mode chip leaks the crafting mechanism on a discovery teaser'
     );
     // None of the body detail (sections, IO, outcome tiers, craft button) leaks.
-    assert.equal(target.querySelector('[data-recipe-section]'), null, 'no detail sections rendered');
+    assert.equal(
+      target.querySelector('[data-recipe-section]'),
+      null,
+      'no detail sections rendered'
+    );
     assert.equal(target.querySelector('[data-io-group]'), null, 'no IO rows rendered');
-    assert.equal(target.querySelector('[data-recipe-section="outcome-tiers"]'), null, 'no outcome tiers rendered');
-    assert.equal(target.querySelector('[data-crafting-craft]'), null, 'no craft button on a teaser');
+    assert.equal(
+      target.querySelector('[data-recipe-section="outcome-tiers"]'),
+      null,
+      'no outcome tiers rendered'
+    );
+    assert.equal(
+      target.querySelector('[data-crafting-craft]'),
+      null,
+      'no craft button on a teaser'
+    );
   });
 
   it('shows a select-a-recipe hint when no recipe is provided', async () => {
@@ -139,20 +172,72 @@ describe('RecipeDetail mounted behavior', () => {
     const blocked = recipe({
       browseStatus: 'missingMaterials',
       blockingReasons: ['You are missing some required materials.'],
-      learn: { canLearn: true, consumeOnLearn: true }
+      learn: { canLearn: true, consumeOnLearn: true },
     });
     const target = await harness.mount({
       recipe: blocked,
       selectedSetId: blocked.defaultSetId,
-      craftability: craftability({ canCraft: false })
+      craftability: craftability({ canCraft: false }),
     });
 
     assert.ok(target.querySelector('[data-recipe-blocking]'), 'blocking callout rendered');
     assert.ok(target.querySelector('[data-recipe-learn]'), 'learn affordance rendered');
-    assert.ok(target.querySelector('[data-recipe-learn-warning]'), 'consume-on-learn warning rendered');
+    assert.ok(
+      target.querySelector('[data-recipe-learn-warning]'),
+      'consume-on-learn warning rendered'
+    );
     // A non-craftable recipe still renders a (disabled) craft button.
     const craftButton = target.querySelector('[data-crafting-craft]');
     assert.ok(craftButton, 'craft button present');
-    assert.equal(craftButton.getAttribute('data-crafting-craft-disabled'), 'true', 'craft button disabled when materials missing');
+    assert.equal(
+      craftButton.getAttribute('data-crafting-craft-disabled'),
+      'true',
+      'craft button disabled when materials missing'
+    );
+  });
+
+  it('moves the status onto a thumbnail pip and drops the header badge when uncraftable', async () => {
+    const blocked = recipe({
+      browseStatus: 'missingMaterials',
+      blockingReasons: ['You are missing some required materials.'],
+    });
+    const target = await harness.mount({
+      recipe: blocked,
+      selectedSetId: blocked.defaultSetId,
+      craftability: craftability({ canCraft: false }),
+    });
+
+    const header = target.querySelector('[data-recipe-header]');
+    assert.ok(
+      header.querySelector('.crafting-detail-thumb.is-uncraftable .crafting-detail-pip'),
+      'error pip overlays the faded thumbnail'
+    );
+    assert.equal(
+      header.querySelector('.crafting-detail-header-meta [data-crafting-status]'),
+      null,
+      'the labelled status badge is dropped in favour of the pip'
+    );
+    assert.ok(
+      header.querySelector('[data-recipe-blocking].is-uncraftable'),
+      'the blocking callout uses the error palette when uncraftable'
+    );
+  });
+
+  it('keeps the labelled status badge (no pip) for a craftable recipe', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available' }),
+      selectedSetId: recipe().defaultSetId,
+    });
+
+    const header = target.querySelector('[data-recipe-header]');
+    assert.ok(
+      header.querySelector('.crafting-detail-header-meta [data-crafting-status]'),
+      'craftable recipe keeps the labelled status badge'
+    );
+    assert.equal(
+      header.querySelector('.crafting-detail-pip'),
+      null,
+      'no thumbnail pip when craftable'
+    );
   });
 });

@@ -10,6 +10,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import CraftingThumb from './CraftingThumb.svelte';
   import CraftingStatusBadge from './CraftingStatusBadge.svelte';
+  import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
 
   let { recipe = null, onLearn = null } = $props();
 
@@ -18,6 +19,12 @@
   const flavor = $derived(String(recipe?.flavor ?? ''));
   const status = $derived(String(recipe?.browseStatus ?? ''));
   const redacted = $derived(recipe?.redaction?.redacted === true);
+  const descriptor = $derived(craftingRecipeStatus(status));
+  // Danger tone === the player cannot craft this (missing materials). Gate on the
+  // tone so the presentation map stays the single source of truth, mirroring the
+  // RecipeListRow treatment.
+  const uncraftable = $derived(descriptor.tone === 'danger');
+  const statusLabel = $derived(localize(descriptor.labelKey));
   const blockingReasons = $derived(
     Array.isArray(recipe?.blockingReasons) ? recipe.blockingReasons : []
   );
@@ -27,7 +34,23 @@
 
 <header class="crafting-detail-header" data-recipe-header>
   <div class="crafting-detail-header-top">
-    <CraftingThumb src={recipe?.img} alt="" size={56} />
+    <span class="crafting-detail-thumb" class:is-uncraftable={uncraftable}>
+      <span class="crafting-detail-thumb-media">
+        <CraftingThumb src={recipe?.img} alt="" size={56} />
+      </span>
+      {#if uncraftable}
+        <span class="crafting-detail-thumb-scrim" aria-hidden="true"></span>
+        <span
+          class="crafting-detail-pip"
+          data-crafting-status={status}
+          role="img"
+          aria-label={statusLabel}
+          title={statusLabel}
+        >
+          <i class={descriptor.icon} aria-hidden="true"></i>
+        </span>
+      {/if}
+    </span>
     <div class="crafting-detail-header-copy">
       <h2 class="crafting-detail-name" title={name}>{name}</h2>
       <div class="crafting-detail-header-meta">
@@ -38,7 +61,12 @@
         {#if !redacted && modeLabel}
           <span class="crafting-detail-mode-chip">{modeLabel}</span>
         {/if}
-        <CraftingStatusBadge {status} />
+        <!-- Uncraftable moves the status onto the thumbnail pip, so the labelled
+             badge is dropped here to avoid a duplicate icon; the blocking-reasons
+             callout below still spells out the reason. -->
+        {#if !uncraftable}
+          <CraftingStatusBadge {status} />
+        {/if}
       </div>
     </div>
   </div>
@@ -54,7 +82,12 @@
     {/if}
 
     {#if blockingReasons.length > 0}
-      <div class="crafting-detail-blocking" data-recipe-blocking role="status">
+      <div
+        class="crafting-detail-blocking"
+        class:is-uncraftable={uncraftable}
+        data-recipe-blocking
+        role="status"
+      >
         <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
         <ul class="crafting-detail-blocking-list">
           {#each blockingReasons as reason, index (index)}
@@ -98,6 +131,57 @@
     display: flex;
     align-items: center;
     gap: var(--fab-space-3);
+  }
+
+  /* Thumbnail wrapper: a positioning context for the uncraftable scrim + pip,
+     mirroring RecipeListRow. */
+  .crafting-detail-thumb {
+    position: relative;
+    flex: 0 0 auto;
+    display: inline-flex;
+  }
+
+  .crafting-detail-thumb-media {
+    display: inline-flex;
+  }
+
+  /* Fade the artwork so the error pip reads as the focal point. */
+  .crafting-detail-thumb.is-uncraftable .crafting-detail-thumb-media {
+    opacity: 0.4;
+  }
+
+  /* Flat error wash over the dimmed thumbnail (matches CraftingThumb's radius). */
+  .crafting-detail-thumb-scrim {
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background: var(--fab-danger-soft);
+    pointer-events: none;
+  }
+
+  /* The status icon, moved onto the thumbnail as a solid error pip. on-accent is a
+     near-black foreground in every theme, legible over the mid-tone danger fill. */
+  .crafting-detail-pip {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    border: 1px solid var(--fab-danger-border);
+    background: var(--fab-danger);
+    color: var(--fab-on-accent);
+    box-shadow: var(--fab-shadow-sm);
+    pointer-events: none;
+  }
+
+  .crafting-detail-pip i {
+    font-size: 13px;
+    line-height: 1;
   }
 
   .crafting-detail-header-copy {
@@ -164,6 +248,15 @@
     border-radius: 8px;
     background: var(--fab-warning-soft);
     color: var(--fab-warning-text);
+  }
+
+  /* Missing materials is an error, not a warning: align the callout with the row
+     tint + thumbnail pip. Other blockers (locked/unknown/exhausted) keep the amber
+     warning treatment. */
+  .crafting-detail-blocking.is-uncraftable {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+    color: var(--fab-danger-text);
   }
 
   .crafting-detail-blocking-list {
