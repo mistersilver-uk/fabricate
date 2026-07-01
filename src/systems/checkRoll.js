@@ -106,7 +106,8 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
  * a bad formula (callers wrap it).
  */
 export async function evaluateCheckRoll(formula, actor) {
-  if (typeof globalThis.Roll !== 'function') return { engine: false, total: 0, diceGroups: [] };
+  if (typeof globalThis.Roll !== 'function')
+    return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   // Automated check roll: never surface a manual roll-fulfilment dialog mid-craft
   // on a client configured for manual fulfilment (mirrors Roll.simulate's V13
@@ -114,7 +115,47 @@ export async function evaluateCheckRoll(formula, actor) {
   const roll = await new globalThis.Roll(formula, rollData).evaluate({ allowInteractive: false });
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
-  return { engine: true, total, diceGroups: rolledDiceGroups(roll) };
+  // Capture the @-resolved formula (e.g. "1d20 + 3") so the run journal can show
+  // the actual modifiers rolled, not the authored `@abilities…` placeholders.
+  const resolved = resolveCheckFormulaDisplay(formula, actor);
+  return {
+    engine: true,
+    total,
+    diceGroups: rolledDiceGroups(roll),
+    resolvedFormula: resolved?.display ?? null,
+  };
+}
+
+/**
+ * Resolve a check formula's `@` placeholders against an actor's roll data for
+ * DISPLAY — substituting each placeholder with its numeric value inline
+ * (e.g. `1d20 + @abilities.str.mod + @prof` → `1d20 + 3 + 2`) WITHOUT rolling any
+ * dice (no evaluation, so no randomness / side effects).
+ *
+ * Returns `null` when there is no formula or no dice engine (the caller then shows
+ * the raw formula). Otherwise `{ display, resolved }` where `resolved` is false when
+ * the formula does not reduce to a number for this actor (unknown/missing `@` keys
+ * or a non-numeric substitution) — `missing: 'NaN'` makes those detectable, since
+ * Foundry would otherwise silently leave or zero an unmatched key.
+ *
+ * @param {string} formula
+ * @param {object|null} actor
+ * @returns {{ display: string, resolved: boolean }|null}
+ */
+export function resolveCheckFormulaDisplay(formula, actor) {
+  if (typeof formula !== 'string' || formula.trim() === '') return null;
+  const Roll = globalThis.Roll;
+  if (typeof Roll?.replaceFormulaData !== 'function') return null;
+  const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  const display = Roll.replaceFormulaData(String(formula), rollData, {
+    missing: 'NaN',
+    warn: false,
+  });
+  const resolved =
+    !/NaN/.test(display) &&
+    !/@/.test(display) &&
+    (typeof Roll.validate !== 'function' || Roll.validate(display) === true);
+  return { display, resolved };
 }
 
 /**
@@ -134,6 +175,7 @@ export async function runFormulaPassFail({
   const formula = String(rawFormula || '').trim();
   let total = 0;
   let diceGroups = [];
+  let resolvedFormula = null;
   if (formula) {
     let rolled;
     try {
@@ -154,6 +196,7 @@ export async function runFormulaPassFail({
     }
     total = rolled.total;
     diceGroups = rolled.diceGroups;
+    resolvedFormula = rolled.resolvedFormula;
   }
 
   const forced = resolveForcedOutcome(triggers, { total, diceGroups });
@@ -173,6 +216,7 @@ export async function runFormulaPassFail({
     data: {
       dc,
       formula,
+      resolvedFormula,
       total,
       comparison,
       diceGroups,
@@ -197,6 +241,7 @@ export async function runFormulaProgressive({
   const formula = String(rawFormula || '').trim();
   let total = 0;
   let diceGroups = [];
+  let resolvedFormula = null;
   if (formula) {
     let rolled;
     try {
@@ -217,6 +262,7 @@ export async function runFormulaProgressive({
     }
     total = rolled.total;
     diceGroups = rolled.diceGroups;
+    resolvedFormula = rolled.resolvedFormula;
   }
 
   // Forced-outcome resolution sees the RAW total as the awarding value (the
@@ -238,6 +284,7 @@ export async function runFormulaProgressive({
     value,
     data: {
       formula,
+      resolvedFormula,
       total,
       value,
       diceGroups,
@@ -357,6 +404,7 @@ export async function runFormulaRouted({
   const formula = String(rawFormula || '').trim();
   let total = 0;
   let diceGroups = [];
+  let resolvedFormula = null;
   if (formula) {
     let rolled;
     try {
@@ -384,6 +432,7 @@ export async function runFormulaRouted({
     }
     total = rolled.total;
     diceGroups = rolled.diceGroups;
+    resolvedFormula = rolled.resolvedFormula;
   }
 
   const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
@@ -426,6 +475,7 @@ export async function runFormulaRouted({
     data: {
       dc,
       formula,
+      resolvedFormula,
       total,
       type,
       comparison,

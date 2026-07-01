@@ -1,4 +1,9 @@
 /**
+ * @module sourceUuid
+ */
+import { getFabricateFlag } from '../config/flags.js';
+
+/**
  * Resolve the compendium source UUID of a Foundry item document.
  *
  * On Foundry v12+, the canonical location is `_stats.compendiumSource`.
@@ -118,6 +123,14 @@ export function getComponentSourceReferences(component) {
  * @returns {boolean} True when the item overlaps the component's source reference chain
  */
 export function itemMatchesComponentSource(item, component) {
+  // A `flags.fabricate.componentId` on the item — copied from the component's flagged
+  // source world item and inherited by every duplicate — is the most durable link: it
+  // survives Foundry's transitive `_stats.duplicateSource` template chaining, which
+  // source-UUID matching cannot (the copy loses the ref back to the component source).
+  const componentId = component ? component.id : null;
+  if (componentId && getFabricateFlag(item, 'componentId', null) === componentId) {
+    return true;
+  }
   const itemRefs = new Set(getItemSourceReferences(item));
   if (itemRefs.size === 0) return false;
   return getComponentSourceReferences(component).some((ref) => itemRefs.has(ref));

@@ -256,10 +256,10 @@ test('T8 - toolMatchesItem: matches item linked only by _stats.duplicateSource',
 });
 
 // ---------------------------------------------------------------------------
-// Test 9 — mythwrightId-only item does NOT match
+// Test 9 — mythwrightId-only item with an unrelated name does NOT match
 // ---------------------------------------------------------------------------
 
-test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId alone', () => {
+test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId with an unrelated name', () => {
   const system = makeSystemWithComponent({
     id: 'cat-9',
     sourceUuid: 'Compendium.world.items.pick-live',
@@ -272,14 +272,40 @@ test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId alone
   const recipe = makeRecipe();
   const tool = makeTool('cat-9');
 
+  // Neither the source UUIDs nor the name match — a mythwrightId flag alone is not
+  // a match signal.
   const item = {
     uuid: 'Item.actor-seeded',
     _stats: {},
     flags: { fabricate: { mythwrightId: 'mw-pick' } },
-    name: 'Mining Pick'
+    name: 'Unrelated Chisel'
   };
 
   assert.equal(manager.toolMatchesItem(recipe, tool, item), false);
+});
+
+test('T9b - toolMatchesItem: matches a same-named item when source UUIDs differ (template-copy fallback)', () => {
+  const system = makeSystemWithComponent({
+    id: 'cat-9b',
+    sourceUuid: 'Compendium.world.items.pick-live',
+    sourceItemUuid: 'Item.world-pick',
+    name: 'Mining Pick'
+  });
+  globalThis.game = makeFakeGame({ system });
+
+  const manager = new RecipeManager();
+  const recipe = makeRecipe();
+  const tool = makeTool('cat-9b');
+
+  // Owned copy whose only source ref is a template, not the tool component's source.
+  const item = {
+    uuid: 'Item.actor-templated',
+    _stats: { duplicateSource: 'Item.some-template' },
+    flags: {},
+    name: 'Mining Pick'
+  };
+
+  assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
 });
 
 test('T7 - ingredientMatchesItem: matches canonical sourceItemUuid when live sourceUuid differs', () => {

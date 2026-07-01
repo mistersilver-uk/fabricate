@@ -195,6 +195,33 @@ export class RecipeVisibilityService {
     };
   }
 
+  /**
+   * Whether a recipe's item-based knowledge is exhausted for a viewer: the
+   * system uses item-limited knowledge (`knowledge.item.limitUses`), the actor
+   * (or a component-source actor) DOES own at least one matching recipe item, but
+   * every such item has reached its `maxUses` cap. Returns `false` when the
+   * system does not limit uses, when no matching item is owned at all (that is an
+   * "unknown"/teaser state, not "exhausted"), or when at least one non-exhausted
+   * item remains. Read-only; composes the same candidate-collection +
+   * non-exhausted filter the learn/use paths rely on, so the player listing's
+   * "exhausted" status agrees with what the engine would refuse to consume.
+   *
+   * @param {object} args
+   * @param {object} args.recipe
+   * @param {object|null} args.craftingActor
+   * @param {object[]} [args.componentSourceActors]
+   * @returns {boolean}
+   */
+  isKnowledgeItemExhausted({ recipe, craftingActor, componentSourceActors = [] }) {
+    const system = this._getCraftingSystem(recipe);
+    const knowledge = this._getKnowledgeConfig(system);
+    if (!knowledge?.item?.limitUses) return false;
+    const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
+    if (allMatches.length === 0) return false;
+    const nonExhausted = this._filterNonExhausted(allMatches, knowledge.item);
+    return nonExhausted.length === 0;
+  }
+
   _getDiscoveryProgress(actor, recipeId) {
     const all = getFabricateFlag(actor, 'discoveryProgress', {});
     const entry = all?.[recipeId];

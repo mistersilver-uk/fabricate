@@ -335,7 +335,7 @@ test('TC6: evaluateCraftability matches managed-component ingredients by sourceU
   });
 
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: compId, sourceUuid, name: 'Iron Ingot' }
+    { id: compId, sourceUuid, name: 'Iron Ingot', img: 'icons/iron-ingot.webp' }
   ]);
 
   const actor = makeActor([actorItem]);
@@ -343,7 +343,99 @@ test('TC6: evaluateCraftability matches managed-component ingredients by sourceU
 
   assert.equal(result.canCraft, true, 'managed-component ingredient should match by sourceUuid');
   assert.equal(result.ingredientStates.length, 1);
+  const state = result.ingredientStates[0];
+  assert.equal(state.satisfied, true);
+  // The ingredient state carries the component visuals for the player image grid.
+  assert.equal(state.componentId, compId, 'ingredient state exposes its component id');
+  assert.equal(state.name, 'Iron Ingot', 'ingredient state exposes the component name');
+  assert.equal(state.img, 'icons/iron-ingot.webp', 'ingredient state exposes the component image');
+});
+
+test('TC6b: a missing managed-component ingredient still exposes its component image', () => {
+  const systemId = 'sys-tc6b';
+  const compId = 'comp-mithril';
+  const sourceUuid = 'Item.mithril-source';
+
+  const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 2)])]);
+  const recipe = new Recipe({
+    name: 'Missing Component Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }]
+  });
+
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compId, sourceUuid, name: 'Mithril', img: 'icons/mithril.webp' }
+  ]);
+
+  // Actor has none of the component.
+  const result = manager.evaluateCraftability([makeActor([])], recipe);
+
+  assert.equal(result.canCraft, false);
+  const state = result.ingredientStates[0];
+  assert.equal(state.satisfied, false);
+  assert.equal(state.componentId, compId);
+  assert.equal(state.name, 'Mithril');
+  assert.equal(state.img, 'icons/mithril.webp', 'missing ingredient still resolves its image');
+});
+
+test('TC6c: an identically-named item satisfies a sourced component even when source UUIDs differ', () => {
+  const systemId = 'sys-tc6c';
+  const compId = 'comp-embercap';
+  // Owned copy whose only source ref is a TEMPLATE (its _stats.duplicateSource),
+  // NOT the component's source item — the transitive-duplicateSource GM workflow.
+  const templatedItem = {
+    uuid: 'Actor.a.Item.owned-embercap',
+    id: 'owned-embercap',
+    name: 'Embercap Mushroom',
+    system: { quantity: 1 },
+    _stats: { duplicateSource: 'Item.SomeTemplate' },
+    flags: {},
+    getFlag: () => undefined,
+  };
+  const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 1)])]);
+  const recipe = new Recipe({
+    name: 'Templated Component Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compId, sourceUuid: 'Item.EmbercapSource', sourceItemUuid: 'Item.EmbercapSource', name: 'Embercap Mushroom' },
+  ]);
+
+  const result = manager.evaluateCraftability([makeActor([templatedItem])], recipe);
+  assert.equal(result.canCraft, true, 'name fallback matches a same-named component');
   assert.equal(result.ingredientStates[0].satisfied, true);
+  assert.equal(result.ingredientStates[0].have, 1);
+});
+
+test('TC6d: the name fallback does NOT match a differently-named item', () => {
+  const systemId = 'sys-tc6d';
+  const compId = 'comp-embercap-d';
+  const wrongItem = {
+    uuid: 'Actor.a.Item.owned-other',
+    id: 'owned-other',
+    name: 'Foraged Greens',
+    system: { quantity: 1 },
+    _stats: { duplicateSource: 'Item.SomeTemplate' },
+    flags: {},
+    getFlag: () => undefined,
+  };
+  const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 1)])]);
+  const recipe = new Recipe({
+    name: 'Templated Component Recipe D',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compId, sourceUuid: 'Item.EmbercapSource', sourceItemUuid: 'Item.EmbercapSource', name: 'Embercap Mushroom' },
+  ]);
+
+  const result = manager.evaluateCraftability([makeActor([wrongItem])], recipe);
+  assert.equal(result.canCraft, false, 'a different name is not a false positive');
+  assert.equal(result.ingredientStates[0].satisfied, false);
 });
 
 // ---------------------------------------------------------------------------
@@ -414,7 +506,7 @@ test('TC8: evaluateCraftability toolStates show available when tool present', ()
   ]);
 
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: compId, sourceUuid, name: 'Mortar' }
+    { id: compId, sourceUuid, name: 'Mortar', img: 'icons/mortar.webp' }
   ], [{ id: 'tool-mortar', componentId: compId, enabled: true }]);
 
   const recipe = new Recipe({
@@ -431,6 +523,44 @@ test('TC8: evaluateCraftability toolStates show available when tool present', ()
   assert.equal(result.canCraft, true, 'should be craftable with tool present');
   assert.equal(result.toolStates.length, 1);
   assert.equal(result.toolStates[0].available, true, 'tool should be marked available');
+  assert.equal(result.toolStates[0].name, 'Mortar', 'tool state carries the component name');
+  assert.equal(result.toolStates[0].img, 'icons/mortar.webp', 'tool state carries the component image');
+  assert.equal(result.toolStates[0].needsRepair, false, 'a present tool does not need repair');
+});
+
+test('TC8d: a present-but-broken tool is unavailable and needs repair', () => {
+  const systemId = 'sys-tc8d';
+  const compId = 'comp-mortar-d';
+  const sourceUuid = 'Item.mortar-d-source';
+
+  // A matching item that carries the fabricate toolBroken flag → damaged (repair).
+  const brokenTool = {
+    uuid: 'broken-mortar-uuid',
+    id: 'broken-mortar-uuid',
+    system: { quantity: 1 },
+    flags: { core: { sourceId: sourceUuid }, fabricate: { toolBroken: true } },
+    getFlag: (scope, key) => (scope === 'fabricate' && key === 'toolBroken' ? true : undefined)
+  };
+  const ingredientItem = makeItem('item-a', 1);
+
+  const set = makeIngredientSet([makeGroupData([makeIngredientData('item-a', 1)])]);
+  const manager = makeRecipeManagerWithSystem(
+    systemId,
+    [{ id: compId, sourceUuid, name: 'Mortar D' }],
+    [{ id: 'tool-mortar-d', componentId: compId, enabled: true }]
+  );
+  const recipe = new Recipe({
+    name: 'Broken Tool Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    toolIds: ['tool-mortar-d'],
+    resultGroups: [{ id: 'rg-1', results: [] }]
+  });
+
+  const result = manager.evaluateCraftability([makeActor([ingredientItem, brokenTool])], recipe);
+
+  assert.equal(result.toolStates[0].available, false, 'a broken tool is unavailable');
+  assert.equal(result.toolStates[0].needsRepair, true, 'a broken tool needs repair');
 });
 
 test('TC8b: evaluateCraftability toolStates show unavailable when tool missing', () => {
@@ -783,4 +913,38 @@ test('TC10b (regression): evaluateCraftability returns all states unsatisfied wh
   const allSatisfied = result.ingredientStates.every(s => s.satisfied);
   assert.equal(allSatisfied, false,
     'not all ingredientStates can be satisfied when canCraft is false (no false positive)');
+});
+
+// ---------------------------------------------------------------------------
+// evaluateShoppingRequirement: union across ingredient sets, max need per component
+// ---------------------------------------------------------------------------
+
+test('evaluateShoppingRequirement unions all ingredient sets with the max need per component', () => {
+  const systemId = 'sys-shop';
+  const setA = makeIngredientSet([makeGroupData([makeComponentIngredientData('c-iron', 2)])]);
+  const setB = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData('c-iron', 3)]),
+    makeGroupData([makeComponentIngredientData('c-wood', 1)])
+  ]);
+  const recipe = new Recipe({
+    name: 'Routed Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [setA.toJSON(), setB.toJSON()],
+    resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }]
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: 'c-iron', sourceUuid: 'Item.iron', name: 'Iron', img: 'icons/iron.webp' },
+    { id: 'c-wood', sourceUuid: 'Item.wood', name: 'Wood', img: 'icons/wood.webp' }
+  ]);
+
+  // Owns nothing — the shopping requirement is the full union.
+  const result = manager.evaluateShoppingRequirement([makeActor([])], recipe);
+
+  assert.equal(result.ingredientStates.length, 2, 'union of components across both sets');
+  const byName = Object.fromEntries(result.ingredientStates.map((s) => [s.name, s]));
+  assert.equal(byName.Iron.need, 3, 'iron need is the max across sets (2 vs 3), not the sum');
+  assert.equal(byName.Iron.img, 'icons/iron.webp', 'carries the component image');
+  assert.equal(byName.Wood.need, 1, 'wood from the second set is included');
+  assert.equal(byName.Iron.satisfied, false);
+  assert.equal(byName.Iron.have, 0);
 });

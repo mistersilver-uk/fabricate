@@ -172,7 +172,7 @@ test('GatheringRunManager creates active runs with only canonical fields', async
     environmentSnapshot: { name: 'Snapshot' },
     checkResult: { total: 18, leaked: 'allowed because checkResult is opaque' },
     usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1, label: 'Tool' }],
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 2, name: 'Herb' }]
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 2, name: 'Herb', img: 'icons/herb.webp', leaked: 'dropped' }]
   }));
 
   assert.deepEqual(Object.keys(run), [
@@ -192,7 +192,11 @@ test('GatheringRunManager creates active runs with only canonical fields', async
   assert.equal(run.id, 'run-1');
   assert.equal(run.status, 'inProgress');
   assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1 }]);
-  assert.deepEqual(run.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 2 }]);
+  // name/img are canonical display fields for created results (for the run journal);
+  // other extras (e.g. `leaked`) are still stripped.
+  assert.deepEqual(run.createdResults, [
+    { actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 2, name: 'Herb', img: 'icons/herb.webp' }
+  ]);
   assert.equal('blindLabel' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
   assert.equal('environmentSnapshot' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
 });

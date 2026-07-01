@@ -2,7 +2,7 @@
  * Manages crafting systems and their item libraries
  */
 import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { getFabricateFlag, setFabricateFlag, FABRICATE_FLAG_NAMESPACE } from '../config/flags.js';
 import {
   cleanupStalePreferences,
   isGatheringActorSelectableByUser,
@@ -2045,6 +2045,136 @@ export class CraftingSystemManager {
    *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>
    * }>}
    */
+  /**
+   * Persist a transferable `flags.fabricate.componentId` on a component's source
+   * WORLD item, so any future inventory copy (drag/duplicate) inherits it and matches
+   * this component even when Foundry's transitive `_stats.duplicateSource` points at a
+   * template rather than this source (the GM "copy an item as a template" workflow).
+   * No-op for compendium/locked/non-Item sources (not writable in place — those still
+   * match via source UUIDs). GM context is guaranteed by the callers.
+   * @private
+   */
+  async _stampComponentSourceFlag(source, componentId) {
+    if (!componentId) return;
+    if (!source || source.pack || (source.documentName && source.documentName !== 'Item')) return;
+    if (typeof source.setFlag !== 'function') return;
+    if (getFabricateFlag(source, 'componentId', null) === componentId) return;
+    await setFabricateFlag(source, 'componentId', componentId);
+  }
+
+  /**
+   * Clear a stale `flags.fabricate.componentId` from a world item that no longer
+   * sources the given component (used when a component is re-pointed to a new source).
+   * @private
+   */
+  async _clearComponentSourceFlag(sourceUuid, componentId) {
+    if (!sourceUuid || !componentId) return;
+    let doc;
+    try {
+      doc = await fromUuid(sourceUuid);
+    } catch {
+      doc = null;
+    }
+    if (!doc || doc.pack || typeof doc.unsetFlag !== 'function') return;
+    if (getFabricateFlag(doc, 'componentId', null) !== componentId) return;
+    try {
+      await doc.unsetFlag(FABRICATE_FLAG_NAMESPACE, 'fabricate.componentId');
+    } catch {
+      // Non-fatal.
+    }
+  }
+
+  /**
+   * Repair a single source item against the known components: if it is the source
+   * of a component (matched by IDENTITY — its own uuid / compendium source, NOT the
+   * transitive duplicateSource), strip a lingering `_stats.duplicateSource` so future
+   * copies link to THIS item, and stamp `flags.fabricate.componentId`. If it carries
+   * a stale component flag but sources no component, clear it. Compendium/locked and
+   * non-writable items are skipped by the callers.
+   *
+   * @private
+   * @param {object} item - a Foundry Item document
+   * @param {object[]} components - all managed components across systems
+   * @param {{stamped:number, stripped:number, cleared:number}} summary - mutated in place
+   */
+  async _repairSourceItem(item, components, summary) {
+    if (!item || typeof item.update !== 'function') return;
+    const identityRefs = new Set(getItemIdentityReferences(item));
+    const owner =
+      identityRefs.size > 0
+        ? components.find((component) =>
+            getComponentSourceReferences(component).some((ref) => identityRefs.has(ref))
+          )
+        : null;
+    const currentFlag = getFabricateFlag(item, 'componentId', null);
+
+    if (owner) {
+      if (item._stats?.duplicateSource) {
+        await item.update({ '_stats.duplicateSource': null });
+        summary.stripped += 1;
+      }
+      if (currentFlag !== owner.id) {
+        await setFabricateFlag(item, 'componentId', owner.id);
+        summary.stamped += 1;
+      }
+    } else if (currentFlag && typeof item.unsetFlag === 'function') {
+      await item.unsetFlag(FABRICATE_FLAG_NAMESPACE, 'fabricate.componentId');
+      summary.cleared += 1;
+    }
+  }
+
+  /**
+   * GM maintenance: reconcile every component's source item so craft-time matching
+   * is durable. For each source item this strips a transitive `_stats.duplicateSource`
+   * (so future inventory copies link back to it) and stamps a transferable
+   * `flags.fabricate.componentId`. World-directory items are always processed;
+   * compendium items are processed only when the pack is writable (unlocked world
+   * pack) — locked/module packs are counted and skipped (their copies already match
+   * via `_stats.compendiumSource`, so no repair is needed).
+   *
+   * @param {{ includeCompendiums?: boolean }} [options]
+   * @returns {Promise<{scanned:number, stamped:number, stripped:number, cleared:number, skippedLocked:number}>}
+   */
+  async repairComponentSourceFlags({ includeCompendiums = true } = {}) {
+    this._assertGM('repair component sources');
+
+    const components = [];
+    for (const system of this.getSystems()) {
+      for (const component of system.components || []) components.push(component);
+    }
+
+    const summary = { scanned: 0, stamped: 0, stripped: 0, cleared: 0, skippedLocked: 0 };
+
+    const worldItems = globalThis.game?.items ? [...globalThis.game.items] : [];
+    for (const item of worldItems) {
+      summary.scanned += 1;
+      await this._repairSourceItem(item, components, summary);
+    }
+
+    if (includeCompendiums) {
+      const packs = globalThis.game?.packs ? [...globalThis.game.packs] : [];
+      for (const pack of packs) {
+        if (pack?.documentName !== 'Item') continue;
+        if (pack.locked) {
+          summary.skippedLocked += 1;
+          continue;
+        }
+        let docs;
+        try {
+          docs = await pack.getDocuments();
+        } catch {
+          docs = [];
+        }
+        for (const item of docs) {
+          summary.scanned += 1;
+          await this._repairSourceItem(item, components, summary);
+        }
+      }
+    }
+
+    return summary;
+  }
+
   async addItemFromUuid(systemId, itemUuid) {
     this._assertGM('add component from uuid');
     const system = this.getSystem(systemId);
@@ -2089,6 +2219,10 @@ export class CraftingSystemManager {
         nextFallbacks.length === (existing.fallbackItemIds || []).length &&
         nextFallbacks.every((ref) => (existing.fallbackItemIds || []).includes(ref));
 
+      // Stamp the source (both skipped + updated) so a source that predates this
+      // flag — or was re-imported — always carries the transferable component id.
+      await this._stampComponentSourceFlag(source, existing.id);
+
       if (unchanged) {
         return { item: existing, action: 'skipped', sourceFallbacks: nextSnapshot.sourceFallbacks };
       }
@@ -2115,6 +2249,7 @@ export class CraftingSystemManager {
 
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
+    await this._stampComponentSourceFlag(source, item.id);
     await this.save();
     return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
@@ -2152,6 +2287,7 @@ export class CraftingSystemManager {
     }
 
     const existing = system.components[idx];
+    const previousSourceUuid = existing.sourceItemUuid || existing.sourceUuid || null;
     const nextSnapshot = await this._buildComponentSourceSnapshot(itemUuid, source, existing);
     const conflict = this._findComponentBySourceReferences(system, nextSnapshot.references, itemId);
     if (conflict) {
@@ -2177,6 +2313,12 @@ export class CraftingSystemManager {
     );
 
     system.components[idx] = updatedItem;
+    // Re-point the transferable flag: clear the old source (if it still points here)
+    // and stamp the new source, so copies match the current source, not the old one.
+    if (previousSourceUuid && previousSourceUuid !== itemUuid) {
+      await this._clearComponentSourceFlag(previousSourceUuid, itemId);
+    }
+    await this._stampComponentSourceFlag(source, itemId);
     await this.save();
     return { item: updatedItem, sourceFallbacks: nextSnapshot.sourceFallbacks };
   }

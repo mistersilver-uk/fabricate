@@ -3,8 +3,10 @@ import FabricateAppRoot from './svelte/apps/FabricateAppRoot.svelte';
 import { registerFabricateApp } from './appFactory.js';
 import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
+import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
+import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
 import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
-import { notifyInfo } from './svelte/util/foundryBridge.js';
+import { notifyWarn, localize } from './svelte/util/foundryBridge.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -192,6 +194,24 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         ...opts
       }) ?? null,
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
+      // Player Crafting tab seams. The listing/craft/source reads mirror the
+      // gathering seams: every Foundry-facing call routes through the
+      // `game.fabricate` facade so the stores stay Foundry-free.
+      listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
+      craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      listCraftingSourceActors: () => game?.fabricate?.listCraftingSourceActors?.() ?? [],
+      getCraftingSourceActors: () => game?.fabricate?.getCraftingSourceActors?.() ?? [],
+      getSelectedCraftingActorId: () => game?.fabricate?.getSelectedCraftingActorId?.() ?? '',
+      setSelectedCraftingActorId: (id) => game?.fabricate?.setSelectedCraftingActorId?.(id),
+      getCraftingComponentSourceIds: () => game?.fabricate?.getCraftingComponentSourceIds?.() ?? [],
+      setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
+      getFavouriteRecipeIds: () => game?.fabricate?.getFavouriteRecipeIds?.() ?? [],
+      toggleFavouriteRecipe: (id) => game?.fabricate?.toggleFavouriteRecipe?.(id) ?? [],
+      // Player-facing notification seam (a failed craft surfaces as a warning).
+      notify: (message) => notifyWarn(message),
+      // Localized generic craft-failure message for a thrown craft (the engine can
+      // throw on the currency-payment macro path, producing no result message).
+      craftErrorMessage: () => localize('FABRICATE.App.Crafting.Notify.CraftFailed'),
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
@@ -203,7 +223,6 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
       getWorldTimeComponents: (worldTime) =>
         game?.fabricate?.getWorldTimeComponents?.(worldTime) ?? null,
-      notify: (message) => notifyInfo(message),
       // GM economy authoring + manual state controls (Manager app).
       getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
       setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
@@ -224,6 +243,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // One shared actor-bar store instance, reused across renders, so the shell
     // and the gathering tab read/write the same reactive selection state.
     services.actorBar = createActorBarStore({ services });
+    // Player Crafting tab stores. The component-sources store is created first so
+    // the crafting store can read the current source ids off it when it loads.
+    services.craftingSources = createCraftingSourcesStore({ services });
+    services.crafting = createCraftingStore({ services });
     // One shared journal store instance so the nav badge (shell) and the Journal
     // tab read the same reactive run state.
     services.journal = createJournalStore({ services });

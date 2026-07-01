@@ -105,6 +105,13 @@ export class CraftingEngine {
 
     const runManager = this.craftingRunManager || game.fabricate?.getCraftingRunManager?.();
     let run = null;
+    // Track whether THIS call created the run (vs reused an existing one) and whether
+    // it reached a legitimate persisted state (armed a time gate, or completed a
+    // step). A run created here but never resolved — e.g. rejected by a pre-check
+    // validation gate below — is a phantom and is discarded in the `finally`, so a
+    // failed or never-started craft never lingers as an "in progress" active run.
+    let createdThisCall = false;
+    let resolved = false;
     if (runManager) {
       run = options?.runId
         ? runManager.getActiveRun(craftingActor, options.runId)
@@ -116,431 +123,470 @@ export class CraftingEngine {
           componentSourceActors,
           game.user?.id || null
         );
+        createdThisCall = true;
       }
     }
 
-    const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
-    if (visibilityService) {
-      const guard = visibilityService.guardCraftStart({
-        viewer: game.user,
-        recipe,
-        craftingActor,
-        componentSourceActors,
-      });
-      if (!guard.craftable) {
-        const reasonMap = {
-          'missing-system': 'Crafting system not found',
-          visibility: 'Recipe is not visible to this user',
-          knowledge: 'Missing recipe knowledge',
-          locked: 'Recipe is locked',
-        };
-        return {
-          success: false,
-          results: null,
-          message: reasonMap[guard.reason] || 'Crafting is blocked by recipe access rules',
-        };
-      }
-    }
-
-    const executionSteps =
-      typeof recipe.getExecutionSteps === 'function'
-        ? recipe.getExecutionSteps()
-        : [
-            {
-              id: 'implicit-step',
-              name: 'Step 1',
-              ingredientSets: recipe.ingredientSets || [],
-              resultGroups: recipe.resultGroups || [],
-              toolIds: recipe.toolIds || [],
-              timeRequirement: null,
-              outcomeRouting: recipe.outcomeRouting || null,
-            },
-          ];
-
-    let stepIndex = Number(run?.currentStepIndex);
-    if (!Number.isFinite(stepIndex) || stepIndex < 0) stepIndex = 0;
-    const step = executionSteps[stepIndex];
-    if (!step) {
-      return {
-        success: false,
-        results: null,
-        message: 'No active crafting step available',
-      };
-    }
-    if (resolutionService) {
-      const modeValidation = resolutionService.validateRecipe(recipe);
-      if (!modeValidation.valid) {
-        return {
-          success: false,
-          results: null,
-          message: `Mode validation failed: ${modeValidation.errors.join(', ')}`,
-        };
-      }
-    }
-
-    if (runManager && run && step.timeRequirement) {
-      run = await runManager.markStepWaitingForTime(
-        craftingActor,
-        run,
-        stepIndex,
-        step.timeRequirement
-      );
-      const canProceed = runManager.canProceedTimeGate(
-        run,
-        stepIndex,
-        Number(game.time?.worldTime || 0)
-      );
-      if (!canProceed) {
-        const gate = run.steps?.[stepIndex]?.timeGate;
-        const remaining = Math.max(
-          0,
-          Math.ceil(Number(gate?.availableAt || 0) - Number(game.time?.worldTime || 0))
-        );
-        return {
-          success: false,
-          results: null,
-          message: `Step "${step.name || `Step ${stepIndex + 1}`}" is still in progress (${remaining}s remaining)`,
-        };
-      }
-      run = await runManager.markStepInProgress(craftingActor, run, stepIndex);
-    }
-
-    const executionRecipe = this._buildStepRecipeView(recipe, step);
-
-    // Check if recipe step can be crafted. Thread the crafting actor so a currency
-    // alternative is craftable exactly when this actor can afford it — display and
-    // execution agree on the same currency-aware decision.
-    const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, {
-      presentTools,
-      craftingActor,
-    });
-    if (!canCraftCheck.canCraft) {
-      const missingMsg = this._formatMissingItems(canCraftCheck.missing);
-      return {
-        success: false,
-        results: null,
-        message: `Missing required items:\n${missingMsg}`,
-      };
-    }
-
-    // Determine which ingredient set to use
-    let ingredientSet;
-    if (ingredientSetId) {
-      ingredientSet = executionRecipe.ingredientSets.find((s) => s.id === ingredientSetId);
-      if (!ingredientSet) {
-        return {
-          success: false,
-          results: null,
-          message: `Invalid ingredient set ID: ${ingredientSetId}`,
-        };
-      }
-    } else {
-      // Use the satisfiable set from canCraftCheck
-      ingredientSet = canCraftCheck.satisfiableSet;
-    }
-
-    // SINGLE SELECTION SOURCE: compute the widened selection exactly once here, with
-    // the currency probe bound to the crafting actor + system currency profile. Both
-    // consumption (its item `plan`) and the currency gate/spend (its `currencySpends`)
-    // read THIS selection — never a recompute — so item mutation mid-craft can never
-    // diverge the gated spend from the consumed plan.
-    const craftSelection = this._resolveCraftSelection(
-      componentSourceActors,
-      ingredientSet,
-      executionRecipe,
-      craftingActor
-    );
-    const currencySpends = craftSelection.currencySpends || [];
-
-    // Validate tools: the recipe's resolved library Tools must be present
-    // (a matching, non-broken item) on the component source actors.
-    const toolsForSet =
-      typeof this.recipeManager.getToolsForSet === 'function'
-        ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
-        : [];
-    const toolValidation = await this._validateTools(
-      componentSourceActors,
-      executionRecipe,
-      toolsForSet,
-      presentTools
-    );
-    if (!toolValidation.valid) {
-      return {
-        success: false,
-        results: null,
-        message: toolValidation.message,
-      };
-    }
-
-    // Currency afford gate: every chosen currency spend must be affordable (aggregated
-    // cross-unit on the common ladder) BEFORE any item/currency mutation or the
-    // Item-Piles deduct. On a shortfall we abort here with zero mutation and never fall
-    // back to an unselected item plan.
-    const currencyAffordCheck = await checkCurrencySpends(
-      craftingActor,
-      executionRecipe,
-      currencySpends,
-      this._currencySeams()
-    );
-    if (!currencyAffordCheck.valid) {
-      return {
-        success: false,
-        results: null,
-        message: currencyAffordCheck.message,
-      };
-    }
-
-    const itemPilesAffordCheck = await this._checkItemPilesCurrencyCost(craftingActor, recipe);
-    if (!itemPilesAffordCheck.valid) {
-      return {
-        success: false,
-        results: null,
-        message: itemPilesAffordCheck.message,
-      };
-    }
-
-    // Run optional system-level crafting check before consuming ingredients.
-    const checkResult = await this._runCraftingCheck(
-      executionRecipe,
-      craftingActor,
-      componentSourceActors,
-      ingredientSet,
-      step
-    );
-    // A misconfigured required check (no authored roll formula for the active mode)
-    // is a GM-side system gap, not a rolled failure: abort with ZERO mutation so the
-    // player's ingredients/currency/tools are never consumed or broken. The
-    // failure-consumption policy below applies only to genuine rolled failures.
-    if (checkResult.misconfigured) {
-      return {
-        success: false,
-        results: null,
-        message: checkResult.message,
-      };
-    }
-    if (!checkResult.success) {
-      const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
-      let consumedOnFail = [];
-      let usedToolPairs = [];
-      let usedToolsOnFail = [];
-      try {
-        if (failurePolicy.consumeIngredientsOnFail) {
-          consumedOnFail = await this._consumeIngredients(craftSelection.plan);
-          // Currency is consumed alongside items on the failure path only when the
-          // policy consumes ingredients on failure (it is a chosen ingredient).
-          await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+    try {
+      const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
+      if (visibilityService) {
+        const guard = visibilityService.guardCraftStart({
+          viewer: game.user,
+          recipe,
+          craftingActor,
+          componentSourceActors,
+        });
+        if (!guard.craftable) {
+          const reasonMap = {
+            'missing-system': 'Crafting system not found',
+            visibility: 'Recipe is not visible to this user',
+            knowledge: 'Missing recipe knowledge',
+            locked: 'Recipe is locked',
+          };
+          return {
+            success: false,
+            results: null,
+            message: reasonMap[guard.reason] || 'Crafting is blocked by recipe access rules',
+          };
         }
-        if (failurePolicy.breakToolsOnFail) {
-          usedToolPairs = toolValidation.tools;
-          // The single shared `evaluateCheckBreakage` seam decides forced breakage
-          // on the check-failure path too (gated by `breakToolsOnFail`, as
-          // today). Under `toolSpecific` an engine-evaluated crit/tier
-          // `data.breakTools` force-break applies; under `checkDriven` the active
-          // check's `checkBreakage` triggers decide. The no-check passthrough
-          // result is not engine-evaluated, so it never force-breaks (the
-          // `engineEvaluated` guard lives inside the seam).
-          const breakDecision = this._resolveCraftingBreakageDecision(
-            this._getRecipeSystem(executionRecipe),
-            executionRecipe,
-            checkResult
-          );
-          usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
-            forceBreak: breakDecision.forceBreak,
-            authority: breakDecision.authority,
-            reason: breakDecision.reason,
-            triggerId: breakDecision.triggerId,
-          });
-        }
-      } catch (consumptionError) {
-        console.error('Fabricate | Error during failure-path consumption:', consumptionError);
       }
-      if (runManager && run) {
-        await runManager.completeStepFailure(
+
+      const executionSteps =
+        typeof recipe.getExecutionSteps === 'function'
+          ? recipe.getExecutionSteps()
+          : [
+              {
+                id: 'implicit-step',
+                name: 'Step 1',
+                ingredientSets: recipe.ingredientSets || [],
+                resultGroups: recipe.resultGroups || [],
+                toolIds: recipe.toolIds || [],
+                timeRequirement: null,
+                outcomeRouting: recipe.outcomeRouting || null,
+              },
+            ];
+
+      let stepIndex = Number(run?.currentStepIndex);
+      if (!Number.isFinite(stepIndex) || stepIndex < 0) stepIndex = 0;
+      const step = executionSteps[stepIndex];
+      if (!step) {
+        return {
+          success: false,
+          results: null,
+          message: 'No active crafting step available',
+        };
+      }
+      if (resolutionService) {
+        const modeValidation = resolutionService.validateRecipe(recipe);
+        if (!modeValidation.valid) {
+          return {
+            success: false,
+            results: null,
+            message: `Mode validation failed: ${modeValidation.errors.join(', ')}`,
+          };
+        }
+      }
+
+      if (runManager && run && step.timeRequirement) {
+        run = await runManager.markStepWaitingForTime(
           craftingActor,
           run,
           stepIndex,
-          checkResult.message || 'Crafting check failed',
-          {
+          step.timeRequirement
+        );
+        const canProceed = runManager.canProceedTimeGate(
+          run,
+          stepIndex,
+          Number(game.time?.worldTime || 0)
+        );
+        if (!canProceed) {
+          const gate = run.steps?.[stepIndex]?.timeGate;
+          const remaining = Math.max(
+            0,
+            Math.ceil(Number(gate?.availableAt || 0) - Number(game.time?.worldTime || 0))
+          );
+          // The run legitimately stays active while its time gate matures — not a phantom.
+          resolved = true;
+          return {
+            success: false,
+            results: null,
+            message: `Step "${step.name || `Step ${stepIndex + 1}`}" is still in progress (${remaining}s remaining)`,
+          };
+        }
+        run = await runManager.markStepInProgress(craftingActor, run, stepIndex);
+      }
+
+      const executionRecipe = this._buildStepRecipeView(recipe, step);
+
+      // Check if recipe step can be crafted. Thread the crafting actor so a currency
+      // alternative is craftable exactly when this actor can afford it — display and
+      // execution agree on the same currency-aware decision.
+      const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, {
+        presentTools,
+        craftingActor,
+      });
+      if (!canCraftCheck.canCraft) {
+        const missingMsg = this._formatMissingItems(canCraftCheck.missing);
+        return {
+          success: false,
+          results: null,
+          message: `Missing required items:\n${missingMsg}`,
+        };
+      }
+
+      // Determine which ingredient set to use
+      let ingredientSet;
+      if (ingredientSetId) {
+        ingredientSet = executionRecipe.ingredientSets.find((s) => s.id === ingredientSetId);
+        if (!ingredientSet) {
+          return {
+            success: false,
+            results: null,
+            message: `Invalid ingredient set ID: ${ingredientSetId}`,
+          };
+        }
+      } else {
+        // Use the satisfiable set from canCraftCheck
+        ingredientSet = canCraftCheck.satisfiableSet;
+      }
+
+      // SINGLE SELECTION SOURCE: compute the widened selection exactly once here, with
+      // the currency probe bound to the crafting actor + system currency profile. Both
+      // consumption (its item `plan`) and the currency gate/spend (its `currencySpends`)
+      // read THIS selection — never a recompute — so item mutation mid-craft can never
+      // diverge the gated spend from the consumed plan.
+      const craftSelection = this._resolveCraftSelection(
+        componentSourceActors,
+        ingredientSet,
+        executionRecipe,
+        craftingActor
+      );
+      const currencySpends = craftSelection.currencySpends || [];
+
+      // Validate tools: the recipe's resolved library Tools must be present
+      // (a matching, non-broken item) on the component source actors.
+      const toolsForSet =
+        typeof this.recipeManager.getToolsForSet === 'function'
+          ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
+          : [];
+      const toolValidation = await this._validateTools(
+        componentSourceActors,
+        executionRecipe,
+        toolsForSet,
+        presentTools
+      );
+      if (!toolValidation.valid) {
+        return {
+          success: false,
+          results: null,
+          message: toolValidation.message,
+        };
+      }
+
+      // Currency afford gate: every chosen currency spend must be affordable (aggregated
+      // cross-unit on the common ladder) BEFORE any item/currency mutation or the
+      // Item-Piles deduct. On a shortfall we abort here with zero mutation and never fall
+      // back to an unselected item plan.
+      const currencyAffordCheck = await checkCurrencySpends(
+        craftingActor,
+        executionRecipe,
+        currencySpends,
+        this._currencySeams()
+      );
+      if (!currencyAffordCheck.valid) {
+        return {
+          success: false,
+          results: null,
+          message: currencyAffordCheck.message,
+        };
+      }
+
+      const itemPilesAffordCheck = await this._checkItemPilesCurrencyCost(craftingActor, recipe);
+      if (!itemPilesAffordCheck.valid) {
+        return {
+          success: false,
+          results: null,
+          message: itemPilesAffordCheck.message,
+        };
+      }
+
+      // Run optional system-level crafting check before consuming ingredients.
+      const checkResult = await this._runCraftingCheck(
+        executionRecipe,
+        craftingActor,
+        componentSourceActors,
+        ingredientSet,
+        step
+      );
+      // A misconfigured required check (no authored roll formula for the active mode)
+      // is a GM-side system gap, not a rolled failure: abort with ZERO mutation so the
+      // player's ingredients/currency/tools are never consumed or broken. The
+      // failure-consumption policy below applies only to genuine rolled failures.
+      if (checkResult.misconfigured) {
+        return {
+          success: false,
+          results: null,
+          message: checkResult.message,
+        };
+      }
+      if (!checkResult.success) {
+        const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
+        let consumedOnFail = [];
+        let usedToolPairs = [];
+        let usedToolsOnFail = [];
+        try {
+          if (failurePolicy.consumeIngredientsOnFail) {
+            consumedOnFail = await this._consumeIngredients(craftSelection.plan);
+            // Currency is consumed alongside items on the failure path only when the
+            // policy consumes ingredients on failure (it is a chosen ingredient).
+            await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+          }
+          if (failurePolicy.breakToolsOnFail) {
+            usedToolPairs = toolValidation.tools;
+            // The single shared `evaluateCheckBreakage` seam decides forced breakage
+            // on the check-failure path too (gated by `breakToolsOnFail`, as
+            // today). Under `toolSpecific` an engine-evaluated crit/tier
+            // `data.breakTools` force-break applies; under `checkDriven` the active
+            // check's `checkBreakage` triggers decide. The no-check passthrough
+            // result is not engine-evaluated, so it never force-breaks (the
+            // `engineEvaluated` guard lives inside the seam).
+            const breakDecision = this._resolveCraftingBreakageDecision(
+              this._getRecipeSystem(executionRecipe),
+              executionRecipe,
+              checkResult
+            );
+            usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+              forceBreak: breakDecision.forceBreak,
+              authority: breakDecision.authority,
+              reason: breakDecision.reason,
+              triggerId: breakDecision.triggerId,
+            });
+          }
+        } catch (consumptionError) {
+          console.error('Fabricate | Error during failure-path consumption:', consumptionError);
+        }
+        if (runManager && run) {
+          await runManager.completeStepFailure(
+            craftingActor,
+            run,
+            stepIndex,
+            checkResult.message || 'Crafting check failed',
+            {
+              selectedIngredientSetId: ingredientSet.id,
+              lastCheckResult: {
+                success: false,
+                reason: checkResult.message || 'Crafting check failed',
+                outcome: checkResult.outcome ?? undefined,
+                value: checkResult.value ?? undefined,
+                data: checkResult.data || {},
+              },
+              consumedIngredients: consumedOnFail.map(({ item, quantity }) => ({
+                actorUuid: item.parent?.uuid || null,
+                itemUuid: item.uuid,
+                quantity,
+              })),
+              usedTools: usedToolsOnFail,
+            }
+          );
+        }
+        await this._postCraftChatMessage({
+          success: false,
+          craftingActor,
+          recipe,
+          consumedIngredients: consumedOnFail,
+          tools: usedToolPairs,
+          createdResults: [],
+          failureReason: checkResult.message || 'Crafting check failed',
+        });
+        return {
+          success: false,
+          results: null,
+          message: checkResult.message || 'Crafting check failed',
+        };
+      }
+      if (
+        resolutionService &&
+        !resolutionService.validateCheckResult({ recipe: executionRecipe, checkResult })
+      ) {
+        const message =
+          'Crafting check result does not satisfy current resolution mode requirements';
+        const validationFailurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
+        let consumedOnValidationFail = [];
+        let usedToolPairsOnValidationFail = [];
+        let usedToolsOnValidationFail = [];
+        try {
+          if (validationFailurePolicy.consumeIngredientsOnFail) {
+            consumedOnValidationFail = await this._consumeIngredients(craftSelection.plan);
+            await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+          }
+          if (validationFailurePolicy.breakToolsOnFail) {
+            usedToolPairsOnValidationFail = toolValidation.tools;
+            // Resolution-mode validation failure: route through the shared seam so the
+            // breakage authority (and immune handling) stay consistent. The check
+            // itself succeeded, so a checkDriven trigger may still force breakage.
+            const validationBreakDecision = this._resolveCraftingBreakageDecision(
+              this._getRecipeSystem(executionRecipe),
+              executionRecipe,
+              checkResult
+            );
+            usedToolsOnValidationFail = await this._applyToolBreakage(
+              executionRecipe,
+              toolValidation.tools,
+              {
+                forceBreak: validationBreakDecision.forceBreak,
+                authority: validationBreakDecision.authority,
+                reason: validationBreakDecision.reason,
+                triggerId: validationBreakDecision.triggerId,
+              }
+            );
+          }
+        } catch (consumptionError) {
+          console.error('Fabricate | Error during failure-path consumption:', consumptionError);
+        }
+        if (runManager && run) {
+          await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
             selectedIngredientSetId: ingredientSet.id,
             lastCheckResult: {
               success: false,
-              reason: checkResult.message || 'Crafting check failed',
+              reason: message,
               outcome: checkResult.outcome ?? undefined,
               value: checkResult.value ?? undefined,
               data: checkResult.data || {},
             },
-            consumedIngredients: consumedOnFail.map(({ item, quantity }) => ({
+            consumedIngredients: consumedOnValidationFail.map(({ item, quantity }) => ({
               actorUuid: item.parent?.uuid || null,
               itemUuid: item.uuid,
               quantity,
             })),
-            usedTools: usedToolsOnFail,
-          }
-        );
-      }
-      await this._postCraftChatMessage({
-        success: false,
-        craftingActor,
-        recipe,
-        consumedIngredients: consumedOnFail,
-        tools: usedToolPairs,
-        createdResults: [],
-        failureReason: checkResult.message || 'Crafting check failed',
-      });
-      return {
-        success: false,
-        results: null,
-        message: checkResult.message || 'Crafting check failed',
-      };
-    }
-    if (
-      resolutionService &&
-      !resolutionService.validateCheckResult({ recipe: executionRecipe, checkResult })
-    ) {
-      const message = 'Crafting check result does not satisfy current resolution mode requirements';
-      const validationFailurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
-      let consumedOnValidationFail = [];
-      let usedToolPairsOnValidationFail = [];
-      let usedToolsOnValidationFail = [];
-      try {
-        if (validationFailurePolicy.consumeIngredientsOnFail) {
-          consumedOnValidationFail = await this._consumeIngredients(craftSelection.plan);
-          await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+            usedTools: usedToolsOnValidationFail,
+          });
         }
-        if (validationFailurePolicy.breakToolsOnFail) {
-          usedToolPairsOnValidationFail = toolValidation.tools;
-          // Resolution-mode validation failure: route through the shared seam so the
-          // breakage authority (and immune handling) stay consistent. The check
-          // itself succeeded, so a checkDriven trigger may still force breakage.
-          const validationBreakDecision = this._resolveCraftingBreakageDecision(
-            this._getRecipeSystem(executionRecipe),
-            executionRecipe,
-            checkResult
-          );
-          usedToolsOnValidationFail = await this._applyToolBreakage(
-            executionRecipe,
-            toolValidation.tools,
-            {
-              forceBreak: validationBreakDecision.forceBreak,
-              authority: validationBreakDecision.authority,
-              reason: validationBreakDecision.reason,
-              triggerId: validationBreakDecision.triggerId,
-            }
-          );
-        }
-      } catch (consumptionError) {
-        console.error('Fabricate | Error during failure-path consumption:', consumptionError);
-      }
-      if (runManager && run) {
-        await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
-          selectedIngredientSetId: ingredientSet.id,
-          lastCheckResult: {
-            success: false,
-            reason: message,
-            outcome: checkResult.outcome ?? undefined,
-            value: checkResult.value ?? undefined,
-            data: checkResult.data || {},
-          },
-          consumedIngredients: consumedOnValidationFail.map(({ item, quantity }) => ({
-            actorUuid: item.parent?.uuid || null,
-            itemUuid: item.uuid,
-            quantity,
-          })),
-          usedTools: usedToolsOnValidationFail,
+        await this._postCraftChatMessage({
+          success: false,
+          craftingActor,
+          recipe,
+          consumedIngredients: consumedOnValidationFail,
+          tools: usedToolPairsOnValidationFail,
+          createdResults: [],
+          failureReason: message,
         });
+        return {
+          success: false,
+          results: null,
+          message,
+        };
       }
-      await this._postCraftChatMessage({
-        success: false,
-        craftingActor,
-        recipe,
-        consumedIngredients: consumedOnValidationFail,
-        tools: usedToolPairsOnValidationFail,
-        createdResults: [],
-        failureReason: message,
+
+      // Consume ingredients from the single craft selection's item plan.
+      const consumedItems = await this._consumeIngredients(craftSelection.plan);
+
+      // For alchemy attempts: also consume submitted items that weren't handled
+      // by standard ingredient matching (e.g. items used only for essences).
+      if (options?.isAlchemyAttempt && Array.isArray(options?.alchemySubmittedItems)) {
+        const alreadyConsumedUuids = new Set(consumedItems.map((c) => c.item.uuid));
+        const essenceConsumeCounts = new Map();
+        for (const item of options.alchemySubmittedItems) {
+          if (item.uuid && !alreadyConsumedUuids.has(item.uuid)) {
+            essenceConsumeCounts.set(item.uuid, (essenceConsumeCounts.get(item.uuid) || 0) + 1);
+          }
+        }
+        for (const actor of componentSourceActors) {
+          for (const item of actor.items || []) {
+            const count = essenceConsumeCounts.get(item.uuid);
+            if (!count) continue;
+            const qty = Number(item.system?.quantity ?? 1);
+            await (count >= qty ? item.delete() : item.update({ 'system.quantity': qty - count }));
+            consumedItems.push({ item, quantity: count, ingredient: null });
+          }
+        }
+      }
+
+      // Deduct the chosen currency spends after item consumption (the afford gate above
+      // already confirmed every spend is affordable). A mid-loop spend failure is logged
+      // like the Item-Piles deduct error below — not refunded.
+      await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+
+      // Apply tool usage/breakage for the recipe's resolved library Tools via the
+      // single shared `evaluateCheckBreakage` seam. Under `toolSpecific` an
+      // engine-evaluated crit/tier `breakTools` forces every matched tool to break (the
+      // no-check passthrough result is not engine-evaluated, so it does not); under
+      // `checkDriven` the active
+      // check's `checkBreakage` triggers decide whether all required non-immune tools
+      // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
+      // gate exists here).
+      const successBreakDecision = this._resolveCraftingBreakageDecision(
+        this._getRecipeSystem(executionRecipe),
+        executionRecipe,
+        checkResult
+      );
+      const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+        forceBreak: successBreakDecision.forceBreak,
+        authority: successBreakDecision.authority,
+        reason: successBreakDecision.reason,
+        triggerId: successBreakDecision.triggerId,
       });
-      return {
-        success: false,
-        results: null,
-        message,
-      };
-    }
 
-    // Consume ingredients from the single craft selection's item plan.
-    const consumedItems = await this._consumeIngredients(craftSelection.plan);
+      // Deduct Item Piles currency cost after ingredients are consumed to avoid
+      // losing currency if ingredient consumption throws.
+      await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
-    // For alchemy attempts: also consume submitted items that weren't handled
-    // by standard ingredient matching (e.g. items used only for essences).
-    if (options?.isAlchemyAttempt && Array.isArray(options?.alchemySubmittedItems)) {
-      const alreadyConsumedUuids = new Set(consumedItems.map((c) => c.item.uuid));
-      const essenceConsumeCounts = new Map();
-      for (const item of options.alchemySubmittedItems) {
-        if (item.uuid && !alreadyConsumedUuids.has(item.uuid)) {
-          essenceConsumeCounts.set(item.uuid, (essenceConsumeCounts.get(item.uuid) || 0) + 1);
+      // Create the result item(s)
+      const { items: resultItems, resolutionMeta } = await this._createResultItems(
+        craftingActor,
+        executionRecipe,
+        step,
+        ingredientSet,
+        consumedItems,
+        toolValidation.tools,
+        checkResult,
+        options?.resultGroupId || null
+      );
+
+      if (
+        resolutionMeta?.disposition === 'error' ||
+        resolutionMeta?.disposition === 'misconfiguration'
+      ) {
+        const message = resolutionMeta.error || 'Crafting resolution failed';
+        if (runManager && run) {
+          await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+            selectedIngredientSetId: ingredientSet.id,
+            lastCheckResult: {
+              success: false,
+              reason: message,
+              outcome: checkResult.outcome ?? undefined,
+              value: checkResult.value ?? undefined,
+              data: checkResult.data || {},
+            },
+            consumedIngredients: consumedItems.map(({ item, quantity }) => ({
+              actorUuid: item.parent?.uuid || null,
+              itemUuid: item.uuid,
+              quantity,
+            })),
+            usedTools,
+          });
         }
+        await this._postCraftChatMessage({
+          success: false,
+          craftingActor,
+          recipe,
+          consumedIngredients: consumedItems,
+          tools: toolValidation.tools,
+          createdResults: [],
+          failureReason: message,
+        });
+        return {
+          success: false,
+          results: null,
+          message,
+        };
       }
-      for (const actor of componentSourceActors) {
-        for (const item of actor.items || []) {
-          const count = essenceConsumeCounts.get(item.uuid);
-          if (!count) continue;
-          const qty = Number(item.system?.quantity ?? 1);
-          await (count >= qty ? item.delete() : item.update({ 'system.quantity': qty - count }));
-          consumedItems.push({ item, quantity: count, ingredient: null });
-        }
-      }
-    }
 
-    // Deduct the chosen currency spends after item consumption (the afford gate above
-    // already confirmed every spend is affordable). A mid-loop spend failure is logged
-    // like the Item-Piles deduct error below — not refunded.
-    await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
-
-    // Apply tool usage/breakage for the recipe's resolved library Tools via the
-    // single shared `evaluateCheckBreakage` seam. Under `toolSpecific` an
-    // engine-evaluated crit/tier `breakTools` forces every matched tool to break (the
-    // no-check passthrough result is not engine-evaluated, so it does not); under
-    // `checkDriven` the active
-    // check's `checkBreakage` triggers decide whether all required non-immune tools
-    // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
-    // gate exists here).
-    const successBreakDecision = this._resolveCraftingBreakageDecision(
-      this._getRecipeSystem(executionRecipe),
-      executionRecipe,
-      checkResult
-    );
-    const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
-      forceBreak: successBreakDecision.forceBreak,
-      authority: successBreakDecision.authority,
-      reason: successBreakDecision.reason,
-      triggerId: successBreakDecision.triggerId,
-    });
-
-    // Deduct Item Piles currency cost after ingredients are consumed to avoid
-    // losing currency if ingredient consumption throws.
-    await this._deductItemPilesCurrencyCost(craftingActor, recipe);
-
-    // Create the result item(s)
-    const { items: resultItems, resolutionMeta } = await this._createResultItems(
-      craftingActor,
-      executionRecipe,
-      step,
-      ingredientSet,
-      consumedItems,
-      toolValidation.tools,
-      checkResult,
-      options?.resultGroupId || null
-    );
-
-    if (
-      resolutionMeta?.disposition === 'error' ||
-      resolutionMeta?.disposition === 'misconfiguration'
-    ) {
-      const message = resolutionMeta.error || 'Crafting resolution failed';
       if (runManager && run) {
-        await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+        run = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
           selectedIngredientSetId: ingredientSet.id,
           lastCheckResult: {
-            success: false,
-            reason: message,
+            success: true,
+            reason: checkResult.message || 'Success',
             outcome: checkResult.outcome ?? undefined,
             value: checkResult.value ?? undefined,
             data: checkResult.data || {},
@@ -551,76 +597,58 @@ export class CraftingEngine {
             quantity,
           })),
           usedTools,
+          createdResults: (resultItems || []).map((item) => ({
+            actorUuid: craftingActor.uuid,
+            itemUuid: item.uuid,
+            quantity: Number(item.system?.quantity || 1),
+            name: item.name ?? null,
+            img: item.img ?? null,
+          })),
         });
       }
+      // Step resolved: a multi-step recipe keeps an active run for the next step; a
+      // final step is already moved to history. Either way it is not a phantom.
+      resolved = true;
+
+      if (visibilityService) {
+        await visibilityService.applyRecipeItemUseOnCraft({
+          recipe,
+          craftingActor,
+          componentSourceActors,
+        });
+        if (options?.isAlchemyAttempt === true) {
+          await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
+        }
+      }
+
       await this._postCraftChatMessage({
-        success: false,
+        success: true,
         craftingActor,
         recipe,
         consumedIngredients: consumedItems,
         tools: toolValidation.tools,
-        createdResults: [],
-        failureReason: message,
+        createdResults: resultItems,
       });
+
       return {
-        success: false,
-        results: null,
-        message,
+        success: true,
+        results: resultItems,
+        message:
+          run?.status === 'succeeded'
+            ? `Successfully crafted ${recipe.name}`
+            : `Completed ${step.name || `step ${stepIndex + 1}`} for ${recipe.name}`,
       };
-    }
-
-    if (runManager && run) {
-      run = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
-        selectedIngredientSetId: ingredientSet.id,
-        lastCheckResult: {
-          success: true,
-          reason: checkResult.message || 'Success',
-          outcome: checkResult.outcome ?? undefined,
-          value: checkResult.value ?? undefined,
-          data: checkResult.data || {},
-        },
-        consumedIngredients: consumedItems.map(({ item, quantity }) => ({
-          actorUuid: item.parent?.uuid || null,
-          itemUuid: item.uuid,
-          quantity,
-        })),
-        usedTools,
-        createdResults: (resultItems || []).map((item) => ({
-          actorUuid: craftingActor.uuid,
-          itemUuid: item.uuid,
-          quantity: Number(item.system?.quantity || 1),
-        })),
-      });
-    }
-
-    if (visibilityService) {
-      await visibilityService.applyRecipeItemUseOnCraft({
-        recipe,
-        craftingActor,
-        componentSourceActors,
-      });
-      if (options?.isAlchemyAttempt === true) {
-        await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
+    } finally {
+      // A run created this call that never armed a time gate or completed a step is a
+      // phantom stranded by a pre-check early-return (or a mid-execution throw).
+      // Discard it with no history entry — the attempt never began and the caller
+      // already surfaced the failure message. Completed runs are already moved to
+      // history (getActiveRun → null), and a reused pre-existing run
+      // (createdThisCall=false) is never touched.
+      if (createdThisCall && !resolved && run && runManager?.getActiveRun(craftingActor, run.id)) {
+        await runManager.discardRun(craftingActor, run.id);
       }
     }
-
-    await this._postCraftChatMessage({
-      success: true,
-      craftingActor,
-      recipe,
-      consumedIngredients: consumedItems,
-      tools: toolValidation.tools,
-      createdResults: resultItems,
-    });
-
-    return {
-      success: true,
-      results: resultItems,
-      message:
-        run?.status === 'succeeded'
-          ? `Successfully crafted ${recipe.name}`
-          : `Completed ${step.name || `step ${stepIndex + 1}`} for ${recipe.name}`,
-    };
   }
 
   /**

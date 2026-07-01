@@ -403,6 +403,121 @@
           "None": "No current realm"
         }
       },
+      "Crafting": {
+        "IngredientSetFallback": "Option {index}",
+        "Loading": "Loading recipes…",
+        "Error": "Couldn't load your recipes.",
+        "NoActor": "Select a character to see what they can craft.",
+        "Empty": "No recipes are available for this character yet.",
+        "Status": {
+          "Available": "Ready to craft",
+          "Locked": "Locked",
+          "Unknown": "Not yet known",
+          "Exhausted": "Out of uses",
+          "MissingMaterials": "Missing materials",
+          "Discovery": "Undiscovered"
+        },
+        "Blocking": {
+          "Locked": "This recipe is locked by your GM.",
+          "Unknown": "You haven't learned this recipe yet.",
+          "Exhausted": "This recipe's source has no uses left.",
+          "Discovery": "Discover this recipe to reveal its details.",
+          "MissingMaterials": "You're missing some required materials."
+        },
+        "Browser": {
+          "Title": "Recipes",
+          "SearchPlaceholder": "Search recipes…",
+          "SearchLabel": "Search recipes",
+          "Empty": "No recipes to show.",
+          "NoMatches": "No recipes match your filters.",
+          "RecentsTitle": "Recent",
+          "FavouritesOnly": "Favourites",
+          "CraftableOnly": "Craftable",
+          "SystemFilterLabel": "Crafting system",
+          "AllSystems": "All systems",
+          "Favourite": "Add to favourites",
+          "Unfavourite": "Remove from favourites"
+        },
+        "Detail": {
+          "SelectHint": "Select a recipe to see how to craft it.",
+          "IngredientSetsTitle": "Ingredient options",
+          "OutcomesTitle": "Outcomes",
+          "NoOutcomes": "This recipe has no routable outcomes configured.",
+          "TierSuccess": "Awards on this result",
+          "TierNoAward": "No award",
+          "Learn": "Learn this recipe",
+          "ConsumeOnLearnWarning": "Learning this recipe consumes the source item.",
+          "IngredientRoutingHint": "The ingredient option you choose determines what you craft.",
+          "ProgressiveHint": "This recipe is crafted over multiple steps.",
+          "OptionCraftable": "Craftable",
+          "OptionBlocked": "Blocked",
+          "OptionMissing": "Missing {count}",
+          "SelectedRoute": "Selected route",
+          "OptionProduces": "Produces"
+        },
+        "Check": {
+          "Title": "Crafting check",
+          "DcLabel": "DC {dc}",
+          "Optional": "Optional",
+          "Mandatory": "Required",
+          "NoFormula": "No roll formula is configured for this check.",
+          "FormulaUnresolved": "This check can't be resolved to a number for the selected character."
+        },
+        "Io": {
+          "Ingredients": "Ingredients",
+          "Essences": "Essences",
+          "Tools": "Tools",
+          "Output": "Produces",
+          "Have": "Have",
+          "Need": "Need",
+          "Missing": "Missing",
+          "HaveOfNeed": "{have} of {need} in inventory",
+          "Available": "Available",
+          "Unavailable": "Unavailable"
+        },
+        "Shopping": {
+          "Title": "Shopping list",
+          "MaterialsTitle": "Materials needed",
+          "Empty": "Add recipes to plan the materials you'll need.",
+          "Clear": "Clear",
+          "Remove": "Remove from list",
+          "AddToList": "Add to shopping list",
+          "AllSatisfied": "You have everything you need.",
+          "PlannedRecipes": "Planned recipes",
+          "MissingComponents": "Missing components",
+          "UnavailableTools": "Unavailable tools",
+          "RecipesTitle": "Recipes",
+          "AcquireComponents": "Acquire these components",
+          "AcquireTools": "Acquire or repair these tools",
+          "Owned": "{have} / {need} owned",
+          "Acquire": "Acquire",
+          "Repair": "Repair"
+        },
+        "Run": {
+          "Title": "Crafting run",
+          "Completed": "Craft complete",
+          "Failed": "Craft failed",
+          "Advance": "Craft next step",
+          "Dismiss": "Back to shopping list"
+        },
+        "Button": {
+          "Craft": "Craft 1 item",
+          "CraftAnother": "Craft another",
+          "Crafting": "Crafting…",
+          "MissingMaterials": "You're missing some required materials."
+        },
+        "Notify": {
+          "CraftFailed": "Something went wrong while crafting. Nothing was consumed."
+        },
+        "Sources": {
+          "Label": "Component sources",
+          "Edit": "Edit component sources",
+          "Add": "Add a component source",
+          "Remove": "Remove {name} from component sources",
+          "AlwaysIncluded": "always included",
+          "Empty": "No other owned characters to add."
+        }
+      },
       "Journal": {
         "Loading": "Loading runs…",
         "Error": "Couldn't load your runs.",
@@ -436,7 +551,10 @@
           "Check": "Check",
           "Failure": "Failure",
           "CheckWithDc": "{formula} vs DC {dc}",
-          "FailureGeneric": "The crafting attempt failed."
+          "FailureGeneric": "The crafting attempt failed.",
+          "RollLabel": "Roll",
+          "RollResult": "{formula} = {total}",
+          "RollResultWithDc": "{formula} = {total} vs DC {dc}"
         },
         "Redacted": {
           "Title": "Hidden recipe"
@@ -492,7 +610,9 @@
           "ViewFullHistory": "View full history"
         },
         "Results": {
-          "Title": "Crafted items"
+          "Title": "Crafted items",
+          "TitleGathering": "Gathered items",
+          "TitleSalvage": "Salvaged items"
         },
         "Progress": {
           "Label": "Step progress"
@@ -676,6 +796,18 @@
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
         "Hint": "Reserved for future experimental Fabricate features in this world. No current features are gated by this switch. Disabled by default."
+      },
+      "RepairComponentSources": {
+        "Name": "Repair Component Sources",
+        "Label": "Repair Component Sources",
+        "Hint": "Reconcile the source items behind your crafting components so inventory copies match reliably. Fixes items that were built by copying another item as a template.",
+        "Title": "Repair Component Sources",
+        "Body": "This scans your world items and unlocked compendiums, tags each component's source item with a durable component link, and clears misleading duplicate-source metadata. Locked (system/module) compendiums are skipped. Continue?",
+        "Confirm": "Repair",
+        "Cancel": "Cancel",
+        "Success": "Component sources repaired: {stamped} tagged, {stripped} cleaned, {cleared} unlinked ({scanned} scanned, {skippedLocked} locked packs skipped).",
+        "Failed": "Component source repair failed. See the console for details.",
+        "Unavailable": "Fabricate is not ready — try again once the world has finished loading."
       },
       "InteractionPromptPosition": {
         "Name": "Interaction Prompt Position",

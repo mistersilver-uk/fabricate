@@ -24,8 +24,34 @@
   const checkLabel = $derived(String(detail?.checkLabel ?? ''));
   const failureText = $derived(String(detail?.failureText ?? ''));
 
+  // The actual rolled check (resolved formula + total, and DC when applicable) —
+  // distinct from the authored `checkLabel` requirement above.
+  const lastCheck = $derived(step?.lastCheckResult ?? null);
+  const rollFormula = $derived(String(lastCheck?.formula ?? ''));
+  const rollTotal = $derived(Number(lastCheck?.total));
+  const rollDc = $derived(Number(lastCheck?.dc));
+  const rollFailed = $derived(lastCheck?.success === false);
+  const rollResult = $derived(
+    rollFormula === '' || !Number.isFinite(rollTotal)
+      ? ''
+      : Number.isFinite(rollDc)
+        ? localize('FABRICATE.App.Journal.StepDetails.RollResultWithDc', {
+            formula: rollFormula,
+            total: rollTotal,
+            dc: rollDc,
+          })
+        : localize('FABRICATE.App.Journal.StepDetails.RollResult', {
+            formula: rollFormula,
+            total: rollTotal,
+          })
+  );
+
   const hasAnyFact = $derived(
-    requiredTime !== '' || primaryTool !== '' || checkLabel !== '' || failureText !== ''
+    requiredTime !== '' ||
+      primaryTool !== '' ||
+      checkLabel !== '' ||
+      rollResult !== '' ||
+      failureText !== ''
   );
 </script>
 
@@ -51,6 +77,14 @@
           icon="fa-dice-d20"
           label={localize('FABRICATE.App.Journal.StepDetails.Check')}
           value={checkLabel}
+        />
+      {/if}
+      {#if rollResult !== ''}
+        <JournalFactRow
+          icon="fa-dice"
+          label={localize('FABRICATE.App.Journal.StepDetails.RollLabel')}
+          value={rollResult}
+          danger={rollFailed}
         />
       {/if}
       {#if failureText !== ''}

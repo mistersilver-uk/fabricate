@@ -4245,6 +4245,82 @@ async function main() {
         await screenshot(page, 'player-gathering-stacked');
         results.steps.push({ step: 'player-gathering-stacked', passed: true, size: stackedSize });
 
+        // ── Player Crafting tab evidence ──────────────────────────────────────
+        // Switch the shared window to the Crafting tab and capture its states so
+        // changes under src/ui/svelte/apps/crafting/ map to real screenshots (the
+        // 'player-crafting' VIEW_RECIPES entry). The seeded smoke system resolves
+        // by check, so the mode-specific selections fall back to the current frame
+        // when a distinct mode is not present; each capture is defensive so a
+        // missing recipe/control never fails the phase. Gated to the full screenshot
+        // profile (like the other dedicated frame captures) so rc/ci never runs it.
+        if (RUN_SCREENSHOT_PHASES) {
+        try {
+          // Restore the window to a normal width before re-capturing the tab.
+          await page.evaluate(() => {
+            const app = document.querySelector('#fabricate-app');
+            if (!app) return;
+            Object.assign(app.style, { width: '1100px', height: '760px', left: '40px', top: '40px' });
+          });
+          await page.waitForTimeout(300);
+
+          await appShell.locator('.fabricate-app-nav-item:has-text("Crafting")').first().click();
+          await appShell.locator('[data-crafting-state]:not([data-crafting-state="loading"])')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+
+          // Best-effort: select the recipe whose detail renders the given mode, so
+          // the captured frame matches the label when that mode is seeded. Returns
+          // without throwing if no such recipe exists (the seeded smoke system
+          // resolves by check), leaving the current selection on screen.
+          async function selectCraftingRecipeByMode(mode) {
+            const rows = appShell.locator('[data-recipe-id]');
+            const count = await rows.count().catch(() => 0);
+            for (let i = 0; i < count; i++) {
+              await rows.nth(i).locator('.crafting-recipe-row-main').click().catch(() => {});
+              await page.waitForTimeout(150);
+              if (await appShell.locator(`[data-recipe-detail-mode="${mode}"]`).count() > 0) break;
+            }
+          }
+
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-crafting-simple');
+
+          await selectCraftingRecipeByMode('routedByIngredients');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-crafting-ingredient-routed');
+
+          await selectCraftingRecipeByMode('routedByCheck');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-crafting-routed-by-check');
+
+          // Produce a run-summary frame: craft the selected recipe (when craftable)
+          // so the right column swaps to the run summary, then capture it.
+          const craftButton = appShell.locator('[data-crafting-craft][data-crafting-craft-disabled="false"]').first();
+          if (await craftButton.count() > 0) {
+            await craftButton.click().catch(() => {});
+            await appShell.locator('[data-crafting-run-summary]').first()
+              .waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+          }
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-crafting-run-summary');
+
+          // Narrow-window stacked evidence: shrink below the grid's 900px stacking
+          // breakpoint so the three columns reflow into a single vertical stack.
+          const craftingStackedSize = await page.evaluate(() => {
+            const app = document.querySelector('#fabricate-app');
+            if (!app) return null;
+            Object.assign(app.style, { minWidth: '0px', minHeight: '0px', width: '780px', height: '760px', left: '20px', top: '20px' });
+            return { width: app.getBoundingClientRect().width, height: app.getBoundingClientRect().height };
+          });
+          await page.waitForTimeout(600);
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-crafting-stacked');
+          results.steps.push({ step: 'player-crafting-stacked', passed: true, size: craftingStackedSize });
+        } catch (craftingTabError) {
+          results.steps.push({ step: 'player-crafting', passed: false, error: String(craftingTabError?.message ?? craftingTabError) });
+          process.stdout.write(`  Player Crafting tab capture skipped: ${craftingTabError?.message ?? craftingTabError}\n`);
+        }
+        }
+
         await closeOpenApplications(page);
         results.steps.push({ step: 'open-fabricate-app-shell', passed: true });
         process.stdout.write('  Shared Fabricate app shell verified and screenshotted.\n');

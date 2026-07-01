@@ -152,11 +152,12 @@ export function subscribeSceneChange(handler) {
 
 /**
  * Subscribe to world-time changes so callers can refresh time-gated views
- * (Journal countdowns, run readiness) when `game.time.worldTime` advances.
- * Foundry's `updateWorldTime` is a synced hook firing on every connected client.
- * This is a READ-only refresh subscription — the handler must not publish side
- * effects (no GM-gating is applied here). Returns an unsubscribe function; no-ops
- * gracefully when the Foundry `Hooks` global is absent (e.g. unit tests).
+ * (Journal countdowns and run readiness, the player Crafting list's calendar-aware
+ * durations) when `game.time.worldTime` advances. Foundry's `updateWorldTime` is a
+ * synced hook firing on every connected client. This is a READ-only refresh
+ * subscription — the handler must not publish side effects (no GM-gating is applied
+ * here). Returns an unsubscribe function; no-ops gracefully when the Foundry `Hooks`
+ * global is absent (e.g. unit tests).
  *
  * @param {Function} handler Invoked (no args) on each world-time change.
  * @returns {Function} Unsubscribe callback.

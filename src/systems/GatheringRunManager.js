@@ -526,11 +526,20 @@ function normalizeRunItems(items) {
   if (!Array.isArray(items)) return [];
   return items
     .filter((item) => item && typeof item === 'object')
-    .map((item) => ({
-      actorUuid: stringOrNull(item.actorUuid),
-      itemUuid: stringOrNull(item.itemUuid),
-      quantity: positiveNumberOrDefault(item.quantity, 1),
-    }))
+    .map((item) => {
+      const entry = {
+        actorUuid: stringOrNull(item.actorUuid),
+        itemUuid: stringOrNull(item.itemUuid),
+        quantity: positiveNumberOrDefault(item.quantity, 1),
+      };
+      // Preserve the display name/image (when present) so the journal can list
+      // gathered items; absent for legacy/lean records.
+      const name = stringOrNull(item.name);
+      const img = stringOrNull(item.img);
+      if (name) entry.name = name;
+      if (img) entry.img = img;
+      return entry;
+    })
     .filter((item) => item.actorUuid && item.itemUuid);
 }
 

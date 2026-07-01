@@ -87,8 +87,13 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
     totalRecipes += 1;
     totalQuantity += quantity;
 
+    // Prefer the shopping requirement (materials to craft once via ANY ingredient
+    // set — max need per component across sets), falling back to single-set
+    // craftability when the manager does not expose it (e.g. test stubs).
     const evaluation = componentSourceActors && componentSourceActors.length > 0
-      ? recipeManager.evaluateCraftability(componentSourceActors, recipe)
+      ? (typeof recipeManager.evaluateShoppingRequirement === 'function'
+          ? recipeManager.evaluateShoppingRequirement(componentSourceActors, recipe)
+          : recipeManager.evaluateCraftability(componentSourceActors, recipe))
       : { ingredientStates: [], essenceStates: [], toolStates: [] };
 
     const ingredientStates = evaluation?.ingredientStates ?? [];
@@ -102,6 +107,8 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
         ingredientMap.set(key, {
           componentId: ing.componentId ?? null,
           itemUuid: ing.itemUuid ?? null,
+          name: ing.name ?? '',
+          img: ing.img ?? null,
           description: ing.description ?? '',
           totalNeed: 0,
           have: ing.have ?? 0,
@@ -117,6 +124,7 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
       if (!essenceMap.has(type)) {
         essenceMap.set(type, {
           type,
+          name: ess.name ?? type,
           totalNeed: 0,
           have: ess.have ?? 0
         });
@@ -133,12 +141,19 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
         toolMap.set(key, {
           componentId: tool.componentId ?? null,
           name: tool.name ?? tool.description ?? key,
-          available: tool.available ?? tool.satisfied ?? false
+          img: tool.img ?? null,
+          available: tool.available ?? tool.satisfied ?? false,
+          needsRepair: tool.needsRepair === true
         });
       }
-      // Availability: if any evaluation shows it unavailable, mark unavailable
+      // Availability: if any evaluation shows it unavailable, mark unavailable;
+      // a broken (needs-repair) tool anywhere makes the aggregate need a repair.
+      const existingTool = toolMap.get(key);
       if (!(tool.available ?? tool.satisfied ?? false)) {
-        toolMap.get(key).available = false;
+        existingTool.available = false;
+      }
+      if (tool.needsRepair === true) {
+        existingTool.needsRepair = true;
       }
     }
   }

@@ -105,6 +105,8 @@ function makeBuilder({
   mode = 'simple',
   system = SYSTEM,
   recipe = RECIPE,
+  getGatheringTask = null,
+  getResultItem = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -128,6 +130,8 @@ function makeBuilder({
       const tool = SYSTEM.tools.find((entry) => entry.id === toolId);
       return tool ? { id: tool.id, name: tool.label } : null;
     },
+    getGatheringTask,
+    getResultItem,
     localize,
     nowWorldTime: () => worldTime,
   });
@@ -296,6 +300,176 @@ test('gathering runs pass through with null steps and re-mapped *WorldTime field
   assert.equal(run.updatedAt, 150);
   assert.equal(run.derivedStatus, 'waiting');
   assert.equal(run.taskId, 'task-a');
+});
+
+test('gathering run resolves task name + image via getGatheringTask (no persisted label)', () => {
+  const gatheringRun = {
+    id: 'gather-2',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    status: 'waitingTime',
+    taskId: 'mwTaskMineIronOre', // raw id, no label
+    startedAtWorldTime: 100,
+  };
+  const getGatheringTask = (environmentId, taskId) =>
+    environmentId === 'env-1' && taskId === 'mwTaskMineIronOre'
+      ? { name: 'Mine Iron Ore', img: 'icons/tools/pick.webp' }
+      : null;
+
+  const run = makeBuilder({ gatheringActive: [gatheringRun], getGatheringTask }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+
+  assert.equal(run.names.title, 'Mine Iron Ore', 'friendly task name, not the raw id');
+  assert.equal(run.img, 'icons/tools/pick.webp', 'task image, not the generic default');
+});
+
+test('gathering run falls back to the raw taskId + default image when the task is unresolved', () => {
+  const gatheringRun = {
+    id: 'gather-3',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-x',
+    status: 'waitingTime',
+    taskId: 'mwTaskUnknown',
+    startedAtWorldTime: 100,
+  };
+  const run = makeBuilder({
+    gatheringActive: [gatheringRun],
+    getGatheringTask: () => null,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.names.title, 'mwTaskUnknown');
+  assert.equal(run.img, 'icons/svg/item-bag.svg');
+});
+
+test('gathering run with a blind/null taskId does not consult the task resolver', () => {
+  let consulted = false;
+  const getGatheringTask = () => {
+    consulted = true;
+    return { name: 'Should Not Appear', img: 'nope.webp' };
+  };
+  const blindRun = {
+    id: 'gather-blind',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    status: 'waitingTime',
+    taskId: 'blind',
+    startedAtWorldTime: 100,
+  };
+  const run = makeBuilder({ gatheringActive: [blindRun], getGatheringTask }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+
+  assert.equal(consulted, false, 'resolver not called for a blind task');
+  assert.equal(run.names.title, 'blind');
+  assert.equal(run.img, 'icons/svg/item-bag.svg');
+});
+
+test('crafting step exposes the recorded roll (resolved formula, total, dc) on lastCheckResult', () => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        lastCheckResult: {
+          success: false,
+          outcome: 'fail',
+          value: 11,
+          reason: 'Crafting check failed',
+          data: {
+            dc: 16,
+            formula: '1d20 + @abilities.int.mod',
+            resolvedFormula: '1d20 + 3',
+            total: 11,
+            diceGroups: [],
+          },
+        },
+        createdResults: [],
+      },
+    ],
+  });
+  const model = makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+  const check = model.steps[0].lastCheckResult;
+  assert.equal(check.formula, '1d20 + 3', 'resolved formula, not the authored placeholder');
+  assert.equal(check.total, 11);
+  assert.equal(check.dc, 16);
+  assert.equal(check.success, false);
+});
+
+test('crafting created results carry the recorded name/img', () => {
+  const run = terminalCraftingRun({
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'succeeded',
+        createdResults: [{ itemUuid: 'Item.plank', quantity: 2, name: 'Plank', img: 'icons/plank.webp' }],
+      },
+    ],
+  });
+  const model = makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+  assert.equal(model.createdResults.length, 1);
+  assert.equal(model.createdResults[0].name, 'Plank');
+  assert.equal(model.createdResults[0].img, 'icons/plank.webp');
+  assert.equal(model.createdResults[0].quantity, 2);
+});
+
+test('gathering created results project the recorded name/img (not just a count)', () => {
+  const gatheringRun = {
+    id: 'gather-results',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    status: 'succeeded',
+    taskId: 'task-a',
+    startedAtWorldTime: 100,
+    completedAtWorldTime: 200,
+    createdResults: [
+      { actorUuid: 'Actor.x', itemUuid: 'Item.ore', quantity: 3, name: 'Iron Ore', img: 'icons/ore.webp' },
+    ],
+  };
+  const run = makeBuilder({ gatheringActive: [gatheringRun] }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+
+  assert.equal(run.createdResultCount, 1);
+  assert.equal(run.createdResults.length, 1);
+  assert.equal(run.createdResults[0].name, 'Iron Ore');
+  assert.equal(run.createdResults[0].img, 'icons/ore.webp');
+  assert.equal(run.createdResults[0].quantity, 3);
+});
+
+test('created results without stored name/img resolve them by uuid (legacy history)', () => {
+  const gatheringRun = {
+    id: 'gather-legacy',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    status: 'succeeded',
+    taskId: 'task-a',
+    startedAtWorldTime: 100,
+    // Legacy record: only actorUuid/itemUuid/quantity, no name/img.
+    createdResults: [{ actorUuid: 'Actor.x', itemUuid: 'Item.legacy-ore', quantity: 2 }],
+  };
+  const getResultItem = (uuid) =>
+    uuid === 'Item.legacy-ore' ? { name: 'Iron Ore', img: 'icons/ore.webp' } : null;
+
+  const run = makeBuilder({ gatheringActive: [gatheringRun], getResultItem }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+
+  assert.equal(run.createdResults[0].name, 'Iron Ore', 'name resolved via uuid fallback');
+  assert.equal(run.createdResults[0].img, 'icons/ore.webp', 'img resolved via uuid fallback');
+  assert.equal(run.createdResults[0].quantity, 2);
 });
 
 test('salvage runs pass through with crafting-named time fields, runType salvage, no manual advance', () => {

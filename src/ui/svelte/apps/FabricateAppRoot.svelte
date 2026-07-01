@@ -12,6 +12,7 @@
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
+  import CraftingView from './crafting/CraftingView.svelte';
   import JournalView from './journal/JournalView.svelte';
   import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
 
@@ -103,24 +104,25 @@
          context cluster (next to the gathering weather/time/region info). It is
          passed down so ActorSelectTopBar can render it adjacent to those
          conditions; see ActorSelectTopBar for the chip markup + aria-live. -->
-    <ActorSelectTopBar store={services?.actorBar} {activeTab} {activeCanvasTool} />
+    <ActorSelectTopBar store={services?.actorBar} {services} {activeTab} {activeCanvasTool} />
 
     <section class="fabricate-app-content" role="tabpanel">
       {#each tabs as tab (tab.id)}
         {#if activeTab === tab.id}
-          {#if tab.id === 'gathering'}
+          {#if tab.id === 'crafting'}
+            <CraftingView {services} />
+          {:else if tab.id === 'gathering'}
             <GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />
           {:else if tab.id === 'journal'}
             <JournalView {services} />
           {:else}
-            <!-- Shared placeholder for the Crafting, (future) Alchemy, Journal,
-                 and Inventory tabs. FORWARD-COMPAT NOTE: when the Crafting and
-                 planned Alchemy tabs gain their own header/context bar (analogous
-                 to gathering's weather/time/region in ActorSelectTopBar), the
-                 active station-tool chip should move into THAT bar's RIGHT side,
-                 next to the tab's own context info. Until then the chip rides in
-                 the shared ActorSelectTopBar right bar (see the gathering pattern
-                 there). -->
+            <!-- Shared placeholder for the (future) Alchemy and Inventory tabs.
+                 FORWARD-COMPAT NOTE: when the planned Alchemy tab
+                 gains its own header/context bar (analogous to gathering's
+                 weather/time/region in ActorSelectTopBar), the active station-tool
+                 chip should move into THAT bar's RIGHT side, next to the tab's own
+                 context info. Until then the chip rides in the shared
+                 ActorSelectTopBar right bar (see the gathering pattern there). -->
             <div class="fabricate-app-placeholder">
               <i class="fas {tab.icon}" aria-hidden="true"></i>
               <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>

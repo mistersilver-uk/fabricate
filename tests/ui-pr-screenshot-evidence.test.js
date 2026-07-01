@@ -81,6 +81,25 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[2].smokeLabels, ['player-gathering-stacked']);
   });
 
+  it('maps player crafting app files to the player-crafting recipes (incl. the stacked frame)', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/crafting/CraftingView.svelte',
+      'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
+    ]);
+
+    assert.deepEqual(
+      views.map(view => view.id),
+      ['player-crafting', 'player-crafting-stacked']
+    );
+    assert.deepEqual(views[0].smokeLabels, [
+      'player-crafting-simple',
+      'player-crafting-ingredient-routed',
+      'player-crafting-routed-by-check',
+      'player-crafting-run-summary',
+    ]);
+    assert.deepEqual(views[1].smokeLabels, ['player-crafting-stacked']);
+  });
+
   it('maps player journal app files to the fabricate-journal recipe', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/journal/JournalView.svelte',

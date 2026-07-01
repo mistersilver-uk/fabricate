@@ -1,6 +1,6 @@
 import { getFabricateFlag } from '../config/flags.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { matchGatheringTools } from '../gatheringToolRuntime.js';
+import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
@@ -351,7 +351,7 @@ export class RecipeManager {
    *   missing: { ingredients: Array, essences: Array, tools: Array },
    *   ingredientStates: Array<{ description: string, need: number, have: number, satisfied: boolean }>,
    *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean }>,
-   *   toolStates: Array<{ name: string, available: boolean, virtual?: boolean }>
+   *   toolStates: Array<{ name: string, img: string|null, available: boolean, virtual?: boolean }>
    * }}
    */
   evaluateCraftability(
@@ -512,6 +512,104 @@ export class RecipeManager {
   }
 
   /**
+   * The material requirement to craft a recipe ONCE via ANY ingredient set, for the
+   * shopping list. Unlike {@link evaluateCraftability} (which reports a single
+   * chosen set), this unions every set: per component / per essence the `need` is
+   * the MAXIMUM across sets, and tools are the union of every set's tools. That is
+   * exactly enough to craft the recipe once whichever set the player picks — NOT
+   * enough to craft every set at once.
+   *
+   * Same `{ ingredientStates, essenceStates, toolStates }` shape as
+   * evaluateCraftability (with `have` re-derived against the merged max `need`), so
+   * the shopping aggregator consumes it identically.
+   *
+   * @param {Actor[]} componentSourceActors
+   * @param {Recipe} recipe
+   * @param {object} [options]
+   * @param {object|null} [options.craftingActor]
+   * @returns {{ ingredientStates: Array, essenceStates: Array, toolStates: Array }}
+   */
+  evaluateShoppingRequirement(componentSourceActors, recipe, { craftingActor = null } = {}) {
+    const sourceActors = Array.isArray(componentSourceActors)
+      ? componentSourceActors
+      : componentSourceActors
+        ? [componentSourceActors]
+        : [];
+
+    const empty = { ingredientStates: [], essenceStates: [], toolStates: [] };
+    if (sourceActors.length === 0 || !Array.isArray(recipe?.ingredientSets)) return empty;
+    if (recipe.ingredientSets.length === 0) return empty;
+
+    const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
+    const features = this._getSystemFeatures(recipe);
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+
+    const ingredientByKey = new Map();
+    const essenceByType = new Map();
+    const toolByKey = new Map();
+
+    for (const set of recipe.ingredientSets) {
+      const selection =
+        typeof set.resolveIngredientSelection === 'function'
+          ? set.resolveIngredientSelection(
+              availableItems,
+              (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item),
+              { affordCurrency }
+            )
+          : {
+              success: true,
+              missingGroups: [],
+              selectedIngredients: [],
+              plan: [],
+              currencySpends: [],
+            };
+
+      // Keep the highest-need state per component (need = worst-case single set).
+      for (const state of this._buildIngredientStates(recipe, set, selection, availableItems)) {
+        const key = state.componentId ?? state.description ?? state.name;
+        const existing = ingredientByKey.get(key);
+        if (!existing || (state.need ?? 0) > (existing.need ?? 0)) {
+          ingredientByKey.set(key, { ...state });
+        }
+      }
+
+      for (const essence of this._buildEssenceStates(recipe, set, availableItems, features)) {
+        const existing = essenceByType.get(essence.type);
+        if (!existing || (essence.need ?? 0) > (existing.need ?? 0)) {
+          essenceByType.set(essence.type, { ...essence });
+        }
+      }
+
+      // A tool is needed if ANY set requires it; prefer an unavailable/repair reading.
+      const toolStates = this._buildToolStates(
+        recipe,
+        this.getToolsForSet(recipe, set),
+        availableItems,
+        null
+      );
+      for (const tool of toolStates) {
+        const key = tool.componentId ?? tool.name;
+        const existing = toolByKey.get(key);
+        if (!existing || (existing.available === true && tool.available !== true)) {
+          toolByKey.set(key, tool);
+        }
+      }
+    }
+
+    // Re-derive satisfaction against the merged max need.
+    const ingredientStates = [...ingredientByKey.values()].map((state) => ({
+      ...state,
+      satisfied: (state.have ?? 0) >= (state.need ?? 0),
+    }));
+    const essenceStates = [...essenceByType.values()].map((essence) => ({
+      ...essence,
+      satisfied: (essence.have ?? 0) >= (essence.need ?? 0),
+    }));
+
+    return { ingredientStates, essenceStates, toolStates: [...toolByKey.values()] };
+  }
+
+  /**
    * Build per-tool display/presence states for a recipe's resolved library
    * Tools. Each entry is
    * `{ name, available }` where `available` is true when at least one of the
@@ -529,23 +627,33 @@ export class RecipeManager {
     // `matchGatheringTools` scopes the virtual-present set to the system passed
     // here (the recipe's crafting system), so a present tool from a different
     // system never satisfies this recipe's tool prerequisites.
-    const matched = matchGatheringTools({
+    const matchArgs = {
       actor: { items: availableItems },
       system: { id: recipe?.craftingSystemId ?? null },
       task: { id: recipe?.id ?? null, craftingSystemId: recipe?.craftingSystemId ?? null },
       tools,
       craftingSystemManager: { recipeManager: this },
       presentTools,
-    });
+    };
+    const matched = matchGatheringTools(matchArgs);
+    // The same matcher, split into present/damaged/missing so the UI can show
+    // "Repair" (present-but-broken) vs "Acquire" (absent) — `matched` alone
+    // collapses both broken and absent into unavailable.
+    const stateByTool = new Map(
+      classifyGatheringToolStates(matchArgs).map((entry) => [entry.tool, entry.state])
+    );
     // Index by tool so the per-tool state can carry the virtual flag (a
     // virtual-present match has no owned item and must be excluded from
     // breakage/usage by the caller).
     const matchedByTool = new Map(matched.items.map((entry) => [entry.tool, entry]));
     return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
+      const toolId = tool?.componentId || tool?.systemItemId;
       const state = {
-        name: this.resolveComponentName(recipe, tool?.componentId || tool?.systemItemId),
+        name: this.resolveComponentName(recipe, toolId),
+        img: this.resolveComponentImg(recipe, toolId),
         available: entry !== null,
+        needsRepair: stateByTool.get(tool) === 'damaged',
       };
       if (entry?.virtual === true) state.virtual = true;
       return state;
@@ -561,7 +669,7 @@ export class RecipeManager {
    * @param {IngredientSet} ingredientSet
    * @param {Object} selection - result from resolveIngredientSelection
    * @param {Item[]} availableItems
-   * @returns {Array<{ description: string, need: number, have: number, satisfied: boolean }>}
+   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have: number, satisfied: boolean }>}
    * @private
    */
   _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
@@ -596,7 +704,9 @@ export class RecipeManager {
         const description =
           this._resolveIngredientDescription(recipe, ingredient) ||
           options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
+        const visual = this._resolveIngredientVisual(recipe, ingredient);
         return {
+          ...visual,
           description,
           need: Number(missingEntry?.need || ingredient?.quantity || 1),
           have: Number(missingEntry?.have || 0),
@@ -618,6 +728,7 @@ export class RecipeManager {
         );
         const totalQty = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
         return {
+          ingredient: ing,
           description: this._resolveIngredientDescription(recipe, ing) || '',
           need: ing.quantity,
           have: totalQty,
@@ -626,7 +737,12 @@ export class RecipeManager {
       });
 
       const satisfiedOption = optionStates.find((s) => s.satisfied) || optionStates[0];
+      const visual = this._resolveIngredientVisual(
+        recipe,
+        satisfiedOption?.ingredient || options[0]
+      );
       return {
+        ...visual,
         description: optionStates.map((s) => s.description).join(' OR '),
         need: satisfiedOption?.need || 1,
         have: satisfiedOption?.have || 0,
@@ -655,6 +771,30 @@ export class RecipeManager {
   }
 
   /**
+   * Resolve the tile visuals (component id, display name, icon image) for an
+   * ingredient, so the player detail can render an image grid. Component-typed
+   * matches resolve through the managed component library; anything else falls
+   * back to a null image (the UI thumbnail then shows its default) and the
+   * ingredient's own description as the name.
+   *
+   * @param {Recipe} recipe
+   * @param {Ingredient|null} ingredient
+   * @returns {{ componentId: string|null, name: string, img: string|null }}
+   * @private
+   */
+  _resolveIngredientVisual(recipe, ingredient) {
+    const match = ingredient?.match || null;
+    if (match?.type === 'component' && match.componentId) {
+      return {
+        componentId: match.componentId,
+        name: this.resolveComponentName(recipe, match.componentId),
+        img: this.resolveComponentImg(recipe, match.componentId),
+      };
+    }
+    return { componentId: null, name: ingredient?.getDescription?.() || '', img: null };
+  }
+
+  /**
    * Build essence display states for the given ingredient set.
    * @param {Recipe} recipe
    * @param {IngredientSet} ingredientSet
@@ -671,8 +811,30 @@ export class RecipeManager {
     const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
     return Object.entries(essences).map(([type, need]) => {
       const have = accumulatedEssences[type] || 0;
-      return { type, need, have, satisfied: have >= need };
+      return {
+        type,
+        name: this._resolveEssenceName(recipe, type),
+        need,
+        have,
+        satisfied: have >= need,
+      };
     });
+  }
+
+  /**
+   * Resolve an essence's display label from the system's essence definitions,
+   * falling back to the raw type id when no definition/name is configured.
+   * @private
+   */
+  _resolveEssenceName(recipe, type) {
+    const systemId = recipe?.craftingSystemId;
+    const system = systemId
+      ? game.fabricate?.getCraftingSystemManager?.()?.getSystem(systemId)
+      : null;
+    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definition = definitions.find((def) => def?.id === type);
+    const name = definition?.name;
+    return typeof name === 'string' && name.trim() ? name : String(type ?? '');
   }
 
   /**
@@ -831,10 +993,16 @@ export class RecipeManager {
 
       if (itemMatchesComponentSource(item, managedItem)) return true;
 
-      const byName =
-        !managedItem.sourceUuid && managedItem.name
-          ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
-          : false;
+      // Source-UUID matching failed — fall back to an exact (case-insensitive) name
+      // match, even when the component carries a sourceUuid. Foundry's transitive
+      // `_stats.duplicateSource` points at the ORIGINAL template rather than the
+      // component's own source item, so an inventory copy of a component that was
+      // built by copying another item as a template (a common GM workflow) has no
+      // ref back to the component's source and would otherwise never match despite
+      // being the right, identically-named component.
+      const byName = managedItem.name
+        ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
+        : false;
       if (!byName) return false;
     } else if (!this._matchesIngredient(ingredient, item, features)) {
       return false;
@@ -857,21 +1025,16 @@ export class RecipeManager {
    * @returns {boolean}
    */
   toolMatchesItem(recipe, tool, item) {
-    if (tool.componentId || tool.systemItemId) {
-      const managedItem = this._getComponent(recipe, tool.componentId || tool.systemItemId);
-      if (!managedItem) return false;
-      if (
-        managedItem.sourceUuid ||
-        managedItem.sourceItemUuid ||
-        managedItem.fallbackItemIds?.length
-      ) {
-        if (itemMatchesComponentSource(item, managedItem)) return true;
-        return false;
-      }
-      return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
-    }
-    // No componentId means the tool cannot be matched; treat as no match.
-    return false;
+    const componentId = tool.componentId || tool.systemItemId;
+    if (!componentId) return false; // No componentId means the tool cannot be matched.
+    const managedItem = this._getComponent(recipe, componentId);
+    if (!managedItem) return false;
+    // Prefer a source-UUID (or component-id flag) match; fall back to an exact,
+    // case-insensitive name match — mirroring ingredientMatchesItem — so a
+    // template-copied tool item (whose transitive `_stats.duplicateSource` points at
+    // the original template rather than this component's source) still satisfies it.
+    if (itemMatchesComponentSource(item, managedItem)) return true;
+    return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
   }
 
   _matchesIngredient(ingredient, item, features) {

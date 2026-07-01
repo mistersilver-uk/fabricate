@@ -222,3 +222,69 @@ test('CraftingRunManager: retention cap holds across completeStepSuccess and com
     assertCappedMostRecentFirst(assert, history, insertedIds);
   }
 });
+
+test('CraftingRunManager: discardRun removes from active WITHOUT archiving to history', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Discarder');
+  actor.id = 'disc-1';
+
+  const run = await manager.createRun(actor, singleStepRecipe('d'), [actor], 'user-1');
+  assert.equal(manager.getActiveRuns(actor).length, 1);
+
+  const discarded = await manager.discardRun(actor, run.id);
+  assert.equal(discarded?.id, run.id, 'returns the discarded run');
+  assert.equal(manager.getActiveRuns(actor).length, 0, 'removed from active');
+  assert.equal(manager.getRunHistory(actor).length, 0, 'NOT archived to history (unlike cancelRun)');
+
+  assert.equal(await manager.discardRun(actor, 'no-such-id'), null, 'unknown id returns null');
+});
+
+test('CraftingRunManager: pruneInstantaneousActiveRuns removes single-step no-time runs, keeps the rest', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Pruner');
+  actor.id = 'prune-1';
+  globalThis.game.actors = [actor];
+
+  const instant = {
+    id: 'r-instant',
+    craftingSystemId: 's',
+    getExecutionSteps: () => [{ id: 's1', name: 'Only' }],
+  };
+  const timed = {
+    id: 'r-timed',
+    craftingSystemId: 's',
+    getExecutionSteps: () => [{ id: 's1', name: 'Only', timeRequirement: { hours: 1 } }],
+  };
+  const multi = {
+    id: 'r-multi',
+    craftingSystemId: 's',
+    getExecutionSteps: () => [{ id: 's1' }, { id: 's2' }],
+  };
+  const unknown = {
+    id: 'r-unknown',
+    craftingSystemId: 's',
+    getExecutionSteps: () => [{ id: 's1' }],
+  };
+
+  await manager.createRun(actor, instant, [actor], 'u');
+  await manager.createRun(actor, timed, [actor], 'u');
+  await manager.createRun(actor, multi, [actor], 'u');
+  await manager.createRun(actor, unknown, [actor], 'u');
+  assert.equal(manager.getActiveRuns(actor).length, 4);
+
+  const byId = { 'r-instant': instant, 'r-timed': timed, 'r-multi': multi };
+  const pruned = await manager.pruneInstantaneousActiveRuns((id) => byId[id] ?? null);
+
+  assert.equal(pruned, 1, 'only the single-step no-time run is pruned');
+  const remaining = manager
+    .getActiveRuns(actor)
+    .map((r) => r.recipeId)
+    .sort();
+  assert.deepEqual(
+    remaining,
+    ['r-multi', 'r-timed', 'r-unknown'],
+    'time-gated, multi-step, and unknown-recipe runs are kept'
+  );
+});

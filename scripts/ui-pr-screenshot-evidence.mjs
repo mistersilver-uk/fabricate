@@ -228,6 +228,23 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/gathering\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
   },
   {
+    id: 'player-crafting',
+    label: 'Player crafting tab',
+    smokeLabels: [
+      'player-crafting-simple',
+      'player-crafting-ingredient-routed',
+      'player-crafting-routed-by-check',
+      'player-crafting-run-summary',
+    ],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-stacked',
+    label: 'Player crafting — narrow window stacked columns',
+    smokeLabels: ['player-crafting-stacked'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
+  {
     id: 'fabricate-journal',
     label: 'Player Journal tab',
     smokeLabels: ['fabricate-journal'],

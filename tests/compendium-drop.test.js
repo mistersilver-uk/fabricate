@@ -2020,3 +2020,62 @@ test('onDropItem integration — compendium pack drop with no system selected sh
   assert.equal(warnings.length, 1);
   assert.equal(warnings[0], 'DropNoSystemSelected');
 });
+
+// ---------------------------------------------------------------------------
+// Transferable component-id flag on the source WORLD item (import stamping)
+// ---------------------------------------------------------------------------
+
+test('addItemFromUuid — stamps flags.fabricate.componentId on a world source item', async () => {
+  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+
+  const setFlags = [];
+  globalThis.fromUuid = async () => ({
+    documentName: 'Item',
+    name: 'Embercap Mushroom',
+    img: 'mush.png',
+    uuid: 'Item.world-embercap',
+    pack: null,
+    system: { description: { value: '' } },
+    _stats: {},
+    getFlag: () => undefined,
+    setFlag: async (scope, key, value) => {
+      setFlags.push({ scope, key, value });
+    }
+  });
+
+  const result = await mgr.addItemFromUuid('sys1', 'Item.world-embercap');
+
+  assert.equal(result.action, 'added');
+  assert.equal(setFlags.length, 1, 'the source world item is stamped once');
+  assert.equal(setFlags[0].scope, 'fabricate');
+  assert.equal(setFlags[0].key, 'fabricate.componentId');
+  assert.equal(setFlags[0].value, result.item.id, 'stamped with the new component id');
+
+  globalThis.fromUuid = async () => null;
+});
+
+test('addItemFromUuid — does NOT stamp a compendium (non-world) source item', async () => {
+  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+
+  const setFlags = [];
+  globalThis.fromUuid = async () => ({
+    documentName: 'Item',
+    name: 'Packaged Ore',
+    img: 'ore.png',
+    uuid: 'Compendium.world.pack.item-ore',
+    pack: 'world.pack',
+    system: { description: { value: '' } },
+    _stats: { compendiumSource: 'Compendium.source.items.ore' },
+    getFlag: () => undefined,
+    setFlag: async (scope, key, value) => {
+      setFlags.push({ scope, key, value });
+    }
+  });
+
+  const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-ore');
+
+  assert.equal(result.action, 'added');
+  assert.equal(setFlags.length, 0, 'compendium/locked sources are not writable in place');
+
+  globalThis.fromUuid = async () => null;
+});
