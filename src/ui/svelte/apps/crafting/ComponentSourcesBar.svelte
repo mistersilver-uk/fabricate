@@ -93,7 +93,6 @@
             </span>
           {/if}
         </button>
-        <span class="crafting-source-name">{source.name}</span>
         {#if source.removable !== false}
           <button
             type="button"
@@ -189,23 +188,12 @@
     align-items: center;
   }
 
-  /* The visible name is hidden by default and revealed on hover/focus of the
-     avatar (the always-present aria-label keeps it accessible meanwhile). */
-  .crafting-source-name {
-    max-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    opacity: 0;
-    font-size: 12px;
-    color: var(--fab-text);
-    transition: max-width 0.15s ease, opacity 0.15s ease, margin 0.15s ease;
-  }
-
-  .crafting-source:hover .crafting-source-name,
-  .crafting-source:focus-within .crafting-source-name {
-    max-width: 120px;
-    margin-left: 4px;
-    opacity: 1;
+  /* The image dims on hover/focus so the centered remove "×" reads clearly over it.
+     The name is exposed via the avatar's title tooltip + aria-label, not an inline
+     label that would reflow the row. */
+  .crafting-source:hover .crafting-source-portrait img,
+  .crafting-source:focus-within .crafting-source-portrait img {
+    filter: brightness(0.5);
   }
 
   .crafting-source-avatar {
@@ -214,9 +202,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    min-height: 36px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
     padding: 0;
     border: 1px solid var(--fab-border);
     border-radius: 8px;
@@ -267,24 +255,21 @@
     font-size: 8px;
   }
 
-  /* The remove "×" is hidden until the source is hovered or keyboard-focused. */
+  /* The remove control is a centered overlay covering the avatar; on hover/focus a
+     "×" appears over the (dimmed) image. Hidden otherwise so the row stays calm. */
   .crafting-source-remove {
     box-sizing: border-box;
     position: absolute;
-    top: -6px;
-    right: -6px;
+    inset: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
-    min-height: 18px;
     padding: 0;
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    background: var(--fab-surface-raised);
+    border: none;
+    border-radius: 8px;
+    background: var(--fab-overlay-dark-24);
     color: var(--fab-text);
-    font-size: 9px;
+    font-size: 15px;
     opacity: 0;
     cursor: pointer;
   }
@@ -297,7 +282,7 @@
 
   .crafting-source-remove:focus-visible {
     outline: 2px solid var(--fab-accent);
-    outline-offset: 1px;
+    outline-offset: 2px;
   }
 
   .crafting-sources-add {
@@ -305,9 +290,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    min-height: 36px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
     padding: 0;
     border: 1px dashed var(--fab-border);
     border-radius: 8px;
