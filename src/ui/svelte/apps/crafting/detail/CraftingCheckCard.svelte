@@ -1,10 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <!--
   CraftingCheckCard surfaces the recipe's crafting check (DC, roll formula, skill)
-  with an optional-vs-mandatory pill. It renders for every mode that configures a
-  check; a mandatory check (routed-by-check / progressive / alchemy) reads as
-  required, an optional one (simple / routed-by-ingredients) reads as a bonus.
-  `usable` is true only when an authored roll formula exists.
+  with an optional-vs-mandatory pill. The pill reads "Required" when the engine will
+  actually roll the check and a failure fails the craft (routed-by-check / progressive
+  / alchemy always; routed-by-ingredients whenever a formula is authored; simple when a
+  formula is authored AND checks are enabled) — otherwise "Optional". `usable` is true
+  only when an authored roll formula exists.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

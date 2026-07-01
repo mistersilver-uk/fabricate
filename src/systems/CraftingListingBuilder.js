@@ -415,7 +415,22 @@ export class CraftingListingBuilder {
     if (!config) return null;
 
     const rollFormula = typeof config.rollFormula === 'string' ? config.rollFormula.trim() : '';
-    const mandatory = MANDATORY_CHECK_MODES.has(mode);
+    const usable = rollFormula.length > 0;
+    // "Mandatory" reflects whether the engine will actually roll this check and a
+    // failure fails the craft (CraftingEngine._runCraftingCheck) — NOT merely whether
+    // the mode requires a check to be configured. Otherwise a routed-by-ingredients
+    // recipe with an authored routed check + DC reads "Optional" even though it is
+    // always rolled and can fail. Active when: the mode requires a check
+    // (routedByCheck / progressive / alchemy); routedByIngredients with an authored
+    // formula (no enabled toggle); or simple with a formula AND checks enabled.
+    const requiredByMode = MANDATORY_CHECK_MODES.has(mode);
+    const checksEnabled =
+      system?.features?.craftingChecks === true || system?.craftingCheck?.enabled === true;
+    const mandatory = requiredByMode
+      ? true
+      : mode === 'routedByIngredients'
+        ? usable
+        : usable && checksEnabled;
     // Resolve the formula's @-placeholders against the acting character for display
     // (e.g. "1d20 + 3 + 2"). `resolvedFormula` is null when not attempted (no actor /
     // no dice engine), so the UI falls back to the raw formula; `formulaResolved` is
@@ -432,7 +447,7 @@ export class CraftingListingBuilder {
       skill: stringOrNull(config.skill),
       optional: !mandatory,
       mandatory,
-      usable: rollFormula.length > 0,
+      usable,
     };
   }
 

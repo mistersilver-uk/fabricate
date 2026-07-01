@@ -341,6 +341,40 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(recipe.check.usable, false);
   });
 
+  it('routedByIngredients: an authored routed check reads as required (it is rolled and can fail)', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12 }, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.usable, true);
+    assert.equal(recipe.check.mandatory, true, 'an active routed check is not optional');
+    assert.equal(recipe.check.optional, false);
+  });
+
+  it('routedByIngredients: no routed formula → optional (no check runs)', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: { simple: {}, routed: {}, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.usable, false);
+    assert.equal(recipe.check.optional, true);
+  });
+
+  it('simple: an authored check is only required when checks are enabled', () => {
+    const disabled = makeSystem({
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
+    });
+    assert.equal(buildOne({ system: disabled }).recipe.check.optional, true, 'checks disabled → optional');
+
+    const enabled = makeSystem({
+      features: { craftingChecks: true },
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
+    });
+    assert.equal(buildOne({ system: enabled }).recipe.check.mandatory, true, 'checks enabled → required');
+  });
+
   it('resolves the check formula against the actor via the injected resolver', () => {
     const system = makeSystem({
       craftingCheck: {
