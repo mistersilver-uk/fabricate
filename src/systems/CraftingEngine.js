@@ -601,6 +601,8 @@ export class CraftingEngine {
             actorUuid: craftingActor.uuid,
             itemUuid: item.uuid,
             quantity: Number(item.system?.quantity || 1),
+            name: item.name ?? null,
+            img: item.img ?? null,
           })),
         });
       }

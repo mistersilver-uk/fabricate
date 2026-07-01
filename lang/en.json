@@ -551,7 +551,10 @@
           "Check": "Check",
           "Failure": "Failure",
           "CheckWithDc": "{formula} vs DC {dc}",
-          "FailureGeneric": "The crafting attempt failed."
+          "FailureGeneric": "The crafting attempt failed.",
+          "RollLabel": "Roll",
+          "RollResult": "{formula} = {total}",
+          "RollResultWithDc": "{formula} = {total} vs DC {dc}"
         },
         "Redacted": {
           "Title": "Hidden recipe"
@@ -607,7 +610,9 @@
           "ViewFullHistory": "View full history"
         },
         "Results": {
-          "Title": "Crafted items"
+          "Title": "Crafted items",
+          "TitleGathering": "Gathered items",
+          "TitleSalvage": "Salvaged items"
         },
         "Progress": {
           "Label": "Step progress"

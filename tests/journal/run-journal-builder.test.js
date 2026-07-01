@@ -365,6 +365,87 @@ test('gathering run with a blind/null taskId does not consult the task resolver'
   assert.equal(run.img, 'icons/svg/item-bag.svg');
 });
 
+test('crafting step exposes the recorded roll (resolved formula, total, dc) on lastCheckResult', () => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        lastCheckResult: {
+          success: false,
+          outcome: 'fail',
+          value: 11,
+          reason: 'Crafting check failed',
+          data: {
+            dc: 16,
+            formula: '1d20 + @abilities.int.mod',
+            resolvedFormula: '1d20 + 3',
+            total: 11,
+            diceGroups: [],
+          },
+        },
+        createdResults: [],
+      },
+    ],
+  });
+  const model = makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+  const check = model.steps[0].lastCheckResult;
+  assert.equal(check.formula, '1d20 + 3', 'resolved formula, not the authored placeholder');
+  assert.equal(check.total, 11);
+  assert.equal(check.dc, 16);
+  assert.equal(check.success, false);
+});
+
+test('crafting created results carry the recorded name/img', () => {
+  const run = terminalCraftingRun({
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'succeeded',
+        createdResults: [{ itemUuid: 'Item.plank', quantity: 2, name: 'Plank', img: 'icons/plank.webp' }],
+      },
+    ],
+  });
+  const model = makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+  assert.equal(model.createdResults.length, 1);
+  assert.equal(model.createdResults[0].name, 'Plank');
+  assert.equal(model.createdResults[0].img, 'icons/plank.webp');
+  assert.equal(model.createdResults[0].quantity, 2);
+});
+
+test('gathering created results project the recorded name/img (not just a count)', () => {
+  const gatheringRun = {
+    id: 'gather-results',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    status: 'succeeded',
+    taskId: 'task-a',
+    startedAtWorldTime: 100,
+    completedAtWorldTime: 200,
+    createdResults: [
+      { actorUuid: 'Actor.x', itemUuid: 'Item.ore', quantity: 3, name: 'Iron Ore', img: 'icons/ore.webp' },
+    ],
+  };
+  const run = makeBuilder({ gatheringActive: [gatheringRun] }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+
+  assert.equal(run.createdResultCount, 1);
+  assert.equal(run.createdResults.length, 1);
+  assert.equal(run.createdResults[0].name, 'Iron Ore');
+  assert.equal(run.createdResults[0].img, 'icons/ore.webp');
+  assert.equal(run.createdResults[0].quantity, 3);
+});
+
 test('salvage runs pass through with crafting-named time fields, runType salvage, no manual advance', () => {
   const salvageRun = {
     id: 'salvage-1',

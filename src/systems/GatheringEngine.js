@@ -3632,11 +3632,18 @@ function normalizeRunItems(items, { actor = null } = {}) {
         stringOrNull(item.actorUuid) || stringOrNull(item.actor?.uuid) || stringOrNull(actor?.uuid);
       const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
       const quantity = Number(item.quantity ?? source.system?.quantity ?? 1);
-      return {
+      const entry = {
         actorUuid,
         itemUuid,
         quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       };
+      // Carry name/img (when known) so the run journal can list the gathered items,
+      // not just a count — the awarded item document is in hand here.
+      const name = stringOrNull(item.name) || stringOrNull(source.name);
+      const img = stringOrNull(item.img) || stringOrNull(source.img);
+      if (name) entry.name = name;
+      if (img) entry.img = img;
+      return entry;
     })
     .filter((item) => item.actorUuid && item.itemUuid);
 }

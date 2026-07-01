@@ -33,6 +33,16 @@
   // the last step (terminal runs).
   const detailStep = $derived(run?.currentStep ?? (stepCount > 0 ? steps[stepCount - 1] : null));
   const createdResults = $derived(Array.isArray(run?.createdResults) ? run.createdResults : []);
+  // The results heading names the activity: gathered vs salvaged vs crafted.
+  const resultsTitle = $derived(
+    localize(
+      runType === 'gathering'
+        ? 'FABRICATE.App.Journal.Results.TitleGathering'
+        : runType === 'salvage'
+          ? 'FABRICATE.App.Journal.Results.TitleSalvage'
+          : 'FABRICATE.App.Journal.Results.Title'
+    )
+  );
 </script>
 
 {#if run == null}
@@ -77,7 +87,7 @@
 
       {#if isSucceeded && createdResults.length > 0}
         <section class="journal-detail-results" data-journal-results>
-          <h3 class="journal-detail-results-title">{localize('FABRICATE.App.Journal.Results.Title')}</h3>
+          <h3 class="journal-detail-results-title">{resultsTitle}</h3>
           <ul class="journal-detail-results-list">
             {#each createdResults as result, index (result.itemUuid ?? result.componentId ?? index)}
               <li class="journal-detail-result" data-journal-result>

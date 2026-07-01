@@ -1,6 +1,5 @@
 import {
   actorToOption,
-  cloneJson,
   idOf,
   normalizeList,
   numberOrNull,
@@ -333,11 +332,19 @@ export class RunJournalBuilder {
 
   _checkResultModel(lastCheckResult) {
     if (!lastCheckResult || typeof lastCheckResult !== 'object') return null;
+    // The roll detail lives on `data` (dc, resolved formula, raw total) — surface it
+    // so the run journal can show the ACTUAL roll (e.g. "1d20 + 3 = 11 vs DC 16"),
+    // not just the authored requirement.
+    const data =
+      lastCheckResult.data && typeof lastCheckResult.data === 'object' ? lastCheckResult.data : {};
     return {
       success: lastCheckResult.success === true,
       outcome: stringOrNull(lastCheckResult.outcome),
       value: numberOrNull(lastCheckResult.value),
       reason: stringOrNull(lastCheckResult.reason),
+      formula: stringOrNull(data.resolvedFormula) || stringOrNull(data.formula),
+      total: numberOrNull(data.total) ?? numberOrNull(lastCheckResult.value),
+      dc: numberOrNull(data.dc),
     };
   }
 
@@ -531,10 +538,26 @@ export class RunJournalBuilder {
       taskId: stringOrNull(run.taskId),
       flavor: '',
       failureReason: stringOrNull(run.failureReason),
-      createdResults: cloneJson(normalizeList(run.createdResults)) ?? [],
-      createdResultCount: normalizeList(run.createdResults).length,
+      ...this._passthroughResults(run.createdResults),
       manualAdvance: false,
     };
+  }
+
+  /**
+   * Map a gathering/salvage run's persisted `createdResults` into the same UI-safe
+   * shape crafting uses, so the detail view can list awarded items (image + name +
+   * quantity) rather than a bare count.
+   * @private
+   */
+  _passthroughResults(createdResults) {
+    const results = normalizeList(createdResults).map((result) => ({
+      componentId: stringOrNull(result?.componentId),
+      itemUuid: stringOrNull(result?.itemUuid),
+      quantity: numberOrNull(result?.quantity) ?? 1,
+      name: stringOrNull(result?.name),
+      img: stringOrNull(result?.img),
+    }));
+    return { createdResults: results, createdResultCount: results.length };
   }
 
   _derivePassthroughStatus({ status, timeGate, worldTime }) {

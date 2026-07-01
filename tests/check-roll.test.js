@@ -272,6 +272,36 @@ test('runFormulaPassFail: no dice engine does not block (pass, value null)', asy
   assert.equal(r.value, null);
 });
 
+test('runFormulaPassFail: records the @-resolved formula + total + dc for the journal', async () => {
+  // A Roll with BOTH an instance evaluate() and the static replaceFormulaData the
+  // display resolver uses, so evaluateCheckRoll can roll AND resolve the formula.
+  const Roll = class {
+    async evaluate() {
+      return { total: 18, dice: [] };
+    }
+  };
+  Roll.replaceFormulaData = (formula, data) =>
+    String(formula).replace(/@([\w.]+)/g, (_m, path) => {
+      const value = path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data);
+      return value == null ? `@${path}` : String(value);
+    });
+  Roll.validate = (formula) => !/@/.test(formula);
+  globalThis.Roll = Roll;
+
+  const actor = { getRollData: () => ({ abilities: { int: { mod: 3 } } }) };
+  const r = await runFormulaPassFail({
+    formula: '1d20 + @abilities.int.mod',
+    dc: 16,
+    thresholdMode: 'meet',
+    actor,
+  });
+
+  assert.equal(r.data.resolvedFormula, '1d20 + 3', 'resolved formula recorded, not the placeholder');
+  assert.equal(r.data.total, 18);
+  assert.equal(r.data.dc, 16);
+  delete globalThis.Roll;
+});
+
 // ── runFormulaProgressive ───────────────────────────────────────────────────
 
 test('runFormulaProgressive: the total is the value; success/failure triggers force all/none', async () => {
