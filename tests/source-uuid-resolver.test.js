@@ -248,3 +248,42 @@ test('26 - getItemIdentityReferences returns [] for null/non-object', () => {
   assert.deepEqual(getItemIdentityReferences(null), []);
   assert.deepEqual(getItemIdentityReferences('Item.x'), []);
 });
+
+// flags.fabricate.componentId short-circuit — a transferable link that survives
+// Foundry's transitive _stats.duplicateSource template chaining.
+
+function itemWithComponentFlag(componentId, extra = {}) {
+  return {
+    uuid: 'Item.actor-templated',
+    _stats: { duplicateSource: 'Item.some-template' },
+    flags: { fabricate: { componentId } },
+    // getFabricateFlag normalizes 'componentId' -> 'fabricate.componentId'
+    getFlag(scope, key) {
+      if (scope === 'fabricate' && key === 'fabricate.componentId') return componentId;
+      return undefined;
+    },
+    ...extra
+  };
+}
+
+test('27 - itemMatchesComponentSource matches on flags.fabricate.componentId even when source UUIDs differ', () => {
+  const item = itemWithComponentFlag('comp-abc');
+  const component = {
+    id: 'comp-abc',
+    sourceUuid: 'Item.component-source',
+    sourceItemUuid: 'Item.component-source',
+    fallbackItemIds: []
+  };
+  assert.equal(itemMatchesComponentSource(item, component), true);
+});
+
+test('28 - itemMatchesComponentSource does NOT match a different componentId flag', () => {
+  const item = itemWithComponentFlag('comp-other');
+  const component = {
+    id: 'comp-abc',
+    sourceUuid: 'Item.component-source',
+    sourceItemUuid: 'Item.component-source',
+    fallbackItemIds: []
+  };
+  assert.equal(itemMatchesComponentSource(item, component), false);
+});

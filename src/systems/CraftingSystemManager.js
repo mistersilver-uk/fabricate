@@ -2,7 +2,7 @@
  * Manages crafting systems and their item libraries
  */
 import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { getFabricateFlag, setFabricateFlag, FABRICATE_FLAG_NAMESPACE } from '../config/flags.js';
 import {
   cleanupStalePreferences,
   isGatheringActorSelectableByUser,
@@ -2045,6 +2045,45 @@ export class CraftingSystemManager {
    *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>
    * }>}
    */
+  /**
+   * Persist a transferable `flags.fabricate.componentId` on a component's source
+   * WORLD item, so any future inventory copy (drag/duplicate) inherits it and matches
+   * this component even when Foundry's transitive `_stats.duplicateSource` points at a
+   * template rather than this source (the GM "copy an item as a template" workflow).
+   * No-op for compendium/locked/non-Item sources (not writable in place — those still
+   * match via source UUIDs). GM context is guaranteed by the callers.
+   * @private
+   */
+  async _stampComponentSourceFlag(source, componentId) {
+    if (!componentId) return;
+    if (!source || source.pack || (source.documentName && source.documentName !== 'Item')) return;
+    if (typeof source.setFlag !== 'function') return;
+    if (getFabricateFlag(source, 'componentId', null) === componentId) return;
+    await setFabricateFlag(source, 'componentId', componentId);
+  }
+
+  /**
+   * Clear a stale `flags.fabricate.componentId` from a world item that no longer
+   * sources the given component (used when a component is re-pointed to a new source).
+   * @private
+   */
+  async _clearComponentSourceFlag(sourceUuid, componentId) {
+    if (!sourceUuid || !componentId) return;
+    let doc;
+    try {
+      doc = await fromUuid(sourceUuid);
+    } catch {
+      doc = null;
+    }
+    if (!doc || doc.pack || typeof doc.unsetFlag !== 'function') return;
+    if (getFabricateFlag(doc, 'componentId', null) !== componentId) return;
+    try {
+      await doc.unsetFlag(FABRICATE_FLAG_NAMESPACE, 'fabricate.componentId');
+    } catch {
+      // Non-fatal.
+    }
+  }
+
   async addItemFromUuid(systemId, itemUuid) {
     this._assertGM('add component from uuid');
     const system = this.getSystem(systemId);
@@ -2089,6 +2128,10 @@ export class CraftingSystemManager {
         nextFallbacks.length === (existing.fallbackItemIds || []).length &&
         nextFallbacks.every((ref) => (existing.fallbackItemIds || []).includes(ref));
 
+      // Stamp the source (both skipped + updated) so a source that predates this
+      // flag — or was re-imported — always carries the transferable component id.
+      await this._stampComponentSourceFlag(source, existing.id);
+
       if (unchanged) {
         return { item: existing, action: 'skipped', sourceFallbacks: nextSnapshot.sourceFallbacks };
       }
@@ -2115,6 +2158,7 @@ export class CraftingSystemManager {
 
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
+    await this._stampComponentSourceFlag(source, item.id);
     await this.save();
     return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
@@ -2152,6 +2196,7 @@ export class CraftingSystemManager {
     }
 
     const existing = system.components[idx];
+    const previousSourceUuid = existing.sourceItemUuid || existing.sourceUuid || null;
     const nextSnapshot = await this._buildComponentSourceSnapshot(itemUuid, source, existing);
     const conflict = this._findComponentBySourceReferences(system, nextSnapshot.references, itemId);
     if (conflict) {
@@ -2177,6 +2222,12 @@ export class CraftingSystemManager {
     );
 
     system.components[idx] = updatedItem;
+    // Re-point the transferable flag: clear the old source (if it still points here)
+    // and stamp the new source, so copies match the current source, not the old one.
+    if (previousSourceUuid && previousSourceUuid !== itemUuid) {
+      await this._clearComponentSourceFlag(previousSourceUuid, itemId);
+    }
+    await this._stampComponentSourceFlag(source, itemId);
     await this.save();
     return { item: updatedItem, sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
