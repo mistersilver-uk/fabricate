@@ -78,7 +78,7 @@
               <ul class="crafting-option-product-grid">
                 {#each products as product, index (product.name + index)}
                   <li class="crafting-option-product" title={product.name}>
-                    <CraftingThumb src={product.img} alt="" size={30} />
+                    <CraftingThumb src={product.img} alt="" size={40} />
                     <span class="crafting-option-product-pip">×{product.qty}</span>
                   </li>
                 {/each}
@@ -106,15 +106,24 @@
 
   .crafting-option-card {
     box-sizing: border-box;
+    /* height:auto + white-space:normal defeat Foundry's fixed-height / nowrap button
+       chrome, which would otherwise collapse the card and overlap its content. */
+    height: auto;
+    min-height: 0;
+    width: 100%;
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: 8px;
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
     color: var(--fab-text);
+    font: inherit;
     text-align: left;
+    white-space: normal;
+    line-height: 1.3;
     cursor: pointer;
   }
 
@@ -226,25 +235,28 @@
     line-height: 0;
   }
 
+  /* Opaque backing (not the translucent surface tint) so the count stays legible
+     over the component artwork. */
   .crafting-option-product-pip {
     position: absolute;
     top: -6px;
     right: -6px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 3px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 999px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-raised);
+    border: 1px solid var(--fab-border-strong);
+    background: var(--fab-bg-2);
     color: var(--fab-text);
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;
+    box-shadow: var(--fab-shadow-sm);
   }
 
   .crafting-detail-section-title {

@@ -19,6 +19,23 @@
     onChoose = null,
     onCraft = null
   } = $props();
+
+  // The chosen ingredient set determines the output, so the "Produces" list must
+  // follow the selected route's products (not the builder's static default-set
+  // result). Keep the recipe result's time/xp metadata.
+  const selectedSet = $derived(
+    Array.isArray(recipe?.ingredientSets)
+      ? (recipe.ingredientSets.find((set) => set?.id === selectedSetId) ?? null)
+      : null
+  );
+  const routedResult = $derived({
+    items: Array.isArray(selectedSet?.products)
+      ? selectedSet.products
+      : (recipe?.result?.items ?? []),
+    time: recipe?.result?.time ?? null,
+    timeLabel: recipe?.result?.timeLabel ?? null,
+    xp: recipe?.result?.xp ?? null
+  });
 </script>
 
 <div data-recipe-mode="routedByIngredients">
@@ -29,7 +46,7 @@
       </p>
     {/snippet}
     {#snippet results()}
-      <IoTable {craftability} result={recipe?.result} />
+      <IoTable {craftability} result={routedResult} />
     {/snippet}
   </RecipeBodyShell>
 </div>

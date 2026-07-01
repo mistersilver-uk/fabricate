@@ -265,6 +265,39 @@ describe('RecipeDetail mounted behavior', () => {
     assert.deepEqual(onChoose, ['set-b'], 'clicking a card selects that route');
   });
 
+  it('routes the Produces output to the selected ingredient set', async () => {
+    const routed = () =>
+      recipe({
+        modeToken: 'routedByIngredients',
+        modeLabel: 'Routed by ingredients',
+        defaultSetId: 'set-a',
+        result: { items: [{ name: 'STALE default', img: null, qty: 9 }], time: null, timeLabel: null, xp: null },
+        ingredientSets: [
+          {
+            id: 'set-a',
+            label: 'Iron route',
+            craftability: craftability(),
+            products: [{ name: 'Iron Boss', img: 'icons/iron.webp', qty: 1 }],
+          },
+          {
+            id: 'set-b',
+            label: 'Steel route',
+            craftability: craftability(),
+            products: [{ name: 'Steel Boss', img: 'icons/steel.webp', qty: 2 }],
+          },
+        ],
+      });
+
+    const outputName = (target) =>
+      target.querySelector('[data-io-group="outputs"] .crafting-io-output-name')?.textContent.trim();
+
+    const targetA = await harness.mount({ recipe: routed(), selectedSetId: 'set-a' });
+    assert.equal(outputName(targetA), 'Iron Boss', 'Produces follows the selected route (set-a)');
+
+    const targetB = await harness.mount({ recipe: routed(), selectedSetId: 'set-b' });
+    assert.equal(outputName(targetB), 'Steel Boss', 'Produces follows the selected route (set-b)');
+  });
+
   it('colours tiered outcomes green for success and red for failure', async () => {
     const target = await harness.mount({
       recipe: recipe({
