@@ -38,8 +38,9 @@ export async function promptCheckRoll({ formula, resolvedFormula, dc, label } = 
   const defaultRollMode = globalThis.game?.settings?.get?.('core', 'rollMode');
   const displayFormula = resolvedFormula || formula || '';
 
+  // The label is the dialog window title (below), so it is not repeated in the
+  // body — only the DC, formula, and situational-bonus input live in the content.
   const lines = [];
-  if (label) lines.push(`<p class="fabricate-roll-prompt-label">${escapeHtml(label)}</p>`);
   if (Number.isFinite(dc)) {
     lines.push(`<p class="fabricate-roll-prompt-dc">DC ${escapeHtml(String(dc))}</p>`);
   }

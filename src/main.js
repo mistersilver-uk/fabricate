@@ -1802,9 +1802,12 @@ class Fabricate {
    * @param {string} options.actorId World-actor id the run is keyed to.
    * @param {string} options.runId Active run id.
    * @param {string} options.recipeId Recipe id to craft.
+   * @param {boolean} [options.interactive] When true (a player "Trigger Next Step"
+   *   click), prompt the interactive roll dialog + post the roll to chat. Defaults
+   *   false so automated/headless advances stay silent.
    * @returns {Promise<object>} The craft result, or a `{ success: false, message }`.
    */
-  async advanceCraftingRun({ actorId, runId, recipeId } = {}) {
+  async advanceCraftingRun({ actorId, runId, recipeId, interactive = false } = {}) {
     this._requireReady();
     const actor = game.actors?.get(actorId);
     const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
@@ -1815,6 +1818,7 @@ class Fabricate {
     return this.craft(actor, recipeId, {
       runId,
       componentSourceActors: resolved.componentSourceActors,
+      interactive,
     });
   }
 

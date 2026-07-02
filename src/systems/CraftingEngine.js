@@ -70,8 +70,12 @@ export class CraftingEngine {
    *   the roll to chat so Dice So Nice animates it. Defaults to false so automation
    *   and macros stay silent. A dismissed prompt returns
    *   `{ success: false, cancelled: true, results: null }` with zero mutation (no
-   *   ingredients, currency, or tools consumed, no run created). Timed/maturation
-   *   steps never prompt (they resolve at GM-gated world-time maturation).
+   *   ingredients, currency, or tools consumed, no run created). Note there is no
+   *   silent world-time roll for crafting: the initial time-gate-ARMING call
+   *   returns before the check runs (nothing to prompt), but a timed step's RESUME
+   *   is always a player click (Crafting-tab craft or the Journal "Trigger Next
+   *   Step") and DOES prompt when `interactive` is passed. (Only gathering has a
+   *   GM-gated world-time maturation path that resolves silently.)
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string, cancelled?: boolean}>}
    */
   async craft(craftingActor, componentSourceActors, recipe, ingredientSetId = null, options = {}) {

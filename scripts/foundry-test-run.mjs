@@ -150,6 +150,35 @@ async function screenshot(page, label) {
 }
 
 /**
+ * A UI-triggered craft / immediate-d100 gather now opens the interactive roll
+ * prompt (a Foundry DialogV2 carrying `.fabricate-roll-prompt`). When present:
+ * capture it as evidence, click Roll to dismiss it, and wait for it to detach so
+ * the caller's subsequent `assertNoScreenshotOverlays` / state waits do not trip
+ * on the dialog overlay. Returns true when a dialog was handled, false otherwise
+ * (e.g. a timed task that resolves without a roll) — the short presence timeout
+ * makes the no-dialog case a cheap no-op.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} label Screenshot label for the captured prompt.
+ * @returns {Promise<boolean>}
+ */
+async function handleRollPromptIfPresent(page, label) {
+  const dialog = page
+    .locator('.application.dialog:has(.fabricate-roll-prompt), .dialog:has(.fabricate-roll-prompt)')
+    .first();
+  try {
+    await dialog.waitFor({ state: 'visible', timeout: 2500 });
+  } catch {
+    return false;
+  }
+  await screenshot(page, label);
+  const rollBtn = dialog.locator('button[data-action="roll"], button:has-text("Roll")').first();
+  await rollBtn.click().catch(() => {});
+  await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  return true;
+}
+
+/**
  * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme
  * setting's onChange (applyFabricateTheme) does: set the theme attribute on the
  * document element and every `.fabricate` root. This re-themes the real app via
@@ -4125,6 +4154,10 @@ async function main() {
 
         async function clickReadyGatheringAttempt() {
           await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first().click();
+          // An immediate (d100) attempt opens the interactive roll prompt: capture
+          // it and click Roll. A timed task resolves without a roll, so the helper's
+          // short presence check simply returns false there — safe for both callers.
+          await handleRollPromptIfPresent(page, 'player-gathering-roll-prompt');
           await appShell.locator('[data-gathering-state="populated"]').first()
             .waitFor({ state: 'visible', timeout: 10_000 });
         }
@@ -4297,6 +4330,9 @@ async function main() {
           const craftButton = appShell.locator('[data-crafting-craft][data-crafting-craft-disabled="false"]').first();
           if (await craftButton.count() > 0) {
             await craftButton.click().catch(() => {});
+            // A UI craft now opens the interactive roll prompt: capture it, then
+            // click Roll so the run summary resolves and the overlay clears.
+            await handleRollPromptIfPresent(page, 'player-crafting-roll-prompt');
             await appShell.locator('[data-crafting-run-summary]').first()
               .waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
           }

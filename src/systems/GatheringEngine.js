@@ -3,7 +3,10 @@ import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
 } from '../gatheringToolRuntime.js';
-import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import {
+  buildInteractiveRollOptions,
+  promptCheckRoll,
+} from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
@@ -2003,7 +2006,7 @@ export class GatheringEngine {
   }) {
     const outcome =
       task.resolutionMode === 'd100'
-        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
+        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive })
         : task.resolutionMode === 'progressive'
           ? await this._resolveProgressiveOutcome({
               viewer,
@@ -2459,7 +2462,7 @@ export class GatheringEngine {
     return Number.isFinite(dc) ? Math.trunc(dc) : 15;
   }
 
-  async _resolveD100Outcome({ viewer, actor, system, environment, task }) {
+  async _resolveD100Outcome({ viewer, actor, system, environment, task, interactive = false }) {
     if (typeof this.richState?.resolveD100Attempt !== 'function') {
       return misconfiguredOutcome({
         code: 'MISSING_D100_RESOLVER',
@@ -2472,6 +2475,26 @@ export class GatheringEngine {
     const eventModifier = Number(
       environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
     );
+
+    // Interactive d100 (opt-in): the d100 path does NOT use a Foundry `Roll` DC —
+    // each drop row / event is an independent percentile check. So there is no DC
+    // to show; the prompt just confirms the attempt and collects an optional flat
+    // situational modifier applied to every throw. A dismissed prompt returns a
+    // cancelled outcome the caller maps to a zero-mutation `_cancelledStart`.
+    let extraModifier = 0;
+    if (interactive) {
+      // No DC is passed: the d100 path has no single DC (each row/event is an
+      // independent percentile check), so the dialog shows no DC line.
+      const choice = await promptCheckRoll({
+        label: `${task?.name ?? 'Gathering'} — Gathering`,
+      });
+      if (!choice || choice.confirmed === false) {
+        return { status: 'cancelled', resultGroups: [], checkResult: null };
+      }
+      const parsedBonus = Number(choice.bonus);
+      extraModifier = Number.isFinite(parsedBonus) ? parsedBonus : 0;
+    }
+
     const resolved = await this.richState.resolveD100Attempt({
       task,
       environment,
@@ -2480,6 +2503,13 @@ export class GatheringEngine {
       system,
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
+      // DSN animation + the situational bonus flow only for an interactive attempt;
+      // the automated/timed path leaves the resolver's behaviour untouched.
+      animate: interactive === true,
+      extraModifier,
+      rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
+      speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
+      flavor: `${task?.name ?? 'Gathering'} — Gathering check`,
     });
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({
