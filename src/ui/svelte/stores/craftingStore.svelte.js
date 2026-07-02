@@ -287,7 +287,16 @@ export function createCraftingStore({ services } = {}) {
         recipeId,
         ingredientSetId: selectedIngredientSetId ?? recipe?.defaultSetId ?? null,
         componentSourceActorIds: currentSourceIds(),
+        // UI-triggered craft: prompt an interactive roll dialog + post the roll to
+        // chat (Dice So Nice). Automation/macros omit this and stay silent.
+        interactive: true,
       });
+      // Dismissing the roll dialog is a user choice, not a failure: a cancelled
+      // result is also `success: false`, so it MUST be handled first and returned
+      // quietly (no error notification, no listing refresh churn).
+      if (result && result.cancelled === true) {
+        return result;
+      }
       if (result && result.success === false) {
         services?.notify?.(result.message);
         return result;
