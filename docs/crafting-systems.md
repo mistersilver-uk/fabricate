@@ -112,6 +112,9 @@ Chat messages appear as if spoken by the crafting actor.
 Early validation failures do not post a chat message, because the craft never started.
 These failures include a missing actor, missing ingredients, missing or unsatisfied tools, and invalid recipe configuration.
 
+**Interactive check rolls.** When a player crafts or gathers from the UI, Fabricate also posts the check's dice roll to chat so a dice-animation module like Dice So Nice can animate it.
+See [Rolling a check from the UI]({% link crafting-checks.md %}#rolling-a-check-from-the-ui) for the prompt, the situational-modifier field, and which rolls do not prompt.
+
 ### Crafting Checks
 
 If your system uses Routed by check mode, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.

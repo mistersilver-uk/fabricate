@@ -104,20 +104,98 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
  * Evaluate a check roll formula, returning `{ engine, total, diceGroups }`. Returns
  * `engine: false` when no dice engine is available (headless/non-Foundry). Throws on
  * a bad formula (callers wrap it).
+ *
+ * All interactive behaviour is opt-in via `options`; with no `options` (or no
+ * `prompt`/`ChatMessage`) this behaves exactly as the original automated roll.
+ *
+ * @param {string} formula The roll formula (may carry `@` placeholders).
+ * @param {object|null} actor The actor whose roll data resolves the formula.
+ * @param {object} [options]
+ * @param {boolean} [options.interactive] When true (and a `prompt` is supplied),
+ *   confirm the roll with the player and optionally add a situational modifier;
+ *   when true (and `ChatMessage.create` exists) post the evaluated roll to chat so
+ *   Dice So Nice animates it.
+ * @param {(args: {formula: string, resolvedFormula: string|null, dc: *, label: *})
+ *   => Promise<{confirmed?: boolean, bonus?: string|null, rollMode?: string}>}
+ *   [options.prompt] The confirm dialog (see `promptCheckRoll`).
+ * @param {string} [options.rollMode] The effective chat roll mode.
+ * @param {string} [options.flavor] Chat message flavor / dialog label.
+ * @param {object} [options.speaker] Chat message speaker.
+ * @param {*} [options.dc] The DC surfaced to the prompt (display only).
+ * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
+ *   resolvedFormula: string|null, cancelled?: boolean}>}
  */
-export async function evaluateCheckRoll(formula, actor) {
+export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (typeof globalThis.Roll !== 'function')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
+  // can show the actual modifiers, not the authored `@abilities…` placeholders.
+  // Recomputed from the COMBINED formula below when a valid situational bonus is
+  // applied, so the journal display reconciles with the rolled total (FIX 3).
+  let resolved = resolveCheckFormulaDisplay(formula, actor);
+
+  let effectiveFormula = String(formula);
+  let effectiveRollMode = options?.rollMode;
+
+  // Interactive roll (opt-in): confirm with the player and optionally append a
+  // situational modifier before rolling. A cancelled prompt short-circuits with
+  // `cancelled: true` so the runner can abort with zero mutation.
+  if (options?.interactive && typeof options.prompt === 'function') {
+    const choice = await options.prompt({
+      formula: effectiveFormula,
+      resolvedFormula: resolved?.display ?? null,
+      dc: options.dc,
+      label: options.flavor,
+    });
+    if (!choice || choice.confirmed === false) {
+      return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
+    }
+    const bonus = typeof choice.bonus === 'string' ? choice.bonus.trim() : choice.bonus;
+    if (bonus) {
+      // Guaranteed safety net: a malformed situational bonus must NEVER reach
+      // `new Roll(...).evaluate()` and become a rolled (consuming) check failure.
+      // When `Roll.validate` is available and rejects the combined formula, IGNORE
+      // the bonus and roll the base formula instead. When `Roll.validate` is
+      // unavailable (headless/tests), fall through — the runner's try/catch is the
+      // backstop there.
+      const combined = `${effectiveFormula} + (${bonus})`;
+      const validate = globalThis.Roll?.validate;
+      if (typeof validate === 'function' && validate(combined) === false) {
+        console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
+      } else {
+        effectiveFormula = combined;
+        // Reconcile the journal display with the total actually rolled (FIX 3).
+        resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
+      }
+    }
+    if (choice.rollMode) effectiveRollMode = choice.rollMode;
+  }
+
   // Automated check roll: never surface a manual roll-fulfilment dialog mid-craft
   // on a client configured for manual fulfilment (mirrors Roll.simulate's V13
   // behaviour). `allowInteractive: false` suppresses that resolver.
-  const roll = await new globalThis.Roll(formula, rollData).evaluate({ allowInteractive: false });
+  const roll = await new globalThis.Roll(effectiveFormula, rollData).evaluate({
+    allowInteractive: false,
+  });
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
-  // Capture the @-resolved formula (e.g. "1d20 + 3") so the run journal can show
-  // the actual modifiers rolled, not the authored `@abilities…` placeholders.
-  const resolved = resolveCheckFormulaDisplay(formula, actor);
+
+  // Surface the roll to chat so Dice So Nice animates it (interactive only).
+  // `toMessage` is the DSN trigger — no dice3d/game.dice3d code is needed. A chat
+  // failure is logged and swallowed, never thrown (mirrors
+  // `CraftingEngine._postCraftChatMessage`).
+  if (options?.interactive && typeof globalThis.ChatMessage?.create === 'function') {
+    try {
+      await roll.toMessage(
+        { speaker: options.speaker, flavor: options.flavor },
+        { rollMode: effectiveRollMode, create: true }
+      );
+    } catch (error) {
+      console.error('Fabricate | Failed to post check roll to chat:', error);
+    }
+  }
+
   return {
     engine: true,
     total,
@@ -163,6 +241,12 @@ export function resolveCheckFormulaDisplay(formula, actor) {
  * (met-or-exceeded or strictly exceeded), honouring the unified per-check trigger
  * list's forced outcomes (issue 419). Returns
  * `{ success, outcome: 'pass'|'fail', value, data, message }`.
+ *
+ * @param {object} [params.rollOptions] Optional interactive-roll bag threaded to
+ *   {@link evaluateCheckRoll} (built by `buildInteractiveRollOptions`). When it
+ *   opts into an interactive roll and the player dismisses the prompt, the runner
+ *   returns `{ success: false, cancelled: true, outcome: null, value: null }` so
+ *   the caller aborts with zero mutation. Omit it (the default) for a silent roll.
  */
 export async function runFormulaPassFail({
   formula: rawFormula,
@@ -171,6 +255,7 @@ export async function runFormulaPassFail({
   triggers,
   actor,
   label = 'Crafting',
+  rollOptions = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -179,7 +264,7 @@ export async function runFormulaPassFail({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor);
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc });
     } catch (error) {
       console.error(`Fabricate | ${label} check roll failed (${formula})`, error);
       return {
@@ -189,6 +274,11 @@ export async function runFormulaPassFail({
         data: { dc, formula },
         message: `${label} check roll failed: ${error.message}`,
       };
+    }
+    // The player cancelled the interactive roll dialog: abort with zero mutation
+    // (no crit/DC logic, no consumption downstream).
+    if (rolled.cancelled) {
+      return { success: false, cancelled: true, outcome: null, value: null, data: { dc, formula } };
     }
     if (!rolled.engine) {
       // No dice engine: cannot evaluate, so do not block the activity.
@@ -231,12 +321,19 @@ export async function runFormulaPassFail({
  * activity always proceeds. A matched forced SUCCESS awards everything
  * (`MAX_SAFE_INTEGER`), a forced FAILURE awards nothing (`0`). Returns
  * `{ success: true, outcome: null, value, data }`.
+ *
+ * @param {object} [params.rollOptions] Optional interactive-roll bag threaded to
+ *   {@link evaluateCheckRoll} (built by `buildInteractiveRollOptions`). When the
+ *   player dismisses the interactive prompt, the runner returns
+ *   `{ success: false, cancelled: true, outcome: null, value: null }` so the caller
+ *   aborts with zero mutation. Omit it (the default) for a silent roll.
  */
 export async function runFormulaProgressive({
   formula: rawFormula,
   triggers,
   actor,
   label = 'Crafting',
+  rollOptions = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -245,7 +342,7 @@ export async function runFormulaProgressive({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor);
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions });
     } catch (error) {
       console.error(`Fabricate | ${label} progressive check roll failed (${formula})`, error);
       return {
@@ -255,6 +352,10 @@ export async function runFormulaProgressive({
         data: { formula },
         message: `${label} check roll failed: ${error.message}`,
       };
+    }
+    // The player cancelled the interactive roll dialog: abort with zero mutation.
+    if (rolled.cancelled) {
+      return { success: false, cancelled: true, outcome: null, value: null, data: { formula } };
     }
     if (!rolled.engine) {
       // No dice engine: award nothing (a finite value) rather than block.
@@ -388,6 +489,11 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  * returns a non-blocking `{ success: true, outcome: null, value: null }` rather
  * than fabricating a route.
  *
+ * @param {object} [params.rollOptions] Optional interactive-roll bag threaded to
+ *   {@link evaluateCheckRoll} (built by `buildInteractiveRollOptions`). When the
+ *   player dismisses the interactive prompt, the runner returns
+ *   `{ success: false, cancelled: true, outcome: null, value: null }` so the caller
+ *   aborts with zero mutation. Omit it (the default) for a silent roll.
  * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
  */
 export async function runFormulaRouted({
@@ -400,6 +506,7 @@ export async function runFormulaRouted({
   triggers,
   actor,
   label = 'Crafting',
+  rollOptions = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -408,7 +515,7 @@ export async function runFormulaRouted({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor);
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc });
     } catch (error) {
       console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
       return {
@@ -417,6 +524,16 @@ export async function runFormulaRouted({
         value: null,
         data: { dc, formula, type },
         message: `${label} check roll failed: ${error.message}`,
+      };
+    }
+    // The player cancelled the interactive roll dialog: abort with zero mutation.
+    if (rolled.cancelled) {
+      return {
+        success: false,
+        cancelled: true,
+        outcome: null,
+        value: null,
+        data: { dc, formula, type },
       };
     }
     if (!rolled.engine) {

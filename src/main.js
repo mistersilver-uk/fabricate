@@ -1286,9 +1286,15 @@ class Fabricate {
    * @param {string} options.recipeId Recipe id.
    * @param {string|null} [options.ingredientSetId] Chosen ingredient set id.
    * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
-   * @returns {Promise<{success: boolean, results: Array|null, message: string}>}
+   * @param {boolean} [options.interactive] When true, prompt the player with the
+   *   confirm-roll dialog (optional situational modifier) and post the roll to chat
+   *   so Dice So Nice animates it. Defaults to false so macros and automation keep
+   *   the original silent behaviour. The Fabricate Crafting tab passes true. A
+   *   dismissed prompt returns `{ success: false, cancelled: true }` with zero
+   *   mutation (no ingredients, currency, or tools consumed, no run created).
+   * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
    */
-  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, componentSourceActorIds = null } = {}) {
+  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, componentSourceActorIds = null, interactive = false } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
@@ -1298,9 +1304,12 @@ class Fabricate {
       return { success: false, results: null, message: 'No crafting actor selected' };
     }
     const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
+    // `interactive` (UI-triggered craft) opts into the confirm-roll dialog + chat
+    // post; omitted/false for macros/automation so they stay silent (no API break).
     return await this.craft(craftingActor, recipeId, {
       componentSourceActors: sources,
       ingredientSetId,
+      interactive,
     });
   }
 
@@ -1412,6 +1421,15 @@ class Fabricate {
    * current-user viewer enforcement.
    *
    * @param {object} options Gathering start-attempt options.
+   * @param {boolean} [options.interactive] When true, prompt the player with the
+   *   confirm-roll dialog (optional situational modifier) and post the roll to chat
+   *   so Dice So Nice animates it, for the routed and progressive check paths.
+   *   Defaults to false so macros and automation stay silent. The Fabricate
+   *   Gathering view passes true. The d100 immediate gathering mode never prompts
+   *   (its roll runs outside the shared check seam), and timed gathering tasks never
+   *   prompt (they resolve at GM-gated world-time maturation). A dismissed prompt
+   *   returns a quiet `{ accepted: false, cancelled: true }` result with zero
+   *   mutation and no notification.
    * @returns {*} Gathering start-attempt result.
    */
   startGatheringAttempt(options = {}) {

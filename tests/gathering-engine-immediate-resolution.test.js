@@ -1089,3 +1089,74 @@ test('_resolveRoutedOutcome: no system roll formula reports a MISSING_ROUTED_CHE
   assert.equal(outcome.status, 'misconfigured');
   assert.equal(outcome.diagnostics[0].code, 'MISSING_ROUTED_CHECK');
 });
+
+// ---------------------------------------------------------------------------
+// Interactive roll cancel: dismissing the dialog aborts with ZERO mutation.
+// Stub `foundry.applications.api.DialogV2.wait` to resolve to a cancel so the
+// real `promptCheckRoll` returns { confirmed: false } -> the routed/progressive
+// check reports a cancelled outcome -> `_resolveImmediateAttempt` returns quietly
+// before any run creation / result / tool side effect.
+// ---------------------------------------------------------------------------
+
+function stubCancelDialog() {
+  const original = globalThis.foundry;
+  globalThis.foundry = {
+    applications: { api: { DialogV2: { wait: async () => ({ confirmed: false }) } } }
+  };
+  return () => {
+    if (original === undefined) delete globalThis.foundry;
+    else globalThis.foundry = original;
+  };
+}
+
+test('immediate interactive cancel (routed): dismissing the roll dialog aborts with zero mutation', async () => {
+  const calls = {};
+  routedRoll(true);
+  const restoreFoundry = stubCancelDialog();
+  try {
+    const engine = makeEngine({ calls });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+      interactive: true
+    });
+
+    assert.equal(result.accepted, false, 'a cancelled attempt is not accepted');
+    assert.equal(result.cancelled, true, 'the cancelled flag is surfaced for a silent no-op');
+    assert.deepEqual(result.blockedReasons, [], 'no blocked reasons — a cancel is not a rejection');
+    assertNoTerminalSideEffects(calls);
+  } finally {
+    restoreFoundry();
+    delete globalThis.Roll;
+  }
+});
+
+test('immediate interactive cancel (progressive): dismissing the roll dialog aborts with zero mutation', async () => {
+  const calls = {};
+  routedRoll(true);
+  const restoreFoundry = stubCancelDialog();
+  try {
+    const engine = makeEngine({
+      task: progressiveTask(),
+      gatheringCraftingCheck: { progressive: { rollFormula: '1d20' } },
+      calls
+    });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+      interactive: true
+    });
+
+    assert.equal(result.accepted, false, 'a cancelled attempt is not accepted');
+    assert.equal(result.cancelled, true, 'the cancelled flag is surfaced');
+    assert.deepEqual(result.blockedReasons, [], 'no blocked reasons on cancel');
+    assertNoTerminalSideEffects(calls);
+  } finally {
+    restoreFoundry();
+    delete globalThis.Roll;
+  }
+});

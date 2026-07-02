@@ -335,6 +335,36 @@ test('craft(): posts ChatMessage exactly once on success', async () => {
   assert.equal(chatCreated.length, 1, 'ChatMessage.create should be called exactly once on success');
 });
 
+test('craft(): a cancelled check aborts with {success:false, cancelled:true} and zero consumption', async () => {
+  setupGame(true);
+  resetChat();
+
+  const item = buildIngredientItem('Iron Ingot', 3);
+  const ingredientSet = buildIngredientSet(item);
+  const recipe = buildRecipe();
+  const { sourceActor, craftingActor } = buildActors(item);
+
+  const engine = buildEngine(item, ingredientSet);
+  // Simulate the player dismissing the interactive roll dialog.
+  engine._runCraftingCheck = async () => ({ success: false, cancelled: true });
+  // Fail loudly if any consumption runs — a cancel must mutate nothing.
+  let consumeCalled = false;
+  engine._consumeIngredients = async () => {
+    consumeCalled = true;
+    return [];
+  };
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {
+    interactive: true,
+  });
+
+  assert.equal(result.success, false, 'cancelled craft is not a success');
+  assert.equal(result.cancelled, true, 'cancelled flag surfaced');
+  assert.equal(result.results, null, 'no results created');
+  assert.equal(consumeCalled, false, 'no ingredients consumed on cancel');
+  assert.equal(chatCreated.length, 0, 'no chat message posted on cancel');
+});
+
 test('craft(): posts ChatMessage exactly once on check failure', async () => {
   setupGame(true);
   resetChat();
