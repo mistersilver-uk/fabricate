@@ -14,6 +14,34 @@ The page's shape follows the system's resolution mode: simple and alchemy author
 A routed crafting check is optional in Routed by ingredients mode and required in Routed by check mode.
 Each attempt runs the check automatically, before any materials are consumed.
 
+## Rolling a check from the UI
+
+When a player crafts or gathers from the Fabricate UI, the check is rolled interactively.
+Fabricate opens a small dialog that shows the check, its difficulty, and the formula about to be rolled.
+The dialog has a **Roll** button, a **Cancel** button, and a **Situational bonus** field for a one-off modifier.
+Type a number into **Situational bonus** to add it to this roll, for example a bonus from a spell or a helping hand.
+Leave the field blank to roll the check as configured.
+An entry that is not a valid modifier is ignored, and the check rolls with its base formula.
+
+Clicking **Roll** evaluates the check and posts the result to chat as a normal roll card.
+The roll uses your current chat roll mode, so a private or blind roll stays hidden from other players in the usual way.
+If the [Dice So Nice](https://foundryvtt.com/packages/dice-so-nice) module is installed, it animates the 3D dice for that roll.
+Dice So Nice is optional.
+Without it the roll still posts to chat as a normal roll card, just with no 3D animation.
+
+Clicking **Cancel**, or dismissing the dialog, aborts the attempt with no changes.
+No ingredients, currency, or Tools are consumed, and no run is recorded.
+
+This interactive prompt is the default when you craft from the Crafting tab or gather from the Gathering screen.
+It applies to the crafting, salvage, and gathering checks that run through the shared check step.
+Some rolls never prompt:
+
+- The immediate d100 gathering mode rolls without a prompt, because it resolves outside the shared check step.
+- Timed and maturation crafting steps, and timed gathering tasks, do not prompt, because they resolve later when the Game Master advances world time.
+- Salvage supports the prompt, but no current screen starts a salvage, so players do not see a salvage prompt today.
+
+Macros and automation that call Fabricate directly keep the original silent behaviour and never prompt.
+
 ## How a routed check is rolled
 
 In a Routed by check system, the crafting check rolls its configured expression at the moment of crafting and maps the total onto one of the outcome tiers you defined.

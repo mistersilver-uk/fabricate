@@ -1,6 +1,7 @@
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { Tool } from '../models/Tool.js';
 import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakageRuntime.js';
+import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
@@ -64,7 +65,14 @@ export class CraftingEngine {
    * @param {Recipe} recipe - The recipe to use
    * @param {string} ingredientSetId - Which ingredient set to use (optional, uses first satisfiable if not provided)
    * @param {Object} options - Additional options
-   * @returns {Promise<{success: boolean, results: Item[]|null, message: string}>}
+   * @param {boolean} [options.interactive] When true, the crafting check prompts the
+   *   player with the confirm-roll dialog (optional situational modifier) and posts
+   *   the roll to chat so Dice So Nice animates it. Defaults to false so automation
+   *   and macros stay silent. A dismissed prompt returns
+   *   `{ success: false, cancelled: true, results: null }` with zero mutation (no
+   *   ingredients, currency, or tools consumed, no run created). Timed/maturation
+   *   steps never prompt (they resolve at GM-gated world-time maturation).
+   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, cancelled?: boolean}>}
    */
   async craft(craftingActor, componentSourceActors, recipe, ingredientSetId = null, options = {}) {
     const resolutionService =
@@ -311,12 +319,15 @@ export class CraftingEngine {
       }
 
       // Run optional system-level crafting check before consuming ingredients.
+      // `interactive` (opt-in, from a UI-triggered craft) surfaces a confirm/roll
+      // dialog and posts the roll to chat; automation/macros omit it and stay silent.
       const checkResult = await this._runCraftingCheck(
         executionRecipe,
         craftingActor,
         componentSourceActors,
         ingredientSet,
-        step
+        step,
+        { interactive: options?.interactive === true }
       );
       // A misconfigured required check (no authored roll formula for the active mode)
       // is a GM-side system gap, not a rolled failure: abort with ZERO mutation so the
@@ -328,6 +339,12 @@ export class CraftingEngine {
           results: null,
           message: checkResult.message,
         };
+      }
+      // The player dismissed the interactive roll dialog: a user choice, not a
+      // failure. Abort with ZERO mutation (no consumption, no breakage, no chat)
+      // before the failure-consumption path below.
+      if (checkResult.cancelled) {
+        return { success: false, cancelled: true, results: null, message: 'Crafting cancelled' };
       }
       if (!checkResult.success) {
         const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
@@ -1513,7 +1530,11 @@ export class CraftingEngine {
     // The routing basis is now a property of the system MODE, so the check no
     // longer reads the step's `resultSelection`; the param is retained for the
     // positional call signature.
-    _step = null
+    _step = null,
+    // Interactive-roll options threaded from `craft()`. `{ interactive }` opts a
+    // UI-triggered craft into the confirm-roll dialog + chat post; defaults to
+    // non-interactive so the programmatic API stays silent.
+    { interactive = false } = {}
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -1573,15 +1594,15 @@ export class CraftingEngine {
     }
 
     if (useSimpleCheck) {
-      return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor);
+      return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor, { interactive });
     }
 
     if (useProgressiveCheck) {
-      return this._runProgressiveCheck(system, recipe, craftingActor);
+      return this._runProgressiveCheck(system, recipe, craftingActor, { interactive });
     }
 
     if (useRoutedCheck) {
-      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor);
+      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, { interactive });
     }
 
     // No usable roll-formula check path applied. A check is only "usable" when its
@@ -1610,7 +1631,13 @@ export class CraftingEngine {
    *
    * @returns {Promise<{success: boolean, outcome: string, value: number|null, data: object, message: string|null}>}
    */
-  async _runSimpleCheck(system, recipe, ingredientSet, craftingActor) {
+  async _runSimpleCheck(
+    system,
+    recipe,
+    ingredientSet,
+    craftingActor,
+    { interactive = false } = {}
+  ) {
     const simple = system?.craftingCheck?.simple || {};
     const dc = await this._resolveSimpleCheckDc(
       system,
@@ -1626,6 +1653,13 @@ export class CraftingEngine {
       triggers: simple.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor: craftingActor,
+        name: recipe?.name,
+        activity: 'Crafting',
+        dc,
+      }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -1650,7 +1684,13 @@ export class CraftingEngine {
    *
    * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
    */
-  async _runRoutedCheck(system, recipe, ingredientSet, craftingActor) {
+  async _runRoutedCheck(
+    system,
+    recipe,
+    ingredientSet,
+    craftingActor,
+    { interactive = false } = {}
+  ) {
     const routed = system?.craftingCheck?.routed || {};
     const dc = await this._resolveSimpleCheckDc(
       system,
@@ -1669,6 +1709,13 @@ export class CraftingEngine {
       triggers: routed.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor: craftingActor,
+        name: recipe?.name,
+        activity: 'Crafting',
+        dc,
+      }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -1697,13 +1744,19 @@ export class CraftingEngine {
    * crit awards nothing (`value = 0`), and either may break tools (forced failure
    * wins). Delegates to the shared {@link runFormulaProgressive}.
    */
-  async _runProgressiveCheck(system, recipe, craftingActor) {
+  async _runProgressiveCheck(system, recipe, craftingActor, { interactive = false } = {}) {
     const progressive = system?.craftingCheck?.progressive || {};
     const result = await runFormulaProgressive({
       formula: progressive.rollFormula,
       triggers: progressive.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor: craftingActor,
+        name: recipe?.name,
+        activity: 'Crafting',
+      }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -2109,7 +2162,14 @@ export class CraftingEngine {
    * @param {string} craftingSystemId - ID of the crafting system.
    * @param {string} componentId - ID of the component to salvage.
    * @param {Object} [options={}] - Optional overrides.
-   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null}>}
+   * @param {boolean} [options.interactive] When true, the salvage check prompts the
+   *   player with the confirm-roll dialog (optional situational modifier) and posts
+   *   the roll to chat so Dice So Nice animates it. Defaults to false so automation
+   *   and macros stay silent. A dismissed prompt returns
+   *   `{ success: false, cancelled: true, results: null }` with zero mutation (no
+   *   component consumed, no tool breakage) and discards a run created by this call.
+   *   No current UI surface triggers salvage, so this is API/engine-level only today.
+   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null, cancelled?: boolean}>}
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
     const actor = await fromUuid(actorUuid);
@@ -2173,6 +2233,10 @@ export class CraftingEngine {
 
     const salvageRunManager = this._getSalvageRunManager();
     let salvageRun = null;
+    // Track whether THIS call created the salvage run (vs reused an existing one),
+    // so a cancelled interactive salvage can discard its phantom run and net ZERO
+    // run mutation — mirroring the crafting `createdThisCall` phantom-discard.
+    let salvageRunCreatedThisCall = false;
     if (salvageRunManager) {
       salvageRun = options?.runId
         ? salvageRunManager.getActiveRun(actor, options.runId)
@@ -2233,6 +2297,7 @@ export class CraftingEngine {
         startedAt: now,
         usedTools: [],
       });
+      salvageRunCreatedThisCall = true;
     }
 
     if (salvageRunManager && timeRequirement && !options?.skipTimeGate) {
@@ -2260,7 +2325,9 @@ export class CraftingEngine {
       salvageRun = await salvageRunManager.markRunInProgress(actor, salvageRun);
     }
 
-    const checkResult = await this._runSalvageCraftingCheck(component, system, actor);
+    const checkResult = await this._runSalvageCraftingCheck(component, system, actor, {
+      interactive: options?.interactive === true,
+    });
     const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
 
     // A misconfigured required salvage check (routed/progressive with no authored
@@ -2273,6 +2340,24 @@ export class CraftingEngine {
         results: null,
         message: checkResult.message,
         salvageRun,
+      };
+    }
+
+    // The player dismissed the interactive roll dialog: a user choice, not a
+    // failure. Abort with ZERO mutation (no component consumption, no tool
+    // breakage) before the failure/consumption paths below. Discard a run created
+    // by THIS call so a cancel leaves no orphaned `inProgress` run — parity with
+    // `craft()`'s phantom-discard. A reused pre-existing run is left untouched.
+    if (checkResult.cancelled) {
+      if (salvageRunManager && salvageRun && salvageRunCreatedThisCall) {
+        await salvageRunManager.discardRun(actor, salvageRun.id);
+      }
+      return {
+        success: false,
+        cancelled: true,
+        results: null,
+        message: 'Salvage cancelled',
+        salvageRun: salvageRunCreatedThisCall ? null : salvageRun,
       };
     }
 
@@ -2539,18 +2624,18 @@ export class CraftingEngine {
    * other mode with no usable formula is a no-op success.
    * @private
    */
-  async _runSalvageCraftingCheck(component, system, actor) {
+  async _runSalvageCraftingCheck(component, system, actor, { interactive = false } = {}) {
     const check = system?.salvageCraftingCheck || {};
     const mode = system?.salvageResolutionMode || 'simple';
 
     if (mode === 'progressive' && check.progressive?.rollFormula) {
-      return this._runSalvageProgressiveCheck(check.progressive, actor);
+      return this._runSalvageProgressiveCheck(check.progressive, component, actor, { interactive });
     }
     if (mode === 'simple' && check.simple?.rollFormula) {
-      return this._runSalvageSimpleCheck(check.simple, component, actor);
+      return this._runSalvageSimpleCheck(check.simple, component, actor, { interactive });
     }
     if (mode === 'routed' && check.routed?.rollFormula) {
-      return this._runSalvageRoutedCheck(check.routed, component, actor);
+      return this._runSalvageRoutedCheck(check.routed, component, actor, { interactive });
     }
 
     // A salvage check is REQUIRED to produce an outcome in progressive mode and in
@@ -2585,14 +2670,22 @@ export class CraftingEngine {
    * (per-component override ?? default), honouring per-die crits. Delegates the roll
    * to the shared {@link runFormulaPassFail}.
    */
-  async _runSalvageSimpleCheck(simple, component, actor) {
+  async _runSalvageSimpleCheck(simple, component, actor, { interactive = false } = {}) {
+    const dc = this._resolveSalvageDc(simple, component);
     const result = await runFormulaPassFail({
       formula: simple.rollFormula,
-      dc: this._resolveSalvageDc(simple, component),
+      dc,
       thresholdMode: simple.thresholdMode,
       triggers: simple.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: component?.name,
+        activity: 'Salvage',
+        dc,
+      }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -2602,12 +2695,18 @@ export class CraftingEngine {
    * progressive salvage awarding spends against result difficulties. Delegates to the
    * shared {@link runFormulaProgressive}.
    */
-  async _runSalvageProgressiveCheck(progressive, actor) {
+  async _runSalvageProgressiveCheck(progressive, component, actor, { interactive = false } = {}) {
     const result = await runFormulaProgressive({
       formula: progressive.rollFormula,
       triggers: progressive.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: component?.name,
+        activity: 'Salvage',
+      }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -2621,10 +2720,11 @@ export class CraftingEngine {
    * component `dcOverride` shifts every relative threshold. Delegates to the shared
    * {@link runFormulaRouted}.
    */
-  async _runSalvageRoutedCheck(routed, component, actor) {
+  async _runSalvageRoutedCheck(routed, component, actor, { interactive = false } = {}) {
+    const dc = this._resolveSalvageDc(routed, component);
     const result = await runFormulaRouted({
       formula: routed.rollFormula,
-      dc: this._resolveSalvageDc(routed, component),
+      dc,
       thresholdMode: routed.thresholdMode,
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
@@ -2632,6 +2732,13 @@ export class CraftingEngine {
       triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: component?.name,
+        activity: 'Salvage',
+        dc,
+      }),
     });
     return this._markEngineEvaluated(result);
   }

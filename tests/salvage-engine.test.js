@@ -445,6 +445,43 @@ test('salvage() does not consume component on failure when consumeComponentOnFai
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be deleted when consumeComponentOnFail=false');
 });
 
+test('salvage(): a cancelled interactive check aborts with zero mutation and no orphaned run', async () => {
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [], meta: {} })
+  };
+  const salvageRunManager = new SalvageRunManager();
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService, salvageRunManager });
+  // Simulate the player dismissing the interactive roll dialog.
+  engine._runSalvageCraftingCheck = async () => ({ success: false, cancelled: true });
+
+  const compItem = makeItem('comp-item', 'Test Component', 3);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent({ name: 'Test Component', ingredientQuantity: 1 });
+  const system = makeSystem({
+    components: [component],
+    salvageCraftingCheck: {
+      enabled: true,
+      macroUuid: null,
+      outcomes: [],
+      progressive: null,
+      // A policy that WOULD consume + break on a genuine failure — proving the
+      // cancel path bypasses it entirely.
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true }
+    }
+  });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id, { interactive: true });
+
+  assert.equal(result.success, false, 'cancelled salvage is not a success');
+  assert.equal(result.cancelled, true, 'cancelled flag surfaced');
+  assert.equal(result.results, null, 'no results created');
+  assert.equal(compItem.deleteCalled, false, 'component NOT consumed on cancel');
+  assert.equal(salvageRunManager.getActiveRuns(actor).length, 0, 'phantom in-progress run discarded');
+  assert.equal(salvageRunManager.getRunHistory(actor).length, 0, 'no history entry — zero run mutation');
+});
+
 test('misconfigured required salvage check: salvage aborts with ZERO mutation (no consume/break)', async () => {
   // routed salvage with no authored roll formula is a GM-side misconfiguration. The
   // real _runSalvageCraftingCheck flags it `misconfigured`, and salvage() must abort

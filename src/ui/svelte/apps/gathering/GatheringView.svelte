@@ -207,11 +207,20 @@
       const result = await services?.startGatheringAttempt?.({
         environmentId,
         taskId,
-        rememberedActorId: store?.selectedActorId ?? null
+        rememberedActorId: store?.selectedActorId ?? null,
+        // UI-triggered attempt: prompt an interactive roll dialog + post the roll
+        // to chat (Dice So Nice) for the routed/progressive check paths.
+        interactive: true
       });
       // Never swallow a rejected attempt: surface WHY so a blocked attempt can't be
       // a silent no-op. A started/accepted attempt reports its outcome via the chat
-      // card, so only an explicit rejection notifies here.
+      // card, so only an explicit rejection notifies here. A CANCELLED attempt
+      // (player dismissed the roll dialog) is a user choice, not a rejection: it is
+      // also `accepted: false` but carries no blockedReasons, so handle it first and
+      // stay silent.
+      if (result && result.cancelled === true) {
+        return;
+      }
       if (result && result.accepted === false) {
         notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
       }
