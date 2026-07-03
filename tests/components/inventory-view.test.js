@@ -40,13 +40,39 @@ function makeItem() {
     tags: ['Beast', 'Mordant'],
     tier: 1,
     isEssenceSource: false,
+    isTool: true,
     totalQuantity: 7,
     sources: [
       { actorId: 'a1', actorName: 'Akra', actorImg: null, quantity: 2 },
       { actorId: 'a2', actorName: 'Camp Chest', actorImg: null, quantity: 5 }
     ],
     essences: [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 }],
-    usedBy: [{ recipeId: 'r1', recipeName: "Alchemist's Crucible", recipeImg: null, role: 'ingredient' }]
+    usedBy: [{ recipeId: 'r1', recipeName: "Alchemist's Crucible", recipeImg: null, role: 'ingredient' }],
+    producedBy: [
+      { kind: 'recipe', recipeId: 'r2', name: 'Distil Gland', img: null },
+      { kind: 'gathering', recipeId: null, name: 'Harvest Beast', img: null }
+    ],
+    contributors: []
+  };
+}
+
+function makeEssenceItem() {
+  return {
+    key: 'sys:fire',
+    componentId: 'fire',
+    name: 'Fire',
+    img: null,
+    icon: 'fas fa-fire',
+    tags: [],
+    tier: null,
+    isEssenceSource: true,
+    isTool: false,
+    totalQuantity: 6,
+    sources: [{ actorId: 'a1', actorName: 'Akra', actorImg: null, quantity: 6 }],
+    essences: [],
+    usedBy: [],
+    producedBy: [],
+    contributors: [{ componentId: 'c1', name: 'Iron', img: 'icons/iron.webp', quantity: 6 }]
   };
 }
 
@@ -64,9 +90,9 @@ function makeServices(item) {
     search: '',
     filter: 'all',
     sort: 'name',
-    filterCounts: { all: 1, components: 1, essences: 0, tools: 0, rare: 0 },
+    filterCounts: { all: 1, components: 1, essences: 0, tools: 1 },
     page: 0,
-    pageSize: 12,
+    pageSize: 25,
     visibleItems: [item],
     pageItems: [item],
     selectedItem: item,
@@ -114,6 +140,33 @@ describe('InventoryView (mounted)', () => {
     assert.match(detail.textContent, /Mordant Gland/, 'detail shows the item name');
     assert.match(detail.textContent, /Akra/, 'detail lists a source actor');
     assert.match(detail.textContent, /Alchemist's Crucible/, 'detail lists the using recipe');
+    // Produced By section lists the producing recipe + gathering task.
+    assert.match(detail.textContent, /Distil Gland/, 'detail lists a producing recipe');
+    assert.match(detail.textContent, /Harvest Beast/, 'detail lists a producing gathering task');
+  });
+
+  it('shows essence and tool pips on a component card', async () => {
+    const { services } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const card = target.querySelector('[data-inventory-card="sys:c1"]');
+    assert.ok(card.querySelector('[data-inventory-pip="essence"]'), 'renders an essence pip');
+    assert.ok(card.querySelector('[data-inventory-pip="tool"]'), 'renders a tool pip');
+  });
+
+  it('shows contributing components when an essence is selected', async () => {
+    const item = makeEssenceItem();
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-detail="sys:fire"]');
+    assert.ok(detail, 'renders the essence detail');
+    assert.ok(detail.querySelector('[data-inventory-contributor="c1"]'), 'lists a contributing component');
+    assert.match(detail.textContent, /Iron/, 'names the contributing component');
+    // An essence has no Produced By section.
+    assert.equal(detail.querySelector('[data-inventory-produced-by]'), null, 'essence has no produced-by');
   });
 
   it('shows the empty state when the actor owns nothing', async () => {
@@ -139,5 +192,12 @@ describe('InventoryView (mounted)', () => {
     usedBy.click();
     flushSync();
     assert.deepEqual(calls.navigate, ['r1'], 'clicking a used-by recipe navigates to that recipe');
+
+    // A recipe producer is clickable and navigates too.
+    const producedBy = target.querySelector('[data-inventory-produced-by="r2"]');
+    assert.ok(producedBy, 'renders a clickable produced-by recipe');
+    producedBy.click();
+    flushSync();
+    assert.deepEqual(calls.navigate, ['r1', 'r2'], 'clicking a produced-by recipe navigates to it');
   });
 });

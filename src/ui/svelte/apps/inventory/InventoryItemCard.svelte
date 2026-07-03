@@ -7,6 +7,7 @@
   accent border/fill when selected).
 -->
 <script>
+  import { localize } from '../../util/foundryBridge.js';
   import CraftingThumb from '../crafting/CraftingThumb.svelte';
 
   let { item = null, selected = false, onSelect = null } = $props();
@@ -17,6 +18,10 @@
   const isEssence = $derived(item?.isEssenceSource === true);
   const icon = $derived(typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle');
   const quantityLabel = $derived(`×${quantity}`);
+  // At-a-glance pips (component rows only): one per essence the component carries,
+  // plus a tool pip when it is a registered tool. Essence rows carry neither.
+  const isTool = $derived(item?.isTool === true);
+  const essencePips = $derived(Array.isArray(item?.essences) ? item.essences : []);
 
   function select() {
     onSelect?.(id);
@@ -54,6 +59,30 @@
         <CraftingThumb src={item?.img ?? ''} alt="" size={72} />
       {/if}
       <span class="inventory-card-qty" data-inventory-qty>{quantityLabel}</span>
+      {#if essencePips.length > 0 || isTool}
+        <span class="inventory-card-pips" data-inventory-pips>
+          {#each essencePips as pip (pip.id)}
+            <span
+              class="inventory-card-pip"
+              data-inventory-pip="essence"
+              title={pip.name}
+              aria-label={pip.name}
+            >
+              <i class={pip.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>
+            </span>
+          {/each}
+          {#if isTool}
+            <span
+              class="inventory-card-pip is-tool"
+              data-inventory-pip="tool"
+              title={localize('FABRICATE.App.Inventory.Card.ToolPip')}
+              aria-label={localize('FABRICATE.App.Inventory.Card.ToolPip')}
+            >
+              <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+            </span>
+          {/if}
+        </span>
+      {/if}
     </span>
     <span class="inventory-card-name">{name}</span>
   </button>
@@ -128,6 +157,40 @@
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     text-align: center;
+  }
+
+  /* At-a-glance pips: a vertical stack on the right of the thumbnail, starting just
+     below the quantity badge. */
+  .inventory-card-pips {
+    position: absolute;
+    top: 20px;
+    right: -6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .inventory-card-pip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: 1px solid var(--fab-border-strong);
+    background: var(--fab-surface-raised);
+    color: var(--fab-text);
+  }
+
+  .inventory-card-pip i {
+    font-size: 9px;
+    line-height: 1;
+  }
+
+  .inventory-card-pip.is-tool {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
   }
 
   .inventory-card-name {

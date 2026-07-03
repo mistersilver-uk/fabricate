@@ -117,9 +117,9 @@ describe('inventoryStore', () => {
   it('subsets rows by each filter pill', async () => {
     const listing = {
       rows: [
-        row('c1', 'Iron', { tags: ['metal'] }),
-        row('c2', 'Ruby', { tags: ['Rare'] }),
-        row('c3', 'Hammer', { usedBy: [{ recipeId: 'r1', role: 'tool' }] }),
+        row('c1', 'Iron'),
+        row('c2', 'Ruby'),
+        row('c3', 'Hammer', { isTool: true }),
         row('e1', 'Fire', { isEssenceSource: true }),
       ],
       selectedActorId: 'hero',
@@ -137,9 +137,20 @@ describe('inventoryStore', () => {
 
     assert.deepEqual(idsFor('components'), ['c1', 'c2', 'c3']);
     assert.deepEqual(idsFor('essences'), ['e1']);
-    assert.deepEqual(idsFor('tools'), ['c3']);
-    assert.deepEqual(idsFor('rare'), ['c2'], 'rare pill is tag-based and case-insensitive');
-    assert.deepEqual(store.filterCounts.all, 4);
+    assert.deepEqual(idsFor('tools'), ['c3'], 'tools pill selects registered tools (isTool)');
+    assert.equal(store.filterCounts.all, 4);
+    assert.equal(store.filterCounts.tools, 1);
+
+    // 'rare' is no longer a valid filter — setFilter rejects it back to 'all'.
+    store.setFilter('rare');
+    flushSync();
+    assert.equal(store.filter, 'all', 'unknown/removed filter falls back to all');
+  });
+
+  it('defaults the page size to 25', async () => {
+    const { services } = makeServices();
+    const store = createInventoryStore({ services });
+    assert.equal(store.pageSize, 25);
   });
 
   it('sorts by name, quantity (desc), and type', async () => {

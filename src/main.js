@@ -1301,6 +1301,13 @@ class Fabricate {
           ? (game.i18n?.format?.(key, data) ?? key)
           : (game.i18n?.localize?.(key) ?? key),
       nowWorldTime: () => game.time?.worldTime ?? 0,
+      // Gathering tasks live in the `gatheringConfig` setting (keyed by system id),
+      // not on the system object — surface them for the "produced by" gathering index.
+      getGatheringTasksForSystem: (systemId) => {
+        const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
+        const tasks = config?.systems?.[systemId]?.tasks;
+        return Array.isArray(tasks) ? tasks : [];
+      },
     });
     return this._inventoryListingBuilder;
   }

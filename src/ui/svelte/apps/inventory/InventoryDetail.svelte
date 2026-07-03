@@ -20,6 +20,8 @@
   const essences = $derived(Array.isArray(item?.essences) ? item.essences : []);
   const sources = $derived(Array.isArray(item?.sources) ? item.sources : []);
   const usedBy = $derived(Array.isArray(item?.usedBy) ? item.usedBy : []);
+  const producedBy = $derived(Array.isArray(item?.producedBy) ? item.producedBy : []);
+  const contributors = $derived(Array.isArray(item?.contributors) ? item.contributors : []);
   const tierLabel = $derived(
     item?.tier != null && item.tier !== '' ? localize('FABRICATE.App.Inventory.Detail.Tier', { tier: item.tier }) : null
   );
@@ -40,6 +42,11 @@
         ? 'FABRICATE.App.Inventory.Detail.RoleTool'
         : 'FABRICATE.App.Inventory.Detail.RoleIngredient'
     );
+  }
+  function kindLabel(kind) {
+    const key =
+      kind === 'salvage' ? 'KindSalvage' : kind === 'gathering' ? 'KindGathering' : 'KindRecipe';
+    return localize(`FABRICATE.App.Inventory.Detail.${key}`);
   }
   function openRecipe(recipeId) {
     if (recipeId) onOpenRecipe?.(recipeId);
@@ -95,6 +102,25 @@
       </ul>
     </section>
 
+    {#if isEssence}
+      <section class="inventory-detail-section">
+        <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.ContributingTitle')}</p>
+        {#if contributors.length > 0}
+          <ul class="inventory-detail-list">
+            {#each contributors as contributor (contributor.componentId)}
+              <li class="inventory-detail-row" data-inventory-contributor={contributor.componentId}>
+                <CraftingThumb src={contributor.img ?? ''} alt="" size={40} />
+                <span class="inventory-detail-row-name">{contributor.name}</span>
+                <span class="inventory-detail-row-qty">×{contributor.quantity}</span>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')}</p>
+        {/if}
+      </section>
+    {/if}
+
     {#if essences.length > 0}
       <section class="inventory-detail-section">
         <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}</p>
@@ -133,6 +159,40 @@
         <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')}</p>
       {/if}
     </section>
+
+    {#if !isEssence}
+      <section class="inventory-detail-section">
+        <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}</p>
+        {#if producedBy.length > 0}
+          <ul class="inventory-detail-list">
+            {#each producedBy as producer, index (producer.kind + ':' + (producer.recipeId ?? producer.name) + ':' + index)}
+              <li>
+                {#if producer.kind === 'recipe' && producer.recipeId}
+                  <button
+                    type="button"
+                    class="inventory-detail-recipe"
+                    data-inventory-produced-by={producer.recipeId}
+                    onclick={() => openRecipe(producer.recipeId)}
+                  >
+                    <CraftingThumb src={producer.img ?? ''} alt="" size={40} />
+                    <span class="inventory-detail-row-name">{producer.name}</span>
+                    <span class="inventory-chip inventory-chip-role">{kindLabel(producer.kind)}</span>
+                  </button>
+                {:else}
+                  <div class="inventory-detail-row" data-inventory-produced-by-kind={producer.kind}>
+                    <CraftingThumb src={producer.img ?? ''} alt="" size={40} />
+                    <span class="inventory-detail-row-name">{producer.name}</span>
+                    <span class="inventory-chip inventory-chip-role">{kindLabel(producer.kind)}</span>
+                  </div>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty')}</p>
+        {/if}
+      </section>
+    {/if}
   </div>
 {/if}
 

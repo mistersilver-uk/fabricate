@@ -21,18 +21,12 @@
  * @returns {object} The reactive inventory store.
  */
 
-const DEFAULT_PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 25;
 
 // The filter pills. Kept as a local constant so the store never imports the
 // builder's module graph.
-export const INVENTORY_FILTERS = Object.freeze(['all', 'components', 'essences', 'tools', 'rare']);
+export const INVENTORY_FILTERS = Object.freeze(['all', 'components', 'essences', 'tools']);
 const VALID_SORTS = new Set(['name', 'quantity', 'type']);
-
-function hasTag(row, tag) {
-  return (
-    Array.isArray(row?.tags) && row.tags.some((entry) => String(entry ?? '').toLowerCase() === tag)
-  );
-}
 
 function matchesFilter(row, filter) {
   switch (filter) {
@@ -41,9 +35,7 @@ function matchesFilter(row, filter) {
     case 'essences':
       return row?.isEssenceSource === true;
     case 'tools':
-      return Array.isArray(row?.usedBy) && row.usedBy.some((use) => use?.role === 'tool');
-    case 'rare':
-      return hasTag(row, 'rare');
+      return row?.isTool === true;
     case 'all':
     default:
       return true;

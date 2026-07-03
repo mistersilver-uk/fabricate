@@ -385,11 +385,13 @@
           "Components": "Components",
           "Essences": "Essences",
           "Tools": "Tools",
-          "Rare": "Rare",
           "SortLabel": "Sort",
           "SortName": "Name",
           "SortQuantity": "Quantity",
           "SortType": "Type"
+        },
+        "Card": {
+          "ToolPip": "Tool"
         },
         "Detail": {
           "SelectHint": "Select an item to see its sources and where it's used.",
@@ -398,11 +400,18 @@
           "TypeComponent": "Component",
           "TypeEssence": "Essence",
           "SourcesTitle": "Sources",
+          "ContributingTitle": "Contributing components",
+          "ContributingEmpty": "No owned components contribute this essence.",
           "EssenceContentTitle": "Essences",
           "UsedByTitle": "Used by",
           "UsedByEmpty": "Not used by any known recipe.",
+          "ProducedByTitle": "Produced by",
+          "ProducedByEmpty": "Not produced by any known recipe, salvage, or gathering.",
           "RoleIngredient": "Ingredient",
-          "RoleTool": "Tool"
+          "RoleTool": "Tool",
+          "KindRecipe": "Recipe",
+          "KindSalvage": "Salvage",
+          "KindGathering": "Gathering"
         }
       },
       "ActorBar": {

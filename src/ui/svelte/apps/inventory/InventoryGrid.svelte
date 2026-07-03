@@ -37,7 +37,7 @@
         {totalCount}
         {pageSize}
         {pageIndex}
-        pageSizeOptions={[12, 24, 48]}
+        pageSizeOptions={[25, 50, 75]}
         onPageChange={(index) => onPageChange?.(index)}
         onPageSizeChange={(size) => onPageSizeChange?.(size)}
       />

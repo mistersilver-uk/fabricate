@@ -358,4 +358,156 @@ describe('InventoryListingBuilder — multi-system + essences', () => {
     assert.equal(listing.counts.essences, 0);
     assert.deepEqual(rowByComponent(listing, 'c1').essences, []);
   });
+
+  it('lists an essence row’s contributing components with their contribution', () => {
+    const { builder } = makeBuilder();
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 3), item('Coal', 2)]),
+    });
+    const fire = listing.rows.find((r) => r.isEssenceSource && r.componentId === 'fire');
+    // Iron fire:2 ×3 = 6; Coal fire:1 ×2 = 2.
+    assert.deepEqual(fire.contributors, [
+      { componentId: 'c1', name: 'Iron', img: 'icons/iron.webp', quantity: 6 },
+      { componentId: 'c2', name: 'Coal', img: 'icons/coal.webp', quantity: 2 },
+    ]);
+  });
+});
+
+describe('InventoryListingBuilder — tools + produced-by', () => {
+  it('marks a component registered in the system tool library as a tool', () => {
+    const { builder } = makeBuilder();
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Hammerhead', 1), item('Iron', 1)]),
+    });
+    // c3 (Hammerhead) is the componentId of tool t1 in makeSystem.
+    assert.equal(rowByComponent(listing, 'c3').isTool, true);
+    assert.equal(rowByComponent(listing, 'c1').isTool, false);
+  });
+
+  it('lists producing recipes (kind: recipe) that output the component', () => {
+    const recipe = {
+      id: 'r1',
+      name: 'Smelt Iron',
+      img: 'icons/smelt.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [],
+      results: [{ componentId: 'c1', quantity: 1 }],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    assert.deepEqual(rowByComponent(listing, 'c1').producedBy, [
+      { kind: 'recipe', recipeId: 'r1', name: 'Smelt Iron', img: 'icons/smelt.webp' },
+    ]);
+  });
+
+  it('lists a recipe result from an explicit step', () => {
+    const recipe = {
+      id: 'r1',
+      name: 'Multi Smelt',
+      img: 'icons/smelt.webp',
+      craftingSystemId: 'sys-1',
+      ingredientSets: [],
+      steps: [{ id: 's1', resultGroups: [{ id: 'g1', results: [{ componentId: 'c1' }] }] }],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    assert.equal(rowByComponent(listing, 'c1').producedBy[0].recipeId, 'r1');
+  });
+
+  it('lists salvage producers (kind: salvage) from a component whose salvage yields it', () => {
+    const system = makeSystem({
+      components: [
+        { id: 'c1', name: 'Iron', img: 'icons/iron.webp', essences: {} },
+        {
+          id: 'c2',
+          name: 'Scrap',
+          img: 'icons/scrap.webp',
+          essences: {},
+          salvage: { enabled: true, resultGroups: [{ results: [{ componentId: 'c1' }] }] },
+        },
+      ],
+      tools: [],
+    });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    assert.deepEqual(rowByComponent(listing, 'c1').producedBy, [
+      { kind: 'salvage', recipeId: null, name: 'Scrap', img: 'icons/scrap.webp' },
+    ]);
+  });
+
+  it('ignores salvage from a component whose salvage is disabled', () => {
+    const system = makeSystem({
+      components: [
+        { id: 'c1', name: 'Iron', img: 'icons/iron.webp', essences: {} },
+        {
+          id: 'c2',
+          name: 'Scrap',
+          essences: {},
+          salvage: { enabled: false, resultGroups: [{ results: [{ componentId: 'c1' }] }] },
+        },
+      ],
+      tools: [],
+    });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    assert.deepEqual(rowByComponent(listing, 'c1').producedBy, []);
+  });
+
+  it('lists gathering producers (kind: gathering) from an injected task drop', () => {
+    const system = makeSystem();
+    const builder = new InventoryListingBuilder({
+      recipeManager: { getRecipes: () => [] },
+      craftingSystemManager: { getSystems: () => [system] },
+      localize: (key) => key,
+      nowWorldTime: () => 1,
+      getGatheringTasksForSystem: (systemId) =>
+        systemId === 'sys-1'
+          ? [
+              {
+                id: 'task-1',
+                name: 'Mine Ore',
+                img: 'icons/pick.webp',
+                dropRows: [
+                  { componentId: 'c1', enabled: true },
+                  { componentId: 'c2', enabled: false },
+                ],
+              },
+            ]
+          : [],
+    });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    assert.deepEqual(rowByComponent(listing, 'c1').producedBy, [
+      { kind: 'gathering', recipeId: null, name: 'Mine Ore', img: 'icons/pick.webp' },
+    ]);
+    // A disabled drop row does not count.
+    assert.deepEqual(rowByComponent(listing, 'c2').producedBy, []);
+  });
+
+  it('excludes redacted (teaser) recipes from produced-by for a non-GM viewer', () => {
+    const recipe = {
+      id: 'r1',
+      name: 'Smelt Iron',
+      img: 'icons/smelt.webp',
+      craftingSystemId: 'sys-1',
+      ingredientSets: [],
+      results: [{ componentId: 'c1' }],
+    };
+    const builder = new InventoryListingBuilder({
+      recipeManager: { getRecipes: () => [recipe] },
+      craftingSystemManager: { getSystems: () => [makeSystem()] },
+      recipeVisibility: {
+        getVisibleRecipes: () => [{ recipe: { id: 'r1' }, access: { reason: 'teaser' } }],
+      },
+      localize: (key) => key,
+      nowWorldTime: () => 1,
+    });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+      viewer: { isGM: false },
+    });
+    assert.deepEqual(rowByComponent(listing, 'c1').producedBy, []);
+  });
 });

@@ -121,7 +121,7 @@
           selectedKey={store?.selectedItem?.key ?? null}
           totalCount={store?.visibleItems?.length ?? 0}
           pageIndex={store?.page ?? 0}
-          pageSize={store?.pageSize ?? 12}
+          pageSize={store?.pageSize ?? 25}
           {filtering}
           {onSelect}
           onPageChange={(index) => store?.setPage(index)}
