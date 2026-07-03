@@ -440,6 +440,7 @@ describe('CraftingListingBuilder — outcome tiers', () => {
     assert.equal(recipe.outcomeTiers.length, 2);
     const [success, failure] = recipe.outcomeTiers;
     assert.equal(success.success, true);
+    assert.deepEqual(success.names, ['Success']);
     // Single-result-group exemption: the lone group is awarded without a name/tier map.
     assert.equal(success.awardedResults.length, 1);
     assert.deepEqual(success.awardedResults[0], {
@@ -448,12 +449,106 @@ describe('CraftingListingBuilder — outcome tiers', () => {
       qty: 2,
     });
     assert.equal(failure.success, false);
+    assert.deepEqual(failure.names, ['Failure']);
     assert.deepEqual(failure.awardedResults, [], 'a failure-only tier awards nothing');
   });
 
   it('routedByCheck top-level result list is empty (awards are per tier)', () => {
     const { recipe } = buildOne({ system: routedSystem() });
     assert.deepEqual(recipe.result.items, []);
+  });
+
+  // System of five tiers routing to two result groups by explicit tier assignment:
+  // Flawed/Standard/Fine → Bronze (Iron Sword ×2), Masterwork → Steel (Steel Sword ×1),
+  // Ruined → failure. Used to exercise same-signature collapsing.
+  function collapseSetup() {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      components: [
+        { id: 'c1', name: 'Iron Sword', img: 'icons/sword.webp' },
+        { id: 'c2', name: 'Steel Sword', img: 'icons/steel.webp' },
+      ],
+      craftingCheck: {
+        simple: {},
+        routed: {
+          rollFormula: '1d20',
+          type: 'fixed',
+          fixedOutcomes: [
+            { id: 't-flawed', name: 'Flawed', success: true },
+            { id: 't-standard', name: 'Standard', success: true },
+            { id: 't-fine', name: 'Fine', success: true },
+            { id: 't-master', name: 'Masterwork', success: true },
+            { id: 't-ruined', name: 'Ruined', success: false },
+          ],
+        },
+        progressive: {},
+      },
+    });
+    const recipe = makeRecipe({
+      resultGroups: [
+        {
+          id: 'g-bronze',
+          name: 'Bronze',
+          checkOutcomeIds: ['t-flawed', 't-standard', 't-fine'],
+          results: [{ componentId: 'c1', quantity: 2 }],
+        },
+        {
+          id: 'g-steel',
+          name: 'Steel',
+          checkOutcomeIds: ['t-master'],
+          results: [{ componentId: 'c2', quantity: 1 }],
+        },
+      ],
+    });
+    return { system, recipe };
+  }
+
+  it('collapses tiers with an identical result signature into one entry', () => {
+    const { system, recipe } = collapseSetup();
+    const { recipe: model } = buildOne({
+      system,
+      entries: [{ recipe, access: { reason: 'ok' } }],
+    });
+    // Flawed/Standard/Fine collapse (Iron Sword ×2); Masterwork distinct; Ruined failure.
+    assert.equal(model.outcomeTiers.length, 3);
+    const [shared, master, ruined] = model.outcomeTiers;
+    assert.deepEqual(shared.names, ['Flawed', 'Standard', 'Fine']);
+    assert.equal(shared.success, true);
+    assert.deepEqual(shared.awardedResults, [
+      { name: 'Iron Sword', img: 'icons/sword.webp', qty: 2 },
+    ]);
+    assert.deepEqual(master.names, ['Masterwork']);
+    assert.deepEqual(master.awardedResults, [
+      { name: 'Steel Sword', img: 'icons/steel.webp', qty: 1 },
+    ]);
+    assert.deepEqual(ruined.names, ['Ruined']);
+    assert.deepEqual(ruined.awardedResults, []);
+  });
+
+  it('collapses multiple no-award (failure) tiers into a single entry', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: {
+        simple: {},
+        routed: {
+          rollFormula: '1d20',
+          type: 'fixed',
+          fixedOutcomes: [
+            { id: 't1', name: 'Success', success: true },
+            { id: 't2', name: 'Ruined', success: false },
+            { id: 't3', name: 'Botched', success: false },
+          ],
+        },
+        progressive: {},
+      },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.outcomeTiers.length, 2);
+    const [success, failure] = recipe.outcomeTiers;
+    assert.deepEqual(success.names, ['Success']);
+    assert.equal(failure.success, false);
+    assert.deepEqual(failure.names, ['Ruined', 'Botched']);
+    assert.deepEqual(failure.awardedResults, []);
   });
 });
 

@@ -453,11 +453,17 @@ export class CraftingListingBuilder {
 
   /**
    * Outcome tiers for `routedByCheck` mode only (null for every other mode). Each
-   * tier carries its `awardedResults`, resolved through
-   * `ResolutionModeService.resolveResultGroups` so the success-only routing,
-   * single-result-group exemption, and checkOutcomeIds→name→unrouted precedence
-   * are honoured identically to a real attempt. A `success === false` tier never
-   * routes and carries an empty `awardedResults`.
+   * tier's award is resolved through `ResolutionModeService.resolveResultGroups`
+   * so the success-only routing, single-result-group exemption, and
+   * checkOutcomeIds→name→unrouted precedence are honoured identically to a real
+   * attempt. A `success === false` tier never routes and awards nothing.
+   *
+   * Tiers that produce the exact same result signature (same components + counts,
+   * and the same success flag) are collapsed into a single entry whose `names`
+   * lists every contributing tier in first-appearance order, so the OUTCOMES panel
+   * shows one row per distinct result rather than one row per tier.
+   * @returns {Array<{id: string|null, names: string[], success: boolean,
+   *   awardedResults: Array<{name: string, img: string|null, qty: number}>}>|null}
    * @private
    */
   _buildOutcomeTiers({ recipe, system, mode }) {
@@ -466,24 +472,51 @@ export class CraftingListingBuilder {
     const tiers = routed?.type === 'fixed' ? routed.fixedOutcomes : routed?.relativeOutcomes;
     if (!Array.isArray(tiers)) return [];
     const step = this._firstStep(recipe);
-    return tiers.map((tier) => {
+    const groups = [];
+    const byKey = new Map();
+    for (const tier of tiers) {
       const success = tier?.success === true;
-      let awardedResults = [];
+      let resolvedGroups = null;
       if (success) {
-        const resolved = this.resolutionModeService?.resolveResultGroups?.({
+        resolvedGroups = this.resolutionModeService?.resolveResultGroups?.({
           recipe,
           step,
           checkResult: { outcome: tier?.name ?? null },
-        });
-        awardedResults = this._resultItemsFromGroups(resolved?.groups, system);
+        })?.groups;
       }
-      return {
+      const key = `${success ? 's' : 'f'}|${this._resultSignature(resolvedGroups)}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.names.push(stringOrEmpty(tier?.name));
+        continue;
+      }
+      const entry = {
         id: stringOrNull(tier?.id),
-        name: stringOrEmpty(tier?.name),
+        names: [stringOrEmpty(tier?.name)],
         success,
-        awardedResults,
+        awardedResults: success ? this._resultItemsFromGroups(resolvedGroups, system) : [],
       };
-    });
+      byKey.set(key, entry);
+      groups.push(entry);
+    }
+    return groups;
+  }
+
+  /**
+   * Canonical, order-independent signature of a set of resolved result groups,
+   * built from `componentId` + `quantity` pairs (not resolved names) so unknown or
+   * renamed components still group correctly. Empty/failure resolves to `''`.
+   * @private
+   */
+  _resultSignature(groups) {
+    if (!Array.isArray(groups) || groups.length === 0) return '';
+    const pairs = [];
+    for (const group of groups) {
+      for (const result of group?.results ?? []) {
+        pairs.push(`${stringOrEmpty(result?.componentId)}:${Number(result?.quantity || 1)}`);
+      }
+    }
+    return pairs.sort((a, b) => a.localeCompare(b)).join(',');
   }
 
   /**

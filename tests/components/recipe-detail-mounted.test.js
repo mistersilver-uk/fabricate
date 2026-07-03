@@ -60,11 +60,11 @@ const MODE_CASES = [
       outcomeTiers: [
         {
           id: 't-success',
-          name: 'Success',
+          names: ['Success'],
           success: true,
           awardedResults: [{ name: 'Elixir', img: null, qty: 1 }],
         },
-        { id: 't-fail', name: 'Failure', success: false, awardedResults: [] },
+        { id: 't-fail', names: ['Failure'], success: false, awardedResults: [] },
       ],
     }),
     expectedSections: ['check', 'io', 'outcome-tiers'],
@@ -324,11 +324,11 @@ describe('RecipeDetail mounted behavior', () => {
         outcomeTiers: [
           {
             id: 't-success',
-            name: 'Success',
+            names: ['Success'],
             success: true,
             awardedResults: [{ name: 'Elixir', img: null, qty: 1 }],
           },
-          { id: 't-fail', name: 'Failure', success: false, awardedResults: [] },
+          { id: 't-fail', names: ['Failure'], success: false, awardedResults: [] },
         ],
       }),
       selectedSetId: recipe().defaultSetId,
@@ -348,6 +348,46 @@ describe('RecipeDetail mounted behavior', () => {
       failureRow.querySelector('.crafting-tier-flag.tone-danger'),
       'failure flag uses the danger tone'
     );
+  });
+
+  it('renders a collapsed tier group as one row listing every tier name', async () => {
+    const target = await harness.mount({
+      recipe: recipe({
+        modeToken: 'routedByCheck',
+        modeLabel: 'Routed by check',
+        check: {
+          dc: 15,
+          rollFormula: '1d20',
+          skill: null,
+          optional: false,
+          mandatory: true,
+          usable: true,
+        },
+        result: { items: [], time: null, timeLabel: null, xp: null },
+        outcomeTiers: [
+          {
+            id: 't-flawed',
+            names: ['Flawed', 'Standard', 'Fine', 'Masterwork'],
+            success: true,
+            awardedResults: [{ name: 'Bronze Ingot', img: null, qty: 2 }],
+          },
+          { id: 't-ruined', names: ['Ruined'], success: false, awardedResults: [] },
+        ],
+      }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
+    });
+
+    const section = target.querySelector('[data-recipe-section="outcome-tiers"]');
+    const rows = section.querySelectorAll('.crafting-tier-row');
+    assert.equal(rows.length, 2, 'one collapsed success row + one failure row');
+    assert.equal(
+      rows[0].querySelector('.crafting-tier-name').textContent.trim(),
+      'Flawed, Standard, Fine, Masterwork',
+      'the collapsed row lists every contributing tier name'
+    );
+    const awards = rows[0].querySelectorAll('.crafting-tier-award');
+    assert.equal(awards.length, 1, 'the shared result is shown once');
   });
 
   it('shows the check formula resolved against the selected actor', async () => {
