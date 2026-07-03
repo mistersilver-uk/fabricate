@@ -273,12 +273,26 @@ export class RunJournalBuilder {
       img: redacted ? DEFAULT_RUN_IMAGE : this._resolveCraftingRunImg(recipe),
       stepIndex: Number.isFinite(currentStepIndex) ? currentStepIndex : null,
       stepCount,
-      stepLabel: this._stepLabel({
-        stepCount,
-        currentStepIndex,
-        terminal,
-        stepName: stringOrEmpty(labelStep?.stepName),
-      }),
+      multiStep,
+      // The final step of a recipe (single-step, or the last step of a
+      // multi-step recipe) resolves the run rather than triggering a next step,
+      // so the actions panel switches to completion copy.
+      isFinalStep:
+        stepCount <= 1 || (Number.isFinite(currentStepIndex) && currentStepIndex >= stepCount - 1),
+      // "Step X of Y" bookkeeping is meaningless for a single-step recipe — the
+      // structure chip ("Single-Step Recipe") already conveys it — so blank the
+      // label there and let RunCard / RunDetail suppress the redundant chip. A
+      // redacted run also blanks it so a hidden multi-step recipe does not leak
+      // its step count / active step name.
+      stepLabel:
+        !redacted && multiStep
+          ? this._stepLabel({
+              stepCount,
+              currentStepIndex,
+              terminal,
+              stepName: stringOrEmpty(labelStep?.stepName),
+            })
+          : '',
       steps,
       currentStep,
       timeGate: plainObjectOrNull(activeStep?.timeGate),
@@ -567,6 +581,8 @@ export class RunJournalBuilder {
       img,
       stepIndex: null,
       stepCount: 0,
+      multiStep: false,
+      isFinalStep: false,
       stepLabel: '',
       steps: [],
       currentStep: null,

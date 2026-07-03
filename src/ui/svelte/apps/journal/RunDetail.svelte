@@ -73,7 +73,9 @@
 
     <div class="journal-detail-body">
       {#if hasSteps}
-        <StepTimeline {steps} currentIndex={run.stepIndex} />
+        {#if run.multiStep}
+          <StepTimeline {steps} currentIndex={run.stepIndex} />
+        {/if}
         <StepDetails step={detailStep} />
       {:else}
         <p class="journal-detail-gathering-summary" data-journal-gathering-summary>

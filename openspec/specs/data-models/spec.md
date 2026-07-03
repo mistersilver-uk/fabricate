@@ -1204,7 +1204,9 @@ RunModel = {
   img: string,
   stepIndex: number | null,
   stepCount: number,
-  stepLabel: string,
+  multiStep: boolean,                    // crafting only: the recipe has more than one step (false for single-step and non-crafting)
+  isFinalStep: boolean,                  // crafting only: the run is on its last step (single-step, or the last step of a multi-step recipe)
+  stepLabel: string,                     // "" for single-step, gathering/salvage, and redacted crafting runs
   steps: StepModel[],                    // [] for gathering/salvage and for redacted crafting runs
   currentStep: StepModel | null,
   timeGate: object | null,               // per-runType source (see Requirements)
@@ -1260,13 +1262,15 @@ StepModel = {
    For gathering and salvage runs, they come from the RUN-level `timeGate`.
    Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
 3. **Viewer redaction (`redacted`).**
-   A crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe for a non-GM viewer — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` are blanked, `manualAdvance` is `false` (a hidden-identity run offers no Trigger Next Step), and `img` falls back to the default run image.
+   A crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe for a non-GM viewer — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, `manualAdvance` is `false` (a hidden-identity run offers no Trigger Next Step), and `img` falls back to the default run image.
    A GM viewer and globally-visible recipes are never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
    Gathering and salvage runs are not redacted by this projection (`redacted: false`); gathering's own blind-task redaction is applied upstream by its listing builder.
 4. **Step projection is crafting-only.**
-   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, and each step's `detail.checkLabel` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, and empty structure/mode labels.
+   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, `multiStep`, `isFinalStep`, and each step's `detail.checkLabel` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure/mode labels, and `multiStep: false` / `isFinalStep: false`.
    A redacted crafting run also projects `steps: []`.
+   `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
+   `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
 5. **`manualAdvance` is the Trigger Next Step gate.**
    It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*).
 6. **`resolutionModeLabel` uses the player-facing label map.**
