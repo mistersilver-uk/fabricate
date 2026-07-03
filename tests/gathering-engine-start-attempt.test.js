@@ -20,7 +20,7 @@ function systemWithoutRoutedCheck() {
 }
 
 function makeEngine({
-  systems = [{ id: 'system-a', enabled: true, features: { gathering: true }, components: [], gatheringCraftingCheck: routedSystemCheck() }],
+  systems = [{ id: 'system-a', enabled: true, features: { gathering: true }, components: [], gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }) }],
   environments = [environment()],
   selectableActors = [actor],
   paused = false,

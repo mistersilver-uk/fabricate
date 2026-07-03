@@ -280,10 +280,13 @@ test('immediate routed failure writes failed terminal history, creates no result
   const usedTools = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
   const failureOutcome = { mode: 'text', text: 'The vein is exhausted.' };
   const task = routedTask({ toolIds: ['tool-pick'], failureOutcome });
-  routedRoll(false); // miss the success tier → routed failure
+  routedRoll(false); // 5 lands the failure tier (threshold 5) → routed failure
   try {
     const engine = makeEngine({
       task,
+      // A failure tier is needed now that a below-lowest relative roll clamps to the
+      // closest tier: without it, the miss would clamp up to the success tier.
+      gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
       libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
       usedTools,
       calls
@@ -647,11 +650,13 @@ test('blind non-GM terminal failure response redacts task, tool, provider diagno
     name: 'Secret Mooncap Patch',
     toolIds: ['tool-sickle']
   });
-  routedRoll(false); // miss the success tier → routed failure
+  routedRoll(false); // 5 lands the failure tier (threshold 5) → routed failure
   try {
     const engine = makeEngine({
       environment: targetedEnvironment({ selectionMode: 'blind', tasks: [secretTask] }),
       task: secretTask,
+      // A failure tier so the low roll fails rather than clamping up to success.
+      gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
       libraryTools: [{ id: 'tool-sickle', componentId: 'silver-sickle' }],
       usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
       calls
@@ -911,7 +916,9 @@ test('routed: system routed formula resolves a tier name and routes to the same-
 test('routed: task.dcOverride shifts the base DC for the formula tier match', async () => {
   const calls = {};
   // Roll 18 with a per-task dcOverride of 20 misses the success tier (delta 0 →
-  // threshold 20), so no group routes and the attempt fails.
+  // threshold 20) but lands the failure tier (delta -10 → threshold 10), so no group
+  // routes and the attempt fails. (With the default dc 15 the same roll would clear
+  // the success tier — this pins that the override shifts every threshold.)
   const task = routedTask({
     dcOverride: 20,
     failureOutcome: { mode: 'text', text: 'No useful finds.' },
@@ -921,15 +928,7 @@ test('routed: task.dcOverride shifts the base DC for the formula tier match', as
   try {
     const engine = makeEngine({
       task,
-      gatheringCraftingCheck: {
-        routed: {
-          rollFormula: '1d20',
-          dc: 15,
-          type: 'relative',
-          thresholdMode: 'meet',
-          relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
-        }
-      },
+      gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
       calls
     });
 
@@ -1039,10 +1038,42 @@ test('_resolveRoutedFormulaOutcome: a passing tier routes to the same-named resu
   }
 });
 
-test('_resolveRoutedFormulaOutcome: a failing tier resolves to a terminal failure', async () => {
+test('_resolveRoutedFormulaOutcome: a below-lowest total clamps to the closest tier', async () => {
+  // Single 'Iron' success tier at threshold 15; a roll of 5 meets no threshold, so
+  // gathering (like crafting/salvage) clamps to that closest tier rather than a
+  // null/failure outcome, and routes to the same-named result group.
   const task = routedTask();
   const routed = routedSystemCheck().routed;
-  stubRoll(5, [{ number: 1, faces: 20, total: 5 }]); // misses dc 15
+  stubRoll(5, [{ number: 1, faces: 20, total: 5 }]); // misses dc 15 → clamps to Iron
+  try {
+    const engine = makeEngine({ task });
+    const outcome = await engine._resolveRoutedFormulaOutcome({
+      routed,
+      rollFormula: routed.rollFormula,
+      actor,
+      task
+    });
+    assert.equal(outcome.status, 'succeeded');
+    assert.equal(outcome.checkResult.outcome, 'Iron');
+    assert.deepEqual(outcome.resultGroups.map(group => group.id), ['group-a']);
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('_resolveRoutedFormulaOutcome: a matched failure tier resolves to a terminal failure', async () => {
+  // With an explicit failure tier as the lowest tier, a low roll lands (or clamps) on
+  // it and resolves to a terminal failure — the clamp routes to the closest tier, it
+  // does not force success.
+  const task = routedTask();
+  const routed = {
+    ...routedSystemCheck().routed,
+    relativeOutcomes: [
+      { id: 'tier-iron', name: 'Iron', success: true, dc: 0 }, // threshold 15
+      { id: 'tier-dust', name: 'Dust', success: false, dc: -10 } // threshold 5
+    ]
+  };
+  stubRoll(5, [{ number: 1, faces: 20, total: 5 }]); // matches Dust (threshold 5)
   try {
     const engine = makeEngine({ task });
     const outcome = await engine._resolveRoutedFormulaOutcome({
@@ -1054,6 +1085,7 @@ test('_resolveRoutedFormulaOutcome: a failing tier resolves to a terminal failur
     assert.equal(outcome.status, 'failed');
     assert.deepEqual(outcome.resultGroups, []);
     assert.equal(outcome.checkResult.success, false);
+    assert.equal(outcome.checkResult.outcome, 'Dust');
   } finally {
     delete globalThis.Roll;
   }
