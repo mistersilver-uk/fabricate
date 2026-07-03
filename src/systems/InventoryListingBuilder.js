@@ -443,21 +443,28 @@ export class InventoryListingBuilder {
       else index.set(targetId, [entry]);
     };
 
-    // Produced-by: one entry per (componentId, producer key) across all sources.
-    const producedSeen = new Map();
-    const addProduced = (componentId, key, value) => {
-      if (!componentId) return;
-      let keys = producedSeen.get(componentId);
-      if (!keys) {
-        keys = new Set();
-        producedSeen.set(componentId, keys);
-      }
-      if (keys.has(key)) return;
-      keys.add(key);
-      const list = componentProducedBy.get(componentId);
-      if (list) list.push(value);
-      else componentProducedBy.set(componentId, [value]);
+    // A one-entry-per-(componentId, source key) accumulator, shared by the
+    // produced-by and required-for indexes (each with its own seen + target map).
+    const makeAdder = (targetMap) => {
+      const seen = new Map();
+      return (componentId, key, value) => {
+        if (!componentId) return;
+        let keys = seen.get(componentId);
+        if (!keys) {
+          keys = new Set();
+          seen.set(componentId, keys);
+        }
+        if (keys.has(key)) return;
+        keys.add(key);
+        const list = targetMap.get(componentId);
+        if (list) list.push(value);
+        else targetMap.set(componentId, [value]);
+      };
     };
+    const addProduced = makeAdder(componentProducedBy);
+    // Required-for: recipes/gathering tasks that require the component as a TOOL
+    // (present but not consumed).
+    const addRequiredFor = makeAdder(componentRequiredFor);
 
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
     for (const recipe of Array.isArray(recipes) ? recipes : []) {
@@ -477,6 +484,14 @@ export class InventoryListingBuilder {
         recipeName: stringOrEmpty(recipe?.name),
         recipeImg,
       };
+      // The produced-by / required-for entry for this recipe (a navigable recipe).
+      const recipeSourceKey = `recipe:${recipe?.id}`;
+      const recipeSourceValue = {
+        kind: 'recipe',
+        recipeId: recipeEntry.recipeId,
+        name: recipeEntry.recipeName,
+        img: recipeImg,
+      };
       // Per-recipe dedupe of (targetId, role) pairs so one recipe contributes a
       // single entry per component/essence per role even across multiple sets.
       const seen = new Set();
@@ -492,8 +507,7 @@ export class InventoryListingBuilder {
         }
         for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
           const componentId = toolComponentById.get(toolId);
-          if (componentId)
-            pushUse(componentRequiredFor, componentId, { ...recipeEntry, role: 'tool' }, seen);
+          if (componentId) addRequiredFor(componentId, recipeSourceKey, recipeSourceValue);
         }
         for (const [essenceId, quantity] of Object.entries(set?.essences ?? {})) {
           if (Number(quantity) > 0) {
@@ -503,20 +517,12 @@ export class InventoryListingBuilder {
       }
       for (const toolId of Array.isArray(recipe?.toolIds) ? recipe.toolIds : []) {
         const componentId = toolComponentById.get(toolId);
-        if (componentId)
-          pushUse(componentRequiredFor, componentId, { ...recipeEntry, role: 'tool' }, seen);
+        if (componentId) addRequiredFor(componentId, recipeSourceKey, recipeSourceValue);
       }
 
       // Produced-by (recipe): every output result component id.
-      const producedValue = {
-        kind: 'recipe',
-        recipeId: recipeEntry.recipeId,
-        name: recipeEntry.recipeName,
-        img: recipeImg,
-      };
-      const producedKey = `recipe:${recipe?.id}`;
       for (const componentId of this._recipeResultComponentIds(recipe)) {
-        addProduced(componentId, producedKey, producedValue);
+        addProduced(componentId, recipeSourceKey, recipeSourceValue);
       }
     }
 
@@ -558,6 +564,16 @@ export class InventoryListingBuilder {
       for (const row of rows) {
         if (row?.enabled === false) continue;
         addProduced(row?.componentId, key, value);
+      }
+
+      // Required-for (gathering): the task's required tools (present, not consumed),
+      // resolved via the system Tool library (task.toolIds) or inline task.tools.
+      for (const toolId of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+        const componentId = toolComponentById.get(toolId);
+        if (componentId) addRequiredFor(componentId, key, value);
+      }
+      for (const inlineTool of Array.isArray(task?.tools) ? task.tools : []) {
+        if (inlineTool?.componentId) addRequiredFor(inlineTool.componentId, key, value);
       }
     }
 

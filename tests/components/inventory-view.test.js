@@ -50,7 +50,7 @@ function makeItem() {
     usedBy: [
       { recipeId: 'r1', recipeName: "Alchemist's Crucible", recipeImg: null, role: 'ingredient' },
     ],
-    requiredFor: [{ recipeId: 'r3', recipeName: 'Carve Bone Idol', recipeImg: null, role: 'tool' }],
+    requiredFor: [{ kind: 'recipe', recipeId: 'r3', name: 'Carve Bone Idol', img: null }],
     producedBy: [
       { kind: 'recipe', recipeId: 'r2', name: 'Distil Gland', img: null },
       { kind: 'gathering', recipeId: null, name: 'Harvest Beast', img: null },

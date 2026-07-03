@@ -220,17 +220,26 @@
         <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}</p>
         {#if requiredFor.length > 0}
           <ul class="inventory-detail-list">
-            {#each sliceOf(requiredFor, 'required') as req (req.recipeId)}
+            {#each sliceOf(requiredFor, 'required') as req, index (req.kind + ':' + (req.recipeId ?? req.name) + ':' + index)}
               <li>
-                <button
-                  type="button"
-                  class="inventory-detail-recipe"
-                  data-inventory-required-for={req.recipeId}
-                  onclick={() => openRecipe(req.recipeId)}
-                >
-                  <CraftingThumb src={req.recipeImg ?? ''} alt="" size={40} />
-                  <span class="inventory-detail-row-name">{req.recipeName}</span>
-                </button>
+                {#if req.kind === 'recipe' && req.recipeId}
+                  <button
+                    type="button"
+                    class="inventory-detail-recipe"
+                    data-inventory-required-for={req.recipeId}
+                    onclick={() => openRecipe(req.recipeId)}
+                  >
+                    <CraftingThumb src={req.img ?? ''} alt="" size={40} />
+                    <span class="inventory-detail-row-name">{req.name}</span>
+                    <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
+                  </button>
+                {:else}
+                  <div class="inventory-detail-row" data-inventory-required-for-kind={req.kind}>
+                    <CraftingThumb src={req.img ?? ''} alt="" size={40} />
+                    <span class="inventory-detail-row-name">{req.name}</span>
+                    <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
+                  </div>
+                {/if}
               </li>
             {/each}
           </ul>

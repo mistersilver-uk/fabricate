@@ -176,7 +176,7 @@ describe('InventoryListingBuilder — used-by index', () => {
   it('records tool usage under requiredFor (present but not consumed), not usedBy', () => {
     const { listing } = ownAll();
     assert.deepEqual(rowByComponent(listing, 'c3').requiredFor, [
-      { recipeId: 'r1', recipeName: 'Iron Blade', recipeImg: 'icons/blade.webp', role: 'tool' },
+      { kind: 'recipe', recipeId: 'r1', name: 'Iron Blade', img: 'icons/blade.webp' },
     ]);
     // A tool is never "used by" (consumed) — that list stays empty for a pure tool.
     assert.deepEqual(rowByComponent(listing, 'c3').usedBy, []);
@@ -526,6 +526,30 @@ describe('InventoryListingBuilder — tools + produced-by', () => {
     ]);
     // A disabled drop row does not count.
     assert.deepEqual(rowByComponent(listing, 'c2').producedBy, []);
+  });
+
+  it('lists a gathering task under requiredFor when it needs the component as a tool', () => {
+    // c3 (Hammerhead) is the componentId of tool t1 in makeSystem; a gathering task
+    // requires t1 (via toolIds) and another task references a tool inline.
+    const system = makeSystem();
+    const builder = new InventoryListingBuilder({
+      recipeManager: { getRecipes: () => [] },
+      craftingSystemManager: { getSystems: () => [system] },
+      localize: (key) => key,
+      nowWorldTime: () => 1,
+      getGatheringTasksForSystem: () => [
+        { id: 'task-mine', name: 'Mine Ore', img: 'icons/pick.webp', toolIds: ['t1'] },
+        { id: 'task-dig', name: 'Dig', img: 'icons/dig.webp', tools: [{ componentId: 'c3' }] },
+        { id: 'task-off', name: 'Disabled', enabled: false, toolIds: ['t1'] },
+      ],
+    });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Hammerhead', 1)]),
+    });
+    assert.deepEqual(rowByComponent(listing, 'c3').requiredFor, [
+      { kind: 'gathering', recipeId: null, name: 'Mine Ore', img: 'icons/pick.webp' },
+      { kind: 'gathering', recipeId: null, name: 'Dig', img: 'icons/dig.webp' },
+    ]);
   });
 
   it('excludes redacted (teaser) recipes from produced-by for a non-GM viewer', () => {
