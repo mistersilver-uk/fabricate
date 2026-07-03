@@ -2409,6 +2409,7 @@ export class GatheringEngine {
         actor,
         name: task?.name,
         activity: 'Gathering',
+        img: task?.img,
         dc,
       }),
     });
@@ -2487,6 +2488,9 @@ export class GatheringEngine {
       // independent percentile check), so the dialog shows no DC line.
       const choice = await promptCheckRoll({
         label: `${task?.name ?? 'Gathering'} — Gathering`,
+        name: task?.name,
+        activity: 'Gathering',
+        img: task?.img,
       });
       if (!choice || choice.confirmed === false) {
         return { status: 'cancelled', resultGroups: [], checkResult: null };
@@ -2633,6 +2637,7 @@ export class GatheringEngine {
           actor,
           name: task?.name,
           activity: 'Gathering',
+          img: task?.img,
         }),
       });
       // The player cancelled the interactive roll: surface a cancel marker so

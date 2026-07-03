@@ -409,3 +409,152 @@ test('runFormulaPassFail: non-interactive rollOptions rolls and evaluates normal
     clearStubs();
   }
 });
+
+// ---------------------------------------------------------------------------
+// 7. Advantage / Disadvantage transform (2d20kh1 / 2d20kl1)
+// ---------------------------------------------------------------------------
+
+test('evaluateCheckRoll: advantage rewrites a plain d20 to 2d20kh1 (before any bonus)', async () => {
+  installRollStub();
+  installChatStub();
+  try {
+    await evaluateCheckRoll('1d20 + 3', actor, {
+      interactive: true,
+      prompt: async () => ({ confirmed: true, advantage: 'advantage' }),
+      flavor: 'Crafting check',
+    });
+    assert.equal(lastRoll.formula, '2d20kh1 + 3', 'first plain d20 became keep-highest');
+  } finally {
+    clearStubs();
+  }
+});
+
+test('evaluateCheckRoll: advantage + situational bonus yields 2d20kh1 ... + (2)', async () => {
+  installRollStub();
+  installChatStub();
+  try {
+    await evaluateCheckRoll('1d20', actor, {
+      interactive: true,
+      prompt: async () => ({ confirmed: true, advantage: 'advantage', bonus: '2' }),
+      flavor: 'Crafting check',
+    });
+    // Advantage transform runs first, then the bonus appends.
+    assert.equal(lastRoll.formula, '2d20kh1 + (2)');
+  } finally {
+    clearStubs();
+  }
+});
+
+test('evaluateCheckRoll: disadvantage rewrites a plain d20 to 2d20kl1', async () => {
+  installRollStub();
+  installChatStub();
+  try {
+    await evaluateCheckRoll('1d20 + 3', actor, {
+      interactive: true,
+      prompt: async () => ({ confirmed: true, advantage: 'disadvantage' }),
+      flavor: 'Crafting check',
+    });
+    assert.equal(lastRoll.formula, '2d20kl1 + 3');
+  } finally {
+    clearStubs();
+  }
+});
+
+test('evaluateCheckRoll: normal disposition leaves the formula unchanged', async () => {
+  installRollStub();
+  installChatStub();
+  try {
+    await evaluateCheckRoll('1d20', actor, {
+      interactive: true,
+      prompt: async () => ({ confirmed: true, advantage: 'normal' }),
+      flavor: 'Crafting check',
+    });
+    assert.equal(lastRoll.formula, '1d20', 'normal keeps the plain d20');
+  } finally {
+    clearStubs();
+  }
+});
+
+test('evaluateCheckRoll: advantage is a no-op for a non-d20 formula (defensive)', async () => {
+  installRollStub();
+  installChatStub();
+  try {
+    await evaluateCheckRoll('2d6', actor, {
+      interactive: true,
+      prompt: async () => ({ confirmed: true, advantage: 'advantage' }),
+      flavor: 'Crafting check',
+    });
+    assert.equal(lastRoll.formula, '2d6', 'no plain d20 → advantage transform does nothing');
+  } finally {
+    clearStubs();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 8. Crit preservation on an advantage (2d20kh1) roll — §3 verification.
+//    The kept (active) die face must reach a `diceGroup anyDie == 20` trigger
+//    through `rolledDiceGroups` (active-only faces) + `resolveForcedOutcome`.
+// ---------------------------------------------------------------------------
+
+function installKeptDieRoll() {
+  // A 2d20kh1 pool: the kept die is a natural 20 (active), the dropped die a 5
+  // (inactive). Total is the kept face.
+  globalThis.Roll = class {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = 20;
+      this.dice = [
+        {
+          number: 2,
+          faces: 20,
+          total: 20,
+          results: [
+            { result: 20, active: true },
+            { result: 5, active: false },
+          ],
+        },
+      ];
+    }
+    async evaluate() {
+      return this;
+    }
+  };
+}
+
+test('runFormulaPassFail: a nat-20 on the kept advantage die fires a diceGroup crit trigger', async () => {
+  installKeptDieRoll();
+  try {
+    const critTrigger = {
+      outcome: 'success',
+      condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 20 },
+    };
+
+    // DC 25 > the total (20): without the trigger this would FAIL.
+    const control = await runFormulaPassFail({
+      formula: '2d20kh1',
+      dc: 25,
+      thresholdMode: 'meet',
+      triggers: [],
+      actor,
+      label: 'Crafting',
+    });
+    assert.equal(control.success, false, 'control: 20 < DC 25 fails without a crit trigger');
+
+    const forced = await runFormulaPassFail({
+      formula: '2d20kh1',
+      dc: 25,
+      thresholdMode: 'meet',
+      triggers: [critTrigger],
+      actor,
+      label: 'Crafting',
+    });
+    assert.equal(
+      forced.success,
+      true,
+      'the kept-die nat-20 forces success — active-only face reached the diceGroup trigger'
+    );
+    assert.equal(forced.value, 20, 'the reported total is the kept-die face');
+  } finally {
+    delete globalThis.Roll;
+  }
+});

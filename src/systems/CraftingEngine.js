@@ -1,4 +1,5 @@
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
+import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
 import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakageRuntime.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
@@ -1662,6 +1663,7 @@ export class CraftingEngine {
         actor: craftingActor,
         name: recipe?.name,
         activity: 'Crafting',
+        img: this._resolveRecipePromptImg(recipe),
         dc,
       }),
     });
@@ -1718,6 +1720,7 @@ export class CraftingEngine {
         actor: craftingActor,
         name: recipe?.name,
         activity: 'Crafting',
+        img: this._resolveRecipePromptImg(recipe),
         dc,
       }),
     });
@@ -1734,6 +1737,27 @@ export class CraftingEngine {
    */
   _markEngineEvaluated(result) {
     return { ...result, engineEvaluated: true };
+  }
+
+  /**
+   * Resolve the recipe icon for the interactive roll prompt with the SAME
+   * precedence the GM editor and player listings use — the recipe-item
+   * definition's image wins over the recipe's own `img` (which is itself
+   * model-defaulted to `DEFAULT_RECIPE_IMAGE`, so it already supplies the trailing
+   * default). Raw `recipe.img` alone shows the generic blueprint for a
+   * recipe-item-backed recipe; mirror `CraftingListingBuilder`'s precedence here.
+   * @private
+   */
+  _resolveRecipePromptImg(recipe) {
+    const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
+    const recipeItemImg = recipe?.recipeItemId
+      ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)
+          ?.img || ''
+      : '';
+    // The final fallback is ALWAYS the recipe default (blueprint), matching the GM
+    // editor — never a generic item bag. `recipe.img` is itself model-defaulted to
+    // DEFAULT_RECIPE_IMAGE, so this is belt-and-braces for a plain-object recipe.
+    return recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
   }
 
   /**
@@ -1760,6 +1784,7 @@ export class CraftingEngine {
         actor: craftingActor,
         name: recipe?.name,
         activity: 'Crafting',
+        img: this._resolveRecipePromptImg(recipe),
       }),
     });
     return this._markEngineEvaluated(result);
@@ -2688,6 +2713,7 @@ export class CraftingEngine {
         actor,
         name: component?.name,
         activity: 'Salvage',
+        img: component?.img,
         dc,
       }),
     });
@@ -2710,6 +2736,7 @@ export class CraftingEngine {
         actor,
         name: component?.name,
         activity: 'Salvage',
+        img: component?.img,
       }),
     });
     return this._markEngineEvaluated(result);
@@ -2741,6 +2768,7 @@ export class CraftingEngine {
         actor,
         name: component?.name,
         activity: 'Salvage',
+        img: component?.img,
         dc,
       }),
     });

@@ -9,6 +9,7 @@
  */
 
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
+import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
 
 /**
  * Summarise an evaluated Roll's dice as
@@ -147,9 +148,21 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
       resolvedFormula: resolved?.display ?? null,
       dc: options.dc,
       label: options.flavor,
+      name: options.name,
+      activity: options.activity,
+      img: options.img,
+      // Advantage/Disadvantage are offered only for a plain-d20 check.
+      allowAdvantage: hasPlainD20(effectiveFormula),
     });
     if (!choice || choice.confirmed === false) {
       return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
+    }
+    // Advantage transform first (so the situational bonus appends AFTER the pool),
+    // yielding e.g. `2d20kh1 + 3 + (2)`. Only a plain `1d20` is rewritten; any other
+    // disposition or formula is left unchanged.
+    if (choice.advantage === 'advantage' || choice.advantage === 'disadvantage') {
+      effectiveFormula = applyD20Advantage(effectiveFormula, choice.advantage);
+      resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
     }
     const bonus = typeof choice.bonus === 'string' ? choice.bonus.trim() : choice.bonus;
     if (bonus) {

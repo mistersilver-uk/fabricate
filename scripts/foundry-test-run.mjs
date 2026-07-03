@@ -172,7 +172,14 @@ async function handleRollPromptIfPresent(page, label) {
     return false;
   }
   await screenshot(page, label);
-  const rollBtn = dialog.locator('button[data-action="roll"], button:has-text("Roll")').first();
+  // The confirm button is "Normal" for a d20 check (Advantage/Normal/Disadvantage)
+  // or "Roll" for a non-d20 / d100 check (single button). Click whichever proceeds
+  // without advantage; never Advantage/Disadvantage.
+  const rollBtn = dialog
+    .locator(
+      'button[data-action="normal"], button[data-action="roll"], button:has-text("Normal"), button:has-text("Roll")'
+    )
+    .first();
   await rollBtn.click().catch(() => {});
   await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   return true;

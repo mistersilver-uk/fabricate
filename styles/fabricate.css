@@ -13339,3 +13339,243 @@
   flex-direction: column;
   gap: var(--fab-space-1);
 }
+
+/* ==========================================
+   Interactive roll prompt (DialogV2)
+   ==========================================
+   The check roll-config dialog (`promptCheckRoll`, rollPrompt.js) carries the
+   `.fabricate-roll-prompt-dialog` root class (+ `.fabricate-dialog`) so its body
+   and footer buttons are themeable, styled to resemble the dnd5e roll dialog:
+   a centered header (icon + activity title / subject subtitle), a die glyph, the
+   formula with a right-aligned "Formula" label, a DC chip, a situational-bonus
+   input, and a Configuration section with a Roll Mode picker. Tokens only (no
+   colour literals); every selector namespaced under `.fabricate`. */
+.fabricate-roll-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) 0;
+  color: var(--fab-text);
+}
+
+.fabricate-roll-prompt__header {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.fabricate-roll-prompt__icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--fab-bg-1);
+}
+
+.fabricate-roll-prompt__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-roll-prompt__title {
+  margin: 0;
+  border: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--fab-text);
+}
+
+.fabricate-roll-prompt__die {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--fab-accent);
+}
+
+.fabricate-roll-prompt__formula {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-roll-prompt__formula code {
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--fab-text);
+  background: none;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-roll-prompt__formula-meta {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2);
+  align-items: center;
+}
+
+.fabricate-roll-prompt__formula--dc-only {
+  justify-content: center;
+}
+
+.fabricate-roll-prompt__formula-label {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-roll-prompt__dc {
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-roll-prompt__bonus {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-roll-prompt__config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-border-soft);
+}
+
+.fabricate-roll-prompt__config-heading {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-roll-prompt__config label {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--fab-text);
+}
+
+.fabricate-roll-prompt select {
+  flex: 0 1 60%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-roll-prompt select option {
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+/* Footer buttons: three equal Advantage/Normal/Disadvantage (or a single Roll),
+   mirroring the .fabricate-dialog flex template + .manager-button fill/weight. */
+.fabricate-roll-prompt-dialog .form-footer button,
+.fabricate-roll-prompt-dialog .dialog-buttons button {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  min-height: 36px;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--fab-text);
+  background: var(--fab-overlay-light-06);
+  cursor: pointer;
+}
+
+.fabricate-roll-prompt-dialog .form-footer button:hover,
+.fabricate-roll-prompt-dialog .dialog-buttons button:hover {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-overlay-light-10);
+}
+
+.fabricate-roll-prompt-dialog .form-footer button[data-action='advantage'],
+.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='advantage'] {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-roll-prompt-dialog .form-footer button[data-action='disadvantage'],
+.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='disadvantage'] {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+/* Tinted buttons need their own hover (the neutral hover rule above has the same
+   specificity but is overridden by the later data-action fills, so without these
+   Advantage/Disadvantage would not react to hover). */
+.fabricate-roll-prompt-dialog .form-footer button[data-action='advantage']:hover,
+.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='advantage']:hover {
+  border-color: var(--fab-success-strong);
+  color: var(--fab-on-success);
+  background: var(--fab-success-strong);
+}
+
+.fabricate-roll-prompt-dialog .form-footer button[data-action='disadvantage']:hover,
+.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='disadvantage']:hover {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-surface-strong);
+}
+
+/* Keep Foundry core's orange focus ring off; use the Fabricate accent instead.
+   The app-scoped focus rules elsewhere don't match this DialogV2 root. */
+.fabricate-roll-prompt-dialog button:focus,
+.fabricate-roll-prompt-dialog input:focus,
+.fabricate-roll-prompt-dialog select:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-roll-prompt-dialog button:focus-visible,
+.fabricate-roll-prompt-dialog input:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-roll-prompt-dialog select:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--fab-accent);
+}
