@@ -1,8 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  OutcomeTierTable renders the per-tier awarded results for a routed-by-check
-  recipe. Each tier shows its name, whether it is a success tier, and the items it
-  awards (a failure tier routes nothing and reads as such).
+  OutcomeTierTable renders the awarded results for a routed-by-check recipe. Each
+  row shows its tier name(s), whether it is a success tier, and the items it awards
+  (a failure tier routes nothing and reads as such). Tiers that produce the exact
+  same result are collapsed into one row, so `tier.names` may list several tiers.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -17,7 +18,7 @@
   <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Detail.OutcomesTitle')}</p>
   {#if rows.length > 0}
     <ul class="crafting-tier-list">
-      {#each rows as tier, index (tier.id ?? tier.name ?? index)}
+      {#each rows as tier, index (tier.id ?? tier.names?.[0] ?? index)}
         <li
           class="crafting-tier-row"
           class:is-success={tier.success}
@@ -25,7 +26,7 @@
           data-tier-success={tier.success ? 'true' : 'false'}
         >
           <div class="crafting-tier-head">
-            <span class="crafting-tier-name">{tier.name}</span>
+            <span class="crafting-tier-name">{(tier.names ?? []).join(', ')}</span>
             <span class={`crafting-tier-flag tone-${tier.success ? 'success' : 'danger'}`}>
               <i class={`fas ${tier.success ? 'fa-circle-check' : 'fa-circle-xmark'}`} aria-hidden="true"></i>
               {tier.success
