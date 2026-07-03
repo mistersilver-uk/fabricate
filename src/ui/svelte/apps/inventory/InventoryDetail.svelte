@@ -12,6 +12,10 @@
 
   let { item = null, onOpenRecipe = null } = $props();
 
+  // Each detail list (sources, used-by, required-for, produced-by, contributors)
+  // paginates independently at this many rows.
+  const PAGE_SIZE = 6;
+
   const isEssence = $derived(item?.isEssenceSource === true);
   const icon = $derived(
     typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
@@ -20,6 +24,7 @@
   const essences = $derived(Array.isArray(item?.essences) ? item.essences : []);
   const sources = $derived(Array.isArray(item?.sources) ? item.sources : []);
   const usedBy = $derived(Array.isArray(item?.usedBy) ? item.usedBy : []);
+  const requiredFor = $derived(Array.isArray(item?.requiredFor) ? item.requiredFor : []);
   const producedBy = $derived(Array.isArray(item?.producedBy) ? item.producedBy : []);
   const contributors = $derived(Array.isArray(item?.contributors) ? item.contributors : []);
   const tierLabel = $derived(
@@ -32,6 +37,24 @@
         : 'FABRICATE.App.Inventory.Detail.TypeComponent'
     )
   );
+
+  // Per-section current page, keyed by section id, reset when the item changes.
+  let pages = $state({});
+  $effect(() => {
+    void item?.key;
+    pages = {};
+  });
+  function pageOf(list, key) {
+    const count = Math.max(1, Math.ceil((list?.length ?? 0) / PAGE_SIZE));
+    return Math.min(Math.max(0, pages[key] ?? 0), count - 1);
+  }
+  function sliceOf(list, key) {
+    const start = pageOf(list, key) * PAGE_SIZE;
+    return (Array.isArray(list) ? list : []).slice(start, start + PAGE_SIZE);
+  }
+  function setPage(key, value) {
+    pages = { ...pages, [key]: Math.max(0, value) };
+  }
 
   function hasImg(value) {
     return typeof value === 'string' && value.trim() !== '';
@@ -50,6 +73,37 @@
     if (recipeId) onOpenRecipe?.(recipeId);
   }
 </script>
+
+{#snippet pager(list, key)}
+  {#if (list?.length ?? 0) > PAGE_SIZE}
+    {@const total = list.length}
+    {@const page = pageOf(list, key)}
+    {@const count = Math.ceil(total / PAGE_SIZE)}
+    <div class="inventory-detail-pager" data-inventory-pager={key}>
+      <button
+        type="button"
+        class="inventory-detail-pager-btn"
+        disabled={page === 0}
+        aria-label={localize('FABRICATE.App.Inventory.Detail.PagePrevious')}
+        onclick={() => setPage(key, page - 1)}
+      >
+        <i class="fas fa-chevron-left" aria-hidden="true"></i>
+      </button>
+      <span class="inventory-detail-pager-range" data-inventory-pager-range>
+        {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} / {total}
+      </span>
+      <button
+        type="button"
+        class="inventory-detail-pager-btn"
+        disabled={page >= count - 1}
+        aria-label={localize('FABRICATE.App.Inventory.Detail.PageNext')}
+        onclick={() => setPage(key, page + 1)}
+      >
+        <i class="fas fa-chevron-right" aria-hidden="true"></i>
+      </button>
+    </div>
+  {/if}
+{/snippet}
 
 {#if !item}
   <div class="inventory-detail-empty" data-inventory-detail-empty>
@@ -84,7 +138,7 @@
     <section class="inventory-detail-section">
       <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.SourcesTitle')}</p>
       <ul class="inventory-detail-list">
-        {#each sources as source (source.actorId)}
+        {#each sliceOf(sources, 'sources') as source (source.actorId)}
           <li class="inventory-detail-row">
             <span class="inventory-detail-portrait" aria-hidden="true">
               {#if hasImg(source.actorImg)}
@@ -98,6 +152,7 @@
           </li>
         {/each}
       </ul>
+      {@render pager(sources, 'sources')}
     </section>
 
     {#if isEssence}
@@ -105,7 +160,7 @@
         <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.ContributingTitle')}</p>
         {#if contributors.length > 0}
           <ul class="inventory-detail-list">
-            {#each contributors as contributor (contributor.componentId)}
+            {#each sliceOf(contributors, 'contributors') as contributor (contributor.componentId)}
               <li class="inventory-detail-row" data-inventory-contributor={contributor.componentId}>
                 <CraftingThumb src={contributor.img ?? ''} alt="" size={40} />
                 <span class="inventory-detail-row-name">{contributor.name}</span>
@@ -113,6 +168,7 @@
               </li>
             {/each}
           </ul>
+          {@render pager(contributors, 'contributors')}
         {:else}
           <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')}</p>
         {/if}
@@ -138,7 +194,7 @@
       <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}</p>
       {#if usedBy.length > 0}
         <ul class="inventory-detail-list">
-          {#each usedBy as use (use.recipeId + ':' + use.role)}
+          {#each sliceOf(usedBy, 'used') as use (use.recipeId + ':' + use.role)}
             <li>
               <button
                 type="button"
@@ -153,6 +209,7 @@
             </li>
           {/each}
         </ul>
+        {@render pager(usedBy, 'used')}
       {:else}
         <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')}</p>
       {/if}
@@ -160,10 +217,36 @@
 
     {#if !isEssence}
       <section class="inventory-detail-section">
+        <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}</p>
+        {#if requiredFor.length > 0}
+          <ul class="inventory-detail-list">
+            {#each sliceOf(requiredFor, 'required') as req (req.recipeId)}
+              <li>
+                <button
+                  type="button"
+                  class="inventory-detail-recipe"
+                  data-inventory-required-for={req.recipeId}
+                  onclick={() => openRecipe(req.recipeId)}
+                >
+                  <CraftingThumb src={req.recipeImg ?? ''} alt="" size={40} />
+                  <span class="inventory-detail-row-name">{req.recipeName}</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+          {@render pager(requiredFor, 'required')}
+        {:else}
+          <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty')}</p>
+        {/if}
+      </section>
+    {/if}
+
+    {#if !isEssence}
+      <section class="inventory-detail-section">
         <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}</p>
         {#if producedBy.length > 0}
           <ul class="inventory-detail-list">
-            {#each producedBy as producer, index (producer.kind + ':' + (producer.recipeId ?? producer.name) + ':' + index)}
+            {#each sliceOf(producedBy, 'produced') as producer, index (producer.kind + ':' + (producer.recipeId ?? producer.name) + ':' + index)}
               <li>
                 {#if producer.kind === 'recipe' && producer.recipeId}
                   <button
@@ -186,6 +269,7 @@
               </li>
             {/each}
           </ul>
+          {@render pager(producedBy, 'produced')}
         {:else}
           <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty')}</p>
         {/if}
@@ -410,5 +494,49 @@
     margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);
+  }
+
+  /* Compact per-section pager: prev/next + an "x–y / total" range readout. */
+  .inventory-detail-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 2px;
+    font-size: 11px;
+    color: var(--fab-text-muted);
+  }
+
+  .inventory-detail-pager-range {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .inventory-detail-pager-btn {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+    background: var(--fab-surface);
+    color: var(--fab-text);
+    cursor: pointer;
+  }
+
+  .inventory-detail-pager-btn:hover:not(:disabled) {
+    background: var(--fab-surface-raised);
+  }
+
+  .inventory-detail-pager-btn:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .inventory-detail-pager-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 </style>

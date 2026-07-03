@@ -218,10 +218,8 @@ export class InventoryListingBuilder {
       essencesEnabled && Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
     const essenceDefById = new Map(essenceDefs.map((def) => [def.id, def]));
 
-    const { componentUsedBy, essenceUsedBy, componentProducedBy } = this._buildRecipeIndexes(
-      system,
-      allowedRecipeIds
-    );
+    const { componentUsedBy, componentRequiredFor, essenceUsedBy, componentProducedBy } =
+      this._buildRecipeIndexes(system, allowedRecipeIds);
     // Component ids registered as a Tool in the system library — a tool reads as a
     // tool even when no recipe references it.
     const toolComponentIds = new Set(
@@ -282,6 +280,7 @@ export class InventoryListingBuilder {
         sources: rowSources,
         essences: essencesEnabled ? this._componentEssences(rawEssences, essenceDefById) : [],
         usedBy,
+        requiredFor: componentRequiredFor.get(component.id) ?? [],
         producedBy: componentProducedBy.get(component.id) ?? [],
         contributors: [],
       });
@@ -351,6 +350,7 @@ export class InventoryListingBuilder {
         sources: rowSources,
         essences: [],
         usedBy: essenceUsedBy.get(essenceId) ?? [],
+        requiredFor: [],
         producedBy: [],
         contributors: essenceContributors.get(essenceId) ?? [],
       });
@@ -409,9 +409,11 @@ export class InventoryListingBuilder {
   /**
    * Build the recipe-derived reverse indexes for a system in a single pass over its
    * recipes, plus the salvage/gathering producers:
-   *  - `componentUsedBy` / `essenceUsedBy` — a component/essence is used by a recipe
-   *    as an `ingredient` (an ingredient option references its id) or a `tool` (a
-   *    recipe/set tool resolves, via the system Tool library, to its id).
+   *  - `componentUsedBy` / `essenceUsedBy` — a component/essence CONSUMED by a recipe
+   *    (an ingredient option references its id).
+   *  - `componentRequiredFor` — a recipe that requires the component as a `tool` (a
+   *    recipe/set tool resolves, via the system Tool library, to its id): it must be
+   *    present but is not consumed.
    *  - `componentProducedBy` — everything that produces a component: recipes (a
    *    result references its id), salvage (a component whose salvage yields it), and
    *    gathering (a task drop yields it). Recipe producers respect `allowedRecipeIds`
@@ -421,6 +423,7 @@ export class InventoryListingBuilder {
    */
   _buildRecipeIndexes(system, allowedRecipeIds = null) {
     const componentUsedBy = new Map();
+    const componentRequiredFor = new Map();
     const essenceUsedBy = new Map();
     const componentProducedBy = new Map();
 
@@ -490,7 +493,7 @@ export class InventoryListingBuilder {
         for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
           const componentId = toolComponentById.get(toolId);
           if (componentId)
-            pushUse(componentUsedBy, componentId, { ...recipeEntry, role: 'tool' }, seen);
+            pushUse(componentRequiredFor, componentId, { ...recipeEntry, role: 'tool' }, seen);
         }
         for (const [essenceId, quantity] of Object.entries(set?.essences ?? {})) {
           if (Number(quantity) > 0) {
@@ -501,7 +504,7 @@ export class InventoryListingBuilder {
       for (const toolId of Array.isArray(recipe?.toolIds) ? recipe.toolIds : []) {
         const componentId = toolComponentById.get(toolId);
         if (componentId)
-          pushUse(componentUsedBy, componentId, { ...recipeEntry, role: 'tool' }, seen);
+          pushUse(componentRequiredFor, componentId, { ...recipeEntry, role: 'tool' }, seen);
       }
 
       // Produced-by (recipe): every output result component id.
@@ -558,7 +561,7 @@ export class InventoryListingBuilder {
       }
     }
 
-    return { componentUsedBy, essenceUsedBy, componentProducedBy };
+    return { componentUsedBy, componentRequiredFor, essenceUsedBy, componentProducedBy };
   }
 
   /**

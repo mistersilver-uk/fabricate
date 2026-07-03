@@ -173,11 +173,13 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.equal(rowByComponent(listing, 'c2').usedBy[0].role, 'ingredient');
   });
 
-  it('resolves tool usage via the system Tool library componentId', () => {
+  it('records tool usage under requiredFor (present but not consumed), not usedBy', () => {
     const { listing } = ownAll();
-    assert.deepEqual(rowByComponent(listing, 'c3').usedBy, [
+    assert.deepEqual(rowByComponent(listing, 'c3').requiredFor, [
       { recipeId: 'r1', recipeName: 'Iron Blade', recipeImg: 'icons/blade.webp', role: 'tool' },
     ]);
+    // A tool is never "used by" (consumed) — that list stays empty for a pure tool.
+    assert.deepEqual(rowByComponent(listing, 'c3').usedBy, []);
   });
 
   it('records essence usage on the essence row', () => {
