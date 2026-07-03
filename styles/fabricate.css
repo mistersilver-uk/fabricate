@@ -11536,7 +11536,7 @@
 
 /* -------------------------------------------------------------------------- */
 
-/* Gathering result chat card                                                 */
+/* Gathering + crafting result chat cards                                     */
 
 /* Rendered inside the Foundry chat log (outside the Fabricate app shell), so  */
 
@@ -11546,8 +11546,12 @@
 
 /* Blends with Foundry's chat card: inherits the chat text colour (so it stays
    legible on parchment and on dark chat themes) and uses barely-there
-   translucent washes instead of a solid theme surface. */
-.fabricate-gather-chat {
+   translucent washes instead of a solid theme surface. The crafting result card
+   (.fabricate-craft-chat*, built by CraftingChatCard.js) shares this structure so
+   the two cards read as one system — the selectors below are comma-joined rather
+   than duplicated. */
+.fabricate-gather-chat,
+.fabricate-craft-chat {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -11559,21 +11563,25 @@
   background: var(--fab-overlay-dark-05);
 }
 
-.fabricate-gather-chat--success {
+.fabricate-gather-chat--success,
+.fabricate-craft-chat--success {
   border-left-color: var(--fab-success);
 }
 
-.fabricate-gather-chat--failure {
+.fabricate-gather-chat--failure,
+.fabricate-craft-chat--failure {
   border-left-color: var(--fab-danger);
 }
 
-.fabricate-gather-chat__header {
+.fabricate-gather-chat__header,
+.fabricate-craft-chat__header {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 
-.fabricate-gather-chat__title {
+.fabricate-gather-chat__title,
+.fabricate-craft-chat__title {
   margin: 0;
   border: none;
   font-size: 1.02em;
@@ -11581,19 +11589,22 @@
   line-height: 1.2;
 }
 
-.fabricate-gather-chat__subtitle {
+.fabricate-gather-chat__subtitle,
+.fabricate-craft-chat__subtitle {
   margin: 0;
   font-size: 0.85em;
   opacity: 0.72;
 }
 
-.fabricate-gather-chat__section {
+.fabricate-gather-chat__section,
+.fabricate-craft-chat__section {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-1);
 }
 
-.fabricate-gather-chat__heading {
+.fabricate-gather-chat__heading,
+.fabricate-craft-chat__heading {
   margin: 0;
   border: none;
   font-size: 0.74em;
@@ -11608,7 +11619,19 @@
   opacity: 0.95;
 }
 
-.fabricate-gather-chat__grid {
+/* Crafting failure reason — a short notice above the forfeited-items section. */
+.fabricate-craft-chat__notice {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.fabricate-craft-chat--failure .fabricate-craft-chat__notice {
+  color: var(--fab-danger);
+  opacity: 0.95;
+}
+
+.fabricate-gather-chat__grid,
+.fabricate-craft-chat__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: var(--fab-space-1);
@@ -11617,7 +11640,8 @@
   list-style: none;
 }
 
-.fabricate-gather-chat__item {
+.fabricate-gather-chat__item,
+.fabricate-craft-chat__item {
   display: flex;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -11628,7 +11652,8 @@
   background: var(--fab-overlay-dark-05);
 }
 
-.fabricate-gather-chat__icon {
+.fabricate-gather-chat__icon,
+.fabricate-craft-chat__icon {
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
@@ -11637,7 +11662,8 @@
   object-fit: cover;
 }
 
-.fabricate-gather-chat__label {
+.fabricate-gather-chat__label,
+.fabricate-craft-chat__label {
   min-width: 0;
   overflow: hidden;
   font-size: 0.85em;

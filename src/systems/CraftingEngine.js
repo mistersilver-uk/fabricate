@@ -13,6 +13,7 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
@@ -1607,6 +1608,20 @@ export class CraftingEngine {
     }
 
     if (useRoutedCheck) {
+      // `routedByIngredients` routes result groups by the chosen ingredient set, not
+      // by check outcome tiers, so its check is a plain pass/fail gate against the DC
+      // (tiers are typically unconfigured — routing them through the tier evaluator
+      // would fail every roll). Only `routedByCheck` uses the tier-routing path.
+      if (mode === 'routedByIngredients') {
+        return this._runPassFailCheck(
+          system,
+          system?.craftingCheck?.routed || {},
+          recipe,
+          ingredientSet,
+          craftingActor,
+          { interactive }
+        );
+      }
       return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, { interactive });
     }
 
@@ -1643,19 +1658,53 @@ export class CraftingEngine {
     craftingActor,
     { interactive = false } = {}
   ) {
-    const simple = system?.craftingCheck?.simple || {};
+    return this._runPassFailCheck(
+      system,
+      system?.craftingCheck?.simple || {},
+      recipe,
+      ingredientSet,
+      craftingActor,
+      { interactive }
+    );
+  }
+
+  /**
+   * Evaluate a pass/fail crafting check against an arbitrary check sub-config
+   * (`simple` or, for the ingredient-routed mode, `routed`): resolve the DC
+   * (static default, recipe tier, or dynamic macro) via {@link _resolveSimpleCheckDc}
+   * — parameterized over `config`, so a recipe `checkTierId` / dynamic-DC macro still
+   * applies — then roll and compare (meet-or-exceed / exceed) via the shared
+   * {@link runFormulaPassFail}. Forced-outcome triggers and interactive cancel are
+   * honoured inside that runner.
+   *
+   * Used by BOTH `simple`/`alchemy` mode and `routedByIngredients`, whose check is an
+   * optional pass/fail gate (that mode routes result groups by the chosen ingredient
+   * set, NOT by check outcome tiers — see {@link ResolutionModeService#resolveResultGroups}).
+   * Only `routedByCheck` uses the tier-routing {@link _runRoutedCheck}.
+   *
+   * @returns {Promise<{success: boolean, outcome: string, value: number|null, data: object, message: string|null}>}
+   */
+  async _runPassFailCheck(
+    system,
+    config,
+    recipe,
+    ingredientSet,
+    craftingActor,
+    { interactive = false } = {}
+  ) {
+    const checkConfig = config || {};
     const dc = await this._resolveSimpleCheckDc(
       system,
-      simple,
+      checkConfig,
       recipe,
       ingredientSet,
       craftingActor
     );
     const result = await runFormulaPassFail({
-      formula: simple.rollFormula,
+      formula: checkConfig.rollFormula,
       dc,
-      thresholdMode: simple.thresholdMode,
-      triggers: simple.checkBreakage?.triggers,
+      thresholdMode: checkConfig.thresholdMode,
+      triggers: checkConfig.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
       rollOptions: buildInteractiveRollOptions({
@@ -1945,64 +1994,37 @@ export class CraftingEngine {
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
     if (!system || system.features?.chatOutput !== true) return;
 
-    const loc = (key) => game.i18n?.localize?.(key) ?? key;
+    const localize = (key) => game.i18n?.localize?.(key) ?? key;
 
-    let content;
-    if (success) {
-      const lines = [
-        `<h3>${loc('FABRICATE.Chat.CraftSuccess')}: ${recipe.name}</h3>`,
-        `<p><strong>${loc('FABRICATE.Chat.Actor')}:</strong> ${craftingActor?.name || ''}</p>`,
-      ];
-
-      if (createdResults && createdResults.length > 0) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.Results')}</strong></p><ul>`);
-        for (const item of createdResults) {
-          const qty = Number(item?.system?.quantity || 1);
-          lines.push(`<li>${qty}x ${item?.name || ''}</li>`);
-        }
-        lines.push('</ul>');
-      }
-
-      if (consumedIngredients && consumedIngredients.length > 0) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.Consumed')}</strong></p><ul>`);
-        for (const { item, quantity } of consumedIngredients) {
-          lines.push(`<li>${quantity}x ${item?.name || ''}</li>`);
-        }
-        lines.push('</ul>');
-      }
-
-      if (tools && tools.length > 0) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.Tools')}</strong></p><ul>`);
-        for (const { item } of tools) {
-          lines.push(`<li>${item?.name || ''}</li>`);
-        }
-        lines.push('</ul>');
-      }
-
-      content = lines.join('\n');
-    } else {
-      const lines = [
-        `<h3>${loc('FABRICATE.Chat.CraftFailure')}: ${recipe.name}</h3>`,
-        `<p><strong>${loc('FABRICATE.Chat.Actor')}:</strong> ${craftingActor?.name || ''}</p>`,
-        `<p><strong>${loc('FABRICATE.Chat.FailureReason')}:</strong> ${failureReason || ''}</p>`,
-      ];
-
-      const hasConsumed =
-        (consumedIngredients && consumedIngredients.length > 0) || (tools && tools.length > 0);
-
-      if (hasConsumed) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.ConsumedOnFailure')}</strong></p><ul>`);
-        for (const { item, quantity } of consumedIngredients || []) {
-          lines.push(`<li>${quantity}x ${item?.name || ''}</li>`);
-        }
-        for (const { item } of tools || []) {
-          lines.push(`<li>${item?.name || ''}</li>`);
-        }
-        lines.push('</ul>');
-      }
-
-      content = lines.join('\n');
-    }
+    // Resolve to a plain, Foundry-free model, then render via the shared pure
+    // builder (mirrors the gathering card: resolve names/images here, format there).
+    const content = buildCraftingChatContent(
+      {
+        status: success ? 'succeeded' : 'failed',
+        actorName: craftingActor?.name || '',
+        recipeName: recipe?.name || '',
+        results: (createdResults || []).map((item) => ({
+          name: item?.name || '',
+          img: item?.img || '',
+          quantity: Number(item?.system?.quantity || 1),
+        })),
+        consumed: (consumedIngredients || []).map(({ item, quantity }) => ({
+          name: item?.name || '',
+          img: item?.img || '',
+          quantity: Number(quantity || 1),
+        })),
+        // Skip virtual-present canvas tools (no owned item) so they don't render
+        // an empty-named chip.
+        tools: (tools || [])
+          .filter(({ item }) => !!item)
+          .map(({ item }) => ({
+            name: item?.name || '',
+            img: item?.img || '',
+          })),
+        failureReason: failureReason || '',
+      },
+      localize
+    );
 
     try {
       await ChatMessage.create({

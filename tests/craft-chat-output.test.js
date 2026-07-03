@@ -160,10 +160,10 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
 
   const consumedIngredients = [
-    { item: { name: 'Iron Ingot', uuid: 'Item.iron' }, quantity: 3 }
+    { item: { name: 'Iron Ingot', uuid: 'Item.iron', img: 'icons/ingot.png' }, quantity: 3 }
   ];
-  const tools = [{ item: { name: 'Forge Hammer', uuid: 'Item.hammer' } }];
-  const createdResults = [{ name: 'Iron Sword', uuid: 'Item.sword', system: { quantity: 1 } }];
+  const tools = [{ item: { name: 'Forge Hammer', uuid: 'Item.hammer', img: 'icons/hammer.png' } }];
+  const createdResults = [{ name: 'Iron Sword', uuid: 'Item.sword', img: 'icons/sword.png', system: { quantity: 1 } }];
 
   await engine._postCraftChatMessage({
     success: true,
@@ -177,12 +177,15 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
 
   assert.equal(chatCreated.length, 1, 'Exactly one message posted');
   const content = chatCreated[0].content;
+  assert.ok(content.includes('fabricate-craft-chat--success'), 'success card wrapper class');
   assert.ok(content.includes('Gandalf'), 'Actor name in content');
   assert.ok(content.includes('Iron Sword'), 'Recipe name in content');
   assert.ok(content.includes('Iron Ingot'), 'Consumed ingredient name in content');
   assert.ok(content.includes('3'), 'Consumed ingredient quantity in content');
   assert.ok(content.includes('Forge Hammer'), 'Tool name in content');
   assert.ok(content.includes('Iron Sword'), 'Created result name in content');
+  assert.ok(content.includes('src="icons/ingot.png"'), 'consumed ingredient image src');
+  assert.ok(content.includes('src="icons/sword.png"'), 'created result image src');
 });
 
 // ---------------------------------------------------------------------------
@@ -210,6 +213,7 @@ test('_postCraftChatMessage: failure message includes actor, recipe, reason, and
 
   assert.equal(chatCreated.length, 1, 'Exactly one message posted');
   const content = chatCreated[0].content;
+  assert.ok(content.includes('fabricate-craft-chat--failure'), 'failure card wrapper class');
   assert.ok(content.includes('Merlin'), 'Actor name in failure message');
   assert.ok(content.includes('Iron Sword'), 'Recipe name in failure message');
   assert.ok(content.includes('Skill check too low'), 'Failure reason in message');
