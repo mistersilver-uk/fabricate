@@ -31,10 +31,10 @@ Each loop iterates until acceptance or hits a 3-revision cap; at the cap, halt a
 If the current branch is `main`, create or switch to a task branch before changing canonical specs or workflow files.
 3. Select exactly one task and resolve its GitHub issue.
    - If the user gave an issue number, use it.
-   - Otherwise query open issues and choose the next unblocked task.
+   - Otherwise select mechanically: run `gh issue list --state open --json number,title,labels,body --limit 100`, exclude issues labeled `triage` or `in-progress`, exclude issues whose body contains `Blocked by #<n>` while issue `<n>` is still open, then pick the lowest remaining issue number and state which issues you excluded and why.
    - If the work originates from a prompt with no issue, create one from the `OpenSpec Change Delta` issue template (`.github/ISSUE_TEMPLATE/openspec_change.md`).
-4. Compute the change signals (paths likely to change, behaviour change, API/docs surface, test changes) and resolve the auto-spawn routing table in `AGENTS.md` to determine which agents are required for plan review, post-implementation review, and the docs loop.
-Record the resolved roster in the delta block's `### Resolved Roster` section.
+4. Resolve the roster mechanically: apply the numbered procedure under `### Auto-spawn routing` in `AGENTS.md` — match the planned affected-file list against each row's path globs and take the union of every matching row's agents.
+Record the resolved roster in the delta block's `### Resolved Roster` section, split by stage.
 5. Author the OpenSpec delta in the issue's managed `openspec-delta` block (via `gh issue edit`) before any code changes happen.
 When appending to an existing issue, preserve the reporter's original text above the block and edit only inside the markers; rewrite the block **in place** on later iterations (never append a second block).
 If `gh` is unavailable, return the delta block in your output for the driver/user instead of guessing — there is no longer a versioned file to drop it in.
@@ -97,7 +97,7 @@ The `check-screenshots` gate has no `SCREENSHOTS_NEEDED:` bypass; when capture i
 The script uses exact manifest keys and does not require `s3:ListBucket`.
 - For Manager V2 feature routes, plan placeholder promotion explicitly: remove disabled placeholder data, add feature-gated nav, route normalization, breadcrumbs/copy, focused route component, inspector state, localization/CSS, and mounted/source-contract tests.
 - For an unclickable Manager V2 feature nav item, check placeholder/deferred-view rendering and feature gates before planning event-handler or pointer-overlay work.
-- For card grids, overlays, disabled states, menus, and icon-button workflows, plan real browser pointer hit-tests when feasible.
+- For card grids, overlays, disabled states, menus, and icon-button workflows, plan real browser pointer hit-tests whenever the change adds or repositions such a control; the plan may skip them only when the rendered DOM and CSS stacking of the control are unchanged, and must say so.
 - For image-driven UI, plan at least one representative fixture that exercises the linked image path, not only fallback artwork.
 - For tasks centered on JavaScript structure or testability, use `javascript-structural-design` to make the handoff explicit about collaborator seams, boring constructors, and responsibility splits.
 - If `gh` is unavailable or unauthenticated, return the delta block (and any blocker note) in your output for the driver/user instead of guessing issue state — there is no versioned change folder to fall back to.

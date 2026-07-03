@@ -16,7 +16,6 @@ See `openspec/README.md` for the block format and rules.
 - Read your assigned issue using the GitHub CLI before implementation work starts.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
 - Treat `openspec/specs/*/spec.md` as the canonical specification source of truth.
-The legacy `spec/` directory is compatibility-only.
 - Route quick-start documentation changes to `docs/quickstart.md` only.
 
 ## Default Agentic Workflow
@@ -36,19 +35,28 @@ Spawned role agents execute their scoped role and do not nest — no role agent 
 
 ### Auto-spawn routing
 
-Match the change against every signal that applies.
-All matching agents run in parallel within their stage; this is multi-select, not single-pick.
+Resolve the roster with this procedure — it is mechanical, not a judgment call:
+
+1. Compute the changed-path set: the delta's affected-files list during planning, or `git diff --name-only origin/main...HEAD` during review.
+2. Match every path against every row's signal below; a path-signal row matches when any changed path matches any of its globs, and a content-signal row (Foundry identifiers, competitor questions, PR investigation) matches on the diff content or request text instead.
+3. Take the union of every matching row's agents — multi-select, never single-pick; the "any non-trivial task" row always applies.
+4. Record the union in the issue delta's `### Resolved Roster` section, split by stage (plan-review, post-implementation review, docs loop).
 
 | Signal                                                                                                                            | Agent(s)                                                                                         | Stage                                    |
 |-----------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|------------------------------------------|
 | Any non-trivial task                                                                                                              | `fabricate_orchestrator` (plan), `fabricate_implementer` (build), `fabricate_reviewer` (verdict) | always                                   |
-| Touches `src/ui/`, `src/ui/svelte/`, or `styles/`                                                                                 | `fabricate_ux_designer`                                                                          | plan-review + post-implementation review |
-| Touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language                        | `fabricate_domain_expert`                                                                        | plan-review + docs loop                  |
-| Adds, removes, or restructures tests, or changes test infrastructure under `tests/`                                               | `fabricate_quality_engineer`                                                                     | plan-review + post-implementation review |
-| Calls Foundry VTT APIs or hooks into Foundry's lifecycle (`Hooks`; `game`/`ui`/`CONFIG`; document/`ApplicationV2`/`DialogV2`/sheet APIs; settings/flags/UUIDs; `src/integrations/`, `src/canvas/`, Foundry-facing `src/main.js`; or `module.json` compatibility) | `foundry_integrator`                                                                             | plan-review + post-implementation review |
+| Any path matches `src/ui/**`, `styles/**`, or `**/*.svelte`                                                                       | `fabricate_ux_designer`                                                                          | plan-review + post-implementation review |
+| Any path matches `src/models/**`, `src/systems/**`, `src/integrations/**`, `openspec/specs/**`, or `lang/**`, or the change renames or redefines domain language | `fabricate_domain_expert`                                                                        | plan-review + docs loop                  |
+| Any path matches `tests/**` (adds, removes, or restructures tests or test infrastructure)                                         | `fabricate_quality_engineer`                                                                     | plan-review + post-implementation review |
+| Any path matches `src/canvas/**` or `src/integrations/**` or touches `src/main.js` or `module.json`, or the diff adds or edits `Hooks.`, `game.`, `ui.`, `CONFIG.`, `ApplicationV2`, `DialogV2`, sheet/document APIs, or settings/flags/UUID handling | `foundry_integrator`                                                                             | plan-review + post-implementation review |
 | Changes behaviour, public API surfaces, hooks, slash commands, settings, JSDoc-documented exports, or anything covered by `docs/` | `fabricate_docs_writer` + `fabricate_domain_expert` (paired loop)                                | post-implementation docs loop            |
-| Competitor, market, or precedent question                                                                                         | `fabricate_competitive_analyst`                                                                  | plan                                     |
-| GitHub PR investigation                                                                                                           | `fabricate_pr_explorer`                                                                          | as needed                                |
+| The request asks a competitor, market, or precedent question                                                                      | `fabricate_competitive_analyst`                                                                  | plan                                     |
+| The request needs GitHub PR investigation                                                                                         | `fabricate_pr_explorer`                                                                          | as needed                                |
+
+Worked examples:
+
+- A change touching `src/ui/svelte/apps/manager/EnvironmentEditView.svelte` and `lang/en.json` matches the always row, the UI row (`**/*.svelte`), and the domain row (`lang/**`): plan-review runs `fabricate_ux_designer` and `fabricate_domain_expert`, post-implementation review runs `fabricate_reviewer` and `fabricate_ux_designer`, and the docs loop runs `fabricate_docs_writer` with `fabricate_domain_expert`.
+- A change touching `src/systems/GatheringEngine.js` and `tests/gathering-engine-listing.test.js` matches the always row, the domain row (`src/systems/**`), and the tests row (`tests/**`); `foundry_integrator` joins only when the diff also adds or edits one of the Foundry identifiers above.
 
 ### Iteration cycles
 
@@ -200,6 +208,7 @@ See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 
 These deep-dive notes explain layered patterns and data-model subtleties that aren't obvious from reading any single file.
 Treat the cited file paths as **load-bearing**: when a change touches a path mentioned in a note, update the note in the same change — stale citations defeat the whole point.
+Cite code by symbol name and file path only — for example `_playerListingFields` in `src/systems/GatheringListingBuilder.js`, locatable with `grep -n` — never by line number; `npm run validate:agents` rejects `file.js:NNN`-style citations because they rot silently as code moves.
 
 Some contributor-workflow deep-dives moved into `CONTRIBUTING.md`: the Foundry smoke harness (`npm run test:foundry` phases, outputs, Phase D0 selector drift) is the "Foundry integration (smoke) tests" section; UI PR screenshot evidence is the "UI PR screenshot evidence" section; the Foundry-vs-Fabricate CSS override map (button layout, focus rings, specificity ladder) is the "Foundry vs Fabricate CSS overrides" section.
 
@@ -225,7 +234,7 @@ The two kinds whose dirty state lives in the store (environment, tools) wrap the
 Foundry layer — `src/ui/svelte/util/foundryBridge.js`.** `services.confirmDialog` is wired to `foundry.applications.api.DialogV2.confirm`.
 In tests, `services.confirmDialog` is absent and the store helpers are stubbed directly on the test fixture — the Svelte layer never knows the difference.
 
-**Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) update the test fixture in `tests/components/manager-mounted.test.js` (~line 738) with a stub for the new helper.
+**Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/components/manager-mounted.test.js` (locate it with `grep -n confirmDiscardDirty`).
 
 **Anti-patterns:** adding `globalThis.confirm(message)` as a fallback (DialogV2 is always present in Foundry; missing-DialogV2 means a test environment that should stub the store helper); adding a `services?.confirmDiscard{Kind}Draft?.()` seam that nothing wires up in production; skipping the dirty check at the Svelte layer and relying solely on the store helper (the Svelte layer is the source of truth for which view is active and whether its draft is dirty; the store helper just asks the user).
 
@@ -238,19 +247,20 @@ Knowing which one to read for which question saves a lot of stale-zero confusion
 The actual composed-task set is `enabled ∪ forced − disabled`, then filtered by environment matching rules (biome / danger / library-enabled).
 Geography is NOT a composition axis — the first-class `GatheringRealm` only gates location availability, never composition.
 
-**Canonical GM-admin composition counts** for the row table and inspector live at `$viewState.environmentTaskCounts[envId]` (shape `{ availableTaskCount, availableEventCount }`), computed inside `adminStore.js` via `_buildEnvironmentCompositionViewModel(environment)?.counts` (`src/ui/svelte/stores/adminStore.js:2692`). `availableTaskCount` counts only records whose `runtimeState === 'available'` — composed **and** with current conditions met (`adminStore.js:2145`, `:2239`).
+**Canonical GM-admin composition counts** for the row table and inspector live at `$viewState.environmentTaskCounts[envId]` (shape `{ availableTaskCount, availableEventCount }`), computed via `_buildEnvironmentCompositionViewModel(environment)?.counts` in `src/ui/svelte/stores/adminStore.js`. `availableTaskCount` counts only records whose `runtimeState === 'available'` — composed **and** with current conditions met (the `runtimeState === 'available'` filters inside the same store).
 It is the authoritative GM-runtime "ready right now" count; it is **not** what a player blind-reveal `(x/y)` suffix divides by.
 
-**Player listing counts are a separate, engine-owned surface.** The player-facing listing is produced by `GatheringEngine.listForActor` / `_buildEnvironmentListing` (`src/systems/GatheringEngine.js:535`, `:825`), not the admin store.
-Each listing carries count/policy fields via `_playerListingFields` (`GatheringEngine.js:1017`): `composedTaskCount` (total composed task pool — `normalizeList(environment.tasks).length`, the blind-reveal denominator `y`; `0` when locked); `discoveredTaskCount` (the `x` — tasks this actor revealed at the effective reveal scope via `GatheringRichStateService.countRevealedTasks`; `0` when locked or `revealPolicy === 'never'`); `revealPolicy` (effective **system-level** policy `never` | `onSuccess` | `onAttempt`, resolved by `GatheringEngine._resolveRevealPolicy` at `:2275` — reveal is system-level only, environments do not override it); `locked` (`true` for a disabled environment, surfaced as a locked identity-only listing to all viewers); and `biomeTags` (resolved biome display metadata).
-Beyond `_playerListingFields`, `_buildEnvironmentListing` surfaces `tasks[]` (visible task models — a targeted env lists every task transparently; a non-GM viewer of a blind env gets a single opaque `blindGather` entry; a GM viewer of a blind env gets the full transparent list) and `discoveredTasks[]` (for a non-GM viewer of a blind env only — the transparent, attemptable models for tasks already revealed, each tagged `discovered: true`; `[]` for targeted/GM/locked/`never`-policy; built by `_discoveredTaskModels` at `:942`).
+**Player listing counts are a separate, engine-owned surface.** The player-facing listing is produced by `GatheringEngine.listForActor` — a thin delegator to the engine's injected `GatheringListingBuilder` collaborator, whose `_buildEnvironmentListing` in `src/systems/GatheringListingBuilder.js` does the construction — not the admin store.
+Each listing carries count/policy fields via `_playerListingFields` in `GatheringListingBuilder.js`: `composedTaskCount` (total composed task pool — `normalizeList(environment.tasks).length`, the blind-reveal denominator `y`; `0` when locked); `discoveredTaskCount` (the `x` — tasks this actor revealed at the effective reveal scope via `GatheringRichStateService.countRevealedTasks`; `0` when locked or `revealPolicy === 'never'`); `revealPolicy` (effective **system-level** policy `never` | `onSuccess` | `onAttempt`, resolved by `GatheringEngine._resolveRevealPolicy`, which the builder receives as its injected `resolveRevealPolicy` collaborator — reveal is system-level only, environments do not override it); `locked` (`true` for a disabled environment, surfaced as a locked identity-only listing to all viewers); and `biomeTags` (resolved biome display metadata).
+Beyond `_playerListingFields`, `_buildEnvironmentListing` surfaces `tasks[]` (visible task models — a targeted env lists every task transparently; a non-GM viewer of a blind env gets a single opaque `blindGather` entry; a GM viewer of a blind env gets the full transparent list) and `discoveredTasks[]` (for a non-GM viewer of a blind env only — the transparent, attemptable models for tasks already revealed, each tagged `discovered: true`; `[]` for targeted/GM/locked/`never`-policy; built by `_discoveredTaskModels` in `GatheringListingBuilder.js`).
 
 Per-task `successChance` (on transparent task models, from `GatheringEngine._taskSuccessChance`) is a 0–1 **static drop-rate approximation** `1 − ∏(1 − dropRate_i/100)` over enabled d100 drop rows; `null` for non-d100 tasks and when no enabled drop rows.
 It is a **find-chance** ("chance at least one drop rolls"), **not** whole-attempt success — it ignores actor/condition/character modifiers, attempt limits, node depletion, stamina, required tools, and the d100 success threshold.
 Use the admin `environmentTaskCounts` only for GM manager surfaces; use the engine listing fields for anything a player sees.
 
-**Legacy (still normalized, almost always empty).** `environment.tasks[]` — full task records embedded directly on the environment, normalized via `_normalizeTask` in `src/systems/GatheringEnvironmentStore.js` (~line 318); each embedded task carries `toolIds[]`, `dropRows[]`, `resultGroups[]`.
-In modern environments this array is empty (the embedded-task UX moved to the standalone `gathering-task-edit` route; the schema slot survives for back-compat). **Do not read counts off `environment.tasks.length`** for the row table, inspector, or readiness checks — switch to `$viewState.environmentTaskCounts`. (An older `task.catalysts[]` field was dead/vestigial and is fully removed.)
+**Legacy (stored slot, superseded by composition).** A stored environment record's embedded `environment.tasks[]` survives only as a back-compat schema slot (the embedded-task UX moved to the standalone `gathering-task-edit` route), and no per-task normalizer for it remains — the old `_normalizeTask` helper was removed from `src/systems/GatheringEnvironmentStore.js`.
+At runtime, `GatheringRichStateService.composeEnvironment` replaces `tasks` wholesale with the composed library set (built from the system's task library and normalized by `normalizeLibraryTask`), so the `normalizeList(environment.tasks)` reads in `GatheringEngine.js` and `GatheringListingBuilder.js` see composed library tasks, never the embedded slot.
+**Do not read counts off a stored record's `environment.tasks.length`** for the row table, inspector, or readiness checks — switch to `$viewState.environmentTaskCounts`. (An older `task.catalysts[]` field was dead/vestigial and is fully removed.)
 
 **Required tools (system-owned).** Tools are the unified, required-but-reusable, breakable prerequisite primitive (they replaced the retired Catalyst concept).
 A task references them by id via `task.toolIds`; the environment surfaces **required tools**, aggregated from the unique `task.toolIds` across the composed task set.
@@ -301,7 +311,8 @@ These rules apply to every agent (Claude and Codex) and to how all Markdown is a
 - Committed Markdown documents — every in-repo `*.md` (e.g. `openspec/specs/`, `docs/`, `DOMAIN.md`, `README`s, `AGENTS.md`, `CLAUDE.md`) — use semantic line breaks: one complete sentence per line.
 Start each sentence on its own line; never hard-wrap a single sentence across multiple lines at a fixed column.
 This keeps diffs sentence-scoped and review-friendly.
-Headings and list items stay one per line as usual, and a multi-sentence list item or table cell still puts each sentence on its own line where practical.
+Headings and list items stay one per line as usual, and a multi-sentence list item still puts each sentence on its own line.
+A multi-sentence table cell cannot break across lines, so keep its sentences in the one cell and wrap that table in the markdownlint disable region described in the Build & Test section.
 Prettier does not format Markdown (its glob is `src/**/*.js` plus `eslint.config.js` only), so nothing re-wraps these files — author them this way by hand.
 - GitHub issue, PR, and comment bodies are written as normal prose with no manual line wrapping — one line per paragraph, and let GitHub soft-wrap.
 Do not hard-wrap at a fixed column, and do not apply the one-sentence-per-line rule here (GitHub renders single newlines as spaces, but unwrapped source is cleaner to read and edit).
@@ -367,9 +378,7 @@ for the same role rather than a dedicated binding.
 These are loaded on demand (by path) from the role skills that reference them — not auto-spawned
 as agents:
 
-- `skills/javascript-mastery/SKILL.md`
 - `skills/javascript-structural-design/SKILL.md`
-- `skills/playwright-skill/SKILL.md`
 - `skills/review-implementing/SKILL.md`
 
 ## What Agents Must Not Do

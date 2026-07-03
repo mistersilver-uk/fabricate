@@ -494,7 +494,7 @@ A `passed: false` driven purely by `404` console noise with zero failed steps me
 
 ### Known drift pattern: Phase D0 selectors
 
-`exerciseManagerEnvironmentPointerTargets` (~line 905 in `foundry-test-run.mjs`) and the env-edit checks (~line 2490) pin many selectors by class, child index (`.nth(N)`), and visible button text.
+`exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-test-run.mjs` and the env-edit checks in the same file pin many selectors by class, child index (`.nth(N)`), and visible button text.
 When the manager UI evolves, these go stale silently — the harness only fails when the next smoke run hits the broken locator.
 
 Hit list seen historically:
@@ -633,9 +633,9 @@ Use it only when screenshot capture is genuinely impossible (e.g. the smoke harn
 
 ## CI workflows
 
-### Conventional Commits workflow
+### Conventional Commits gate
 
-File: `.github/workflows/conventional-commits.yml`
+Job: `lint-commits` in `.github/workflows/ci.yml`
 
 Runs on every pull request.
 Validates all commits in the PR using `commitlint` and checks that the PR title itself also follows the Conventional Commits format.

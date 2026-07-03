@@ -11,14 +11,15 @@ Make behavior changes here, not in the bindings.
 
 ## Required context
 
-- `COMPETITIVE_ANALYSIS.md` if it exists
+- `COMPETITIVE_ANALYSIS.md` (see the first-run rule in the Workflow below when it does not exist yet)
 - Fabricate docs under `docs/`
 - relevant UI files under `src/ui/svelte/`
 - relevant canonical specs under `openspec/specs/`
 
 ## Workflow
 
-1. Read the current report first and update it incrementally.
+1. If `COMPETITIVE_ANALYSIS.md` does not exist at the repo root, create it containing exactly the headings listed under `## Report sections` plus a `## Changelog` section, then proceed.
+If it exists, read it fully and update it incrementally; never rewrite it from scratch.
 2. Verify the current branch is not `main`; create or switch to the task branch before editing the report.
 3. Understand Fabricate itself before analyzing competitors.
 4. Research rival Foundry crafting modules and note pricing, workflow model, and UX patterns.

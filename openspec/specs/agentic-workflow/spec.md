@@ -103,6 +103,24 @@ Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.
 - **THEN** the workflow driver (the provider's top-level loop — Codex's depth-0 prompt agent or Claude's main loop) owns routing and the plan, implementation, and docs iteration loops
 - **AND** scoped role agents execute their role and return without spawning or routing further agents
 
+### Requirement: Harness reference integrity
+
+Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `skills/README.md`, `skills/*/SKILL.md`, `skills/*/references/*.md`, `.claude/agents/*.md`, `.codex/agents/*.toml`, and `.github/prompts/*.md` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
+
+#### Scenario: validating harness references
+
+- **WHEN** `npm run validate:agents` runs
+- **THEN** it verifies every conservatively path-shaped backtick reference in the harness documents resolves to an existing file or directory, allowing only entries in an explicit, commented allow-missing set
+- **AND** it rejects line-number-based code citations (such as `file.js:NNN` or approximate line references) in the harness documents
+- **AND** it verifies every skill-backed role's Claude binding declares a `model:` and its Codex binding declares a `model =`
+- **AND** it verifies the AGENTS.md shared-skills list equals the set of `skills/` subdirectories containing a `SKILL.md` minus the role directories derived from the bindings table
+- **AND** it exits non-zero on any violation
+
+#### Scenario: citing code from harness documents
+
+- **WHEN** a harness document cites a location in the codebase
+- **THEN** it names the symbol and the file path (locatable with `grep -n`) instead of a line number
+
 ### Requirement: Product contracts stay in specs
 
 Agents and skills MUST keep durable product behavior in canonical specs or active OpenSpec design docs, not in role prompts.

@@ -16,7 +16,6 @@ Read these files before doing anything else, ideally in parallel:
 - `skills/fabricate-orchestrator/SKILL.md`
 - `skills/fabricate-implementer/SKILL.md`
 - `skills/javascript-structural-design/SKILL.md`
-- `skills/javascript-mastery/SKILL.md`
 - `skills/fabricate-reviewer/SKILL.md`
 - `skills/fabricate-docs-writer/SKILL.md`
 
@@ -51,10 +50,9 @@ The delta lives in the issue, not in versioned files, so it persists even when t
 
 - Follow the repo rules in `AGENTS.md` and the local implementer skill.
 - Use `javascript-structural-design` when work changes module boundaries, collaborator wiring, constructors, API shape, or test seams.
-- Use `javascript-mastery` when implementation work depends on JavaScript language semantics or edge cases.
 - Keep changes limited to the selected issue.
 - Prefer existing patterns over new abstractions.
-- Add or update tests first when practical.
+- Write the failing test first; the exceptions are pure refactors covered by existing tests and visual-only CSS tweaks — name the exception in the summary when you take one.
 
 1. Validate
 
