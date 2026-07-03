@@ -15,7 +15,6 @@ Make behavior changes here, not in the bindings.
 - the work's GitHub issue and its `openspec-delta` block, via `gh issue view`
 - relevant `openspec/specs/`, `src/`, and `tests/` files
 - `skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, API shape, or test seams
-- `skills/javascript-mastery/SKILL.md` when the task involves tricky JavaScript semantics, async flow, closures, coercion, prototypes, or `this` behavior
 - current git diff when continuing existing work
 
 ## Workflow
@@ -27,13 +26,12 @@ Make the canonical spec changes the delta's `### Spec Deltas` require under `ope
 If implementation forces a justified departure from the proposed delta, note it for the driver so the docs loop can reconcile the issue delta against what shipped.
 4. Add or adjust tests first when practical.
 5. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
-6. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
-7. Implement the minimum change that satisfies the plan.
-8. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
-9. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main`, run `npm run test:foundry` (local default `full` profile), then once a PR number exists: `npm run screenshots:ui -- --base origin/main --pr <number>` to collect into `tmp/pr-screenshots/<number>/`, `npm run screenshots:ui:publish -- --pr <number>` to upload the collected files to S3 and embed the returned `![pr-<number> ...]` markdown in the PR body, then `npm run screenshots:ui:clean -- --pr <number>`.
+6. Implement the minimum change that satisfies the plan.
+7. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
+8. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main`, run `npm run test:foundry` (local default `full` profile), then once a PR number exists: `npm run screenshots:ui -- --base origin/main --pr <number>` to collect into `tmp/pr-screenshots/<number>/`, `npm run screenshots:ui:publish -- --pr <number>` to upload the collected files to S3 and embed the returned `![pr-<number> ...]` markdown in the PR body, then `npm run screenshots:ui:clean -- --pr <number>`.
 There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if capture is genuinely impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
-10. If implementation reveals a durable product rule, update the relevant canonical spec under `openspec/specs/` (and flag it for the issue delta when it changes the planned contract).
-11. Run validation gates after each logical change set:
+9. If implementation reveals a durable product rule, update the relevant canonical spec under `openspec/specs/` (and flag it for the issue delta when it changes the planned contract).
+10. Run validation gates after each logical change set:
 
 - `npm test`
 - `npm run build`
@@ -51,7 +49,6 @@ There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if 
 - Follow existing patterns before inventing new ones.
 - Prefer JavaScript ES modules and Svelte 5 patterns already used in this repo.
 - Use `javascript-structural-design` as the default reference for dependency seams, cohesion, constructors, and behavior-first APIs.
-- Use `javascript-mastery` as the default reference for JavaScript-specific correctness questions before inventing local style rules.
 - Prefer explicit collaborators over `context`, `container`, or `manager` grab bags.
 - Avoid exported utility buckets, hidden mutable singletons, and constructors that do real work when a local abstraction or injected dependency will do.
 - When splitting an oversized class/file, follow the repo's proven extraction recipe: move a cohesive cluster into a new collaborator; inject it through the existing constructor with default-construction (so test factories like `makeEngine`/`makeRichState` that never pass it keep working); keep the original public methods as thin delegators so external callers and `main.js` are unaffected; move file-private helpers shared by the moved and retained code into a shared `*Internals.js` module imported by both (never duplicate them — the Sonar duplication gate fails copies); and keep the dependency one-directional (parent → collaborator, no callback into the parent). `GatheringWorldTimeProcessor`/`GatheringListingBuilder` (extracted from `GatheringEngine`) and `GatheringStaminaService`/`GatheringNodeService` (extracted from `GatheringRichStateService`) are reference examples.
@@ -79,7 +76,7 @@ It is not the normal PR screenshot generator.
 - `npm run test:foundry` defaults to host port `30100` so it coexists with a developer's local Foundry on `30000`.
 If `30100` is also occupied, override with matching `FOUNDRY_HOST_PORT` and `FOUNDRY_URL` (e.g. `FOUNDRY_HOST_PORT=30101 FOUNDRY_URL=http://localhost:30101`).
 - Treat Docker startup conflicts, launch reconnects, and stale container-name failures as harness infrastructure unless the app loaded and failed a product assertion.
-- For card, overlay, menu, disabled-state, and icon-button interactions, add real browser pointer hit-tests when feasible. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss.
+- For card, overlay, menu, disabled-state, and icon-button interactions, real browser pointer hit-tests are required whenever the change adds or repositions an overlay, menu, disabled state, card action, or icon-only control; skip them only when the rendered DOM and CSS stacking of the control are unchanged, and say so in the handoff. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss — see `skills/fabricate-implementer/references/pointer-hit-tests.md` for the `assertPointerTarget` recipe and where to wire it into the smoke harness.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external URLs.

@@ -368,9 +368,7 @@ for the same role rather than a dedicated binding.
 These are loaded on demand (by path) from the role skills that reference them — not auto-spawned
 as agents:
 
-- `skills/javascript-mastery/SKILL.md`
 - `skills/javascript-structural-design/SKILL.md`
-- `skills/playwright-skill/SKILL.md`
 - `skills/review-implementing/SKILL.md`
 
 ## What Agents Must Not Do
