@@ -40,6 +40,10 @@
   const hasActors = $derived(selectableActors.length > 0);
   const isGathering = $derived(activeTab === 'gathering');
   const isCrafting = $derived(activeTab === 'crafting');
+  // The Inventory tab pulls owned components from the same component-source actors
+  // as Crafting, so it surfaces the same source picker in the shared bar.
+  const isInventory = $derived(activeTab === 'inventory');
+  const showSourcesBar = $derived(isCrafting || isInventory);
 
   // The active station tool's display name, shown in a status chip in the
   // right-side context cluster when the GM granted activation of a Tool-station
@@ -57,7 +61,7 @@
   // The right-side context cluster renders when there is gathering context, the
   // crafting tab's component-sources bar, OR an active station tool chip to
   // surface (forward-compatible: the chip appears on whatever tab is active).
-  const hasRightContext = $derived(isGathering || isCrafting || Boolean(activeCanvasTool));
+  const hasRightContext = $derived(isGathering || showSourcesBar || Boolean(activeCanvasTool));
 
   // The bar is "ready" once its selectable list and conditions have loaded, so
   // the smoke harness can wait on a mounted, conditions-loaded bar.
@@ -293,9 +297,9 @@
           {/if}
         </span>
       {/if}
-      {#if isCrafting}
-        <!-- The Crafting tab surfaces the component-source actor picker (whose
-             inventories the listing pulls ingredients from) in the right slot. -->
+      {#if showSourcesBar}
+        <!-- The Crafting and Inventory tabs surface the component-source actor
+             picker (whose inventories the listing pulls from) in the right slot. -->
         <ComponentSourcesBar {services} />
       {/if}
     </div>

@@ -372,6 +372,40 @@
         "Journal": "Journal",
         "Inventory": "Inventory"
       },
+      "Inventory": {
+        "Loading": "Loading your inventory…",
+        "Error": "Couldn't load your inventory.",
+        "NoActor": "Select a character to see their crafting inventory.",
+        "Empty": "This character isn't carrying any crafting components yet.",
+        "NoMatches": "No items match the current filters.",
+        "Filters": {
+          "SearchPlaceholder": "Search items, essences, tags…",
+          "SearchLabel": "Search inventory",
+          "All": "All",
+          "Components": "Components",
+          "Essences": "Essences",
+          "Tools": "Tools",
+          "Rare": "Rare",
+          "SortLabel": "Sort",
+          "SortName": "Name",
+          "SortQuantity": "Quantity",
+          "SortType": "Type"
+        },
+        "Detail": {
+          "SelectHint": "Select an item to see its sources and where it's used.",
+          "Total": "{count} total",
+          "Tier": "Tier {tier}",
+          "TypeComponent": "Component",
+          "TypeEssence": "Essence",
+          "SourcesTitle": "Sources",
+          "EssenceContentTitle": "Essences",
+          "UsedByTitle": "Used by",
+          "UsedByEmpty": "Not used by any known recipe.",
+          "RoleIngredient": "Ingredient",
+          "RoleTool": "Tool",
+          "PinForCrafting": "Pin for Crafting"
+        }
+      },
       "ActorBar": {
         "Trigger": "Select a character",
         "Stamina": "Stamina",

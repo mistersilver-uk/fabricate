@@ -23,7 +23,7 @@ function hasEssences(essences) {
   return Object.keys(essences || {}).length > 0;
 }
 
-function findMatchingComponent(item, components = []) {
+export function findMatchingComponent(item, components = []) {
   if (!item || !Array.isArray(components)) return null;
 
   // Deterministic precedence: source references are authoritative; name is a
