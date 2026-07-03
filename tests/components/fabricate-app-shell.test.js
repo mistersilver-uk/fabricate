@@ -19,22 +19,45 @@ describe('FabricateAppRoot shell', () => {
     for (const id of ['crafting', 'alchemy', 'gathering', 'journal', 'inventory']) {
       assert.ok(rootSource.includes(`id: '${id}'`), `nav should include the ${id} tab`);
     }
-    for (const key of ['FABRICATE.App.Nav.Crafting', 'FABRICATE.App.Nav.Alchemy', 'FABRICATE.App.Nav.Gathering', 'FABRICATE.App.Nav.Journal', 'FABRICATE.App.Nav.Inventory']) {
+    for (const key of [
+      'FABRICATE.App.Nav.Crafting',
+      'FABRICATE.App.Nav.Alchemy',
+      'FABRICATE.App.Nav.Gathering',
+      'FABRICATE.App.Nav.Journal',
+      'FABRICATE.App.Nav.Inventory',
+    ]) {
       assert.ok(rootSource.includes(key), `nav should localize ${key}`);
     }
   });
 
   it('gates the Alchemy tab behind the showAlchemy prop', () => {
     assert.ok(rootSource.includes('showAlchemy = false'), 'shell should accept a showAlchemy prop');
-    assert.ok(rootSource.includes("requires: 'alchemy'"), 'the alchemy tab should be marked conditional');
+    assert.ok(
+      rootSource.includes("requires: 'alchemy'"),
+      'the alchemy tab should be marked conditional'
+    );
     assert.ok(
       rootSource.includes("tab.requires !== 'alchemy' || showAlchemy"),
       'the alchemy tab should only render when showAlchemy is true'
     );
   });
 
-  it('shows a "Coming soon" hint in each tab placeholder', () => {
-    assert.ok(rootSource.includes('FABRICATE.App.ComingSoon'), 'placeholder should localize a coming-soon hint');
+  it('shows a "Coming soon" hint in the remaining tab placeholder', () => {
+    assert.ok(
+      rootSource.includes('FABRICATE.App.ComingSoon'),
+      'placeholder should localize a coming-soon hint'
+    );
+  });
+
+  it('routes the inventory tab to InventoryView (not the placeholder)', () => {
+    assert.ok(
+      rootSource.includes("import InventoryView from './inventory/InventoryView.svelte'"),
+      'the shell should import InventoryView'
+    );
+    assert.ok(
+      /\{:else if tab\.id === 'inventory'\}\s*<InventoryView \{services\} \/>/.test(rootSource),
+      'the inventory tab should render InventoryView'
+    );
   });
 
   it('threads the active canvas tool into the shared header bar instead of a chip bar above the content', () => {
@@ -45,7 +68,8 @@ describe('FabricateAppRoot shell', () => {
       'the standalone tool-chip bar should be gone from the app shell'
     );
     assert.ok(
-      rootSource.includes('{activeCanvasTool}') || rootSource.includes('activeCanvasTool={activeCanvasTool}'),
+      rootSource.includes('{activeCanvasTool}') ||
+        rootSource.includes('activeCanvasTool={activeCanvasTool}'),
       'the active canvas tool should be passed into ActorSelectTopBar'
     );
     assert.ok(
@@ -56,8 +80,14 @@ describe('FabricateAppRoot shell', () => {
 
   it('exposes an accessible tablist driven by host state', () => {
     assert.ok(rootSource.includes('role="tablist"'), 'left nav should be a tablist');
-    assert.ok(rootSource.includes('activeTab === tab.id'), 'active state should derive from the activeTab prop');
-    assert.ok(rootSource.includes('onSelectTab?.(tab.id)'), 'clicks should delegate selection to the host');
+    assert.ok(
+      rootSource.includes('activeTab === tab.id'),
+      'active state should derive from the activeTab prop'
+    );
+    assert.ok(
+      rootSource.includes('onSelectTab?.(tab.id)'),
+      'clicks should delegate selection to the host'
+    );
   });
 });
 
@@ -69,18 +99,29 @@ describe('SvelteFabricateApp shell window', () => {
 
   it('opens or re-focuses on the requested tab', () => {
     assert.ok(appSource.includes('static async show(tab'), 'show should accept a tab argument');
-    assert.ok(appSource.includes('bringToFront()'), 'an already-open window should be brought to front');
-    assert.ok(appSource.includes('updateProps({ activeTab'), 'tab switches should update props reactively');
+    assert.ok(
+      appSource.includes('bringToFront()'),
+      'an already-open window should be brought to front'
+    );
+    assert.ok(
+      appSource.includes('updateProps({ activeTab'),
+      'tab switches should update props reactively'
+    );
   });
 
   describe('activeCanvasTool session context (Phase 4)', () => {
     it('show accepts a two-arg { activeCanvasTool } options bag without breaking single-arg callers', () => {
       assert.ok(
-        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {})'),
+        appSource.includes(
+          'static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {})'
+        ),
         'show should be the two-arg form with an options default so single-arg callers stay valid'
       );
       // existing single-arg call sites pass no options → activeCanvasTool undefined → null.
-      assert.ok(appSource.includes('const nextCanvasTool = activeCanvasTool ?? null;'), 'undefined options collapse to null');
+      assert.ok(
+        appSource.includes('const nextCanvasTool = activeCanvasTool ?? null;'),
+        'undefined options collapse to null'
+      );
     });
 
     it('show SETS the active canvas tool on a fresh open and REPLACES it on re-show', () => {
@@ -89,7 +130,8 @@ describe('SvelteFabricateApp shell window', () => {
         're-show of the live singleton replaces the active canvas tool'
       );
       assert.ok(
-        appSource.includes('new SvelteFabricateApp({') && appSource.includes('activeCanvasTool: nextCanvasTool'),
+        appSource.includes('new SvelteFabricateApp({') &&
+          appSource.includes('activeCanvasTool: nextCanvasTool'),
         'a fresh open seeds the active canvas tool through the constructor'
       );
     });
@@ -97,7 +139,10 @@ describe('SvelteFabricateApp shell window', () => {
     it('a plain show(tab) CLEARS any existing active canvas tool (no stale station inherit)', () => {
       // nextCanvasTool is null when no options are supplied, and re-show assigns it
       // unconditionally — so a plain re-open clears a prior station context.
-      assert.ok(appSource.includes('const nextCanvasTool = activeCanvasTool ?? null;'), 'plain show resolves to null');
+      assert.ok(
+        appSource.includes('const nextCanvasTool = activeCanvasTool ?? null;'),
+        'plain show resolves to null'
+      );
     });
 
     it('exposes the active canvas tool through the services bag', () => {
@@ -112,22 +157,30 @@ describe('SvelteFabricateApp shell window', () => {
       const onCloseIdx = appSource.indexOf('_onClose(options)');
       assert.ok(closeIdx >= 0 && onCloseIdx >= 0, 'both close paths exist');
       const closeBody = appSource.slice(closeIdx, onCloseIdx);
-      assert.ok(closeBody.includes('this._activeCanvasTool = null;'), 'close() clears the session context');
+      assert.ok(
+        closeBody.includes('this._activeCanvasTool = null;'),
+        'close() clears the session context'
+      );
       const onCloseBody = appSource.slice(onCloseIdx);
-      assert.ok(onCloseBody.includes('this._activeCanvasTool = null;'), '_onClose clears the session context too');
+      assert.ok(
+        onCloseBody.includes('this._activeCanvasTool = null;'),
+        '_onClose clears the session context too'
+      );
     });
 
     it('derives a system-scoped presentTools payload from the active canvas tool', () => {
       assert.ok(
-        appSource.includes("const componentId = this._activeCanvasTool?.componentId;"),
+        appSource.includes('const componentId = this._activeCanvasTool?.componentId;'),
         'the threading boundary derives the present set from the active tool componentId'
       );
       assert.ok(
-        appSource.includes("const systemId = this._activeCanvasTool?.systemId;"),
+        appSource.includes('const systemId = this._activeCanvasTool?.systemId;'),
         'the threading boundary also reads the active tool systemId for scoping'
       );
       assert.ok(
-        appSource.includes('return componentId && systemId ? { systemId, componentIds: [componentId] } : null;'),
+        appSource.includes(
+          'return componentId && systemId ? { systemId, componentIds: [componentId] } : null;'
+        ),
         'the payload carries both systemId and componentIds so matching is system-scoped'
       );
     });
@@ -143,11 +196,13 @@ describe('SvelteFabricateApp shell window', () => {
   describe('interactable close re-prompt callback (issue 332)', () => {
     it('threads a one-shot onClose option through show into the constructor', () => {
       assert.ok(
-        appSource.includes('static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {})'),
+        appSource.includes(
+          'static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {})'
+        ),
         'show should accept an onClose option'
       );
       assert.ok(
-        appSource.includes('const nextOnClose = typeof onClose === \'function\' ? onClose : null;'),
+        appSource.includes("const nextOnClose = typeof onClose === 'function' ? onClose : null;"),
         'show should normalize a non-function onClose to null'
       );
       assert.ok(
@@ -155,7 +210,7 @@ describe('SvelteFabricateApp shell window', () => {
         'a fresh open seeds the close callback through the constructor'
       );
       assert.ok(
-        appSource.includes('if (typeof options.onClose === \'function\') {'),
+        appSource.includes("if (typeof options.onClose === 'function') {"),
         'the constructor stores a function onClose'
       );
       assert.ok(
@@ -178,17 +233,26 @@ describe('SvelteFabricateApp shell window', () => {
       const closeBody = appSource.slice(closeIdx, onCloseIdx);
       assert.ok(closeBody.includes('this._fireCloseCallback();'), 'close() fires the callback');
       const onCloseBody = appSource.slice(onCloseIdx);
-      assert.ok(onCloseBody.includes('this._fireCloseCallback();'), '_onClose fires the callback as a safety net');
+      assert.ok(
+        onCloseBody.includes('this._fireCloseCallback();'),
+        '_onClose fires the callback as a safety net'
+      );
       // The helper is one-shot: it clears the ref BEFORE invoking so a double
       // close path (close → _onClose) cannot fire it twice.
       const fireIdx = appSource.indexOf('_fireCloseCallback() {');
       const fireBody = appSource.slice(fireIdx, fireIdx + 400);
-      assert.ok(fireBody.includes('this._onCloseCallback = null;'), 'the helper clears the callback ref');
+      assert.ok(
+        fireBody.includes('this._onCloseCallback = null;'),
+        'the helper clears the callback ref'
+      );
       assert.ok(
         fireBody.indexOf('this._onCloseCallback = null;') < fireBody.indexOf('callback()'),
         'the callback ref is cleared BEFORE invoking so it fires at most once'
       );
-      assert.ok(fireBody.includes('try {') && fireBody.includes('catch'), 'the fire is wrapped no-throw');
+      assert.ok(
+        fireBody.includes('try {') && fireBody.includes('catch'),
+        'the fire is wrapped no-throw'
+      );
     });
 
     it('fires the close callback AFTER super.close() so the canvas is settled', () => {
@@ -196,7 +260,8 @@ describe('SvelteFabricateApp shell window', () => {
       const onCloseIdx = appSource.indexOf('_onClose(options)');
       const closeBody = appSource.slice(closeIdx, onCloseIdx);
       assert.ok(
-        closeBody.indexOf('await super.close(options)') < closeBody.indexOf('this._fireCloseCallback();'),
+        closeBody.indexOf('await super.close(options)') <
+          closeBody.indexOf('this._fireCloseCallback();'),
         'the re-prompt fires after the window has fully closed'
       );
     });
@@ -207,14 +272,50 @@ describe('SvelteFabricateApp shell window', () => {
       appSource.includes("['crafting', 'alchemy', 'gathering', 'journal', 'inventory']"),
       'valid tabs should be constrained to the known nav tabs'
     );
-    assert.ok(appSource.includes('VALID_TABS.has(tab)'), '_selectTab should guard against unknown tabs');
+    assert.ok(
+      appSource.includes('VALID_TABS.has(tab)'),
+      '_selectTab should guard against unknown tabs'
+    );
+  });
+
+  it('wires the player Inventory tab seam, store, and cross-tab navigation', () => {
+    assert.ok(
+      appSource.includes(
+        'listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts)'
+      ),
+      '_buildServices should expose the listInventoryForActor seam'
+    );
+    assert.ok(
+      appSource.includes('services.inventory = createInventoryStore({ services })'),
+      'the inventory store should be instantiated as a shared singleton'
+    );
+    assert.ok(
+      appSource.includes('services.navigateToCraftingRecipe ='),
+      'a cross-tab navigation seam should be exposed for Pin for Crafting'
+    );
+    assert.ok(
+      appSource.includes("this._selectTab('crafting')"),
+      'navigation should switch to the Crafting tab'
+    );
   });
 
   it('computes and live-refreshes Alchemy tab availability', () => {
-    assert.ok(appSource.includes('isAlchemyTabAvailable'), 'shell should derive Alchemy availability from the shared helper');
+    assert.ok(
+      appSource.includes('isAlchemyTabAvailable'),
+      'shell should derive Alchemy availability from the shared helper'
+    );
     assert.ok(appSource.includes('showAlchemy:'), 'showAlchemy should be passed to the component');
-    assert.ok(appSource.includes("Hooks.on('fabricate.craftingSystemsChanged'"), 'should re-evaluate when systems change');
-    assert.ok(appSource.includes("Hooks.on('fabricate.recipesChanged'"), 'should re-evaluate when recipes change');
-    assert.ok(appSource.includes("this._activeTab === 'alchemy'"), 'should fall back off the Alchemy tab when it disappears');
+    assert.ok(
+      appSource.includes("Hooks.on('fabricate.craftingSystemsChanged'"),
+      'should re-evaluate when systems change'
+    );
+    assert.ok(
+      appSource.includes("Hooks.on('fabricate.recipesChanged'"),
+      'should re-evaluate when recipes change'
+    );
+    assert.ok(
+      appSource.includes("this._activeTab === 'alchemy'"),
+      'should fall back off the Alchemy tab when it disappears'
+    );
   });
 });

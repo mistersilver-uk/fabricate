@@ -29,6 +29,7 @@ import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
+import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
 import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
@@ -456,6 +457,9 @@ class Fabricate {
     // Lazily-built player-facing crafting listing projector (issue: player
     // Crafting tab). Constructed on first read once the managers exist.
     this._craftingListingBuilder = null;
+    // Lazily-built player-facing inventory listing projector (player Inventory
+    // tab). Constructed on first read once the managers exist.
+    this._inventoryListingBuilder = null;
     this.itemPilesIntegration = null;
     this.actorInventoryCoinSpender = null;
     this.actorPropertyCoinSpender = null;
@@ -1269,6 +1273,62 @@ class Fabricate {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
     return this._getCraftingListingBuilder().buildListing({
+      craftingActor,
+      componentSourceActors,
+      viewer: game.user,
+    });
+  }
+
+  /**
+   * Lazily build (and cache) the {@link InventoryListingBuilder} that projects the
+   * owned-component view for the player Inventory tab. Mirrors
+   * {@link Fabricate#_getCraftingListingBuilder}: a Foundry-global-free read-side
+   * collaborator wired with the existing managers — `localize` and `nowWorldTime`
+   * are injected here. `recipeVisibility` is injected so a non-GM viewer's used-by
+   * list never names an undiscovered (teaser) recipe.
+   *
+   * @returns {InventoryListingBuilder}
+   * @private
+   */
+  _getInventoryListingBuilder() {
+    if (this._inventoryListingBuilder) return this._inventoryListingBuilder;
+    this._inventoryListingBuilder = new InventoryListingBuilder({
+      recipeManager: this.recipeManager,
+      craftingSystemManager: this.craftingSystemManager,
+      recipeVisibility: this.recipeVisibilityService,
+      localize: (key, data) =>
+        data !== undefined
+          ? (game.i18n?.format?.(key, data) ?? key)
+          : (game.i18n?.localize?.(key) ?? key),
+      nowWorldTime: () => game.time?.worldTime ?? 0,
+      // Gathering tasks live in the `gatheringConfig` setting (keyed by system id),
+      // not on the system object — surface them for the "produced by" gathering index.
+      getGatheringTasksForSystem: (systemId) => {
+        const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
+        const tasks = config?.systems?.[systemId]?.tasks;
+        return Array.isArray(tasks) ? tasks : [];
+      },
+    });
+    return this._inventoryListingBuilder;
+  }
+
+  /**
+   * Build the player-facing Inventory listing for the current user's selected
+   * crafting actor + component-source actors. Reuses the crafting selection
+   * (same persisted actor + component sources) so the Inventory and Crafting tabs
+   * agree on what the player owns. The current Foundry user is always the viewer.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.rememberedActorId] Crafting actor id; defaults
+   *   to the persisted last-crafting selection when omitted.
+   * @param {string[]|null} [options.componentSourceActorIds] Additional inventory
+   *   source actor ids; defaults to the persisted component-source set.
+   * @returns {object} Inventory listing model (owned components + essence rows).
+   */
+  listInventoryForActor(options = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
+    return this._getInventoryListingBuilder().buildListing({
       craftingActor,
       componentSourceActors,
       viewer: game.user,

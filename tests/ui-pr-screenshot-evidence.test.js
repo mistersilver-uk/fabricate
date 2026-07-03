@@ -110,6 +110,16 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[0].smokeLabels, ['fabricate-journal']);
   });
 
+  it('maps player inventory app files to the player-inventory recipe', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/inventory/InventoryView.svelte',
+      'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
+    ]);
+
+    assert.deepEqual(views.map(view => view.id), ['player-inventory']);
+    assert.deepEqual(views[0].smokeLabels, ['player-inventory']);
+  });
+
   it('maps a recipe editor file to all five recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',

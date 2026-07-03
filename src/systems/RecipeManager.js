@@ -811,9 +811,13 @@ export class RecipeManager {
     const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
     return Object.entries(essences).map(([type, need]) => {
       const have = accumulatedEssences[type] || 0;
+      const definition = this._resolveEssenceDefinition(recipe, type);
+      const name = definition?.name;
+      const icon = definition?.icon;
       return {
         type,
-        name: this._resolveEssenceName(recipe, type),
+        name: typeof name === 'string' && name.trim() ? name : String(type ?? ''),
+        icon: typeof icon === 'string' && icon.trim() ? icon : null,
         need,
         have,
         satisfied: have >= need,
@@ -822,18 +826,26 @@ export class RecipeManager {
   }
 
   /**
-   * Resolve an essence's display label from the system's essence definitions,
-   * falling back to the raw type id when no definition/name is configured.
+   * Resolve an essence's definition (`{ id, name, icon, … }`) from its system's
+   * essence library, or null when no definition matches.
    * @private
    */
-  _resolveEssenceName(recipe, type) {
+  _resolveEssenceDefinition(recipe, type) {
     const systemId = recipe?.craftingSystemId;
     const system = systemId
       ? game.fabricate?.getCraftingSystemManager?.()?.getSystem(systemId)
       : null;
     const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
-    const definition = definitions.find((def) => def?.id === type);
-    const name = definition?.name;
+    return definitions.find((def) => def?.id === type) ?? null;
+  }
+
+  /**
+   * Resolve an essence's display label from the system's essence definitions,
+   * falling back to the raw type id when no definition/name is configured.
+   * @private
+   */
+  _resolveEssenceName(recipe, type) {
+    const name = this._resolveEssenceDefinition(recipe, type)?.name;
     return typeof name === 'string' && name.trim() ? name : String(type ?? '');
   }
 

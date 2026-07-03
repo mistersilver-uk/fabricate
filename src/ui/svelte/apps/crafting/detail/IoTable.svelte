@@ -23,7 +23,10 @@
   const outputs = $derived(Array.isArray(result?.items) ? result.items : []);
 
   function essenceLabel(state) {
-    return String(state?.label ?? state?.type ?? state?.essenceType ?? '');
+    return String(state?.name ?? state?.label ?? state?.type ?? state?.essenceType ?? '');
+  }
+  function essenceIcon(state) {
+    return typeof state?.icon === 'string' && state.icon.trim() ? state.icon : null;
   }
 </script>
 
@@ -66,7 +69,12 @@
       <ul class="crafting-io-list">
         {#each essences as state, index (state.type ?? state.essenceType ?? index)}
           <li class="crafting-io-row" data-io-satisfied={state.satisfied ? 'true' : 'false'}>
-            <span class="crafting-io-name">{essenceLabel(state)}</span>
+            <span class="crafting-io-essence-label">
+              {#if essenceIcon(state)}
+                <i class={`crafting-io-essence-icon ${essenceIcon(state)}`} aria-hidden="true"></i>
+              {/if}
+              <span class="crafting-io-name">{essenceLabel(state)}</span>
+            </span>
             <span class="crafting-io-tags">
               <QuantityTag
                 label={localize('FABRICATE.App.Crafting.Io.Have')}
@@ -239,6 +247,21 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
+  }
+
+  /* Essence row: FA icon to the left of the essence name. */
+  .crafting-io-essence-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .crafting-io-essence-icon {
+    flex: 0 0 auto;
+    font-size: 14px;
+    color: var(--fab-text-muted);
   }
 
   .crafting-io-tags {

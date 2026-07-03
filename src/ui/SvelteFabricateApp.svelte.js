@@ -5,6 +5,7 @@ import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
 import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
 import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
+import { createInventoryStore } from './svelte/stores/inventoryStore.svelte.js';
 import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
 import { notifyWarn, localize } from './svelte/util/foundryBridge.js';
 
@@ -198,6 +199,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // gathering seams: every Foundry-facing call routes through the
       // `game.fabricate` facade so the stores stay Foundry-free.
       listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
+      // Player Inventory tab seam — owned components/essences across the shared
+      // crafting source actors. Foundry-free store consumes this wrapper only.
+      listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts) ?? null,
       craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
       listCraftingSourceActors: () => game?.fabricate?.listCraftingSourceActors?.() ?? [],
       getCraftingSourceActors: () => game?.fabricate?.getCraftingSourceActors?.() ?? [],
@@ -247,6 +251,18 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // the crafting store can read the current source ids off it when it loads.
     services.craftingSources = createCraftingSourcesStore({ services });
     services.crafting = createCraftingStore({ services });
+    // Player Inventory tab store. Shares the crafting source/actor selection (it
+    // reads the same seams + sibling craftingSources store) so both tabs agree on
+    // what the player owns.
+    services.inventory = createInventoryStore({ services });
+    // Cross-tab navigation for the Inventory tab's "Pin for Crafting" / used-by
+    // links: select the recipe in the shared crafting store, then switch to the
+    // Crafting tab. Both stores are the same singletons the Crafting tab reads, so
+    // the selection is already applied when that tab renders.
+    services.navigateToCraftingRecipe = (recipeId) => {
+      if (recipeId) services.crafting?.select?.(recipeId);
+      this._selectTab('crafting');
+    };
     // One shared journal store instance so the nav badge (shell) and the Journal
     // tab read the same reactive run state.
     services.journal = createJournalStore({ services });
