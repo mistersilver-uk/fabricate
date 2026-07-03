@@ -240,6 +240,31 @@ test('salvage routed: a per-component dcOverride shifts the relative thresholds'
   assert.equal(r.success, false);
 });
 
+test('salvage routed: a below-lowest total clamps to the closest tier', async () => {
+  const engine = makeEngine();
+  // base dc 15: lowest threshold is "Failure" at 10. total 4 meets nothing, so the
+  // salvage engine's clampToNearest routes to that closest tier instead of null.
+  stubRoll(4, [{ number: 1, faces: 20, total: 4 }]);
+  const r = await run(
+    engine,
+    sys(
+      {
+        routed: {
+          type: 'relative',
+          rollFormula: '1d20',
+          dc: 15,
+          thresholdMode: 'meet',
+          relativeOutcomes: ROUTED_RELATIVE,
+        },
+      },
+      'routed'
+    )
+  );
+  assert.equal(r.outcome, 'Failure', 'clamps to the lowest-threshold tier');
+  assert.equal(r.success, false, "the clamped tier's own success flag stands");
+  assert.equal(r.value, 4);
+});
+
 test('salvage routed WITHOUT a formula fails loudly (no legacy macro path)', async () => {
   const engine = makeEngine();
   const r = await run(

@@ -413,6 +413,41 @@ test('runFormulaRouted: no tier matches → outcome null, success false', async 
   assert.equal(r.value, 4);
 });
 
+test('runFormulaRouted: clampToNearest routes a below-lowest total to the lowest tier', async () => {
+  // Same below-everything roll as above (total 4, lowest threshold "bad" at 10), but
+  // clampToNearest routes to that closest tier instead of a null outcome. The clamped
+  // tier carries its own success flag ("bad" is success:false).
+  stubRoll(4, [{ number: 1, faces: 20, total: 4 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+    clampToNearest: true,
+  });
+  assert.equal(r.outcome, 'Failure', 'clamps to the lowest-threshold tier');
+  assert.equal(r.data.outcomeId, 'bad');
+  assert.equal(r.success, false, "the clamped tier's own success flag stands");
+  assert.equal(r.value, 4);
+});
+
+test('runFormulaRouted: clampToNearest leaves fixed mode returning null out of range', async () => {
+  // Fixed authored ranges own their own gaps: the clamp flag does not fill them.
+  stubRoll(25, [{ number: 1, faces: 20, total: 25 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    clampToNearest: true,
+  });
+  assert.equal(r.outcome, null, '25 is above every fixed range; clamp is relative-only');
+  assert.equal(r.success, false);
+});
+
 test('runFormulaRouted: a success trigger forces the highest succeeding tier', async () => {
   // total 4 would match nothing, but the success trigger reroutes to the best success tier.
   stubRoll(4, [{ number: 1, faces: 20, total: 20 }]);

@@ -54,6 +54,7 @@ The ingredients used select the result instead, and the check is optional.
 The base difficulty comes from the recipe's selected tier, or from a dynamic difficulty macro when you set one up.
 This is the same difficulty source a simple check uses.
 When the tiers are relative, the recipe tier or dynamic difficulty shifts every tier threshold together, so a harder recipe makes every outcome harder to reach.
+A roll that falls below every relative tier still maps to the lowest tier, so a higher difficulty never produces a craft with no outcome.
 
 Developers configuring a custom check for a non-D&D-5e system should refer to the API reference for the expected setup.
 

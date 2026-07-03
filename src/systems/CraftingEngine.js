@@ -1764,6 +1764,9 @@ export class CraftingEngine {
       triggers: routed.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
+      // A total below every relative threshold clamps to the lowest tier, so a
+      // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
+      clampToNearest: true,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
@@ -2785,6 +2788,9 @@ export class CraftingEngine {
       triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
+      // Clamp a below-lowest total to the closest tier (mirrors crafting); a per-
+      // component dcOverride never opens a null-outcome dead zone.
+      clampToNearest: true,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor,
