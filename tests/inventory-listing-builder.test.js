@@ -187,6 +187,46 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.equal(fire.usedBy[0].recipeId, 'r1');
   });
 
+  it('marks a component as used by a recipe that requires an essence it carries', () => {
+    // A recipe that requires fire essence but never names Iron as an ingredient.
+    const recipe = {
+      id: 'r-ess',
+      name: 'Fire Brew',
+      img: 'icons/brew.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [{ id: 's1', ingredientGroups: [], essences: { fire: 2 } }],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    // Iron carries fire:2 → used by the fire-essence recipe (role: essence).
+    assert.deepEqual(rowByComponent(listing, 'c1').usedBy, [
+      { recipeId: 'r-ess', recipeName: 'Fire Brew', recipeImg: 'icons/brew.webp', role: 'essence' },
+    ]);
+  });
+
+  it('does not duplicate a recipe that uses the component directly and via its essence', () => {
+    const recipe = {
+      id: 'r1',
+      name: 'Dual Use',
+      img: 'icons/dual.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [{ id: 'g1', options: [{ componentId: 'c1' }] }],
+          essences: { fire: 1 },
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    const usedBy = rowByComponent(listing, 'c1').usedBy;
+    assert.equal(usedBy.length, 1, 'the recipe appears once');
+    assert.equal(usedBy[0].role, 'ingredient', 'direct ingredient usage wins over essence');
+  });
+
   it('builds the used-by index once per system that has owned rows', () => {
     const { getRecipesCalls } = ownAll();
     assert.equal(getRecipesCalls.length, 1);

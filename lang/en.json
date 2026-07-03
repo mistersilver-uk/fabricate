@@ -409,6 +409,7 @@
           "ProducedByEmpty": "Not produced by any known recipe, salvage, or gathering.",
           "RoleIngredient": "Ingredient",
           "RoleTool": "Tool",
+          "RoleEssence": "Essence",
           "KindRecipe": "Recipe",
           "KindSalvage": "Salvage",
           "KindGathering": "Gathering"

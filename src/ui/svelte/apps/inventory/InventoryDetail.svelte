@@ -37,11 +37,9 @@
     return typeof value === 'string' && value.trim() !== '';
   }
   function roleLabel(role) {
-    return localize(
-      role === 'tool'
-        ? 'FABRICATE.App.Inventory.Detail.RoleTool'
-        : 'FABRICATE.App.Inventory.Detail.RoleIngredient'
-    );
+    const key =
+      role === 'tool' ? 'RoleTool' : role === 'essence' ? 'RoleEssence' : 'RoleIngredient';
+    return localize(`FABRICATE.App.Inventory.Detail.${key}`);
   }
   function kindLabel(kind) {
     const key =

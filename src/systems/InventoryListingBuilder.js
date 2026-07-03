@@ -257,6 +257,14 @@ export class InventoryListingBuilder {
 
       const rawEssences =
         component.essences && typeof component.essences === 'object' ? component.essences : {};
+      // A component is "used by" a recipe when it is a direct ingredient/tool AND
+      // when the recipe requires an essence the component carries (e.g. Ham, which
+      // carries Bacon essence, is used by a recipe that needs Bacon essence).
+      // Deduped by recipe so a recipe that uses it both ways appears once.
+      const directUsedBy = componentUsedBy.get(component.id) ?? [];
+      const usedBy = essencesEnabled
+        ? this._mergeEssenceUsedBy(directUsedBy, rawEssences, essenceUsedBy)
+        : directUsedBy;
 
       componentRows.push({
         key: `${systemId}:${component.id}`,
@@ -273,7 +281,7 @@ export class InventoryListingBuilder {
         totalQuantity,
         sources: rowSources,
         essences: essencesEnabled ? this._componentEssences(rawEssences, essenceDefById) : [],
-        usedBy: componentUsedBy.get(component.id) ?? [],
+        usedBy,
         producedBy: componentProducedBy.get(component.id) ?? [],
         contributors: [],
       });
@@ -371,6 +379,31 @@ export class InventoryListingBuilder {
       });
     }
     return out;
+  }
+
+  /**
+   * Merge a component's direct `usedBy` (ingredient/tool) with the recipes that
+   * require any essence the component carries (role `essence`). Recipes already in
+   * the direct list are not repeated, so a recipe that uses the component both as an
+   * ingredient and via its essence appears once (as the direct usage).
+   * @private
+   */
+  _mergeEssenceUsedBy(directUsedBy, rawEssences, essenceUsedBy) {
+    const seenRecipeIds = new Set(directUsedBy.map((entry) => entry.recipeId));
+    const merged = [...directUsedBy];
+    for (const essenceId of Object.keys(rawEssences)) {
+      for (const entry of essenceUsedBy.get(essenceId) ?? []) {
+        if (entry.recipeId && seenRecipeIds.has(entry.recipeId)) continue;
+        if (entry.recipeId) seenRecipeIds.add(entry.recipeId);
+        merged.push({
+          recipeId: entry.recipeId,
+          recipeName: entry.recipeName,
+          recipeImg: entry.recipeImg,
+          role: 'essence',
+        });
+      }
+    }
+    return merged;
   }
 
   /**
