@@ -123,13 +123,7 @@
                 data-inventory-used-by={use.recipeId}
                 onclick={() => openRecipe(use.recipeId)}
               >
-                <span class="inventory-detail-portrait" aria-hidden="true">
-                  {#if hasImg(use.recipeImg)}
-                    <img src={use.recipeImg} alt="" />
-                  {:else}
-                    <i class="fas fa-scroll"></i>
-                  {/if}
-                </span>
+                <CraftingThumb src={use.recipeImg ?? ''} alt="" size={40} />
                 <span class="inventory-detail-row-name">{use.recipeName}</span>
                 <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
               </button>
@@ -284,14 +278,17 @@
     gap: 6px;
   }
 
+  /* Row height + padding mirror the Crafting browser's RecipeListRow so the
+     thumbnail sits framed with vertical breathing room rather than edge-to-edge. */
   .inventory-detail-row,
   .inventory-detail-recipe {
     box-sizing: border-box;
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 8px;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-2);
+    min-height: 56px;
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
@@ -318,13 +315,13 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     border-radius: 6px;
     overflow: hidden;
     background: var(--fab-surface-raised);
     color: var(--fab-text-muted);
-    font-size: 13px;
+    font-size: 15px;
   }
 
   .inventory-detail-portrait img {

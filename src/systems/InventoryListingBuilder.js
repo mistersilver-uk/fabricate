@@ -368,10 +368,20 @@ export class InventoryListingBuilder {
 
     for (const recipe of recipes) {
       if (allowedRecipeIds && !allowedRecipeIds.has(recipe?.id)) continue;
+      // Resolve the recipe image the way the GM Manager / player Crafting tab do
+      // (recipeItemImg || recipe.img): a recipe whose icon lives on its linked
+      // recipe item keeps the model default `recipe.img` otherwise, so prefer the
+      // linked item definition's image. `recipe.img` is itself model-defaulted to
+      // DEFAULT_RECIPE_IMAGE (the alchemical blueprint), so the trailing fallback
+      // is the blueprint — never the generic component item-bag.
+      const recipeItemImg = recipe?.recipeItemId
+        ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)
+            ?.img || ''
+        : '';
       const recipeEntry = {
         recipeId: stringOrNull(recipe?.id),
         recipeName: stringOrEmpty(recipe?.name),
-        recipeImg: stringOrNull(recipe?.img),
+        recipeImg: stringOrNull(recipeItemImg || recipe?.img),
       };
       // Per-recipe dedupe of (targetId, role) pairs so one recipe contributes a
       // single entry per component/essence per role even across multiple sets.

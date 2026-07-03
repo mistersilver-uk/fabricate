@@ -213,6 +213,44 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.deepEqual(rowByComponent(listing, 'c1').usedBy, []);
   });
 
+  it('resolves the used-by recipe image from the linked recipe item (GM parity), not the raw recipe.img', () => {
+    // A recipe whose icon lives on its linked recipe item: the raw recipe.img is a
+    // generic bag, but the GM/crafting UI shows the linked item's image.
+    const linkedRecipe = {
+      id: 'r2',
+      name: 'Smelt Iron Ingot',
+      img: 'icons/svg/item-bag.svg',
+      recipeItemId: 'ri-1',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        { id: 's1', ingredientGroups: [{ id: 'g1', options: [{ componentId: 'c1' }] }] },
+      ],
+    };
+    const systemList = [makeSystem()];
+    const recipeManager = { getRecipes: () => [linkedRecipe] };
+    const craftingSystemManager = {
+      getSystems: () => systemList,
+      getRecipeItemDefinition: (systemId, itemId) =>
+        systemId === 'sys-1' && itemId === 'ri-1'
+          ? { img: 'icons/commodities/metal/ingot-iron.webp' }
+          : null,
+    };
+    const builder = new InventoryListingBuilder({
+      recipeManager,
+      craftingSystemManager,
+      localize: (key) => key,
+      nowWorldTime: () => 1000,
+    });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+    });
+    assert.equal(
+      rowByComponent(listing, 'c1').usedBy[0].recipeImg,
+      'icons/commodities/metal/ingot-iron.webp'
+    );
+  });
+
   it('hides undiscovered (teaser) recipes from a non-GM viewer’s used-by list', () => {
     const systemList = [makeSystem()];
     const recipeManager = { getRecipes: () => [recipe] };
