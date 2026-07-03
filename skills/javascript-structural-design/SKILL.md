@@ -44,7 +44,7 @@ Use this skill when a change touches JavaScript module boundaries, collaborator 
    - Ask a module or object to do work or produce a representation.
    - Do not add getters and setters by default just to let outside code orchestrate internals.
 6. Confine mutation and global access.
-   - Prefer immutable inputs and return values when practical.
+   - Prefer immutable inputs and return values; accept mutation only at measured hot paths or where a Foundry API contract demands it.
    - Isolate Foundry globals, clocks, randomness, and third-party statics at thin edges that are easy to fake in tests.
 7. Test the seam, not the internals.
    - Write tests against public behavior and narrow collaborator contracts.

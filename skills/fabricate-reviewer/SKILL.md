@@ -29,8 +29,9 @@ Make behavior changes here, not in the bindings.
 8. Verify Foundry compatibility assumptions for touched APIs.
 9. For UI changes, verify generated screenshots are present for the changed views as embedded screenshot images in the PR `Screenshots (if applicable)` section (S3-hosted, produced by `npm run screenshots:ui:publish`), and evaluated against acceptance criteria rather than merely attached.
 10. Reconcile the canonical-spec changes against the plan: compare the `openspec/specs/` portion of the diff against the issue delta's `### Spec Deltas`.
+Run this as a mechanical tick-list: (1) list every entry under the delta's `##### Added/Modified/Removed Requirements` headings; (2) read the `openspec/specs/` portion of the driver-supplied diff; (3) tick each delta entry against a matching diff hunk one by one, and note any spec diff hunk with no delta entry.
+Every entry ticked and no unplanned hunks passes this check; any mismatch without a `### Deviations` note is `NEEDS_CHANGES`; when the driver supplied no delta or no diff, return `BLOCKED` rather than guessing.
 The implementation must faithfully realize the proposed delta; when it justifiably deviated, the issue delta must have been updated (with a `### Deviations` note) so it accurately describes what shipped.
-An unexplained mismatch between the shipped canonical spec and the delta is a finding.
 11. Check durable product behavior is documented in canonical specs or the issue delta, not only in tests, agent prompts, or conversation history.
 12. If validation is missing, stale, or suspicious, flag it as a finding for the driver or implementer to run `npm test` / `npm run build`; do not run validation or other commands from this read-only role.
 13. Return one gate status on the first line:

@@ -24,7 +24,7 @@ Make behavior changes here, not in the bindings.
 3. Confirm the task scope and keep changes limited to that task.
 Make the canonical spec changes the delta's `### Spec Deltas` require under `openspec/specs/` as part of the change.
 If implementation forces a justified departure from the proposed delta, note it for the driver so the docs loop can reconcile the issue delta against what shipped.
-4. Add or adjust tests first when practical.
+4. Write the failing test first; the exceptions are pure refactors covered by existing tests and visual-only CSS tweaks — name the exception in the summary when you take one.
 5. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
 6. Implement the minimum change that satisfies the plan.
 7. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
@@ -78,7 +78,7 @@ If `30100` is also occupied, override with matching `FOUNDRY_HOST_PORT` and `FOU
 - Treat Docker startup conflicts, launch reconnects, and stale container-name failures as harness infrastructure unless the app loaded and failed a product assertion.
 - For card, overlay, menu, disabled-state, and icon-button interactions, real browser pointer hit-tests are required whenever the change adds or repositions an overlay, menu, disabled state, card action, or icon-only control; skip them only when the rendered DOM and CSS stacking of the control are unchanged, and say so in the handoff. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss — see `skills/fabricate-implementer/references/pointer-hit-tests.md` for the `assertPointerTarget` recipe and where to wire it into the smoke harness.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
-- For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
+- For image-card UI, use representative fixture data so at least one screenshot proves the linked image path as well as fallback behavior; when no linked-image fixture exists, name that gap explicitly in the handoff.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external URLs.
 - When adding a capture to `scripts/foundry-test-run.mjs`, `waitFor` a stable container/section/tab marker (e.g. `[data-recipe-tab="results"] [data-recipe-section]`), not deep leaf content (`[data-recipe-result-item]`).
 An over-specific wait that times out fails the whole phase and can cascade into an unrelated-looking later-phase failure — one root cause reported as `N step(s) failed`.

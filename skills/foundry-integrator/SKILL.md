@@ -31,8 +31,11 @@ The driver auto-spawns this role from the routing table in `AGENTS.md` whenever 
 Establish the real shape and behaviour of Foundry before judging Fabricate's use of it.
 Prefer the most authoritative source available and always cite which one a claim rests on, pinned to the target Foundry version.
 
-1. **Foundry VTT sources first.** The actual client/server source (a local Foundry install's `resources/app/`, or the version-matched source) is authoritative for real signatures, return shapes, hook timing, and side effects.
-Cite the file and symbol.
+1. **Foundry VTT sources first.** The actual client/server source is authoritative for real signatures, return shapes, hook timing, and side effects; cite the file and symbol.
+Locate it with this probe ladder — one probe per rung, then fall through; never stall waiting for a source that is not present:
+   - Probe a local Foundry install's `resources/app` (on Windows typically `C:\Program Files\Foundry Virtual Tabletop\resources\app`, or the path the user supplies).
+   - Otherwise probe the repo's smoke-test container, which exists after any `npm run test:foundry` run: `docker exec fabricate-foundry-test ls /home/foundry/resources/app` (start it first with `npm run test:foundry:up` only when the task already warrants a smoke environment; do not boot Docker solely to read source).
+   - If neither probe succeeds, proceed directly to rung 2 and say which rung your claims rest on.
 2. **Official API documentation second.** Use the version-matched API docs at `foundryvtt.com/api` when source is not to hand, or to confirm a documented contract.
 Cite the page/symbol.
 3. **Community discussions third.** The community wiki (`foundryvtt.wiki`), the official Discord `#dev`/`#api` channels, GitHub issues/discussions, and forum/Reddit threads surface undocumented behaviour, gotchas, and cross-version migrations.
