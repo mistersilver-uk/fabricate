@@ -93,7 +93,11 @@ function system(overrides = {}) {
     enabled: true,
     features: { gathering: true },
     components: [{ id: 'comp-a', difficulty: 1 }],
-    gatheringCraftingCheck: routedSystemCheck(),
+    // Include a failure tier so a below-success roll resolves to a genuine failure:
+    // routed gathering now clamps a below-lowest relative roll to the closest tier, so
+    // a success-only check would clamp a miss up to success. With the failure tier the
+    // fixture's sub-threshold behaviour matches the pre-clamp "no match → failure".
+    gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
     ...overrides
   };
 }

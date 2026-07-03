@@ -420,8 +420,23 @@ export async function runFormulaProgressive({
  *   range; a tier matches when `start <= total <= end`. Ranges are validated
  *   non-overlapping, but should several match the one with the highest `start`
  *   wins.
+ *
+ * `clampToNearest` (relative only) closes the below-lowest dead zone: when the total
+ * meets NO relative threshold, it routes to the lowest-threshold tier (the closest
+ * one) instead of returning null, so a rising base DC never yields a rolled-but-
+ * unrouted craft. There is no top-end clamp — the highest tier is meet-or-exceed and
+ * unbounded above. The flag is ignored in the fixed branch (authored ranges own their
+ * own gaps).
  */
-function matchRoutedOutcome({ type, total, dc, comparison, relativeOutcomes, fixedOutcomes }) {
+function matchRoutedOutcome({
+  type,
+  total,
+  dc,
+  comparison,
+  relativeOutcomes,
+  fixedOutcomes,
+  clampToNearest = false,
+}) {
   if (type === 'fixed') {
     const outcomes = Array.isArray(fixedOutcomes) ? fixedOutcomes : [];
     let best = null;
@@ -438,11 +453,19 @@ function matchRoutedOutcome({ type, total, dc, comparison, relativeOutcomes, fix
   const outcomes = Array.isArray(relativeOutcomes) ? relativeOutcomes : [];
   let best = null;
   let bestThreshold = null;
+  let lowest = null;
+  let lowestThreshold = null;
   for (const outcome of outcomes) {
     if (!outcome) continue;
     const delta = Number(outcome.dc);
     if (!Number.isFinite(delta)) continue;
     const threshold = dc + delta;
+    // Track the lowest-threshold tier for the clamp fallback; strict `<` keeps the
+    // first tier (author order) among equal-lowest thresholds — deterministic.
+    if (lowest === null || threshold < lowestThreshold) {
+      lowest = outcome;
+      lowestThreshold = threshold;
+    }
     const matches = comparison === 'exceed' ? total > threshold : total >= threshold;
     if (!matches) continue;
     if (best === null || threshold > bestThreshold) {
@@ -450,6 +473,8 @@ function matchRoutedOutcome({ type, total, dc, comparison, relativeOutcomes, fix
       bestThreshold = threshold;
     }
   }
+  // Below every threshold: clamp to the closest (lowest) tier when asked, else null.
+  if (best === null && clampToNearest) return lowest;
   return best;
 }
 
@@ -507,6 +532,10 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  *   player dismisses the interactive prompt, the runner returns
  *   `{ success: false, cancelled: true, outcome: null, value: null }` so the caller
  *   aborts with zero mutation. Omit it (the default) for a silent roll.
+ * @param {boolean} [params.clampToNearest] Relative-mode only: when a total meets no
+ *   tier threshold, route to the lowest (closest) tier instead of returning a null
+ *   outcome. Opted into by the crafting + salvage callers; gathering leaves it off to
+ *   preserve its "no tier name → failure" path.
  * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
  */
 export async function runFormulaRouted({
@@ -520,6 +549,7 @@ export async function runFormulaRouted({
   actor,
   label = 'Crafting',
   rollOptions = null,
+  clampToNearest = false,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -575,6 +605,7 @@ export async function runFormulaRouted({
     comparison,
     relativeOutcomes,
     fixedOutcomes,
+    clampToNearest,
   });
 
   if (forced) {

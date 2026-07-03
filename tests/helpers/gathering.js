@@ -152,16 +152,31 @@ export function makeEngine({ richState, env = environment(), calls = {}, runMana
  * @param {string} [options.tierName] Name of the lone success tier (matches the
  *   result group it should route to). Defaults to `'Iron'`.
  * @param {number} [options.dc] Base difficulty class. Defaults to `15`.
+ * @param {string|null} [options.failureTierName] When set, append a lowest
+ *   `success: false` tier (delta `-10`, threshold `dc - 10`) named this. Routed
+ *   gathering now clamps a below-lowest relative roll to the closest tier, so a
+ *   failure-path test needs a genuine failure tier for a low roll to land on — a
+ *   bare success-only check would clamp a miss up to success. The name should not
+ *   match any result group (so it routes to the failure path). Defaults to `null`.
  * @returns {{ routed: object }} A `gatheringCraftingCheck` fragment.
  */
-export function routedSystemCheck({ tierName = 'Iron', dc = 15 } = {}) {
+export function routedSystemCheck({ tierName = 'Iron', dc = 15, failureTierName = null } = {}) {
+  const relativeOutcomes = [{ id: `tier-${tierName}`, name: tierName, success: true, dc: 0 }];
+  if (failureTierName) {
+    relativeOutcomes.push({
+      id: `tier-${failureTierName}`,
+      name: failureTierName,
+      success: false,
+      dc: -10
+    });
+  }
   return {
     routed: {
       rollFormula: '1d20',
       dc,
       type: 'relative',
       thresholdMode: 'meet',
-      relativeOutcomes: [{ id: `tier-${tierName}`, name: tierName, success: true, dc: 0 }]
+      relativeOutcomes
     }
   };
 }

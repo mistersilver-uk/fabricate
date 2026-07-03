@@ -125,6 +125,8 @@ No other result groups are awarded.**
 - The crafting check is **required**.
 The outcome is produced by the system's configured routed crafting check, whose required field is an authored `craftingCheck.routed.rollFormula`.
 - `outcome` is trim-normalized and case-insensitive.
+- **Relative tier clamp:** when the routed check uses **relative** outcome tiers and the rolled total meets no tier's effective threshold (`baseDc + outcome.dc`), the outcome is the lowest (closest) tier rather than an empty/null outcome, so a recipe tier or dynamic DC that raises the base difficulty never yields a rolled-but-unrouted craft.
+The clamp is relative-only; **fixed** tiers keep the "outside every range → no outcome" behaviour (their ranges are authored explicitly).
 - **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
 Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.

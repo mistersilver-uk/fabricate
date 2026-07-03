@@ -2404,6 +2404,9 @@ export class GatheringEngine {
       triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Gathering',
+      // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
+      // a per-task dcOverride never opens a null-outcome dead zone.
+      clampToNearest: true,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor,

@@ -47,6 +47,7 @@ The check rolls the routed crafting check you configured on the system, then map
 The matched tier's name is the outcome that selects the result.
 The base difficulty comes from the recipe's selected tier, or from a dynamic difficulty if you set one up, the same way a simple check resolves its difficulty.
 A recipe tier or dynamic difficulty shifts every outcome threshold up or down together.
+A roll that falls below every tier still lands your lowest tier, so raising the difficulty never leaves a craft with no outcome at all.
 
 Use this when the quality of the result should depend on a roll.
 For example, a forging recipe might give a Masterwork Longsword on a great roll, a plain Longsword on an average one, and a Bent Blade on a poor one.

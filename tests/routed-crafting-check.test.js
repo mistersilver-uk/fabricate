@@ -179,8 +179,10 @@ test('recipe tier overrides the base DC and shifts every relative threshold', as
   stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
   const r = await runRoutedCheck(engine, { craftingSystemId: 'sys-1', checkTierId: 'tier-hard' });
   assert.equal(r.data.dc, 18, 'resolves the recipe tier DC, not the flat routed.dc');
-  assert.equal(r.outcome, null, '17 < 18 (Fine threshold shifted by the tier), no match');
-  assert.equal(r.success, false);
+  // 17 < 18 (the tier-shifted Fine threshold) meets no tier, so the crafting engine's
+  // clampToNearest routes to the lowest (here only) tier rather than a null outcome.
+  assert.equal(r.outcome, 'Fine', 'below every threshold clamps to the closest tier');
+  assert.equal(r.success, true, "the clamped tier's own success flag stands");
 });
 
 test('dynamic DC macro return drives the base DC for routed thresholds', async () => {

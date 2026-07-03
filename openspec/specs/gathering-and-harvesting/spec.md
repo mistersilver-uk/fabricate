@@ -1462,6 +1462,10 @@ threshold/outcome-tier configuration) drives resolution:
 1. Roll the routed `rollFormula` against the effective DC — the task's
    `dcOverride` when finite, otherwise the routed check's own `dc` (default 15).
 2. The roll yields a named outcome tier and a success disposition.
+   With **relative** outcome tiers, a total below every threshold clamps to the
+   lowest (closest) tier rather than yielding no tier name, so a `dcOverride` that
+   raises the difficulty never leaves a rolled task unrouted.
+   **Fixed** tiers keep the "outside every range → no tier name" behaviour.
 3. A failing tier, or no tier name, takes the failure path.
 4. A succeeding tier name must match exactly one `ResultGroup.name` under
    trim-normalized, case-insensitive comparison; the matched group is awarded.
