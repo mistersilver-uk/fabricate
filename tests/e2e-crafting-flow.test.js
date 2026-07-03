@@ -492,6 +492,88 @@ test('multi-step: craft() advances through two steps to completion', async () =>
   assert.ok(craftingActor.createdItems.length >= 2, 'result items created across both steps');
 });
 
+test('multi-step: a cancelled interactive continuation aborts the resume with zero mutation', async () => {
+  const system = makeSystem({
+    id: 'sys-1',
+    resolutionMode: 'simple',
+    managedItems: [
+      { id: 'comp-extract', sourceUuid: 'uuid:extract', difficulty: 1 },
+      { id: 'comp-ingot', sourceUuid: 'uuid:ingot', difficulty: 1 }
+    ]
+  });
+  setupGame(system);
+
+  const extractSource = makeSourceItem('Extract');
+  const ingotSource = makeSourceItem('Ingot');
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'uuid:extract') return extractSource;
+    if (uuid === 'uuid:ingot') return ingotSource;
+    return null;
+  };
+
+  const herb = makeItem({ id: 'herb-cc', name: 'Herb', quantity: 3 });
+  const ore = makeItem({ id: 'ore-cc', name: 'Ore', quantity: 2 });
+
+  const set1 = makeIngredientSet({ id: 'set-step1', ingredientItem: herb, quantity: 1 });
+  const set2 = makeIngredientSet({ id: 'set-step2', ingredientItem: ore, quantity: 1 });
+
+  const steps = [
+    {
+      id: 'step-1', name: 'Step 1',
+      ingredientSets: [set1],
+      resultGroups: [{ id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'comp-extract', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
+    },
+    {
+      id: 'step-2', name: 'Step 2',
+      ingredientSets: [set2],
+      resultGroups: [{ id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'comp-ingot', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
+    }
+  ];
+
+  const recipe = makeRecipe({ craftingSystemId: 'sys-1', steps });
+  const sourceActor = makeActor({ id: 'a-cc', items: [herb, ore] });
+  const craftingActor = makeActor({ id: 'a-cc' });
+  const runManager = makeRunManager(2);
+
+  const recipeManager = {
+    canCraft(_actors, executionRecipe) {
+      const currentSets = executionRecipe.ingredientSets || [];
+      if (currentSets.some(s => s.id === 'set-step1')) {
+        return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [] } };
+      }
+      if (currentSets.some(s => s.id === 'set-step2')) {
+        return { canCraft: true, satisfiableSet: set2, missing: { ingredients: [], essences: [] } };
+      }
+      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [], essences: [] } };
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) { return item.id === ingredient.systemItemId; }
+  };
+
+  const resolutionService = makeResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  // Step 1 succeeds and advances the run to step index 1.
+  const result1 = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(result1.success, true, 'step 1 should succeed');
+  assert.equal(runManager.storedRun.currentStepIndex, 1, 'advanced to step index 1');
+
+  // The continuation (step 2) is triggered interactively and the player cancels the
+  // roll dialog: abort with zero mutation and do NOT advance the run.
+  engine._runCraftingCheck = async () => ({ success: false, cancelled: true });
+  const oreConsumedBefore = ore.updateCalled || ore.deleteCalled;
+  const result2 = await engine.craft(craftingActor, [sourceActor], recipe, null, {
+    runId: 'run-1',
+    interactive: true
+  });
+
+  assert.equal(result2.success, false, 'cancelled continuation is not a success');
+  assert.equal(result2.cancelled, true, 'cancelled flag surfaced');
+  assert.equal(runManager.storedRun.currentStepIndex, 1, 'run did NOT advance past step index 1');
+  assert.equal(runManager.storedRun.status, 'inProgress', 'run still in progress after cancel');
+  assert.equal(ore.updateCalled || ore.deleteCalled, oreConsumedBefore, 'step-2 ingredient not consumed on cancel');
+});
+
 test('multi-step: craft() returns failure when step ingredient is insufficient', async () => {
   const system = makeSystem({ id: 'sys-1', resolutionMode: 'simple' });
   setupGame(system);

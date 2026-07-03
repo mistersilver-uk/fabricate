@@ -92,6 +92,47 @@ export function parsePlainDiceGroups(expression) {
 }
 
 /**
+ * Whether a roll expression contains a plain, unmodified `1d20` (bare `d20` ≡
+ * `1d20`) term — the gate for offering Advantage/Disadvantage on an interactive
+ * roll. False for `2d20`, `d200`, and any modified pool (`2d20kh1`), reusing the
+ * same plain-term classifier as {@link parsePlainDiceGroups}.
+ * @param {string} formula
+ * @returns {boolean}
+ */
+export function hasPlainD20(formula) {
+  return parsePlainDiceGroups(formula).some((group) => group.raw === '1d20');
+}
+
+/**
+ * Rewrite the FIRST plain `1d20`/bare `d20` term of a roll expression into a
+ * keep-highest (`2d20kh1`, advantage) or keep-lowest (`2d20kl1`, disadvantage)
+ * pool. Any other `mode`, or an expression with no plain `1d20`, returns the
+ * formula unchanged. Only a whole plain `NdS` token matches (bare `dN` ≡ `1dN`),
+ * so `2d20`, `d200`, and already-modified pools are left alone.
+ * @param {string} formula
+ * @param {'advantage'|'disadvantage'|string} mode
+ * @returns {string}
+ */
+export function applyD20Advantage(formula, mode) {
+  const text = String(formula ?? '');
+  if (mode !== 'advantage' && mode !== 'disadvantage') return text;
+  const replacement = mode === 'advantage' ? '2d20kh1' : '2d20kl1';
+  let replaced = false;
+  // Match maximal non-separator runs (the complement of the term separators used
+  // by parsePlainDiceGroups), so each token is a single term. Replace only the
+  // first token that is a whole plain `1d20`.
+  return text.replaceAll(/[^\s+\-*/%(),[\]]+/g, (token) => {
+    if (replaced) return token;
+    const plain = parsePlainTerm(token);
+    if (plain && plain.raw === '1d20') {
+      replaced = true;
+      return replacement;
+    }
+    return token;
+  });
+}
+
+/**
  * Whether two inclusive integer ranges intersect.
  * @param {{ start: number, end: number }} a
  * @param {{ start: number, end: number }} b

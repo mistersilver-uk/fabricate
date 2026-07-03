@@ -3,6 +3,10 @@ import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
 } from '../gatheringToolRuntime.js';
+import {
+  buildInteractiveRollOptions,
+  promptCheckRoll,
+} from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
@@ -332,6 +336,10 @@ export class GatheringEngine {
     // attempt was opened against an interactable that owns its own scoped node
     // pool (issue 302). Null for the default environment-scoped flow.
     interactableRef = null,
+    // Opt-in interactive roll (UI-triggered attempt): surfaces the confirm-roll
+    // dialog + posts the roll to chat for the routed/progressive check paths.
+    // Defaults false so the programmatic API and timed maturation stay silent.
+    interactive = false,
   } = {}) {
     const resolved = await this._resolveStartContext({
       viewer,
@@ -573,6 +581,7 @@ export class GatheringEngine {
       richAttempt,
       presentTools,
       interactableRef,
+      interactive,
     });
   }
 
@@ -1993,13 +2002,35 @@ export class GatheringEngine {
     richAttempt = null,
     presentTools = null,
     interactableRef = null,
+    interactive = false,
   }) {
     const outcome =
       task.resolutionMode === 'd100'
-        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
+        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive })
         : task.resolutionMode === 'progressive'
-          ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
-          : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
+          ? await this._resolveProgressiveOutcome({
+              viewer,
+              actor,
+              system,
+              environment,
+              task,
+              interactive,
+            })
+          : await this._resolveRoutedOutcome({
+              viewer,
+              actor,
+              system,
+              environment,
+              task,
+              interactive,
+            });
+
+    // The player dismissed the interactive roll dialog: a user choice, not a
+    // blocked attempt. Return a quiet, non-notifying result BEFORE any run
+    // creation, side effects, or chat — zero mutation.
+    if (outcome.status === 'cancelled') {
+      return this._cancelledStart({ viewer, actor, environment, task });
+    }
 
     if (outcome.status === 'misconfigured') {
       return this._blockedStart({
@@ -2332,7 +2363,7 @@ export class GatheringEngine {
     });
   }
 
-  async _resolveRoutedOutcome({ actor, system, task }) {
+  async _resolveRoutedOutcome({ actor, system, task, interactive = false }) {
     // Routed gathering resolves exclusively through the system-level gathering
     // check (Checks editor): roll the configured routed formula and map its total
     // onto a named outcome tier, then route that tier name to a result group by
@@ -2347,7 +2378,7 @@ export class GatheringEngine {
       });
     }
 
-    return this._resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task });
+    return this._resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task, interactive });
   }
 
   /**
@@ -2361,10 +2392,11 @@ export class GatheringEngine {
    * `normalizeTerminalOutcome` machinery the provider path uses.
    * @private
    */
-  async _resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task }) {
+  async _resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task, interactive = false }) {
+    const dc = this._resolveGatheringRoutedDc(routed, task);
     const rolled = await runFormulaRouted({
       formula: rollFormula,
-      dc: this._resolveGatheringRoutedDc(routed, task),
+      dc,
       thresholdMode: routed.thresholdMode,
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
@@ -2372,7 +2404,21 @@ export class GatheringEngine {
       triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Gathering',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: task?.name,
+        activity: 'Gathering',
+        img: task?.img,
+        dc,
+      }),
     });
+
+    // The player cancelled the interactive roll: propagate a cancelled outcome so
+    // `_resolveImmediateAttempt` aborts with zero mutation.
+    if (rolled.cancelled) {
+      return { status: 'cancelled', resultGroups: [], checkResult: null };
+    }
 
     const outcomeName = stringOrNull(rolled.outcome);
     const checkResult = {
@@ -2417,7 +2463,7 @@ export class GatheringEngine {
     return Number.isFinite(dc) ? Math.trunc(dc) : 15;
   }
 
-  async _resolveD100Outcome({ viewer, actor, system, environment, task }) {
+  async _resolveD100Outcome({ viewer, actor, system, environment, task, interactive = false }) {
     if (typeof this.richState?.resolveD100Attempt !== 'function') {
       return misconfiguredOutcome({
         code: 'MISSING_D100_RESOLVER',
@@ -2430,6 +2476,29 @@ export class GatheringEngine {
     const eventModifier = Number(
       environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
     );
+
+    // Interactive d100 (opt-in): the d100 path does NOT use a Foundry `Roll` DC —
+    // each drop row / event is an independent percentile check. So there is no DC
+    // to show; the prompt just confirms the attempt and collects an optional flat
+    // situational modifier applied to every throw. A dismissed prompt returns a
+    // cancelled outcome the caller maps to a zero-mutation `_cancelledStart`.
+    let extraModifier = 0;
+    if (interactive) {
+      // No DC is passed: the d100 path has no single DC (each row/event is an
+      // independent percentile check), so the dialog shows no DC line.
+      const choice = await promptCheckRoll({
+        label: `${task?.name ?? 'Gathering'} — Gathering`,
+        name: task?.name,
+        activity: 'Gathering',
+        img: task?.img,
+      });
+      if (!choice || choice.confirmed === false) {
+        return { status: 'cancelled', resultGroups: [], checkResult: null };
+      }
+      const parsedBonus = Number(choice.bonus);
+      extraModifier = Number.isFinite(parsedBonus) ? parsedBonus : 0;
+    }
+
     const resolved = await this.richState.resolveD100Attempt({
       task,
       environment,
@@ -2438,6 +2507,13 @@ export class GatheringEngine {
       system,
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
+      // DSN animation + the situational bonus flow only for an interactive attempt;
+      // the automated/timed path leaves the resolver's behaviour untouched.
+      animate: interactive === true,
+      extraModifier,
+      rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
+      speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
+      flavor: `${task?.name ?? 'Gathering'} — Gathering check`,
     });
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({
@@ -2471,14 +2547,28 @@ export class GatheringEngine {
     };
   }
 
-  async _resolveProgressiveOutcome({ viewer, actor, system, environment, task }) {
+  async _resolveProgressiveOutcome({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    interactive = false,
+  }) {
     const checkResult = await this._evaluateGatheringCheck({
       actor,
       viewer,
       system,
       environment,
       task,
+      interactive,
     });
+    // The player cancelled the interactive roll: propagate a cancelled outcome so
+    // `_resolveImmediateAttempt` aborts with zero mutation (before normalization,
+    // which does not model a cancel).
+    if (checkResult?.cancelled) {
+      return { status: 'cancelled', resultGroups: [], checkResult: null };
+    }
     const normalizedCheck = normalizeCheckResult(checkResult);
     if (normalizedCheck.diagnostic) {
       return misconfiguredOutcome({
@@ -2529,7 +2619,7 @@ export class GatheringEngine {
     return outcome;
   }
 
-  async _evaluateGatheringCheck({ actor, system }) {
+  async _evaluateGatheringCheck({ actor, system, task = null, interactive = false }) {
     // System-level gathering check (Checks editor) drives progressive
     // resolution: roll the configured formula and map its numeric total onto the
     // check-result shape the progressive resolver expects (`{ success, status,
@@ -2542,7 +2632,19 @@ export class GatheringEngine {
         triggers: progressive.checkBreakage?.triggers,
         actor,
         label: 'Gathering',
+        rollOptions: buildInteractiveRollOptions({
+          interactive,
+          actor,
+          name: task?.name,
+          activity: 'Gathering',
+          img: task?.img,
+        }),
       });
+      // The player cancelled the interactive roll: surface a cancel marker so
+      // `_resolveProgressiveOutcome` aborts with zero mutation.
+      if (rolled.cancelled) {
+        return { success: false, status: null, value: null, cancelled: true };
+      }
       // Progressive is value-driven, not pass/fail: leave `status` null so the
       // award logic (in `resolveProgressiveAward`) decides succeeded/failed from
       // the numeric `value`. A roll-evaluation error surfaces `success: false`,
@@ -3109,6 +3211,28 @@ export class GatheringEngine {
       environmentId: environment ? stringOrNull(environment.id) : null,
       taskId: opaqueBlind ? null : task ? stringOrNull(task.id) : null,
       blockedReasons: [reason],
+    };
+  }
+
+  /**
+   * Build the quiet result returned when the player dismisses the interactive
+   * roll dialog. Not `accepted`, but carries no `blockedReasons` and sets
+   * `cancelled: true` so the UI treats it as a SILENT no-op (no notification) —
+   * distinct from a genuinely blocked attempt.
+   * @private
+   */
+  _cancelledStart({ viewer, actor = null, environment = null, task = null }) {
+    const opaqueBlind = environment && task && this._isOpaqueBlindTask({ environment, viewer });
+    return {
+      accepted: false,
+      cancelled: true,
+      started: false,
+      state: 'cancelled',
+      viewerId: idOf(viewer),
+      actorId: actor ? idOf(actor) : null,
+      environmentId: environment ? stringOrNull(environment.id) : null,
+      taskId: opaqueBlind ? null : task ? stringOrNull(task.id) : null,
+      blockedReasons: [],
     };
   }
 

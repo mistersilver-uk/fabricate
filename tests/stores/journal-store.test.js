@@ -162,9 +162,30 @@ describe('journalStore', () => {
     await store.advance({ id: 'b', recipeId: 'r-b' });
     flushSync();
 
-    assert.deepEqual(setup.calls.advance, [{ actorId: 'actor-1', runId: 'b', recipeId: 'r-b' }]);
+    assert.deepEqual(setup.calls.advance, [
+      { actorId: 'actor-1', runId: 'b', recipeId: 'r-b', interactive: true }
+    ]);
     assert.deepEqual(setup.calls.notify, ['You must own the source character.']);
     assert.equal(setup.calls.list, 2, 'refetched after advance');
+    assert.equal(store.busyRunId, '', 'busy flag cleared');
+  });
+
+  it('advance treats a cancelled continuation as a silent no-op (no notify, no refetch)', async () => {
+    const setup = makeServices({
+      advanceResult: { success: false, cancelled: true, message: 'Crafting cancelled' }
+    });
+    const store = await loadedStore(setup);
+
+    await store.advance({ id: 'b', recipeId: 'r-b' });
+    flushSync();
+
+    // The continuation opts into the interactive roll dialog.
+    assert.deepEqual(setup.calls.advance, [
+      { actorId: 'actor-1', runId: 'b', recipeId: 'r-b', interactive: true }
+    ]);
+    // A cancel is a user choice, not a failure: no error notification, no refetch.
+    assert.deepEqual(setup.calls.notify, [], 'no notification on cancel');
+    assert.equal(setup.calls.list, 1, 'listing NOT refetched after a cancel');
     assert.equal(store.busyRunId, '', 'busy flag cleared');
   });
 

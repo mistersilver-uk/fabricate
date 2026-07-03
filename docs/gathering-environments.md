@@ -449,6 +449,11 @@ It is not the chance the whole attempt succeeds, so it can read high while an at
 Tasks that have no enabled drop rows carry no bar.
 The opaque blind action never shows per-task success chances.
 
+Attempting a routed or progressive task opens an interactive roll dialog before anything is gathered, and the roll posts to chat so a module like Dice So Nice can animate it.
+Cancelling the dialog aborts the attempt with no changes.
+The immediate d100 mode and timed tasks do not prompt.
+See [Rolling a check from the UI]({% link crafting-checks.md %}#rolling-a-check-from-the-ui) for the full behaviour.
+
 ![Fabricate player gathering task](img/screenshots/fabricate-player-gathering-task.webp)
 ![Fabricate player gathering events](img/screenshots/fabricate-player-gathering-events.webp)
 ![Fabricate player gathering missing tool](img/screenshots/fabricate-player-gathering-tool-blocked.webp)

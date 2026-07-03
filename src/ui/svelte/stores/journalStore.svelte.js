@@ -143,7 +143,16 @@ export function createJournalStore({ services } = {}) {
         actorId: listing?.selectedActorId ?? null,
         runId: run.id,
         recipeId: run.recipeId,
+        // A player-clicked "Trigger Next Step" is an interactive continuation:
+        // prompt the roll dialog + post to chat (Dice So Nice).
+        interactive: true,
       });
+      // Dismissing the roll dialog is a user choice, not a failure: a cancelled
+      // result is also `success: false`, so handle it first and return quietly
+      // (no error notification, no listing churn), mirroring craftingStore.craft.
+      if (result?.cancelled === true) {
+        return;
+      }
       const message = result?.message;
       if (message) services?.notify?.(message);
       await load(true);

@@ -107,6 +107,7 @@ function makeBuilder({
   recipe = RECIPE,
   getGatheringTask = null,
   getResultItem = null,
+  getRecipeItemImg = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -132,6 +133,7 @@ function makeBuilder({
     },
     getGatheringTask,
     getResultItem,
+    getRecipeItemImg,
     localize,
     nowWorldTime: () => worldTime,
   });
@@ -592,4 +594,39 @@ test('a dynamic-DC check surfaces the formula without a DC number', () => {
     .buildListing({ actor: ACTOR, viewer: PLAYER })
     .activeRuns[0].steps[1].detail;
   assert.equal(detail.checkLabel, '1d20');
+});
+
+const BLUEPRINT_IMG = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
+const ITEM_BAG = 'icons/svg/item-bag.svg';
+
+test('a recipe-item crafting run resolves the recipe-item definition image (never the item bag)', () => {
+  const recipeItemRecipe = { ...RECIPE, img: BLUEPRINT_IMG, recipeItemId: 'ri-1' };
+
+  // The recipe-item definition image wins over recipe.img.
+  let run = makeBuilder({
+    active: [activeCraftingRun()],
+    recipe: recipeItemRecipe,
+    getRecipeItemImg: (systemId, recipeItemId) =>
+      systemId === 'sys-1' && recipeItemId === 'ri-1' ? 'icons/tools/smithing/anvil.webp' : null,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.equal(run.img, 'icons/tools/smithing/anvil.webp');
+
+  // No definition image → recipe.img (blueprint), NEVER the item bag.
+  run = makeBuilder({
+    active: [activeCraftingRun()],
+    recipe: recipeItemRecipe,
+    getRecipeItemImg: () => null,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.equal(run.img, BLUEPRINT_IMG);
+  assert.notEqual(run.img, ITEM_BAG);
+});
+
+test('a crafting run with no recipe image falls back to the blueprint default, never the item bag', () => {
+  const noImgRecipe = { ...RECIPE, img: '', recipeItemId: null };
+  const run = makeBuilder({ active: [activeCraftingRun()], recipe: noImgRecipe }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0];
+  assert.equal(run.img, BLUEPRINT_IMG);
+  assert.notEqual(run.img, ITEM_BAG);
 });

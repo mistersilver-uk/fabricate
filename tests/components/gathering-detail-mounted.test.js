@@ -626,8 +626,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(calls.attempts.length, 1, 'startGatheringAttempt called once');
     assert.deepEqual(
       calls.attempts[0],
-      { environmentId: 'env-meadow', taskId: 'task-1', rememberedActorId: null },
-      'called with env + task id (+ remembered actor; null with no actor bar)'
+      { environmentId: 'env-meadow', taskId: 'task-1', rememberedActorId: null, interactive: true },
+      'called with env + task id (+ remembered actor; null with no actor bar) and interactive roll'
     );
     assert.equal(calls.list, 2, 'listing re-fetched after the attempt');
   });
@@ -751,8 +751,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(calls.attempts.length, 1, 'blind attempt fires once');
     assert.deepEqual(
       calls.attempts[0],
-      { environmentId: 'env-blind', taskId: null, rememberedActorId: null },
-      'blind attempt omits the task id (remembered actor null with no actor bar)'
+      { environmentId: 'env-blind', taskId: null, rememberedActorId: null, interactive: true },
+      'blind attempt omits the task id (remembered actor null with no actor bar) and rolls interactively'
     );
   });
 

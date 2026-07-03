@@ -426,7 +426,20 @@ export class GatheringRichStateService {
     system = null,
     gatheringModifier = 0,
     eventModifier = 0,
+    // Interactive DSN animation (opt-in). `animate` pre-rolls a single `Nd100`
+    // Foundry Roll so Dice So Nice animates every percentile throw at once, then
+    // draws the per-row/event faces from it (falling back to `this.rollD100()` if
+    // the pool runs dry). `extraModifier` is a flat situational bonus added to
+    // every throw. `rollMode`/`speaker`/`flavor` decorate the DSN chat post. All
+    // default to the pre-existing silent behaviour (`animate` false → each throw
+    // uses `this.rollD100()` unchanged, and nothing is posted to chat).
+    animate = false,
+    extraModifier = 0,
+    rollMode,
+    speaker,
+    flavor,
   } = {}) {
+    const flatBonus = Number.isFinite(extraModifier) ? extraModifier : 0;
     const itemRows = normalizeList(task?.dropRows ?? task?.itemDrops);
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
     const conditions = environment?.conditions || {};
@@ -538,13 +551,38 @@ export class GatheringRichStateService {
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
     const biomeAggregation = rules.biomeModifierAggregation;
 
+    // Draw each percentile throw from a pre-rolled `Nd100` pool when animating, so
+    // Dice So Nice shows the whole attempt at once; otherwise fall back to the
+    // injected `this.rollD100()` seam (unchanged for the automated/timed path).
+    const throwCount = rowContributions.length + eventContributions.length;
+    let animationPool = null;
+    let nextRoll = () => this.rollD100();
+    if (animate && typeof globalThis.Roll === 'function' && throwCount > 0) {
+      try {
+        animationPool = await new globalThis.Roll(`${throwCount}d100`).evaluate({
+          allowInteractive: false,
+        });
+        const faces = Array.isArray(animationPool?.dice?.[0]?.results)
+          ? animationPool.dice[0].results
+              .map((entry) => Number(entry?.result))
+              .filter((face) => Number.isFinite(face))
+          : [];
+        let cursor = 0;
+        nextRoll = () => (cursor < faces.length ? faces[cursor++] : this.rollD100());
+      } catch (error) {
+        console.error('Fabricate | Failed to pre-roll d100 animation pool:', error);
+        animationPool = null;
+        nextRoll = () => this.rollD100();
+      }
+    }
+
     const droppedItems = rowContributions
       .map((entry, index) =>
         rollDropRow({
           row: entry.row,
           index,
-          roll: this.rollD100(),
-          modifier: taskModifier,
+          roll: nextRoll(),
+          modifier: taskModifier + flatBonus,
           conditions,
           biomes,
           biomeAggregation,
@@ -560,8 +598,8 @@ export class GatheringRichStateService {
         rollDropRow({
           row: entry.event,
           index,
-          roll: this.rollD100(),
-          modifier: numericModifier(entry.event?.eventModifier, eventModifier),
+          roll: nextRoll(),
+          modifier: numericModifier(entry.event?.eventModifier, eventModifier) + flatBonus,
           conditions,
           biomes,
           biomeAggregation,
@@ -572,6 +610,16 @@ export class GatheringRichStateService {
       .filter((result) => result.dropped);
     const selectedEvents = selectDrops(droppedEvents, rules.eventSelectionMode, rules.eventLimit);
     const eventPolicy = rules.eventPolicy;
+
+    // Surface the pooled roll to chat so Dice So Nice animates it. Interactive/
+    // animate-only; a chat failure is logged and swallowed, never thrown.
+    if (animationPool) {
+      try {
+        await animationPool.toMessage({ speaker, flavor }, { rollMode, create: true });
+      } catch (error) {
+        console.error('Fabricate | Failed to post d100 roll to chat:', error);
+      }
+    }
 
     return {
       status:
