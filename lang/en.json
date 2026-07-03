@@ -372,6 +372,53 @@
         "Journal": "Journal",
         "Inventory": "Inventory"
       },
+      "Inventory": {
+        "Loading": "Loading your inventory…",
+        "Error": "Couldn't load your inventory.",
+        "NoActor": "Select a character to see their crafting inventory.",
+        "Empty": "This character isn't carrying any crafting components yet.",
+        "NoMatches": "No items match the current filters.",
+        "Filters": {
+          "SearchPlaceholder": "Search items, essences, tags…",
+          "SearchLabel": "Search inventory",
+          "All": "All",
+          "Components": "Components",
+          "Essences": "Essences",
+          "Tools": "Tools",
+          "SortLabel": "Sort",
+          "SortName": "Name",
+          "SortQuantity": "Quantity",
+          "SortType": "Type"
+        },
+        "Card": {
+          "ToolPip": "Tool"
+        },
+        "Detail": {
+          "SelectHint": "Select an item to see its sources and where it's used.",
+          "Total": "{count} total",
+          "Tier": "Tier {tier}",
+          "TypeComponent": "Component",
+          "TypeEssence": "Essence",
+          "SourcesTitle": "Sources",
+          "ContributingTitle": "Contributing components",
+          "ContributingEmpty": "No owned components contribute this essence.",
+          "EssenceContentTitle": "Essences",
+          "UsedByTitle": "Used by",
+          "UsedByEmpty": "Not used by any known recipe.",
+          "RequiredForTitle": "Required for",
+          "RequiredForEmpty": "Not required as a tool by any known recipe.",
+          "ProducedByTitle": "Produced by",
+          "ProducedByEmpty": "Not produced by any known recipe, salvage, or gathering.",
+          "PagePrevious": "Previous page",
+          "PageNext": "Next page",
+          "RoleIngredient": "Ingredient",
+          "RoleTool": "Tool",
+          "RoleEssence": "Essence",
+          "KindRecipe": "Recipe",
+          "KindSalvage": "Salvage",
+          "KindGathering": "Gathering"
+        }
+      },
       "ActorBar": {
         "Trigger": "Select a character",
         "Stamina": "Stamina",

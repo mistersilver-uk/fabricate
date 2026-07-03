@@ -251,6 +251,12 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/journal\//],
   },
   {
+    id: 'player-inventory',
+    label: 'Player Inventory tab',
+    smokeLabels: ['player-inventory'],
+    matches: [/^src\/ui\/svelte\/apps\/inventory\//],
+  },
+  {
     id: 'fabricate-app-shell',
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],

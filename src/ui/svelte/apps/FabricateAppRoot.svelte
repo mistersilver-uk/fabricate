@@ -14,6 +14,7 @@
   import GatheringView from './gathering/GatheringView.svelte';
   import CraftingView from './crafting/CraftingView.svelte';
   import JournalView from './journal/JournalView.svelte';
+  import InventoryView from './inventory/InventoryView.svelte';
   import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
 
   let {
@@ -115,8 +116,10 @@
             <GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />
           {:else if tab.id === 'journal'}
             <JournalView {services} />
+          {:else if tab.id === 'inventory'}
+            <InventoryView {services} />
           {:else}
-            <!-- Shared placeholder for the (future) Alchemy and Inventory tabs.
+            <!-- Shared placeholder for the (future) Alchemy tab.
                  FORWARD-COMPAT NOTE: when the planned Alchemy tab
                  gains its own header/context bar (analogous to gathering's
                  weather/time/region in ActorSelectTopBar), the active station-tool

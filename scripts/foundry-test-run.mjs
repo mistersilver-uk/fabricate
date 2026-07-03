@@ -4108,6 +4108,37 @@ async function main() {
         await screenshot(page, 'player-gathering-environments');
         await screenshot(page, 'fabricate-app-shell');
 
+        // Dedicated player Inventory tab evidence: switch the shared window to the
+        // Inventory tab and wait for its listing to settle off "loading" so the
+        // captured frame shows the resolved owned-materials grid (or the empty /
+        // no-actor state) rather than the spinner. Maps changes under
+        // src/ui/svelte/apps/inventory/ to a real screenshot (see the
+        // 'player-inventory' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
+        await appShell.locator('.fabricate-app-nav-item:has-text("Inventory")')
+          .first().click();
+        await appShell.locator('.fabricate-app-nav-item.active:has-text("Inventory")')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-state]:not([data-inventory-state="loading"])')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        // A selectable item auto-selects, so when the grid is populated wait for
+        // the detail panel to render before capturing (mirrors the gathering
+        // detail wait), so the frame shows the sources / used-by panel.
+        if (await appShell.locator('[data-inventory-state="populated"]').count() > 0) {
+          await appShell.locator('[data-inventory-detail]').first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-inventory');
+        // Restore the Gathering tab (the tab active before this inventory capture):
+        // the downstream steps operate on the Gathering view (selecting the
+        // 'Azure Grove' environment, etc.), so re-activate it and wait for its
+        // listing to settle off "loading" before continuing.
+        await appShell.locator('.fabricate-app-nav-item:has-text("Gathering")').first().click();
+        await appShell.locator('.fabricate-app-nav-item.active:has-text("Gathering")')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-gathering-state]:not([data-gathering-state="loading"])')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+
         async function clearGatheringEnvironmentSearch() {
           const search = appShell.locator('.gathering-env-search input').first();
           if (await search.count() === 0) return;
