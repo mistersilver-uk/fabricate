@@ -402,8 +402,7 @@
           "UsedByTitle": "Used by",
           "UsedByEmpty": "Not used by any known recipe.",
           "RoleIngredient": "Ingredient",
-          "RoleTool": "Tool",
-          "PinForCrafting": "Pin for Crafting"
+          "RoleTool": "Tool"
         }
       },
       "ActorBar": {

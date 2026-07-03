@@ -2,9 +2,9 @@
 <!--
   InventoryDetail is the right-hand panel for the selected owned item. It shows the
   item's image + name + type/tag/tier chips, a per-source quantity breakdown, the
-  essence content it carries, and the recipes that use it ("Used By"). Each used-by
-  recipe (and the Pin-for-Crafting action) jumps to the Crafting tab with that
-  recipe selected. Prop-driven; navigation routes back through the store seam.
+  essence content it carries, and the recipes that use it ("Used By"). Clicking a
+  used-by recipe jumps to the Crafting tab with that recipe selected. Prop-driven;
+  navigation routes back through the store seam.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -30,7 +30,6 @@
         : 'FABRICATE.App.Inventory.Detail.TypeComponent'
     )
   );
-  const firstRecipeId = $derived(usedBy.length > 0 ? usedBy[0].recipeId : null);
 
   function hasImg(value) {
     return typeof value === 'string' && value.trim() !== '';
@@ -134,19 +133,6 @@
         <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')}</p>
       {/if}
     </section>
-
-    <div class="inventory-detail-actions">
-      <button
-        type="button"
-        class="inventory-detail-pin"
-        data-inventory-pin
-        disabled={!firstRecipeId}
-        onclick={() => openRecipe(firstRecipeId)}
-      >
-        <i class="fas fa-thumbtack" aria-hidden="true"></i>
-        <span>{localize('FABRICATE.App.Inventory.Detail.PinForCrafting')}</span>
-      </button>
-    </div>
   </div>
 {/if}
 
@@ -366,45 +352,5 @@
     margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);
-  }
-
-  .inventory-detail-actions {
-    margin-top: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .inventory-detail-pin {
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    min-height: 38px;
-    padding: 8px 12px;
-    border: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .inventory-detail-pin:hover:not(:disabled) {
-    background: var(--fab-accent);
-    color: var(--fab-on-accent, var(--fab-surface));
-  }
-
-  .inventory-detail-pin:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .inventory-detail-pin:disabled {
-    opacity: 0.5;
-    cursor: default;
   }
 </style>

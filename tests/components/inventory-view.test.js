@@ -139,10 +139,5 @@ describe('InventoryView (mounted)', () => {
     usedBy.click();
     flushSync();
     assert.deepEqual(calls.navigate, ['r1'], 'clicking a used-by recipe navigates to that recipe');
-
-    // The Pin for Crafting action jumps to the first using recipe too.
-    target.querySelector('[data-inventory-pin]').click();
-    flushSync();
-    assert.deepEqual(calls.navigate, ['r1', 'r1'], 'Pin for Crafting jumps to the first using recipe');
   });
 });
