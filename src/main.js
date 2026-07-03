@@ -1694,6 +1694,8 @@ class Fabricate {
         getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
         getGatheringTask: (environmentId, taskId) =>
           this._resolveJournalGatheringTask(environmentId, taskId),
+        getRecipeItemImg: (systemId, recipeItemId) =>
+          this.craftingSystemManager?.getRecipeItemDefinition?.(systemId, recipeItemId)?.img ?? null,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),

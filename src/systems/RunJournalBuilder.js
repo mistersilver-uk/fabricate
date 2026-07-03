@@ -1,3 +1,5 @@
+import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
+
 import {
   actorToOption,
   idOf,
@@ -101,6 +103,7 @@ export class RunJournalBuilder {
     getSystem = null,
     getTool = null,
     getGatheringTask = null,
+    getRecipeItemImg = null,
     getResultItem = null,
     getViewer = null,
     localize = (key) => key,
@@ -115,6 +118,7 @@ export class RunJournalBuilder {
     this._getSystem = typeof getSystem === 'function' ? getSystem : () => null;
     this._getTool = typeof getTool === 'function' ? getTool : () => null;
     this._getGatheringTask = typeof getGatheringTask === 'function' ? getGatheringTask : () => null;
+    this._getRecipeItemImg = typeof getRecipeItemImg === 'function' ? getRecipeItemImg : () => null;
     this._getResultItem = typeof getResultItem === 'function' ? getResultItem : () => null;
     this._getViewer = typeof getViewer === 'function' ? getViewer : () => null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
@@ -196,6 +200,22 @@ export class RunJournalBuilder {
   // Crafting (fully projected)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Resolve a crafting run's icon with the SAME precedence the GM editor / player
+   * listings / roll prompt use — the recipe-item definition image wins over the
+   * recipe's own `img`, and the final fallback is the recipe default (blueprint),
+   * NEVER the generic item bag. A recipe-item-backed recipe's `recipe.img` is the
+   * model default blueprint, so without the recipe-item lookup the run showed the
+   * bag / blueprint instead of the authored item image.
+   * @private
+   */
+  _resolveCraftingRunImg(recipe) {
+    const recipeItemImg = recipe?.recipeItemId
+      ? this._getRecipeItemImg(recipe.craftingSystemId, recipe.recipeItemId) || ''
+      : '';
+    return recipeItemImg || stringOrNull(recipe?.img) || DEFAULT_RECIPE_IMAGE;
+  }
+
   _craftingRunModel({ run, actor, viewer, worldTime, terminal }) {
     if (!run?.id) return null;
     const recipe = this._recipeManager?.getRecipe?.(stringOrNull(run.recipeId)) ?? null;
@@ -250,7 +270,7 @@ export class RunJournalBuilder {
         subtitle: redacted ? '' : stringOrEmpty(system?.name),
       },
       redacted,
-      img: redacted ? DEFAULT_RUN_IMAGE : stringOrNull(recipe?.img) || DEFAULT_RUN_IMAGE,
+      img: redacted ? DEFAULT_RUN_IMAGE : this._resolveCraftingRunImg(recipe),
       stepIndex: Number.isFinite(currentStepIndex) ? currentStepIndex : null,
       stepCount,
       stepLabel: this._stepLabel({

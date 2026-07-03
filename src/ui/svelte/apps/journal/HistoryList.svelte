@@ -107,12 +107,36 @@
      scoped wrapper so it cannot bleed beyond this list. */
   .journal-history-body :global(.manager-pagination) {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: var(--fab-space-2);
     padding-top: var(--fab-space-2);
     font-size: 12px;
     color: var(--fab-text-muted);
+  }
+
+  /* Only the summary shrinks (ellipsis); the nav and per-page picker stay put so
+     the footer never wraps to a second row in the narrow History column. */
+  .journal-history-body :global(.manager-pagination-summary) {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .journal-history-body :global(.manager-pagination-page) {
+    color: var(--fab-text);
+    white-space: nowrap;
+  }
+
+  .journal-history-body :global(.manager-pagination-size) {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: var(--fab-space-1);
+    align-items: center;
+    margin-left: auto;
+    white-space: nowrap;
   }
 
   .journal-history-body :global(.manager-icon-button) {
@@ -135,6 +159,7 @@
 
   .journal-history-body :global(.manager-pagination-nav) {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: var(--fab-space-2);
   }

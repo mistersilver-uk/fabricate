@@ -3,9 +3,10 @@
  *
  * Fabricate supports many game systems (dnd5e / pf2e / …) and has no
  * system-specific roll API, so this dialog is deliberately generic. Styled to
- * resemble the dnd5e roll-configuration dialog: a header (activity + subject
- * name, optional icon), a die glyph, the (optionally @-resolved) formula with a
- * "Formula" label, a DC chip, a free-form "Situational Bonus?" input, and a
+ * resemble the dnd5e roll-configuration dialog: a die glyph on its own row above
+ * an icon-first header (subject icon then name), the (optionally @-resolved)
+ * formula with a "Formula" label, a DC chip, a free-form "Situational Bonus?"
+ * input, and a
  * Configuration section with a Roll Mode picker. When the check formula has a
  * plain `1d20`, the footer offers Advantage / Normal / Disadvantage; otherwise a
  * single Roll button. The actual rolling + chat posting happens in
@@ -123,9 +124,11 @@ export async function promptCheckRoll({
     `<label>Roll Mode <select name="rollMode">${rollModeOptions}</select></label>` +
     `</div>`;
 
+  // Die glyph on its own row ABOVE the icon + name row, then the formula/DC,
+  // situational bonus, and configuration.
   const content =
     `<div class="fabricate-roll-prompt">` +
-    `${headerHtml}${dieHtml}${formulaHtml}${bonusHtml}${configHtml}</div>`;
+    `${dieHtml}${headerHtml}${formulaHtml}${bonusHtml}${configHtml}</div>`;
 
   // Read the form on a button click: normalize the situational bonus (strip one
   // leading `+`, trim, empty → null), read the chosen roll mode, and tag the
