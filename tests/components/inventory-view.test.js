@@ -149,12 +149,31 @@ describe('InventoryView (mounted)', () => {
     // Produced By section lists the producing recipe + gathering task.
     assert.match(detail.textContent, /Distil Gland/, 'detail lists a producing recipe');
     assert.match(detail.textContent, /Harvest Beast/, 'detail lists a producing gathering task');
-    // Required For section lists the tool recipe.
+    // Required For section (the item is a tool) lists the tool recipe.
+    assert.ok(detail.querySelector('[data-inventory-section="required"]'), 'shows Required for for a tool');
     assert.ok(
       detail.querySelector('[data-inventory-required-for="r3"]'),
       'renders the required-for recipe'
     );
     assert.match(detail.textContent, /Carve Bone Idol/, 'detail lists the tool recipe');
+  });
+
+  it('hides the Required for section for a non-tool component', async () => {
+    const item = makeItem();
+    item.isTool = false;
+    item.requiredFor = [];
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-detail="sys:c1"]');
+    assert.equal(
+      detail.querySelector('[data-inventory-section="required"]'),
+      null,
+      'no Required for section for a non-tool component'
+    );
+    // Used By and Produced By still render.
+    assert.ok(detail.querySelector('[data-inventory-used-by="r1"]'), 'still shows Used by');
   });
 
   it('shows essence and tool pips on a component card', async () => {

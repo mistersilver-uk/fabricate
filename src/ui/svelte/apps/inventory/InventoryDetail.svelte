@@ -17,6 +17,7 @@
   const PAGE_SIZE = 6;
 
   const isEssence = $derived(item?.isEssenceSource === true);
+  const isTool = $derived(item?.isTool === true);
   const icon = $derived(
     typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
   );
@@ -215,8 +216,8 @@
       {/if}
     </section>
 
-    {#if !isEssence}
-      <section class="inventory-detail-section">
+    {#if isTool}
+      <section class="inventory-detail-section" data-inventory-section="required">
         <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}</p>
         {#if requiredFor.length > 0}
           <ul class="inventory-detail-list">
