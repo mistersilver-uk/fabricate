@@ -40,6 +40,32 @@ const RECIPE = {
   ],
 };
 
+// Same id as RECIPE (so a run's recipeId resolves), but a single execution step —
+// exercises the single-step projection (blanked stepLabel, multiStep false).
+const SINGLE_STEP_RECIPE = {
+  ...RECIPE,
+  name: 'Round Shield',
+  steps: [{ id: 's0' }],
+  getExecutionSteps: () => [{ id: 's0', toolIds: ['t1'], timeRequirement: { hours: 1 } }],
+};
+
+// A single-step run body (one recorded step) to pair with SINGLE_STEP_RECIPE.
+function activeSingleStepRun(overrides = {}) {
+  return activeCraftingRun({
+    currentStepIndex: 0,
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Step 1',
+        index: 0,
+        status: 'waitingTime',
+        timeGate: { requiredSeconds: 3600, initiatedAt: 150, availableAt: 3750 },
+      },
+    ],
+    ...overrides,
+  });
+}
+
 function activeCraftingRun(overrides = {}) {
   return {
     id: 'run-1',
@@ -157,6 +183,9 @@ test('projects a crafting RunModel with stepLabel, per-step timeGate, and stepNa
   assert.equal(run.manualAdvance, true);
   assert.equal(run.stepCount, 2);
   assert.equal(run.stepIndex, 1);
+  assert.equal(run.multiStep, true);
+  // Current step is the last (index 1 of 2), so the run is on its final step.
+  assert.equal(run.isFinalStep, true);
   // The active step (s1 "Temper") name annotates the label via LabelNamed.
   assert.equal(run.stepLabel, 'FABRICATE.App.Journal.Step.LabelNamed|{"index":2,"count":2,"name":"Temper"}');
   // Per-step gate: the run-level timeGate is the CURRENT step's gate.
@@ -213,6 +242,38 @@ test('resolves tool, check (formula + DC), and required time on the step detail'
   assert.equal(run.structureLabel, 'FABRICATE.App.Journal.Structure.MultiStep');
 });
 
+test('isFinalStep is false on a non-final step of a multi-step recipe', () => {
+  const run = makeBuilder({ active: [activeCraftingRun({ currentStepIndex: 0 })] })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .activeRuns[0];
+  assert.equal(run.multiStep, true);
+  assert.equal(run.isFinalStep, false);
+});
+
+test('single-step recipe blanks the step label and marks the run final', () => {
+  const run = makeBuilder({ active: [activeSingleStepRun()], recipe: SINGLE_STEP_RECIPE })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .activeRuns[0];
+
+  assert.equal(run.stepCount, 1);
+  assert.equal(run.multiStep, false);
+  assert.equal(run.isFinalStep, true);
+  // The redundant "Step 1 of 1" bookkeeping is suppressed; the structure chip stays.
+  assert.equal(run.stepLabel, '');
+  assert.equal(run.structureLabel, 'FABRICATE.App.Journal.Structure.SingleStep');
+});
+
+test('terminal single-step run blanks the label and stays final (currentStepIndex null)', () => {
+  const run = makeBuilder({ history: [terminalCraftingRun()], recipe: SINGLE_STEP_RECIPE })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+  assert.equal(run.derivedStatus, 'succeeded');
+  assert.equal(run.multiStep, false);
+  // stepCount <= 1 marks it final even though currentStepIndex is null on a terminal run.
+  assert.equal(run.isFinalStep, true);
+  assert.equal(run.stepLabel, '');
+});
+
 test('check DC comes from the recipe tier, not a hardcoded default', () => {
   const tieredSystem = {
     ...SYSTEM,
@@ -256,6 +317,9 @@ test('redacts an undiscovered recipe for a non-GM viewer but not for a GM', () =
   assert.equal(redacted.recipeId, null);
   assert.deepEqual(redacted.steps, []);
   assert.deepEqual(redacted.createdResults, []);
+  // The step label is blanked so a hidden multi-step recipe never leaks its
+  // step count / active step name through the run journal.
+  assert.equal(redacted.stepLabel, '');
   // A hidden-identity run offers no "Trigger Next Step" advance.
   assert.equal(redacted.manualAdvance, false);
 

@@ -17,6 +17,9 @@
   let { run = null, now = 0, services = null } = $props();
 
   const manualAdvance = $derived(run?.manualAdvance === true);
+  // The final step resolves the run, so it has no "next step" to trigger: the
+  // button + gate hint switch to completion copy.
+  const isFinalStep = $derived(run?.isFinalStep === true);
   const availableAt = $derived(Number(run?.timeGate?.availableAt));
   const hasGate = $derived(Number.isFinite(availableAt));
   // Race-free readiness: an un-armed step (no gate) is actionable now; an armed
@@ -41,12 +44,22 @@
       onclick={trigger}
     >
       <i class="fas fa-play" aria-hidden="true"></i>
-      <span>{localize('FABRICATE.App.Journal.Actions.TriggerNextStep')}</span>
+      <span
+        >{localize(
+          isFinalStep ? 'FABRICATE.App.Journal.Actions.FinishCrafting' : 'FABRICATE.App.Journal.Actions.TriggerNextStep'
+        )}</span
+      >
     </button>
     {#if hasGate && !ready}
-      <TimeRemainingBox {availableAt} {services} />
+      <TimeRemainingBox
+        {availableAt}
+        {services}
+        hintKey={isFinalStep ? 'FABRICATE.App.Journal.TimeRemaining.WhenPassedFinal' : undefined}
+      />
     {:else}
-      <p class="journal-actions-hint">{localize('FABRICATE.App.Journal.Actions.TriggerHint')}</p>
+      <p class="journal-actions-hint">
+        {localize(isFinalStep ? 'FABRICATE.App.Journal.Actions.FinishHint' : 'FABRICATE.App.Journal.Actions.TriggerHint')}
+      </p>
     {/if}
   {:else}
     <p class="journal-actions-auto" data-journal-auto-resolve>

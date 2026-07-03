@@ -10,7 +10,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { makeCraftingRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
+import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -136,6 +136,70 @@ describe('JournalView mounted behavior', () => {
       about.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING,
       'about-this-run is ordered before recent results in the right column'
     );
+    // A multi-step crafting run uses the standard crafting explainer, not the single-step variant.
+    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
+    assert.match(expect.textContent, /WhatToExpect\.Crafting\b/, 'multi-step run uses the standard crafting copy');
+    assert.doesNotMatch(expect.textContent, /CraftingSingleStep/, 'not the single-step variant');
+  });
+
+  it('suppresses the step timeline and uses finish copy for a single-step run', async () => {
+    const base = makeCraftingRun();
+    const run = makeCraftingRun({
+      id: 'run-single-1',
+      multiStep: false,
+      isFinalStep: true,
+      stepLabel: '',
+      structureLabel: 'Single-Step Recipe',
+      steps: [base.steps[0]]
+    });
+    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    const center = target.querySelector('.journal-view-column-center');
+    assert.ok(!center.querySelector('[data-journal-timeline]'), 'no step timeline for a single-step run');
+    // Only the structure chip renders — the blanked step-label chip is gone from the DOM.
+    assert.equal(center.querySelectorAll('.journal-detail-tag').length, 1, 'only the structure chip remains');
+
+    const trigger = target.querySelector('[data-journal-trigger]');
+    assert.ok(trigger, 'the primary action button renders');
+    assert.match(trigger.textContent, /FinishCrafting/, 'button uses the finish-crafting label');
+    // Gated (worldTime 0 < availableAt): the time-gate card shows the finish hint.
+    const gate = target.querySelector('[data-journal-time-remaining]');
+    assert.ok(gate, 'the time-gate card renders while gated');
+    assert.match(gate.textContent, /WhenPassedFinal/, 'gate hint uses the finish variant');
+    // The right-column explainer switches to the single-step crafting copy.
+    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
+    assert.match(expect.textContent, /CraftingSingleStep/, 'what-to-expect uses the single-step copy');
+  });
+
+  it('uses finish copy on the last step of a multi-step run while keeping the timeline', async () => {
+    // multiStep stays true (timeline shown) but the run is on its final step
+    // (isFinalStep true) — proving the finish copy keys off isFinalStep, not !multiStep.
+    const run = makeCraftingRun({ id: 'run-last-step', stepIndex: 1, isFinalStep: true });
+    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    const center = target.querySelector('.journal-view-column-center');
+    assert.ok(center.querySelector('[data-journal-timeline]'), 'the multi-step timeline is still shown');
+    assert.match(
+      target.querySelector('[data-journal-trigger]').textContent,
+      /FinishCrafting/,
+      'the last step uses the finish-crafting label'
+    );
+    assert.match(
+      target.querySelector('[data-journal-time-remaining]').textContent,
+      /WhenPassedFinal/,
+      'the last step gate uses the finish variant'
+    );
+  });
+
+  it('keeps the gathering explainer for a gathering run (not the single-step crafting copy)', async () => {
+    const run = makeGatheringRun();
+    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
+    const target = await harness.mount({ services: makeServices(store) });
+    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
+    assert.match(expect.textContent, /WhatToExpect\.Gathering/, 'gathering run keeps the gathering copy');
+    assert.doesNotMatch(expect.textContent, /CraftingSingleStep/, 'gathering never mis-routes to the single-step copy');
   });
 
   it('shows per-column empty states when there are no active or history runs', async () => {

@@ -12,7 +12,13 @@
   import { localize } from '../../util/foundryBridge.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
 
-  let { availableAt = null, services = null } = $props();
+  // hintKey overrides the "ready once time passes" line; the default suits an
+  // auto-resolving run, while a final crafting step passes a "ready to finish" key.
+  let {
+    availableAt = null,
+    services = null,
+    hintKey = 'FABRICATE.App.Journal.TimeRemaining.WhenPassed'
+  } = $props();
 
   const components = $derived(
     Number.isFinite(Number(availableAt)) ? (services?.getWorldTimeComponents?.(Number(availableAt)) ?? null) : null
@@ -28,7 +34,7 @@
         {localize('FABRICATE.App.Journal.TimeRemaining.AvailableAt', { when: whenLabel })}
       </span>
     {/if}
-    <span class="journal-time-remaining-hint">{localize('FABRICATE.App.Journal.TimeRemaining.WhenPassed')}</span>
+    <span class="journal-time-remaining-hint">{localize(hintKey)}</span>
   </div>
 </div>
 

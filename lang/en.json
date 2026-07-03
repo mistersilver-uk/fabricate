@@ -631,12 +631,14 @@
         },
         "Countdown": {
           "ReadyToContinue": "Ready to continue",
+          "ReadyToFinish": "Ready to finish",
           "Remaining": "{time} remaining"
         },
         "TimeRemaining": {
           "Title": "Time remaining",
           "AvailableAt": "Available at {when}",
-          "WhenPassed": "Ready to continue once enough world time has passed."
+          "WhenPassed": "Ready to continue once enough world time has passed.",
+          "WhenPassedFinal": "Ready to finish once enough world time has passed."
         },
         "About": {
           "Title": "About this run",
@@ -648,6 +650,7 @@
         "WhatToExpect": {
           "Title": "What to expect",
           "Crafting": "This is a crafting run. Trigger the next step when its time gate has passed; each step rolls its crafting check and the run completes (or fails) once the final step resolves.",
+          "CraftingSingleStep": "This is a crafting run. Once its time gate has passed, finish crafting to roll its crafting check — the run completes (or fails) on that result.",
           "Gathering": "This is a gathering run. It resolves automatically as world time advances — no action is needed from you.",
           "Salvage": "This is a salvage run. It resolves automatically as world time advances — no action is needed from you."
         },
@@ -682,7 +685,9 @@
         },
         "Actions": {
           "TriggerNextStep": "Trigger Next Step",
+          "FinishCrafting": "Finish Crafting",
           "TriggerHint": "Advance this run to roll the next step's crafting check.",
+          "FinishHint": "Resolve this run's final crafting check.",
           "AutoResolve": "Resolves automatically when the world time advances.",
           "WaitingHint": "Waiting for enough world time to pass before the next step can be triggered.",
           "NeedsOwner": "You must own the source character (or ask your GM) to advance this run."

@@ -121,7 +121,7 @@
       <div class="journal-view-column journal-view-column-right">
         {#if selectedRun}
           <AboutThisRun run={selectedRun} {services} />
-          <WhatToExpect runType={expectRunType} />
+          <WhatToExpect runType={expectRunType} multiStep={selectedRun?.multiStep === true} />
         {/if}
         <RecentResults runs={recentTerminalRuns} onViewFullHistory={viewFullHistory} />
         <JournalTips />

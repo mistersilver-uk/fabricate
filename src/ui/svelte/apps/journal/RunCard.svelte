@@ -26,6 +26,9 @@
   const img = $derived(String(run?.img ?? '') || DEFAULT_RUN_IMAGE);
   const status = $derived(String(run?.derivedStatus ?? 'inProgress'));
   const stepLabel = $derived(String(run?.stepLabel ?? ''));
+  // On the final step the run finishes rather than continuing, so the matured
+  // countdown mirrors the detail button's "finish" wording.
+  const isFinalStep = $derived(run?.isFinalStep === true);
 
   const availableAt = $derived(Number(run?.timeGate?.availableAt));
   const initiatedAt = $derived(Number(run?.timeGate?.initiatedAt));
@@ -88,7 +91,13 @@
     <div class="journal-run-card-countdown" data-run-countdown>
       <i class="fas fa-clock" aria-hidden="true"></i>
       {#if isReady}
-        <span>{localize('FABRICATE.App.Journal.Countdown.ReadyToContinue')}</span>
+        <span
+          >{localize(
+            isFinalStep
+              ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
+              : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
+          )}</span
+        >
       {:else}
         <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span>
       {/if}

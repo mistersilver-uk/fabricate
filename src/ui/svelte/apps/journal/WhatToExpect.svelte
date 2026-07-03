@@ -9,14 +9,20 @@
   import { localize } from '../../util/foundryBridge.js';
   import JournalCard from './JournalCard.svelte';
 
-  let { runType = 'crafting' } = $props();
+  let { runType = 'crafting', multiStep = true } = $props();
 
   const COPY_KEYS = {
     crafting: 'FABRICATE.App.Journal.WhatToExpect.Crafting',
     gathering: 'FABRICATE.App.Journal.WhatToExpect.Gathering',
     salvage: 'FABRICATE.App.Journal.WhatToExpect.Salvage'
   };
-  const copyKey = $derived(COPY_KEYS[runType] ?? COPY_KEYS.crafting);
+  // A single-step crafting run has no "next step" flow to describe, so it gets a
+  // one-check variant of the crafting explainer.
+  const copyKey = $derived(
+    runType === 'crafting' && !multiStep
+      ? 'FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep'
+      : (COPY_KEYS[runType] ?? COPY_KEYS.crafting)
+  );
 </script>
 
 <JournalCard kind="expect" title={localize('FABRICATE.App.Journal.WhatToExpect.Title')}>
