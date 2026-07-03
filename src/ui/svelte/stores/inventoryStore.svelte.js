@@ -28,6 +28,22 @@ const DEFAULT_PAGE_SIZE = 25;
 export const INVENTORY_FILTERS = Object.freeze(['all', 'components', 'essences', 'tools']);
 const VALID_SORTS = new Set(['name', 'quantity', 'type']);
 
+/**
+ * Whether a row matches the free-text query. Matches the placeholder's promise —
+ * item name, tags, and the names of essences the component carries — all
+ * case-insensitively. An empty query matches everything.
+ */
+function matchesQuery(row, query) {
+  if (query.length === 0) return true;
+  if (String(row?.name ?? '').toLowerCase().includes(query)) return true;
+  const tags = Array.isArray(row?.tags) ? row.tags : [];
+  if (tags.some((tag) => String(tag ?? '').toLowerCase().includes(query))) return true;
+  const essences = Array.isArray(row?.essences) ? row.essences : [];
+  if (essences.some((essence) => String(essence?.name ?? '').toLowerCase().includes(query)))
+    return true;
+  return false;
+}
+
 function matchesFilter(row, filter) {
   switch (filter) {
     case 'components':
@@ -75,13 +91,7 @@ export function createInventoryStore({ services } = {}) {
     const query = search.trim().toLowerCase();
     const filtered = rows.filter((row) => {
       if (!matchesFilter(row, filter)) return false;
-      if (
-        query.length > 0 &&
-        !String(row?.name ?? '')
-          .toLowerCase()
-          .includes(query)
-      )
-        return false;
+      if (!matchesQuery(row, query)) return false;
       return true;
     });
     // Explicit comparator (never a bare `.sort()`).
@@ -108,13 +118,7 @@ export function createInventoryStore({ services } = {}) {
   // the badges reflect what a pill would show given the current query).
   const filterCounts = $derived.by(() => {
     const query = search.trim().toLowerCase();
-    const searched = rows.filter(
-      (row) =>
-        query.length === 0 ||
-        String(row?.name ?? '')
-          .toLowerCase()
-          .includes(query)
-    );
+    const searched = rows.filter((row) => matchesQuery(row, query));
     const counts = {};
     for (const key of INVENTORY_FILTERS) {
       counts[key] = searched.filter((row) => matchesFilter(row, key)).length;

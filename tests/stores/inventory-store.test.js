@@ -114,6 +114,33 @@ describe('inventoryStore', () => {
     );
   });
 
+  it('matches search against tags and carried essence names, not just the name', async () => {
+    const listing = {
+      rows: [
+        row('c1', 'Liquid Death', { tags: ['nasty', 'potion'] }),
+        row('c2', 'Ham', { essences: [{ id: 'bacon', name: 'Bacon', icon: null, quantity: 3 }] }),
+        row('c3', 'Iron', {}),
+      ],
+      selectedActorId: 'hero',
+    };
+    const { services } = makeServices({ listing });
+    const store = createInventoryStore({ services });
+    await store.load();
+    flushSync();
+
+    const idsFor = (query) => {
+      store.setSearch(query);
+      flushSync();
+      return store.visibleItems.map((entry) => entry.componentId).sort();
+    };
+
+    assert.deepEqual(idsFor('nasty'), ['c1'], 'matches a tag');
+    assert.deepEqual(idsFor('bacon'), ['c2'], 'matches a carried essence name');
+    assert.deepEqual(idsFor('bac'), ['c2'], 'partially matches a carried essence name');
+    assert.deepEqual(idsFor('iron'), ['c3'], 'still matches the item name');
+    assert.equal(store.filterCounts.all, 1, 'filter counts reflect the query too');
+  });
+
   it('subsets rows by each filter pill', async () => {
     const listing = {
       rows: [
