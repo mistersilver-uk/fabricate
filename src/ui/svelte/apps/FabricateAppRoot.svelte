@@ -10,7 +10,13 @@
   `activeTab`, so this component stays a pure projection of host state.
 -->
 <script>
-  import { localize, subscribeSceneChange, subscribeWorldTime } from '../util/foundryBridge.js';
+  import {
+    localize,
+    subscribeSceneChange,
+    subscribeWorldTime,
+    subscribeInventoryChange,
+    subscribeCraftingDataChange
+  } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
   import CraftingView from './crafting/CraftingView.svelte';
   import JournalView from './journal/JournalView.svelte';
@@ -78,6 +84,46 @@
   });
   $effect(() => subscribeWorldTime(() => services?.journal?.load?.(true)));
   $effect(() => subscribeSceneChange(() => services?.journal?.load?.(true)));
+
+  // Is the actor whose items just changed one this app's crafting/inventory views
+  // read from? Membership in the selected crafting actor + the component-source
+  // actors, read at fire time so it tracks the live selection. Filters out
+  // unrelated actors' item churn so we don't reload on every world item edit.
+  function isRelevantCraftingActor(actorId) {
+    if (!actorId) return false;
+    const selected = services?.getSelectedCraftingActorId?.() || null;
+    if (selected && String(selected) === String(actorId)) return true;
+    const sources = services?.getCraftingComponentSourceIds?.() ?? [];
+    return Array.isArray(sources) && sources.some((id) => String(id) === String(actorId));
+  }
+
+  // Shell-level inventory-change refresh: adding/removing a component or editing an
+  // item quantity on a relevant actor invalidates owned counts and recipe
+  // craftability. Quietly re-fetch the item-derived shared stores (the Crafting and
+  // Inventory views read these singletons, so both tabs update — even while closed).
+  // The Gathering tab owns its own subscription (its listing is view-local).
+  $effect(() =>
+    subscribeInventoryChange(
+      () => {
+        services?.crafting?.load?.(true);
+        services?.inventory?.load?.(true);
+      },
+      { isRelevantActor: (actorId) => isRelevantCraftingActor(actorId) }
+    )
+  );
+
+  // Shell-level crafting-data refresh: a GM editing/saving a crafting system or
+  // recipe can change definitions surfaced on any tab (recipe names in Journal runs,
+  // component metadata, availability), so quietly reload every shared data store.
+  // Works cross-client via main.js's updateSetting bridge (see subscribeCraftingDataChange).
+  $effect(() =>
+    subscribeCraftingDataChange(() => {
+      services?.craftingSources?.load?.(true);
+      services?.crafting?.load?.(true);
+      services?.inventory?.load?.(true);
+      services?.journal?.load?.(true);
+    })
+  );
 </script>
 
 <div class="fabricate-app-shell">

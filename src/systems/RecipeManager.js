@@ -59,6 +59,32 @@ export class RecipeManager {
     await setSetting(SETTING_KEYS.RECIPES, recipesArray);
   }
 
+  /**
+   * Re-read the persisted recipes setting into the in-memory map. Unlike
+   * `initialize()` (which early-returns once initialized), this is the un-guarded
+   * refresh path used when the replicated world setting changes on ANOTHER client —
+   * the GM's save updates their own map directly, but a player's in-memory map only
+   * catches up here. Does NOT persist, so it is safe to call from a settings hook
+   * without a write loop.
+   *
+   * @returns {boolean} `true` only when the serialized recipes actually changed, so
+   *   callers can skip re-emitting a change hook (and avoid a redundant refresh on
+   *   the writing client, whose map already holds the saved data).
+   */
+  reload() {
+    const serialize = (map) => JSON.stringify([...map.values()].map((r) => r.toJSON()));
+    const before = serialize(this.recipes);
+    const savedRecipes = getSetting(SETTING_KEYS.RECIPES) || [];
+    const next = new Map();
+    for (const recipeData of savedRecipes) {
+      const recipe = Recipe.fromJSON(recipeData);
+      next.set(recipe.id, recipe);
+    }
+    this.recipes = next;
+    this.initialized = true;
+    return before !== serialize(this.recipes);
+  }
+
   _notifyRecipesChanged(action, details = {}) {
     globalThis.Hooks?.callAll?.('fabricate.recipesChanged', {
       action,

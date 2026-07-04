@@ -10,7 +10,7 @@
   highlight-only — no center-column wiring yet.
 -->
 <script>
-  import { localize, notifyWarn, subscribeSceneChange, subscribeTravelMarkerMove } from '../../util/foundryBridge.js';
+  import { localize, notifyWarn, subscribeSceneChange, subscribeTravelMarkerMove, subscribeInventoryChange, subscribeCraftingDataChange } from '../../util/foundryBridge.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
@@ -263,6 +263,19 @@
   $effect(() => subscribeTravelMarkerMove((actorUuid) => {
     if (services?.isTravelMarkerActor?.(actorUuid)) load(true);
   }));
+
+  // Present-tool availability is read live from the selected actor's items, so an
+  // item added/removed/edited on that actor can change which tasks are attemptable.
+  // Quietly re-fetch when the selected gathering actor's inventory changes.
+  $effect(() => subscribeInventoryChange(() => load(true), {
+    isRelevantActor: (actorId) =>
+      Boolean(store?.selectedActorId) && String(actorId) === String(store.selectedActorId)
+  }));
+
+  // A GM editing/saving a crafting system can change the gathering tasks, tools, or
+  // drop tables surfaced here; quietly re-fetch. Cross-client via the updateSetting
+  // bridge (see subscribeCraftingDataChange).
+  $effect(() => subscribeCraftingDataChange(() => load(true)));
 
   // Report the selected environment's stamina pool up to the shared store so the
   // header bar can render it; cleared when no environment is selected.

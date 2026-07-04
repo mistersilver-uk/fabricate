@@ -19,6 +19,22 @@ test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
   );
 });
 
+test('Fabricate bridges replicated crafting-data setting changes into local refresh hooks', () => {
+  assert.ok(
+    mainSource.includes("import { handleFabricateSettingChange } from './config/settingChangeBridge.js'"),
+    'main.js should import the setting-change bridge'
+  );
+  assert.ok(
+    mainSource.includes('handleFabricateSettingChange(key, {'),
+    'the updateSetting hook should invoke the bridge with the changed key'
+  );
+  assert.ok(
+    mainSource.includes('craftingSystemManager: fabricate.craftingSystemManager') &&
+      mainSource.includes('recipeManager: fabricate.recipeManager'),
+    'the bridge should receive both live managers so cross-client reloads apply'
+  );
+});
+
 test('Fabricate macro helper exposes deleteRecipe', () => {
   assert.ok(
     mainSource.includes('deleteRecipe: async (recipeId) => {'),
