@@ -18,7 +18,14 @@ The [list modes below](#list-modes) walk through each approach, starting with th
 
 ## List Modes
 
-Choose a visibility approach for your crafting system in the **Recipe Visibility** card in the Crafting Admin panel, or through the API.
+Choose how recipes are exposed to players in the **Recipe Visibility** card.
+You find it on the crafting system's **Settings** tab in the Crafting Admin panel, below the optional features.
+The card is hidden for alchemy systems, which do not use recipe visibility.
+The card's list-mode selector offers three modes: **Global**, **Player-specific**, and **Knowledge-based**.
+Every control on the card applies as soon as you change it, so there is no separate save step.
+You can also set the list mode through the API.
+Teaser mode is a separate layer on top of these list modes and is not one of the card's list-mode choices.
+See [Teaser Mode]({% link visibility-teaser.md %}) for how to turn it on.
 
 ### Global Mode
 
@@ -43,9 +50,12 @@ The GM directly controls who sees each recipe through a per-recipe list of allow
   It is a valid configuration and saves without error.
 - The recipe list in the Crafting Admin panel shows a **Visibility** column summarising each recipe's access level.
 
-**In the recipe editor.** When the system is in player mode, the recipe editor shows a "Restrict visibility to specific users" checkbox.
-When checked, a list of users appears so you can tick the ones who should have access.
-Leaving the user list empty is allowed.
+**In the recipe editor.** When the system is in player mode, the recipe editor's Overview tab shows a **Restrict visibility to specific users** toggle.
+This toggle only appears in player mode.
+When you turn it on, a list of the world's non-GM players appears so you can tick the ones who should have access.
+Leaving the allowed-users list empty is allowed.
+The editor then shows a warning that the recipe is restricted with no users selected, so no player can see it.
+Your choices save with the rest of the recipe when you save the recipe.
 
 **Simple and explicit.** Good for smaller recipe sets where you want direct control over who can see what.
 
@@ -148,7 +158,7 @@ This creates one-time-use "recipe scrolls".
 You can choose to keep the item after learning instead.
 For example, a spellbook that teaches recipes but is not destroyed in the process.
 
-You set this in the **Recipe Visibility** card on the System tab of the Crafting Admin panel.
+You set this in the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
 The option only appears when the system is in knowledge mode.
 
 ### Drag-and-Drop Learning

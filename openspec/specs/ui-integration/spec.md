@@ -262,9 +262,17 @@ If `features.gathering === false`:
 
 #### Recipe Visibility Controls
 
-- `listMode` selector with options: `global`, `player`, `knowledge`
+The selected system's recipe visibility is authored in a standalone **Recipe Visibility** card on the System Overview Settings tab, rendered below the optional features and mirroring the self-contained Resolution Mode card.
+The card SHALL be hidden entirely when the system's crafting resolution mode is `alchemy`, because alchemy recipe visibility follows its own rules (`006`) and is not list-mode driven.
+
+The card is controlled and live-applies each control: every handler sends only its own changed field to `saveVisibilityConfig`, which merges the omitted fields from the system's existing `recipeVisibility`.
+There is no separate save action for this card.
+
+- `listMode` selector with exactly three options: `global`, `player`, `knowledge`.
+Teaser mode is not a `listMode` option and is not offered by this card.
+- When `listMode === "player"`, the card shows an informational note that per-recipe restrictions are authored in each recipe's editor, and that a restricted recipe with no allowed users is hidden from all players by default.
 - `knowledge.mode` selector (only shown when `listMode === "knowledge"`)
-- `item.limitUses` and `item.maxUses` (only shown when `listMode === "knowledge"` and item mode is active)
+- `item.limitUses`, `item.maxUses`, and `item.destroyWhenExhausted` (only shown when `listMode === "knowledge"` and item mode is active)
 - `learn.consumeOnLearn` (only shown when `listMode === "knowledge"` and learned mode is active)
 - `learn.dragDropEnabled` (only shown when `listMode === "knowledge"` and learned mode is active)
 
@@ -307,7 +315,7 @@ The rail item SHALL surface a count badge with the number of open critical-plus-
 
 #### Settings Tab
 
-The default-selected Settings tab renders the system settings form (identity, resolution modes, optional features, character modifiers, and currency configuration) unchanged.
+The default-selected Settings tab renders the system settings form (identity, resolution modes, optional features, the Recipe Visibility card for non-alchemy systems, character modifiers, and currency configuration) unchanged.
 It writes through the existing admin-store persistence and confirmation flows.
 
 #### Validation Tab
@@ -447,7 +455,7 @@ The recipe browse row `Edit` action opens that same dedicated recipe-edit view r
 The recipe-edit view holds a recipe identity card (name, description, image, and an `enabled` on/off toggle) editing a local draft in the central `manager-main`, and the GM manager's right-hand context inspector panel (the global `manager-inspector` aside) holds the recipe-item link card.
 Identity edits track a dirty state surfaced by a header dirty chip, persist via `store.updateRecipe` → `RecipeManager.updateRecipe(recipeId, updates, { allowIncomplete: true })` (so an identity-only save is not blocked by the shell's still-empty ingredients/results), and a dirty draft prompts a discard confirmation on route exit.
 The recipe-edit header follows the standard editor convention shared with the gathering-task, gathering-event, and environment editors: an `Unsaved` chip (when dirty), `Back to recipes`, `Delete recipe` (danger, enabled whenever a recipe is selected), and `Save`.
-The recipe-item card is the partial implementation of the `### Visibility Form` recipe-item selector (see below); the rest of the Visibility Form (restricted-visibility toggle, allowed-users multiselect) and the rest of `## Recipe Editor` (ingredients, catalysts, essences, steps, and results) remain deferred.
+The recipe-item card is the partial implementation of the `### Visibility Form` recipe-item selector (see below); the Visibility Form's per-recipe restriction editor (restricted toggle + allowed-users allow-list) is implemented for the `player` list mode, and the rest of `## Recipe Editor` (ingredients, catalysts, essences, steps, and results) remain deferred.
 The inspector panel that carries the recipe-item card is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and suppressed (central column full-width) when the selected system's recipe knowledge mode does not consume an item (`knowledge.mode === 'learned'`); the layout collapses to a single column at the Manager container's narrow breakpoint (`@container fabricate-manager (max-width: 960px)`), mirroring the environment editor.
 The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
@@ -633,10 +641,10 @@ It is GM-only; players never see it.
 
 Scoped to a single crafting system.
 
-The Manager recipe-edit view partially implements this editor: the identity surface from `### Base Form` (Name and Description, plus a player-facing image and an `enabled` on/off toggle, edited as a local draft with a standard `Unsaved` chip + `Back to recipes` + `Delete recipe` + `Save` header and a dirty/route-exit guard) and the `recipeItemId` selector from `### Visibility Form` are implemented.
+The Manager recipe-edit view partially implements this editor: the identity surface from `### Base Form` (Name and Description, plus a player-facing image and an `enabled` on/off toggle, edited as a local draft with a standard `Unsaved` chip + `Back to recipes` + `Delete recipe` + `Save` header and a dirty/route-exit guard), the `recipeItemId` selector from `### Visibility Form`, and the `### Visibility Form` player-mode restriction editor (restricted toggle + allowed-users allow-list, shown only while `listMode === "player"`) are implemented.
 Because ingredients/steps/results are deferred, the recipe under edit is typically an *incomplete shell*: it is created (via "+ Create recipe") and its identity is saved through the `allowIncomplete` authoring path, which gates on structural validity only.
 The shell remains non-craftable (the engine still gates on completeness) and the browse row shows a derived `Incomplete` chip until those deferred sections are filled in.
-The Locked toggle, Category, the rest of the Visibility Form (restricted-visibility toggle, allowed-users multiselect), the Step Structure UI, and the Step Editor remain deferred.
+The Locked toggle, Category, the Step Structure UI, and the Step Editor remain deferred.
 
 ### Base Form
 
@@ -656,8 +664,13 @@ If `listMode === "global"`:
 
 If `listMode === "player"`:
 
-- Restricted visibility toggle — deferred
-- Allowed users multiselect — deferred
+- A **restrict to specific users** toggle bound to `recipe.visibility.restricted`, shown on the recipe editor's Overview tab only while the system's `listMode === "player"`.
+- When restriction is on, an allow-list of the world's non-GM users bound to `recipe.visibility.allowedUserIds`.
+The user options come from a `getWorldUsers` service projected into the admin store as `worldUsers`; the store never reads Foundry globals directly.
+- When restriction is on and the allow-list is empty, the editor SHALL surface a warning that the recipe is restricted with no users selected, so no player can see it.
+This is a valid configuration and saves without error.
+- The toggle and allow-list stage `recipe.visibility = { restricted, allowedUserIds }` into the recipe draft and persist through the normal recipe-draft save flow, not on change.
+- When the world has no non-GM users, the allow-list shows an empty-state note instead of user rows.
 
 If knowledge mode includes item matching or learning:
 
@@ -671,7 +684,7 @@ The central `manager-main` holds the recipe identity card; the recipe-item card 
 Linking or unlinking applies immediately and is independent of the identity Save draft.
 Dropping a Foundry Item links it via `addRecipeItemFromUuid` (which synthesizes or dedups a `RecipeItemDefinition`) and sets `recipe.recipeItemId`; unlinking nulls `recipe.recipeItemId` and does **not** delete the shared definition; and when the linked definition's `sourceItemUuid` no longer resolves the card shows a missing/stale state and retains the link.
 The inspector panel is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and suppressed (full-width main) for `learned`.
-The restricted-visibility toggle and allowed-users multiselect remain deferred.
+The player-mode restricted-visibility toggle and allowed-users allow-list are implemented on the Overview tab as described above.
 
 If the required linkage is missing, show a validation warning.
 

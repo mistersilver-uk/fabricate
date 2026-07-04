@@ -46,6 +46,11 @@
     // Progressive systems award a recipe's results in order, so the Results tab
     // exposes drag-reorder on the result rows. Other modes ignore result order.
     progressive = false,
+    // True when the system's recipe visibility list mode is `player`; unlocks the
+    // per-recipe "restrict to specific users" editor on the Overview tab.
+    playerListMode = false,
+    // Non-GM world users ({ id, name }) offered as the restriction allow-list.
+    worldUsers = [],
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
     onAddStep = () => {},
@@ -229,6 +234,8 @@
             onChooseImage={chooseImage}
             {isMultiStep}
             {checkTierOptions}
+            {playerListMode}
+            {worldUsers}
             {onUpdateRecipe}
             {onAddStep}
             {onReorderSteps}

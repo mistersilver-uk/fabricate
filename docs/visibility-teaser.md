@@ -23,7 +23,8 @@ The existing global, player, and knowledge modes continue to work unchanged when
 
 ## How Teaser Mode Works
 
-1. The GM sets the crafting system to teaser mode in the **Recipe Visibility** card of the Crafting Admin panel.
+1. The GM sets the crafting system to teaser mode through the API (`CraftingSystemManager` / `saveVisibilityConfig`).
+   The Recipe Visibility card on the System settings tab covers global, player, and knowledge modes; a teaser option in that card is planned.
 2. For each recipe, the GM chooses which details to hide, how much discovery progress is needed to unlock the recipe fully, and an optional teaser description shown to players before unlock.
 3. Players see the recipe with only the permitted details revealed.
 4. When a player's discovery progress for a recipe reaches the required amount, the recipe becomes fully visible and craftable.
@@ -48,8 +49,8 @@ You choose how players build up discovery progress for the system.
 
 ## System Configuration
 
-Open the **Recipe Visibility** card in the Crafting Admin panel and set the system to teaser mode.
-This reveals a **Teaser Config** section where you can:
+Set the system to teaser mode through the API (the Recipe Visibility card does not yet offer teaser as a mode).
+Teaser mode reveals a **Teaser Config** section where you can:
 
 - Turn teaser mode on, which must be on for teaser recipes to appear as teasers rather than being hidden.
 - Choose the discovery method: manual, fragments, or both (see the table above).

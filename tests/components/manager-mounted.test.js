@@ -29,6 +29,8 @@ let ProgressiveCraftingCheckEditorComponent;
 let ToolsBrowserViewComponent;
 let ChecksViewComponent;
 let RecipeOverviewTabComponent;
+let SystemEditViewComponent;
+let SystemRecipeVisibilityCardComponent;
 let mounted;
 let target;
 
@@ -101,6 +103,7 @@ function compileManagerRoot() {
     'RecipeRoutingAssignment',
     'RecipeResultItemRow',
     'RecipeToolsSection',
+    'SystemRecipeVisibilityCard',
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);
   }
@@ -1476,6 +1479,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       await import(
         pathToFileURL(
           join(tempRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte.js')
+        )
+      )
+    ).default;
+    SystemEditViewComponent = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte.js'))
+      )
+    ).default;
+    SystemRecipeVisibilityCardComponent = (
+      await import(
+        pathToFileURL(
+          join(tempRoot, 'src/ui/svelte/apps/manager/recipe/SystemRecipeVisibilityCard.svelte.js')
         )
       )
     ).default;
@@ -3077,6 +3092,232 @@ describe('CraftingSystemManager mounted behavior', () => {
     select.value = '';
     select.dispatchEvent(new Event('change', { bubbles: true }));
     assert.deepEqual(emitted.at(-1), { checkTierId: null }, 'Default clears the tier');
+  });
+
+  function mountSystemEditView(props) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(SystemEditViewComponent, { target, props });
+    flushSync();
+    return target;
+  }
+
+  function mountRecipeVisibilityCard(props) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(SystemRecipeVisibilityCardComponent, { target, props });
+    flushSync();
+    return target;
+  }
+
+  function mountRecipeOverview(props) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(RecipeOverviewTabComponent, { target, props });
+    flushSync();
+    return target;
+  }
+
+  it('SystemEditView renders the recipe visibility card for a non-alchemy system and hides it for alchemy', () => {
+    const baseSystem = {
+      id: 'sys1',
+      name: 'System One',
+      resolutionMode: 'simple',
+      features: {},
+      recipeVisibility: { listMode: 'global' },
+      showRecipeVisibilityKnowledgeOptions: false,
+    };
+    mountSystemEditView({ selectedSystem: baseSystem });
+    assert.ok(
+      target.querySelector('[data-system-recipe-visibility]'),
+      'the card renders for a non-alchemy system'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    mountSystemEditView({ selectedSystem: { ...baseSystem, resolutionMode: 'alchemy' } });
+    assert.equal(
+      target.querySelector('[data-system-recipe-visibility]'),
+      null,
+      'the card is hidden for an alchemy system'
+    );
+  });
+
+  it('recipe visibility card list-mode select emits a listMode-only save patch', () => {
+    const emitted = [];
+    mountRecipeVisibilityCard({
+      recipeVisibility: { listMode: 'global' },
+      showKnowledgeOptions: false,
+      onSave: (patch) => emitted.push(patch),
+    });
+    const select = target.querySelector('[data-recipe-visibility-list-mode]');
+    assert.ok(select, 'the list-mode select renders');
+    assert.equal(select.value, 'global', 'reflects the current list mode');
+
+    select.value = 'knowledge';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.deepEqual(emitted.at(-1), { listMode: 'knowledge' });
+  });
+
+  it('recipe visibility card shows knowledge sub-rows only in knowledge mode', () => {
+    mountRecipeVisibilityCard({
+      recipeVisibility: { listMode: 'global' },
+      showKnowledgeOptions: false,
+      onSave: () => {},
+    });
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-knowledge]'),
+      null,
+      'no knowledge sub-rows outside knowledge mode'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    const emitted = [];
+    mountRecipeVisibilityCard({
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'itemOrLearned',
+          item: { limitUses: true, maxUses: 3, destroyWhenExhausted: false },
+          learn: { consumeOnLearn: true, dragDropEnabled: true },
+        },
+      },
+      showKnowledgeOptions: true,
+      onSave: (patch) => emitted.push(patch),
+    });
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-knowledge-mode]'),
+      'the knowledge-mode select renders in knowledge mode'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-limit-uses]'),
+      'the item limit-uses toggle renders for itemOrLearned'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-max-uses]'),
+      'the max-uses stepper renders when limitUses is on'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
+      'the consume-on-learn toggle renders for itemOrLearned'
+    );
+
+    // Turning the limit-uses toggle OFF passes only that field; the store
+    // cascade clears the cap.
+    target.querySelector('[data-recipe-visibility-limit-uses]').click();
+    assert.deepEqual(emitted.at(-1), { limitUses: false });
+  });
+
+  it('recipe visibility card commits a concrete cap when enabling limited uses', () => {
+    // Enabling limited uses without a stored maxUses must persist a real cap
+    // (>= 1); otherwise the runtime treats the undefined cap as unlimited while
+    // the card displays "1".
+    const emitted = [];
+    mountRecipeVisibilityCard({
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'itemOrLearned',
+          item: { limitUses: false },
+          learn: { consumeOnLearn: true, dragDropEnabled: true },
+        },
+      },
+      showKnowledgeOptions: true,
+      onSave: (patch) => emitted.push(patch),
+    });
+
+    // The stepper is hidden until limited uses is on.
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-max-uses]'),
+      null,
+      'the max-uses stepper is hidden when limitUses is off'
+    );
+
+    target.querySelector('[data-recipe-visibility-limit-uses]').click();
+    assert.deepEqual(emitted.at(-1), { limitUses: true, maxUses: 1 });
+  });
+
+  it('recipe visibility card shows the player note only in player mode', () => {
+    mountRecipeVisibilityCard({
+      recipeVisibility: { listMode: 'global' },
+      showKnowledgeOptions: false,
+      onSave: () => {},
+    });
+    assert.equal(target.querySelector('[data-recipe-visibility-player-note]'), null);
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    mountRecipeVisibilityCard({
+      recipeVisibility: { listMode: 'player' },
+      showKnowledgeOptions: false,
+      onSave: () => {},
+    });
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-player-note]'),
+      'the player note renders in player mode'
+    );
+  });
+
+  it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
+    // Not in player mode ⇒ no visibility section.
+    mountRecipeOverview({
+      recipe: { id: 'r1', visibility: null },
+      playerListMode: false,
+      worldUsers: [{ id: 'u1', name: 'Alice' }],
+      onUpdateRecipe: () => {},
+    });
+    assert.equal(target.querySelector('[data-recipe-section="visibility"]'), null);
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    // Player mode ⇒ restrict toggle present; toggling stages the full visibility object.
+    const emitted = [];
+    mountRecipeOverview({
+      recipe: { id: 'r1', visibility: null },
+      playerListMode: true,
+      worldUsers: [{ id: 'u1', name: 'Alice' }],
+      onUpdateRecipe: (patch) => emitted.push(patch),
+    });
+    assert.ok(target.querySelector('[data-recipe-section="visibility"]'), 'visibility section renders');
+    const toggle = target.querySelector('[data-recipe-field="visibility-restricted"]');
+    assert.ok(toggle, 'the restrict toggle renders');
+    toggle.click();
+    assert.deepEqual(emitted.at(-1), {
+      visibility: { restricted: true, allowedUserIds: [] },
+    });
+  });
+
+  it('recipe overview restriction editor toggles a user into allowedUserIds', () => {
+    const emitted = [];
+    mountRecipeOverview({
+      recipe: { id: 'r1', visibility: { restricted: true, allowedUserIds: [] } },
+      playerListMode: true,
+      worldUsers: [
+        { id: 'u1', name: 'Alice' },
+        { id: 'u2', name: 'Bob' },
+      ],
+      onUpdateRecipe: (patch) => emitted.push(patch),
+    });
+    // The empty-state warning shows while restricted with no users selected.
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-empty]'),
+      'the no-users-selected warning renders'
+    );
+    const bob = target.querySelector('[data-recipe-visibility-user="u2"] input');
+    assert.ok(bob, 'a checkbox renders per world user');
+    bob.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.deepEqual(emitted.at(-1), {
+      visibility: { restricted: true, allowedUserIds: ['u2'] },
+    });
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {

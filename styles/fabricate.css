@@ -9111,6 +9111,94 @@
   text-align: center;
 }
 
+/* Recipe Visibility card: each control is a self-contained sub-card that reuses
+   the resolution-mode-card frame, laid out in a responsive 3-column grid rather
+   than one full-width stack. Cards are top-aligned (`align-items: start`) because
+   a gating card (e.g. Limited uses) grows to hold the inputs it controls. */
+.fabricate-manager .manager-recipe-visibility-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-subcard {
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-recipe-visibility-subcard.is-span-all {
+  grid-column: 1 / -1;
+}
+
+.fabricate-manager .manager-recipe-visibility-subcard-desc {
+  margin: 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager .manager-recipe-visibility-control {
+  padding-top: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+/* Inputs a card gates (e.g. Maximum uses / Delete exhausted under Limited uses)
+   nest inside that card, set off by a divider rather than floating as siblings. */
+.fabricate-manager .manager-recipe-visibility-nested {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2xs);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-recipe-visibility-nested-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-nested-label {
+  color: var(--fab-mv2-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-recipe-visibility-control select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-weight: 400;
+}
+
+.fabricate-manager .manager-recipe-visibility-stepper {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-stepper input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-weight: 400;
+  text-align: center;
+}
+
 .fabricate-manager .manager-empty {
   display: grid;
   place-items: center;
@@ -9443,9 +9531,17 @@
   .fabricate-manager .manager-toggle-list {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .fabricate-manager .manager-recipe-visibility-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @container fabricate-manager (max-width: 680px) {
+  .fabricate-manager .manager-recipe-visibility-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .fabricate-manager .manager-header,
   .fabricate-manager .manager-section-header {
     align-items: stretch;

@@ -14,6 +14,7 @@
   import { resolveDropData } from '../../util/dropUtils.js';
   import IconPicker from '../../components/IconPicker.svelte';
   import ResolutionModeCard from './ResolutionModeCard.svelte';
+  import SystemRecipeVisibilityCard from './recipe/SystemRecipeVisibilityCard.svelte';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';
 
@@ -40,6 +41,7 @@
     onSetResolutionMode = async () => true,
     onSetSalvageResolutionMode = async () => true,
     onToggleFeature = async () => true,
+    onSaveVisibilityConfig = () => {},
     characterModifierLibrary = [],
     characterModifierPresetsSupported = false,
     onAddCharacterModifier = async () => null,
@@ -527,6 +529,14 @@
           </div>
         </div>
       </section>
+
+      {#if selectedSystem.resolutionMode !== 'alchemy'}
+        <SystemRecipeVisibilityCard
+          recipeVisibility={selectedSystem.recipeVisibility}
+          showKnowledgeOptions={selectedSystem.showRecipeVisibilityKnowledgeOptions}
+          onSave={onSaveVisibilityConfig}
+        />
+      {/if}
 
       {#if gatheringEnabled}
         <section class="manager-edit-card manager-character-modifier-card" data-system-character-modifiers aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title', 'Character modifiers')}>

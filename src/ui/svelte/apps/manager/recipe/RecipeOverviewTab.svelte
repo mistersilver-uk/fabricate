@@ -31,6 +31,11 @@
     onChooseImage = () => {},
     isMultiStep = false,
     checkTierOptions = [],
+    // True when the system's recipe-visibility list mode is `player`: unlocks the
+    // per-recipe "restrict to specific users" editor below.
+    playerListMode = false,
+    // Non-GM world users ({ id, name }) offered as the restriction allow-list.
+    worldUsers = [],
     onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
@@ -45,6 +50,32 @@
 
   function recipeImage(value) {
     return value || DEFAULT_RECIPE_IMAGE;
+  }
+
+  // Per-recipe visibility (player list mode). The draft is the source of truth.
+  const restricted = $derived(recipe?.visibility?.restricted === true);
+  const allowedUserIds = $derived(
+    Array.isArray(recipe?.visibility?.allowedUserIds) ? recipe.visibility.allowedUserIds : []
+  );
+
+  function emitVisibility(next) {
+    onUpdateRecipe({
+      visibility: {
+        restricted: next.restricted,
+        allowedUserIds: next.allowedUserIds,
+      },
+    });
+  }
+
+  function toggleRestricted() {
+    emitVisibility({ restricted: !restricted, allowedUserIds });
+  }
+
+  function toggleAllowedUser(userId) {
+    const nextIds = allowedUserIds.includes(userId)
+      ? allowedUserIds.filter((id) => id !== userId)
+      : [...allowedUserIds, userId];
+    emitVisibility({ restricted, allowedUserIds: nextIds });
   }
 </script>
 
@@ -129,6 +160,57 @@
       <p class="manager-muted manager-form-warning">{text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed. Check for duplicate or blank names and try again.')}</p>
     {/if}
   </section>
+
+  {#if playerListMode}
+    <section class="manager-task-core-card manager-recipe-visibility-section" data-recipe-section="visibility">
+      <div class="manager-task-card-heading">
+        <div>
+          <h3>{text('FABRICATE.Admin.Manager.Recipe.Visibility.Title', 'Visibility')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Visibility.RestrictHint', 'Restrict this recipe to specific players. When off, every player can see it.')}</p>
+        </div>
+      </div>
+      <div class="manager-task-core-status">
+        <button
+          type="button"
+          class={`manager-status-toggle ${restricted ? 'is-on' : 'is-off'}`}
+          data-recipe-field="visibility-restricted"
+          aria-pressed={restricted}
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.Visibility.RestrictToggle', 'Restrict visibility to specific users')}
+          disabled={saving}
+          onclick={toggleRestricted}
+        >
+          <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+          <span class="manager-status-toggle-label">{restricted ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+        </button>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Visibility.RestrictToggle', 'Restrict visibility to specific users')}</p>
+      </div>
+      {#if restricted}
+        <div class="manager-field is-wide" data-recipe-visibility-users>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Visibility.AllowedUsers', 'Allowed users')}</span>
+          {#if worldUsers.length > 0}
+            <div class="manager-toggle-list">
+              {#each worldUsers as user (user.id)}
+                <label class="manager-field manager-recipe-visibility-user" data-recipe-visibility-user={user.id}>
+                  <input
+                    type="checkbox"
+                    checked={allowedUserIds.includes(user.id)}
+                    disabled={saving}
+                    onchange={() => toggleAllowedUser(user.id)}
+                  />
+                  <span>{user.name}</span>
+                </label>
+              {/each}
+            </div>
+          {:else}
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Visibility.NoWorldUsers', 'No non-GM players exist in this world yet.')}</p>
+          {/if}
+          {#if allowedUserIds.length === 0}
+            <p class="manager-muted manager-form-warning" data-recipe-visibility-empty>{text('FABRICATE.Admin.Manager.Recipe.Visibility.NoUsersSelected', 'Restricted with no users selected — no player can see this recipe.')}</p>
+          {/if}
+        </div>
+      {/if}
+    </section>
+  {/if}
 
   {#if isMultiStep}
     <RecipeStepsCard

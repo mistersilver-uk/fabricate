@@ -1490,6 +1490,14 @@
           "DiscardDirtyConfirm": "Discard changes",
           "DiscardDirtyCancel": "Keep editing",
           "SaveFailed": "Save failed. Check for duplicate or blank names and try again.",
+          "Visibility": {
+            "Title": "Visibility",
+            "RestrictToggle": "Restrict visibility to specific users",
+            "RestrictHint": "Restrict this recipe to specific players. When off, every player can see it.",
+            "AllowedUsers": "Allowed users",
+            "NoWorldUsers": "No non-GM players exist in this world yet.",
+            "NoUsersSelected": "Restricted with no users selected — no player can see this recipe."
+          },
           "EmptySetup": {
             "Kicker": "Recipe setup",
             "Title": "Set up recipes",
@@ -3384,11 +3392,19 @@
           "KnowledgeByItem": "By item (must have recipe item)",
           "KnowledgeByLearning": "By learning (must have learnt recipe)",
           "KnowledgeByEither": "Item or learning (either method)",
-          "ItemLimitUses": "Track limited uses on recipe items",
+          "ItemLimitUses": "Limited uses of recipe items",
           "ItemMaxUses": "Maximum uses",
           "ItemDestroyWhenExhausted": "Delete exhausted recipe item",
           "ConsumeOnLearn": "Consume item on learn",
-          "DragDropEnabled": "Learn recipes from actor item drops"
+          "DragDropEnabled": "Learn recipes from actor item drops",
+          "MaxUsesDecrease": "Decrease maximum uses",
+          "MaxUsesIncrease": "Increase maximum uses",
+          "ListModeLabel": "List mode",
+          "ListModeHint": "How recipes are exposed to players.",
+          "KnowledgeModeHint": "How players gain access to a recipe.",
+          "ItemLimitUsesHint": "Cap how many times a recipe item grants access.",
+          "ConsumeOnLearnHint": "Delete the recipe item when a player learns it.",
+          "DragDropEnabledHint": "Dropping the item on an actor learns the recipe."
         }
       },
       "Items": {
