@@ -1273,6 +1273,31 @@ export class CraftingSystemManager {
     await setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, payload);
   }
 
+  /**
+   * Re-read the persisted crafting-systems setting into the in-memory map. Unlike
+   * `initialize()` (which early-returns once initialized), this is the un-guarded
+   * refresh path used when the replicated world setting changes on ANOTHER client —
+   * the GM's save updates their own map directly, but a player's in-memory map only
+   * catches up here. Does NOT re-run legacy migration and does NOT persist, so it is
+   * safe to call from a settings hook without a write loop.
+   *
+   * @returns {boolean} `true` only when the normalized systems actually changed, so
+   *   callers can skip re-emitting a change hook (and avoid a redundant refresh on
+   *   the writing client, whose map already holds the saved data).
+   */
+  reload() {
+    const before = JSON.stringify([...this.systems.values()]);
+    const saved = getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) || [];
+    const next = new Map();
+    for (const system of saved) {
+      const normalized = this._normalizeSystem(system);
+      next.set(normalized.id, normalized);
+    }
+    this.systems = next;
+    this.initialized = true;
+    return before !== JSON.stringify([...this.systems.values()]);
+  }
+
   getSystems() {
     return [...this.systems.values()];
   }

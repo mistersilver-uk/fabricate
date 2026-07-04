@@ -61,6 +61,7 @@ import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
+import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
@@ -2147,6 +2148,15 @@ Hooks.once('ready', async () => {
     if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
       void runInteractableMarkerSync();
     }
+    // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
+    // `Hooks.callAll`s fired only on the GM's client. `updateSetting` fires on every
+    // client when the replicated world setting lands, so reload the stale in-memory
+    // manager here and re-emit the local change hook so open player apps refresh.
+    handleFabricateSettingChange(key, {
+      craftingSystemManager: fabricate.craftingSystemManager,
+      recipeManager: fabricate.recipeManager,
+      callAll: (hook, payload) => Hooks.callAll(hook, payload),
+    });
   });
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();

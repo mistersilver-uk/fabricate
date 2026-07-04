@@ -13,6 +13,10 @@ const appSource = readFileSync(
   resolve(__dirname, '../../src/ui/SvelteFabricateApp.svelte.js'),
   'utf8'
 );
+const gatheringSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/apps/gathering/GatheringView.svelte'),
+  'utf8'
+);
 
 describe('FabricateAppRoot shell', () => {
   it('renders the planned navigation tabs', () => {
@@ -75,6 +79,61 @@ describe('FabricateAppRoot shell', () => {
     assert.ok(
       /<ActorSelectTopBar[^>]*activeCanvasTool/.test(rootSource),
       'ActorSelectTopBar should receive the activeCanvasTool prop'
+    );
+  });
+
+  it('refreshes item-derived stores when a relevant actor inventory changes', () => {
+    assert.ok(
+      rootSource.includes('subscribeInventoryChange'),
+      'the shell should subscribe to owned-item changes'
+    );
+    // Only reload for actors this app reads from — the selected crafting actor or a
+    // component-source actor, resolved at fire time.
+    assert.ok(
+      rootSource.includes('isRelevantCraftingActor'),
+      'inventory refresh should be filtered to relevant actors'
+    );
+    assert.ok(
+      rootSource.includes('getSelectedCraftingActorId') &&
+        rootSource.includes('getCraftingComponentSourceIds'),
+      'relevance should be computed from the selected + source actor seams'
+    );
+    const effectIdx = rootSource.indexOf('subscribeInventoryChange(');
+    const effectBody = rootSource.slice(effectIdx, effectIdx + 400);
+    assert.ok(
+      effectBody.includes('services?.crafting?.load?.(true)') &&
+        effectBody.includes('services?.inventory?.load?.(true)'),
+      'inventory change should quietly reload the crafting and inventory stores'
+    );
+  });
+
+  it('refreshes every data store when a crafting system or recipe changes', () => {
+    assert.ok(
+      rootSource.includes('subscribeCraftingDataChange'),
+      'the shell should subscribe to crafting-data changes'
+    );
+    const effectIdx = rootSource.indexOf('subscribeCraftingDataChange(');
+    const effectBody = rootSource.slice(effectIdx, effectIdx + 400);
+    for (const store of ['craftingSources', 'crafting', 'inventory', 'journal']) {
+      assert.ok(
+        effectBody.includes(`services?.${store}?.load?.(true)`),
+        `data change should quietly reload the ${store} store`
+      );
+    }
+  });
+
+  it('wires the Gathering view to refresh on inventory and crafting-data changes', () => {
+    assert.ok(
+      gatheringSource.includes('subscribeInventoryChange'),
+      'GatheringView should refresh on the selected actor inventory change'
+    );
+    assert.ok(
+      gatheringSource.includes('subscribeCraftingDataChange'),
+      'GatheringView should refresh on a crafting-system/recipe change'
+    );
+    assert.ok(
+      gatheringSource.includes('store.selectedActorId'),
+      'gathering inventory relevance should be gated on the selected gathering actor'
     );
   });
 
