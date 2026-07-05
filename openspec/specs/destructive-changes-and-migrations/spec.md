@@ -36,6 +36,10 @@ When `CraftingSystem.resolutionMode` changes:
 
 1. Delete all recipes in the system.
 2. Apply the same clean-up as mode change.
+   This clean-up covers all three actor- and user-scoped stores keyed by the deleted system: crafting runs (both active and history) via the runs clean-up; learned-recipe flags via the learned-recipes clean-up; and per-user progressive-ordering and stale-reference preferences via the preferences clean-up.
+   For performance and reliability, once all recipes have been deleted this clean-up is performed as a single bulk pass across all actors per store, not a per-recipe sequential clean-up that fans out to one flag write per recipe per actor.
+   Batching how the clean-up runs does not narrow which categories it covers.
+   The deliberately-orphaned per-actor `discoveryProgress` flag remains out of scope.
 3. Remove the system from persisted settings.
 4. Emit one summary notification that includes the deleted crafting system name and the number of related entities removed; do not emit one notification per deleted recipe.
 5. A failure to delete an individual recipe must not abort the deletion: the remaining recipes are still deleted, the system is still removed from persisted settings, and clean-up still runs.
@@ -112,11 +116,13 @@ For systems in `alchemy` mode:
 - Remove run entries that reference missing recipe IDs.
 - Remove run entries for recipes in deleted systems.
 - Runs cleanup should be executed after every destructive operation and during startup migration.
+- During a Delete Crafting System operation this clean-up runs as one bulk pass per store across all actors, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
 
 ### Learned Recipes Clean-up
 
 - Remove learned entries for missing recipe IDs.
 - Keep valid learned entries even if the visibility mode changes.
+- During a Delete Crafting System operation this clean-up runs as one bulk pass across all actors, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
 
 ### Preferences Clean-up
 
