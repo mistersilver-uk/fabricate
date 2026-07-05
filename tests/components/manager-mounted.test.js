@@ -3231,24 +3231,31 @@ describe('CraftingSystemManager mounted behavior', () => {
       onSave: (patch) => emitted.push(patch),
     });
 
-    // The stepper is hidden until limited uses is on.
+    // The stepper stays visible but disabled until limited uses is on (faded,
+    // non-interactive) rather than appearing/disappearing.
+    const stepper = target.querySelector('[data-recipe-visibility-max-uses]');
+    assert.ok(stepper, 'the max-uses stepper is present even when limitUses is off');
     assert.equal(
-      target.querySelector('[data-recipe-visibility-max-uses]'),
-      null,
-      'the max-uses stepper is hidden when limitUses is off'
+      stepper.querySelector('input').disabled,
+      true,
+      'the max-uses input is disabled when limitUses is off'
     );
 
     target.querySelector('[data-recipe-visibility-limit-uses]').click();
     assert.deepEqual(emitted.at(-1), { limitUses: true, maxUses: 1 });
   });
 
-  it('recipe visibility card shows the player note only in player mode', () => {
+  it('recipe visibility card shows a per-mode note under the list-mode select', () => {
+    // The note now lives inside the List mode card (under the select) and has an
+    // equivalent for every mode, so the option labels can stay terse.
     mountRecipeVisibilityCard({
       recipeVisibility: { listMode: 'global' },
       showKnowledgeOptions: false,
       onSave: () => {},
     });
-    assert.equal(target.querySelector('[data-recipe-visibility-player-note]'), null);
+    const globalNote = target.querySelector('[data-recipe-visibility-list-mode-note]');
+    assert.ok(globalNote, 'a mode note renders in global mode');
+    assert.match(globalNote.textContent, /visible to all players/i);
 
     unmount(mounted);
     mounted = null;
@@ -3259,10 +3266,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       showKnowledgeOptions: false,
       onSave: () => {},
     });
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-player-note]'),
-      'the player note renders in player mode'
-    );
+    const playerNote = target.querySelector('[data-recipe-visibility-list-mode-note]');
+    assert.ok(playerNote, 'a mode note renders in player mode');
+    assert.match(playerNote.textContent, /per-recipe/i);
   });
 
   it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
