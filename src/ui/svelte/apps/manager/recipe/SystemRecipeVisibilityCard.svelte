@@ -6,8 +6,11 @@
   (per-recipe restrictions authored in each recipe's editor), or Knowledge-based
   (item and/or learning gated). Teaser mode is intentionally out of scope here.
 
-  Each control is its own sub-card (reusing the `manager-resolution-mode-card`
-  frame) laid out in a responsive 3-column grid rather than one full-width stack.
+  Layout is stable as options change: the List mode card and the Knowledge-based
+  card each span the full width, and the knowledge mode's variable inputs (item /
+  learning sub-cards) are NESTED inside the Knowledge card in their own responsive
+  3-column grid — so switching modes reflows only that nested grid, never the
+  top-level cards. Sub-cards reuse the `manager-resolution-mode-card` frame.
 
   The card is CONTROLLED and live-applies each control: every handler passes ONLY
   its own field to `onSave(patch)`. The admin store's object-form
@@ -109,7 +112,7 @@
   </div>
 
   <div class="manager-recipe-visibility-grid">
-    <div class="manager-resolution-mode-card manager-recipe-visibility-subcard">
+    <div class="manager-resolution-mode-card manager-recipe-visibility-subcard is-span-all">
       <span class="manager-resolution-mode-legend">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ListModeLabel', 'List mode')}</span>
       <p class="manager-recipe-visibility-subcard-desc">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ListModeHint', 'How recipes are exposed to players.')}</p>
       <div class="manager-recipe-visibility-control">
@@ -134,7 +137,10 @@
     {/if}
 
     {#if showKnowledgeOptions}
-      <div class="manager-resolution-mode-card manager-recipe-visibility-subcard" data-recipe-visibility-knowledge>
+      <!-- The Knowledge-based card spans the full width and holds the mode select
+           plus its variable inputs NESTED within it, so switching knowledge modes
+           reflows only the nested grid rather than shifting the top-level cards. -->
+      <div class="manager-resolution-mode-card manager-recipe-visibility-subcard is-span-all" data-recipe-visibility-knowledge>
         <span class="manager-resolution-mode-legend">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.KnowledgeBased', 'Knowledge-based (item or learning)')}</span>
         <p class="manager-recipe-visibility-subcard-desc">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.KnowledgeModeHint', 'How players gain access to a recipe.')}</p>
         <div class="manager-recipe-visibility-control">
@@ -149,40 +155,44 @@
             <option value="itemOrLearned">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.KnowledgeByEither', 'Item or learning (either method)')}</option>
           </select>
         </div>
-      </div>
 
-      {#if showItemOptions}
-        <div class="manager-resolution-mode-card manager-recipe-visibility-subcard">
-          <span class="manager-resolution-mode-legend">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemLimitUses', 'Limited uses of recipe items')}</span>
-          <p class="manager-recipe-visibility-subcard-desc">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemLimitUsesHint', 'Cap how many times a recipe item grants access.')}</p>
-          <div class="manager-recipe-visibility-control">
-            {@render toggleButton('data-recipe-visibility-limit-uses', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemLimitUses', 'Limited uses of recipe items', limitUses, setLimitUses)}
-          </div>
-
-          {#if limitUses}
-            <div class="manager-recipe-visibility-nested">
-              <div class="manager-recipe-visibility-nested-field" data-recipe-visibility-max-uses-row>
-                <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemMaxUses', 'Maximum uses')}</span>
-                <div class="manager-recipe-visibility-stepper" data-recipe-visibility-max-uses>
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxUsesDecrease', 'Decrease maximum uses')} onclick={() => adjustMaxUses(-1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
-                  <input type="number" min="1" step="1" value={maxUses} aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemMaxUses', 'Maximum uses')} oninput={(event) => onSave({ maxUses: Math.max(1, Number(event.target.value || 1)) })} />
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxUsesIncrease', 'Increase maximum uses')} onclick={() => adjustMaxUses(1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
+        {#if showItemOptions || showLearnOptions}
+          <div class="manager-recipe-visibility-nested-grid">
+            {#if showItemOptions}
+              <div class="manager-resolution-mode-card manager-recipe-visibility-subcard">
+                <span class="manager-resolution-mode-legend">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemLimitUses', 'Limited uses of recipe items')}</span>
+                <p class="manager-recipe-visibility-subcard-desc">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemLimitUsesHint', 'Cap how many times a recipe item grants access.')}</p>
+                <div class="manager-recipe-visibility-control">
+                  {@render toggleButton('data-recipe-visibility-limit-uses', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemLimitUses', 'Limited uses of recipe items', limitUses, setLimitUses)}
                 </div>
-              </div>
-              <div class="manager-recipe-visibility-nested-field">
-                <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete exhausted recipe item')}</span>
-                {@render toggleButton('data-recipe-visibility-destroy', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete exhausted recipe item', destroyWhenExhausted, (next) => onSave({ destroyWhenExhausted: next }))}
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/if}
 
-      {#if showLearnOptions}
-        {@render toggleCard('data-recipe-visibility-consume-on-learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearn', 'Consume item on learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearnHint', 'Delete the recipe item when a player learns it.', consumeOnLearn, (next) => onSave({ consumeOnLearn: next }))}
+                {#if limitUses}
+                  <div class="manager-recipe-visibility-nested">
+                    <div class="manager-recipe-visibility-nested-field" data-recipe-visibility-max-uses-row>
+                      <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemMaxUses', 'Maximum uses')}</span>
+                      <div class="manager-recipe-visibility-stepper" data-recipe-visibility-max-uses>
+                        <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxUsesDecrease', 'Decrease maximum uses')} onclick={() => adjustMaxUses(-1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
+                        <input type="number" min="1" step="1" value={maxUses} aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemMaxUses', 'Maximum uses')} oninput={(event) => onSave({ maxUses: Math.max(1, Number(event.target.value || 1)) })} />
+                        <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxUsesIncrease', 'Increase maximum uses')} onclick={() => adjustMaxUses(1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
+                      </div>
+                    </div>
+                    <div class="manager-recipe-visibility-nested-field">
+                      <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete exhausted recipe item')}</span>
+                      {@render toggleButton('data-recipe-visibility-destroy', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete exhausted recipe item', destroyWhenExhausted, (next) => onSave({ destroyWhenExhausted: next }))}
+                    </div>
+                  </div>
+                {/if}
+              </div>
+            {/if}
 
-        {@render toggleCard('data-recipe-visibility-drag-drop', 'FABRICATE.Admin.Manager.System.RecipeVisibility.DragDropEnabled', 'Learn recipes from actor item drops', 'FABRICATE.Admin.Manager.System.RecipeVisibility.DragDropEnabledHint', 'Dropping the item on an actor learns the recipe.', dragDropEnabled, (next) => onSave({ dragDropEnabled: next }))}
-      {/if}
+            {#if showLearnOptions}
+              {@render toggleCard('data-recipe-visibility-consume-on-learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearn', 'Consume item on learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearnHint', 'Delete the recipe item when a player learns it.', consumeOnLearn, (next) => onSave({ consumeOnLearn: next }))}
+
+              {@render toggleCard('data-recipe-visibility-drag-drop', 'FABRICATE.Admin.Manager.System.RecipeVisibility.DragDropEnabled', 'Learn recipes from actor item drops', 'FABRICATE.Admin.Manager.System.RecipeVisibility.DragDropEnabledHint', 'Dropping the item on an actor learns the recipe.', dragDropEnabled, (next) => onSave({ dragDropEnabled: next }))}
+            {/if}
+          </div>
+        {/if}
+      </div>
     {/if}
   </div>
 </section>
