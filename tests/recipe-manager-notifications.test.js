@@ -129,6 +129,32 @@ describe('RecipeManager notification controls', () => {
     }
   });
 
+  it('deleteRecipe suppresses the per-recipe flag cleanup only when cleanupFlags is false', async () => {
+    const manager = makeManager();
+    // Spy on the per-recipe actor-flag fan-out so the gate is pinned against the
+    // REAL RecipeManager: a gate-only revert (deleteRecipe ignoring cleanupFlags and
+    // always fanning out) would reintroduce the N×M regression and fail here.
+    let cleanupCalls = 0;
+    manager._cleanupFlagsAfterRecipeMutation = async () => {
+      cleanupCalls += 1;
+    };
+
+    await manager.createRecipe(makeRecipeData({ id: 'recipe-gate-off', name: 'Gate Off' }), {
+      notify: false
+    });
+    await manager.createRecipe(makeRecipeData({ id: 'recipe-gate-on', name: 'Gate On' }), {
+      notify: false
+    });
+
+    // Batch caller opting out: no per-recipe cleanup.
+    await manager.deleteRecipe('recipe-gate-off', { notify: false, cleanupFlags: false });
+    assert.equal(cleanupCalls, 0, 'cleanupFlags: false suppresses _cleanupFlagsAfterRecipeMutation');
+
+    // Default / omitted option: the per-recipe cleanup still runs.
+    await manager.deleteRecipe('recipe-gate-on', { notify: false });
+    assert.equal(cleanupCalls, 1, 'default deleteRecipe still runs _cleanupFlagsAfterRecipeMutation');
+  });
+
   it('importRecipes emits one aggregate notification and returns counts', async () => {
     const manager = makeManager();
     manager.recipes.set('existing-recipe', new Recipe(makeRecipeData({ id: 'existing-recipe', name: 'Existing' })));
