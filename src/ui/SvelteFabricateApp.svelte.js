@@ -220,8 +220,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
       // Player-side "hide out-of-reach (locked) environments" preference for the
-      // Environments column (client-scoped; the component reads/writes it here
-      // rather than touching Foundry globals directly).
+      // Environments column. Client-scoped, so it persists per client/device
+      // (`localStorage`), not per user account. The component reads/writes it
+      // through these seams rather than touching Foundry globals directly; the
+      // getter defaults to false (show all) when the facade is unavailable.
       getHideOutOfReachEnvironments: () =>
         game?.fabricate?.getHideOutOfReachEnvironments?.() ?? false,
       setHideOutOfReachEnvironments: (value) =>

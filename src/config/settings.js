@@ -132,6 +132,13 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Boolean,
     default: false,
   },
+  // Player-side "hide out-of-reach (locked) environments" preference for the
+  // Gathering app's Environments column. `scope: 'client'` persists it in the
+  // browser's `localStorage`, so the choice is per client/device, not per user
+  // account, and does not follow the user to a second device. Hidden from the
+  // Foundry settings menu (`config: false`); toggled from the app UI. Defaults
+  // to false (show all). The identifier keeps the `Unavailable` spelling for
+  // back-compat; user-facing copy says "out of reach".
   [SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE]: {
     name: 'Hide Out-of-Reach Gathering Environments',
     scope: 'client',
