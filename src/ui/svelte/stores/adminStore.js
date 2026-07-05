@@ -1477,6 +1477,10 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       complex: raw.complex === true,
       toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),
+      // The raw `{ restricted, allowedUserIds }` object (display string aside) so
+      // the per-recipe restriction editor can seed, stage, and save an edit. Without
+      // it `recipeDraft.visibility` is undefined and edits cannot be persisted.
+      visibility: raw.visibility || null,
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
@@ -1974,6 +1978,7 @@ export function createAdminStore(services) {
     recipes: [],
     recipeCategories: [],
     showVisibilitySummary: false,
+    worldUsers: [],
     // The derived `evaluateSystemValidation` report for the selected system,
     // consumed by the GM system-overview view, its rail count badge, and the
     // system-blocker banner. A derived/computed view — nothing is persisted on
@@ -3106,6 +3111,17 @@ export function createAdminStore(services) {
     }));
   }
 
+  // Re-project the non-GM world users backing the per-recipe restriction
+  // allow-list. Cheap and surgical (no full `refresh()`), so the owning app can
+  // wire it to Foundry's user CRUD hooks and keep the allow-list current when a
+  // player is added, renamed, or removed while the manager is open.
+  function refreshWorldUsers() {
+    viewState.update((state) => ({
+      ...state,
+      worldUsers: services.getWorldUsers?.() || [],
+    }));
+  }
+
   async function _saveGatheringConfig(config) {
     const normalized = _normalizeGatheringConfig(config, _randomID);
     await services.setSetting?.(GATHERING_CONFIG_SETTING, normalized);
@@ -4151,6 +4167,9 @@ export function createAdminStore(services) {
 
     const availableScriptMacros = services.getScriptMacros?.() || [];
     const sceneOptions = services.getSceneOptions?.() || [];
+    // Non-GM world users, for the per-recipe "restrict to specific users" editor.
+    // Sourced through the injected service so the store never touches `game.*`.
+    const worldUsers = services.getWorldUsers?.() || [];
 
     let selectedSystemData = null;
     let essenceCards = [];
@@ -4219,6 +4238,7 @@ export function createAdminStore(services) {
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
+      worldUsers,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
     }));
@@ -4276,6 +4296,7 @@ export function createAdminStore(services) {
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
+      worldUsers,
       systemValidation,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
@@ -7258,6 +7279,7 @@ export function createAdminStore(services) {
     setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
     refresh,
     refreshGatheringConfig,
+    refreshWorldUsers,
     destroy,
   };
 }

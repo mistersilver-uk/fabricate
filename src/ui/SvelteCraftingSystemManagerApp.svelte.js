@@ -90,6 +90,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   _adminStore = null;
   _services = null;
   _confirmDiscardDirtyEssenceDraft = null;
+  // Foundry user CRUD hook registrations, torn down on close, that keep the
+  // per-recipe restriction allow-list current when players change while open.
+  _userHooks = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-crafting-system-manager',
@@ -212,6 +215,15 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         Array.from(game.scenes?.contents || [])
           .map(scene => normalizeSceneOption(scene))
           .filter(scene => scene.uuid && scene.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      // Non-GM world users ({ id, name }), name-sorted, for the per-recipe
+      // "restrict to specific users" allow-list under the `player` list mode.
+      // GMs are excluded because they always see every recipe, so restricting
+      // to a GM would be a no-op.
+      getWorldUsers: () =>
+        Array.from(game.users?.contents || [])
+          .filter(user => !user?.isGM)
+          .map(user => ({ id: user.id, name: user.name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       getActorOptions: () =>
         Array.from(game.actors?.contents || [])
@@ -403,6 +415,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     if (!this._adminStore) {
       this._services = this._buildServices();
       this._adminStore = createAdminStore(this._services);
+      this._registerUserHooks();
     }
 
     const resolveSingleItemDropUuid = (data) => {
@@ -679,6 +692,26 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     };
   }
 
+  // Keep the per-recipe restriction allow-list (`worldUsers`) live: when a player
+  // is created, renamed, or removed while the manager is open, re-project it.
+  // Each entry is `[hook, id]` so `_unregisterUserHooks` can pair them off.
+  _registerUserHooks() {
+    if (this._userHooks) return;
+    const reproject = () => this._adminStore?.refreshWorldUsers?.();
+    this._userHooks = ['createUser', 'updateUser', 'deleteUser'].map((hook) => [
+      hook,
+      Hooks.on(hook, reproject),
+    ]);
+  }
+
+  _unregisterUserHooks() {
+    if (!this._userHooks) return;
+    for (const [hook, id] of this._userHooks) {
+      Hooks.off(hook, id);
+    }
+    this._userHooks = null;
+  }
+
   async close(options) {
     const canCloseEssence = await this._confirmDiscardDirtyEssenceDraft?.();
     if (canCloseEssence === false) return this;
@@ -693,6 +726,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     }
 
     this._confirmDiscardDirtyEssenceDraft = null;
+    this._unregisterUserHooks();
     if (this._adminStore) {
       this._adminStore.destroy();
       this._adminStore = null;

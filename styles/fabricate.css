@@ -9111,6 +9111,170 @@
   text-align: center;
 }
 
+/* Recipe Visibility card: List mode and Knowledge-based are inline subheading
+   sections within the parent card; the knowledge OPTION cards share one
+   equal-height 3-column grid (align-items: stretch) below them. */
+.fabricate-manager .manager-recipe-visibility-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-subcard {
+  gap: var(--fab-space-2xs);
+}
+
+/* A labelled section (List mode / Knowledge-based) inside the parent card: an
+   uppercase subheading, its select, and a note — no bordered frame. */
+.fabricate-manager .manager-recipe-visibility-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-subheading {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Keep the section selects at a readable width rather than edge to edge. */
+.fabricate-manager
+  .manager-recipe-visibility-section
+  .manager-recipe-visibility-control
+  select {
+  max-width: 28rem;
+}
+
+/* The per-mode List mode note sits under the select. */
+.fabricate-manager .manager-recipe-visibility-list-mode-note {
+  margin-top: var(--fab-space-2);
+}
+
+/* The Limited-uses card stacks its toggle row above the Maximum-uses stepper,
+   which stays visible but faded and disabled until limited uses is enabled so
+   the card never changes size. */
+.fabricate-manager .manager-recipe-visibility-item-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2xs);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+/* Enabled + Delete-exhausted toggles share one row, splitting the width evenly. */
+.fabricate-manager .manager-recipe-visibility-item-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--fab-space-4);
+  min-width: 0;
+}
+
+.fabricate-manager
+  .manager-recipe-visibility-item-toggle-row
+  .manager-recipe-visibility-item-cell {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Learn-option cards pin their toggle to the top-right — the same head layout as
+   the Optional-features tiles — with the description below. An explicit two-column
+   grid (label | toggle) keeps a guaranteed gap so a wrapping legend never crowds
+   the pill: the legend wraps inside the first column and the toggle sits in its
+   own auto column. */
+.fabricate-manager .manager-recipe-visibility-toggle-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--fab-space-6);
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager
+  .manager-recipe-visibility-toggle-head
+  .manager-resolution-mode-legend {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-item-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-item-cell .manager-recipe-visibility-stepper {
+  min-width: 132px;
+}
+
+/* Faded, non-interactive gated inputs when limited uses is off. */
+.fabricate-manager .manager-recipe-visibility-item-cell.is-disabled {
+  opacity: 0.45;
+}
+
+.fabricate-manager .manager-status-toggle.is-disabled,
+.fabricate-manager .manager-status-toggle:disabled {
+  cursor: not-allowed;
+}
+
+.fabricate-manager .manager-recipe-visibility-subcard-desc {
+  margin: 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager .manager-recipe-visibility-control {
+  padding-top: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+/* Label above each stacked control inside the Limited-uses card. */
+.fabricate-manager .manager-recipe-visibility-nested-label {
+  color: var(--fab-mv2-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-recipe-visibility-control select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-weight: 400;
+}
+
+.fabricate-manager .manager-recipe-visibility-stepper {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-stepper input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-weight: 400;
+  text-align: center;
+}
+
 .fabricate-manager .manager-empty {
   display: grid;
   place-items: center;
@@ -9443,9 +9607,17 @@
   .fabricate-manager .manager-toggle-list {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .fabricate-manager .manager-recipe-visibility-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @container fabricate-manager (max-width: 680px) {
+  .fabricate-manager .manager-recipe-visibility-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .fabricate-manager .manager-header,
   .fabricate-manager .manager-section-header {
     align-items: stretch;

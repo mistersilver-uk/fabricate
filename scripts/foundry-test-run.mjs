@@ -3095,6 +3095,35 @@ async function main() {
         await currencyStrategy.selectOption('actorProperty');
         await page.waitForTimeout(300);
 
+        // --- Recipe Visibility card (GM authoring surface) ---
+        // The card renders on the Settings tab below the optional-features card
+        // for non-alchemy systems. Switch it to knowledge mode so the mode
+        // selector and the item/learn sub-options are shown, scroll it into
+        // view, and capture the whole normal-sized GM window for context.
+        await setManagerWindowSize(page, { width: 1280, height: 900 });
+        const recipeVisibilityCard = page.locator('.fabricate-manager [data-system-recipe-visibility]').first();
+        await recipeVisibilityCard.waitFor({ state: 'visible', timeout: 5_000 });
+        const recipeVisibilityMode = recipeVisibilityCard.locator('[data-recipe-visibility-list-mode]').first();
+        await recipeVisibilityMode.selectOption('knowledge');
+        await recipeVisibilityCard.locator('[data-recipe-visibility-knowledge]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.evaluate(async () => {
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
+        await recipeVisibilityCard.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+        await page.waitForTimeout(250);
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-system-recipe-visibility');
+
+        // Switch to player mode so the per-recipe restriction editor (player-mode
+        // only) renders in the recipe Overview capture below. Rendering the
+        // section reads the recipe draft without mutating it, so the recipe
+        // editor stays clean for the subsequent navigation.
+        await recipeVisibilityMode.selectOption('player');
+        await page.waitForTimeout(300);
+        await page.evaluate(async () => {
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
+
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const recipeApiCount = await page.evaluate((sysId) => {
           const rm = game.fabricate?.getRecipeManager?.();

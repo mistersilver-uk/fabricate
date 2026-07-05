@@ -56,6 +56,7 @@ function makeRecipe(overrides = {}) {
       id,
       name: overrides.name || `Recipe ${id}`,
       craftingSystemId: overrides.craftingSystemId || '',
+      visibility: overrides.visibility ?? null,
     }),
     ...overrides,
   };
@@ -5388,6 +5389,71 @@ describe('createAdminStore', () => {
           assert.ok(field in recipe, `recipe entry should have field: ${field}`);
         }
       }
+    });
+
+    it('viewState.recipes entries project the raw visibility object for the restriction editor', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const visibility = { restricted: true, allowedUserIds: ['u1', 'u2'] };
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [makeRecipe({ id: 'r1', name: 'VIP', craftingSystemId: 'sys1', visibility })].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+        getRecipe: () => null,
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      const r = vs.recipes.find((row) => row.id === 'r1');
+      assert.ok(r, 'the recipe row is present');
+      assert.ok('visibility' in r, 'the row projects a visibility field');
+      assert.deepEqual(r.visibility, visibility, 'the raw visibility object flows through toJSON');
+    });
+
+    it('viewState.recipes visibility is null when the recipe has no visibility object', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.ok(vs.recipes.length > 0, 'at least one recipe');
+      assert.equal(vs.recipes[0].visibility, null, 'absent visibility projects as null');
+    });
+
+    it('viewState.worldUsers exposes non-GM users from the getWorldUsers service', async () => {
+      const worldUsers = [
+        { id: 'u1', name: 'Alice' },
+        { id: 'u2', name: 'Bob' },
+      ];
+      const services = createMockServices({ getWorldUsers: () => worldUsers });
+      const store = createAdminStore(services);
+      await store.refresh();
+      assert.deepEqual(get(store.viewState).worldUsers, worldUsers);
+    });
+
+    it('viewState.worldUsers defaults to an empty array when the service is absent', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.refresh();
+      assert.deepEqual(get(store.viewState).worldUsers, []);
+    });
+
+    it('refreshWorldUsers re-projects the allow-list without a full refresh', async () => {
+      let current = [{ id: 'u1', name: 'Alice' }];
+      const services = createMockServices({ getWorldUsers: () => current });
+      const store = createAdminStore(services);
+      await store.refresh();
+      assert.deepEqual(get(store.viewState).worldUsers, [{ id: 'u1', name: 'Alice' }]);
+
+      // A player is added while the manager is open; the user-CRUD hook calls
+      // refreshWorldUsers, which must surface the change without a full refresh().
+      current = [
+        { id: 'u1', name: 'Alice' },
+        { id: 'u2', name: 'Bob' },
+      ];
+      store.refreshWorldUsers();
+      assert.deepEqual(get(store.viewState).worldUsers, current);
     });
 
     it('viewState.experimentalFeaturesEnabled mirrors the world setting', async () => {

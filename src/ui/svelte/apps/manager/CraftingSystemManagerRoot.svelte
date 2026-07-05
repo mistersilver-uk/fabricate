@@ -977,6 +977,10 @@
   // Progressive systems award a recipe's results in order, so the Results tab
   // enables drag-reorder of the result rows (resolution mode is a system setting).
   const recipeProgressive = $derived(selectedSystem?.resolutionMode === 'progressive');
+  // The per-recipe "restrict to specific users" editor only applies under the
+  // system's `player` recipe-visibility list mode; other modes gate visibility
+  // globally, per-knowledge, or not at all.
+  const recipePlayerListMode = $derived(selectedSystem?.recipeVisibility?.listMode === 'player');
   const recipeEditDirty = $derived(Boolean(recipeDraft)
     && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline));
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
@@ -4539,6 +4543,8 @@
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        playerListMode={recipePlayerListMode}
+        worldUsers={$viewState.worldUsers || []}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
         onAddStep={handleAddStep}
@@ -4576,6 +4582,7 @@
         onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
         onSetSalvageResolutionMode={(nextMode) => store.setSalvageResolutionMode?.(nextMode)}
         onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
+        onSaveVisibilityConfig={(cfg) => store.saveVisibilityConfig?.(cfg)}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         {characterModifierPresetsSupported}
         onAddCharacterModifier={onAddCharacterModifier}
