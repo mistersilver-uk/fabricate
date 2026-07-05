@@ -1127,7 +1127,7 @@ While Scene Region automation is unimplemented, the `Travel actor` source is pre
 
 The player Gathering app makes location-gated availability understandable.
 
-- Available environments sort before locked (out-of-realm/scene-gated) environments.
+- Available environments sort before locked (disabled or out-of-realm/scene-gated) environments.
 Locked environments remain visible by default (when safe, with clear blocked reasons); the player may opt to hide all currently-locked (out-of-reach) environments via the client-persisted Environments-column toggle described under Environment List.
 This toggle targets only `locked === true` listings and never hides in-realm, task-blocked environments.
 - Known destination guidance may list realm names; secret or undiscovered destination guidance must use undiscovered placeholders and counts.
