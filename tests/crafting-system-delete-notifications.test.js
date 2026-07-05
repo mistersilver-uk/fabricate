@@ -108,8 +108,8 @@ test('CraftingSystemManager.deleteSystem emits one summary and suppresses per-re
   assert.equal(manager.getSystem('sys-delete'), null);
   assert.deepEqual(recipeManager.remainingRecipes().map(recipe => recipe.id), ['recipe-other']);
   assert.deepEqual(recipeManager.deleteCalls, [
-    { recipeId: 'recipe-1', options: { notify: false } },
-    { recipeId: 'recipe-2', options: { notify: false } }
+    { recipeId: 'recipe-1', options: { notify: false, cleanupFlags: false } },
+    { recipeId: 'recipe-2', options: { notify: false, cleanupFlags: false } }
   ]);
   assert.deepEqual(notifications, [
     'Deleted crafting system "Alchemy" and 6 related entities.'
