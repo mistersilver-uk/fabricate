@@ -23,6 +23,7 @@ export const SETTING_KEYS = Object.freeze({
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
   LAST_MANAGED_CRAFTING_SYSTEM: 'lastManagedCraftingSystem',
   MANAGER_RAIL_COLLAPSED: 'managerRailCollapsed',
+  GATHERING_HIDE_UNAVAILABLE: 'gatheringHideUnavailableEnvironments',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
@@ -126,6 +127,13 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.MANAGER_RAIL_COLLAPSED]: {
     name: 'Crafting System Manager Rail Collapsed',
+    scope: 'client',
+    config: false,
+    type: Boolean,
+    default: false,
+  },
+  [SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE]: {
+    name: 'Hide Out-of-Reach Gathering Environments',
     scope: 'client',
     config: false,
     type: Boolean,

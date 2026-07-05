@@ -353,7 +353,7 @@
   <div class="gathering-view-container">
   <div class="gathering-view-grid" data-gathering-state="populated">
     <div class="gathering-view-column gathering-view-column-left">
-      <GatheringEnvironmentList {environments} {selectedId} {onSelect} />
+      <GatheringEnvironmentList {environments} {selectedId} {onSelect} {services} />
     </div>
     <section class="gathering-view-column gathering-view-column-center" data-gathering-detail>
       <GatheringDetail

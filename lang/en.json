@@ -706,7 +706,12 @@
           "Discovered": "{x} of {y} tasks discovered",
           "SearchPlaceholder": "Search environments…",
           "SearchLabel": "Search environments",
-          "NoMatches": "No environments match your search."
+          "NoMatches": "No environments match your search.",
+          "HideOutOfReach": "Hide out-of-reach",
+          "HideOutOfReachCount": "Hide out-of-reach ({count})",
+          "HideOutOfReachTooltip": "Hide environments your party can't currently reach — locked, out-of-realm, or scene-gated.",
+          "AllOutOfReachHidden": "All out-of-reach environments are hidden.",
+          "ShowOutOfReach": "Show out-of-reach"
         },
         "Detail": {
           "SelectHint": "Select an available environment from the left menu.",

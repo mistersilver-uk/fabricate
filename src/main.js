@@ -1476,6 +1476,27 @@ class Fabricate {
   }
 
   /**
+   * Whether the player has opted to hide out-of-reach (locked) gathering
+   * environments in the Environments column (client-scoped,
+   * `GATHERING_HIDE_UNAVAILABLE`; stored per device via `localStorage`).
+   *
+   * @returns {boolean}
+   */
+  getHideOutOfReachEnvironments() {
+    return getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE) === true;
+  }
+
+  /**
+   * Persist the player's "hide out-of-reach environments" preference.
+   *
+   * @param {boolean} value Whether to hide locked environments.
+   * @returns {Promise<boolean>}
+   */
+  setHideOutOfReachEnvironments(value) {
+    return setSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE, value === true);
+  }
+
+  /**
    * Start a gathering attempt for the current user.
    *
    * The raw GatheringEngine remains module-internal so all public attempts use
