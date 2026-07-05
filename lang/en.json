@@ -3394,7 +3394,7 @@
           "KnowledgeByEither": "Item or learning (either method)",
           "ItemLimitUses": "Limited uses of recipe items",
           "ItemMaxUses": "Maximum uses",
-          "ItemDestroyWhenExhausted": "Delete exhausted recipe item",
+          "ItemDestroyWhenExhausted": "Delete when exhausted",
           "ConsumeOnLearn": "Consume item on learn",
           "DragDropEnabled": "Learn recipes from actor item drops",
           "MaxUsesDecrease": "Decrease maximum uses",

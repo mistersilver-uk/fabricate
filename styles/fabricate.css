@@ -9185,13 +9185,15 @@
 }
 
 /* Learn-option cards pin their toggle to the top-right — the same head layout as
-   the Optional-features tiles — with the description below. The toggle holds its
-   size and keeps clear space from the (wrapping) legend. */
+   the Optional-features tiles — with the description below. An explicit two-column
+   grid (label | toggle) keeps a guaranteed gap so a wrapping legend never crowds
+   the pill: the legend wraps inside the first column and the toggle sits in its
+   own auto column. */
 .fabricate-manager .manager-recipe-visibility-toggle-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fab-space-4);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--fab-space-6);
+  align-items: start;
   min-width: 0;
 }
 
@@ -9199,10 +9201,6 @@
   .manager-recipe-visibility-toggle-head
   .manager-resolution-mode-legend {
   min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-visibility-toggle-head .manager-status-toggle {
-  flex-shrink: 0;
 }
 
 .fabricate-manager .manager-recipe-visibility-item-cell {
