@@ -96,11 +96,44 @@
   function onChoose(setId) {
     store?.chooseIngredientSet(setId);
   }
+  // The recipe's resolution mode drives the body-appropriate "expected results"
+  // the pre-craft confirmation dialog (issue 61) shows — it must match what the
+  // detail pane renders, which is NOT a uniform recipe.result:
+  //   simple / progressive → recipe.result
+  //   routedByIngredients  → the selected set's routed products
+  //   routedByCheck        → null (roll-dependent) + the outcome tiers to list
+  const mode = $derived(String(selectedRecipe?.modeToken ?? 'simple'));
+
+  // Build the confirm context passed into store.craft so the dialog and the
+  // detail pane never disagree about what will be produced.
+  function buildConfirmContext() {
+    const recipe = selectedRecipe;
+    if (!recipe) return undefined;
+    const base = { recipeName: recipe.name, craftability };
+    if (mode === 'routedByCheck') {
+      return { ...base, result: null, outcomeTiers: recipe.outcomeTiers ?? [], dependsOnRoll: true };
+    }
+    if (mode === 'routedByIngredients') {
+      const set = store?.selectedSet ?? null;
+      const items = Array.isArray(set?.products) ? set.products : (recipe.result?.items ?? []);
+      return {
+        ...base,
+        result: {
+          items,
+          time: recipe.result?.time ?? null,
+          timeLabel: recipe.result?.timeLabel ?? null,
+          xp: recipe.result?.xp ?? null
+        }
+      };
+    }
+    return { ...base, result: recipe.result ?? null };
+  }
+
   async function onCraft() {
     if (!selectedRecipe) return;
     // A fresh craft re-opens the run summary for this recipe.
     dismissedRunFor = null;
-    await store?.craft(selectedRecipe);
+    await store?.craft(selectedRecipe, buildConfirmContext());
   }
   function onDismissRun() {
     dismissedRunFor = selectedRecipe?.id ?? null;

@@ -812,6 +812,30 @@ Each
   bridge refreshes calendar-aware durations and re-fetches the listing quietly when
   the GM advances the clock.
 
+#### Craft Confirmation
+
+- Before dispatching a craft from the Crafting tab, the UI presents a confirmation
+  dialog through the Foundry `DialogV2` `services.confirmDialog` seam, never
+  `globalThis.confirm()`.
+- The dialog leads with a permanent, irreversible-consumption warning.
+- It summarizes the ingredients to be consumed with the consumed quantity as the
+  salient number and availability shown secondarily.
+- It lists the required tools and the required essences as distinct requirement
+  sections (essences are a requirement track, not named ingredients that are
+  consumed).
+- It shows the expected results appropriate to the recipe's resolution mode:
+  the selected-route products for an ingredient-routed recipe, and a
+  roll-dependent-outcome note or tier list for a check-routed recipe rather than a
+  bogus deterministic result.
+- The dialog exposes Confirm and Cancel actions; Cancel aborts the craft with no
+  resource consumption and dispatches no craft.
+- The dialog is skippable via a client-scope `skipCraftConfirmation` setting
+  (default off, exposed in module settings) and an in-dialog "Don't ask again"
+  checkbox that persists that same setting; when skipping is enabled the craft
+  dispatches without the dialog.
+- This realizes the intent noted under Run Guardrails for the crafting craft
+  action.
+
 ### Deferred (this iteration)
 
 - The learn affordance renders (the control plus its consume-on-learn warning), but

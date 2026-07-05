@@ -55,6 +55,7 @@ describe('Fabricate theme management', () => {
     assert.deepEqual(configurableKeys, [
       SETTING_KEYS.EXPERIMENTAL_FEATURES,
       SETTING_KEYS.INTERACTION_PROMPT_POSITION,
+      SETTING_KEYS.SKIP_CRAFT_CONFIRMATION,
       SETTING_KEYS.THEME
     ].sort());
 
@@ -90,6 +91,18 @@ describe('Fabricate theme management', () => {
     assert.equal(experimental.definition.config, true);
     assert.equal(experimental.definition.type, Boolean);
     assert.equal(experimental.definition.default, false);
+
+    // Pre-craft confirmation opt-out (issue 61): client-scope, configurable,
+    // Boolean, default off.
+    const skipConfirm = registrations.find(
+      entry => entry.key === SETTING_KEYS.SKIP_CRAFT_CONFIRMATION
+    );
+    assert.ok(skipConfirm, 'skip-craft-confirmation setting should be registered');
+    assert.equal(skipConfirm.namespace, FABRICATE_SETTINGS_NAMESPACE);
+    assert.equal(skipConfirm.definition.scope, 'client');
+    assert.equal(skipConfirm.definition.config, true);
+    assert.equal(skipConfirm.definition.type, Boolean);
+    assert.equal(skipConfirm.definition.default, false);
   });
 
   it('registers a hidden client-scoped boolean for the collapsed manager rail preference', () => {

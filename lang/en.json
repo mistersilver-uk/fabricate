@@ -556,6 +556,18 @@
         "Notify": {
           "CraftFailed": "Something went wrong while crafting. Nothing was consumed."
         },
+        "Confirm": {
+          "Title": "Confirm craft",
+          "Confirm": "Craft",
+          "Cancel": "Cancel",
+          "DontAskAgain": "Don't ask me again",
+          "ConsumeWarning": "Crafting permanently consumes the ingredients below. This can't be undone.",
+          "DependsOnRoll": "The outcome depends on your roll.",
+          "IngredientsConsumed": "Ingredients consumed",
+          "RequiredTools": "Required tools",
+          "RequiredEssences": "Required essences",
+          "ExpectedResults": "Expected results"
+        },
         "Sources": {
           "Label": "Component sources",
           "Edit": "Edit component sources",
@@ -848,6 +860,10 @@
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
         "Hint": "Reserved for future experimental Fabricate features in this world. No current features are gated by this switch. Disabled by default."
+      },
+      "SkipCraftConfirmation": {
+        "Name": "Skip Craft Confirmation",
+        "Hint": "Skip the confirmation dialog shown before a craft consumes its ingredients. You can also enable this from the \"Don't ask me again\" checkbox in the dialog. Applies only to you. Disabled by default."
       },
       "RepairComponentSources": {
         "Name": "Repair Component Sources",

@@ -1450,6 +1450,26 @@ class Fabricate {
   }
 
   /**
+   * Whether the player has opted out of the pre-craft confirmation dialog
+   * (client-scoped `SKIP_CRAFT_CONFIRMATION`, issue 61). Defaults to false.
+   *
+   * @returns {boolean}
+   */
+  getSkipCraftConfirmation() {
+    return getSetting(SETTING_KEYS.SKIP_CRAFT_CONFIRMATION) === true;
+  }
+
+  /**
+   * Persist the pre-craft confirmation opt-out (`SKIP_CRAFT_CONFIRMATION`).
+   *
+   * @param {boolean} value True to skip the confirmation on future crafts.
+   * @returns {*}
+   */
+  setSkipCraftConfirmation(value) {
+    return setSetting(SETTING_KEYS.SKIP_CRAFT_CONFIRMATION, value === true);
+  }
+
+  /**
    * The player's favourite recipe ids (client-scoped, `FAVOURITE_RECIPES`).
    *
    * @returns {string[]}

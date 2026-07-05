@@ -24,7 +24,13 @@ const RUNE_MODULES = [
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-crafting-actor-bar-',
-  rawModules: [...CRAFTING_APP_RAW_MODULES, 'src/ui/svelte/util/shoppingListAggregator.js'],
+  rawModules: [
+    ...CRAFTING_APP_RAW_MODULES,
+    'src/ui/svelte/util/shoppingListAggregator.js',
+    // The real crafting store now imports the pre-craft confirmation builder
+    // (issue 61); copy it so the compiled store's import resolves in the harness.
+    'src/ui/svelte/apps/crafting/craftConfirm.js'
+  ],
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
   runeModules: RUNE_MODULES,
   componentPath: 'src/ui/svelte/apps/crafting/CraftingView.svelte'

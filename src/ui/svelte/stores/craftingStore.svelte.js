@@ -26,6 +26,7 @@
  */
 
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
+import { buildCraftConfirmContent } from '../apps/crafting/craftConfirm.js';
 
 const DEFAULT_PAGE_SIZE = 12;
 const MAX_RECENTS = 8;
@@ -273,15 +274,62 @@ export function createCraftingStore({ services } = {}) {
    * unhandled rejection. `craftInFlight` is always cleared in `finally` so a throw
    * never leaves the craft action stuck.
    *
+   * Before dispatching, when the `services.confirmDialog` seam is present AND the
+   * client has not opted out (`getSkipCraftConfirmation()` is not true), it opens a
+   * pre-craft confirmation dialog (issue 61) summarizing the irreversible
+   * consumption. The gate is a NO-OP when the seam is absent (the craft dispatches),
+   * which is the OPPOSITE of the Manager discard-guard and keeps the seam-less craft
+   * tests dispatching unchanged. `confirmContext` (optional, supplied by
+   * `CraftingView` from the active recipe body) carries the body-appropriate
+   * expected result; when absent the dialog still warns + lists the consumed
+   * ingredients but omits the results section.
+   *
    * @param {object|null} recipe The recipe model (or null to use the selection).
+   * @param {object} [confirmContext] Optional body-appropriate confirm context:
+   *   `{ recipeName, craftability, result, outcomeTiers, dependsOnRoll }`.
    * @returns {Promise<object|null>} The craft result.
    */
-  async function craft(recipe) {
+  async function craft(recipe, confirmContext) {
     if (craftInFlight) return null;
     const recipeId = recipe?.id ?? selectedRecipeId;
     if (!recipeId) return null;
     craftInFlight = true;
     try {
+      // Pre-craft confirmation (issue 61). Only prompt when the seam is present and
+      // the client has not opted out; an absent seam is a no-op that dispatches.
+      if (
+        typeof services?.confirmDialog === 'function' &&
+        services?.getSkipCraftConfirmation?.() !== true
+      ) {
+        // DialogV2 resolves the confirm button as `(await callback()) ?? action`, so
+        // the callback MUST return true unconditionally — a fall-through to the 'yes'
+        // action string (!== true) would silently drop the craft. It persists the
+        // opt-out only when the in-dialog checkbox is ticked.
+        const readDontAskAgain = async (event, button) => {
+          if (button?.form?.elements?.dontAskAgain?.checked === true) {
+            await services?.setSkipCraftConfirmation?.(true);
+          }
+          return true;
+        };
+        const t = (key, fallback) => services?.localize?.(key) || fallback;
+        const confirmed = await services.confirmDialog({
+          window: { title: t('FABRICATE.App.Crafting.Confirm.Title', 'Confirm craft') },
+          classes: ['fabricate', 'fabricate-dialog', 'fabricate-craft-confirm-dialog'],
+          content: buildCraftConfirmContent({
+            recipeName: confirmContext?.recipeName ?? recipe?.name ?? selectedRecipe?.name ?? '',
+            craftability: confirmContext?.craftability ?? selectedCraftability,
+            result: confirmContext?.result ?? null,
+            outcomeTiers: confirmContext?.outcomeTiers ?? null,
+            dependsOnRoll: confirmContext?.dependsOnRoll === true,
+          }),
+          yes: {
+            label: t('FABRICATE.App.Crafting.Confirm.Confirm', 'Craft'),
+            callback: readDontAskAgain,
+          },
+          no: { label: t('FABRICATE.App.Crafting.Confirm.Cancel', 'Cancel') },
+        });
+        if (confirmed !== true) return { cancelled: true };
+      }
       const result = await services?.craftRecipe?.({
         actorId: currentActorId(),
         recipeId,

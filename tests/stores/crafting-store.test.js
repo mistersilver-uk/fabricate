@@ -8,7 +8,14 @@ let compiler;
 let createCraftingStore;
 
 function makeServices(overrides = {}) {
-  const calls = { listCraftingForActor: [], craftRecipe: [], notify: [], toggleFavourite: [] };
+  const calls = {
+    listCraftingForActor: [],
+    craftRecipe: [],
+    notify: [],
+    toggleFavourite: [],
+    confirmDialog: [],
+    setSkipCraftConfirmation: [],
+  };
   // Stateful favourites fake so toggleFavourite round-trips like the real setting.
   let favourites = Array.isArray(overrides.favourites) ? [...overrides.favourites] : [];
   const services = {
@@ -39,6 +46,24 @@ function makeServices(overrides = {}) {
       return [...favourites];
     },
   };
+  // Pre-craft confirmation seams (issue 61). Only wire the confirm seam when a
+  // test supplies it, so the seam-less craft tests keep dispatching unchanged
+  // (an absent `confirmDialog` makes the gate a no-op). The skip getter is opt-in
+  // too; `setSkipCraftConfirmation` is always recorded (only reached inside the
+  // confirm branch).
+  if (overrides.confirmDialog) {
+    services.confirmDialog = async (options) => {
+      calls.confirmDialog.push(options);
+      return overrides.confirmDialog(options);
+    };
+  }
+  if ('skipCraftConfirmation' in overrides) {
+    services.getSkipCraftConfirmation = () => overrides.skipCraftConfirmation === true;
+  }
+  services.setSkipCraftConfirmation = (value) => {
+    calls.setSkipCraftConfirmation.push(value);
+  };
+  services.localize = (key) => key;
   return { services, calls };
 }
 
@@ -56,6 +81,9 @@ describe('craftingStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-crafting-store-');
     compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
+    // The real store now imports the pre-craft confirmation content builder
+    // (issue 61); copy it verbatim so the compiled store's import resolves.
+    compiler.copyPlain('src/ui/svelte/apps/crafting/craftConfirm.js');
     ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
   });
 
@@ -378,6 +406,92 @@ describe('craftingStore', () => {
       loadsAfterInitial + 1,
       'a successful craft quietly refreshes the listing'
     );
+  });
+
+  it('confirm gate: a declined confirmDialog cancels the craft without dispatching (issue 61)', async () => {
+    const { services, calls } = makeServices({ confirmDialog: async () => false });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.deepEqual(result, { cancelled: true }, 'a declined confirm cancels the craft');
+    assert.equal(calls.confirmDialog.length, 1, 'the confirmation dialog was shown');
+    assert.equal(calls.craftRecipe.length, 0, 'no craft is dispatched when declined');
+  });
+
+  it('confirm gate: skip setting bypasses the dialog and dispatches directly (issue 61)', async () => {
+    const { services, calls } = makeServices({
+      skipCraftConfirmation: true,
+      confirmDialog: async () => true,
+    });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.success, true, 'the craft dispatches');
+    assert.equal(calls.confirmDialog.length, 0, 'the dialog is skipped when the setting is on');
+    assert.equal(calls.craftRecipe.length, 1, 'the craft is dispatched once');
+  });
+
+  it('confirm gate: a ticked "don\'t ask again" persists the skip before dispatch (issue 61)', async () => {
+    const { services, calls } = makeServices({
+      confirmDialog: async (options) => {
+        // DialogV2 invokes the yes button callback with the submitting button; the
+        // form exposes the named checkbox. Tick it so the store persists the opt-out.
+        await options.yes.callback(
+          {},
+          { form: { elements: { dontAskAgain: { checked: true } } } }
+        );
+        return true;
+      },
+    });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.success, true, 'the craft dispatches after confirming');
+    assert.deepEqual(calls.setSkipCraftConfirmation, [true], 'the opt-out is persisted');
+    assert.equal(calls.craftRecipe.length, 1, 'the craft is dispatched once');
+  });
+
+  it('confirm gate: an unticked confirm dispatches without persisting the skip (issue 61)', async () => {
+    const { services, calls } = makeServices({
+      confirmDialog: async (options) => {
+        // A normal Confirm-without-ticking: the callback must still resolve true so
+        // the craft is not silently dropped (F1), and must not persist the opt-out.
+        const resolved = await options.yes.callback(
+          {},
+          { form: { elements: { dontAskAgain: { checked: false } } } }
+        );
+        assert.equal(resolved, true, 'the yes callback returns true unconditionally');
+        return true;
+      },
+    });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.success, true, 'the craft dispatches');
+    assert.deepEqual(calls.setSkipCraftConfirmation, [], 'the opt-out is not persisted');
+    assert.equal(calls.craftRecipe.length, 1, 'the craft is dispatched once');
+  });
+
+  it('confirm gate: an absent confirmDialog seam is a no-op that dispatches (issue 61)', async () => {
+    // No `confirmDialog` override → the seam is absent, so the gate must NOT block
+    // the craft (opposite of the Manager discard-guard).
+    const { services, calls } = makeServices();
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.success, true, 'the craft dispatches with no confirm seam');
+    assert.equal(calls.confirmDialog.length, 0, 'no dialog is shown when the seam is absent');
+    assert.equal(calls.craftRecipe.length, 1, 'the craft is dispatched once');
   });
 
   it('markRecent dedupes and caps newest-first', () => {

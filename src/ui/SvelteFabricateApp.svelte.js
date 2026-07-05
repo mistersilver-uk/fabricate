@@ -7,7 +7,7 @@ import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
 import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
 import { createInventoryStore } from './svelte/stores/inventoryStore.svelte.js';
 import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
-import { notifyWarn, localize } from './svelte/util/foundryBridge.js';
+import { notifyWarn, localize, confirmDialog } from './svelte/util/foundryBridge.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -203,6 +203,15 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // crafting source actors. Foundry-free store consumes this wrapper only.
       listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts) ?? null,
       craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      // Pre-craft confirmation seams (issue 61). The confirm routes through the
+      // DialogV2 bridge (never globalThis.confirm); the skip getter/setter read and
+      // persist the client-scope `skipCraftConfirmation` setting via the facade.
+      confirmDialog: (options) => confirmDialog(options),
+      getSkipCraftConfirmation: () => game?.fabricate?.getSkipCraftConfirmation?.() === true,
+      setSkipCraftConfirmation: (value) => game?.fabricate?.setSkipCraftConfirmation?.(value),
+      // Localization seam for store-owned dialog strings (matches the Manager
+      // services bag), so the Foundry-free stores stay off `game.i18n`.
+      localize: (key, data) => localize(key, data),
       listCraftingSourceActors: () => game?.fabricate?.listCraftingSourceActors?.() ?? [],
       getCraftingSourceActors: () => game?.fabricate?.getCraftingSourceActors?.() ?? [],
       getSelectedCraftingActorId: () => game?.fabricate?.getSelectedCraftingActorId?.() ?? '',

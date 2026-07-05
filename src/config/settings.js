@@ -31,6 +31,7 @@ export const SETTING_KEYS = Object.freeze({
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
   INTERACTION_PROMPT_POSITION: 'interactionPromptPosition',
+  SKIP_CRAFT_CONFIRMATION: 'skipCraftConfirmation',
 });
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -95,6 +96,14 @@ const BASE_DEFINITIONS = Object.freeze({
     type: String,
     choices: INTERACTION_PROMPT_POSITION_CHOICES,
     default: DEFAULT_INTERACTION_PROMPT_POSITION,
+  },
+  [SETTING_KEYS.SKIP_CRAFT_CONFIRMATION]: {
+    name: 'FABRICATE.Settings.SkipCraftConfirmation.Name',
+    hint: 'FABRICATE.Settings.SkipCraftConfirmation.Hint',
+    scope: 'client',
+    config: true,
+    type: Boolean,
+    default: false,
   },
   [SETTING_KEYS.LAST_CRAFTING_ACTOR]: {
     name: 'Last Crafting Actor',
