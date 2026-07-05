@@ -845,6 +845,15 @@ Each
   (resolved through the resolution-mode label keys — the raw `simple` token is
   never surfaced to the UI), `browseStatus`, per-set `ingredientSets[].craftability`,
   an optional `check` descriptor, `outcomeTiers`, and `result`.
+- Each `RecipeListingModel` also carries `category` (the normalized category token;
+  `general` for the reserved/default bucket) and a `categoryLabel` display string.
+- The label rule is exact: the reserved `general` token is localized to
+  `FABRICATE.Common.General` and is never shown as a bare token, while a custom
+  category token is surfaced verbatim as its own label (GM free-text; no prettify
+  or title-casing).
+- `category`/`categoryLabel` ride on the shared `base` projection, so they are
+  present on Discovery-Mode teaser models too (category is GM-authored grouping
+  metadata, not a redacted spoiler field).
 - The listing exposes `counts.available` / `counts.total` for header summaries.
 
 ##### Browse Status
@@ -903,7 +912,19 @@ Each
 
 #### Recipe List
 
-- Filter/search controls (category/tags if enabled)
+- A search box plus the favourites-only, craftable-only, crafting-system, and
+  category filter controls narrow the list.
+- Each row shows a neutral category badge for non-`general` categories, in both the
+  normal and the uncraftable row layouts.
+- The badge is suppressed for `general` recipes so the default bucket is not tagged
+  with a redundant "General" chip; its text is the localized/verbatim `categoryLabel`,
+  never the raw token.
+- A single-level category filter dropdown sits above the crafting-system filter.
+- The category dropdown is client-local browse state with an "All categories"
+  default; its options are the distinct categories present in the player's visible
+  recipes, sorted non-`general` A→Z with "General" pinned last.
+- Category grouping headers and nested/expandable category folders are explicitly
+  deferred follow-ups; this first cut ships the badge and filter only.
 - Row status badges from `006` evaluation, drawn from the `browseStatus`
   vocabulary:
   - Available

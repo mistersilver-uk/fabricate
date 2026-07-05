@@ -92,6 +92,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
   'src/systems/CraftingListingBuilder.js',
+  // CraftingListingBuilder imports these category helpers (issue 514); the builder
+  // is already in the mounted graph, so this transitive dep must be copied too or
+  // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
+  // imports of its own, so this single entry suffices.
+  'src/utils/recipeCategories.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);
 

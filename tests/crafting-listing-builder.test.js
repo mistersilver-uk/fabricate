@@ -262,6 +262,41 @@ describe('CraftingListingBuilder — teaser redaction (non-leak)', () => {
   });
 });
 
+describe('CraftingListingBuilder — category projection (issue 514)', () => {
+  it('projects the reserved general category + its localized label for an uncategorized recipe', () => {
+    // makeRecipe() authors no category → normalizeRecipeCategory defaults to general.
+    const { recipe } = buildOne();
+    assert.equal(recipe.category, 'general', 'defaults to the reserved general token');
+    assert.equal(
+      recipe.categoryLabel,
+      'FABRICATE.Common.General',
+      'general localizes (never a bare token) — passthrough localize returns the key'
+    );
+  });
+
+  it('surfaces a custom category token verbatim as its own label (no prettify)', () => {
+    const { recipe } = buildOne({
+      entries: [{ recipe: makeRecipe({ category: 'weapons' }), access: { reason: 'ok' } }],
+    });
+    assert.equal(recipe.category, 'weapons', 'custom token is the raw filter-match key');
+    assert.equal(recipe.categoryLabel, 'weapons', 'custom token is surfaced verbatim, not prettified');
+  });
+
+  it('rides category + categoryLabel on the shared base so a teaser carries them too', () => {
+    const { recipe } = buildOne({
+      entries: [
+        {
+          recipe: makeRecipe({ category: 'potions' }),
+          access: { reason: 'teaser', teaserState: { hiddenFields: ['ingredients', 'results', 'description'] } },
+        },
+      ],
+    });
+    assert.equal(recipe.redaction.redacted, true, 'the teaser is redacted');
+    assert.equal(recipe.category, 'potions', 'category rides on ...base onto the teaser model');
+    assert.equal(recipe.categoryLabel, 'potions', 'categoryLabel rides on ...base onto the teaser model');
+  });
+});
+
 describe('CraftingListingBuilder — recipe image (matches GM Manager precedence)', () => {
   it('resolves a linked recipe item image when img is the default placeholder', () => {
     // The reported bug: a recipe whose icon lives on a linked item keeps the default

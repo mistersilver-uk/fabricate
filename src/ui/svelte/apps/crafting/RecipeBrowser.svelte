@@ -23,6 +23,8 @@
     craftableOnly = false,
     systemFilter = null,
     systems = [],
+    categoryFilter = null,
+    categories = [],
     favouriteIds = [],
     onSelect = null,
     onSearch = null,
@@ -31,6 +33,7 @@
     onToggleFavourites = null,
     onToggleCraftable = null,
     onSystemChange = null,
+    onCategoryChange = null,
     onPageChange = null,
     onPageSizeChange = null
   } = $props();
@@ -40,7 +43,11 @@
   // Any active filter (search or the three controls) switches the empty state to
   // the "no matches" copy rather than the "no recipes at all" copy.
   const isFiltering = $derived(
-    isSearching || favouritesOnly === true || craftableOnly === true || Boolean(systemFilter)
+    isSearching ||
+      favouritesOnly === true ||
+      craftableOnly === true ||
+      Boolean(systemFilter) ||
+      Boolean(categoryFilter)
   );
   const favouriteSet = $derived(new Set(Array.isArray(favouriteIds) ? favouriteIds : []));
 
@@ -50,6 +57,10 @@
   function onSystemInput(event) {
     const value = event.currentTarget.value;
     onSystemChange?.(value === '' ? null : value);
+  }
+  function onCategoryInput(event) {
+    const value = event.currentTarget.value;
+    onCategoryChange?.(value === '' ? null : value);
   }
 </script>
 
@@ -92,6 +103,23 @@
           <span>{localize('FABRICATE.App.Crafting.Browser.CraftableOnly')}</span>
         </button>
       </div>
+      {#if categories.length > 0}
+        <label class="crafting-browser-filter-category">
+          <span class="crafting-browser-filter-label"
+            >{localize('FABRICATE.App.Crafting.Browser.CategoryFilterLabel')}</span
+          >
+          <select
+            value={categoryFilter ?? ''}
+            aria-label={localize('FABRICATE.App.Crafting.Browser.CategoryFilterLabel')}
+            onchange={onCategoryInput}
+          >
+            <option value="">{localize('FABRICATE.App.Crafting.Browser.AllCategories')}</option>
+            {#each categories as category (category.id)}
+              <option value={category.id}>{category.name}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
       {#if systems.length > 0}
         <label class="crafting-browser-filter-system">
           <span class="crafting-browser-filter-label"
@@ -237,7 +265,8 @@
     color: var(--fab-accent);
   }
 
-  .crafting-browser-filter-system {
+  .crafting-browser-filter-system,
+  .crafting-browser-filter-category {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -248,7 +277,8 @@
     color: var(--fab-text-muted);
   }
 
-  .crafting-browser-filter-system select {
+  .crafting-browser-filter-system select,
+  .crafting-browser-filter-category select {
     box-sizing: border-box;
     width: 100%;
     height: 30px;
@@ -260,7 +290,8 @@
     font-size: 12px;
   }
 
-  .crafting-browser-filter-system select:focus-visible {
+  .crafting-browser-filter-system select:focus-visible,
+  .crafting-browser-filter-category select:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
