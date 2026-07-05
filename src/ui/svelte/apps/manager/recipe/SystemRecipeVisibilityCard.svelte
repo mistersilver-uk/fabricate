@@ -190,8 +190,8 @@
                   {@render toggleButton('data-recipe-visibility-limit-uses', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemLimitUses', 'Limited uses of recipe items', limitUses, setLimitUses, false)}
                 </div>
                 <div class="manager-recipe-visibility-item-cell" class:is-disabled={!limitUses}>
-                  <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete exhausted recipe item')}</span>
-                  {@render toggleButton('data-recipe-visibility-destroy', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete exhausted recipe item', destroyWhenExhausted, (next) => onSave({ destroyWhenExhausted: next }), !limitUses)}
+                  <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete when exhausted')}</span>
+                  {@render toggleButton('data-recipe-visibility-destroy', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete when exhausted', destroyWhenExhausted, (next) => onSave({ destroyWhenExhausted: next }), !limitUses)}
                 </div>
               </div>
               <div class="manager-recipe-visibility-item-cell" class:is-disabled={!limitUses} data-recipe-visibility-max-uses-row>
