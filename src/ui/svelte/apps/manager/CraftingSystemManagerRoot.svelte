@@ -9,7 +9,8 @@
   import {
     routedSuccessTierOptions,
     routedHasOutcomeTiers,
-    routedOutcomeTierNames
+    routedOutcomeTierNames,
+    resolveRecipeCheckTierOptions
   } from '../../../../utils/routedOutcomeKeywords.js';
   import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
@@ -386,13 +387,13 @@
         : craftingCheckSaving
   );
 
-  // Static recipe tiers offered to the recipe editor's tier dropdown. Only when the
-  // system uses a simple static check that actually defines tiers.
+  // Recipe tiers offered to the recipe editor's "Check tier" dropdown, resolved
+  // from the active crafting-check mode. Recipe tiers are authored on a RELATIVE
+  // check, so a simple-static check surfaces its `simple.tiers` and a routed
+  // relative check (`routed.type !== 'fixed'`) surfaces its `routed.tiers`; fixed,
+  // dynamic-dc, progressive and unknown modes offer nothing. See the pure helper.
   const recipeCheckTierOptions = $derived(
-    craftingCheckMode === 'simple' &&
-      (selectedSystem?.craftingCheck?.simple?.dcMode || 'static') === 'static'
-      ? selectedSystem?.craftingCheck?.simple?.tiers || []
-      : []
+    resolveRecipeCheckTierOptions(selectedSystem?.craftingCheck, craftingCheckMode)
   );
 
   // Routed-check outcome tiers (active type) offered to the recipe editor's

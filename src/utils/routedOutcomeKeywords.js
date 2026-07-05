@@ -140,6 +140,43 @@ export function routedHasOutcomeTiers(routed) {
 }
 
 /**
+ * The recipe-tier list offered to the recipe editor's "Check tier" dropdown for
+ * the selected system, resolved from its active crafting-check mode. Recipe tiers
+ * are authored on a RELATIVE check (simple-static or routed-relative), so this
+ * returns the active mode's tier list only in those two cases:
+ *
+ *  - simple mode + static `dcMode` → `craftingCheck.simple.tiers`
+ *  - routed mode + relative type (`routed.type !== 'fixed'`) → `craftingCheck.routed.tiers`
+ *
+ * Everything else — simple + dynamic dcMode, routed + fixed type, progressive,
+ * or a null/unknown mode — yields `[]` (no tier selection is meaningful). The
+ * routed gate mirrors CraftingCheckEditor's `type` normalization
+ * (`type === 'fixed' ? 'fixed' : 'relative'`), so an omitted/undefined routed
+ * `type` is treated as relative and its tiers are offered.
+ *
+ * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly and reused
+ * by the recipe editor's `$derived` without adding a new module dependency.
+ *
+ * @param {?{simple?: {dcMode?: string, tiers?: Array}, routed?: {type?: string, tiers?: Array}}} craftingCheck
+ * @param {?string} craftingCheckMode the active crafting-check mode: 'simple' |
+ *   'routed' | 'progressive' | null
+ * @returns {Array} the tier objects for the active mode, or `[]`
+ */
+export function resolveRecipeCheckTierOptions(craftingCheck, craftingCheckMode) {
+  if (craftingCheckMode === 'simple') {
+    // Mirror SimpleCraftingCheckEditor's `dcMode === 'dynamic' ? 'dynamic' : 'static'`
+    // normalization: only an explicit `dynamic` hides tiers; every other value
+    // (including omitted) is static and offers them. Structurally symmetric with the
+    // routed `type === 'fixed'` gate below.
+    return craftingCheck?.simple?.dcMode === 'dynamic' ? [] : craftingCheck?.simple?.tiers || [];
+  }
+  if (craftingCheckMode === 'routed') {
+    return craftingCheck?.routed?.type === 'fixed' ? [] : craftingCheck?.routed?.tiers || [];
+  }
+  return [];
+}
+
+/**
  * All NON-EMPTY outcome-tier NAMES of a routed check's active type — success AND
  * failure tiers — in author order. The active list is the `fixedOutcomes` when
  * `type === 'fixed'`, else `relativeOutcomes`. This is the single source of truth
