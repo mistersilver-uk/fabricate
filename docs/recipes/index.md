@@ -114,5 +114,31 @@ Runtime crafting is available through the public API.
 See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.
 
 {: .note }
-> A player-facing Crafting tab is planned and not yet available.
-Recipe crafting works through the API today.
+> Players craft recipes from the Crafting tab in the Fabricate window.
+Recipe crafting is also available through the API.
+
+## Craft Confirmation
+
+Crafting a recipe is permanent, so Fabricate asks you to confirm before anything is consumed.
+When you craft a recipe from the Crafting tab, a **Confirm craft** dialog opens first and summarises what the craft will use and produce.
+
+The dialog lists, for the recipe you are about to craft:
+
+- **Ingredients consumed**, with the quantity each craft removes from your inventory.
+- **Required tools**, which the craft needs but does not consume.
+- **Required essences** the recipe draws on.
+- **Expected results** the craft will produce.
+
+The results shown match the recipe you are about to craft.
+When a recipe can produce different results depending on which ingredients you chose, the dialog shows the results for the ingredients you selected.
+When a recipe's result is decided by a skill check, the outcome is not known in advance.
+In that case the dialog tells you the outcome depends on your roll instead of showing a fixed result.
+When such a recipe lists several possible outcomes, the dialog shows those outcomes so you can see what each one awards.
+
+Choose **Craft** to go ahead with the craft.
+Choose **Cancel**, or close the dialog, to back out with nothing consumed.
+
+To skip the confirmation next time, tick **Don't ask me again** in the dialog.
+You can also turn on **Skip Craft Confirmation** in Fabricate's module settings.
+This preference applies only to your own client and is off by default, so each player decides whether to see the confirmation.
+When it is on, crafting a recipe commits straight away without the dialog.
