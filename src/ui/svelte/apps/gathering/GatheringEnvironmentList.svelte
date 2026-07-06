@@ -98,7 +98,6 @@
       class="gathering-env-hide-filter"
       title={localize('FABRICATE.App.Gathering.Environments.HideUnavailableTooltip')}
     >
-      <span id={hideLabelId} class="gathering-env-hide-filter-label">{hideLabel}</span>
       <button
         type="button"
         class={`gathering-env-hide-toggle ${hideUnavailable ? 'is-on' : 'is-off'}`}
@@ -110,10 +109,8 @@
         <span class="gathering-env-hide-toggle-track" aria-hidden="true">
           <span class="gathering-env-hide-toggle-knob"></span>
         </span>
-        <span class="gathering-env-hide-toggle-state">{hideUnavailable
-          ? localize('FABRICATE.App.Gathering.Environments.HideToggleOn')
-          : localize('FABRICATE.App.Gathering.Environments.HideToggleOff')}</span>
       </button>
+      <span id={hideLabelId} class="gathering-env-hide-filter-label">{hideLabel}</span>
     </div>
   </header>
 
@@ -220,18 +217,20 @@
   }
 
   /*
-    Full-width filter row beneath the search input: a descriptive label on the
-    left and Fabricate's pill switch on the right — the same track+knob+On/Off
-    control used across the GM apps (`.manager-status-toggle`), re-themed here
-    with the base `--fab-*` player tokens. The switch is a plain <button> (NOT a
+    Full-width filter row beneath the search input: Fabricate's pill switch on
+    the left and a descriptive label to its right — the same track+knob control
+    used across the GM apps (`.manager-status-toggle`), re-themed here with the
+    base `--fab-*` player tokens. The switch is a plain <button> (NOT a
     checkbox), so Foundry paints none of the control and the track/knob are the
-    only visual — the label to its left is the accessible name (aria-labelledby).
+    only visual (no On/Off text); the label to its right is the accessible name
+    (aria-labelledby). The extra top margin sets the row off from the search.
   */
   .gathering-env-hide-filter {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
     width: 100%;
+    margin-top: var(--fab-space-2);
   }
 
   .gathering-env-hide-filter-label {
@@ -244,37 +243,22 @@
     color: var(--fab-text-muted);
   }
 
+  /*
+    Bare, labelless switch: no button chrome (border/background) — the track IS
+    the control and carries the on/off signal by recolouring. The knob slides
+    across and darkens on so it reads against the accent-filled track.
+  */
   .gathering-env-hide-toggle {
     appearance: none;
     -webkit-appearance: none;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    justify-content: flex-start;
-    gap: var(--fab-space-1);
-    height: 24px;
-    padding: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-2xs) var(--fab-space-2xs);
-    border: 1px solid var(--fab-border);
+    padding: 0;
+    border: 0;
     border-radius: 999px;
-    background: var(--fab-overlay-dark-18);
-    color: var(--fab-text-muted);
-    white-space: nowrap;
+    background: none;
     cursor: pointer;
-  }
-
-  .gathering-env-hide-toggle.is-on {
-    border-color: var(--fab-success-border);
-    color: var(--fab-text);
-    background: var(--fab-success-soft);
-  }
-
-  .gathering-env-hide-toggle.is-off {
-    border-color: var(--fab-warning-border);
-    background: var(--fab-warning-soft);
-  }
-
-  .gathering-env-hide-toggle:hover {
-    border-color: var(--fab-border-strong);
   }
 
   .gathering-env-hide-toggle:focus-visible {
@@ -291,6 +275,11 @@
     padding: var(--fab-space-2xs);
     border-radius: 999px;
     background: var(--fab-overlay-light-14);
+    transition: background-color 120ms ease;
+  }
+
+  .gathering-env-hide-toggle.is-on .gathering-env-hide-toggle-track {
+    background: var(--fab-accent);
   }
 
   .gathering-env-hide-toggle-knob {
@@ -303,17 +292,7 @@
 
   .gathering-env-hide-toggle.is-on .gathering-env-hide-toggle-knob {
     transform: translateX(10px);
-    background: var(--fab-accent);
-  }
-
-  .gathering-env-hide-toggle-state {
-    min-width: 0;
-    overflow: hidden;
-    color: inherit;
-    font-size: 0.74rem;
-    font-weight: 700;
-    line-height: 1;
-    text-overflow: ellipsis;
+    background: var(--fab-bg-0);
   }
 
   .gathering-env-list-scroll {
