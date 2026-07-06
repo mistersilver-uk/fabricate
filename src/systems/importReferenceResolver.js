@@ -35,13 +35,20 @@ export const REFERENCE_KINDS = Object.freeze({
   RECIPE_ITEM: 'recipeItem',
 });
 
+const LOCAL_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
 function localId() {
   // 16-char base36 id; Foundry-free stand-in for foundry.utils.randomID().
+  // Draws from the platform CSPRNG (`crypto.getRandomValues`, available in Node
+  // and the Foundry browser context) rather than a pseudorandom generator, so it
+  // stays pure, unit-testable, and free of insecure-randomness findings.
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
   let id = '';
-  while (id.length < 16) {
-    id += Math.random().toString(36).slice(2);
+  for (const byte of bytes) {
+    id += LOCAL_ID_ALPHABET[byte % LOCAL_ID_ALPHABET.length];
   }
-  return id.slice(0, 16);
+  return id;
 }
 
 /**
