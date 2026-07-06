@@ -1959,6 +1959,138 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('routedByIngredients renders the SimpleCraftingCheckEditor (no tier editor) and Save routes through the simple slot', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          alchemyResolutionMode: 'routedByIngredients',
+          // The RI check now lives on the shared simple pass/fail slot.
+          craftingCheck: {
+            simple: { rollFormula: '1d20', dc: 14, thresholdMode: 'meet', dcMode: 'static', tiers: [] },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    const craftingPanel = target.querySelector('[data-checks-panel="crafting"]');
+    assert.ok(
+      craftingPanel.querySelector('[data-simple-check-editor]'),
+      'routedByIngredients renders the simple pass/fail editor'
+    );
+    // It is NOT the routed tier editor: no relative/fixed toggle, no outcome-tiers
+    // table, no "Recipes do not have a DC" fixed-mode notice.
+    assert.equal(
+      craftingPanel.querySelector('[data-crafting-check-editor]'),
+      null,
+      'the routed tier editor is not rendered for routedByIngredients'
+    );
+    assert.equal(
+      craftingPanel.querySelector('[data-check-type-option]'),
+      null,
+      'no relative/fixed type toggle'
+    );
+    assert.equal(
+      craftingPanel.querySelector('[data-outcome-row]'),
+      null,
+      'no outcome-tiers table'
+    );
+    // The DC + static/dynamic DC source are shown (pass/fail gate uses the DC).
+    assert.ok(
+      craftingPanel.querySelector('[data-dc-mode-option]'),
+      'the simple editor shows the static/dynamic DC source'
+    );
+    const formulaInput = craftingPanel.querySelector('[data-check-roll-formula]');
+    assert.equal(formulaInput.value, '1d20', 'seeded from craftingCheck.simple');
+
+    // Save routes through the simple slot, not the routed slot.
+    formulaInput.value = '1d20+2';
+    formulaInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('[data-checks-save]').click();
+    await tick();
+    await Promise.resolve();
+    flushSync();
+    assert.ok(
+      calls.find((call) => call[0] === 'saveCraftingCheckSimple'),
+      'Save persists the routedByIngredients check through the simple slot'
+    );
+    assert.equal(
+      calls.some((call) => call[0] === 'saveCraftingCheckRouted'),
+      false,
+      'routedByIngredients never saves through the routed slot'
+    );
+  });
+
+  it('reseeds the crafting-check drafts on a same-system resolution-mode switch across the RI boundary', async () => {
+    const calls = [];
+    const store = createStore(calls, {
+      alchemyResolutionMode: 'routedByIngredients',
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 14, thresholdMode: 'meet', dcMode: 'static', tiers: [] },
+        routed: { rollFormula: '', type: 'relative', relativeOutcomes: [], fixedOutcomes: [] },
+      },
+    });
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    // Initially routedByIngredients → the simple editor, seeded from the simple slot.
+    let craftingPanel = target.querySelector('[data-checks-panel="crafting"]');
+    assert.ok(craftingPanel.querySelector('[data-simple-check-editor]'));
+
+    // Switch the SAME system to routedByCheck with a persisted routed formula. The
+    // reseed guard must re-read both crafting-check slots so the routed editor shows
+    // the persisted routed formula (not a stale/empty draft).
+    store.viewState.update((state) => ({
+      ...state,
+      selectedSystem: {
+        ...state.selectedSystem,
+        resolutionMode: 'routedByCheck',
+        craftingCheck: {
+          simple: state.selectedSystem.craftingCheck.simple,
+          routed: {
+            rollFormula: '2d8+1',
+            type: 'relative',
+            relativeOutcomes: [],
+            fixedOutcomes: [],
+          },
+        },
+      },
+    }));
+    await tick();
+    flushSync();
+
+    craftingPanel = target.querySelector('[data-checks-panel="crafting"]');
+    assert.ok(
+      craftingPanel.querySelector('[data-crafting-check-editor]'),
+      'routedByCheck now renders the routed tier editor'
+    );
+    assert.equal(
+      craftingPanel.querySelector('[data-check-roll-formula]').value,
+      '2d8+1',
+      'the routed draft was reseeded from the persisted routed slot (no data-loss)'
+    );
+  });
+
   it('Checks Save is tab-aware: edits and persists the salvage progressive award mode', async () => {
     const calls = [];
     target = document.createElement('div');

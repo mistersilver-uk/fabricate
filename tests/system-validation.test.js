@@ -304,11 +304,15 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
     assert.equal(report.blocksSystem, true);
   });
 
-  it('routedByIngredients never raises routedCheckNoFormula at any formula state', () => {
+  it('routedByIngredients with an empty simple formula raises no blocker (its check is optional, like simple/alchemy)', () => {
+    // RI now reads craftingCheck.simple (unified onto the shared optional pass/fail
+    // slot). An unauthored simple formula simply means no check runs — its readiness
+    // stays identical to its equally-optional simple/alchemy peers; collectSystemBlockers
+    // only raises routedCheckNoFormula for routedByCheck.
     const system = makeSystem({
       resolutionMode: 'routedByIngredients',
       features: { craftingChecks: false },
-      craftingCheck: { routed: { rollFormula: '' } },
+      craftingCheck: { simple: { rollFormula: '' }, routed: { rollFormula: '' } },
     });
     const report = evaluateSystemValidation(system, { recipes: [makeRecipe({})] });
 
@@ -317,7 +321,7 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
       false,
       'routedByIngredients carries no routedCheckNoFormula pressure'
     );
-    assert.equal(report.blocksSystem, false);
+    assert.equal(report.blocksSystem, false, 'the optional RI check raises no system blocker');
   });
 
   it('does NOT block a routedByCheck system once a routed formula is configured', () => {

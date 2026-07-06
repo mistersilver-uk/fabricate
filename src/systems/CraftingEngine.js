@@ -1981,12 +1981,13 @@ export class CraftingEngine {
    *  - `routedByCheck` mode.
    *
    * `routedByIngredients` does not need a check outcome to route: it selects by
-   * the chosen ingredient set, so its check is OPTIONAL (runs only when a routed
-   * roll formula is authored). For it, and for `simple`/`alchemy`, the check only
-   * runs when the system enables crafting checks (alchemy additionally always runs
-   * its simple pass/fail check when a roll formula is configured — see
-   * `useSimpleCheck` below). There is no legacy `tiered` branch — `tiered` is gone,
-   * replaced by the two routed modes.
+   * the chosen ingredient set, so its check is the SAME optional pass/fail check as
+   * `simple`/`alchemy`, read from the shared `craftingCheck.simple` slot (runs only
+   * when a `simple.rollFormula` is authored). For `simple` the check honours the
+   * crafting-checks enabled toggle; alchemy and `routedByIngredients` run their
+   * simple pass/fail check on an authored roll formula alone (see `useSimpleCheck`
+   * below). There is no legacy `tiered` branch — `tiered` is gone, replaced by the
+   * two routed modes.
    *
    * @private
    * @returns {Promise<{success: boolean, outcome: ?string, value?: *, data: object}>}
@@ -2018,23 +2019,27 @@ export class CraftingEngine {
     }
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
-    const isRoutedMode = mode === 'routedByIngredients' || mode === 'routedByCheck';
     const checkRequired = mode === 'progressive' || mode === 'routedByCheck';
     const features = system.features || {};
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;
 
-    // Simple pass/fail check (Checks editor) for simple and alchemy modes: used
-    // when a roll formula is configured. Optional in simple mode (honours the
-    // enabled toggle) and always-on in alchemy mode, where the check is required.
+    // Simple pass/fail check (Checks editor) for the simple, alchemy, AND
+    // routedByIngredients modes: used when a roll formula is configured. The
+    // `craftingCheck.simple` slot is the shared optional pass/fail crafting-check
+    // slot (it backs all three modes), NOT a simple-mode-only slot. Optional in
+    // simple + routedByIngredients modes (routedByIngredients routes result groups
+    // by ingredient set, so its check never gates routing — it stays an optional
+    // pass/fail layer that runs on an authored formula alone, with no
+    // `checksEnabled` requirement) and always-on in alchemy mode.
     const simpleConfig = system?.craftingCheck?.simple;
     // With an EMPTY `simple.rollFormula` the simple pass/fail check is not usable,
-    // so `useSimpleCheck` is false and (in optional simple mode) the attempt
-    // proceeds with no check.
+    // so `useSimpleCheck` is false and (in optional simple / routedByIngredients
+    // mode) the attempt proceeds with no check.
     const useSimpleCheck =
-      ['simple', 'alchemy'].includes(mode) &&
+      ['simple', 'alchemy', 'routedByIngredients'].includes(mode) &&
       !!simpleConfig?.rollFormula &&
-      (mode === 'alchemy' || checksEnabled);
+      (mode === 'alchemy' || mode === 'routedByIngredients' || checksEnabled);
 
     // Progressive check (Checks editor) for progressive mode: rolls a formula
     // whose total becomes the numeric `value` the progressive result-awarding
@@ -2043,14 +2048,14 @@ export class CraftingEngine {
     const progressiveConfig = system?.craftingCheck?.progressive;
     const useProgressiveCheck = mode === 'progressive' && !!progressiveConfig?.rollFormula;
 
-    // Routed check (Checks editor) for the routed modes: rolls the routed formula
-    // and maps the total to an outcome tier whose NAME drives `routedByCheck`
-    // routing. Usable only when a routed formula is configured. In `routedByCheck`
-    // the check is required (a missing formula fails via the required-check guard
-    // below); in `routedByIngredients` it is an optional pass/fail layer that runs
-    // only when a formula is authored.
+    // Routed check (Checks editor) for `routedByCheck` ONLY: rolls the routed
+    // formula and maps the total to an outcome tier whose NAME drives the
+    // `routedByCheck` routing. Usable only when a routed formula is configured; the
+    // check is required, so a missing formula fails via the required-check guard
+    // below. `routedByIngredients` no longer reads `craftingCheck.routed` — its
+    // optional pass/fail check lives on `craftingCheck.simple` (see `useSimpleCheck`).
     const routedConfig = system?.craftingCheck?.routed;
-    const useRoutedCheck = isRoutedMode && !!routedConfig?.rollFormula;
+    const useRoutedCheck = mode === 'routedByCheck' && !!routedConfig?.rollFormula;
 
     if (
       !checksEnabled &&
@@ -2071,20 +2076,10 @@ export class CraftingEngine {
     }
 
     if (useRoutedCheck) {
-      // `routedByIngredients` routes result groups by the chosen ingredient set, not
-      // by check outcome tiers, so its check is a plain pass/fail gate against the DC
-      // (tiers are typically unconfigured — routing them through the tier evaluator
-      // would fail every roll). Only `routedByCheck` uses the tier-routing path.
-      if (mode === 'routedByIngredients') {
-        return this._runPassFailCheck(
-          system,
-          system?.craftingCheck?.routed || {},
-          recipe,
-          ingredientSet,
-          craftingActor,
-          { interactive }
-        );
-      }
+      // Only `routedByCheck` uses the tier-routing path (its check total maps to an
+      // outcome tier whose name drives routing). `routedByIngredients` routes result
+      // groups by the chosen ingredient set and runs its optional pass/fail check
+      // through `useSimpleCheck` above against `craftingCheck.simple`.
       return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, { interactive });
     }
 
@@ -2133,7 +2128,7 @@ export class CraftingEngine {
 
   /**
    * Evaluate a pass/fail crafting check against an arbitrary check sub-config
-   * (`simple` or, for the ingredient-routed mode, `routed`): resolve the DC
+   * (the shared `simple` slot, which backs `simple`/`alchemy`/`routedByIngredients`): resolve the DC
    * (static default, recipe tier, or dynamic macro) via {@link _resolveSimpleCheckDc}
    * — parameterized over `config`, so a recipe `checkTierId` / dynamic-DC macro still
    * applies — then roll and compare (meet-or-exceed / exceed) via the shared
@@ -2230,13 +2225,18 @@ export class CraftingEngine {
       // A total below every relative threshold clamps to the lowest tier, so a
       // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
       clampToNearest: true,
+      // Fixed-type only: a recipe may require a minimum success tier; a roll below it
+      // fails the craft outright. Null for relative / unset recipes (no-op).
+      minOutcomeId: recipe?.minSuccessOutcomeId ?? null,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
         name: recipe?.name,
         activity: 'Crafting',
         img: this._resolveRecipePromptImg(recipe),
-        dc,
+        // Fixed-type routed checks match by value range, not DC, so the prompt must
+        // not advertise a (meaningless) DC. Undefined suppresses the chip + flavor.
+        dc: routed.type === 'fixed' ? undefined : dc,
       }),
     });
     return this._markEngineEvaluated(result);
@@ -2307,8 +2307,9 @@ export class CraftingEngine {
 
   /**
    * Resolve the active crafting check's `checkBreakage` block for the system's
-   * resolution mode (issue 419). The simple/alchemy modes author on the simple
-   * check, routed on the routed check, progressive on the progressive check.
+   * resolution mode (issue 419). The simple/alchemy/routedByIngredients modes author
+   * on the shared simple check, routedByCheck on the routed check, progressive on the
+   * progressive check.
    * @private
    */
   _resolveCraftingCheckBreakage(system, recipe) {
@@ -2316,8 +2317,7 @@ export class CraftingEngine {
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     const mode = resolutionService?.getMode?.(recipe) || system?.resolutionMode || 'simple';
     const check = system?.craftingCheck || {};
-    if (mode === 'routedByIngredients' || mode === 'routedByCheck')
-      return check.routed?.checkBreakage ?? null;
+    if (mode === 'routedByCheck') return check.routed?.checkBreakage ?? null;
     if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
     return check.simple?.checkBreakage ?? null;
   }

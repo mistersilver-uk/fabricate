@@ -523,6 +523,184 @@ test('runFormulaRouted: the matched (or rerouted) tier surfaces its breakTools',
   assert.equal(forced.data.breakTools, true);
 });
 
+// ── minOutcomeId gate (fixed-type recipe minimum success tier) ───────────────
+
+test('runFormulaRouted fixed: a roll below the recipe minimum tier fails outright', async () => {
+  // Require "Clean" (start 15); a total of 8 lands in "Partial" (start 6) — below it.
+  stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    minOutcomeId: 'high',
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.outcome, null, 'no tier routes on a min-tier failure');
+  assert.equal(r.data.outcomeId, null);
+  assert.equal(r.data.breakTools, false);
+  assert.equal(r.data.minTierFailed, true);
+  assert.equal(r.data.rolledOutcomeId, 'mid', 'the rolled tier is surfaced for explanation');
+  assert.equal(r.value, 8);
+});
+
+test('runFormulaRouted fixed: a roll at or above the minimum tier resolves normally', async () => {
+  // Roll into "Clean" (15-20) with the same "high" minimum → the tier stands.
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    minOutcomeId: 'high',
+  });
+  assert.equal(r.outcome, 'Clean');
+  assert.equal(r.success, true);
+  assert.equal(r.data.outcomeId, 'high');
+  assert.equal(r.data.minTierFailed, undefined, 'the gate flag is absent on a pass');
+
+  // The boundary is inclusive: rolling exactly the required tier passes.
+  stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
+  const equal = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    minOutcomeId: 'mid',
+  });
+  assert.equal(equal.outcome, 'Partial');
+  assert.equal(equal.success, true);
+});
+
+test('runFormulaRouted fixed: no minOutcomeId leaves the rolled tier untouched', async () => {
+  stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    minOutcomeId: null,
+  });
+  assert.equal(r.outcome, 'Partial');
+  assert.equal(r.success, true);
+  assert.equal(r.data.minTierFailed, undefined);
+});
+
+test('runFormulaRouted fixed: a forced success bypasses the minimum-tier gate', async () => {
+  // Below the "high" minimum, but a success trigger reroutes to the best success tier.
+  stubRoll(8, [{ number: 1, faces: 20, total: 20 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    triggers: [totalTrigger({ groupId: 0, value: 20, outcome: 'success' })],
+    actor: ACTOR,
+    minOutcomeId: 'high',
+  });
+  assert.equal(r.success, true, 'a forced crit is not downgraded by the recipe minimum');
+  assert.equal(r.outcome, 'Clean');
+  assert.equal(r.data.minTierFailed, undefined);
+});
+
+test('runFormulaRouted fixed: an unknown minOutcomeId no-ops gracefully', async () => {
+  stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    minOutcomeId: 'ghost',
+  });
+  assert.equal(r.outcome, 'Partial');
+  assert.equal(r.success, true);
+});
+
+test('runFormulaRouted relative: minOutcomeId is ignored (fixed-type only)', async () => {
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+    minOutcomeId: 'good',
+  });
+  assert.equal(r.outcome, 'Success');
+  assert.equal(r.success, true);
+});
+
+test('runFormulaRouted fixed: a min-tier failure drops the rolled tier breakTools', async () => {
+  // Require "Clean" (start 15); the roll lands in "Fumble" (start 1), which carries
+  // breakTools:true — but a min-tier failure routes no tier, so breakTools is dropped.
+  stubRoll(3, [{ number: 1, faces: 20, total: 3 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    minOutcomeId: 'high',
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.data.breakTools, false, 'no tier routes → the rolled tier breakTools is dropped');
+  assert.equal(r.data.minTierFailed, true);
+  assert.equal(r.data.rolledOutcomeId, 'low');
+});
+
+// ── interactive prompt DC seam (the fixed-check "no DC" contract) ────────────
+
+test('runFormulaRouted: the fixed-check interactive prompt shows no DC (rollOptions.dc is not clobbered by the tier-matching dc)', async () => {
+  // The engine passes dc:undefined on rollOptions for a fixed check; the runner must
+  // NOT re-inject its tier-matching `dc` param and re-surface a DC chip in the prompt.
+  stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
+  let promptedDc = 'UNSET';
+  await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    rollOptions: {
+      interactive: true,
+      dc: undefined,
+      prompt: async (args) => {
+        promptedDc = args.dc;
+        return { confirmed: true };
+      },
+    },
+  });
+  assert.equal(promptedDc, undefined);
+});
+
+test('runFormulaRouted: a relative interactive prompt still receives its DC', async () => {
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  let promptedDc = 'UNSET';
+  await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+    rollOptions: {
+      interactive: true,
+      dc: 15,
+      prompt: async (args) => {
+        promptedDc = args.dc;
+        return { confirmed: true };
+      },
+    },
+  });
+  assert.equal(promptedDc, 15);
+});
+
 test('runFormulaRouted: no dice engine does not block and does not fabricate a route', async () => {
   delete globalThis.Roll;
   const r = await runFormulaRouted({

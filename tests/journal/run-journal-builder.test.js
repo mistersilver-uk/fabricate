@@ -655,11 +655,16 @@ test('routedByCheck reads check.routed.rollFormula and the RoutedByCheck label',
   assert.equal(run.resolutionModeLabel, 'FABRICATE.App.Journal.Mode.RoutedByCheck');
 });
 
-test('routedByIngredients reads check.routed and the RoutedByIngredients label', () => {
+test('routedByIngredients reads check.simple (not routed) and the RoutedByIngredients label', () => {
   const routedSystem = {
     ...SYSTEM,
     resolutionMode: 'routedByIngredients',
-    craftingCheck: { routed: { rollFormula: '1d12', dc: 9, tiers: [] } },
+    // The real pass/fail config lives in `simple` (DC 9); a stale value in `routed`
+    // must be ignored — the label/DC come from the simple slot.
+    craftingCheck: {
+      simple: { rollFormula: '1d12', dc: 9, tiers: [] },
+      routed: { rollFormula: '1d20+99', dc: 30, tiers: [] },
+    },
   };
   const run = makeBuilder({
     active: [activeCraftingRun()],

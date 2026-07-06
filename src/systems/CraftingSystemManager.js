@@ -1605,6 +1605,15 @@ export class CraftingSystemManager {
       this._assertNoAlchemySignatureCollisions(merged);
     }
 
+    // Move the crafting-check config between the shared `simple` and tier-routing
+    // `routed` slots when the mode crosses the `routedByIngredients` boundary, BEFORE
+    // the first persist — `routedByIngredients` reads `craftingCheck.simple`, the other
+    // routed mode (`routedByCheck`) reads `craftingCheck.routed`. Mutates `merged` in
+    // place, guarded to fill only an unauthored destination.
+    if (resolutionModeChanged) {
+      this._reconcileCraftingCheckSlotsForModeChange(merged, fromMode, toMode);
+    }
+
     // Persist the merged system FIRST so recipe migration/validation reads the NEW
     // mode through the in-memory `systems` map (e.g. `RecipeManager` activation and
     // routed-provider validation consult the current system).
@@ -1653,6 +1662,81 @@ export class CraftingSystemManager {
       await this._cleanupCraftingPreferences();
     }
     return merged;
+  }
+
+  /**
+   * Move the crafting-check config between the shared pass/fail `simple` slot and the
+   * tier-routing `routed` slot when a system's resolution mode crosses the
+   * `routedByIngredients` boundary, mirroring the one-time 1.10.0 migration
+   * ({@link migrateMoveRoutedByIngredientsCheck}) for a live GM mode switch. Mutates
+   * `merged.craftingCheck` in place; called after normalization and before the first
+   * persist in {@link updateSystem}, keyed on `resolutionModeChanged`.
+   *
+   *  - INTO `routedByIngredients` (e.g. from `routedByCheck`, whose config lived in
+   *    `routed`): copy the shared pass/fail fields `routed → simple` when `simple` is
+   *    unauthored, so the simple editor starts from the GM's existing formula/DC.
+   *  - OUT of `routedByIngredients` INTO `routedByCheck`: copy the shared pass/fail
+   *    fields `simple → routed` when `routed` is unauthored, so the tier editor starts
+   *    from the GM's existing formula/DC.
+   *
+   * Both directions are guarded to fill only an UNAUTHORED destination (an authored
+   * destination formula is never clobbered). `→ simple`/`alchemy` targets already read
+   * `simple`, and `→ progressive` has no comparable pass/fail fields, so neither needs
+   * a move. Caveat: a `dcMode: 'dynamic'` simple check copied into `routedByCheck`
+   * loses its dynamic DC (the routed slot has no `dcMode`); the resulting static
+   * `routed.dc` is whatever value lingered in the simple slot, so the GM should
+   * re-author the DC after switching into `routedByCheck`.
+   *
+   * @param {object} merged The merged (post-change, normalized) system.
+   * @param {string} fromMode
+   * @param {string} toMode
+   * @private
+   */
+  _reconcileCraftingCheckSlotsForModeChange(merged, fromMode, toMode) {
+    const check = merged?.craftingCheck;
+    if (!check || typeof check !== 'object') return;
+
+    if (toMode === 'routedByIngredients' && fromMode !== 'routedByIngredients') {
+      this._copyPassFailCheckFields(check.routed, check.simple);
+    } else if (fromMode === 'routedByIngredients' && toMode === 'routedByCheck') {
+      this._copyPassFailCheckFields(check.simple, check.routed);
+    }
+  }
+
+  /**
+   * Copy the shared pass/fail crafting-check fields (`rollFormula`, `dc`,
+   * `thresholdMode`, `tiers`, `checkBreakage`) from a source slot to a destination
+   * slot, but ONLY when the destination has no authored `rollFormula` and the source
+   * does — so an authored destination is never clobbered. `dcMode`/`macroUuid` are not
+   * copied (the routed slot has neither; the read-time normalizer defaults them).
+   * @param {object} source
+   * @param {object} destination
+   * @private
+   */
+  _copyPassFailCheckFields(source, destination) {
+    if (!source || typeof source !== 'object' || !destination || typeof destination !== 'object') {
+      return;
+    }
+    const sourceFormula = typeof source.rollFormula === 'string' ? source.rollFormula.trim() : '';
+    if (sourceFormula.length === 0) return;
+    const destFormula =
+      typeof destination.rollFormula === 'string' ? destination.rollFormula.trim() : '';
+    if (destFormula.length > 0) return;
+
+    destination.rollFormula = source.rollFormula;
+    if ('dc' in source) destination.dc = source.dc;
+    if ('thresholdMode' in source) destination.thresholdMode = source.thresholdMode;
+    if ('tiers' in source) {
+      destination.tiers = Array.isArray(source.tiers)
+        ? source.tiers.map((tier) => ({ ...tier }))
+        : source.tiers;
+    }
+    if ('checkBreakage' in source) {
+      destination.checkBreakage =
+        source.checkBreakage && typeof source.checkBreakage === 'object'
+          ? structuredClone(source.checkBreakage)
+          : source.checkBreakage;
+    }
   }
 
   /**
