@@ -21,15 +21,15 @@
   let searchTerm = $state('');
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
 
-  // Client-persisted "hide out-of-reach (locked) environments" toggle. Seeded
+  // Client-persisted "hide unavailable (locked) environments" toggle. Seeded
   // from the services getter and written back through the services setter, so
   // the component never touches Foundry globals. Every access is optional-chained
   // so a mount with a bare/absent `services` bag defaults to off (show all).
-  let hideOutOfReach = $state(services?.getHideOutOfReachEnvironments?.() === true);
+  let hideUnavailable = $state(services?.getHideUnavailableEnvironments?.() === true);
 
-  function setHideOutOfReach(next) {
-    hideOutOfReach = next === true;
-    services?.setHideOutOfReachEnvironments?.(hideOutOfReach);
+  function setHideUnavailable(next) {
+    hideUnavailable = next === true;
+    services?.setHideUnavailableEnvironments?.(hideUnavailable);
   }
 
   let pageIndex = $state(0);
@@ -42,14 +42,14 @@
     ...environments.filter(environment => environment?.locked === true)
   ]);
 
-  // Count of currently out-of-reach (locked) teasers, sourced from the ordered
+  // Count of currently unavailable (locked) teasers, sourced from the ordered
   // (pre-search) set. This is what the toggle label surfaces; with an active
   // search term it can exceed the cards actually removed from the current view.
   const lockedCount = $derived(ordered.filter(environment => environment?.locked === true).length);
 
   const hideLabel = $derived(lockedCount > 0
-    ? localize('FABRICATE.App.Gathering.Environments.HideOutOfReachCount', { count: lockedCount })
-    : localize('FABRICATE.App.Gathering.Environments.HideOutOfReach'));
+    ? localize('FABRICATE.App.Gathering.Environments.HideUnavailableCount', { count: lockedCount })
+    : localize('FABRICATE.App.Gathering.Environments.HideUnavailable'));
 
   // Filter the already-ordered list by a case-insensitive substring match on
   // name + description, mirroring EnvironmentsBrowserView.
@@ -61,7 +61,7 @@
   // Single post-toggle derived list. Render, the empty check, Pagination
   // totalCount, and the pageIndex-reset effect all read THIS list, so the view
   // stays consistent whether or not the toggle is on.
-  const visible = $derived(hideOutOfReach
+  const visible = $derived(hideUnavailable
     ? filtered.filter(environment => environment?.locked !== true)
     : filtered);
 
@@ -74,6 +74,7 @@
   });
 
   const titleId = 'gathering-environments-title';
+  const hideLabelId = 'gathering-environments-hide-label';
 </script>
 
 <section class="gathering-env-list" aria-labelledby={titleId}>
@@ -93,18 +94,27 @@
         aria-label={localize('FABRICATE.App.Gathering.Environments.SearchLabel')}
       />
     </label>
-    <label
-      class="gathering-env-hide-toggle"
-      title={localize('FABRICATE.App.Gathering.Environments.HideOutOfReachTooltip')}
+    <div
+      class="gathering-env-hide-filter"
+      title={localize('FABRICATE.App.Gathering.Environments.HideUnavailableTooltip')}
     >
-      <input
-        type="checkbox"
-        checked={hideOutOfReach}
+      <span id={hideLabelId} class="gathering-env-hide-filter-label">{hideLabel}</span>
+      <button
+        type="button"
+        class={`gathering-env-hide-toggle ${hideUnavailable ? 'is-on' : 'is-off'}`}
+        aria-pressed={hideUnavailable}
+        aria-labelledby={hideLabelId}
         data-gathering-env-hide-toggle
-        onchange={(event) => setHideOutOfReach(event.currentTarget.checked)}
-      />
-      <span class="gathering-env-hide-toggle-label">{hideLabel}</span>
-    </label>
+        onclick={() => setHideUnavailable(!hideUnavailable)}
+      >
+        <span class="gathering-env-hide-toggle-track" aria-hidden="true">
+          <span class="gathering-env-hide-toggle-knob"></span>
+        </span>
+        <span class="gathering-env-hide-toggle-state">{hideUnavailable
+          ? localize('FABRICATE.App.Gathering.Environments.HideToggleOn')
+          : localize('FABRICATE.App.Gathering.Environments.HideToggleOff')}</span>
+      </button>
+    </div>
   </header>
 
   {#if filtered.length === 0}
@@ -112,17 +122,17 @@
       {localize('FABRICATE.App.Gathering.Environments.NoMatches')}
     </p>
   {:else if visible.length === 0}
-    <div class="gathering-env-empty" data-gathering-env-empty="all-out-of-reach">
+    <div class="gathering-env-empty" data-gathering-env-empty="all-unavailable">
       <p class="gathering-env-empty-message">
-        {localize('FABRICATE.App.Gathering.Environments.AllOutOfReachHidden')}
+        {localize('FABRICATE.App.Gathering.Environments.AllUnavailableHidden')}
       </p>
       <button
         type="button"
-        class="gathering-env-show-out-of-reach"
-        data-gathering-env-show-out-of-reach
-        onclick={() => setHideOutOfReach(false)}
+        class="gathering-env-show-unavailable"
+        data-gathering-env-show-unavailable
+        onclick={() => setHideUnavailable(false)}
       >
-        {localize('FABRICATE.App.Gathering.Environments.ShowOutOfReach')}
+        {localize('FABRICATE.App.Gathering.Environments.ShowUnavailable')}
       </button>
     </div>
   {:else}
@@ -210,32 +220,100 @@
   }
 
   /*
-    Full-width row beneath the search input. A NATIVE checkbox (Foundry paints
-    checkbox pseudo-elements, so a custom ::before/::after switch would double);
-    the visible label span IS the control's accessible name.
+    Full-width filter row beneath the search input: a descriptive label on the
+    left and Fabricate's pill switch on the right — the same track+knob+On/Off
+    control used across the GM apps (`.manager-status-toggle`), re-themed here
+    with the base `--fab-*` player tokens. The switch is a plain <button> (NOT a
+    checkbox), so Foundry paints none of the control and the track/knob are the
+    only visual — the label to its left is the accessible name (aria-labelledby).
   */
-  .gathering-env-hide-toggle {
+  .gathering-env-hide-filter {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
     width: 100%;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    cursor: pointer;
   }
 
-  .gathering-env-hide-toggle input {
-    flex: 0 0 auto;
-    margin: 0;
-    cursor: pointer;
-  }
-
-  .gathering-env-hide-toggle-label {
+  .gathering-env-hide-filter-label {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 12px;
+    color: var(--fab-text-muted);
+  }
+
+  .gathering-env-hide-toggle {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--fab-space-1);
+    height: 24px;
+    padding: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-2xs) var(--fab-space-2xs);
+    border: 1px solid var(--fab-border);
+    border-radius: 999px;
+    background: var(--fab-overlay-dark-18);
+    color: var(--fab-text-muted);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .gathering-env-hide-toggle.is-on {
+    border-color: var(--fab-success-border);
+    color: var(--fab-text);
+    background: var(--fab-success-soft);
+  }
+
+  .gathering-env-hide-toggle.is-off {
+    border-color: var(--fab-warning-border);
+    background: var(--fab-warning-soft);
+  }
+
+  .gathering-env-hide-toggle:hover {
+    border-color: var(--fab-border-strong);
+  }
+
+  .gathering-env-hide-toggle:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .gathering-env-hide-toggle-track {
+    display: inline-flex;
+    align-items: center;
+    width: 24px;
+    height: 14px;
+    flex: 0 0 24px;
+    padding: var(--fab-space-2xs);
+    border-radius: 999px;
+    background: var(--fab-overlay-light-14);
+  }
+
+  .gathering-env-hide-toggle-knob {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--fab-text-muted);
+    transition: transform 120ms ease, background-color 120ms ease;
+  }
+
+  .gathering-env-hide-toggle.is-on .gathering-env-hide-toggle-knob {
+    transform: translateX(10px);
+    background: var(--fab-accent);
+  }
+
+  .gathering-env-hide-toggle-state {
+    min-width: 0;
+    overflow: hidden;
+    color: inherit;
+    font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1;
+    text-overflow: ellipsis;
   }
 
   .gathering-env-list-scroll {
@@ -267,7 +345,7 @@
     margin: 0;
   }
 
-  .gathering-env-show-out-of-reach {
+  .gathering-env-show-unavailable {
     flex: 0 0 auto;
     padding: 4px 10px;
     border: 1px solid var(--fab-border);
@@ -278,11 +356,11 @@
     cursor: pointer;
   }
 
-  .gathering-env-show-out-of-reach:hover {
+  .gathering-env-show-unavailable:hover {
     background: var(--fab-surface-raised);
   }
 
-  .gathering-env-show-out-of-reach:focus-visible {
+  .gathering-env-show-unavailable:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 1px;
   }

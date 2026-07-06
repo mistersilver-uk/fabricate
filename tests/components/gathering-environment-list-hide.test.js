@@ -49,8 +49,8 @@ function makeServices(initialHide = false) {
   const calls = { set: [] };
   return {
     calls,
-    getHideOutOfReachEnvironments: () => initialHide,
-    setHideOutOfReachEnvironments: (value) => calls.set.push(value)
+    getHideUnavailableEnvironments: () => initialHide,
+    setHideUnavailableEnvironments: (value) => calls.set.push(value)
   };
 }
 
@@ -61,6 +61,12 @@ function ids(target) {
 
 function toggle(target) {
   return target.querySelector('[data-gathering-env-hide-toggle]');
+}
+
+// The pill switch is a <button aria-pressed>, not a checkbox — read its state
+// from aria-pressed.
+function isOn(target) {
+  return toggle(target).getAttribute('aria-pressed') === 'true';
 }
 
 // A mixed listing: one available, one disabled-locked, one out-of-realm-locked,
@@ -93,7 +99,7 @@ function mixedListing() {
   ];
 }
 
-describe('GatheringEnvironmentList hide-out-of-reach toggle', () => {
+describe('GatheringEnvironmentList hide-unavailable toggle', () => {
   before(harness.setup);
   after(harness.teardown);
   afterEach(harness.remount);
@@ -102,7 +108,7 @@ describe('GatheringEnvironmentList hide-out-of-reach toggle', () => {
     const { calls, ...services } = makeServices(false);
     const target = await harness.mount({ environments: mixedListing(), services });
 
-    assert.equal(toggle(target).checked, false, 'toggle starts off (getter seeded false)');
+    assert.equal(isOn(target), false, 'toggle starts off (getter seeded false)');
     assert.deepEqual(
       ids(target).sort(),
       ['env-blind-locked', 'env-blind-open', 'env-disabled', 'env-open', 'env-realm'],
@@ -117,7 +123,7 @@ describe('GatheringEnvironmentList hide-out-of-reach toggle', () => {
     const { ...services } = makeServices(true);
     const target = await harness.mount({ environments: mixedListing(), services });
 
-    assert.equal(toggle(target).checked, true, 'checkbox reflects the seeded-on state');
+    assert.equal(isOn(target), true, 'toggle reflects the seeded-on state');
     assert.deepEqual(
       ids(target).sort(),
       ['env-blind-open', 'env-open'],
@@ -127,13 +133,11 @@ describe('GatheringEnvironmentList hide-out-of-reach toggle', () => {
     assert.equal(target.querySelector('[data-locked="true"]'), null, 'no locked card renders when hidden');
   });
 
-  it('invokes the services setter and hides locked cards when the checkbox is toggled on', async () => {
+  it('invokes the services setter and hides locked cards when the pill switch is toggled on', async () => {
     const { calls, ...services } = makeServices(false);
     const target = await harness.mount({ environments: mixedListing(), services });
 
-    const checkbox = toggle(target);
-    checkbox.checked = true;
-    checkbox.dispatchEvent(new window.Event('change', { bubbles: true }));
+    toggle(target).click();
     flushSync();
 
     assert.deepEqual(calls.set, [true], 'setter direction invoked through the services stub with true');
@@ -147,11 +151,11 @@ describe('GatheringEnvironmentList hide-out-of-reach toggle', () => {
   it('defaults to off (shows all) when mounted with no services prop', async () => {
     const target = await harness.mount({ environments: mixedListing() });
 
-    assert.equal(toggle(target).checked, false, 'no services bag -> default-off checkbox');
+    assert.equal(isOn(target), false, 'no services bag -> default-off toggle');
     assert.equal(ids(target).length, 5, 'all cards render with no services (nothing hidden)');
   });
 
-  it('shows the cause-specific all-out-of-reach empty state (distinct from no-matches) with a recovery control', async () => {
+  it('shows the cause-specific all-unavailable empty state (distinct from no-matches) with a recovery control', async () => {
     // Every environment is locked; with the toggle seeded on, the filtered set is
     // non-empty but the visible set is empty -> the toggle-emptied branch.
     const { calls, ...services } = makeServices(true);
@@ -162,8 +166,8 @@ describe('GatheringEnvironmentList hide-out-of-reach toggle', () => {
     const target = await harness.mount({ environments: lockedOnly, services });
 
     assert.equal(ids(target).length, 0, 'no cards render when every environment is hidden');
-    const empty = target.querySelector('[data-gathering-env-empty="all-out-of-reach"]');
-    assert.ok(empty, 'the toggle-emptied empty state carries the all-out-of-reach marker');
+    const empty = target.querySelector('[data-gathering-env-empty="all-unavailable"]');
+    assert.ok(empty, 'the toggle-emptied empty state carries the all-unavailable marker');
     assert.equal(
       target.querySelector('[data-gathering-env-empty="no-matches"]'),
       null,
@@ -171,21 +175,21 @@ describe('GatheringEnvironmentList hide-out-of-reach toggle', () => {
     );
 
     // The in-place recovery control flips the toggle back off.
-    const recover = target.querySelector('[data-gathering-env-show-out-of-reach]');
-    assert.ok(recover, 'the all-out-of-reach empty state renders a recovery control');
+    const recover = target.querySelector('[data-gathering-env-show-unavailable]');
+    assert.ok(recover, 'the all-unavailable empty state renders a recovery control');
     recover.click();
     flushSync();
 
     assert.deepEqual(calls.set, [false], 'recovery control invokes the setter with false');
     assert.deepEqual(ids(target).sort(), ['env-a', 'env-b'], 'hidden cards return after recovery');
     assert.equal(
-      target.querySelector('[data-gathering-env-empty="all-out-of-reach"]'),
+      target.querySelector('[data-gathering-env-empty="all-unavailable"]'),
       null,
       'the empty state clears once the toggle is off again'
     );
   });
 
-  it('shows the no-matches empty state (not all-out-of-reach) when a search matches nothing', async () => {
+  it('shows the no-matches empty state (not all-unavailable) when a search matches nothing', async () => {
     const { ...services } = makeServices(false);
     const target = await harness.mount({
       environments: [environment({ id: 'env-a', name: 'Alpha' })],
@@ -202,7 +206,7 @@ describe('GatheringEnvironmentList hide-out-of-reach toggle', () => {
       'a zero-result search uses the no-matches marker'
     );
     assert.equal(
-      target.querySelector('[data-gathering-env-empty="all-out-of-reach"]'),
+      target.querySelector('[data-gathering-env-empty="all-unavailable"]'),
       null,
       'search-zero does not use the toggle-emptied branch'
     );

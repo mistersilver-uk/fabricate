@@ -427,13 +427,13 @@ Visible environments and tasks remain listed even when they are currently blocke
 Scene-linked entries stay visible when the selected character is not on the linked scene or has no active token there, and the app shows the reason it is blocked.
 Active timed runs, last-attempt feedback, and recent history remain visible for the selected character even when browsing is empty or blocked.
 
-#### Hide out-of-reach
+#### Hide unavailable
 
-Beneath the environment search field is a **Hide out-of-reach** checkbox.
+Beneath the environment search field is a **Hide unavailable** toggle switch.
 Turn it on to tidy the column when locked teasers pile up.
 It hides only the environments your party cannot currently reach.
 That is the locked teasers: disabled environments, and environments in another realm or gated behind a scene you are not on.
-The checkbox label shows how many environments are currently out of reach, for example **Hide out-of-reach (3)**.
+The toggle label shows how many environments are currently unavailable, for example **Hide unavailable (3)**.
 
 It does not hide environments you can still select whose individual tasks happen to be blocked.
 An in-realm environment where a task is short on stamina or missing a tool stays visible so you can open it and read why the task is blocked.
@@ -445,7 +445,7 @@ It never changes saved data or anything the GM configured, and it does not affec
 Fabricate remembers the choice for this browser or device, so reopening the app here keeps it on.
 Opening Fabricate on another device or in another browser starts from off again.
 
-If turning it on hides every environment in the column, Fabricate shows an **all out-of-reach environments hidden** message with a **Show out-of-reach** button.
+If turning it on hides every environment in the column, Fabricate shows an **all unavailable environments hidden** message with a **Show unavailable** button.
 Use that button to bring the hidden environments back.
 This is a different message from the **no environments match your search** one you get when a search term matches nothing.
 

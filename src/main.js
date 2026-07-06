@@ -1476,7 +1476,7 @@ class Fabricate {
   }
 
   /**
-   * Whether the player has opted to hide out-of-reach (locked) gathering
+   * Whether the player has opted to hide unavailable (locked) gathering
    * environments in the Environments column.
    *
    * Backed by the `GATHERING_HIDE_UNAVAILABLE` setting, which is
@@ -1487,22 +1487,22 @@ class Fabricate {
    *
    * @returns {boolean}
    */
-  getHideOutOfReachEnvironments() {
+  getHideUnavailableEnvironments() {
     return getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE) === true;
   }
 
   /**
-   * Persist the player's "hide out-of-reach environments" preference.
+   * Persist the player's "hide unavailable environments" preference.
    *
    * Writes the client-scoped `GATHERING_HIDE_UNAVAILABLE` setting, so the
    * choice is remembered per client/device (`localStorage`) and does not
    * follow the user account to another device. This is a view-only preference
    * and changes no saved data, the engine listing, or GM configuration.
    *
-   * @param {boolean} value Whether to hide out-of-reach (locked) environments.
+   * @param {boolean} value Whether to hide unavailable (locked) environments.
    * @returns {Promise<boolean>}
    */
-  setHideOutOfReachEnvironments(value) {
+  setHideUnavailableEnvironments(value) {
     return setSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE, value === true);
   }
 
