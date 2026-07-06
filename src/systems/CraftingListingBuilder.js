@@ -19,6 +19,8 @@
  * browse status so no ingredient/result/check detail leaks.
  */
 
+import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
+
 /**
  * Resolution-mode → localization key map. Kept in lockstep with the GM manager's
  * private map in `adminStore.js`; the builder owns its own copy so the systems
@@ -238,6 +240,14 @@ export class CraftingListingBuilder {
       img: stringOrNull(redacted ? recipe.img : recipeItemImg || recipe.img),
       systemId: stringOrNull(recipe.craftingSystemId),
       systemName: stringOrEmpty(system?.name),
+      // GM-authored grouping metadata. `category` is the raw normalized token
+      // (the filter-match key; the reserved `general` for the default bucket);
+      // `categoryLabel` is its display string — `general` localizes to
+      // FABRICATE.Common.General while a custom token is surfaced verbatim.
+      // Both ride on `base` so the redacted teaser model inherits them via
+      // `...base` (category is grouping metadata, not a redacted spoiler field).
+      category: normalizeRecipeCategory(recipe.category),
+      categoryLabel: getRecipeCategoryLabel(recipe.category, this.localize),
       modeToken: mode,
       modeLabel,
       redaction: { redacted, hiddenFields },

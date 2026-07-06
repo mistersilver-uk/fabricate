@@ -1775,7 +1775,7 @@ export class CraftingSystemManager {
     const failedRecipeIds = [];
     for (const recipe of affected) {
       try {
-        await this.recipeManager.deleteRecipe(recipe.id, { notify: false });
+        await this.recipeManager.deleteRecipe(recipe.id, { notify: false, cleanupFlags: false });
       } catch (error) {
         failedRecipeIds.push(recipe.id);
         console.error(
@@ -1823,6 +1823,13 @@ export class CraftingSystemManager {
    * tests constructing the manager without a `game.fabricate` registry stay
    * green. Recipe-keyed preferences (favourites, recent, discovery progress)
    * are orphaned via the prior recipe deletion and are not re-cleaned here.
+   *
+   * Learned-recipe flags are bulk-cleaned here in a SINGLE pass across all
+   * actors (via `cleanupLearnedRecipes`) rather than once per deleted recipe:
+   * `deleteSystem` passes `cleanupFlags: false` to each `deleteRecipe` to
+   * suppress the per-recipe `_cleanupFlagsAfterRecipeMutation` fan-out, and
+   * this method runs the one bulk pass after the recipes and the system have
+   * already been removed, so the derived valid-id set excludes them.
    *
    * @param {string} systemId
    */
@@ -1872,6 +1879,16 @@ export class CraftingSystemManager {
         await richStateService.removeSystem(systemId);
       } catch (error) {
         console.error('Fabricate | gathering-config cleanup failed for system', systemId, error);
+      }
+    }
+
+    const visibilityService = this._getRecipeVisibilityService();
+    if (visibilityService?.cleanupLearnedRecipes) {
+      try {
+        const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map((r) => r.id));
+        await visibilityService.cleanupLearnedRecipes(validRecipeIds);
+      } catch (error) {
+        console.error('Fabricate | learned-recipe cleanup failed for system', systemId, error);
       }
     }
 
@@ -2738,6 +2755,10 @@ export class CraftingSystemManager {
 
   _getGatheringRichStateService() {
     return game.fabricate?.getGatheringRichStateService?.() || null;
+  }
+
+  _getRecipeVisibilityService() {
+    return game.fabricate?.getRecipeVisibilityService?.() || null;
   }
 
   /**

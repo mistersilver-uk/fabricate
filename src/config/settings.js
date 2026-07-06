@@ -23,6 +23,7 @@ export const SETTING_KEYS = Object.freeze({
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
   LAST_MANAGED_CRAFTING_SYSTEM: 'lastManagedCraftingSystem',
   MANAGER_RAIL_COLLAPSED: 'managerRailCollapsed',
+  GATHERING_HIDE_UNAVAILABLE: 'gatheringHideUnavailableEnvironments',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
@@ -135,6 +136,19 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.MANAGER_RAIL_COLLAPSED]: {
     name: 'Crafting System Manager Rail Collapsed',
+    scope: 'client',
+    config: false,
+    type: Boolean,
+    default: false,
+  },
+  // Player-side "hide unavailable (locked) environments" preference for the
+  // Gathering app's Environments column. `scope: 'client'` persists it in the
+  // browser's `localStorage`, so the choice is per client/device, not per user
+  // account, and does not follow the user to a second device. Hidden from the
+  // Foundry settings menu (`config: false`); toggled from the app UI. Defaults
+  // to false (show all).
+  [SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE]: {
+    name: 'Hide Unavailable Gathering Environments',
     scope: 'client',
     config: false,
     type: Boolean,

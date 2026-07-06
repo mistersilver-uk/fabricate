@@ -29,6 +29,12 @@
   const id = $derived(String(recipe?.id ?? ''));
   const name = $derived(String(recipe?.name ?? ''));
   const systemName = $derived(String(recipe?.systemName ?? ''));
+  // GM-authored category (issue 514). The badge is neutral grouping metadata, shown
+  // only for a real (non-`general`) category so the default bucket is not tagged
+  // with a redundant "General" chip. categoryLabel arrives pre-localized on the model.
+  const category = $derived(String(recipe?.category ?? ''));
+  const categoryLabel = $derived(String(recipe?.categoryLabel ?? ''));
+  const showCategory = $derived(category !== '' && category !== 'general');
   const status = $derived(String(recipe?.browseStatus ?? ''));
   const redacted = $derived(recipe?.redaction?.redacted === true);
   const descriptor = $derived(craftingRecipeStatus(status));
@@ -97,6 +103,9 @@
         <span class="crafting-recipe-row-system">{systemName}</span>
         {#if !uncraftable}
           <CraftingStatusBadge {status} compact />
+        {/if}
+        {#if showCategory}
+          <span class="crafting-recipe-row-category" title={categoryLabel}>{categoryLabel}</span>
         {/if}
       </span>
     </span>
@@ -257,12 +266,33 @@
   }
 
   .crafting-recipe-row-system {
+    /* The lower-value meta token: it gives up width FIRST so the category badge
+       (issue 514) keeps its floor before the system name truncates. */
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 11px;
     color: var(--fab-text-muted);
+  }
+
+  /* Neutral category badge (issue 514): grouping metadata, explicitly NOT a status
+     tone. Neutral theme tokens only. Holds a small floor and truncates with an
+     ellipsis + hover title so a long custom category name cannot blow out the row. */
+  .crafting-recipe-row-category {
+    flex: 0 1 auto;
+    min-width: 2rem;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 1px 6px;
+    border: 1px solid var(--fab-border);
+    border-radius: 999px;
+    background: var(--fab-surface-raised);
+    color: var(--fab-text-muted);
+    font-size: 11px;
   }
 
   .crafting-recipe-row-actions {

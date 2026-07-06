@@ -1496,6 +1496,37 @@ class Fabricate {
   }
 
   /**
+   * Whether the player has opted to hide unavailable (locked) gathering
+   * environments in the Environments column.
+   *
+   * Backed by the `GATHERING_HIDE_UNAVAILABLE` setting, which is
+   * `scope: 'client'`. A client-scoped setting persists in that browser's
+   * `localStorage`, so this preference is per client/device, not per user.
+   * The same account on a second device or browser starts at the default
+   * (off). Defaults to false (show all).
+   *
+   * @returns {boolean}
+   */
+  getHideUnavailableEnvironments() {
+    return getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE) === true;
+  }
+
+  /**
+   * Persist the player's "hide unavailable environments" preference.
+   *
+   * Writes the client-scoped `GATHERING_HIDE_UNAVAILABLE` setting, so the
+   * choice is remembered per client/device (`localStorage`) and does not
+   * follow the user account to another device. This is a view-only preference
+   * and changes no saved data, the engine listing, or GM configuration.
+   *
+   * @param {boolean} value Whether to hide unavailable (locked) environments.
+   * @returns {Promise<boolean>}
+   */
+  setHideUnavailableEnvironments(value) {
+    return setSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE, value === true);
+  }
+
+  /**
    * Start a gathering attempt for the current user.
    *
    * The raw GatheringEngine remains module-internal so all public attempts use

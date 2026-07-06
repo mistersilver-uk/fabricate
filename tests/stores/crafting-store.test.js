@@ -250,6 +250,84 @@ describe('craftingStore', () => {
     assert.equal(store.visibleRecipes.length, 3, 'clearing the system filter restores all');
   });
 
+  it('filters the visible list by category and exposes de-duped, sorted category options', async () => {
+    const listing = {
+      recipes: [
+        recipe('r1', 'Iron Sword', { category: 'weapons', categoryLabel: 'Weapons' }),
+        recipe('r2', 'Bronze Shield', { category: 'armor', categoryLabel: 'Armor' }),
+        recipe('r3', 'Oak Bow', { category: 'weapons', categoryLabel: 'Weapons' }),
+        recipe('r4', 'Odd Trinket', { category: 'general', categoryLabel: 'General' }),
+      ],
+    };
+    const { services } = makeServices({ listing });
+    const store = createCraftingStore({ services });
+    await store.load();
+    flushSync();
+
+    assert.deepEqual(
+      store.availableCategories,
+      [
+        { id: 'armor', name: 'Armor' },
+        { id: 'weapons', name: 'Weapons' },
+        { id: 'general', name: 'General' },
+      ],
+      'de-duped options sorted non-general A→Z, then General pinned last'
+    );
+
+    store.setPage(2);
+    store.setCategoryFilter('weapons');
+    flushSync();
+    assert.equal(store.page, 0, 'setting the category filter resets to the first page');
+    assert.deepEqual(
+      store.visibleRecipes.map((entry) => entry.id),
+      ['r1', 'r3'],
+      'only the selected category remains'
+    );
+
+    store.setCategoryFilter(null);
+    flushSync();
+    assert.equal(store.visibleRecipes.length, 4, 'clearing the category filter restores all');
+  });
+
+  it('composes the category filter (AND) with active search and system filters', async () => {
+    const listing = {
+      recipes: [
+        recipe('r1', 'Iron Sword', {
+          category: 'weapons',
+          categoryLabel: 'Weapons',
+          systemId: 'sys-a',
+          systemName: 'Smithing',
+        }),
+        recipe('r2', 'Iron Dagger', {
+          category: 'weapons',
+          categoryLabel: 'Weapons',
+          systemId: 'sys-b',
+          systemName: 'Armoury',
+        }),
+        recipe('r3', 'Iron Shield', {
+          category: 'armor',
+          categoryLabel: 'Armor',
+          systemId: 'sys-a',
+          systemName: 'Smithing',
+        }),
+      ],
+    };
+    const { services } = makeServices({ listing });
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    store.setSearch('iron');
+    store.setSystemFilter('sys-a');
+    store.setCategoryFilter('weapons');
+    flushSync();
+
+    assert.deepEqual(
+      store.visibleRecipes.map((entry) => entry.id),
+      ['r1'],
+      'category composes AND with the search AND system filter'
+    );
+  });
+
   it('toggles a recipe favourite through the services seam and updates the id list', async () => {
     const listing = { recipes: [recipe('r1', 'Iron Sword')] };
     const { services, calls } = makeServices({ listing });

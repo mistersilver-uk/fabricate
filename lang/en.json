@@ -482,6 +482,8 @@
           "CraftableOnly": "Craftable",
           "SystemFilterLabel": "Crafting system",
           "AllSystems": "All systems",
+          "CategoryFilterLabel": "Category",
+          "AllCategories": "All categories",
           "Favourite": "Add to favourites",
           "Unfavourite": "Remove from favourites"
         },
@@ -718,7 +720,12 @@
           "Discovered": "{x} of {y} tasks discovered",
           "SearchPlaceholder": "Search environments…",
           "SearchLabel": "Search environments",
-          "NoMatches": "No environments match your search."
+          "NoMatches": "No environments match your search.",
+          "HideUnavailable": "Hide unavailable",
+          "HideUnavailableCount": "Hide unavailable ({count})",
+          "HideUnavailableTooltip": "Hide environments that are currently unavailable — locked, out-of-realm, or scene-gated.",
+          "AllUnavailableHidden": "All unavailable environments are hidden.",
+          "ShowUnavailable": "Show unavailable"
         },
         "Detail": {
           "SelectHint": "Select an available environment from the left menu.",
