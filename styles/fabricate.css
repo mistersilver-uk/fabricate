@@ -4103,6 +4103,7 @@
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
 .fabricate-manager[data-manager-view="checks"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
+.fabricate-manager[data-manager-view="books-scrolls"] .manager-body,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
@@ -4110,6 +4111,7 @@
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="checks"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="books-scrolls"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
@@ -9632,6 +9634,7 @@
   .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
   .fabricate-manager[data-manager-view="checks"] .manager-body,
   .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
+  .fabricate-manager[data-manager-view="books-scrolls"] .manager-body,
   .fabricate-manager[data-manager-view="system-edit"] .manager-body {
     grid-template-columns: 1fr;
   }

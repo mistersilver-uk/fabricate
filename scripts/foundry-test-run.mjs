@@ -216,6 +216,21 @@ async function captureManagerThemes(page) {
   await applyManagerTheme(page, DEFAULT_FABRICATE_THEME);
 }
 
+// Recipes now nests inside the gated Crafting nav group (issue 511). Clicking the
+// Crafting parent from a non-crafting route routes straight to Recipes and expands
+// the group; from a crafting child route (e.g. recipe-edit) it only expands, so
+// always follow with the Recipes sub-item to land on the recipes browser.
+async function openManagerCraftingSection(page, subitemId, managerView) {
+  await page.locator('.fabricate-manager .manager-nav-parent:has-text("Crafting")').first().click();
+  const subitem = page.locator(`.fabricate-manager #manager-crafting-nav-${subitemId}`).first();
+  await subitem.waitFor({ state: 'visible', timeout: 5_000 });
+  await subitem.click();
+  await page
+    .locator(`.fabricate-manager[data-manager-view="${managerView}"]`)
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+}
+
 /**
  * Safely parse a page pathname.
  * @param {string} rawUrl
@@ -3694,7 +3709,7 @@ async function main() {
         if (navLabels.at(0) !== 'System Overview') {
           throw new Error(`Manager selected nav should keep System Overview first. Saw: ${navLabels.join(', ')}`);
         }
-        for (const expected of ['System Overview', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
+        for (const expected of ['System Overview', 'Components', 'Crafting', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
           if (!navLabels.includes(expected)) {
             throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
@@ -4017,13 +4032,38 @@ async function main() {
         if (recipeApiCount < 2) {
           throw new Error(`Expected the smoke system to expose at least 2 recipes via the API; saw ${recipeApiCount}.`);
         }
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerCraftingSection(page, 'recipes', 'recipes');
         await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion")').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
         await assertManagerLayoutStable(page, 'recipes normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipes-normal');
+
+        // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the
+        // Books & Scrolls recipe-item surface + the Settings placeholder. Guarded so a
+        // hiccup records a failed step rather than aborting the whole phase.
+        try {
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-crafting-group-expanded');
+          await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
+          await page.locator('.fabricate-manager [data-books-scrolls]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertManagerLayoutStable(page, 'books and scrolls');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-books-scrolls-normal');
+          await openManagerCraftingSection(page, 'settings', 'crafting-settings');
+          await page.locator('.fabricate-manager [data-crafting-settings-placeholder]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-crafting-settings');
+          results.steps.push({ step: 'crafting-group-surfaces', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'crafting-group-surfaces', passed: false, error: err.message });
+          process.stderr.write(`Crafting group surface capture failed: ${err.message}\n`);
+        }
+
+        // Return to the recipes browser for the recipe-editor captures below.
+        await openManagerCraftingSection(page, 'recipes', 'recipes');
 
         // Recipes → open the editor so the identity card (central column) and the
         // knowledge-gated recipe-item inspector (right context panel) are captured (#387).
@@ -4051,8 +4091,7 @@ async function main() {
         }
 
         // Return to the recipes browser for the remaining recipe-editor captures.
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerCraftingSection(page, 'recipes', 'recipes');
 
         // Showcase Requirements → Ingredients tab: capture every requirement row type
         // (component, OR group, tag, currency cost), the faint dividers, and the tag
@@ -4072,8 +4111,7 @@ async function main() {
         // Ingredients capture stays on Showcase Requirements above; only this
         // validation capture is repointed at the check-routed fixture so the published
         // frame shows the unroutedResultGroup + unproducedOutcomeTier warning chips.
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerCraftingSection(page, 'recipes', 'recipes');
 
         // Routed Check Readiness → Validation tab: both new routed warnings render.
         await page.locator('.fabricate-manager .manager-recipe-row:has-text("Routed Check Readiness") button:has(i.fa-edit)').first().click();
@@ -4088,8 +4126,7 @@ async function main() {
         await screenshot(page, 'manager-recipe-edit-validation');
 
         // Return to the recipes browser before opening the multi-step recipe.
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerCraftingSection(page, 'recipes', 'recipes');
 
         // Multi-Step Alloy → Overview: the steps accordion shows the per-step duration
         // chips/controls. Wait on the steps card and a per-step time chip.
@@ -4106,8 +4143,7 @@ async function main() {
         await screenshot(page, 'manager-recipe-edit-multistep');
 
         // Return to the recipes browser for the remaining navigation.
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipes"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerCraftingSection(page, 'recipes', 'recipes');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();

@@ -33,6 +33,7 @@
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
+  import BooksScrollsView from './BooksScrollsView.svelte';
   import RecipeEditView from './RecipeEditView.svelte';
   import RecipeItemInspector from './RecipeItemInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
@@ -80,6 +81,8 @@
   // Crafting nav group (issue 511): mirrors the gathering group's expand state.
   // The whole group is gated behind experimental features (`recipesRouteEnabled`).
   let craftingMenuExpanded = $state(false);
+  // The selected recipe item on the Books & Scrolls surface (issue 511).
+  let selectedRecipeItemId = $state('');
   // svelte-ignore state_referenced_locally
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
 
@@ -1183,11 +1186,11 @@
   });
 
   // Crafting nav group (issue 511). Mirrors the gathering group verbatim: an
-  // expandable parent with Settings (placeholder) and Recipes sub-routes. Each
-  // sub-item maps to a distinct route (unlike the gathering sub-tabs, which share
-  // the `environments` view), so `activeCraftingTab` is derived from the current
-  // route rather than held as separate state. The whole group is gated behind
-  // `recipesRouteEnabled` (experimental features).
+  // expandable parent with Settings (placeholder), Recipes, and Books & Scrolls
+  // sub-routes. Each sub-item maps to a distinct route (unlike the gathering
+  // sub-tabs, which share the `environments` view), so `activeCraftingTab` is
+  // derived from the current route rather than held as separate state. The whole
+  // group is gated behind `recipesRouteEnabled` (experimental features).
   const craftingNavItems = $derived([
     {
       id: 'settings',
@@ -1207,15 +1210,28 @@
       labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes',
       labelFallback: 'Recipes',
       count: $viewState.recipes?.length || 0
+    },
+    {
+      id: 'books-scrolls',
+      view: 'books-scrolls',
+      icon: 'fas fa-book',
+      labelKey: 'FABRICATE.Admin.Manager.Nav.BooksScrolls',
+      labelFallback: 'Books & Scrolls',
+      count: recipeItemDefinitions.length
     }
   ]);
   const isCraftingRoute = $derived(
     currentView === 'recipes'
       || currentView === 'recipe-edit'
       || currentView === 'crafting-settings'
+      || currentView === 'books-scrolls'
   );
   const activeCraftingTab = $derived(
-    currentView === 'crafting-settings' ? 'settings' : 'recipes'
+    currentView === 'crafting-settings'
+      ? 'settings'
+      : currentView === 'books-scrolls'
+        ? 'books-scrolls'
+        : 'recipes'
   );
   // The Crafting group's expansion follows the active route: it expands on
   // entering a crafting child route and collapses on leaving, so the submenu
@@ -1653,7 +1669,7 @@
     // the `systems` library here.
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
-    if ((view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings') && !recipesAvailable) return 'system-edit';
+    if ((view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings' || view === 'books-scrolls') && !recipesAvailable) return 'system-edit';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
@@ -1683,6 +1699,7 @@
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Title', 'Recipes');
     if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe');
     if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle', 'Crafting settings');
+    if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Title', 'Components');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories');
@@ -1707,6 +1724,7 @@
     if (currentView === 'recipe-edit' && !recipeInspectorVisible) return text('FABRICATE.Admin.Manager.Recipe.EditIdentityOnlySubtitle', 'Edit identity for this recipe.');
     if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditSubtitle', 'Edit identity and the linked recipe item for this recipe.');
     if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderHint', 'Recipe visibility is configured on the System Overview page. This section is reserved for future system-level crafting rules.');
+    if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Subtitle', 'Review every recipe item in this system with its linked recipes, use cap, learn cap, and consume or destroy behaviour.');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditSubtitle', 'Update tags, essences, and source linkage for this component.');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Subtitle', 'Manage recipe category and item tag vocabulary for the selected crafting system.');
@@ -1998,7 +2016,7 @@
 
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'checks') && !selectedSystem) return;
-    if ((view === 'recipes' || view === 'crafting-settings') && !recipesRouteEnabled) return;
+    if ((view === 'recipes' || view === 'crafting-settings' || view === 'books-scrolls') && !recipesRouteEnabled) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
@@ -3964,6 +3982,12 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Settings', 'Settings')}</span>
         {/if}
+        {#if currentView === 'books-scrolls'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</span>
+        {/if}
         {#if currentView === 'components'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
@@ -4741,6 +4765,16 @@
           </section>
         </section>
       </main>
+    {:else if currentView === 'books-scrolls' && selectedSystem}
+      <BooksScrollsView
+        recipeItems={recipeItemDefinitions}
+        recipes={$viewState.recipes || []}
+        recipeVisibility={selectedSystem?.recipeVisibility || {}}
+        selectedSystemName={selectedSystem?.name || ''}
+        selectedRecipeItemId={selectedRecipeItemId}
+        onSelectRecipeItem={(id) => { selectedRecipeItemId = id; }}
+        onSaveVisibilityConfig={(patch) => store.saveVisibilityConfig?.(patch)}
+      />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView
         recipes={$viewState.recipes || []}
@@ -4813,7 +4847,7 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'books-scrolls' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">

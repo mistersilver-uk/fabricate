@@ -115,14 +115,14 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
       'crafting parent aria-current should track isCraftingRoute'
     );
     assert.ok(
-      rootSource.includes("currentView === 'crafting-settings' ? 'settings' : 'recipes'"),
+      rootSource.includes("currentView === 'crafting-settings'") && rootSource.includes("? 'settings'") && rootSource.includes(": 'recipes'"),
       'activeCraftingTab should map recipe-edit (default) to the recipes sub-item'
     );
   });
 
   it('redirects recipe-edit like recipes (fallback to system-edit) in normalizedActiveView', () => {
     assert.ok(
-      rootSource.includes("if ((view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings') && !recipesAvailable) return 'system-edit'"),
+      rootSource.includes("if ((view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings' || view === 'books-scrolls') && !recipesAvailable) return 'system-edit'"),
       'normalizedActiveView should treat recipe-edit like recipes and fall back to system-edit'
     );
   });

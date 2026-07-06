@@ -1314,6 +1314,28 @@
             "OpenSystemOverview": "Open System Overview"
           }
         },
+        "BooksScrolls": {
+          "Title": "Books & Scrolls",
+          "Subtitle": "Review every recipe item in this system with its linked recipes, use cap, learn cap, and consume or destroy behaviour.",
+          "Library": "Books & Scrolls",
+          "LibraryHint": "Every recipe item in this system — books, scrolls, or any item type — with its linked recipes and the shared recipe-item rules.",
+          "Rules": "Recipe item rules",
+          "RulesKicker": "System-wide",
+          "RulesHint": "These rules apply to every recipe item in this system. Changes apply immediately.",
+          "UseCap": "Limited uses of recipe items",
+          "UseCapHint": "Cap how many times a recipe item grants crafting access.",
+          "UseCapChip": "Use cap: {n}",
+          "UseCapNone": "Unlimited uses",
+          "LearnCap": "Limited recipes learned per item",
+          "LearnCapHint": "Cap how many recipes a player can learn from one recipe item.",
+          "LearnCapChip": "Learn cap: {n}",
+          "LearnCapNone": "Learn all",
+          "LinkedRecipes": "Linked recipes",
+          "NoLinkedRecipes": "No recipes link to this item yet.",
+          "Table": "Recipe items",
+          "EmptyTitle": "No recipe items yet",
+          "EmptyHint": "Link a recipe item to a recipe in the recipe editor and it will appear here."
+        },
         "Recipe": {
           "Kicker": "Recipes View",
           "Title": "Recipes",

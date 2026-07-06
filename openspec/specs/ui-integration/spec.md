@@ -116,9 +116,16 @@ An empty or stale persisted selection resolves to the first available crafting s
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders.
 If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`.
-When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route.
-When the setting is enabled, `Recipes` is available as an implemented route for the selected system; `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
-When `Recipes` is the active implemented route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, redirect-when-unavailable (falling back to `system-edit` exactly as `recipes` does, since Recipes is nested under the experimental system-edit gate), breadcrumb (`Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route, and the `Crafting` nav group is not shown.
+When the setting is enabled, `Recipes` and `Books & Scrolls` are available as implemented routes for the selected system, nested inside an expandable `Crafting` nav group (see below); `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
+When `Recipes` is the active implemented route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, redirect-when-unavailable (falling back to `system-edit` exactly as `recipes` does, since Recipes is nested under the experimental system-edit gate), breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+- When `fabricate.experimentalFeatures` is enabled, the selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, and the whole group (parent and every sub-item) is shown only while the setting is enabled.
+The parent row shows an expand/collapse control and the recipe count as its badge.
+Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page, and while a Crafting child route is active the expand/collapse control is locked (it only toggles, and the submenu stays expanded).
+The group collapses when the active route leaves Crafting, so its submenu does not dangle open over unrelated views.
+The expanded submenu contains `Settings`, `Recipes`, and `Books & Scrolls` inside the same soft grouped container the Gathering group uses, and it carries Gathering-parity accessibility: `aria-expanded`/`aria-controls`/`aria-current`, distinct expand and collapse labels, and unique `manager-nav-crafting` / `manager-crafting-submenu` / `manager-crafting-nav-<id>` ids.
+Route exit from any Crafting child route runs through the Manager confirm-discard route-exit guard.
+- The `Crafting` group's `Settings` sub-route is a placeholder that mirrors the Gathering `Settings` placeholder (a hero title and hint), and its copy cross-references the System Overview page for recipe visibility; it is reserved for future system-level crafting rules and does not move or duplicate the Recipe Visibility card, which stays on System Overview.
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count.
 Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
 Activating only the expand/collapse control toggles the submenu without navigation.
@@ -467,6 +474,19 @@ The inspector panel that carries the recipe-item card is shown for knowledge mod
 The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
 Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
+
+### Books & Scrolls Surface
+
+`Books & Scrolls` is the `Crafting` group's recipe-item management surface, shown only while `fabricate.experimentalFeatures` is enabled.
+It is a display name only: the surface manages every recipe item in the selected system regardless of the item's Foundry item type (book, scroll, ring, wand, gem, note), and `recipe item` remains the canonical noun.
+
+The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes linked to it (matched by `recipe.recipeItemId`) as a count plus the linked recipe names, and the shared recipe-item rules as chips: the use cap (craft charges), the learn cap, and the active consume/destroy behaviour.
+When the selected system has no recipe items, the surface shows an empty state.
+
+The recipe-item rules are system-level: the use cap (`knowledge.item.limitUses` / `maxUses` / `destroyWhenExhausted`), the learn cap (`knowledge.learn.limitRecipes` / `maxRecipes` / `destroyWhenSpent`), and `knowledge.learn.consumeOnLearn` apply to every recipe item in the system, so they are edited once in a shared rules panel and reflected per item as read-only chips.
+Editing is live-apply: each control passes only its own field to the store's object-form `saveVisibilityConfig`, which merges the rest from the persisted config, so the surface stages no dirty draft and does not participate in the Manager confirm-discard route-exit chain.
+`consumeOnLearn` is hidden while the learn cap is enabled (the learn cap's `destroyWhenSpent` supersedes it), matching the Recipe Visibility card.
+The surface reads configuration only (recipe-item definitions plus the recipes referencing each item) and never reads per-item-instance runtime flags, so the admin store stays Foundry-free.
 
 ### Environments Tab
 

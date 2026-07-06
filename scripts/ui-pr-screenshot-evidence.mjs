@@ -184,6 +184,27 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-system-recipe-visibility'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/recipe\/SystemRecipeVisibilityCard\.svelte$/],
   },
+  // The gated Crafting nav group (issue 511) publishes three distinct frames — the
+  // expanded group rail, the Books & Scrolls surface, and the Settings placeholder.
+  // `collect` emits one file per recipe id, so each frame is its own recipe.
+  {
+    id: 'manager-crafting-group',
+    label: 'Manager Crafting nav group (expanded: Settings + Recipes + Books & Scrolls)',
+    smokeLabels: ['manager-crafting-group-expanded'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+  },
+  {
+    id: 'manager-books-scrolls',
+    label: 'Manager Books & Scrolls recipe-item surface',
+    smokeLabels: ['manager-books-scrolls-normal'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/],
+  },
+  {
+    id: 'manager-crafting-settings',
+    label: 'Manager Crafting → Settings placeholder',
+    smokeLabels: ['manager-crafting-settings'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+  },
   // The recipe editor publishes FOUR distinct frames (overview/identity,
   // ingredients, validation tab, multi-step durations). `collect` emits ONE
   // file per recipe id (it takes the first matching smoke label), so each frame
