@@ -178,6 +178,12 @@ See [Travel: live current-realm sensing](#travel-live-current-realm-sensing).
 - `updateWorldTime` is a **synced** hook — it fires on every connected client off the server's broadcast.
 Any externally observable side effect driven from it (publishing public hooks, posting chat, writing documents) must be gated to the primary GM (`game.users.activeGM?.id === game.user?.id`, the `isPrimaryGM` seam in `GatheringEngine`) or it duplicates N times.
 Idempotent shared-state updates (stamina regen, node respawn) are already gated this way; the gathering completion-hook publication follows the same rule for matured timed runs.
+- Directory entry context menus are extended through the `get<Directory>ContextOptions` hook family (`getCompendiumContextOptions`, introduced 13.344; confirmed against V14.361 source) — an **array-mutation** hook: `(app, contextOptions) => contextOptions.push(entry)`, mutate in place and return nothing.
+Two traps.
+(1) **Register early** (module top-level, or `init`/`setup` — NOT the `ready` body): the menu is built exactly once in the directory's `_onFirstRender`, which runs during the pre-`ready` sidebar force-render, so a `ready`-body listener can miss the one-time build (unlike `renderItemDirectory` header-button wiring, which legitimately re-runs on every render).
+(2) Use the **modern `ContextMenuEntry` shape** `{ label, icon, visible, onClick }`, NOT the deprecated `{ name, condition, callback }` (compat-warns per menu open, removed in v15): `visible(target)` returns a boolean, and `onClick(event, target)` takes the target **second** (the old `callback` passed `(target, event)` reversed).
+The entry element is a raw `HTMLElement`; read the pack id from `target.dataset.pack`.
+See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `main.js` wiring.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
 - `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
