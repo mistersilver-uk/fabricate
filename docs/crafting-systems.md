@@ -37,6 +37,11 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 Custom recipe categories organize recipe browsing and authoring, and item tags allow component labeling plus tag-based ingredient matching.
 The reserved **General** recipe category is always present and is not stored in the custom category list.
 
+In the player recipe browser, each recipe that belongs to a custom category shows that category as a small label on its row.
+Recipes in the reserved **General** category show no label, so the default bucket does not tag every row.
+A **Category** filter, placed above the crafting-system filter, lets players narrow the list to a single category.
+The filter offers only the categories that appear in the player's visible recipes, sorted alphabetically with **General** pinned last, and its default **All categories** option shows the full list.
+
 ### Feature Toggles
 
 Each system can independently enable or disable optional features.

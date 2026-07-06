@@ -482,6 +482,8 @@
           "CraftableOnly": "Craftable",
           "SystemFilterLabel": "Crafting system",
           "AllSystems": "All systems",
+          "CategoryFilterLabel": "Category",
+          "AllCategories": "All categories",
           "Favourite": "Add to favourites",
           "Unfavourite": "Remove from favourites"
         },

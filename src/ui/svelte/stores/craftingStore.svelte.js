@@ -33,6 +33,10 @@ const MAX_RECENTS = 8;
 // local copy keeps the store free of the builder import so its unit-test compiler
 // need not resolve that module graph.
 const RECIPE_STATUS_AVAILABLE = 'available';
+// Mirrors GENERAL_RECIPE_CATEGORY (utils/recipeCategories.js). The reserved
+// default bucket is pinned LAST in the category filter (it is the catch-all, not
+// interleaved alphabetically). A local copy keeps the store import-free.
+const GENERAL_RECIPE_CATEGORY = 'general';
 
 export function createCraftingStore({ services } = {}) {
   let listing = $state(null);
@@ -56,6 +60,7 @@ export function createCraftingStore({ services } = {}) {
   let favouritesOnly = $state(false);
   let craftableOnly = $state(false);
   let systemFilter = $state(null);
+  let categoryFilter = $state(null);
 
   /** Resolve the current component-source actor ids, preferring the sibling store. */
   function currentSourceIds() {
@@ -86,6 +91,7 @@ export function createCraftingStore({ services } = {}) {
       if (favouritesOnly && !favourites.has(recipe?.id)) return false;
       if (craftableOnly && recipe?.browseStatus !== RECIPE_STATUS_AVAILABLE) return false;
       if (systemFilter && recipe?.systemId !== systemFilter) return false;
+      if (categoryFilter && recipe?.category !== categoryFilter) return false;
       return true;
     });
     // Explicit comparator (never a bare `.sort()`): stable A→Z by display name.
@@ -106,6 +112,26 @@ export function createCraftingStore({ services } = {}) {
       if (id && !byId.has(id)) byId.set(id, { id, name: String(recipe?.systemName ?? '') });
     }
     return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name));
+  });
+
+  // The distinct recipe categories present in the listing, for the category-filter
+  // dropdown. Like availableSystems, derived from the visible listing (not a global
+  // category vocabulary) so the dropdown only offers categories the player actually
+  // has recipes in. De-duped by raw token; sorted non-`general` A→Z by label, then
+  // the reserved "General" bucket pinned LAST when present (it is the catch-all).
+  const availableCategories = $derived.by(() => {
+    const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
+    const byId = new Map();
+    for (const recipe of recipes) {
+      const id = recipe?.category;
+      if (id && !byId.has(id)) byId.set(id, { id, name: String(recipe?.categoryLabel ?? '') });
+    }
+    const entries = [...byId.values()];
+    const general = entries.filter((entry) => entry.id === GENERAL_RECIPE_CATEGORY);
+    const rest = entries
+      .filter((entry) => entry.id !== GENERAL_RECIPE_CATEGORY)
+      .sort((left, right) => left.name.localeCompare(right.name));
+    return [...rest, ...general];
   });
 
   const pageCount = $derived.by(() => {
@@ -198,6 +224,12 @@ export function createCraftingStore({ services } = {}) {
   /** Filter to a single crafting system id, or clear it with a falsy value. */
   function setSystemFilter(systemId) {
     systemFilter = systemId ? String(systemId) : null;
+    page = 0;
+  }
+
+  /** Filter to a single recipe category token, or clear it with a falsy value. */
+  function setCategoryFilter(category) {
+    categoryFilter = category ? String(category) : null;
     page = 0;
   }
 
@@ -380,6 +412,12 @@ export function createCraftingStore({ services } = {}) {
     get availableSystems() {
       return availableSystems;
     },
+    get categoryFilter() {
+      return categoryFilter;
+    },
+    get availableCategories() {
+      return availableCategories;
+    },
     get visibleRecipes() {
       return visibleRecipes;
     },
@@ -404,6 +442,7 @@ export function createCraftingStore({ services } = {}) {
     setFavouritesOnly,
     setCraftableOnly,
     setSystemFilter,
+    setCategoryFilter,
     toggleFavourite,
     setPage,
     setPageSize,
