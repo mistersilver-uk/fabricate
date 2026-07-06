@@ -3403,6 +3403,103 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.match(playerNote.textContent, /per-recipe/i);
   });
 
+  it('recipe visibility card renders the learn-cap card and hides consume-on-learn when the cap is on (issue 511)', () => {
+    // Cap OFF: consume-on-learn tile present; learn-cap nested inputs disabled.
+    mountRecipeVisibilityCard({
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'itemOrLearned',
+          item: { limitUses: false },
+          learn: { consumeOnLearn: true, dragDropEnabled: true, limitRecipes: false },
+        },
+      },
+      showKnowledgeOptions: true,
+      onSave: () => {},
+    });
+
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-limit-recipes]'),
+      'the learn-cap Enabled toggle renders'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-max-recipes]'),
+      'the max-recipes stepper renders even when the cap is off'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-destroy-spent]'),
+      'the destroy-when-spent toggle renders'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-max-recipes] input').disabled,
+      true,
+      'the max-recipes input is disabled while the cap is off'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
+      'consume-on-learn shows while the cap is off'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    // Cap ON: consume-on-learn tile hidden; stepper enabled.
+    mountRecipeVisibilityCard({
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'itemOrLearned',
+          item: { limitUses: false },
+          learn: {
+            consumeOnLearn: true,
+            dragDropEnabled: true,
+            limitRecipes: true,
+            maxRecipes: 3,
+          },
+        },
+      },
+      showKnowledgeOptions: true,
+      onSave: () => {},
+    });
+
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
+      null,
+      'consume-on-learn is hidden while the cap is on'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-limit-recipes]'),
+      'the learn-cap card still renders while the cap is on'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-max-recipes] input').disabled,
+      false,
+      'the max-recipes input is enabled while the cap is on'
+    );
+    // The drag-drop tile is unaffected by the cap.
+    assert.ok(target.querySelector('[data-recipe-visibility-drag-drop]'));
+  });
+
+  it('recipe visibility card commits a concrete cap when enabling the learn limit (issue 511)', () => {
+    const emitted = [];
+    mountRecipeVisibilityCard({
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'learned',
+          item: { limitUses: false },
+          learn: { consumeOnLearn: false, dragDropEnabled: true, limitRecipes: false },
+        },
+      },
+      showKnowledgeOptions: true,
+      onSave: (patch) => emitted.push(patch),
+    });
+
+    target.querySelector('[data-recipe-visibility-limit-recipes]').click();
+    assert.deepEqual(emitted.at(-1), { limitRecipes: true, maxRecipes: 1 });
+  });
+
   it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
     // Not in player mode ⇒ no visibility section.
     mountRecipeOverview({

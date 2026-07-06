@@ -46,6 +46,14 @@
   const destroyWhenExhausted = $derived(knowledge?.item?.destroyWhenExhausted === true);
   const consumeOnLearn = $derived(knowledge?.learn?.consumeOnLearn !== false);
   const dragDropEnabled = $derived(knowledge?.learn?.dragDropEnabled !== false);
+  // Recipe-item learn cap (issue 511): how many linked recipes a player may learn
+  // from one recipe item. When on, `consumeOnLearn` is hidden (superseded by
+  // `destroyWhenSpent`) and ignored by the runtime.
+  const limitRecipes = $derived(knowledge?.learn?.limitRecipes === true);
+  const maxRecipes = $derived(
+    Number.isFinite(Number(knowledge?.learn?.maxRecipes)) ? Number(knowledge.learn.maxRecipes) : 1
+  );
+  const destroyWhenSpent = $derived(knowledge?.learn?.destroyWhenSpent === true);
 
   // The item sub-cards apply when the recipe item can gate visibility.
   const showItemOptions = $derived(knowledgeMode === 'item' || knowledgeMode === 'itemOrLearned');
@@ -85,6 +93,21 @@
       onSave({ limitUses: true, maxUses: Math.max(1, maxUses) });
     } else {
       onSave({ limitUses: false });
+    }
+  }
+
+  function adjustMaxRecipes(delta) {
+    onSave({ maxRecipes: Math.max(1, maxRecipes + delta) });
+  }
+
+  // Enabling the learn cap commits a concrete `maxRecipes` (>= 1) alongside the
+  // flag, mirroring the item Limited-uses toggle; disabling clears the cap via
+  // the store cascade (and preserves the prior consumeOnLearn value).
+  function setLimitRecipes(next) {
+    if (next) {
+      onSave({ limitRecipes: true, maxRecipes: Math.max(1, maxRecipes) });
+    } else {
+      onSave({ limitRecipes: false });
     }
   }
 </script>
@@ -207,7 +230,42 @@
         {/if}
 
         {#if showLearnOptions}
-          {@render toggleCard('data-recipe-visibility-consume-on-learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearn', 'Consume item on learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearnHint', 'Delete the recipe item when a player learns it.', consumeOnLearn, (next) => onSave({ consumeOnLearn: next }))}
+          <!-- Recipe learn limit (issue 511): built on the item Limited-uses card
+               structure so the card never resizes — the Max-recipes stepper and
+               Destroy-when-spent toggle stay visible but faded + disabled until
+               the cap is enabled. It occupies the grid slot the ConsumeOnLearn
+               tile vacates while the cap is on. -->
+          <div class="manager-resolution-mode-card manager-recipe-visibility-subcard manager-recipe-visibility-item-card">
+            <span class="manager-resolution-mode-legend">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.LearnLimitRecipes', 'Limited recipes learned per item')}</span>
+            <p class="manager-recipe-visibility-subcard-desc">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.LearnLimitRecipesHint', 'Cap how many recipes a player can learn from one recipe item.')}</p>
+            <div class="manager-recipe-visibility-item-controls">
+              <div class="manager-recipe-visibility-item-toggle-row">
+                <div class="manager-recipe-visibility-item-cell">
+                  <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.LearnLimitRecipesToggle', 'Enabled')}</span>
+                  {@render toggleButton('data-recipe-visibility-limit-recipes', 'FABRICATE.Admin.Manager.System.RecipeVisibility.LearnLimitRecipes', 'Limited recipes learned per item', limitRecipes, setLimitRecipes, false)}
+                </div>
+                <div class="manager-recipe-visibility-item-cell" class:is-disabled={!limitRecipes}>
+                  <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.DestroyWhenSpent', 'Delete when spent')}</span>
+                  {@render toggleButton('data-recipe-visibility-destroy-spent', 'FABRICATE.Admin.Manager.System.RecipeVisibility.DestroyWhenSpent', 'Delete when spent', destroyWhenSpent, (next) => onSave({ destroyWhenSpent: next }), !limitRecipes)}
+                </div>
+              </div>
+              <div class="manager-recipe-visibility-item-cell" class:is-disabled={!limitRecipes} data-recipe-visibility-max-recipes-row>
+                <span class="manager-recipe-visibility-nested-label">{text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxRecipes', 'Maximum recipes')}</span>
+                <div class="manager-recipe-visibility-stepper" data-recipe-visibility-max-recipes>
+                  <button type="button" class="manager-icon-button" disabled={!limitRecipes} aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxRecipesDecrease', 'Decrease maximum recipes')} onclick={() => adjustMaxRecipes(-1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
+                  <input type="number" min="1" step="1" value={maxRecipes} disabled={!limitRecipes} aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxRecipes', 'Maximum recipes')} oninput={(event) => onSave({ maxRecipes: Math.max(1, Number(event.target.value || 1)) })} />
+                  <button type="button" class="manager-icon-button" disabled={!limitRecipes} aria-label={text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxRecipesIncrease', 'Increase maximum recipes')} onclick={() => adjustMaxRecipes(1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Consume-on-learn is incompatible with a multi-learn cap (it would
+               delete the book on the first learn), so it is hidden while the cap
+               is on — Destroy-when-spent replaces it. -->
+          {#if !limitRecipes}
+            {@render toggleCard('data-recipe-visibility-consume-on-learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearn', 'Consume item on learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearnHint', 'Delete the recipe item when a player learns it.', consumeOnLearn, (next) => onSave({ consumeOnLearn: next }))}
+          {/if}
 
           {@render toggleCard('data-recipe-visibility-drag-drop', 'FABRICATE.Admin.Manager.System.RecipeVisibility.DragDropEnabled', 'Learn recipes from actor item drops', 'FABRICATE.Admin.Manager.System.RecipeVisibility.DragDropEnabledHint', 'Dropping the item on an actor learns the recipe.', dragDropEnabled, (next) => onSave({ dragDropEnabled: next }))}
         {/if}
