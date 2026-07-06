@@ -450,9 +450,11 @@ Every profile boots a real Foundry instance, joins the `fabricate-smoke-ci` worl
 4. Verifies the Fabricate module is active (`game.modules.get('fabricate')?.active === true`).
 5. Opens the unified Fabricate shell from the sidebar actions, verifies the shared navigation/actor bar, and completes one successful **Gather Meadow Herbs** task on Alara the Alchemist.
 6. Crafts one **Healing Potion** through the runtime API, verifying it lands in Alara's inventory.
-7. Fails if any non-ignored browser console errors were captured during the session.
+7. Executes and asserts craft coverage across every resolution mode through the runtime API: a `simple` craft, a `routedByCheck` craft on a recipe with two result groups on different outcome tiers (the selected tier's item is produced and the sibling's is not), a `routedByIngredients` craft across two ingredient sets mapped to different groups (the chosen set's item is produced and the other's is not), and a `progressive` craft completed in a single deterministic advance.
+8. Executes and asserts a `breakageChance` and a `limitedUses` tool breakage (the backing tool item ends flagged broken with the localized " (broken)" name suffix), one salvage run (the result components land in inventory), a negative tool-gating craft (returns `success: false` when the required tool is absent), and one guaranteed-success gather (the actor's inventory increases).
+9. Fails if any non-ignored browser console errors were captured during the session.
 
-The `full` profile additionally captures Crafting System Manager v2 screenshots, exercises the blocked / failure / timed gathering states, the non-GM redaction path, the no-selectable-actors state, and runs document cleanup.
+The `full` profile additionally captures Crafting System Manager v2 screenshots, exercises the blocked / failure / timed gathering states, the non-GM redaction path, the no-selectable-actors state, asserts the seeded 0%-drop and scene-blocked gathers plus the hazardous "Bramble Snare" event firing, and runs document cleanup.
 
 ### Smoke profiles (`rc` vs `full`)
 
