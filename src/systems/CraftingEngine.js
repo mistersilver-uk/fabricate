@@ -819,7 +819,11 @@ export class CraftingEngine {
       quantity,
       name: item.name ?? null,
       img: item.img ?? null,
-      componentId: ingredient?.componentId ?? ingredient?.systemItemId ?? null,
+      componentId:
+        ingredient?.match?.componentId ??
+        ingredient?.componentId ??
+        ingredient?.systemItemId ??
+        null,
     }));
 
     await runManager.markStepPrepared(craftingActor, run, stepIndex, {
