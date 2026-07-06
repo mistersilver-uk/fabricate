@@ -20,29 +20,31 @@ A system export carries every supported GM-authored record type for that system:
 - The crafting system itself: metadata, feature flags, components (with categories, tags, difficulty, and source-item references), essences, recipe-item definitions, tools, item tags, and realms.
 - Its recipes: identity, steps, ingredients (including grouped and alternative options), outputs, checks, tools, and outcomes.
 - Its gathering environments: identity, enabled state, selection and composition mode, scene gate, realm membership, biomes, danger, manual include/exclude/force lists, and local adjustments.
-- Its per-system gathering configuration: rules, condition vocabularies, biome/danger/weather/time-of-day vocabularies, reusable Gathering Tasks, reusable event records, gathering tools, character modifiers, and the economy block (stamina defaults and resource-node limits).
+- Its per-system gathering configuration: gathering rules, the biome, danger, weather, and time-of-day options you have configured, reusable Gathering Tasks, reusable events, gathering tools, per-drop modifiers, and your stamina and resource-node settings.
 
-The export envelope records an explicit integer `schemaVersion` so future format changes stay backward compatible.
-Older exports still import: Fabricate upcasts them automatically before validating.
+Every export records a version marker so future format changes stay backward compatible.
+Older exports still import.
+Fabricate upcasts them automatically before validating.
 
 ## What is excluded
 
 Export includes authoring data and leaves out runtime and world state.
-The envelope marks this with `runtimeStateIncluded: false`.
+Each export is marked as authoring-only.
 Excluded state includes:
 
-- The current weather and time of day (these are reset to defaults; your authored condition vocabularies are kept).
+- The current weather and time of day (reset to defaults, while your authored weather and time-of-day options are kept).
 - Per-environment resource-node depletion and respawn timers.
 - Gathering parties, per-character stamina pools, per-character blind-task discovery, and recent gathering history.
 - Active timed gathering runs and any actor, token, or scene state.
 
 ## How unresolved references are handled
 
-Some references point at world documents that may not exist in the target world: component source items, scene gates, scene regions, drop-row item UUIDs, and macros.
+Some references point at world documents that may not exist in the target world: component source items, scene gates, scene regions, the items a drop row grants, and macros.
 Fabricate never silently drops these.
 It preserves each reference exactly as authored and, after import, shows a GM-readable report grouped by kind.
 The report separates references that need your attention from those it resolved automatically.
-Internal links inside the system (for example, an environment that points at a Gathering Task by id) are rebound within the payload; a link that resolves to nothing is kept and reported as a data-integrity warning.
+Internal links inside the system (for example, an environment that points at a Gathering Task) are matched up within the imported data.
+A link that resolves to nothing is kept and reported as a data-integrity warning.
 
 ## Import modes
 
