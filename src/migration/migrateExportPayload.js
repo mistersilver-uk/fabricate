@@ -41,9 +41,15 @@ export function migrateExportPayload(payload) {
   }
 
   if (!migrated.gatheringConfig || typeof migrated.gatheringConfig !== 'object') {
+    // Real schema-1 exports never carried gathering config. Defensively lift a
+    // hand-authored `system.gatheringConfig` ONLY when it already matches the
+    // export envelope shape (`{ system, shared }`) that the importer expects; a
+    // world-setting-shaped object (`{ systems, vocabularies, ... }`) would persist
+    // as an empty slice, so it is ignored in favour of the empty default.
     const legacy = migrated.system?.gatheringConfig;
-    migrated.gatheringConfig =
-      legacy && typeof legacy === 'object' ? legacy : { system: {}, shared: {} };
+    const looksLikeExportShape =
+      legacy && typeof legacy === 'object' && ('system' in legacy || 'shared' in legacy);
+    migrated.gatheringConfig = looksLikeExportShape ? legacy : { system: {}, shared: {} };
   }
 
   return migrated;

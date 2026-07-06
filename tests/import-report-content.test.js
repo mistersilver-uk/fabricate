@@ -55,8 +55,9 @@ test('report: groups reported refs by kind with per-kind counts + localized labe
 
   const row = scene.rows[0];
   assert.equal(row.ownerTypeLabel, 'FABRICATE.Admin.ImportReport.OwnerType.environment');
-  assert.equal(row.dispositionLabel, 'FABRICATE.Admin.ImportReport.Disposition.reported');
   assert.equal(row.referenceValue, 'Scene.a');
+  // Rows carry no per-row disposition (every grouped row is `reported`).
+  assert.equal(row.dispositionLabel, undefined);
 });
 
 test('report: handled line reflects remapped + retained count', () => {

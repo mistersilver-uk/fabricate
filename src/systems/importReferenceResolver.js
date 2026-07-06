@@ -294,6 +294,15 @@ function collectBrokenInternalReferences(payload, out) {
     }
   }
 
+  // Essence sourceComponentId → components (fall back to the legacy
+  // associatedSystemItemId alias).
+  for (const def of arrayOf(system.essenceDefinitions)) {
+    const sourceComponentId = def?.sourceComponentId ?? def?.associatedSystemItemId;
+    if (sourceComponentId && !componentIds.has(sourceComponentId)) {
+      push(REFERENCE_KINDS.COMPONENT_LINK, 'essence', def, sourceComponentId);
+    }
+  }
+
   // Recipe recipeItemId → recipeItemDefinitions.
   for (const recipe of arrayOf(payload.recipes)) {
     if (recipe?.recipeItemId && !recipeItemIds.has(recipe.recipeItemId)) {

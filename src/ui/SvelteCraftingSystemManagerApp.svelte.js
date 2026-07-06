@@ -42,7 +42,7 @@ function renderImportReportHtml(content) {
     );
     for (const group of content.groups) {
       parts.push(
-        `<h3 class="fabricate-import-report__kind">${esc(group.kindLabel)} (${group.count})</h3>`
+        `<h2 class="fabricate-import-report__kind">${esc(group.kindLabel)} (${group.count})</h2>`
       );
       parts.push(`<ul class="fabricate-import-report__list">`);
       for (const row of group.rows) {
@@ -51,8 +51,7 @@ function renderImportReportHtml(content) {
           : esc(row.ownerTypeLabel);
         parts.push(
           `<li><span class="fabricate-import-report__owner">${owner}</span> ` +
-            `<code class="fabricate-import-report__ref">${esc(row.referenceValue)}</code> ` +
-            `<em class="fabricate-import-report__disposition">${esc(row.dispositionLabel)}</em></li>`
+            `<code class="fabricate-import-report__ref" style="overflow-wrap: anywhere; word-break: break-all;">${esc(row.referenceValue)}</code></li>`
         );
       }
       parts.push(`</ul>`);
@@ -419,6 +418,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         });
         if (!result || !result.file) return;
 
+        // The import itself (parse → validate → persist) is the only work whose
+        // failure is an "Import failed" toast; the post-success report render is
+        // deliberately OUTSIDE this try so a render error is never misreported as
+        // a failed import.
+        let summary;
         try {
           const text = await result.file.text();
           const data = JSON.parse(text);
@@ -443,40 +447,41 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             setSetting: (key, value) => setSetting(key, value),
             isGM: () => game.user?.isGM === true
           });
-          const summary = await importer.importFromPackData(packData, {
+          summary = await importer.importFromPackData(packData, {
             overwriteExisting: result.conflictMode === 'overwrite'
-          });
-
-          if (summary.system.skipped) {
-            // "already exists — skipped" stays a toast; it does NOT open the report.
-            ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
-            await this._adminStore.refresh();
-            return;
-          }
-
-          const verb = summary.collisions.some(c => c.type === 'system' && c.resolution === 'overwritten')
-            ? 'Updated' : 'Imported';
-          const message = `${verb} "${summary.system.name}" with ${summary.components.total} components, ${summary.recipes.imported} imported recipes, ${summary.recipes.skipped} skipped recipes, and ${summary.recipes.errors.length} failed recipes.`;
-          if (summary.recipes.errors.length > 0) {
-            ui.notifications.warn(message);
-          } else {
-            ui.notifications.info(message);
-          }
-
-          await this._adminStore.refresh();
-
-          // Post-import GM-readable report (informational DialogV2 — single OK).
-          const content = buildImportReportContent(summary, (key, data) => localize(key, data));
-          await DialogV2.wait({
-            window: { title: content.title },
-            content: renderImportReportHtml(content),
-            buttons: [{ action: 'ok', label: 'Close', default: true }],
-            rejectClose: false
           });
         } catch (err) {
           // Hard failures stay on the DISTINCT error-toast path (never the report).
           ui.notifications.error(`Import failed: ${err.message}`);
+          return;
         }
+
+        if (summary.system.skipped) {
+          // "already exists — skipped" stays a toast; it does NOT open the report.
+          ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
+          await this._adminStore.refresh();
+          return;
+        }
+
+        const verb = summary.collisions.some(c => c.type === 'system' && c.resolution === 'overwritten')
+          ? 'Updated' : 'Imported';
+        const message = `${verb} "${summary.system.name}" with ${summary.components.total} components, ${summary.recipes.imported} imported recipes, ${summary.recipes.skipped} skipped recipes, and ${summary.recipes.errors.length} failed recipes.`;
+        if (summary.recipes.errors.length > 0) {
+          ui.notifications.warn(message);
+        } else {
+          ui.notifications.info(message);
+        }
+
+        await this._adminStore.refresh();
+
+        // Post-import GM-readable report (informational DialogV2 — single OK).
+        const content = buildImportReportContent(summary, (key, data) => localize(key, data));
+        await DialogV2.wait({
+          window: { title: content.title },
+          content: renderImportReportHtml(content),
+          buttons: [{ action: 'ok', label: localize('FABRICATE.Admin.ImportReport.Close'), default: true }],
+          rejectClose: false
+        });
       }
     };
   }

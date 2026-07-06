@@ -920,8 +920,9 @@
         "Title": "Import report",
         "HeadlineNeedsAttention": "Import succeeded — {count} reference(s) need attention.",
         "HeadlineAllResolved": "Import succeeded — all references resolved.",
-        "EmptyState": "All references resolved.",
+        "EmptyState": "Nothing needs your attention.",
         "HandledLine": "{count} reference(s) resolved automatically.",
+        "Close": "Close",
         "Kind": {
           "sourceItem": "Component source items",
           "scene": "Scene gates",
@@ -934,18 +935,13 @@
           "recipeItem": "Recipe item links",
           "unknown": "Other references"
         },
-        "Disposition": {
-          "remapped": "Remapped",
-          "retained": "Retained",
-          "reported": "Needs attention",
-          "unknown": "Unknown"
-        },
         "OwnerType": {
           "component": "Component",
           "environment": "Environment",
           "realm": "Realm",
           "dropRow": "Drop row",
           "tool": "Tool",
+          "essence": "Essence",
           "recipe": "Recipe",
           "task": "Task",
           "event": "Event",

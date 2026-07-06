@@ -49,13 +49,14 @@ export function buildImportReportContent(summary, localize) {
   for (const ref of reported) {
     const kind = ref.kind || 'unknown';
     if (!groupsByKind.has(kind)) groupsByKind.set(kind, []);
+    // Every grouped row is a `reported` ref, so a per-row disposition label
+    // would be a zero-information repeat under a headline that already says so —
+    // it is intentionally omitted here.
     groupsByKind.get(kind).push({
       ownerType: ref.ownerType || '',
       ownerTypeLabel: t(`${L}.OwnerType.${ref.ownerType || 'unknown'}`),
       ownerName: ref.ownerName || '',
       referenceValue: ref.referenceValue || '',
-      disposition: ref.disposition,
-      dispositionLabel: t(`${L}.Disposition.${ref.disposition}`),
     });
   }
 

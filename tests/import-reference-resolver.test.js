@@ -86,6 +86,32 @@ test('resolver: broken internal env→task linkage is reported (retained data)',
   assert.equal(broken.disposition, 'reported');
 });
 
+test('resolver: broken essence sourceComponentId is reported', async () => {
+  const payload = payloadFromFixture();
+  payload.system.essenceDefinitions[0].sourceComponentId = 'ghost-component';
+  const { unresolvedReferences } = await resolveImportReferences(payload, {
+    resolveUuid: async () => null,
+  });
+  const broken = unresolvedReferences.find(
+    (r) => r.ownerType === 'essence' && r.referenceValue === 'ghost-component'
+  );
+  assert.ok(broken, 'broken essence→component link reported');
+  assert.equal(broken.disposition, 'reported');
+  assert.equal(broken.kind, REFERENCE_KINDS.COMPONENT_LINK);
+});
+
+test('resolver: broken essence via legacy associatedSystemItemId is reported', async () => {
+  const payload = payloadFromFixture();
+  delete payload.system.essenceDefinitions[0].sourceComponentId;
+  payload.system.essenceDefinitions[0].associatedSystemItemId = 'legacy-ghost';
+  const { unresolvedReferences } = await resolveImportReferences(payload, {
+    resolveUuid: async () => null,
+  });
+  const broken = unresolvedReferences.find((r) => r.referenceValue === 'legacy-ghost');
+  assert.ok(broken, 'legacy alias still reported when broken');
+  assert.equal(broken.ownerType, 'essence');
+});
+
 test('resolver: broken recipe recipeItemId is reported', async () => {
   const payload = payloadFromFixture();
   payload.recipes[0].recipeItemId = 'missing-def';
