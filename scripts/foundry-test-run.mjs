@@ -231,6 +231,21 @@ async function openManagerCraftingSection(page, subitemId, managerView) {
     .waitFor({ state: 'visible', timeout: 5_000 });
 }
 
+// Return to the recipes browser (via the Crafting group) and open the named
+// recipe's editor, waiting for the recipe-edit route. Consolidates the
+// "return then open recipe X" sequence the recipe-editor captures repeat.
+async function openManagerRecipeEditor(page, recipeName) {
+  await openManagerCraftingSection(page, 'recipes', 'recipes');
+  await page
+    .locator(`.fabricate-manager .manager-recipe-row:has-text("${recipeName}") button:has(i.fa-edit)`)
+    .first()
+    .click();
+  await page
+    .locator('.fabricate-manager[data-manager-view="recipe-edit"]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+}
+
 /**
  * Safely parse a page pathname.
  * @param {string} rawUrl
@@ -4062,13 +4077,9 @@ async function main() {
           process.stderr.write(`Crafting group surface capture failed: ${err.message}\n`);
         }
 
-        // Return to the recipes browser for the recipe-editor captures below.
-        await openManagerCraftingSection(page, 'recipes', 'recipes');
-
         // Recipes → open the editor so the identity card (central column) and the
         // knowledge-gated recipe-item inspector (right context panel) are captured (#387).
-        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion") button:has(i.fa-edit)').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerRecipeEditor(page, 'Brew Healing Potion');
         await page.locator('.fabricate-manager [data-recipe-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-recipe-section="recipe-item"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await assertManagerLayoutStable(page, 'recipe edit normal');
@@ -4090,15 +4101,11 @@ async function main() {
           process.stderr.write(`Recipe tools capture failed: ${err.message}\n`);
         }
 
-        // Return to the recipes browser for the remaining recipe-editor captures.
-        await openManagerCraftingSection(page, 'recipes', 'recipes');
-
         // Showcase Requirements → Ingredients tab: capture every requirement row type
         // (component, OR group, tag, currency cost), the faint dividers, and the tag
         // layout. The recipe is authored complex, so the section renders the full set
         // card list with one or more data-recipe-group cards.
-        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Showcase Requirements") button:has(i.fa-edit)').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerRecipeEditor(page, 'Showcase Requirements');
         await page.locator('.fabricate-manager [data-recipe-tab-button="ingredients"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-recipe-tab="ingredients"] [data-recipe-group]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -4111,11 +4118,7 @@ async function main() {
         // Ingredients capture stays on Showcase Requirements above; only this
         // validation capture is repointed at the check-routed fixture so the published
         // frame shows the unroutedResultGroup + unproducedOutcomeTier warning chips.
-        await openManagerCraftingSection(page, 'recipes', 'recipes');
-
-        // Routed Check Readiness → Validation tab: both new routed warnings render.
-        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Routed Check Readiness") button:has(i.fa-edit)').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerRecipeEditor(page, 'Routed Check Readiness');
         await page.locator('.fabricate-manager [data-recipe-tab-button="validation"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="validation"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         // Wait on both warning chips so the capture proves the new readiness signals.
@@ -4125,13 +4128,9 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-validation');
 
-        // Return to the recipes browser before opening the multi-step recipe.
-        await openManagerCraftingSection(page, 'recipes', 'recipes');
-
         // Multi-Step Alloy → Overview: the steps accordion shows the per-step duration
         // chips/controls. Wait on the steps card and a per-step time chip.
-        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Multi-Step Alloy") button:has(i.fa-edit)').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await openManagerRecipeEditor(page, 'Multi-Step Alloy');
         await page.locator('.fabricate-manager [data-recipe-tab="overview"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-recipe-section="steps"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         // The Overview steps accordion passes onUpdateStep, so each step header renders the
