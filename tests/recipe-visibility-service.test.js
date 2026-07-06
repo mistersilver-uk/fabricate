@@ -593,6 +593,33 @@ test('AC4.5 - applyRecipeItemUseOnCraft skips use-tracking when no actual matchi
 });
 
 // ---------------------------------------------------------------------------
+// Issue 511 Phase 1 — per-document learn-count helpers (mirror recipeItemUsage)
+// ---------------------------------------------------------------------------
+
+test('511.P1.1 - _getRecipeItemLearnCount reads the per-document learn count, defaulting to 0', () => {
+  const service = buildService();
+  const empty = new FakeItem({ uuid: 'book' });
+  assert.equal(service._getRecipeItemLearnCount(empty), 0);
+
+  const seeded = new FakeItem({
+    uuid: 'book',
+    flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 2 } } }
+  });
+  assert.equal(service._getRecipeItemLearnCount(seeded), 2);
+});
+
+test('511.P1.2 - _setRecipeItemLearnCount writes a clamped non-negative integer on the item document', async () => {
+  const service = buildService();
+  const item = new FakeItem({ uuid: 'book' });
+
+  await service._setRecipeItemLearnCount(item, 3.9);
+  assert.equal(service._getRecipeItemLearnCount(item), 3);
+
+  await service._setRecipeItemLearnCount(item, -5);
+  assert.equal(service._getRecipeItemLearnCount(item), 0);
+});
+
+// ---------------------------------------------------------------------------
 // AC5 — Deterministic item selection
 // ---------------------------------------------------------------------------
 

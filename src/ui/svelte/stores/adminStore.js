@@ -6802,6 +6802,9 @@ export function createAdminStore(services) {
         ? normalizedConfig.destroyWhenExhausted === true
         : currentItem.destroyWhenExhausted === true
       : false;
+    // `consumeOnLearn` is always merged from the patch or the persisted value —
+    // never zeroed while the learn cap is on — so toggling `limitRecipes` off
+    // again preserves the GM's prior consume-on-learn choice (issue 511, UN4).
     const nextConsumeOnLearn =
       normalizedConfig.consumeOnLearn !== undefined
         ? normalizedConfig.consumeOnLearn !== false
@@ -6810,6 +6813,24 @@ export function createAdminStore(services) {
       normalizedConfig.dragDropEnabled !== undefined
         ? normalizedConfig.dragDropEnabled !== false
         : currentLearn.dragDropEnabled !== false;
+    // Recipe-item learn cap (issue 511), mirroring the item-cap cascade above.
+    const nextLimitRecipes =
+      normalizedConfig.limitRecipes !== undefined
+        ? normalizedConfig.limitRecipes === true
+        : currentLearn.limitRecipes === true;
+    const rawMaxRecipes =
+      normalizedConfig.maxRecipes !== undefined
+        ? normalizedConfig.maxRecipes
+        : currentLearn.maxRecipes;
+    const nextMaxRecipes =
+      nextLimitRecipes && Number.isFinite(Number(rawMaxRecipes)) && Number(rawMaxRecipes) > 0
+        ? Number(rawMaxRecipes)
+        : undefined;
+    const nextDestroyWhenSpent = nextLimitRecipes
+      ? normalizedConfig.destroyWhenSpent !== undefined
+        ? normalizedConfig.destroyWhenSpent === true
+        : currentLearn.destroyWhenSpent === true
+      : false;
     const recipeVisibility = {
       ...existing,
       listMode: nextListMode,
@@ -6826,6 +6847,9 @@ export function createAdminStore(services) {
           ...currentLearn,
           consumeOnLearn: nextConsumeOnLearn,
           dragDropEnabled: nextDragDropEnabled,
+          limitRecipes: nextLimitRecipes,
+          maxRecipes: nextMaxRecipes,
+          destroyWhenSpent: nextDestroyWhenSpent,
         },
       },
     };

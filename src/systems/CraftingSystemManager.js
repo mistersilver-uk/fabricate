@@ -738,6 +738,18 @@ export class CraftingSystemManager {
         learn: {
           consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false,
           dragDropEnabled: knowledge?.learn?.dragDropEnabled !== false,
+          // Recipe-item learn cap (issue 511). Mirrors the sibling item cap
+          // (limitUses / maxUses / destroyWhenExhausted). `destroyWhenSpent`
+          // (learn) is deliberately named distinctly from `destroyWhenExhausted`
+          // (item/craft-charges) — do not normalize them to one name.
+          limitRecipes: knowledge?.learn?.limitRecipes === true,
+          maxRecipes:
+            knowledge?.learn?.limitRecipes === true &&
+            Number.isFinite(Number(knowledge?.learn?.maxRecipes)) &&
+            Number(knowledge.learn.maxRecipes) > 0
+              ? Number(knowledge.learn.maxRecipes)
+              : undefined,
+          destroyWhenSpent: knowledge?.learn?.destroyWhenSpent === true,
         },
       },
     };

@@ -93,6 +93,23 @@ export class RecipeVisibilityService {
     });
   }
 
+  // Per item-DOCUMENT-instance learn count for the recipe-item learn cap (issue
+  // 511). Mirrors `recipeItemUsage.timesUsed` (`_getRecipeItemUsage` /
+  // `_setRecipeItemUsage`): the count lives on the physical item document, so a
+  // stacked qty>1 document shares one count, the budget accumulates across every
+  // actor that holds the document, and it is not reset on transfer/ownership
+  // change (the flag travels with the item data).
+  _getRecipeItemLearnCount(item) {
+    const learning = getFabricateFlag(item, 'recipeItemLearning', {});
+    return Number(learning?.learnedCount || 0);
+  }
+
+  async _setRecipeItemLearnCount(item, learnedCount) {
+    await setFabricateFlag(item, 'recipeItemLearning', {
+      learnedCount: Math.max(0, Math.floor(learnedCount)),
+    });
+  }
+
   _getKnowledgeConfig(system) {
     return (
       system?.recipeVisibility?.knowledge || {
