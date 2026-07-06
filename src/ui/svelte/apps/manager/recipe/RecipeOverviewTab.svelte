@@ -166,14 +166,15 @@
               value={recipe?.minSuccessOutcomeId || ''}
               onchange={(event) => onUpdateRecipe({ minSuccessOutcomeId: event.currentTarget.value || null })}
               disabled={saving}
+              aria-describedby="manager-recipe-min-success-tier-hint"
             >
               <option value="">{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTierNone', 'No override (use rolled tier)')}</option>
               {#each minSuccessTierOptions as tier (tier.id)}
-                <option value={tier.id}>{tier.name}</option>
+                <option value={tier.id}>{tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')}</option>
               {/each}
             </select>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTierHint', 'Fail the craft outright when the roll lands below this tier. Fixed-type routed checks only.')}</p>
           </label>
+          <p id="manager-recipe-min-success-tier-hint" class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTierHint', 'Fail the craft outright when the roll lands below this tier.')}</p>
         {/if}
       </div>
     </div>

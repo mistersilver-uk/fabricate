@@ -636,6 +636,71 @@ test('runFormulaRouted relative: minOutcomeId is ignored (fixed-type only)', asy
   assert.equal(r.success, true);
 });
 
+test('runFormulaRouted fixed: a min-tier failure drops the rolled tier breakTools', async () => {
+  // Require "Clean" (start 15); the roll lands in "Fumble" (start 1), which carries
+  // breakTools:true — but a min-tier failure routes no tier, so breakTools is dropped.
+  stubRoll(3, [{ number: 1, faces: 20, total: 3 }]);
+  const r = await runFormulaRouted({
+    formula: '1d20',
+    dc: 0,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    minOutcomeId: 'high',
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.data.breakTools, false, 'no tier routes → the rolled tier breakTools is dropped');
+  assert.equal(r.data.minTierFailed, true);
+  assert.equal(r.data.rolledOutcomeId, 'low');
+});
+
+// ── interactive prompt DC seam (the fixed-check "no DC" contract) ────────────
+
+test('runFormulaRouted: the fixed-check interactive prompt shows no DC (rollOptions.dc is not clobbered by the tier-matching dc)', async () => {
+  // The engine passes dc:undefined on rollOptions for a fixed check; the runner must
+  // NOT re-inject its tier-matching `dc` param and re-surface a DC chip in the prompt.
+  stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
+  let promptedDc = 'UNSET';
+  await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    type: 'fixed',
+    fixedOutcomes: FIXED,
+    actor: ACTOR,
+    rollOptions: {
+      interactive: true,
+      dc: undefined,
+      prompt: async (args) => {
+        promptedDc = args.dc;
+        return { confirmed: true };
+      },
+    },
+  });
+  assert.equal(promptedDc, undefined);
+});
+
+test('runFormulaRouted: a relative interactive prompt still receives its DC', async () => {
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  let promptedDc = 'UNSET';
+  await runFormulaRouted({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    type: 'relative',
+    relativeOutcomes: RELATIVE,
+    actor: ACTOR,
+    rollOptions: {
+      interactive: true,
+      dc: 15,
+      prompt: async (args) => {
+        promptedDc = args.dc;
+        return { confirmed: true };
+      },
+    },
+  });
+  assert.equal(promptedDc, 15);
+});
+
 test('runFormulaRouted: no dice engine does not block and does not fabricate a route', async () => {
   delete globalThis.Roll;
   const r = await runFormulaRouted({

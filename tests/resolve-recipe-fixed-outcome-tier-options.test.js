@@ -1,7 +1,10 @@
 // Unit tests for resolveRecipeFixedOutcomeTierOptions — the pure helper that resolves
 // the recipe editor's "Minimum success tier" dropdown options. Success tiers of a
-// FIXED-type routed crafting check only, ranked ascending by `start`; every other
-// mode/type yields [] so the control auto-hides.
+// FIXED-type routed crafting check only, ranked ascending by `start`; gated on the
+// system's real `routedByCheck` resolution mode (the min-tier gate is only threaded
+// through the routedByCheck runtime path — routedByIngredients shares the routed
+// check config but never reads the field). Every other case yields [] so the control
+// auto-hides.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -15,10 +18,10 @@ const FIXED_OUTCOMES = [
   { id: 'mid', name: 'Partial', success: true, start: 6, end: 14 },
 ];
 
-test('routed + fixed returns success tiers ranked ascending by start', () => {
+test('routedByCheck + fixed returns success tiers ranked ascending by start', () => {
   const options = resolveRecipeFixedOutcomeTierOptions(
     { routed: { type: 'fixed', fixedOutcomes: FIXED_OUTCOMES } },
-    'routed'
+    'routedByCheck'
   );
   assert.deepEqual(options, [
     { id: 'mid', name: 'Partial', start: 6 },
@@ -26,10 +29,22 @@ test('routed + fixed returns success tiers ranked ascending by start', () => {
   ]);
 });
 
+test('routedByIngredients + fixed yields no options (the field is never read there)', () => {
+  // routedByIngredients shares craftingCheck.routed but runs a pass/fail gate that
+  // ignores minSuccessOutcomeId — surfacing the control would author a dead value.
+  assert.deepEqual(
+    resolveRecipeFixedOutcomeTierOptions(
+      { routed: { type: 'fixed', fixedOutcomes: FIXED_OUTCOMES } },
+      'routedByIngredients'
+    ),
+    []
+  );
+});
+
 test('failure tiers are excluded — only success tiers are a valid minimum', () => {
   const options = resolveRecipeFixedOutcomeTierOptions(
     { routed: { type: 'fixed', fixedOutcomes: [{ id: 'low', name: 'Fumble', success: false, start: 1 }] } },
-    'routed'
+    'routedByCheck'
   );
   assert.deepEqual(options, []);
 });
@@ -37,32 +52,32 @@ test('failure tiers are excluded — only success tiers are a valid minimum', ()
 test('a tier with no id is skipped', () => {
   const options = resolveRecipeFixedOutcomeTierOptions(
     { routed: { type: 'fixed', fixedOutcomes: [{ name: 'Nameless', success: true, start: 3 }] } },
-    'routed'
+    'routedByCheck'
   );
   assert.deepEqual(options, []);
 });
 
-test('a tier with no name falls back to its id', () => {
+test('a tier with no name yields an empty name (the UI applies the "Unnamed tier" label)', () => {
   const options = resolveRecipeFixedOutcomeTierOptions(
     { routed: { type: 'fixed', fixedOutcomes: [{ id: 'x', success: true, start: 2 }] } },
-    'routed'
+    'routedByCheck'
   );
-  assert.deepEqual(options, [{ id: 'x', name: 'x', start: 2 }]);
+  assert.deepEqual(options, [{ id: 'x', name: '', start: 2 }]);
 });
 
-test('routed + relative yields no options (fixed-type only)', () => {
+test('routedByCheck + relative yields no options (fixed-type only)', () => {
   assert.deepEqual(
     resolveRecipeFixedOutcomeTierOptions(
       { routed: { type: 'relative', fixedOutcomes: FIXED_OUTCOMES } },
-      'routed'
+      'routedByCheck'
     ),
     []
   );
 });
 
-test('routed + omitted type yields no options (defaults to relative)', () => {
+test('routedByCheck + omitted type yields no options (defaults to relative)', () => {
   assert.deepEqual(
-    resolveRecipeFixedOutcomeTierOptions({ routed: { fixedOutcomes: FIXED_OUTCOMES } }, 'routed'),
+    resolveRecipeFixedOutcomeTierOptions({ routed: { fixedOutcomes: FIXED_OUTCOMES } }, 'routedByCheck'),
     []
   );
 });
@@ -71,12 +86,13 @@ test('simple / progressive / null modes yield no options', () => {
   const craftingCheck = { routed: { type: 'fixed', fixedOutcomes: FIXED_OUTCOMES } };
   assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(craftingCheck, 'simple'), []);
   assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(craftingCheck, 'progressive'), []);
+  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(craftingCheck, 'alchemy'), []);
   assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(craftingCheck, null), []);
 });
 
 test('missing config / outcomes yield an empty list (no throw)', () => {
-  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(null, 'routed'), []);
-  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(undefined, 'routed'), []);
-  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions({}, 'routed'), []);
-  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions({ routed: { type: 'fixed' } }, 'routed'), []);
+  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(null, 'routedByCheck'), []);
+  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(undefined, 'routedByCheck'), []);
+  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions({}, 'routedByCheck'), []);
+  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions({ routed: { type: 'fixed' } }, 'routedByCheck'), []);
 });

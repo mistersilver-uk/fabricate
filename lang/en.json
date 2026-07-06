@@ -1478,7 +1478,7 @@
           "CheckTierUnnamed": "Unnamed tier",
           "MinSuccessTier": "Minimum success tier",
           "MinSuccessTierNone": "No override (use rolled tier)",
-          "MinSuccessTierHint": "Fail the craft outright when the roll lands below this tier. Fixed-type routed checks only.",
+          "MinSuccessTierHint": "Fail the craft outright when the roll lands below this tier.",
           "ChooseImage": "Choose recipe image",
           "RecipeItemLockedImage": "Image provided by the linked recipe item",
           "RecipeItemLockedImageTooltip": "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image.",

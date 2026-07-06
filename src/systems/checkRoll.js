@@ -537,10 +537,13 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  *   outcome. Opted into by the crafting + salvage callers; gathering leaves it off to
  *   preserve its "no tier name → failure" path.
  * @param {?string} [params.minOutcomeId] FIXED-type only: a recipe's minimum success
- *   tier id. When the naturally-rolled tier ranks below it (by `start`), the check
- *   fails outright (`success:false`, no outcome). Optional and no-op by default —
- *   only the crafting routedByCheck caller threads it, so salvage/gathering are
- *   unaffected. Ignored for relative type and bypassed by a forced (crit) outcome.
+ *   tier id. When the naturally-rolled tier ranks below it (by `start`) — or the
+ *   total lands outside every fixed range, so no tier matched at all — the check
+ *   fails outright: `success:false`, no outcome routes, and the matched tier's
+ *   `breakTools` is dropped (nothing routes, so the per-tier breakage bridge does
+ *   not fire). Optional and no-op by default — only the crafting routedByCheck caller
+ *   threads it, so salvage/gathering are unaffected. Ignored for relative type and
+ *   bypassed by a forced (crit) outcome.
  * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
  */
 export async function runFormulaRouted({
@@ -564,7 +567,13 @@ export async function runFormulaRouted({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc });
+      // Do NOT re-inject the tier-matching `dc` here: `evaluateCheckRoll` uses its
+      // `dc` for the prompt DISPLAY only, and each caller already threads the correct
+      // prompt-facing DC on `rollOptions` (undefined for a fixed routedByCheck check
+      // so the prompt shows no DC chip; numeric otherwise). Re-adding `dc` would
+      // clobber that and re-surface the meaningless DC on a fixed check (mirrors
+      // `runFormulaProgressive`, which also spreads `rollOptions` with no `dc`).
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions });
     } catch (error) {
       console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
       return {

@@ -132,7 +132,8 @@ Fixed outcome tiers own explicit, non-overlapping `[start, end]` value ranges an
 The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it) and relative-type routed checks; only `routedByCheck` with `type: "fixed"` drops it.
 - **Per-recipe minimum success tier (fixed only).**
 A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value.
-When set, a craft whose naturally-rolled tier ranks below the required tier fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
+When set, a craft whose naturally-rolled tier ranks below the required tier — or whose total lands outside every fixed range, so no tier matched at all — fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
+Because no tier routes on this failure, the rolled tier's own `breakTools` flag is dropped (the per-tier breakage bridge fires only for a routed tier); independent dice-group / roll-total breakage triggers are unaffected.
 The default (null/unset) imposes no override, so the outcome is the tier actually rolled.
 A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
 A stale or unknown `minSuccessOutcomeId` no-ops.
