@@ -11,6 +11,7 @@
 -->
 <script>
   import { localize, notifyWarn, subscribeSceneChange, subscribeTravelMarkerMove, subscribeInventoryChange, subscribeCraftingDataChange } from '../../util/foundryBridge.js';
+  import { notifyRollDialogDismissed } from '../../util/rollCancelNotice.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
@@ -216,9 +217,11 @@
       // a silent no-op. A started/accepted attempt reports its outcome via the chat
       // card, so only an explicit rejection notifies here. A CANCELLED attempt
       // (player dismissed the roll dialog) is a user choice, not a rejection: it is
-      // also `accepted: false` but carries no blockedReasons, so handle it first and
-      // stay silent.
+      // also `accepted: false` but carries no blockedReasons, so handle it first. A
+      // NATIVE roll-dialog dismissal (routed/progressive) raises a neutral WARN
+      // toast; the bespoke d100 confirm-prompt Cancel stays silent.
       if (result && result.cancelled === true) {
+        notifyRollDialogDismissed(result, { notifyWarn, localize });
         return;
       }
       if (result && result.accepted === false) {

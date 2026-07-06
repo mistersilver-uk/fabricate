@@ -255,6 +255,20 @@ The `ingredientSet` provider routes by `IngredientSet.resultGroupId` and the `ch
 - All recipes must satisfy alchemy-wide signature uniqueness invariants.
 - Any signature collision blocks save/import operations system-wide until resolved.
 
+## Interactive Check Rolls (native roll-dialog handoff)
+
+This requirement governs the shared **check-roll evaluation seam** used by crafting AND salvage.
+It is not a `resolutionMode` of the crafting taxonomy (salvage is not a mode); it is a property of how any configured check roll is evaluated.
+
+- The check roll is evaluated in one of two modes, selected SOLELY by the per-call `interactive` flag — there is no system setting and no client setting.
+An **automated** roll is used by API / macro / unattended callers; an **interactive** roll is used by UI-triggered attempts.
+- The automated roll evaluates with the manual roll-fulfilment resolver suppressed, so an unattended roll never surfaces a blocking dialog on a manual-fulfilment client (identical to `Roll.simulate`).
+- The interactive roll defers to Foundry's native roll machinery, honouring the rolling client's fulfilment method, roll mode, and Dice So Nice.
+For a default-digital client this is indistinguishable from the automated roll's outcome and MUST NOT be treated as a dismissal; a client on manual roll fulfilment is presented Foundry's native roll dialog to enter their roll.
+- If the client **dismisses** the presented native roll dialog, the attempt is **cancelled with zero mutation** — no ingredients consumed, no result items created, no tools broken — reusing the same cancel path as a dismissed interactive confirm prompt, and a **warning** notification is shown.
+The notification copy is activity-neutral: it states the attempt was cancelled, had no effect, and that the roll dialog was dismissed (no crafting-only vocabulary such as "consumed").
+- The interactive confirm / bonus / advantage / roll-mode prompt is retained alongside the native handoff (it supplies modifiers the native resolver does not); it is not replaced by it.
+
 ## Testing Requirements
 
 - Unit tests per mode for cardinality and routing validation.

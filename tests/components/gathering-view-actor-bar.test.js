@@ -122,6 +122,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     copyModule('src/ui/svelte/util/foundryBridge.js');
+    // GatheringView imports the shared roll-cancel notice helper (issue #513).
+    copyModule('src/ui/svelte/util/rollCancelNotice.js');
     copyModule('src/gatheringImageDefaults.js');
     copyModule('src/ui/svelte/util/gatheringFormat.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');

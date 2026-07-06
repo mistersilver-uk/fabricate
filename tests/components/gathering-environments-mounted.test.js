@@ -93,6 +93,10 @@ describe('GatheringView mounted behavior', () => {
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(utilDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
 
+    // GatheringView imports the shared roll-cancel notice helper (issue #513).
+    const rollCancelDestination = join(tempRoot, 'src/ui/svelte/util/rollCancelNotice.js');
+    writeFileSync(rollCancelDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/rollCancelNotice.js'), 'utf8'));
+
     const imageDefaultsDestination = join(tempRoot, 'src/gatheringImageDefaults.js');
     mkdirSync(dirname(imageDefaultsDestination), { recursive: true });
     writeFileSync(imageDefaultsDestination, readFileSync(resolve(repoRoot, 'src/gatheringImageDefaults.js'), 'utf8'));

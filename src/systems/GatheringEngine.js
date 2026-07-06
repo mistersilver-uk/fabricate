@@ -2029,7 +2029,13 @@ export class GatheringEngine {
     // blocked attempt. Return a quiet, non-notifying result BEFORE any run
     // creation, side effects, or chat — zero mutation.
     if (outcome.status === 'cancelled') {
-      return this._cancelledStart({ viewer, actor, environment, task });
+      return this._cancelledStart({
+        viewer,
+        actor,
+        environment,
+        task,
+        cancelledReason: outcome.cancelledReason,
+      });
     }
 
     if (outcome.status === 'misconfigured') {
@@ -2418,9 +2424,15 @@ export class GatheringEngine {
     });
 
     // The player cancelled the interactive roll: propagate a cancelled outcome so
-    // `_resolveImmediateAttempt` aborts with zero mutation.
+    // `_resolveImmediateAttempt` aborts with zero mutation. Thread `cancelledReason`
+    // so a native-dialog dismissal reaches `GatheringView` for its WARN toast.
     if (rolled.cancelled) {
-      return { status: 'cancelled', resultGroups: [], checkResult: null };
+      return {
+        status: 'cancelled',
+        cancelledReason: rolled.cancelledReason,
+        resultGroups: [],
+        checkResult: null,
+      };
     }
 
     const outcomeName = stringOrNull(rolled.outcome);
@@ -2570,7 +2582,12 @@ export class GatheringEngine {
     // `_resolveImmediateAttempt` aborts with zero mutation (before normalization,
     // which does not model a cancel).
     if (checkResult?.cancelled) {
-      return { status: 'cancelled', resultGroups: [], checkResult: null };
+      return {
+        status: 'cancelled',
+        cancelledReason: checkResult.cancelledReason,
+        resultGroups: [],
+        checkResult: null,
+      };
     }
     const normalizedCheck = normalizeCheckResult(checkResult);
     if (normalizedCheck.diagnostic) {
@@ -2646,7 +2663,13 @@ export class GatheringEngine {
       // The player cancelled the interactive roll: surface a cancel marker so
       // `_resolveProgressiveOutcome` aborts with zero mutation.
       if (rolled.cancelled) {
-        return { success: false, status: null, value: null, cancelled: true };
+        return {
+          success: false,
+          status: null,
+          value: null,
+          cancelled: true,
+          cancelledReason: rolled.cancelledReason,
+        };
       }
       // Progressive is value-driven, not pass/fail: leave `status` null so the
       // award logic (in `resolveProgressiveAward`) decides succeeded/failed from
@@ -3220,15 +3243,18 @@ export class GatheringEngine {
   /**
    * Build the quiet result returned when the player dismisses the interactive
    * roll dialog. Not `accepted`, but carries no `blockedReasons` and sets
-   * `cancelled: true` so the UI treats it as a SILENT no-op (no notification) —
-   * distinct from a genuinely blocked attempt.
+   * `cancelled: true` so the UI treats it as a SILENT no-op — distinct from a
+   * genuinely blocked attempt. `cancelledReason` is threaded through so the UI can
+   * distinguish a native-dialog dismissal (`'nativeRollDialogDismissed'` → WARN
+   * toast) from the bespoke d100 confirm-prompt Cancel (reason-less → silent).
    * @private
    */
-  _cancelledStart({ viewer, actor = null, environment = null, task = null }) {
+  _cancelledStart({ viewer, actor = null, environment = null, task = null, cancelledReason }) {
     const opaqueBlind = environment && task && this._isOpaqueBlindTask({ environment, viewer });
     return {
       accepted: false,
       cancelled: true,
+      cancelledReason,
       started: false,
       state: 'cancelled',
       viewerId: idOf(viewer),

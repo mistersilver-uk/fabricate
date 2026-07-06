@@ -361,6 +361,7 @@
     "App": {
       "Title": "Fabricate",
       "ComingSoon": "Coming soon",
+      "RollCancelled": "Roll dialog dismissed — the attempt was cancelled and had no effect.",
       "ActiveTool": {
         "Label": "Active station tool",
         "Named": "Station tool: {label}"

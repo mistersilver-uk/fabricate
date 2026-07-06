@@ -1192,3 +1192,71 @@ test('immediate interactive cancel (progressive): dismissing the roll dialog abo
     delete globalThis.Roll;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Native roll-dialog dismissal (issue #513): with no DialogV2 present the bespoke
+// prompt auto-confirms, so the attempt reaches Foundry's native resolver; a
+// dismissal there threads `cancelledReason: 'nativeRollDialogDismissed'` all the way
+// out through `_cancelledStart` so `GatheringView` can raise its WARN toast.
+// ---------------------------------------------------------------------------
+
+/** Stub a Roll whose interactive evaluate reports a native-dialog dismissal. */
+function stubNativeDismissRoll() {
+  globalThis.Roll = class {
+    async evaluate() {
+      return { total: 0, dice: [], _resolver: { fabricateDismissed: true } };
+    }
+  };
+  globalThis.Roll.replaceFormulaData = (formula) => String(formula);
+  globalThis.Roll.validate = () => true;
+}
+
+test('immediate native-dialog dismissal (routed): threads cancelledReason to the caller', async () => {
+  const calls = {};
+  stubNativeDismissRoll();
+  try {
+    const engine = makeEngine({ calls });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+      interactive: true
+    });
+
+    assert.equal(result.cancelled, true, 'a native dismissal cancels the attempt');
+    assert.equal(
+      result.cancelledReason,
+      'nativeRollDialogDismissed',
+      'the reason reaches GatheringView through _cancelledStart'
+    );
+    assertNoTerminalSideEffects(calls);
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('immediate native-dialog dismissal (progressive): threads cancelledReason to the caller', async () => {
+  const calls = {};
+  stubNativeDismissRoll();
+  try {
+    const engine = makeEngine({
+      task: progressiveTask(),
+      gatheringCraftingCheck: { progressive: { rollFormula: '1d20' } },
+      calls
+    });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+      interactive: true
+    });
+
+    assert.equal(result.cancelled, true, 'a native dismissal cancels the attempt');
+    assert.equal(result.cancelledReason, 'nativeRollDialogDismissed');
+    assertNoTerminalSideEffects(calls);
+  } finally {
+    delete globalThis.Roll;
+  }
+});

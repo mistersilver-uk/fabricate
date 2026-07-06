@@ -558,3 +558,132 @@ test('runFormulaPassFail: a nat-20 on the kept advantage die fires a diceGroup c
     delete globalThis.Roll;
   }
 });
+
+// ---------------------------------------------------------------------------
+// 9. Native roll-dialog handoff (issue #513): automated vs interactive evaluate
+//    wiring + native-dismissal cancel propagation through the runners.
+// ---------------------------------------------------------------------------
+
+/**
+ * Install a Roll stub that records each `evaluate` call (args + the concrete class
+ * name) and, when `dismiss` is set, marks the evaluated roll as a native-dialog
+ * dismissal via `_resolver.fabricateDismissed`.
+ */
+function installRecordingRollStub({ dismiss = false } = {}) {
+  const evaluations = [];
+  class RecordingRoll {
+    constructor(formula, data) {
+      this.formula = formula;
+      this.data = data;
+      this.total = 15;
+      this.dice = [];
+    }
+    async evaluate(...args) {
+      this._resolver = dismiss ? { fabricateDismissed: true } : { fabricateDismissed: false };
+      evaluations.push({ args, className: this.constructor.name });
+      return this;
+    }
+    async toMessage() {
+      return { id: 'msg' };
+    }
+  }
+  RecordingRoll.replaceFormulaData = (formula) => String(formula);
+  RecordingRoll.validate = () => true;
+  globalThis.Roll = RecordingRoll;
+  return evaluations;
+}
+
+test('T2: the automated path evaluates a plain Roll with { allowInteractive: false }', async () => {
+  const evaluations = installRecordingRollStub();
+  try {
+    await evaluateCheckRoll('1d20', actor); // non-interactive
+    assert.equal(evaluations.length, 1);
+    assert.equal(evaluations[0].className, 'RecordingRoll', 'a plain Roll, not FabricateRoll');
+    assert.deepEqual(
+      evaluations[0].args,
+      [{ allowInteractive: false }],
+      'the automated path keeps allowInteractive:false verbatim'
+    );
+  } finally {
+    clearStubs();
+  }
+});
+
+test('T2: the interactive path evaluates a FabricateRoll with NO allowInteractive arg', async () => {
+  const evaluations = installRecordingRollStub();
+  try {
+    await evaluateCheckRoll('1d20', actor, { interactive: true });
+    assert.equal(evaluations.length, 1);
+    assert.equal(evaluations[0].className, 'FabricateRoll', 'the interactive path uses FabricateRoll');
+    assert.deepEqual(
+      evaluations[0].args,
+      [],
+      'interactive is evaluate()’s default — re-adding allowInteractive:false would regress the handoff'
+    );
+  } finally {
+    clearStubs();
+  }
+});
+
+test('T3: evaluateCheckRoll maps a native dismissal to cancelledReason', async () => {
+  installRecordingRollStub({ dismiss: true });
+  try {
+    const result = await evaluateCheckRoll('1d20', actor, { interactive: true });
+    assert.equal(result.cancelled, true);
+    assert.equal(result.cancelledReason, 'nativeRollDialogDismissed');
+    assert.equal(result.total, 0);
+    assert.deepEqual(result.diceGroups, []);
+  } finally {
+    clearStubs();
+  }
+});
+
+test('T3: a native-dismissal cancelledReason survives all three runFormula* runners', async () => {
+  for (const run of [
+    () => runFormulaPassFail({ formula: '1d20', dc: 10, thresholdMode: 'meet', triggers: [], actor, rollOptions: { interactive: true } }),
+    () => runFormulaProgressive({ formula: '1d20', triggers: [], actor, rollOptions: { interactive: true } }),
+    () =>
+      runFormulaRouted({
+        formula: '1d20',
+        dc: 10,
+        thresholdMode: 'meet',
+        type: 'relative',
+        relativeOutcomes: [],
+        fixedOutcomes: [],
+        triggers: [],
+        actor,
+        rollOptions: { interactive: true },
+      }),
+  ]) {
+    installRecordingRollStub({ dismiss: true });
+    try {
+      const result = await run();
+      assert.equal(result.cancelled, true, 'the runner short-circuits on a native dismissal');
+      assert.equal(
+        result.cancelledReason,
+        'nativeRollDialogDismissed',
+        'the reason threads through the runner cancelled return'
+      );
+    } finally {
+      clearStubs();
+    }
+  }
+});
+
+test('T4: a bespoke confirm-prompt Cancel returns cancelledReason === undefined (silent)', async () => {
+  installRecordingRollStub();
+  try {
+    const result = await runFormulaPassFail({
+      formula: '1d20',
+      dc: 10,
+      thresholdMode: 'meet',
+      triggers: [],
+      actor,
+      rollOptions: { interactive: true, prompt: async () => ({ confirmed: false }) },
+    });
+    assert.equal(result.cancelled, true, 'the bespoke Cancel still aborts');
+    assert.equal(result.cancelledReason, undefined, 'but stays reason-less so no toast fires');
+  } finally {
+    clearStubs();
+  }
+});

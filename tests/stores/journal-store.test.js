@@ -9,7 +9,7 @@
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -86,6 +86,12 @@ describe('journalStore', () => {
   before(async () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-journal-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
+    // The store imports the shared roll-cancel notice helper; copy it verbatim so
+    // the compiled store's relative import resolves.
+    const noticePath = 'src/ui/svelte/util/rollCancelNotice.js';
+    const noticeDest = join(tempRoot, noticePath);
+    mkdirSync(dirname(noticeDest), { recursive: true });
+    copyFileSync(resolve(repoRoot, noticePath), noticeDest);
     writeCompiledModule('src/ui/svelte/stores/journalStore.svelte.js');
     createJournalStore = (await import(pathToFileURL(join(
       tempRoot,
@@ -185,6 +191,27 @@ describe('journalStore', () => {
     ]);
     // A cancel is a user choice, not a failure: no error notification, no refetch.
     assert.deepEqual(setup.calls.notify, [], 'no notification on cancel');
+    assert.equal(setup.calls.list, 1, 'listing NOT refetched after a cancel');
+    assert.equal(store.busyRunId, '', 'busy flag cleared');
+  });
+
+  it('advance warns (WARN toast) on a native roll-dialog dismissal, still no refetch', async () => {
+    const setup = makeServices({
+      advanceResult: {
+        success: false,
+        cancelled: true,
+        cancelledReason: 'nativeRollDialogDismissed',
+        message: 'Crafting cancelled',
+      },
+    });
+    const store = await loadedStore(setup);
+
+    await store.advance({ id: 'b', recipeId: 'r-b' });
+    flushSync();
+
+    // A native dismissal fires the neutral WARN toast (services.notify is the warn
+    // seam) but is still a quiet no-op otherwise (no refetch).
+    assert.deepEqual(setup.calls.notify, ['FABRICATE.App.RollCancelled']);
     assert.equal(setup.calls.list, 1, 'listing NOT refetched after a cancel');
     assert.equal(store.busyRunId, '', 'busy flag cleared');
   });

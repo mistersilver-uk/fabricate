@@ -56,6 +56,7 @@ describe('craftingStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-crafting-store-');
     compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
+    compiler.copyPlain('src/ui/svelte/util/rollCancelNotice.js');
     ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
   });
 
@@ -359,6 +360,40 @@ describe('craftingStore', () => {
       loadsAfterInitial,
       'a thrown craft does not refresh the listing'
     );
+  });
+
+  it('warns (WARN toast) on a native roll-dialog dismissal and does not refresh', async () => {
+    const craftRecipe = async () => ({
+      success: false,
+      cancelled: true,
+      cancelledReason: 'nativeRollDialogDismissed',
+      results: null,
+    });
+    const { services, calls } = makeServices({ craftRecipe });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.cancelled, true, 'the cancel result is returned quietly');
+    assert.deepEqual(
+      calls.notify,
+      ['FABRICATE.App.RollCancelled'],
+      'a native dismissal fires the neutral WARN toast (services.notify is the warn seam)'
+    );
+    assert.equal(calls.listCraftingForActor.length, 0, 'a cancel does not refetch');
+  });
+
+  it('stays silent for a bespoke confirm-prompt Cancel (no cancelledReason)', async () => {
+    const craftRecipe = async () => ({ success: false, cancelled: true, results: null });
+    const { services, calls } = makeServices({ craftRecipe });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.cancelled, true);
+    assert.deepEqual(calls.notify, [], 'a bespoke Cancel raises no toast');
   });
 
   it('on success records the roll result, marks the recipe recent, and refreshes', async () => {

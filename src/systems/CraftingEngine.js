@@ -350,7 +350,13 @@ export class CraftingEngine {
       // failure. Abort with ZERO mutation (no consumption, no breakage, no chat)
       // before the failure-consumption path below.
       if (checkResult.cancelled) {
-        return { success: false, cancelled: true, results: null, message: 'Crafting cancelled' };
+        return {
+          success: false,
+          cancelled: true,
+          cancelledReason: checkResult.cancelledReason,
+          results: null,
+          message: 'Crafting cancelled',
+        };
       }
       if (!checkResult.success) {
         const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
@@ -2409,6 +2415,7 @@ export class CraftingEngine {
       return {
         success: false,
         cancelled: true,
+        cancelledReason: checkResult.cancelledReason,
         results: null,
         message: 'Salvage cancelled',
         salvageRun: salvageRunCreatedThisCall ? null : salvageRun,

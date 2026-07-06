@@ -213,6 +213,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       toggleFavouriteRecipe: (id) => game?.fabricate?.toggleFavouriteRecipe?.(id) ?? [],
       // Player-facing notification seam (a failed craft surfaces as a warning).
       notify: (message) => notifyWarn(message),
+      // Localizer seam for store-side toasts (e.g. the roll-cancel notice); keeps
+      // the stores Foundry-free while resolving i18n keys at the app edge.
+      localize: (key) => localize(key),
       // Localized generic craft-failure message for a thrown craft (the engine can
       // throw on the currency-payment macro path, producing no result message).
       craftErrorMessage: () => localize('FABRICATE.App.Crafting.Notify.CraftFailed'),

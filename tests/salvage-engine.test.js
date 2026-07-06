@@ -452,8 +452,13 @@ test('salvage(): a cancelled interactive check aborts with zero mutation and no 
   };
   const salvageRunManager = new SalvageRunManager();
   const engine = makeEngine({ resolutionModeService: fakeResolutionService, salvageRunManager });
-  // Simulate the player dismissing the interactive roll dialog.
-  engine._runSalvageCraftingCheck = async () => ({ success: false, cancelled: true });
+  // Simulate the player dismissing Foundry's NATIVE roll dialog (issue #513):
+  // the check carries the native-dismissal reason for the UI toast discriminator.
+  engine._runSalvageCraftingCheck = async () => ({
+    success: false,
+    cancelled: true,
+    cancelledReason: 'nativeRollDialogDismissed',
+  });
 
   const compItem = makeItem('comp-item', 'Test Component', 3);
   const actor = makeActor('actor-1', [compItem]);
@@ -476,6 +481,11 @@ test('salvage(): a cancelled interactive check aborts with zero mutation and no 
 
   assert.equal(result.success, false, 'cancelled salvage is not a success');
   assert.equal(result.cancelled, true, 'cancelled flag surfaced');
+  assert.equal(
+    result.cancelledReason,
+    'nativeRollDialogDismissed',
+    'the native-dismissal reason propagates through salvage() for the UI toast'
+  );
   assert.equal(result.results, null, 'no results created');
   assert.equal(compItem.deleteCalled, false, 'component NOT consumed on cancel');
   assert.equal(salvageRunManager.getActiveRuns(actor).length, 0, 'phantom in-progress run discarded');

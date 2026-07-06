@@ -91,6 +91,9 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
+  // The crafting store imports the shared roll-cancel notice helper (issue #513);
+  // copied verbatim so a mounted craftingStore rune module resolves it.
+  'src/ui/svelte/util/rollCancelNotice.js',
   'src/systems/CraftingListingBuilder.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);

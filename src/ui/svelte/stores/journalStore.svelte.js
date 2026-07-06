@@ -1,3 +1,5 @@
+import { notifyRollDialogDismissed } from '../util/rollCancelNotice.js';
+
 const HISTORY_PAGE_SIZES = Object.freeze([6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
 
@@ -149,8 +151,15 @@ export function createJournalStore({ services } = {}) {
       });
       // Dismissing the roll dialog is a user choice, not a failure: a cancelled
       // result is also `success: false`, so handle it first and return quietly
-      // (no error notification, no listing churn), mirroring craftingStore.craft.
+      // (no error notification, no listing churn), mirroring craftingStore.craft. A
+      // NATIVE roll-dialog dismissal raises a neutral WARN toast; a bespoke prompt
+      // Cancel stays silent. `services.notify` is the WARN seam (wired to
+      // `notifyWarn`).
       if (result?.cancelled === true) {
+        notifyRollDialogDismissed(result, {
+          notifyWarn: services?.notify,
+          localize: services?.localize,
+        });
         return;
       }
       const message = result?.message;

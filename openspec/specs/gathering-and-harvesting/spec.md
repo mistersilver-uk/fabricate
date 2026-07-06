@@ -794,6 +794,10 @@ Tasks previously carried no environment reference (they are composed into enviro
 It normalizes to a trimmed string or `null` (empties dropped) in `adminStore._normalizeGatheringTask` and is preserved by `GatheringEnvironmentStore`.
 It serves as the middle tier of **drop-time** environment resolution for a canvas Gathering-Task Interactable; a stale id (no matching environment) falls through to the GM dialog rather than throwing.
 It does **not** participate in environment composition and is unrelated to `environment.sceneUuid` (the runtime gathering gate).
+11. A gathering **routed** or **progressive** formula check, **when those modes run at runtime**, follows the same interactive-vs-automated rule and native roll-dialog handoff as the crafting check (see `004-resolution-modes.md`, "Interactive Check Rolls").
+A UI-triggered attempt defers to Foundry's native roll machinery; a dismissed native dialog cancels the attempt with zero mutation and an activity-neutral warning notification, while an automated / API attempt keeps the resolver suppressed.
+(Qualified so as not to overclaim where routed / progressive gathering is still specified as modelled / coming-soon.)
+The gathering **d100 percentile** resolution path (see the D100 Gathering Resolution section below) is explicitly EXCLUDED from the native-dialog handoff — it fires many independent percentile throws with no single DC, so a native manual-fulfilment dialog per drop row would be a UX regression — and continues to roll with the resolver suppressed.
 
 ## D100 Gathering Resolution
 

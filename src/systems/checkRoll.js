@@ -11,6 +11,8 @@
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
 import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
 
+import { createFabricateRoll, NATIVE_ROLL_DIALOG_DISMISSED } from './fabricateRoll.js';
+
 /**
  * Summarise an evaluated Roll's dice as
  * `{ groupId, group: "NdS", sum, results: number[] }` entries.
@@ -124,7 +126,10 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
  * @param {object} [options.speaker] Chat message speaker.
  * @param {*} [options.dc] The DC surfaced to the prompt (display only).
  * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
- *   resolvedFormula: string|null, cancelled?: boolean}>}
+ *   resolvedFormula: string|null, cancelled?: boolean, cancelledReason?: string}>}
+ *   On the interactive path a dismissed native roll dialog returns
+ *   `cancelled: true` with `cancelledReason: 'nativeRollDialogDismissed'`; the
+ *   bespoke confirm-prompt Cancel stays `cancelledReason`-less (silent).
  */
 export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (typeof globalThis.Roll !== 'function')
@@ -185,12 +190,40 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     if (choice.rollMode) effectiveRollMode = choice.rollMode;
   }
 
-  // Automated check roll: never surface a manual roll-fulfilment dialog mid-craft
-  // on a client configured for manual fulfilment (mirrors Roll.simulate's V13
-  // behaviour). `allowInteractive: false` suppresses that resolver.
-  const roll = await new globalThis.Roll(effectiveFormula, rollData).evaluate({
-    allowInteractive: false,
-  });
+  let roll;
+  if (options?.interactive) {
+    // Interactive path: defer to Foundry's native roll machinery so a client
+    // configured for manual roll fulfilment can enter their physical roll, and roll
+    // mode / Dice So Nice are honoured through Foundry's own resolver. There is NO
+    // `allowInteractive: false` here — interactive is `evaluate()`'s default;
+    // re-adding the blanket guard would regress the native handoff. For a
+    // default-digital client this is indistinguishable from the automated roll.
+    roll = await createFabricateRoll(effectiveFormula, rollData).evaluate();
+    // A dismissed manual-fulfilment dialog RESOLVES (it never rejects) and silently
+    // digital-fills the roll, so detection reads the resolver flag rather than a
+    // caught error. `fabricateDismissed` is only true when the fulfilment dialog was
+    // actually presented (a manual-fulfilment client) and never submitted — a
+    // digital client's resolver reports `false`. Abort with ZERO mutation, tagging
+    // the native-dismissal reason so the UI can surface a WARN toast (the bespoke
+    // #497 prompt Cancel stays reason-less / silent).
+    if (roll?._resolver?.fabricateDismissed === true) {
+      return {
+        engine: true,
+        cancelled: true,
+        cancelledReason: NATIVE_ROLL_DIALOG_DISMISSED,
+        total: 0,
+        diceGroups: [],
+        resolvedFormula: null,
+      };
+    }
+  } else {
+    // Automated check roll: never surface a manual roll-fulfilment dialog mid-craft
+    // on a client configured for manual fulfilment (mirrors Roll.simulate's V13
+    // behaviour). `allowInteractive: false` suppresses that resolver.
+    roll = await new globalThis.Roll(effectiveFormula, rollData).evaluate({
+      allowInteractive: false,
+    });
+  }
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
 
@@ -291,7 +324,14 @@ export async function runFormulaPassFail({
     // The player cancelled the interactive roll dialog: abort with zero mutation
     // (no crit/DC logic, no consumption downstream).
     if (rolled.cancelled) {
-      return { success: false, cancelled: true, outcome: null, value: null, data: { dc, formula } };
+      return {
+        success: false,
+        cancelled: true,
+        cancelledReason: rolled.cancelledReason,
+        outcome: null,
+        value: null,
+        data: { dc, formula },
+      };
     }
     if (!rolled.engine) {
       // No dice engine: cannot evaluate, so do not block the activity.
@@ -368,7 +408,14 @@ export async function runFormulaProgressive({
     }
     // The player cancelled the interactive roll dialog: abort with zero mutation.
     if (rolled.cancelled) {
-      return { success: false, cancelled: true, outcome: null, value: null, data: { formula } };
+      return {
+        success: false,
+        cancelled: true,
+        cancelledReason: rolled.cancelledReason,
+        outcome: null,
+        value: null,
+        data: { formula },
+      };
     }
     if (!rolled.engine) {
       // No dice engine: award nothing (a finite value) rather than block.
@@ -574,6 +621,7 @@ export async function runFormulaRouted({
       return {
         success: false,
         cancelled: true,
+        cancelledReason: rolled.cancelledReason,
         outcome: null,
         value: null,
         data: { dc, formula, type },

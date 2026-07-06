@@ -560,7 +560,12 @@ test('multi-step: a cancelled interactive continuation aborts the resume with ze
 
   // The continuation (step 2) is triggered interactively and the player cancels the
   // roll dialog: abort with zero mutation and do NOT advance the run.
-  engine._runCraftingCheck = async () => ({ success: false, cancelled: true });
+  // A NATIVE roll-dialog dismissal (issue #513) carries the reason for the UI toast.
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    cancelled: true,
+    cancelledReason: 'nativeRollDialogDismissed'
+  });
   const oreConsumedBefore = ore.updateCalled || ore.deleteCalled;
   const result2 = await engine.craft(craftingActor, [sourceActor], recipe, null, {
     runId: 'run-1',
@@ -569,6 +574,11 @@ test('multi-step: a cancelled interactive continuation aborts the resume with ze
 
   assert.equal(result2.success, false, 'cancelled continuation is not a success');
   assert.equal(result2.cancelled, true, 'cancelled flag surfaced');
+  assert.equal(
+    result2.cancelledReason,
+    'nativeRollDialogDismissed',
+    'the native-dismissal reason propagates through craft() for the UI toast'
+  );
   assert.equal(runManager.storedRun.currentStepIndex, 1, 'run did NOT advance past step index 1');
   assert.equal(runManager.storedRun.status, 'inProgress', 'run still in progress after cancel');
   assert.equal(ore.updateCalled || ore.deleteCalled, oreConsumedBefore, 'step-2 ingredient not consumed on cancel');
