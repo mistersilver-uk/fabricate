@@ -25,7 +25,7 @@ import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
-import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
+import { renderDialog, viewScene, localize as bridgeLocalize } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
@@ -60,6 +60,7 @@ import {
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
+import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
@@ -2079,6 +2080,29 @@ Hooks.once('init', async () => {
   console.log('Fabricate | Init Hook');
   registerFabricateConfig();
   bindFabricateGlobal();
+});
+
+// GM-only Compendium Directory bulk-import action. Registered at module
+// top-level (NOT in the `ready` body): the CompendiumDirectory entry context
+// menu is built exactly once in `_onFirstRender`, which runs during the sidebar
+// force-render BEFORE `Hooks.callAll('ready')`, so a `ready`-body listener could
+// miss the one-time build. This differs from the `renderItemDirectory`
+// header-button wiring below, which legitimately re-runs on every render.
+// The listener MUTATES `contextOptions` in place and returns nothing.
+Hooks.on('getCompendiumContextOptions', (application, contextOptions) => {
+  contextOptions.push(buildCompendiumImportContextOption({
+    localize: bridgeLocalize,
+    isGM: () => game.user?.isGM,
+    isItemPack: (id) => game.packs.get(id)?.documentName === 'Item',
+    getPackName: (id) => {
+      const pack = game.packs.get(id);
+      return pack?.title ?? pack?.metadata?.label ?? id;
+    },
+    getSystems: () => game.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [],
+    promptSelectSystem: promptSelectCraftingSystem,
+    importPack: (systemId, packId) => game.fabricate.getCraftingSystemManager().addItemsFromPack(systemId, packId),
+    notify: ui.notifications
+  }));
 });
 
 // Hook into Foundry's ready event
