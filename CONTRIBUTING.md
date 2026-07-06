@@ -455,6 +455,7 @@ Every profile boots a real Foundry instance, joins the `fabricate-smoke-ci` worl
 9. Fails if any non-ignored browser console errors were captured during the session.
 
 The `full` profile additionally captures Crafting System Manager v2 screenshots, exercises the blocked / failure / timed gathering states, the non-GM redaction path, the no-selectable-actors state, asserts the seeded 0%-drop and scene-blocked gathers plus the hazardous "Bramble Snare" event firing, and runs document cleanup.
+For richer, fantasy-appropriate Systems browser and manager screenshots, the `full` profile also imports five real exported crafting systems from `scripts/foundry/fixtures/systems/` — Camp Cookery (`simple` + gathering), Jeweller's Bench (`progressive`), Masterwork Armory (`routedByCheck`), Runesmith's Forge (`routedByIngredients`), and Philosopher's Crucible (`simple`, with essences and multi-step recipes) — alongside the synthetic Arcane Forge fixture, which remains the behavioural craft/gathering fixture.
 
 ### Smoke profiles (`rc` vs `full`)
 
