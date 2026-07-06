@@ -163,6 +163,15 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-recipes-normal'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/],
   },
+  {
+    id: 'manager-import-report',
+    label: 'Manager import — post-import unresolved-reference report (#492)',
+    smokeLabels: ['manager-import-report'],
+    matches: [
+      /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+      /^src\/systems\/importReportContent\.js$/,
+    ],
+  },
   // The recipe editor publishes FOUR distinct frames (overview/identity,
   // ingredients, validation tab, multi-step durations). `collect` emits ONE
   // file per recipe id (it takes the first matching smoke label), so each frame

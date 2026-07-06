@@ -81,6 +81,9 @@ The `Gathering` button is hidden when no crafting system exposes gathering.
 ### Compendium Directory
 
 Provide GM action to import all items from a compendium into a crafting system.
+The action is a GM-only entry in the Foundry Compendium Directory context menu, offered on an Item compendium pack (the right-clicked pack is the compendium to import from) and hidden for non-GMs and for non-Item packs.
+Choosing it opens a target-system picker where the GM confirms which crafting system receives the items, so the import is a deliberate commit rather than a single-click action.
+The action reuses the existing bulk-import primitive and its de-duplication and update/skip reporting rather than reimplementing them.
 Items with the same UUID or sourceUuid are de-duplicated on import.
 If an imported Item's recorded canonical source UUID no longer resolves,
 Fabricate falls back to the live dropped Item UUID.
@@ -221,6 +224,10 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 - Failure consumption policy
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
 - Progressive settings (`awardMode`, `allowPlayerReorder`) (progressive only)
+
+For a `routedByCheck` system whose routed check `type` is `fixed`, the tier `CraftingCheckEditor` hides the DC field and the meet/exceed comparison, because fixed tiers match by explicit value range rather than against a DC.
+The DC-hiding note applies to `routedByCheck + fixed` in the `CraftingCheckEditor` only; the DC and comparison stay shown for relative-type `routedByCheck` and for the salvage/gathering check editors.
+`routedByIngredients` no longer renders the tier `CraftingCheckEditor` at all — it authors its optional pass/fail check via the shared `SimpleCraftingCheckEditor` (bound to `craftingCheck.simple`), which shows the DC, the meet/exceed comparison, the static/dynamic DC source, and the recipe DC tiers.
 
 Mode semantics are defined in `004`.
 
@@ -655,6 +662,10 @@ The Locked toggle, Category, the Step Structure UI, and the Step Editor remain d
 
 In Manager, the recipe-edit identity card additionally edits a player-facing image (via the FilePicker) and an `enabled` on/off toggle alongside Name and Description.
 
+The Overview tab additionally offers an optional **Minimum success tier** dropdown, shown only when the selected system runs a `routedByCheck` check whose routed `type` is `fixed`.
+Its options are that fixed check's success outcome tiers ranked ascending by `start`, preceded by a default `No override (use rolled tier)` entry, and it authors the recipe's `minSuccessOutcomeId`.
+Selecting a tier makes a craft that rolls below it fail outright (see `004`); the control is hidden for relative-type checks and for non-`routedByCheck` systems.
+
 ### Visibility Form
 
 If `listMode === "global"`:
@@ -737,7 +748,8 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
 - `routedByIngredients` UI:
   - Ingredient sets map to result groups via `resultGroupId`.
   - Validation enforces deterministic mapping for all satisfiable sets.
-  - The crafting check is optional (no provider toggle, no check requirement surfaced here).
+  - The crafting check is optional (no provider toggle, no check requirement surfaced here) and is authored via the shared simple pass/fail editor (`SimpleCraftingCheckEditor`, bound to `craftingCheck.simple`).
+  - `routedByIngredients` recipes offer the per-recipe "Check tier" (DC-tier) dropdown sourced from `craftingCheck.simple.tiers` when the simple check uses static `dcMode`; they do NOT get the `minSuccessOutcomeId` minimum-success-tier control (which is `routedByCheck + fixed` only).
 - `routedByCheck` UI:
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
   - Result groups carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.

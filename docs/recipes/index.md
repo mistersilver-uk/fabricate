@@ -109,6 +109,8 @@ Recipes are authored mainly through the API today.
 An early GM recipe editor is also available in the Crafting Admin panel.
 It can edit a recipe's identity (name, description, image, and whether it is on or off) and link a recipe item to it.
 When the system is in player mode, the editor's Overview tab can also restrict a recipe to specific players.
+When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
+See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
 Full recipe authoring through the editor, including ingredients, steps, and results, is still in progress.
 Runtime crafting is available through the public API.
 See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.

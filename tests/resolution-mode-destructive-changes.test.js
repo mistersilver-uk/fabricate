@@ -290,3 +290,141 @@ test('a non-alchemy mode change does not run signature reconciliation', async ()
 
   assert.equal(recipeManager.getSignatureCheckCount(), 0);
 });
+
+// ---------------------------------------------------------------------------
+// Crafting-check slot movement across the routedByIngredients boundary (issue 532)
+// CraftingSystemManager._reconcileCraftingCheckSlotsForModeChange, run in
+// updateSystem after normalization and before the first persist, keyed on the
+// resolution-mode change. `routedByIngredients` reads craftingCheck.simple; the
+// tier-routing routedByCheck reads craftingCheck.routed.
+// ---------------------------------------------------------------------------
+
+test('switching routedByCheck → routedByIngredients copies the pass/fail config routed → simple', async () => {
+  settingsStore.clear();
+  const recipeManager = makeRecipeManager([]);
+  const manager = makeManager(recipeManager);
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Forge',
+    resolutionMode: 'routedByCheck',
+    craftingCheck: {
+      routed: {
+        rollFormula: '1d20+3',
+        dc: 17,
+        thresholdMode: 'exceed',
+        tiers: [{ id: 'tier-hard', name: 'Hard', dc: 22 }]
+      }
+    }
+  }));
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'routedByIngredients' });
+
+  const check = manager.getSystem('sys-1').craftingCheck;
+  assert.equal(check.simple.rollFormula, '1d20+3', 'formula copied into the simple slot');
+  assert.equal(check.simple.dc, 17);
+  assert.equal(check.simple.thresholdMode, 'exceed');
+  assert.equal(check.simple.tiers[0].id, 'tier-hard', 'tier ids preserved');
+});
+
+test('switching routedByIngredients → routedByCheck copies the pass/fail config simple → routed', async () => {
+  settingsStore.clear();
+  const recipeManager = makeRecipeManager([]);
+  const manager = makeManager(recipeManager);
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Forge',
+    resolutionMode: 'routedByIngredients',
+    craftingCheck: {
+      simple: { rollFormula: '2d6+1', dc: 11, thresholdMode: 'meet' }
+    }
+  }));
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'routedByCheck' });
+
+  const check = manager.getSystem('sys-1').craftingCheck;
+  assert.equal(check.routed.rollFormula, '2d6+1', 'formula copied into the routed slot');
+  assert.equal(check.routed.dc, 11);
+  assert.equal(check.routed.thresholdMode, 'meet');
+});
+
+test('into routedByIngredients does NOT clobber an already-authored simple slot', async () => {
+  settingsStore.clear();
+  const recipeManager = makeRecipeManager([]);
+  const manager = makeManager(recipeManager);
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Forge',
+    resolutionMode: 'routedByCheck',
+    craftingCheck: {
+      routed: { rollFormula: '1d20+3', dc: 17 },
+      simple: { rollFormula: '1d8', dc: 6 }
+    }
+  }));
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'routedByIngredients' });
+
+  const check = manager.getSystem('sys-1').craftingCheck;
+  assert.equal(check.simple.rollFormula, '1d8', 'authored simple check is preserved');
+  assert.equal(check.simple.dc, 6);
+});
+
+test('out of routedByIngredients does NOT clobber an already-authored routed slot', async () => {
+  settingsStore.clear();
+  const recipeManager = makeRecipeManager([]);
+  const manager = makeManager(recipeManager);
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Forge',
+    resolutionMode: 'routedByIngredients',
+    craftingCheck: {
+      simple: { rollFormula: '2d6+1', dc: 11 },
+      routed: { rollFormula: '1d20', dc: 25 }
+    }
+  }));
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'routedByCheck' });
+
+  const check = manager.getSystem('sys-1').craftingCheck;
+  assert.equal(check.routed.rollFormula, '1d20', 'authored routed check is preserved');
+  assert.equal(check.routed.dc, 25);
+});
+
+test('a dynamic-DC simple check moved into routedByCheck loses its dynamic DC (routed has no dcMode)', async () => {
+  settingsStore.clear();
+  const recipeManager = makeRecipeManager([]);
+  const manager = makeManager(recipeManager);
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Forge',
+    resolutionMode: 'routedByIngredients',
+    craftingCheck: {
+      simple: { rollFormula: '1d20', dc: 13, dcMode: 'dynamic', macroUuid: 'Macro.abc' }
+    }
+  }));
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'routedByCheck' });
+
+  const routed = manager.getSystem('sys-1').craftingCheck.routed;
+  assert.equal(routed.rollFormula, '1d20');
+  // The routed slot carries no dcMode/macroUuid; the dynamic DC is lost and the
+  // copied static routed.dc is whatever lingered in the simple slot (13 here).
+  assert.equal('dcMode' in routed, false, 'routed slot has no dcMode');
+  assert.equal(routed.dc, 13, 'copied static DC lingers from the simple slot (GM should re-author)');
+});
+
+test('crossing into a non-RI, non-routedByCheck mode moves no crafting-check config', async () => {
+  settingsStore.clear();
+  const recipeManager = makeRecipeManager([]);
+  const manager = makeManager(recipeManager);
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Forge',
+    resolutionMode: 'routedByIngredients',
+    craftingCheck: { simple: { rollFormula: '2d6', dc: 9 } }
+  }));
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'progressive' });
+
+  // progressive has no comparable pass/fail slot; the routed slot stays unauthored.
+  assert.equal(manager.getSystem('sys-1').craftingCheck.routed.rollFormula, '');
+});

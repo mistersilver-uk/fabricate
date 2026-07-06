@@ -536,6 +536,14 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  *   tier threshold, route to the lowest (closest) tier instead of returning a null
  *   outcome. Opted into by the crafting + salvage callers; gathering leaves it off to
  *   preserve its "no tier name → failure" path.
+ * @param {?string} [params.minOutcomeId] FIXED-type only: a recipe's minimum success
+ *   tier id. When the naturally-rolled tier ranks below it (by `start`) — or the
+ *   total lands outside every fixed range, so no tier matched at all — the check
+ *   fails outright: `success:false`, no outcome routes, and the matched tier's
+ *   `breakTools` is dropped (nothing routes, so the per-tier breakage bridge does
+ *   not fire). Optional and no-op by default — only the crafting routedByCheck caller
+ *   threads it, so salvage/gathering are unaffected. Ignored for relative type and
+ *   bypassed by a forced (crit) outcome.
  * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
  */
 export async function runFormulaRouted({
@@ -550,6 +558,7 @@ export async function runFormulaRouted({
   label = 'Crafting',
   rollOptions = null,
   clampToNearest = false,
+  minOutcomeId = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -558,7 +567,13 @@ export async function runFormulaRouted({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc });
+      // Do NOT re-inject the tier-matching `dc` here: `evaluateCheckRoll` uses its
+      // `dc` for the prompt DISPLAY only, and each caller already threads the correct
+      // prompt-facing DC on `rollOptions` (undefined for a fixed routedByCheck check
+      // so the prompt shows no DC chip; numeric otherwise). Re-adding `dc` would
+      // clobber that and re-surface the meaningless DC on a fixed check (mirrors
+      // `runFormulaProgressive`, which also spreads `rollOptions` with no `dc`).
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions });
     } catch (error) {
       console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
       return {
@@ -620,18 +635,43 @@ export async function runFormulaRouted({
     });
   }
 
-  const success = forced
-    ? forced.disposition === 'success'
-    : matched
-      ? matched.success === true
-      : false;
+  // Recipe minimum-success-tier gate (FIXED type only): when the naturally-rolled
+  // tier ranks below the recipe's required tier (by `start`), the craft fails
+  // outright. A forced (crit) outcome BYPASSES the gate — a natural crit must not be
+  // downgraded by a recipe minimum. A stale/unknown `minOutcomeId` no-ops (graceful,
+  // like `checkTierId`); relative type is out of scope and ignored.
+  let minTierFailed = false;
+  if (!forced && type === 'fixed' && minOutcomeId) {
+    const required = (Array.isArray(fixedOutcomes) ? fixedOutcomes : []).find(
+      (outcome) => outcome?.id === minOutcomeId
+    );
+    const requiredStart = Number(required?.start);
+    const matchedStart = Number(matched?.start);
+    if (
+      Number.isFinite(requiredStart) &&
+      (!Number.isFinite(matchedStart) || matchedStart < requiredStart)
+    ) {
+      minTierFailed = true;
+    }
+  }
+  // Below the required minimum: drop the matched tier so nothing routes and the craft
+  // takes its normal failure/consumption path (no success result).
+  const effectiveMatched = minTierFailed ? null : matched;
+
+  const success = minTierFailed
+    ? false
+    : forced
+      ? forced.disposition === 'success'
+      : effectiveMatched
+        ? effectiveMatched.success === true
+        : false;
   // The matched (or rerouted) tier's `breakTools` is the only `data.breakTools`
   // source — the routed per-tier legacy bridge the breakage seam reads.
-  const breakTools = matched ? matched.breakTools === true : false;
+  const breakTools = effectiveMatched ? effectiveMatched.breakTools === true : false;
 
   return {
     success,
-    outcome: matched ? matched.name : null,
+    outcome: effectiveMatched ? effectiveMatched.name : null,
     value: total,
     data: {
       dc,
@@ -640,10 +680,13 @@ export async function runFormulaRouted({
       total,
       type,
       comparison,
-      outcomeId: matched?.id ?? null,
+      outcomeId: effectiveMatched?.id ?? null,
       success,
       breakTools,
       diceGroups,
+      // Additive on a min-tier failure only: the tier that WAS rolled, for a richer
+      // chat/journal explanation later. Absent on a normal route.
+      ...(minTierFailed ? { minTierFailed: true, rolledOutcomeId: matched?.id ?? null } : {}),
     },
     message: success ? null : `${label} check failed`,
   };

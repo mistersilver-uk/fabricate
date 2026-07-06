@@ -4914,6 +4914,126 @@ async function main() {
           process.stderr.write(`Manage Interactables capture failed: ${err.message}\n`);
         }
 
+        // ── Post-import unresolved-reference report (#492) ─────────────────────
+        // The GM-facing import report is a DialogV2 that only appears AFTER an
+        // import, and only surfaces its "needs attention" list when the imported
+        // system carries references that cannot resolve in the target world. The
+        // default smoke performs no import, so `check-screenshots` has no frame to
+        // publish for the new report surface. This drives the REAL app-shell path
+        // (Import button → file-picker DialogV2 → CompendiumImporter → report) with
+        // a payload cloned from the live smoke system plus ONE component pointing at
+        // a foreign `Item.` UUID that cannot resolve here (and a unique name so the
+        // source+name matcher can't salvage it) → it lands in the report's
+        // `reported` list, giving a non-empty "needs attention" report. Imported in
+        // "copy" mode so it never skips and yields a throwaway "(Copy)" system that
+        // is deleted immediately after the capture. Fully self-contained + guarded:
+        // a hiccup records a failed step without aborting the phase.
+        try {
+          // Build the import file from the live smoke system so createSystem accepts
+          // it (this is the same round-trip the #492 unit tests cover), appending one
+          // deliberately-unresolvable component. Returns the JSON string to feed the
+          // native file input.
+          const importReportJson = await page.evaluate((sysId) => {
+            const csm = game.fabricate.getCraftingSystemManager();
+            const source = csm.getSystem(sysId);
+            const payloadSystem = JSON.parse(JSON.stringify(source));
+            delete payloadSystem.id; // copy mode strips ids anyway; be explicit
+            const components = Array.isArray(payloadSystem.components) ? payloadSystem.components : [];
+            const base = components[0] ? JSON.parse(JSON.stringify(components[0])) : {};
+            const orphan = {
+              ...base,
+              id: 'smoke-import-report-orphan',
+              name: 'Smoke Orphan Reagent',
+              sourceItemUuid: 'Item.fabricateSmokeMissing0001',
+              sourceUuid: 'Item.fabricateSmokeMissing0001',
+              fallbackItemIds: [],
+            };
+            payloadSystem.components = [...components, orphan];
+            const payload = {
+              schemaVersion: 2,
+              fabricateVersion: game.modules?.get('fabricate')?.version || '0.0.0',
+              exportedAt: new Date().toISOString(),
+              runtimeStateIncluded: false,
+              system: payloadSystem,
+              recipes: [],
+              gatheringEnvironments: [],
+              gatheringConfig: { system: {}, shared: {} },
+            };
+            return JSON.stringify(payload);
+          }, craftingSetup.systemId);
+
+          // Snapshot system ids so the throwaway "(Copy)" can be found + deleted.
+          const systemIdsBeforeImport = await page.evaluate(() =>
+            game.fabricate.getCraftingSystemManager().getSystems().map((s) => s.id)
+          );
+
+          await page.evaluate(() => {
+            globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          });
+          await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await setManagerWindowSize(page, { width: 1280, height: 820 });
+
+          // The Import button lives in the system-library footer; if a system is
+          // still scoped in, return to the library so the button is present.
+          const returnToLibrary = page.locator('.fabricate-manager .manager-scope-return').first();
+          if (await returnToLibrary.count() > 0) {
+            await returnToLibrary.click().catch(() => {});
+            await page.waitForTimeout(300);
+          }
+
+          // Open the real import file-picker dialog (file-import icon is unique to it).
+          await page.locator('.fabricate-manager button.manager-button:has(i.fa-file-import)').first().click();
+          const importDialog = page
+            .locator('.application.dialog:has(input[name="importFile"]), .dialog:has(input[name="importFile"])')
+            .first();
+          await importDialog.waitFor({ state: 'visible', timeout: 10_000 });
+          // Feed the JSON straight into the native file input, choose "copy" so the
+          // import never skips (fresh "(Copy)" system), then submit.
+          await importDialog.locator('input[name="importFile"]').setInputFiles({
+            name: 'smoke-import-report.json',
+            mimeType: 'application/json',
+            buffer: Buffer.from(importReportJson, 'utf8'),
+          });
+          await importDialog.locator('input[name="conflictMode"][value="copy"]').check({ force: true });
+          await importDialog.locator('button[data-action="ok"], button:has-text("Import")').first().click();
+
+          // The post-import report is its own DialogV2 carrying `.fabricate-import-report`.
+          const reportDialog = page
+            .locator('.application.dialog:has(.fabricate-import-report), .dialog:has(.fabricate-import-report)')
+            .first();
+          await reportDialog.waitFor({ state: 'visible', timeout: 15_000 });
+          // Prove the "needs attention" grouped list rendered (the reported source item).
+          await reportDialog.locator('.fabricate-import-report__kind').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          // The import fires info/warn toasts that can bleed over the dialog; clear
+          // them first. The report IS the intended overlay here, so — like the roll
+          // prompt capture — we deliberately do NOT run assertNoScreenshotOverlays.
+          await dismissFoundryNotifications(page);
+          await screenshot(page, 'manager-import-report');
+
+          // Dismiss the report so the smoke can continue.
+          await reportDialog.locator('button[data-action="ok"], button:has-text("Close")').first().click().catch(() => {});
+          await reportDialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+
+          // Delete the throwaway "(Copy)" system created by the import so no later
+          // phase (or system-library row count) sees it.
+          await page.evaluate(async (idsBefore) => {
+            const csm = game.fabricate.getCraftingSystemManager();
+            const before = new Set(idsBefore);
+            const created = csm.getSystems().filter((s) => !before.has(s.id));
+            for (const s of created) {
+              try { await csm.deleteSystem(s.id); } catch { /* best effort */ }
+            }
+          }, systemIdsBeforeImport);
+
+          await closeOpenApplications(page);
+          results.steps.push({ step: 'import-report', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'import-report', passed: false, error: err.message });
+          process.stderr.write(`Import report capture failed: ${err.message}\n`);
+          await closeOpenApplications(page).catch(() => {});
+        }
+
         await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, {

@@ -1,12 +1,11 @@
 // Engine integration tests for the `routedByIngredients` crafting check
-// (CraftingEngine._runPassFailCheck via the _runCraftingCheck routed dispatch).
+// (CraftingEngine._runPassFailCheck via the _runCraftingCheck simple dispatch).
 //
 // `routedByIngredients` routes result groups by the chosen ingredient set, NOT by
-// check outcome tiers, so its check is a plain pass/fail gate against the DC —
-// tiers are typically unconfigured. Regression guard: before the dispatch split,
-// this mode ran through the tier evaluator (`runFormulaRouted`), which fails every
-// roll when no tiers exist, so even a natural 20 failed a DC 12 check. These tests
-// pin the pass/fail behaviour and prove the tier-routing path is NOT used here.
+// check outcome tiers, so its check is the SAME optional pass/fail gate as
+// `simple`/`alchemy`, stored in the shared `craftingCheck.simple` slot. Regression
+// guard: this mode no longer reads `craftingCheck.routed` — a stale value authored
+// there must be ignored. These tests pin the pass/fail behaviour off the simple slot.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -15,6 +14,7 @@ const {
   stubRoll,
   evaluateArgs,
   clearRollEngine,
+  defaultSimple,
   defaultRouted,
   makeRoutedEngine,
   runRoutedCheck,
@@ -35,7 +35,7 @@ function totalTrigger({ id = 't', groupId = 0, value, outcome = 'none' }) {
 function ingredientsEngine(overrides = {}) {
   return makeRoutedEngine({
     resolutionMode: 'routedByIngredients',
-    routed: defaultRouted({ rollFormula: '1d20', dc: 12, relativeOutcomes: [], fixedOutcomes: [], ...overrides }),
+    simple: defaultSimple({ rollFormula: '1d20', dc: 12, ...overrides }),
   });
 }
 
@@ -66,6 +66,23 @@ test('routedByIngredients: meet mode passes on an exact-DC roll', async () => {
   const r = await runRoutedCheck(engine);
   assert.equal(r.success, true, '12 >= 12 (meet)');
   assert.equal(r.data.comparison, 'meet');
+});
+
+// ── The simple slot is read, NOT the routed slot ──────────────────────────────
+
+test('routedByIngredients: reads craftingCheck.simple, IGNORING a stale routed slot', async () => {
+  // Author a DIFFERENT dc/formula in `routed` (the pre-migration slot). The real
+  // config lives in `simple` (DC 12); the simple DC must win, proving RI no longer
+  // reads `routed`.
+  const { engine } = makeRoutedEngine({
+    resolutionMode: 'routedByIngredients',
+    simple: defaultSimple({ rollFormula: '1d20', dc: 12 }),
+    routed: defaultRouted({ rollFormula: '1d20+100', dc: 30 }),
+  });
+  stubRoll(13, [{ number: 1, faces: 20, total: 13 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.data.dc, 12, 'the simple slot DC wins, not the stale routed DC 30');
+  assert.equal(r.success, true, '13 >= 12 (simple) — would FAIL against the stale routed DC 30');
 });
 
 // ── Threshold mode ────────────────────────────────────────────────────────────
@@ -123,13 +140,13 @@ test('routedByIngredients: a forced-success trigger overrides a failing roll', a
   assert.equal(r.outcome, 'pass');
 });
 
-// ── DC resolution flows through _resolveSimpleCheckDc over the routed config ───
+// ── DC resolution flows through _resolveSimpleCheckDc over the simple config ───
 
-test('routedByIngredients: a recipe tier shifts the DC (not the flat routed.dc)', async () => {
+test('routedByIngredients: a recipe tier shifts the DC (not the flat simple.dc)', async () => {
   const { engine } = ingredientsEngine({ dc: 12, tiers: [{ id: 'tier-hard', name: 'Hard', dc: 18 }] });
   stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
   const r = await runRoutedCheck(engine, { craftingSystemId: 'sys-1', checkTierId: 'tier-hard' });
-  assert.equal(r.data.dc, 18, 'resolves the recipe tier DC, not the flat routed.dc');
+  assert.equal(r.data.dc, 18, 'resolves the recipe tier DC, not the flat simple.dc');
   assert.equal(r.success, false, '17 < 18');
 });
 
@@ -145,7 +162,7 @@ test('routedByIngredients: meeting the recipe-tier DC passes', async () => {
 test('routedByIngredients with no rollFormula is an optional no-op success (not a loud failure)', async () => {
   const { engine } = makeRoutedEngine({
     resolutionMode: 'routedByIngredients',
-    routed: defaultRouted({ rollFormula: '' }),
+    simple: defaultSimple({ rollFormula: '' }),
   });
   const r = await runRoutedCheck(engine);
   assert.equal(r.success, true, 'the optional ingredient-routed check with no formula does not block');

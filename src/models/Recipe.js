@@ -73,6 +73,14 @@ export class Recipe {
       typeof data.checkTierId === 'string' && data.checkTierId.trim()
         ? data.checkTierId.trim()
         : null;
+    // Optional reference to a fixed-type routed check's success outcome tier (its
+    // id). When set, a craft whose rolled tier ranks below this tier fails outright,
+    // letting recipes on a shared fixed check carry different difficulty. Null/unknown
+    // ids impose no override (outcome = the tier actually rolled) at resolution time.
+    this.minSuccessOutcomeId =
+      typeof data.minSuccessOutcomeId === 'string' && data.minSuccessOutcomeId.trim()
+        ? data.minSuccessOutcomeId.trim()
+        : null;
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
 
@@ -406,6 +414,7 @@ export class Recipe {
       outcomeRouting: this.outcomeRouting,
       resultSelection: this.resultSelection,
       checkTierId: this.checkTierId,
+      minSuccessOutcomeId: this.minSuccessOutcomeId,
       currencyCost: this.currencyCost,
       teaser: this.teaser,
       metadata: this.metadata,

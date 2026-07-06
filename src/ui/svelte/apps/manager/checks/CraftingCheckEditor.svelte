@@ -33,14 +33,26 @@
   // `breakageAuthority` (issue 419): tool breakage is a check-driven concept, so the
   // per-outcome break-tools pills (and the unified trigger break pills) are shown
   // only under `checkDriven`.
+  // `resolutionMode` is the SYSTEM crafting resolution mode, passed only by the
+  // crafting-tab instance. From the crafting tab this editor now only ever serves
+  // `routedByCheck` (the tier-routing check); `routedByIngredients` authors its
+  // pass/fail check via the SimpleCraftingCheckEditor, and the salvage/gathering
+  // instances omit this prop entirely (defaulting to relative-with-DC). It scopes the
+  // fixed-type DC hiding to `routedByCheck + fixed` (which matches by value range, so
+  // the DC is meaningless); every other case keeps showing the DC field.
   let {
     value = null,
     showTiers = true,
     breakageAuthority = 'toolSpecific',
+    resolutionMode = null,
     onChange = () => {}
   } = $props();
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
+  // Fixed-type routed-by-check checks match by value range, so DC + the meet/exceed
+  // comparison are meaningless there; hide both (CheckFormulaFields' showDc gate wraps
+  // both). Any other case (relative type, salvage/gathering) keeps the DC.
+  const hideDc = $derived(resolutionMode === 'routedByCheck' && type === 'fixed');
   // Outcome options for the CheckTriggers outcomeTier condition — both tier lists
   // carry an id + name; the active list is the one the editor is showing.
   const breakageOutcomeOptions = $derived(
@@ -168,6 +180,7 @@
       rollFormula={value?.rollFormula || ''}
       dc={value?.dc ?? 15}
       thresholdMode={value?.thresholdMode || 'meet'}
+      showDc={!hideDc}
       placeholder="1d20"
       onChange={emit}
     />

@@ -67,7 +67,7 @@ const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
 
 /**
  * Modes whose crafting check is mandatory (the attempt fails without an authored
- * roll formula). The routed/progressive modes require a check; alchemy runs an
+ * roll formula). The routedByCheck/progressive modes require a check; alchemy runs an
  * always-on check. Simple and routedByIngredients treat the check as optional.
  */
 const MANDATORY_CHECK_MODES = new Set(['routedByCheck', 'progressive', 'alchemy']);
@@ -405,11 +405,11 @@ export class CraftingListingBuilder {
     let config;
     switch (mode) {
       case 'simple':
-      case 'alchemy': {
+      case 'alchemy':
+      case 'routedByIngredients': {
         config = checks.simple;
         break;
       }
-      case 'routedByIngredients':
       case 'routedByCheck': {
         config = checks.routed;
         break;
@@ -429,7 +429,7 @@ export class CraftingListingBuilder {
     // "Mandatory" reflects whether the engine will actually roll this check and a
     // failure fails the craft (CraftingEngine._runCraftingCheck) — NOT merely whether
     // the mode requires a check to be configured. Otherwise a routed-by-ingredients
-    // recipe with an authored routed check + DC reads "Optional" even though it is
+    // recipe with an authored simple pass/fail check + DC reads "Optional" even though it is
     // always rolled and can fail. Active when: the mode requires a check
     // (routedByCheck / progressive / alchemy); routedByIngredients with an authored
     // formula (no enabled toggle); or simple with a formula AND checks enabled.
@@ -449,8 +449,11 @@ export class CraftingListingBuilder {
       rollFormula.length > 0 && craftingActor
         ? this._resolveCheckFormula(rollFormula, craftingActor)
         : null;
+    // A routedByCheck fixed check matches by value range, not DC, so it has no
+    // meaningful DC — null it so the player card hides its DC chip (its `hasDc` gate).
+    const routedFixed = mode === 'routedByCheck' && config.type === 'fixed';
     return {
-      dc: config.dc ?? null,
+      dc: routedFixed ? null : (config.dc ?? null),
       rollFormula: rollFormula.length > 0 ? rollFormula : null,
       resolvedFormula: resolution?.display ?? null,
       formulaResolved: resolution ? resolution.resolved === true : null,

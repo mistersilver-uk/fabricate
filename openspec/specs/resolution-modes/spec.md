@@ -97,8 +97,10 @@ With no authored formula the attempt proceeds with no check; there is no macro-r
 The mode carries no `resultSelection`.
 - **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the chosen ingredient set.
 No other result groups are awarded.**
-- The crafting check is **optional**, matching `simple` mode: it runs only when `craftingCheck.routed.rollFormula` is authored; with no authored formula the attempt proceeds with no check.
-The check never changes which result group is produced.
+- The crafting check is the SAME optional pass/fail check as `simple`/`alchemy` mode, stored in the shared **`craftingCheck.simple`** slot (which backs `simple`, `alchemy`, and `routedByIngredients` — it is not a simple-mode-only slot).
+It runs only when `craftingCheck.simple.rollFormula` is authored; with no formula the attempt proceeds with no check.
+It is a pass/fail gate comparing the roll total against the DC (meet/exceed per `thresholdMode`), honouring per-recipe DC tiers (`checkTierId` → `craftingCheck.simple.tiers`), a dynamic-DC macro (`dcMode: 'dynamic'`), and the check's `checkBreakage` triggers.
+It never reads outcome tiers and never changes which result group is produced (routing stays `IngredientSet.resultGroupId`).
 
 ### Routing
 
@@ -111,7 +113,7 @@ The check never changes which result group is produced.
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
 - Reference integrity (always applies): each `IngredientSet.resultGroupId` must point at a real `ResultGroup` in scope.
-- This mode never raises `routedCheckNoFormula`: a missing routed roll formula simply means no check runs.
+- This mode never raises `routedCheckNoFormula`: a missing `craftingCheck.simple.rollFormula` simply means no check runs (its readiness is identical to its equally-optional `simple`/`alchemy` peers).
 
 ## Routed by Check Mode (`routedByCheck`)
 
@@ -127,6 +129,18 @@ The outcome is produced by the system's configured routed crafting check, whose 
 - `outcome` is trim-normalized and case-insensitive.
 - **Relative tier clamp:** when the routed check uses **relative** outcome tiers and the rolled total meets no tier's effective threshold (`baseDc + outcome.dc`), the outcome is the lowest (closest) tier rather than an empty/null outcome, so a recipe tier or dynamic DC that raises the base difficulty never yields a rolled-but-unrouted craft.
 The clamp is relative-only; **fixed** tiers keep the "outside every range → no outcome" behaviour (their ranges are authored explicitly).
+- **Fixed tiers carry no DC.**
+Fixed outcome tiers own explicit, non-overlapping `[start, end]` value ranges and the roll total is matched by range, so the check DC and the meet/exceed `thresholdMode` comparison are unused in fixed mode — DC and the comparison are relative-only.
+The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it — that DC now lives on its simple check, `craftingCheck.simple.dc`) and relative-type routed checks (which read `craftingCheck.routed.dc`); only `routedByCheck` with `type: "fixed"` drops it.
+- **Per-recipe minimum success tier (fixed only).**
+A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value.
+When set, a craft whose naturally-rolled tier ranks below the required tier — or whose total lands outside every fixed range, so no tier matched at all — fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
+Because no tier routes on this failure, the rolled tier's own `breakTools` flag is dropped (the per-tier breakage bridge fires only for a routed tier); independent dice-group / roll-total breakage triggers are unaffected.
+The default (null/unset) imposes no override, so the outcome is the tier actually rolled.
+A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
+A stale or unknown `minSuccessOutcomeId` no-ops.
+The gate is fixed-type only; relative-type routed checks ignore it.
+It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected — only the crafting `routedByCheck` caller threads the recipe's minimum.
 - **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
 Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.

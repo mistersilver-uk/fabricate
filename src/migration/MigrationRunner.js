@@ -17,6 +17,7 @@ import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
 import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
+import { migrateMoveRoutedByIngredientsCheck } from './migrateMoveRoutedByIngredientsCheck.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
 import { migrateRemoveLegacyCheckSources } from './migrateRemoveLegacyCheckSources.js';
@@ -248,6 +249,15 @@ const MIGRATIONS = [
       '(majority provider wins, ties → routedByIngredients; minority recipes reconciled)',
     migrate(data) {
       return migrateSplitRoutedResolutionModes(data);
+    },
+  },
+  {
+    version: '1.10.0',
+    label:
+      'Move routedByIngredients systems’ optional pass/fail crafting check from ' +
+      'craftingCheck.routed to the shared craftingCheck.simple slot (tier ids preserved; routed formula cleared)',
+    migrate(data) {
+      return migrateMoveRoutedByIngredientsCheck(data);
     },
   },
   // Future migrations added here in version order
