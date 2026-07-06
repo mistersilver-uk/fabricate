@@ -259,6 +259,45 @@ After a drag-and-drop learn attempt, Fabricate shows notifications for successfu
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+## Books & Scrolls
+
+**Books & Scrolls** is a GM management surface that gathers every recipe item in a crafting system into one place.
+It is an experimental feature.
+It only appears when **Experimental Features** is turned on for the world in Fabricate's module settings.
+
+Despite the name, Books & Scrolls manages every recipe item regardless of its Foundry item type.
+A ring, a wand, a gem, or a plain note that is linked to a recipe all appear here alongside books and scrolls.
+"Books & Scrolls" is only the display name of the surface, not a filter on item type.
+
+### Opening Books & Scrolls
+
+When Experimental Features is on, the Crafting Admin panel's left menu shows an expandable **Crafting** group in place of the single **Recipes** entry.
+Expand the group to find its three sections: **Settings**, **Recipes**, and **Books & Scrolls**.
+Open **Books & Scrolls** from that group.
+See [The Crafting Menu]({% link crafting-systems.md %}#the-crafting-menu) for the rest of the group.
+
+### What It Shows
+
+The surface lists every recipe item in the selected system.
+Each item shows its image and name, and the recipes it teaches under **Linked recipes**.
+An item with no linked recipes yet says so, and the whole surface shows an empty state when the system has no recipe items at all.
+
+Each item also shows the current recipe-item rules as read-only chips:
+
+- A **Use cap** chip shows how many times the item grants crafting access, or **Unlimited uses** when use tracking is off.
+- A **Learn cap** chip shows how many recipes a player may learn from the item, or **Learn all** when there is no learn cap.
+
+### The Shared Rules
+
+The use cap, the learn cap, and the consume or destroy behaviour are system-wide rules.
+They apply to every recipe item in the system, not to one item at a time.
+Because of that, you edit them once in the surface's **Recipe item rules** card rather than per item.
+The per-item chips described above only reflect those shared rules, so they are read-only.
+
+Every change in the rules card applies immediately, so there is no separate save step.
+These are the same rules you can set in the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
+Editing them in either place updates the other, because both read and write the one shared configuration.
+
 ## Locked Recipes
 
 Any recipe can be locked, regardless of visibility mode.

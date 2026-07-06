@@ -216,6 +216,26 @@ Nothing is permanently disabled behind the scenes.
 
 ---
 
+## The Crafting Menu
+
+{: .gm }
+> The Crafting Admin panel is GM-only.
+
+The **Crafting** menu is an experimental grouping of the recipe-focused sections in the Crafting Admin panel.
+It only appears when **Experimental Features** is turned on for the world in Fabricate's module settings.
+While it is off, the panel's left menu shows a single **Recipes** entry as before.
+
+When Experimental Features is on, that single entry becomes an expandable **Crafting** group in the left menu, in the same style as the **Gathering** group.
+Expand it to reveal three sections.
+
+- **Settings** is a placeholder for future system-level crafting rules.
+  Recipe visibility and the recipe-item rules are still configured in the **Recipe Visibility** card on the System settings page, and the placeholder links you there.
+- **Recipes** is the existing recipe browser and editor.
+- **Books & Scrolls** is a management surface that lists every recipe item in the system with its linked recipes, use cap, learn cap, and consume or destroy behaviour.
+  See [Books & Scrolls]({% link visibility.md %}#books--scrolls).
+
+---
+
 ## Graph Visualization
 
 The **Graph** tab in the Crafting Admin panel is planned and not yet available.
