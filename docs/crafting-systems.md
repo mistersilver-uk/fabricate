@@ -223,7 +223,7 @@ Nothing is permanently disabled behind the scenes.
 
 The **Crafting** menu is an experimental grouping of the recipe-focused sections in the Crafting Admin panel.
 It only appears when **Experimental Features** is turned on for the world in Fabricate's module settings.
-While it is off, the panel's left menu shows a single **Recipes** entry as before.
+While it is off, the panel's left menu shows **Recipes** as a disabled **Soon** item and does not show the Crafting group or Books & Scrolls.
 
 When Experimental Features is on, that single entry becomes an expandable **Crafting** group in the left menu, in the same style as the **Gathering** group.
 Expand it to reveal three sections.
