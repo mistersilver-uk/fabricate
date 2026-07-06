@@ -480,6 +480,38 @@ describe('craftingStore', () => {
     assert.equal(calls.craftRecipe.length, 1, 'the craft is dispatched once');
   });
 
+  it('confirm gate: a dismissed dialog (resolves null) cancels quietly without an error toast (issue 61)', async () => {
+    // A benign dismiss (Escape / X / click-away) resolves to null via the seam's
+    // rejectClose:false default — it must read as cancel, NOT the craft-error toast.
+    const { services, calls } = makeServices({ confirmDialog: async () => null });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.deepEqual(result, { cancelled: true }, 'a dismissed confirm cancels the craft');
+    assert.equal(calls.craftRecipe.length, 0, 'no craft is dispatched on dismiss');
+    assert.deepEqual(calls.notify, [], 'a dismiss raises no error notification');
+  });
+
+  it('confirm gate: a rejected confirmDialog is treated as a silent cancel, not an error (issue 61)', async () => {
+    // Defensive: even if the seam ever rejects, the confirm-stage catch must yield a
+    // quiet cancel rather than falling through to the outer craft-error toast.
+    const { services, calls } = makeServices({
+      confirmDialog: async () => {
+        throw new Error('dialog blew up');
+      },
+    });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.deepEqual(result, { cancelled: true }, 'a rejected confirm cancels the craft');
+    assert.equal(calls.craftRecipe.length, 0, 'no craft is dispatched on a confirm rejection');
+    assert.deepEqual(calls.notify, [], 'a confirm rejection raises no error notification');
+  });
+
   it('confirm gate: an absent confirmDialog seam is a no-op that dispatches (issue 61)', async () => {
     // No `confirmDialog` override → the seam is absent, so the gate must NOT block
     // the craft (opposite of the Manager discard-guard).

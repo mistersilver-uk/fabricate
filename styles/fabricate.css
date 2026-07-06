@@ -13944,3 +13944,17 @@
   color: var(--fab-on-accent);
   background: var(--fab-accent);
 }
+
+/* Keep Foundry core's orange focus ring off; use the Fabricate accent instead.
+   The app-scoped focus rules don't reach this DialogV2 root (it renders outside
+   .fabricate-app), so mirror the roll-prompt dialog's focus block. */
+.fabricate-craft-confirm-dialog button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-craft-confirm-dialog button:focus-visible,
+.fabricate-craft-confirm-dialog input:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}

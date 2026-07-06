@@ -96,7 +96,7 @@ test('localize with data without game.i18n returns key', () => {
 
 // --- confirmDialog ---
 
-test('confirmDialog calls DialogV2.confirm and returns result', async () => {
+test('confirmDialog calls DialogV2.confirm and returns result (rejectClose:false default)', async () => {
   const opts = { title: 'Are you sure?' };
   globalThis.foundry = {
     applications: {
@@ -108,7 +108,24 @@ test('confirmDialog calls DialogV2.confirm and returns result', async () => {
     }
   };
   const result = await confirmDialog(opts);
-  assert.deepEqual(result, { confirmed: true, options: opts });
+  // A dismiss must resolve (not reject) so callers treat it as cancel: the seam
+  // defaults rejectClose:false, merged ahead of the caller's options.
+  assert.deepEqual(result, { confirmed: true, options: { rejectClose: false, title: 'Are you sure?' } });
+  delete globalThis.foundry;
+});
+
+test('confirmDialog lets a caller override the rejectClose default', async () => {
+  globalThis.foundry = {
+    applications: {
+      api: {
+        DialogV2: {
+          confirm: async (o) => ({ confirmed: true, options: o })
+        }
+      }
+    }
+  };
+  const result = await confirmDialog({ title: 'Keep?', rejectClose: true });
+  assert.equal(result.options.rejectClose, true, 'explicit rejectClose wins over the default');
   delete globalThis.foundry;
 });
 

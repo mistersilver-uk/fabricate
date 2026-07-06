@@ -312,22 +312,27 @@ export function createCraftingStore({ services } = {}) {
           return true;
         };
         const t = (key, fallback) => services?.localize?.(key) || fallback;
-        const confirmed = await services.confirmDialog({
-          window: { title: t('FABRICATE.App.Crafting.Confirm.Title', 'Confirm craft') },
-          classes: ['fabricate', 'fabricate-dialog', 'fabricate-craft-confirm-dialog'],
-          content: buildCraftConfirmContent({
-            recipeName: confirmContext?.recipeName ?? recipe?.name ?? selectedRecipe?.name ?? '',
-            craftability: confirmContext?.craftability ?? selectedCraftability,
-            result: confirmContext?.result ?? null,
-            outcomeTiers: confirmContext?.outcomeTiers ?? null,
-            dependsOnRoll: confirmContext?.dependsOnRoll === true,
-          }),
-          yes: {
-            label: t('FABRICATE.App.Crafting.Confirm.Confirm', 'Craft'),
-            callback: readDontAskAgain,
-          },
-          no: { label: t('FABRICATE.App.Crafting.Confirm.Cancel', 'Cancel') },
-        });
+        // The seam defaults `rejectClose: false`, so a dismiss resolves to a
+        // non-true value (→ cancel). Defensively catch any residual rejection so a
+        // benign decline never falls through to the outer catch's error toast.
+        const confirmed = await services
+          .confirmDialog({
+            window: { title: t('FABRICATE.App.Crafting.Confirm.Title', 'Confirm craft') },
+            classes: ['fabricate', 'fabricate-dialog', 'fabricate-craft-confirm-dialog'],
+            content: buildCraftConfirmContent({
+              recipeName: confirmContext?.recipeName ?? recipe?.name ?? selectedRecipe?.name ?? '',
+              craftability: confirmContext?.craftability ?? selectedCraftability,
+              result: confirmContext?.result ?? null,
+              outcomeTiers: confirmContext?.outcomeTiers ?? null,
+              dependsOnRoll: confirmContext?.dependsOnRoll === true,
+            }),
+            yes: {
+              label: t('FABRICATE.App.Crafting.Confirm.Confirm', 'Craft'),
+              callback: readDontAskAgain,
+            },
+            no: { label: t('FABRICATE.App.Crafting.Confirm.Cancel', 'Cancel') },
+          })
+          .catch(() => false);
         if (confirmed !== true) return { cancelled: true };
       }
       const result = await services?.craftRecipe?.({

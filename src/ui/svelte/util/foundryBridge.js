@@ -71,10 +71,25 @@ export function localize(key, data) {
   return i18n.localize(key);
 }
 
+/**
+ * Confirm/cancel dialog through Foundry V13 `DialogV2.confirm`.
+ *
+ * Defaults `rejectClose: false` so a benign DISMISSAL (Escape / X / click-away)
+ * resolves to a non-`true` value rather than REJECTING — matching the
+ * "dismissed dialog → treat as cancel" convention used by every other DialogV2
+ * caller in the repo (`rollPrompt.js`, `repairComponentSources.js`,
+ * `environmentDialog.js`). Without this a dismiss would throw, which callers
+ * that wrap their confirm in a broader try/catch (e.g. the craft-confirm gate in
+ * `craftingStore.craft()`) would mis-surface as an error. Callers may still
+ * override `rejectClose` explicitly.
+ *
+ * @param {object} options DialogV2.confirm options.
+ * @returns {Promise<*>} The confirm result (falsy/`false` on dismiss/cancel).
+ */
 export async function confirmDialog(options) {
   const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
   if (!DialogV2?.confirm) return false;
-  return DialogV2.confirm(options);
+  return DialogV2.confirm({ rejectClose: false, ...options });
 }
 
 export function renderDialog(options) {
