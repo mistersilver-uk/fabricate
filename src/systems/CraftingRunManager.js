@@ -300,9 +300,20 @@ export class CraftingRunManager {
     run.finishedAt = this._nowWorldTime();
 
     delete container.active[run.id];
-    container.history.unshift(run);
-    if (container.history.length > HISTORY_LIMIT) {
-      container.history = container.history.slice(0, HISTORY_LIMIT);
+    // Never archive a run that already has a history entry: a duplicate id would
+    // crash the Journal's keyed each. This can happen if a run lingered in `active`
+    // (a legacy zombie) after a twin was already recorded in history.
+    const alreadyArchived =
+      Array.isArray(container.history) && container.history.some((entry) => entry?.id === run.id);
+    if (alreadyArchived) {
+      console.warn(
+        `Fabricate | Crafting run "${run.id}" is already in history; removing it from active without archiving a duplicate.`
+      );
+    } else {
+      container.history.unshift(run);
+      if (container.history.length > HISTORY_LIMIT) {
+        container.history = container.history.slice(0, HISTORY_LIMIT);
+      }
     }
     await this._persist(actor, container);
     return run;
