@@ -1,0 +1,3300 @@
+{
+  "fabricateVersion": "0.1.0",
+  "exportedAt": "2026-07-06T12:16:01.202Z",
+  "system": {
+    "id": "0h1oqPbHeiyNl7Oa",
+    "name": "Runesmith’s Forge",
+    "description": "A magical forge discipline for binding runes into weapons, shields, charms, and focus rods. The smith’s craft prepares the vessel, but the chosen rune determines what the item becomes. A blade quenched with a Flame Rune becomes a firebrand; the same blade bound with a Grave Rune becomes a wraith-touched weapon.",
+    "enabled": true,
+    "resolutionMode": "routedByIngredients",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": false,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": false,
+      "chatOutput": true,
+      "itemPiles": false
+    },
+    "itemTags": [],
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "item": {
+          "limitUses": false,
+          "destroyWhenExhausted": false
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": false
+      },
+      "currency": {
+        "enabled": false,
+        "spendStrategy": "actorProperty",
+        "providerId": "",
+        "macros": {
+          "canAfford": "",
+          "increment": "",
+          "decrement": ""
+        },
+        "units": []
+      }
+    },
+    "essenceDefinitions": [],
+    "recipeItemDefinitions": [],
+    "craftingCheck": {
+      "enabled": false,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "fixed",
+        "rollFormula": "1d20 + @abilities.int.mod",
+        "dc": 12,
+        "thresholdMode": "meet",
+        "tiers": [
+          {
+            "id": "hVRkikDo9qbPz2Gr",
+            "name": "Common",
+            "dc": 12
+          },
+          {
+            "id": "FRZMOfJj6pTv2FRd",
+            "name": "Uncommon",
+            "dc": 14
+          },
+          {
+            "id": "uZHbmqTDEly593iG",
+            "name": "Rare",
+            "dc": 16
+          },
+          {
+            "id": "a8cpOqS3nPfjtODV",
+            "name": "Very Rare",
+            "dc": 18
+          },
+          {
+            "id": "FqybWn0PcW33ML1q",
+            "name": "Legendary",
+            "dc": 20
+          }
+        ],
+        "relativeOutcomes": [
+          {
+            "id": "Mo4dd8ILN0CAHmYF",
+            "name": "Critical failure",
+            "success": false,
+            "breakTools": true,
+            "dc": -10
+          },
+          {
+            "id": "vXGmFi6srTBcR2PN",
+            "name": "Failure",
+            "success": false,
+            "breakTools": false,
+            "dc": -5
+          },
+          {
+            "id": "OosfTr64lKslpQSd",
+            "name": "Flawed",
+            "success": true,
+            "breakTools": false,
+            "dc": -1
+          },
+          {
+            "id": "1HjuPQf4JtDYBYVO",
+            "name": "Standard",
+            "success": true,
+            "breakTools": false,
+            "dc": 0
+          },
+          {
+            "id": "ZrjD2nkNEGY11d2B",
+            "name": "Refined",
+            "success": true,
+            "breakTools": false,
+            "dc": 0
+          },
+          {
+            "id": "12s5YoseJyWgopH0",
+            "name": "Masterwork",
+            "success": true,
+            "breakTools": false,
+            "dc": 0
+          }
+        ],
+        "fixedOutcomes": [
+          {
+            "id": "ecdvREAi4zUcahC6",
+            "name": "Cursed",
+            "success": false,
+            "breakTools": true,
+            "start": 1,
+            "end": 5
+          },
+          {
+            "id": "4vFDbK6UuzPK20Ck",
+            "name": "Botched",
+            "success": true,
+            "breakTools": true,
+            "start": 6,
+            "end": 8
+          },
+          {
+            "id": "6RFgO8LklvOjRHdU",
+            "name": "Mundane",
+            "success": true,
+            "breakTools": false,
+            "start": 9,
+            "end": 12
+          },
+          {
+            "id": "9Zu9C3RmxViNGICo",
+            "name": "Exceptional",
+            "success": true,
+            "breakTools": false,
+            "start": 13,
+            "end": 18
+          },
+          {
+            "id": "2YxZconqOQTcI76O",
+            "name": "Legendary",
+            "success": true,
+            "breakTools": false,
+            "start": 19,
+            "end": 24
+          }
+        ],
+        "checkBreakage": {
+          "triggers": [
+            {
+              "id": "Bjs3K6YPyoFB3kh2",
+              "condition": {
+                "type": "diceGroup",
+                "groupId": 0,
+                "aggregate": "total",
+                "operator": "==",
+                "value": 20
+              },
+              "outcome": "success",
+              "breakTools": false
+            },
+            {
+              "id": "NRtXiLP4Ecavld0I",
+              "condition": {
+                "type": "diceGroup",
+                "groupId": 0,
+                "aggregate": "total",
+                "operator": "==",
+                "value": 1
+              },
+              "outcome": "failure",
+              "breakTools": true
+            }
+          ]
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "salvageResolutionMode": "routed",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "categories": [],
+    "components": [
+      {
+        "id": "xgT5gIqkfCi1C5Eo",
+        "name": "Iron Longsword",
+        "img": "icons/weapons/swords/greatsword-crossguard-steel.webp",
+        "description": "",
+        "sourceItemUuid": "Item.k0UEnlIzgsCbP04p",
+        "sourceUuid": "Item.k0UEnlIzgsCbP04p",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "QX08NT9aWuZqtnZZ",
+        "name": "Oak Focus Rod",
+        "img": "icons/weapons/wands/wand-gem-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.1m8s7PPNjl2PPsb8",
+        "sourceUuid": "Item.1m8s7PPNjl2PPsb8",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "YUgnGh9NMmdgdJi8",
+        "name": "Iron Shield Boss",
+        "img": "icons/equipment/shield/buckler-iron-cross-gray.webp",
+        "description": "",
+        "sourceItemUuid": "Item.EErDaVAb0yyXFIz8",
+        "sourceUuid": "Item.EErDaVAb0yyXFIz8",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "FK7gU9YfNQN8Egz6",
+        "name": "Silver Wire",
+        "img": "icons/commodities/metal/hinge-brass.webp",
+        "description": "",
+        "sourceItemUuid": "Item.XleeftPMUcClhBm2",
+        "sourceUuid": "Item.XleeftPMUcClhBm2",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "IzzPOo4OKznJc5WA",
+        "name": "Binding Oil",
+        "img": "icons/consumables/potions/potion-bottle-labeled-medicine-capped-red-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.1ahcZWyqK3gpia9P",
+        "sourceUuid": "Item.1ahcZWyqK3gpia9P",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "fXdzEsydjTYoX56P",
+        "name": "Quicksilver Thread",
+        "img": "icons/magic/control/debuff-chains-ropes-net-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.SzGukStVQJWMJDjF",
+        "sourceUuid": "Item.SzGukStVQJWMJDjF",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "Swdnvev0BQM5PGcj",
+        "name": "Flame Rune",
+        "img": "icons/magic/control/buff-flight-wings-runes-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.RzJVlVNTAG1xrRno",
+        "sourceUuid": "Item.RzJVlVNTAG1xrRno",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "GCVFgJZWkOghdJLg",
+        "name": "Frost Rune",
+        "img": "icons/magic/control/buff-flight-wings-runes-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.jutNJLDPxLAnsVVG",
+        "sourceUuid": "Item.jutNJLDPxLAnsVVG",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "EKCQa0esWdyTEe0f",
+        "name": "Storm Rune",
+        "img": "icons/magic/control/buff-flight-wings-runes-blue-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.xHq2YAgQA8d5cyUx",
+        "sourceUuid": "Item.xHq2YAgQA8d5cyUx",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "m7BnBotoXM4Puscs",
+        "name": "Grave Rune",
+        "img": "icons/magic/control/buff-flight-wings-runes-purple.webp",
+        "description": "",
+        "sourceItemUuid": "Item.Ca70VnsXSi7QlCJr",
+        "sourceUuid": "Item.Ca70VnsXSi7QlCJr",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "kfOD5aLFlJvuAjnW",
+        "name": "Verdant Rune",
+        "img": "icons/magic/nature/wolf-paw-glow-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.jhJKMgBxdNuTJGma",
+        "sourceUuid": "Item.jhJKMgBxdNuTJGma",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "EF8RqWDFrDlvVxrp",
+        "name": "Sun Rune",
+        "img": "icons/magic/control/buff-flight-wings-runes-red-yellow.webp",
+        "description": "",
+        "sourceItemUuid": "Item.TL8k6uMySXYPbu5o",
+        "sourceUuid": "Item.TL8k6uMySXYPbu5o",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "ynggS02L24kOwmSX",
+        "name": "Flamebrand Longsword",
+        "img": "icons/weapons/swords/shortsword-winged.webp",
+        "description": "",
+        "sourceItemUuid": "Item.yv5DEcI1lfo5PGrc",
+        "sourceUuid": "Item.yv5DEcI1lfo5PGrc",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "m09IQabktTGCAl6M",
+        "name": "Frostbrand Longsword",
+        "img": "icons/weapons/swords/greatsword-crossguard-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.HG4PxRDdlxJEMI7B",
+        "sourceUuid": "Item.HG4PxRDdlxJEMI7B",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "VvczBAHoni0vyEiL",
+        "name": "Stormbrand Longsword",
+        "img": "icons/weapons/swords/shortsword-guard-silver.webp",
+        "description": "",
+        "sourceItemUuid": "Item.K7qXx1jk2fIOrRyq",
+        "sourceUuid": "Item.K7qXx1jk2fIOrRyq",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "tzoljFxCKAYhgKcz",
+        "name": "Wraith-touched Longsword",
+        "img": "icons/weapons/swords/sword-guard-flanged-purple.webp",
+        "description": "",
+        "sourceItemUuid": "Item.e4UInCgATGvaf6DM",
+        "sourceUuid": "Item.e4UInCgATGvaf6DM",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "HhX6HkoVSTZeLByJ",
+        "name": "Sun-Blessed Longsword",
+        "img": "icons/weapons/swords/sword-guard-bronze.webp",
+        "description": "",
+        "sourceItemUuid": "Item.fawzsmeiQCR47MTg",
+        "sourceUuid": "Item.fawzsmeiQCR47MTg",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "49UDYpEo5OpE7sbA",
+        "name": "Ember Focus Rod",
+        "img": "icons/weapons/wands/wand-carved-fire.webp",
+        "description": "",
+        "sourceItemUuid": "Item.8kxpBdiRuu7VCctC",
+        "sourceUuid": "Item.8kxpBdiRuu7VCctC",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "lAvzoiJHxoGYAmg6",
+        "name": "Rime Focus Rod",
+        "img": "icons/weapons/wands/wand-gem-teal.webp",
+        "description": "",
+        "sourceItemUuid": "Item.6sKWcgYLk8h1SCJW",
+        "sourceUuid": "Item.6sKWcgYLk8h1SCJW",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "TMyAagX0uOItAAzL",
+        "name": "Thunder Focus Rod",
+        "img": "icons/weapons/wands/wand-gem-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.rktQs72lZf4Hzylv",
+        "sourceUuid": "Item.rktQs72lZf4Hzylv",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "ijoBgYyguHPxSyva",
+        "name": "Verdant Focus Rod",
+        "img": "icons/weapons/wands/wand-gem-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.mMD7Ldgg12kih1LC",
+        "sourceUuid": "Item.mMD7Ldgg12kih1LC",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "UtkbkIEsy4VVa9Nx",
+        "name": "Warding Shield Boss",
+        "img": "icons/equipment/shield/heater-steel-segmented-purple.webp",
+        "description": "",
+        "sourceItemUuid": "Item.ryLKROkagvXBzEi8",
+        "sourceUuid": "Item.ryLKROkagvXBzEi8",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "yLfCv1BKffiN7Bj9",
+        "name": "Sunward Shield Boss",
+        "img": "icons/equipment/shield/heater-stone-orange.webp",
+        "description": "",
+        "sourceItemUuid": "Item.yiEiFFHQ8CDwbfWh",
+        "sourceUuid": "Item.yiEiFFHQ8CDwbfWh",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "bpxh73ljFd2Dvzcs",
+        "name": "Stormguard Shield Boss",
+        "img": "icons/equipment/shield/buckler-wooden-boss-glowing-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.WkwyMCow5iskpS5e",
+        "sourceUuid": "Item.WkwyMCow5iskpS5e",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "bVggtq3mwDZcJaSr",
+        "name": "Graveward Shield Boss",
+        "img": "icons/equipment/shield/targe-steel-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.sA06EWnhkwu4E7Gl",
+        "sourceUuid": "Item.sA06EWnhkwu4E7Gl",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "8XAsycks5BPEvxxA",
+        "name": "Smith's Tools",
+        "img": "icons/tools/hand/hammer-and-nail.webp",
+        "description": "",
+        "sourceItemUuid": "Item.ReK9DTVGCjcM39DG",
+        "sourceUuid": "Item.ReK9DTVGCjcM39DG",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "3oerKoU9GaroRkSY",
+        "name": "Runic Chisel",
+        "img": "icons/tools/hand/screwdriver-flat-steel-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.iw0VmOBUrZNYwcOx",
+        "sourceUuid": "Item.iw0VmOBUrZNYwcOx",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "KjKyISln9UaZVzKz",
+        "name": "Binding Crucible",
+        "img": "icons/tools/cooking/oven-stone-grey.webp",
+        "description": "",
+        "sourceItemUuid": "Item.an5Ab4buLsROJdVt",
+        "sourceUuid": "Item.an5Ab4buLsROJdVt",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "e02JBk9lF91yqlou",
+        "name": "Quenching Trough",
+        "img": "icons/magic/water/bubbles-air-water-light.webp",
+        "description": "",
+        "sourceItemUuid": "Item.dmUXBG6NgVY0w8dC",
+        "sourceUuid": "Item.dmUXBG6NgVY0w8dC",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "0yo1JDLVWUi7Ushu",
+        "label": "",
+        "enabled": true,
+        "componentId": "3oerKoU9GaroRkSY",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 5
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "qcwrlSAdtYIRqsws",
+        "label": "",
+        "enabled": true,
+        "componentId": "KjKyISln9UaZVzKz",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 3
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "rUpypSxXAzaocdFg",
+        "label": "",
+        "enabled": true,
+        "componentId": "8XAsycks5BPEvxxA",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 8
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "iXT6P61Yn7eycXm2",
+        "label": "",
+        "enabled": true,
+        "componentId": "e02JBk9lF91yqlou",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 0
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      }
+    ],
+    "gatheringRealms": [],
+    "gatheringRealmSettings": {
+      "enabled": false,
+      "revealMode": "manual",
+      "modifierVisibility": "visible"
+    }
+  },
+  "recipes": [
+    {
+      "id": "DemvJrVonSAvSVa3",
+      "name": "Rune-Etched Longsword",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": true,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "i1cAVIcET1cewStl",
+          "name": "Flame Binding",
+          "ingredientGroups": [
+            {
+              "id": "FLyA7IvgRmbBynVQ",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "xYtIg1T4UredMJQ7",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "xgT5gIqkfCi1C5Eo"
+                  },
+                  "componentId": "xgT5gIqkfCi1C5Eo",
+                  "systemItemId": "xgT5gIqkfCi1C5Eo",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "sXOusCnVHh82yp3x",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "MpTABw09AgYUpM2e",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "Swdnvev0BQM5PGcj"
+                  },
+                  "componentId": "Swdnvev0BQM5PGcj",
+                  "systemItemId": "Swdnvev0BQM5PGcj",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "xgT5gIqkfCi1C5Eo"
+              },
+              "componentId": "xgT5gIqkfCi1C5Eo",
+              "systemItemId": "xgT5gIqkfCi1C5Eo",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "Swdnvev0BQM5PGcj"
+              },
+              "componentId": "Swdnvev0BQM5PGcj",
+              "systemItemId": "Swdnvev0BQM5PGcj",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "ugJGL5kixJaKBpz0"
+        },
+        {
+          "id": "KxSgQEF8nHHHpjNQ",
+          "name": "Frost Binding",
+          "ingredientGroups": [
+            {
+              "id": "EZaxiSPZuxoDFUX6",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "xgT5gIqkfCi1C5Eo"
+                  },
+                  "componentId": "xgT5gIqkfCi1C5Eo",
+                  "systemItemId": "xgT5gIqkfCi1C5Eo",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "s1bVufJJM2X6BSbq",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "UCjQLfwaw9RIcdDu",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "RVV5WX3ygkGb6ikD",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "GCVFgJZWkOghdJLg"
+                  },
+                  "componentId": "GCVFgJZWkOghdJLg",
+                  "systemItemId": "GCVFgJZWkOghdJLg",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "xgT5gIqkfCi1C5Eo"
+              },
+              "componentId": "xgT5gIqkfCi1C5Eo",
+              "systemItemId": "xgT5gIqkfCi1C5Eo",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "GCVFgJZWkOghdJLg"
+              },
+              "componentId": "GCVFgJZWkOghdJLg",
+              "systemItemId": "GCVFgJZWkOghdJLg",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "2gT0rUrTdTno2kSL"
+        },
+        {
+          "id": "pPmUPIVLFgSMjJKm",
+          "name": "Storm Binding",
+          "ingredientGroups": [
+            {
+              "id": "TM5tfFzYel8G6M8l",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "xgT5gIqkfCi1C5Eo"
+                  },
+                  "componentId": "xgT5gIqkfCi1C5Eo",
+                  "systemItemId": "xgT5gIqkfCi1C5Eo",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "AgqNKQASrAxYkuXO",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "AJeJKI05KwhShGxM",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "lA2qk1DsD5IS7XbB",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "EKCQa0esWdyTEe0f"
+                  },
+                  "componentId": "EKCQa0esWdyTEe0f",
+                  "systemItemId": "EKCQa0esWdyTEe0f",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "xgT5gIqkfCi1C5Eo"
+              },
+              "componentId": "xgT5gIqkfCi1C5Eo",
+              "systemItemId": "xgT5gIqkfCi1C5Eo",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "EKCQa0esWdyTEe0f"
+              },
+              "componentId": "EKCQa0esWdyTEe0f",
+              "systemItemId": "EKCQa0esWdyTEe0f",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "5tZlI4nclEXISqtV"
+        },
+        {
+          "id": "YQrs5hAcEmcaMWYJ",
+          "name": "Grave Binding",
+          "ingredientGroups": [
+            {
+              "id": "qfR4bijQFBYbehNG",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "xgT5gIqkfCi1C5Eo"
+                  },
+                  "componentId": "xgT5gIqkfCi1C5Eo",
+                  "systemItemId": "xgT5gIqkfCi1C5Eo",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "fXMiz3ZJFJrxjU1S",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "QeD0oVMAGvwlLCSl",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "yo4KQRS5gTCfkp0N",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "m7BnBotoXM4Puscs"
+                  },
+                  "componentId": "m7BnBotoXM4Puscs",
+                  "systemItemId": "m7BnBotoXM4Puscs",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "xgT5gIqkfCi1C5Eo"
+              },
+              "componentId": "xgT5gIqkfCi1C5Eo",
+              "systemItemId": "xgT5gIqkfCi1C5Eo",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "m7BnBotoXM4Puscs"
+              },
+              "componentId": "m7BnBotoXM4Puscs",
+              "systemItemId": "m7BnBotoXM4Puscs",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "C5w95e8p39J6TqKs"
+        },
+        {
+          "id": "pBFcEa2PmeJ6cCBn",
+          "name": "Sun Binding",
+          "ingredientGroups": [
+            {
+              "id": "KXWYItLj7gKNGmtk",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "NsCegMjK53lsVwxA",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "jCB6jPteAxcIeAV9",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "xgT5gIqkfCi1C5Eo"
+                  },
+                  "componentId": "xgT5gIqkfCi1C5Eo",
+                  "systemItemId": "xgT5gIqkfCi1C5Eo",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "slVyPl8QfueEH78Q",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "EF8RqWDFrDlvVxrp"
+                  },
+                  "componentId": "EF8RqWDFrDlvVxrp",
+                  "systemItemId": "EF8RqWDFrDlvVxrp",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "xgT5gIqkfCi1C5Eo"
+              },
+              "componentId": "xgT5gIqkfCi1C5Eo",
+              "systemItemId": "xgT5gIqkfCi1C5Eo",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "EF8RqWDFrDlvVxrp"
+              },
+              "componentId": "EF8RqWDFrDlvVxrp",
+              "systemItemId": "EF8RqWDFrDlvVxrp",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "A6K4gecHzaF8dErh"
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "ugJGL5kixJaKBpz0",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "gsgErjIy1tx2iHzZ",
+              "componentId": "ynggS02L24kOwmSX",
+              "systemItemId": "ynggS02L24kOwmSX",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "2gT0rUrTdTno2kSL",
+          "name": "Result Group 2",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "pSTFOU00iK0MQQ09",
+              "componentId": "m09IQabktTGCAl6M",
+              "systemItemId": "m09IQabktTGCAl6M",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "5tZlI4nclEXISqtV",
+          "name": "Result Group 3",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "8h4uFZIafLXKvPoo",
+              "componentId": "VvczBAHoni0vyEiL",
+              "systemItemId": "VvczBAHoni0vyEiL",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "C5w95e8p39J6TqKs",
+          "name": "Result Group 4",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "3X1RC3KqQ4oLMTQY",
+              "componentId": "tzoljFxCKAYhgKcz",
+              "systemItemId": "tzoljFxCKAYhgKcz",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "A6K4gecHzaF8dErh",
+          "name": "Result Group 5",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "2XIxgPgrx19EO9Ac",
+              "componentId": "HhX6HkoVSTZeLByJ",
+              "systemItemId": "HhX6HkoVSTZeLByJ",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [
+        "rUpypSxXAzaocdFg",
+        "0yo1JDLVWUi7Ushu",
+        "iXT6P61Yn7eycXm2"
+      ],
+      "timeRequirement": null,
+      "results": [
+        {
+          "id": "gsgErjIy1tx2iHzZ",
+          "componentId": "ynggS02L24kOwmSX",
+          "systemItemId": "ynggS02L24kOwmSX",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "pSTFOU00iK0MQQ09",
+          "componentId": "m09IQabktTGCAl6M",
+          "systemItemId": "m09IQabktTGCAl6M",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "8h4uFZIafLXKvPoo",
+          "componentId": "VvczBAHoni0vyEiL",
+          "systemItemId": "VvczBAHoni0vyEiL",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "3X1RC3KqQ4oLMTQY",
+          "componentId": "tzoljFxCKAYhgKcz",
+          "systemItemId": "tzoljFxCKAYhgKcz",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "2XIxgPgrx19EO9Ac",
+          "componentId": "HhX6HkoVSTZeLByJ",
+          "systemItemId": "HhX6HkoVSTZeLByJ",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782732543666,
+        "modified": 1782732543666,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "7rGsba8PDWltrdTH",
+      "name": "Runic Focus Rod",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": true,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "pXfiIzrEB25ZsFoL",
+          "name": "Ember core",
+          "ingredientGroups": [
+            {
+              "id": "CJGE3VDAkqrTFDrI",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "QX08NT9aWuZqtnZZ"
+                  },
+                  "componentId": "QX08NT9aWuZqtnZZ",
+                  "systemItemId": "QX08NT9aWuZqtnZZ",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "sI1vweglB8olm3EX",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "TuHbV8DbKyOhCJzO",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "e37CXyuWvbNqAEkv",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "Swdnvev0BQM5PGcj"
+                  },
+                  "componentId": "Swdnvev0BQM5PGcj",
+                  "systemItemId": "Swdnvev0BQM5PGcj",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "QX08NT9aWuZqtnZZ"
+              },
+              "componentId": "QX08NT9aWuZqtnZZ",
+              "systemItemId": "QX08NT9aWuZqtnZZ",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "Swdnvev0BQM5PGcj"
+              },
+              "componentId": "Swdnvev0BQM5PGcj",
+              "systemItemId": "Swdnvev0BQM5PGcj",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "gTNdtGDbHCh8wl9s"
+        },
+        {
+          "id": "xYFpT1OIRsGRmuqw",
+          "name": "Rime core",
+          "ingredientGroups": [
+            {
+              "id": "9ibrRj0tKQN7ORgq",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "QX08NT9aWuZqtnZZ"
+                  },
+                  "componentId": "QX08NT9aWuZqtnZZ",
+                  "systemItemId": "QX08NT9aWuZqtnZZ",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "RxBv4txFIBnIdGJN",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "DiTXXYDi0EWxDji4",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "kKR1mwQ3AlZXQzbf",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "GCVFgJZWkOghdJLg"
+                  },
+                  "componentId": "GCVFgJZWkOghdJLg",
+                  "systemItemId": "GCVFgJZWkOghdJLg",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "QX08NT9aWuZqtnZZ"
+              },
+              "componentId": "QX08NT9aWuZqtnZZ",
+              "systemItemId": "QX08NT9aWuZqtnZZ",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "GCVFgJZWkOghdJLg"
+              },
+              "componentId": "GCVFgJZWkOghdJLg",
+              "systemItemId": "GCVFgJZWkOghdJLg",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "X1zqNCCFpFPsqDYP"
+        },
+        {
+          "id": "KjsxtOvgE7O2CNpI",
+          "name": "Thunder core",
+          "ingredientGroups": [
+            {
+              "id": "PdxlSmMQ13TeKLIv",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "QX08NT9aWuZqtnZZ"
+                  },
+                  "componentId": "QX08NT9aWuZqtnZZ",
+                  "systemItemId": "QX08NT9aWuZqtnZZ",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "bzoiaZoBU5VYLyeD",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "0BrSAFOqAarRJKJp",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "4Gt1NZhoAHM9F0LO",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "EKCQa0esWdyTEe0f"
+                  },
+                  "componentId": "EKCQa0esWdyTEe0f",
+                  "systemItemId": "EKCQa0esWdyTEe0f",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "QX08NT9aWuZqtnZZ"
+              },
+              "componentId": "QX08NT9aWuZqtnZZ",
+              "systemItemId": "QX08NT9aWuZqtnZZ",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "EKCQa0esWdyTEe0f"
+              },
+              "componentId": "EKCQa0esWdyTEe0f",
+              "systemItemId": "EKCQa0esWdyTEe0f",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "cKpdMY3gd7TqZAQt"
+        },
+        {
+          "id": "rvWGz1GJX5AorzHe",
+          "name": "Verdant core",
+          "ingredientGroups": [
+            {
+              "id": "NSk6JrNP2wjHx7dB",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "QX08NT9aWuZqtnZZ"
+                  },
+                  "componentId": "QX08NT9aWuZqtnZZ",
+                  "systemItemId": "QX08NT9aWuZqtnZZ",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "Zp68Zre9jSESSb6P",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "PviTGdGZKzZnZaGi",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "u0lxIEs9eLR0RMKC",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "kfOD5aLFlJvuAjnW"
+                  },
+                  "componentId": "kfOD5aLFlJvuAjnW",
+                  "systemItemId": "kfOD5aLFlJvuAjnW",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "QX08NT9aWuZqtnZZ"
+              },
+              "componentId": "QX08NT9aWuZqtnZZ",
+              "systemItemId": "QX08NT9aWuZqtnZZ",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "kfOD5aLFlJvuAjnW"
+              },
+              "componentId": "kfOD5aLFlJvuAjnW",
+              "systemItemId": "kfOD5aLFlJvuAjnW",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "mVEBDxc0rY3WmKXV"
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "gTNdtGDbHCh8wl9s",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "05SQagbYjQec2bxN",
+              "componentId": "49UDYpEo5OpE7sbA",
+              "systemItemId": "49UDYpEo5OpE7sbA",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "X1zqNCCFpFPsqDYP",
+          "name": "Result Group 2",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "MbWu3ALtTeU5oL0F",
+              "componentId": "lAvzoiJHxoGYAmg6",
+              "systemItemId": "lAvzoiJHxoGYAmg6",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "cKpdMY3gd7TqZAQt",
+          "name": "Result Group 3",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "v4Q6InKaAVvLbRZl",
+              "componentId": "TMyAagX0uOItAAzL",
+              "systemItemId": "TMyAagX0uOItAAzL",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "mVEBDxc0rY3WmKXV",
+          "name": "Result Group 4",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "Ua96L2V9Ls7O23D8",
+              "componentId": "ijoBgYyguHPxSyva",
+              "systemItemId": "ijoBgYyguHPxSyva",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [
+        "0yo1JDLVWUi7Ushu",
+        "qcwrlSAdtYIRqsws"
+      ],
+      "timeRequirement": null,
+      "results": [
+        {
+          "id": "05SQagbYjQec2bxN",
+          "componentId": "49UDYpEo5OpE7sbA",
+          "systemItemId": "49UDYpEo5OpE7sbA",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "MbWu3ALtTeU5oL0F",
+          "componentId": "lAvzoiJHxoGYAmg6",
+          "systemItemId": "lAvzoiJHxoGYAmg6",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "v4Q6InKaAVvLbRZl",
+          "componentId": "TMyAagX0uOItAAzL",
+          "systemItemId": "TMyAagX0uOItAAzL",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "Ua96L2V9Ls7O23D8",
+          "componentId": "ijoBgYyguHPxSyva",
+          "systemItemId": "ijoBgYyguHPxSyva",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782737785830,
+        "modified": 1782737785830,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "Bm1Y8uor68wfp8wz",
+      "name": "Rune-Bound Shield Boss",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": true,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "HIiPQ8zfCyFuw7SC",
+          "name": "Verdant Warding",
+          "ingredientGroups": [
+            {
+              "id": "6JgjY03W908hJwqy",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "YUgnGh9NMmdgdJi8"
+                  },
+                  "componentId": "YUgnGh9NMmdgdJi8",
+                  "systemItemId": "YUgnGh9NMmdgdJi8",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "WGFFrzGhzI0MXPtk",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "ngpe6wBI6OMjIKD7",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "PCymBq989LSNAoAz",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "kfOD5aLFlJvuAjnW"
+                  },
+                  "componentId": "kfOD5aLFlJvuAjnW",
+                  "systemItemId": "kfOD5aLFlJvuAjnW",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "YUgnGh9NMmdgdJi8"
+              },
+              "componentId": "YUgnGh9NMmdgdJi8",
+              "systemItemId": "YUgnGh9NMmdgdJi8",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "kfOD5aLFlJvuAjnW"
+              },
+              "componentId": "kfOD5aLFlJvuAjnW",
+              "systemItemId": "kfOD5aLFlJvuAjnW",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "LD5KJFgecSpHZAoB"
+        },
+        {
+          "id": "l7aObYNS1lpbmVfE",
+          "name": "Sunward Warding",
+          "ingredientGroups": [
+            {
+              "id": "d6vgDy10flwaB4qb",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "YUgnGh9NMmdgdJi8"
+                  },
+                  "componentId": "YUgnGh9NMmdgdJi8",
+                  "systemItemId": "YUgnGh9NMmdgdJi8",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "UfPXDn4NDww9Cmj5",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "ozHW5rgWzKuy3Cmx",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "kXr8j45AUc8gYXhk",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "EF8RqWDFrDlvVxrp"
+                  },
+                  "componentId": "EF8RqWDFrDlvVxrp",
+                  "systemItemId": "EF8RqWDFrDlvVxrp",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "YUgnGh9NMmdgdJi8"
+              },
+              "componentId": "YUgnGh9NMmdgdJi8",
+              "systemItemId": "YUgnGh9NMmdgdJi8",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "EF8RqWDFrDlvVxrp"
+              },
+              "componentId": "EF8RqWDFrDlvVxrp",
+              "systemItemId": "EF8RqWDFrDlvVxrp",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "ztTXipLf4mStayep"
+        },
+        {
+          "id": "Aj3y6h7xBbh8HAbB",
+          "name": "Stormguard Binding",
+          "ingredientGroups": [
+            {
+              "id": "v9hDUcN9xL4tp5Hv",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "YUgnGh9NMmdgdJi8"
+                  },
+                  "componentId": "YUgnGh9NMmdgdJi8",
+                  "systemItemId": "YUgnGh9NMmdgdJi8",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "SSUPgXcRxwvZHhy2",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "PpFcxHyn8RHvkwm4",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "sQFjfcxLYWteJGrR",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "EKCQa0esWdyTEe0f"
+                  },
+                  "componentId": "EKCQa0esWdyTEe0f",
+                  "systemItemId": "EKCQa0esWdyTEe0f",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "YUgnGh9NMmdgdJi8"
+              },
+              "componentId": "YUgnGh9NMmdgdJi8",
+              "systemItemId": "YUgnGh9NMmdgdJi8",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "EKCQa0esWdyTEe0f"
+              },
+              "componentId": "EKCQa0esWdyTEe0f",
+              "systemItemId": "EKCQa0esWdyTEe0f",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "KRHL8bJm5wk1o7ze"
+        },
+        {
+          "id": "h9AGoa4fEMJWkojc",
+          "name": "Graveward Binding",
+          "ingredientGroups": [
+            {
+              "id": "QxJnKqpZM0P74HGf",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "YUgnGh9NMmdgdJi8"
+                  },
+                  "componentId": "YUgnGh9NMmdgdJi8",
+                  "systemItemId": "YUgnGh9NMmdgdJi8",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "zARSREed3YjcMmAA",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "FK7gU9YfNQN8Egz6"
+                  },
+                  "componentId": "FK7gU9YfNQN8Egz6",
+                  "systemItemId": "FK7gU9YfNQN8Egz6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "AbSenE3Flw1L4A4Q",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IzzPOo4OKznJc5WA"
+                  },
+                  "componentId": "IzzPOo4OKznJc5WA",
+                  "systemItemId": "IzzPOo4OKznJc5WA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "j7otQxVhvDVbxc9e",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "m7BnBotoXM4Puscs"
+                  },
+                  "componentId": "m7BnBotoXM4Puscs",
+                  "systemItemId": "m7BnBotoXM4Puscs",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "YUgnGh9NMmdgdJi8"
+              },
+              "componentId": "YUgnGh9NMmdgdJi8",
+              "systemItemId": "YUgnGh9NMmdgdJi8",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "FK7gU9YfNQN8Egz6"
+              },
+              "componentId": "FK7gU9YfNQN8Egz6",
+              "systemItemId": "FK7gU9YfNQN8Egz6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "IzzPOo4OKznJc5WA"
+              },
+              "componentId": "IzzPOo4OKznJc5WA",
+              "systemItemId": "IzzPOo4OKznJc5WA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "m7BnBotoXM4Puscs"
+              },
+              "componentId": "m7BnBotoXM4Puscs",
+              "systemItemId": "m7BnBotoXM4Puscs",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": "WE61ubiC3453k2u0"
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "LD5KJFgecSpHZAoB",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "Bk0UzAD6G15PC7RF",
+              "componentId": "UtkbkIEsy4VVa9Nx",
+              "systemItemId": "UtkbkIEsy4VVa9Nx",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "ztTXipLf4mStayep",
+          "name": "Result Group 2",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "c6NvjzHLbfgBXluh",
+              "componentId": "yLfCv1BKffiN7Bj9",
+              "systemItemId": "yLfCv1BKffiN7Bj9",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "WE61ubiC3453k2u0",
+          "name": "Result Group 3",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "RqtImcSSc8LT1k3u",
+              "componentId": "bVggtq3mwDZcJaSr",
+              "systemItemId": "bVggtq3mwDZcJaSr",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "KRHL8bJm5wk1o7ze",
+          "name": "Result Group 4",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "0tt7B7Ounz5kyKS9",
+              "componentId": "bpxh73ljFd2Dvzcs",
+              "systemItemId": "bpxh73ljFd2Dvzcs",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [],
+      "timeRequirement": null,
+      "results": [
+        {
+          "id": "Bk0UzAD6G15PC7RF",
+          "componentId": "UtkbkIEsy4VVa9Nx",
+          "systemItemId": "UtkbkIEsy4VVa9Nx",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "c6NvjzHLbfgBXluh",
+          "componentId": "yLfCv1BKffiN7Bj9",
+          "systemItemId": "yLfCv1BKffiN7Bj9",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "RqtImcSSc8LT1k3u",
+          "componentId": "bVggtq3mwDZcJaSr",
+          "systemItemId": "bVggtq3mwDZcJaSr",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "0tt7B7Ounz5kyKS9",
+          "componentId": "bpxh73ljFd2Dvzcs",
+          "systemItemId": "bpxh73ljFd2Dvzcs",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782738637484,
+        "modified": 1782738637484,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    }
+  ]
+}

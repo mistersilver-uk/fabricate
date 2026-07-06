@@ -1,0 +1,1252 @@
+{
+  "fabricateVersion": "0.1.0",
+  "exportedAt": "2026-07-06T12:15:57.830Z",
+  "system": {
+    "id": "O8ZlDBViza3GgwHV",
+    "name": "Camp Cookery",
+    "description": "Camp Cookery is a practical field-crafting system for turning gathered ingredients into travel food, hearty meals, and morale-boosting provisions. It is deliberately humble. A cook ca make stews, rations, broth, flatbreads, and trail snacks.",
+    "enabled": true,
+    "resolutionMode": "simple",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": false,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": true,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false
+    },
+    "itemTags": [],
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "item": {
+          "limitUses": false,
+          "destroyWhenExhausted": false
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": false
+      },
+      "currency": {
+        "enabled": false,
+        "spendStrategy": "actorProperty",
+        "providerId": "",
+        "macros": {
+          "canAfford": "",
+          "increment": "",
+          "decrement": ""
+        },
+        "units": []
+      }
+    },
+    "essenceDefinitions": [],
+    "recipeItemDefinitions": [],
+    "craftingCheck": {
+      "enabled": true,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "simple": {
+        "rollFormula": "1d20 + @abilities.int.mod",
+        "dc": 12,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [
+          {
+            "id": "yWsEIEQjZcYAQpA7",
+            "name": "Easy",
+            "dc": 12
+          },
+          {
+            "id": "yMdHmGz3W7ayvGjp",
+            "name": "Moderate",
+            "dc": 14
+          },
+          {
+            "id": "PH8AsfGcJJ4niskx",
+            "name": "Difficult",
+            "dc": 16
+          }
+        ],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": [
+            {
+              "id": "k7yZo387HMMj65u1",
+              "condition": {
+                "type": "diceGroup",
+                "groupId": 0,
+                "aggregate": "total",
+                "operator": "==",
+                "value": 20
+              },
+              "outcome": "failure",
+              "breakTools": false
+            },
+            {
+              "id": "njRQD7rOJ3wgr0qN",
+              "condition": {
+                "type": "diceGroup",
+                "groupId": 0,
+                "aggregate": "total",
+                "operator": "==",
+                "value": 1
+              },
+              "outcome": "failure",
+              "breakTools": false
+            }
+          ]
+        }
+      }
+    },
+    "salvageResolutionMode": "simple",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "categories": [],
+    "components": [
+      {
+        "id": "f3E0YWpTjhvL7bCj",
+        "name": "Clean Water",
+        "img": "icons/consumables/potions/potion-bottle-corked-fancy-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.xdhgpG3mS9oRpKHz",
+        "sourceUuid": "Item.xdhgpG3mS9oRpKHz",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "8tpHgtZApIvXAM7q",
+        "name": "Foraged Greens",
+        "img": "icons/consumables/plants/lily-pad-leaf-stem.webp",
+        "description": "",
+        "sourceItemUuid": "Item.5nP5Ljf4gizEWyTX",
+        "sourceUuid": "Item.5nP5Ljf4gizEWyTX",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "OsGPQapW99WRkEQh",
+        "name": "Trail Grain",
+        "img": "icons/consumables/grains/wheat-yellow.webp",
+        "description": "",
+        "sourceItemUuid": "Item.PUKWDWyLGlWwRjQ9",
+        "sourceUuid": "Item.PUKWDWyLGlWwRjQ9",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "zx1wZOlIpoNknvYM",
+        "name": "Root Vegetables",
+        "img": "icons/consumables/plants/herb-tied-bundle-dried-yellow.webp",
+        "description": "",
+        "sourceItemUuid": "Item.OV0VBKPdp7pPIuOO",
+        "sourceUuid": "Item.OV0VBKPdp7pPIuOO",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "qE2ZORySPXRJDQdj",
+        "name": "Salted Meat",
+        "img": "icons/consumables/meat/drumstick-glowing-yellow.webp",
+        "description": "",
+        "sourceItemUuid": "Item.EvPes1Fa7SDFKk8K",
+        "sourceUuid": "Item.EvPes1Fa7SDFKk8K",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "DstgrO0Iq9LE3E0z",
+        "name": "Fresh Game",
+        "img": "icons/consumables/meat/lamb-chop-rack-raw-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.AQSvWUcXeEsFvpQq",
+        "sourceUuid": "Item.AQSvWUcXeEsFvpQq",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "n0rbAj4Qpc4KapCx",
+        "name": "Embercap Mushroom",
+        "img": "icons/consumables/mushrooms/conical-bell-pink.webp",
+        "description": "",
+        "sourceItemUuid": "Item.4pFtAVkuqUbkY31a",
+        "sourceUuid": "Item.4pFtAVkuqUbkY31a",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "Am52BPIdlfkw5o38",
+        "name": "Hearth Herbs",
+        "img": "icons/consumables/plants/herb-tied-bundle-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.tSAgMUx86HP9RMIO",
+        "sourceUuid": "Item.tSAgMUx86HP9RMIO",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "2EF8wbJKX7fWwjNZ",
+        "name": "Honeyed Nuts",
+        "img": "icons/consumables/nuts/walnut-shelled-glowing-brown.webp",
+        "description": "",
+        "sourceItemUuid": "Item.PGB1BAVi5uMH7dVo",
+        "sourceUuid": "Item.PGB1BAVi5uMH7dVo",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "4VZnwaWisReUSnCh",
+        "name": "Hearty Camp Stew",
+        "img": "icons/consumables/food/bowl-stew-brown.webp",
+        "description": "",
+        "sourceItemUuid": "Item.E99PBpMjChoTTeKg",
+        "sourceUuid": "Item.E99PBpMjChoTTeKg",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "76UADnHssGGUjVwx",
+        "name": "Trail Rations",
+        "img": "icons/consumables/food/berries-ration-round-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.HU6zkio4SnWQxzSe",
+        "sourceUuid": "Item.HU6zkio4SnWQxzSe",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "NESqfdOqM3yeglsS",
+        "name": "Restorative Broth",
+        "img": "icons/consumables/food/bowl-stew-tofu-potato-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.fI2EVUOi8qYO17In",
+        "sourceUuid": "Item.fI2EVUOi8qYO17In",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "2B4Ck01ei2IzLsLH",
+        "name": "Embercap Skillet Cakes",
+        "img": "icons/consumables/food/steak-aged-brown.webp",
+        "description": "",
+        "sourceItemUuid": "Item.BuBcIW4Eej8s4oVF",
+        "sourceUuid": "Item.BuBcIW4Eej8s4oVF",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "3uViZDEaWiYDQ2xo",
+        "name": "Sweet Trail Mix",
+        "img": "icons/consumables/food/berries-cream-bowl-mint-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.hejluKy3ZOVPK8T6",
+        "sourceUuid": "Item.hejluKy3ZOVPK8T6",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "HF1p6r9XZt7Pvf7V",
+        "name": "Cook’s Utensils",
+        "img": "icons/tools/cooking/knife-cleaver-steel-grey.webp",
+        "description": "",
+        "sourceItemUuid": "Item.S9e2qSfaazVRY8JI",
+        "sourceUuid": "Item.S9e2qSfaazVRY8JI",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "Wengb1BgDjWJdDlo",
+        "name": "Camp Kettle",
+        "img": "icons/tools/cooking/cauldron-empty.webp",
+        "description": "",
+        "sourceItemUuid": "Item.mgnVX6FdZLwuMqxG",
+        "sourceUuid": "Item.mgnVX6FdZLwuMqxG",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "2wBxwyjx2KDvLyb1",
+        "name": "Iron Skillet",
+        "img": "icons/tools/cooking/pot-camping-iron-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.y0OSZj0NHjbJByNS",
+        "sourceUuid": "Item.y0OSZj0NHjbJByNS",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "vn7rC1qUspJB7UAt",
+        "name": "Preserving Kit",
+        "img": "icons/tools/cooking/mortar-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.o8H053wuR7413oG1",
+        "sourceUuid": "Item.o8H053wuR7413oG1",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "vl7zyPDce4LB8u5S",
+        "label": "",
+        "enabled": true,
+        "componentId": "HF1p6r9XZt7Pvf7V",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 5
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "zsWGb09XfSn8ramK",
+        "label": "",
+        "enabled": true,
+        "componentId": "Wengb1BgDjWJdDlo",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 3
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "gm1NsNBWDInoVjqn",
+        "label": "",
+        "enabled": true,
+        "componentId": "2wBxwyjx2KDvLyb1",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 5
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "p4J6NtOFsSM0HeN1",
+        "label": "",
+        "enabled": true,
+        "componentId": "vn7rC1qUspJB7UAt",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 2
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      }
+    ],
+    "gatheringRealms": [],
+    "gatheringRealmSettings": {
+      "enabled": false,
+      "revealMode": "manual",
+      "modifierVisibility": "visible"
+    }
+  },
+  "recipes": [
+    {
+      "id": "E9IgB52OqdTRlxes",
+      "name": "Hearty Camp Stew",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": false,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "wRi5yJqL7CnOanfU",
+          "name": "",
+          "ingredientGroups": [
+            {
+              "id": "MdGo4uElGX80F5Kt",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "f3E0YWpTjhvL7bCj"
+                  },
+                  "componentId": "f3E0YWpTjhvL7bCj",
+                  "systemItemId": "f3E0YWpTjhvL7bCj",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "dVq2TKHSXTbxC5iL",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "zx1wZOlIpoNknvYM"
+                  },
+                  "componentId": "zx1wZOlIpoNknvYM",
+                  "systemItemId": "zx1wZOlIpoNknvYM",
+                  "itemUuid": null,
+                  "quantity": 2,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "wukCruZAHWY8mlum",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "qE2ZORySPXRJDQdj"
+                  },
+                  "componentId": "qE2ZORySPXRJDQdj",
+                  "systemItemId": "qE2ZORySPXRJDQdj",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "30RmtUDVZZHNl27d",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "8tpHgtZApIvXAM7q"
+                  },
+                  "componentId": "8tpHgtZApIvXAM7q",
+                  "systemItemId": "8tpHgtZApIvXAM7q",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "f3E0YWpTjhvL7bCj"
+              },
+              "componentId": "f3E0YWpTjhvL7bCj",
+              "systemItemId": "f3E0YWpTjhvL7bCj",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "zx1wZOlIpoNknvYM"
+              },
+              "componentId": "zx1wZOlIpoNknvYM",
+              "systemItemId": "zx1wZOlIpoNknvYM",
+              "itemUuid": null,
+              "quantity": 2,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "qE2ZORySPXRJDQdj"
+              },
+              "componentId": "qE2ZORySPXRJDQdj",
+              "systemItemId": "qE2ZORySPXRJDQdj",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "8tpHgtZApIvXAM7q"
+              },
+              "componentId": "8tpHgtZApIvXAM7q",
+              "systemItemId": "8tpHgtZApIvXAM7q",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": null
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "VTyTdZsM7B6aSL2f",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "YVKUbIiOwvXQOLcW",
+              "componentId": "4VZnwaWisReUSnCh",
+              "systemItemId": "4VZnwaWisReUSnCh",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [
+        "vl7zyPDce4LB8u5S",
+        "zsWGb09XfSn8ramK"
+      ],
+      "timeRequirement": null,
+      "results": [
+        {
+          "id": "YVKUbIiOwvXQOLcW",
+          "componentId": "4VZnwaWisReUSnCh",
+          "systemItemId": "4VZnwaWisReUSnCh",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": "yMdHmGz3W7ayvGjp",
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782744361673,
+        "modified": 1782744361673,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "w9Rrhp9rgpfRGRpe",
+      "name": "Trail Ration Bundle",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": false,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "gOGxRiELzLS2vcCk",
+          "name": "",
+          "ingredientGroups": [
+            {
+              "id": "j2cb0Gpua6pMz0kl",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "OsGPQapW99WRkEQh"
+                  },
+                  "componentId": "OsGPQapW99WRkEQh",
+                  "systemItemId": "OsGPQapW99WRkEQh",
+                  "itemUuid": null,
+                  "quantity": 2,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "LaHXhMDJFTtuRZUU",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "qE2ZORySPXRJDQdj"
+                  },
+                  "componentId": "qE2ZORySPXRJDQdj",
+                  "systemItemId": "qE2ZORySPXRJDQdj",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "8r2QmzbmGjAJetKD",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "2EF8wbJKX7fWwjNZ"
+                  },
+                  "componentId": "2EF8wbJKX7fWwjNZ",
+                  "systemItemId": "2EF8wbJKX7fWwjNZ",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "OsGPQapW99WRkEQh"
+              },
+              "componentId": "OsGPQapW99WRkEQh",
+              "systemItemId": "OsGPQapW99WRkEQh",
+              "itemUuid": null,
+              "quantity": 2,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "qE2ZORySPXRJDQdj"
+              },
+              "componentId": "qE2ZORySPXRJDQdj",
+              "systemItemId": "qE2ZORySPXRJDQdj",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "2EF8wbJKX7fWwjNZ"
+              },
+              "componentId": "2EF8wbJKX7fWwjNZ",
+              "systemItemId": "2EF8wbJKX7fWwjNZ",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": null
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "Hz3gg4DbpVScnxmJ",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "UALAIuSIKKOvwi4n",
+              "componentId": "76UADnHssGGUjVwx",
+              "systemItemId": "76UADnHssGGUjVwx",
+              "itemUuid": null,
+              "quantity": 4,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [
+        "vl7zyPDce4LB8u5S",
+        "p4J6NtOFsSM0HeN1"
+      ],
+      "timeRequirement": null,
+      "results": [
+        {
+          "id": "UALAIuSIKKOvwi4n",
+          "componentId": "76UADnHssGGUjVwx",
+          "systemItemId": "76UADnHssGGUjVwx",
+          "itemUuid": null,
+          "quantity": 4,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": "yWsEIEQjZcYAQpA7",
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782744459600,
+        "modified": 1782744459600,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "LDniMONHLneYf2Vm",
+      "name": "Embercap Skillet Cakes",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": false,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "3cE5LaMZGmrfQflz",
+          "name": "",
+          "ingredientGroups": [
+            {
+              "id": "IiH6VrS5h4Eoof8G",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "n0rbAj4Qpc4KapCx"
+                  },
+                  "componentId": "n0rbAj4Qpc4KapCx",
+                  "systemItemId": "n0rbAj4Qpc4KapCx",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "WbpPQeITcmrGvFar",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "OsGPQapW99WRkEQh"
+                  },
+                  "componentId": "OsGPQapW99WRkEQh",
+                  "systemItemId": "OsGPQapW99WRkEQh",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "1uOvsJMPALYIhGpz",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "f3E0YWpTjhvL7bCj"
+                  },
+                  "componentId": "f3E0YWpTjhvL7bCj",
+                  "systemItemId": "f3E0YWpTjhvL7bCj",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "CD0jVtx5eHnKGXNo",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "Am52BPIdlfkw5o38"
+                  },
+                  "componentId": "Am52BPIdlfkw5o38",
+                  "systemItemId": "Am52BPIdlfkw5o38",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "n0rbAj4Qpc4KapCx"
+              },
+              "componentId": "n0rbAj4Qpc4KapCx",
+              "systemItemId": "n0rbAj4Qpc4KapCx",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "OsGPQapW99WRkEQh"
+              },
+              "componentId": "OsGPQapW99WRkEQh",
+              "systemItemId": "OsGPQapW99WRkEQh",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "f3E0YWpTjhvL7bCj"
+              },
+              "componentId": "f3E0YWpTjhvL7bCj",
+              "systemItemId": "f3E0YWpTjhvL7bCj",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "Am52BPIdlfkw5o38"
+              },
+              "componentId": "Am52BPIdlfkw5o38",
+              "systemItemId": "Am52BPIdlfkw5o38",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": null
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "1bIMZBrKxMp6Rip3",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "U4ggpLoQSg5v3KS2",
+              "componentId": "2B4Ck01ei2IzLsLH",
+              "systemItemId": "2B4Ck01ei2IzLsLH",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [],
+      "timeRequirement": null,
+      "results": [
+        {
+          "id": "U4ggpLoQSg5v3KS2",
+          "componentId": "2B4Ck01ei2IzLsLH",
+          "systemItemId": "2B4Ck01ei2IzLsLH",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": "PH8AsfGcJJ4niskx",
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782744511231,
+        "modified": 1782744511231,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    }
+  ]
+}

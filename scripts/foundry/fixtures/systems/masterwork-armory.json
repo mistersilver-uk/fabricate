@@ -1,0 +1,2041 @@
+{
+  "fabricateVersion": "0.1.0",
+  "exportedAt": "2026-07-06T12:16:06.430Z",
+  "system": {
+    "id": "FwYqFZHlUiG7BYcG",
+    "name": "Masterwork Armory",
+    "description": "A disciplined martial crafting system for forging weapons, armour, shields, and battlefield gear. The recipe defines what the artisan is trying to make, but the check determines how well the work turns out. A poor but successful craft might produce a crude or flawed version. A solid result creates the standard item. An exceptional result produces reinforced, balanced, decorated, or masterwork equipment.",
+    "enabled": true,
+    "resolutionMode": "routedByCheck",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": false,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false
+    },
+    "itemTags": [],
+    "recipeVisibility": {
+      "listMode": "knowledge",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "item": {
+          "limitUses": true,
+          "maxUses": 1,
+          "destroyWhenExhausted": false
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": false
+      },
+      "currency": {
+        "enabled": false,
+        "spendStrategy": "actorProperty",
+        "providerId": "",
+        "macros": {
+          "canAfford": "",
+          "increment": "",
+          "decrement": ""
+        },
+        "units": []
+      }
+    },
+    "essenceDefinitions": [],
+    "recipeItemDefinitions": [],
+    "craftingCheck": {
+      "enabled": true,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "1d20 + @abilities.str.mod + @prof",
+        "dc": 12,
+        "thresholdMode": "meet",
+        "tiers": [
+          {
+            "id": "Tmv69cgie7usRLCM",
+            "name": "Journeyman",
+            "dc": 12
+          },
+          {
+            "id": "fyWajAkOma4cqQVp",
+            "name": "Craftsman",
+            "dc": 15
+          },
+          {
+            "id": "71WvXh5B9tPLw47O",
+            "name": "Artisan",
+            "dc": 19
+          }
+        ],
+        "relativeOutcomes": [
+          {
+            "id": "zeraZCnaUYKHGbAn",
+            "name": "Failure",
+            "success": false,
+            "breakTools": false,
+            "dc": -5
+          },
+          {
+            "id": "5z3EjwTlBCIg4sRY",
+            "name": "Crude",
+            "success": true,
+            "breakTools": false,
+            "dc": -1
+          },
+          {
+            "id": "Srrte82AflxOllBe",
+            "name": "Serviceable",
+            "success": true,
+            "breakTools": false,
+            "dc": 0
+          },
+          {
+            "id": "MCxZFsyZXeLwN4dP",
+            "name": "Fine",
+            "success": true,
+            "breakTools": false,
+            "dc": 5
+          },
+          {
+            "id": "iCGHs7L34wBeewJQ",
+            "name": "Masterwork",
+            "success": true,
+            "breakTools": false,
+            "dc": 10
+          }
+        ],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": [
+            {
+              "id": "TUOe9kJnhfVNbk2m",
+              "condition": {
+                "type": "diceGroup",
+                "groupId": 0,
+                "aggregate": "anyDie",
+                "operator": "==",
+                "value": 1
+              },
+              "outcome": "failure",
+              "breakTools": false
+            },
+            {
+              "id": "a4jg72Xs6liHZj7j",
+              "condition": {
+                "type": "diceGroup",
+                "groupId": 0,
+                "aggregate": "anyDie",
+                "operator": "==",
+                "value": 20
+              },
+              "outcome": "success",
+              "breakTools": false
+            }
+          ]
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "salvageResolutionMode": "routed",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "categories": [],
+    "components": [
+      {
+        "id": "OwItxa4e1qH07Ofi",
+        "name": "Iron Ingot",
+        "img": "icons/commodities/metal/ingot-iron.webp",
+        "description": "",
+        "sourceItemUuid": "Item.3FFkdlwe2BazOEuK",
+        "sourceUuid": "Item.3FFkdlwe2BazOEuK",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "4pHKPmFQkU3mcsXP",
+        "name": "Steel Billet",
+        "img": "icons/commodities/metal/ingot-stack-steel.webp",
+        "description": "",
+        "sourceItemUuid": "Item.DNTh4dlxMcGcXvPw",
+        "sourceUuid": "Item.DNTh4dlxMcGcXvPw",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "WadINfMgmxBEICnL",
+        "name": "Charcoal",
+        "img": "icons/containers/bags/sack-leather-blue-brown.webp",
+        "description": "",
+        "sourceItemUuid": "Item.UnsCRucf6u9Gz6mZ",
+        "sourceUuid": "Item.UnsCRucf6u9Gz6mZ",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "w7LLOTvGk6SjhBt1",
+        "name": "Quenching Oil",
+        "img": "icons/consumables/potions/potion-bottle-labeled-medicine-capped-red-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.Te8afPquqm3AaVAl",
+        "sourceUuid": "Item.Te8afPquqm3AaVAl",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "jAWu4T1iFNmca6nX",
+        "name": "Leather Straps",
+        "img": "icons/sundries/survival/leather-strap-brown.webp",
+        "description": "",
+        "sourceItemUuid": "Item.u3I23hQrw5SpdOJY",
+        "sourceUuid": "Item.u3I23hQrw5SpdOJY",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "iM1Rpd9pFLaCnFEU",
+        "name": "Rivets",
+        "img": "icons/commodities/metal/pin-cottar-steel.webp",
+        "description": "",
+        "sourceItemUuid": "Item.KgeB9jhRIYYlbco1",
+        "sourceUuid": "Item.KgeB9jhRIYYlbco1",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "j0N6WQd8uQLrhIZ2",
+        "name": "Wool Padding",
+        "img": "icons/commodities/cloth/cloth-bolt-glow-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.KOGtJzvjNbvOWjdX",
+        "sourceUuid": "Item.KOGtJzvjNbvOWjdX",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "iSrz7b0QDOYvjUFd",
+        "name": "Brass Trim",
+        "img": "icons/commodities/metal/plate-mount-round-copper.webp",
+        "description": "",
+        "sourceItemUuid": "Item.dFCW22llH71BJoxG",
+        "sourceUuid": "Item.dFCW22llH71BJoxG",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "9aeiyQzt7iGbfapy",
+        "name": "Warped Breastplate",
+        "img": "icons/equipment/chest/breastplate-sculpted-grey.webp",
+        "description": "",
+        "sourceItemUuid": "Item.xMSTSlEFKhSe7tAF",
+        "sourceUuid": "Item.xMSTSlEFKhSe7tAF",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "N2l3jntxcIl7JfLP",
+        "name": "Iron Breastplate",
+        "img": "icons/equipment/chest/breastplate-gorget-steel-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.asxBlktLxmS93QxV",
+        "sourceUuid": "Item.asxBlktLxmS93QxV",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "kT1XPccoVcxWF8L4",
+        "name": "Reinforced Breastplate",
+        "img": "icons/equipment/chest/breastplate-collared-steel.webp",
+        "description": "",
+        "sourceItemUuid": "Item.FCEgReYwKb1be8n9",
+        "sourceUuid": "Item.FCEgReYwKb1be8n9",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "zhc15gaLpLRCDaZH",
+        "name": "Masterwork Breastplate",
+        "img": "icons/equipment/chest/breastplate-layered-steel-grey.webp",
+        "description": "",
+        "sourceItemUuid": "Item.FNOlnfCaLlyh1TCe",
+        "sourceUuid": "Item.FNOlnfCaLlyh1TCe",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "5iJmcH2Q5vxkw57O",
+        "name": "Poorly Tempered Longsword",
+        "img": "icons/weapons/swords/sword-guard-worn.webp",
+        "description": "",
+        "sourceItemUuid": "Item.VAAF5DmpB22WSad4",
+        "sourceUuid": "Item.VAAF5DmpB22WSad4",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "lEM3NjiNEWZIhC3y",
+        "name": "Tempered Longsword",
+        "img": "icons/weapons/swords/greatsword-crossguard-steel.webp",
+        "description": "",
+        "sourceItemUuid": "Item.qmG7yYWm9BbftNKR",
+        "sourceUuid": "Item.qmG7yYWm9BbftNKR",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "YEILnKFROdCDseiP",
+        "name": "Keen Longsword",
+        "img": "icons/weapons/swords/greatsword-crossguard-engraved-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.so1UcSS9JSN463An",
+        "sourceUuid": "Item.so1UcSS9JSN463An",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "37mEHUVVhSOiqvJb",
+        "name": "Perfectly Balanced Longsword",
+        "img": "icons/weapons/swords/greatsword-crossguard-silver.webp",
+        "description": "",
+        "sourceItemUuid": "Item.43A40lYMsi6DNFjD",
+        "sourceUuid": "Item.43A40lYMsi6DNFjD",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "rH7zF4FRolWJ4k6A",
+        "name": "Battered Round Shield",
+        "img": "icons/equipment/shield/buckler-wooden-round-hole.webp",
+        "description": "",
+        "sourceItemUuid": "Item.AVTcxBZ0tGB8rnpT",
+        "sourceUuid": "Item.AVTcxBZ0tGB8rnpT",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "STXbjSJwutoAilAv",
+        "name": "Round Shield",
+        "img": "icons/equipment/shield/buckler-wooden-boss.webp",
+        "description": "",
+        "sourceItemUuid": "Item.Ol1WMaOZ3eahlVDZ",
+        "sourceUuid": "Item.Ol1WMaOZ3eahlVDZ",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "hZAroor51b5ucVEa",
+        "name": "Reinforced Round Shield",
+        "img": "icons/equipment/shield/round-wooden-reinforced-boss-steel.webp",
+        "description": "",
+        "sourceItemUuid": "Item.3fBaEwaFRzQh3iWx",
+        "sourceUuid": "Item.3fBaEwaFRzQh3iWx",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "n4HF4zsrBHCKjy9m",
+        "name": "Masterwork Round Shield",
+        "img": "icons/equipment/shield/buckler-wooden-boss-steel.webp",
+        "description": "",
+        "sourceItemUuid": "Item.WuVfEdQcTkOtyNQZ",
+        "sourceUuid": "Item.WuVfEdQcTkOtyNQZ",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "h2qQuTezY5XyfStT",
+        "name": "Smith’s Mark",
+        "img": "icons/sundries/documents/document-sealed-red-yellow.webp",
+        "description": "",
+        "sourceItemUuid": "Item.8glpAZZF0FbpEZBr",
+        "sourceUuid": "Item.8glpAZZF0FbpEZBr",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "iY4JiNv0f5AlyOzg",
+        "name": "Noble Appraisal",
+        "img": "icons/sundries/documents/document-sealed-red-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.5tjJnm2UyAye2Xiw",
+        "sourceUuid": "Item.5tjJnm2UyAye2Xiw",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "CKAKs0dHwBfqjDs0",
+        "name": "Scrap Metal",
+        "img": "icons/commodities/metal/plate-scored-steel.webp",
+        "description": "",
+        "sourceItemUuid": "Item.bOCkqtL2vcCOTI45",
+        "sourceUuid": "Item.bOCkqtL2vcCOTI45",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "pPZO57262CXQcyv4",
+        "name": "Armourer’s Hammer",
+        "img": "icons/tools/hand/hammer-simple-wood.webp",
+        "description": "",
+        "sourceItemUuid": "Item.WR2W0dFEETEEntvB",
+        "sourceUuid": "Item.WR2W0dFEETEEntvB",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "AIclI4jylMODNwTs",
+        "name": "Grindstone",
+        "img": "icons/commodities/tech/wheel-wooden.webp",
+        "description": "",
+        "sourceItemUuid": "Item.4Mj1FA2kNdvoWv7n",
+        "sourceUuid": "Item.4Mj1FA2kNdvoWv7n",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "NQk3rrF850G7ZBJt",
+        "name": "Shield Press",
+        "img": "icons/tools/smithing/handle-brass.webp",
+        "description": "",
+        "sourceItemUuid": "Item.zOIAEl1N2sq4rfZs",
+        "sourceUuid": "Item.zOIAEl1N2sq4rfZs",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "rLajY90dFYHOB7Zi",
+        "name": "Smith's Tools",
+        "img": "icons/tools/hand/hammer-and-nail.webp",
+        "description": "",
+        "sourceItemUuid": "Item.Hiqyh172HqiG7mBY",
+        "sourceUuid": "Item.Hiqyh172HqiG7mBY",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "c0xzZQUK7eG7dOQn",
+        "name": "Tempering Tongs",
+        "img": "icons/tools/smithing/tongs-steel-grey.webp",
+        "description": "",
+        "sourceItemUuid": "Item.Z9JGmVjcJ2tr7UHd",
+        "sourceUuid": "Item.Z9JGmVjcJ2tr7UHd",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "lYuYI63cnCERPtVl",
+        "label": "",
+        "enabled": true,
+        "componentId": "pPZO57262CXQcyv4",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 8
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "hindoF7gODMPOHWf",
+        "label": "",
+        "enabled": true,
+        "componentId": "AIclI4jylMODNwTs",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 3
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "QOZRoXomBkl6Su04",
+        "label": "",
+        "enabled": true,
+        "componentId": "NQk3rrF850G7ZBJt",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 5
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "K7Mb3sugwvFua2Vj",
+        "label": "",
+        "enabled": true,
+        "componentId": "rLajY90dFYHOB7Zi",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 8
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "nihBvXVwbpgFsAkY",
+        "label": "",
+        "enabled": true,
+        "componentId": "c0xzZQUK7eG7dOQn",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 4
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      }
+    ],
+    "gatheringRealms": [],
+    "gatheringRealmSettings": {
+      "enabled": false,
+      "revealMode": "manual",
+      "modifierVisibility": "visible"
+    }
+  },
+  "recipes": [
+    {
+      "id": "Ujkugbc4XwnU7yfI",
+      "name": "Forge Breastplate",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": true,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "KFi4eyFNKkvG7uRA",
+          "name": "",
+          "ingredientGroups": [
+            {
+              "id": "x6OcWQhygIASt5bt",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "OwItxa4e1qH07Ofi"
+                  },
+                  "componentId": "OwItxa4e1qH07Ofi",
+                  "systemItemId": "OwItxa4e1qH07Ofi",
+                  "itemUuid": null,
+                  "quantity": 3,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "cetYTUPjHgtUJ7gs",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "jAWu4T1iFNmca6nX"
+                  },
+                  "componentId": "jAWu4T1iFNmca6nX",
+                  "systemItemId": "jAWu4T1iFNmca6nX",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "uaATLJgDdVtvlITM",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "iM1Rpd9pFLaCnFEU"
+                  },
+                  "componentId": "iM1Rpd9pFLaCnFEU",
+                  "systemItemId": "iM1Rpd9pFLaCnFEU",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "kYYfyknA1fTriQxS",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "j0N6WQd8uQLrhIZ2"
+                  },
+                  "componentId": "j0N6WQd8uQLrhIZ2",
+                  "systemItemId": "j0N6WQd8uQLrhIZ2",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "eYMaQ1RtvJt7iBQP",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "WadINfMgmxBEICnL"
+                  },
+                  "componentId": "WadINfMgmxBEICnL",
+                  "systemItemId": "WadINfMgmxBEICnL",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "OwItxa4e1qH07Ofi"
+              },
+              "componentId": "OwItxa4e1qH07Ofi",
+              "systemItemId": "OwItxa4e1qH07Ofi",
+              "itemUuid": null,
+              "quantity": 3,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "jAWu4T1iFNmca6nX"
+              },
+              "componentId": "jAWu4T1iFNmca6nX",
+              "systemItemId": "jAWu4T1iFNmca6nX",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "iM1Rpd9pFLaCnFEU"
+              },
+              "componentId": "iM1Rpd9pFLaCnFEU",
+              "systemItemId": "iM1Rpd9pFLaCnFEU",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "j0N6WQd8uQLrhIZ2"
+              },
+              "componentId": "j0N6WQd8uQLrhIZ2",
+              "systemItemId": "j0N6WQd8uQLrhIZ2",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "WadINfMgmxBEICnL"
+              },
+              "componentId": "WadINfMgmxBEICnL",
+              "systemItemId": "WadINfMgmxBEICnL",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": null
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "bgUChEQpjJAJQS7C",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [
+            "5z3EjwTlBCIg4sRY"
+          ],
+          "results": [
+            {
+              "id": "nZ00PJTDcBY2pmlI",
+              "componentId": "9aeiyQzt7iGbfapy",
+              "systemItemId": "9aeiyQzt7iGbfapy",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "mA3PxqMaAv7mtaV2",
+              "componentId": "CKAKs0dHwBfqjDs0",
+              "systemItemId": "CKAKs0dHwBfqjDs0",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "tvJanIZ1qePliP9s",
+          "name": "Result Group 2",
+          "checkOutcomeIds": [
+            "Srrte82AflxOllBe"
+          ],
+          "results": [
+            {
+              "id": "HZbbMcujnIKmlcNr",
+              "componentId": "N2l3jntxcIl7JfLP",
+              "systemItemId": "N2l3jntxcIl7JfLP",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "ywzNgRKHwuPFkHYO",
+          "name": "Result Group 3",
+          "checkOutcomeIds": [
+            "MCxZFsyZXeLwN4dP"
+          ],
+          "results": [
+            {
+              "id": "fdK6beLG8eNd9xby",
+              "componentId": "kT1XPccoVcxWF8L4",
+              "systemItemId": "kT1XPccoVcxWF8L4",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "NiN26250O018pU4V",
+              "componentId": "h2qQuTezY5XyfStT",
+              "systemItemId": "h2qQuTezY5XyfStT",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "iLhhaOytnqe1yaw3",
+          "name": "Result Group 4",
+          "checkOutcomeIds": [
+            "iCGHs7L34wBeewJQ"
+          ],
+          "results": [
+            {
+              "id": "ukjLwRMBjfXMLDn4",
+              "componentId": "zhc15gaLpLRCDaZH",
+              "systemItemId": "zhc15gaLpLRCDaZH",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "D0ANew4GUD3AmV0E",
+              "componentId": "h2qQuTezY5XyfStT",
+              "systemItemId": "h2qQuTezY5XyfStT",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "ybKXnJyMSUTm9z1o",
+              "componentId": "iY4JiNv0f5AlyOzg",
+              "systemItemId": "iY4JiNv0f5AlyOzg",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [
+        "lYuYI63cnCERPtVl",
+        "K7Mb3sugwvFua2Vj"
+      ],
+      "timeRequirement": {
+        "minutes": 0,
+        "hours": 0,
+        "days": 1,
+        "months": 0,
+        "years": 0
+      },
+      "results": [
+        {
+          "id": "nZ00PJTDcBY2pmlI",
+          "componentId": "9aeiyQzt7iGbfapy",
+          "systemItemId": "9aeiyQzt7iGbfapy",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "mA3PxqMaAv7mtaV2",
+          "componentId": "CKAKs0dHwBfqjDs0",
+          "systemItemId": "CKAKs0dHwBfqjDs0",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "HZbbMcujnIKmlcNr",
+          "componentId": "N2l3jntxcIl7JfLP",
+          "systemItemId": "N2l3jntxcIl7JfLP",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "fdK6beLG8eNd9xby",
+          "componentId": "kT1XPccoVcxWF8L4",
+          "systemItemId": "kT1XPccoVcxWF8L4",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "NiN26250O018pU4V",
+          "componentId": "h2qQuTezY5XyfStT",
+          "systemItemId": "h2qQuTezY5XyfStT",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "ukjLwRMBjfXMLDn4",
+          "componentId": "zhc15gaLpLRCDaZH",
+          "systemItemId": "zhc15gaLpLRCDaZH",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "D0ANew4GUD3AmV0E",
+          "componentId": "h2qQuTezY5XyfStT",
+          "systemItemId": "h2qQuTezY5XyfStT",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "ybKXnJyMSUTm9z1o",
+          "componentId": "iY4JiNv0f5AlyOzg",
+          "systemItemId": "iY4JiNv0f5AlyOzg",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782742326176,
+        "modified": 1782742326176,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "lNyi7tdu71JQXryO",
+      "name": "Temper Longsword",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": true,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "6ISW6KpHyv5P7RXB",
+          "name": "",
+          "ingredientGroups": [
+            {
+              "id": "dysOF6ki5c3y3iHN",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "4pHKPmFQkU3mcsXP"
+                  },
+                  "componentId": "4pHKPmFQkU3mcsXP",
+                  "systemItemId": "4pHKPmFQkU3mcsXP",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "uKI5HfWtZFdTK5pA",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "WadINfMgmxBEICnL"
+                  },
+                  "componentId": "WadINfMgmxBEICnL",
+                  "systemItemId": "WadINfMgmxBEICnL",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "B4SDNjZKEulEuX1Z",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "w7LLOTvGk6SjhBt1"
+                  },
+                  "componentId": "w7LLOTvGk6SjhBt1",
+                  "systemItemId": "w7LLOTvGk6SjhBt1",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "295OmVeXrPPSO7Vd",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "iSrz7b0QDOYvjUFd"
+                  },
+                  "componentId": "iSrz7b0QDOYvjUFd",
+                  "systemItemId": "iSrz7b0QDOYvjUFd",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "4pHKPmFQkU3mcsXP"
+              },
+              "componentId": "4pHKPmFQkU3mcsXP",
+              "systemItemId": "4pHKPmFQkU3mcsXP",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "WadINfMgmxBEICnL"
+              },
+              "componentId": "WadINfMgmxBEICnL",
+              "systemItemId": "WadINfMgmxBEICnL",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "w7LLOTvGk6SjhBt1"
+              },
+              "componentId": "w7LLOTvGk6SjhBt1",
+              "systemItemId": "w7LLOTvGk6SjhBt1",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "iSrz7b0QDOYvjUFd"
+              },
+              "componentId": "iSrz7b0QDOYvjUFd",
+              "systemItemId": "iSrz7b0QDOYvjUFd",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": null
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "QfmIE1VQMojqfh64",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [
+            "5z3EjwTlBCIg4sRY"
+          ],
+          "results": [
+            {
+              "id": "blcUY2v6phDbaR2k",
+              "componentId": "5iJmcH2Q5vxkw57O",
+              "systemItemId": "5iJmcH2Q5vxkw57O",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "4PwyXDn8k1YIDAp9",
+              "componentId": "CKAKs0dHwBfqjDs0",
+              "systemItemId": "CKAKs0dHwBfqjDs0",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "xGZkvAMhGWvHpZKZ",
+          "name": "Result Group 2",
+          "checkOutcomeIds": [
+            "Srrte82AflxOllBe"
+          ],
+          "results": [
+            {
+              "id": "aFyCCCuz2CgqhbFm",
+              "componentId": "lEM3NjiNEWZIhC3y",
+              "systemItemId": "lEM3NjiNEWZIhC3y",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "EhimDS3PM7oRWAp2",
+          "name": "Result Group 3",
+          "checkOutcomeIds": [
+            "MCxZFsyZXeLwN4dP"
+          ],
+          "results": [
+            {
+              "id": "A4Nn87TuAhwlAQk4",
+              "componentId": "YEILnKFROdCDseiP",
+              "systemItemId": "YEILnKFROdCDseiP",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "ECTpUhoZ6FcNq8V5",
+              "componentId": "h2qQuTezY5XyfStT",
+              "systemItemId": "h2qQuTezY5XyfStT",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "GI4PqxGY5VGf3nFu",
+          "name": "Result Group 4",
+          "checkOutcomeIds": [
+            "iCGHs7L34wBeewJQ"
+          ],
+          "results": [
+            {
+              "id": "nWoyiFBTuM4sTtvE",
+              "componentId": "37mEHUVVhSOiqvJb",
+              "systemItemId": "37mEHUVVhSOiqvJb",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "TK1Wiy1xSqEgz0A4",
+              "componentId": "h2qQuTezY5XyfStT",
+              "systemItemId": "h2qQuTezY5XyfStT",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "M3M5B7SzCpnLx01O",
+              "componentId": "iY4JiNv0f5AlyOzg",
+              "systemItemId": "iY4JiNv0f5AlyOzg",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [
+        "K7Mb3sugwvFua2Vj",
+        "nihBvXVwbpgFsAkY",
+        "hindoF7gODMPOHWf"
+      ],
+      "timeRequirement": {
+        "minutes": 0,
+        "hours": 8,
+        "days": 0,
+        "months": 0,
+        "years": 0
+      },
+      "results": [
+        {
+          "id": "blcUY2v6phDbaR2k",
+          "componentId": "5iJmcH2Q5vxkw57O",
+          "systemItemId": "5iJmcH2Q5vxkw57O",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "4PwyXDn8k1YIDAp9",
+          "componentId": "CKAKs0dHwBfqjDs0",
+          "systemItemId": "CKAKs0dHwBfqjDs0",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "aFyCCCuz2CgqhbFm",
+          "componentId": "lEM3NjiNEWZIhC3y",
+          "systemItemId": "lEM3NjiNEWZIhC3y",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "A4Nn87TuAhwlAQk4",
+          "componentId": "YEILnKFROdCDseiP",
+          "systemItemId": "YEILnKFROdCDseiP",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "ECTpUhoZ6FcNq8V5",
+          "componentId": "h2qQuTezY5XyfStT",
+          "systemItemId": "h2qQuTezY5XyfStT",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "nWoyiFBTuM4sTtvE",
+          "componentId": "37mEHUVVhSOiqvJb",
+          "systemItemId": "37mEHUVVhSOiqvJb",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "TK1Wiy1xSqEgz0A4",
+          "componentId": "h2qQuTezY5XyfStT",
+          "systemItemId": "h2qQuTezY5XyfStT",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "M3M5B7SzCpnLx01O",
+          "componentId": "iY4JiNv0f5AlyOzg",
+          "systemItemId": "iY4JiNv0f5AlyOzg",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782742710640,
+        "modified": 1782742710640,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "tkPmEfqxBucP4yq1",
+      "name": "Build Round Shield",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": true,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "jL14IV7XVAI8qBiX",
+          "name": "",
+          "ingredientGroups": [
+            {
+              "id": "b9rNLot8w83DG6us",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "OwItxa4e1qH07Ofi"
+                  },
+                  "componentId": "OwItxa4e1qH07Ofi",
+                  "systemItemId": "OwItxa4e1qH07Ofi",
+                  "itemUuid": null,
+                  "quantity": 2,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "tDIxNXD3MeWzoSYk",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "jAWu4T1iFNmca6nX"
+                  },
+                  "componentId": "jAWu4T1iFNmca6nX",
+                  "systemItemId": "jAWu4T1iFNmca6nX",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "dbtlFUYJwPZ7iqYM",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "iM1Rpd9pFLaCnFEU"
+                  },
+                  "componentId": "iM1Rpd9pFLaCnFEU",
+                  "systemItemId": "iM1Rpd9pFLaCnFEU",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "RPmlMPBGF2hfZpOh",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "j0N6WQd8uQLrhIZ2"
+                  },
+                  "componentId": "j0N6WQd8uQLrhIZ2",
+                  "systemItemId": "j0N6WQd8uQLrhIZ2",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "o3rbRG5Gl9K5LHGq",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "WadINfMgmxBEICnL"
+                  },
+                  "componentId": "WadINfMgmxBEICnL",
+                  "systemItemId": "WadINfMgmxBEICnL",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "OwItxa4e1qH07Ofi"
+              },
+              "componentId": "OwItxa4e1qH07Ofi",
+              "systemItemId": "OwItxa4e1qH07Ofi",
+              "itemUuid": null,
+              "quantity": 2,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "jAWu4T1iFNmca6nX"
+              },
+              "componentId": "jAWu4T1iFNmca6nX",
+              "systemItemId": "jAWu4T1iFNmca6nX",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "iM1Rpd9pFLaCnFEU"
+              },
+              "componentId": "iM1Rpd9pFLaCnFEU",
+              "systemItemId": "iM1Rpd9pFLaCnFEU",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "j0N6WQd8uQLrhIZ2"
+              },
+              "componentId": "j0N6WQd8uQLrhIZ2",
+              "systemItemId": "j0N6WQd8uQLrhIZ2",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "WadINfMgmxBEICnL"
+              },
+              "componentId": "WadINfMgmxBEICnL",
+              "systemItemId": "WadINfMgmxBEICnL",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": null
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "FyJCflcXpYptccm8",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [
+            "5z3EjwTlBCIg4sRY"
+          ],
+          "results": [
+            {
+              "id": "50lX5RAcQwjZ113R",
+              "componentId": "rH7zF4FRolWJ4k6A",
+              "systemItemId": "rH7zF4FRolWJ4k6A",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "41vsUaLUPqXupQSq",
+              "componentId": "CKAKs0dHwBfqjDs0",
+              "systemItemId": "CKAKs0dHwBfqjDs0",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "gWo6nMMcJUXFxZrv",
+          "name": "Result Group 2",
+          "checkOutcomeIds": [
+            "Srrte82AflxOllBe"
+          ],
+          "results": [
+            {
+              "id": "YHzbHiLpNXpmDYHo",
+              "componentId": "STXbjSJwutoAilAv",
+              "systemItemId": "STXbjSJwutoAilAv",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "eE4lS7MisWEt1f1l",
+          "name": "Result Group 3",
+          "checkOutcomeIds": [
+            "MCxZFsyZXeLwN4dP"
+          ],
+          "results": [
+            {
+              "id": "e0qbRxfO5GKV5BET",
+              "componentId": "hZAroor51b5ucVEa",
+              "systemItemId": "hZAroor51b5ucVEa",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "1qwC36k6kahTTLTN",
+              "componentId": "h2qQuTezY5XyfStT",
+              "systemItemId": "h2qQuTezY5XyfStT",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "47nEvWeOYui9XOLO",
+          "name": "Result Group 4",
+          "checkOutcomeIds": [
+            "iCGHs7L34wBeewJQ"
+          ],
+          "results": [
+            {
+              "id": "PVQF8CLifg6l6h0k",
+              "componentId": "h2qQuTezY5XyfStT",
+              "systemItemId": "h2qQuTezY5XyfStT",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "pUNpgli9xTjiEzgV",
+              "componentId": "n4HF4zsrBHCKjy9m",
+              "systemItemId": "n4HF4zsrBHCKjy9m",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "1KgLtkzAVvRKxxgg",
+              "componentId": "iY4JiNv0f5AlyOzg",
+              "systemItemId": "iY4JiNv0f5AlyOzg",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [
+        "K7Mb3sugwvFua2Vj",
+        "QOZRoXomBkl6Su04",
+        "lYuYI63cnCERPtVl"
+      ],
+      "timeRequirement": {
+        "minutes": 0,
+        "hours": 5,
+        "days": 0,
+        "months": 0,
+        "years": 0
+      },
+      "results": [
+        {
+          "id": "50lX5RAcQwjZ113R",
+          "componentId": "rH7zF4FRolWJ4k6A",
+          "systemItemId": "rH7zF4FRolWJ4k6A",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "41vsUaLUPqXupQSq",
+          "componentId": "CKAKs0dHwBfqjDs0",
+          "systemItemId": "CKAKs0dHwBfqjDs0",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "YHzbHiLpNXpmDYHo",
+          "componentId": "STXbjSJwutoAilAv",
+          "systemItemId": "STXbjSJwutoAilAv",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "e0qbRxfO5GKV5BET",
+          "componentId": "hZAroor51b5ucVEa",
+          "systemItemId": "hZAroor51b5ucVEa",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "1qwC36k6kahTTLTN",
+          "componentId": "h2qQuTezY5XyfStT",
+          "systemItemId": "h2qQuTezY5XyfStT",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "PVQF8CLifg6l6h0k",
+          "componentId": "h2qQuTezY5XyfStT",
+          "systemItemId": "h2qQuTezY5XyfStT",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "pUNpgli9xTjiEzgV",
+          "componentId": "n4HF4zsrBHCKjy9m",
+          "systemItemId": "n4HF4zsrBHCKjy9m",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "1KgLtkzAVvRKxxgg",
+          "componentId": "iY4JiNv0f5AlyOzg",
+          "systemItemId": "iY4JiNv0f5AlyOzg",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782742853580,
+        "modified": 1782742853580,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    }
+  ]
+}

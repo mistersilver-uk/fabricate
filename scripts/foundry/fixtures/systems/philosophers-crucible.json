@@ -1,0 +1,1608 @@
+{
+  "fabricateVersion": "0.1.0",
+  "exportedAt": "2026-07-06T12:16:10.702Z",
+  "system": {
+    "id": "B3vaE0oFY9ez5XaC",
+    "name": "Philosopher's Crucible",
+    "description": "Configure categories, item tags, essences, and crafting behaviour for this system.",
+    "enabled": true,
+    "resolutionMode": "simple",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": true,
+      "multiStepRecipes": true,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false
+    },
+    "itemTags": [],
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "item": {
+          "limitUses": false,
+          "destroyWhenExhausted": false
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": false
+      },
+      "currency": {
+        "enabled": false,
+        "spendStrategy": "actorProperty",
+        "providerId": "",
+        "macros": {
+          "canAfford": "",
+          "increment": "",
+          "decrement": ""
+        },
+        "units": []
+      }
+    },
+    "essenceDefinitions": [
+      {
+        "id": "f323f617-fbfa-4a03-93fd-c84323e35f49",
+        "name": "Drop",
+        "description": "",
+        "icon": "fas fa-droplet",
+        "sourceComponentId": null,
+        "sourceItemUuid": null
+      },
+      {
+        "id": "a97e6789-3abf-43af-8b90-eaa8fdfe82ed",
+        "name": "Void",
+        "description": "",
+        "icon": "fas fa-moon",
+        "sourceComponentId": null,
+        "sourceItemUuid": null
+      },
+      {
+        "id": "bb559523-3a6e-488c-8629-e0483bb3df4d",
+        "name": "Storm",
+        "description": "",
+        "icon": "fas fa-bolt-lightning",
+        "sourceComponentId": null,
+        "sourceItemUuid": null
+      }
+    ],
+    "recipeItemDefinitions": [],
+    "craftingCheck": {
+      "enabled": false,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "salvageResolutionMode": "simple",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "categories": [],
+    "components": [
+      {
+        "id": "u8vbCkyXKrS0jWUj",
+        "name": "Faint Drop Essence",
+        "img": "icons/magic/water/bubbles-air-water-light.webp",
+        "description": "",
+        "sourceItemUuid": "Item.vW4cr6SNwndzt4J8",
+        "sourceUuid": "Item.vW4cr6SNwndzt4J8",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {
+          "f323f617-fbfa-4a03-93fd-c84323e35f49": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "BMVPRgHNihZJ0DSt",
+        "name": "Drop Essence",
+        "img": "icons/magic/water/bubbles-air-water-light.webp",
+        "description": "",
+        "sourceItemUuid": "Item.EmdcStX5p50r65I6",
+        "sourceUuid": "Item.EmdcStX5p50r65I6",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {
+          "f323f617-fbfa-4a03-93fd-c84323e35f49": 3
+        },
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "MMGfUI059VFoHpkb",
+        "name": "Faint Storm Essence",
+        "img": "icons/magic/control/buff-flight-wings-runes-blue-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.UU59bHZJ7YOeEjbD",
+        "sourceUuid": "Item.UU59bHZJ7YOeEjbD",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {
+          "bb559523-3a6e-488c-8629-e0483bb3df4d": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "oRGSWiBbHNiE6hti",
+        "name": "Storm Essence",
+        "img": "icons/magic/control/buff-flight-wings-runes-blue-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.PkOxi0szbBLmBpjV",
+        "sourceUuid": "Item.PkOxi0szbBLmBpjV",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {
+          "bb559523-3a6e-488c-8629-e0483bb3df4d": 3
+        },
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "nfhmBsqDg5nhC2kP",
+        "name": "Void Essence",
+        "img": "icons/magic/nature/root-vine-thorned-fire-purple.webp",
+        "description": "",
+        "sourceItemUuid": "Item.AGqvlQVDcwH7dYE1",
+        "sourceUuid": "Item.AGqvlQVDcwH7dYE1",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {
+          "a97e6789-3abf-43af-8b90-eaa8fdfe82ed": 3
+        },
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "t2AZNk7FOilvBgq8",
+        "name": "Faint Void Essence",
+        "img": "icons/magic/nature/root-vine-thorned-fire-purple.webp",
+        "description": "",
+        "sourceItemUuid": "Item.wsApLTk45mc89SZl",
+        "sourceUuid": "Item.wsApLTk45mc89SZl",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {
+          "a97e6789-3abf-43af-8b90-eaa8fdfe82ed": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "0cNkwScRvF64Qj89",
+        "name": "Springwater Phial",
+        "img": "icons/consumables/potions/bottle-bulb-corked-labeled-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.Wn03Pa6euXsjePJP",
+        "sourceUuid": "Item.Wn03Pa6euXsjePJP",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "IL5UccmzOR4o3oRP",
+        "name": "Clear Spirit",
+        "img": "icons/consumables/potions/bottle-corked-empty.webp",
+        "description": "",
+        "sourceItemUuid": "Item.mMUVJvdbNGpY2hhS",
+        "sourceUuid": "Item.mMUVJvdbNGpY2hhS",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "CTFiD9BKO1aFjfcz",
+        "name": "Moon-Salt",
+        "img": "icons/commodities/materials/bowl-powder-teal.webp",
+        "description": "",
+        "sourceItemUuid": "Item.GzseiC43K7mKeDZA",
+        "sourceUuid": "Item.GzseiC43K7mKeDZA",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "0iaVK2ZZINc2nydF",
+        "name": "Glass Phial",
+        "img": "icons/consumables/potions/bottle-bulb-empty-glass.webp",
+        "description": "",
+        "sourceItemUuid": "Item.wZvu2cllDmF9w3VC",
+        "sourceUuid": "Item.wZvu2cllDmF9w3VC",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "yFhPYVZHVG8jWe51",
+        "name": "Bitterleaf",
+        "img": "icons/consumables/plants/holly-pointy-leaf-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.7WgIuXPmFdfIZjKt",
+        "sourceUuid": "Item.7WgIuXPmFdfIZjKt",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "Wpx2FiWxUArQyykf",
+        "name": "Silvercap Mushroom",
+        "img": "icons/consumables/mushrooms/umbontae-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.FDb7UFkPoPpwDYTv",
+        "sourceUuid": "Item.FDb7UFkPoPpwDYTv",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "4nL6jqixGtvpGz1V",
+        "name": "Grave Mint",
+        "img": "icons/consumables/plants/tearthumb-dried-halberd-leaf-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.adWofOslHuCmnyO6",
+        "sourceUuid": "Item.adWofOslHuCmnyO6",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "L9K93S9TYk0U8KuV",
+        "name": "Black Poppy Resin",
+        "img": "icons/consumables/potions/potion-bottle-labeled-medicine-capped-red-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.zE4Mj06jOnPRBWSz",
+        "sourceUuid": "Item.zE4Mj06jOnPRBWSz",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "pwdduw92mMSY7ymy",
+        "name": "Copper Filament",
+        "img": "icons/commodities/metal/chain-silver.webp",
+        "description": "",
+        "sourceItemUuid": "Item.0Zl0hGbQ72L061ZE",
+        "sourceUuid": "Item.0Zl0hGbQ72L061ZE",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "pfx6GSP6jV7SMGjh",
+        "name": "Lodestone Dust",
+        "img": "icons/commodities/materials/bowl-powder-grey.webp",
+        "description": "",
+        "sourceItemUuid": "Item.4eXYT4wlt9PeTkBK",
+        "sourceUuid": "Item.4eXYT4wlt9PeTkBK",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "GYGuO77sLh8o4gSJ",
+        "name": "Vital Tincture",
+        "img": "icons/consumables/potions/potion-bottle-labeled-stopped-purple.webp",
+        "description": "",
+        "sourceItemUuid": "Item.xgaQth4Cl0nS9Qjx",
+        "sourceUuid": "Item.xgaQth4Cl0nS9Qjx",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "wo08uKSmxq1sl4AS",
+        "name": "Shadow Suspension",
+        "img": "icons/consumables/potions/flask-ornate-skull-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.gsp6RGIwfhHra6aT",
+        "sourceUuid": "Item.gsp6RGIwfhHra6aT",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "lwk4dckTSzrl4yyx",
+        "name": "Charged Storm Salts",
+        "img": "icons/commodities/materials/bowl-liquid-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.1pL72byfgMzsk65S",
+        "sourceUuid": "Item.1pL72byfgMzsk65S",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "0rXYdb1ZuDAL5YgH",
+        "name": "Alchemist’s Crucible",
+        "img": "icons/tools/laboratory/cauldron-empty-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.teBfsw2ppVVHRmjO",
+        "sourceUuid": "Item.teBfsw2ppVVHRmjO",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "rcL10kszHom24crm",
+        "name": "Alembic Coil",
+        "img": "icons/tools/laboratory/vials-blue-pink.webp",
+        "description": "",
+        "sourceItemUuid": "Item.l0l1Uu7U8n41BwMq",
+        "sourceUuid": "Item.l0l1Uu7U8n41BwMq",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "oH02sjOAq6LD18Ns",
+        "name": "Glass Stirring Rod",
+        "img": "icons/tools/cooking/mortar-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.VBaswAXLYkOFA9sQ",
+        "sourceUuid": "Item.VBaswAXLYkOFA9sQ",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "fmTEeSKknZDfNQ2x",
+        "name": "Conductive Matrix",
+        "img": "icons/tools/laboratory/burner-steel-grey.webp",
+        "description": "",
+        "sourceItemUuid": "Item.0vtnoOQQDftCjJR7",
+        "sourceUuid": "Item.0vtnoOQQDftCjJR7",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "k4zzvsXeVoVV01AO",
+        "name": "Minor Elixir of Mending",
+        "img": "icons/consumables/potions/bottle-metal-yellow-gray.webp",
+        "description": "",
+        "sourceItemUuid": "Item.MeyvgDy8JIGuVn3F",
+        "sourceUuid": "Item.MeyvgDy8JIGuVn3F",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "CGcfsYwijwhqRCrT",
+        "name": "Smoke-Step Draught",
+        "img": "icons/consumables/potions/vial-ornet-silver-black.webp",
+        "description": "",
+        "sourceItemUuid": "Item.IdjFwnu2IDBMCLNe",
+        "sourceUuid": "Item.IdjFwnu2IDBMCLNe",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "37CdBhhiV3pS5Azx",
+        "name": "Infused Vital Tincture",
+        "img": "icons/consumables/potions/potion-bottle-labeled-stopped-purple.webp",
+        "description": "",
+        "sourceItemUuid": "Item.pSStJHO44k9HzNha",
+        "sourceUuid": "Item.pSStJHO44k9HzNha",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "pLS2gof1OjWdzd2j",
+        "name": "Quieted Shadow Suspension",
+        "img": "icons/consumables/potions/flask-ornate-skull-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.oPoiKnaTA3cOooYa",
+        "sourceUuid": "Item.oPoiKnaTA3cOooYa",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "XxHkhVammYQlFjN8",
+        "label": "",
+        "enabled": true,
+        "componentId": "0rXYdb1ZuDAL5YgH",
+        "requirement": null,
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": null
+        },
+        "onBreak": {
+          "mode": "destroy"
+        }
+      },
+      {
+        "id": "DPrVBjQPxkZ4Ophs",
+        "label": "",
+        "enabled": true,
+        "componentId": "rcL10kszHom24crm",
+        "requirement": null,
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": null
+        },
+        "onBreak": {
+          "mode": "destroy"
+        }
+      },
+      {
+        "id": "Gf5Afz4TfU0IO4iU",
+        "label": "",
+        "enabled": true,
+        "componentId": "oH02sjOAq6LD18Ns",
+        "requirement": null,
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": null
+        },
+        "onBreak": {
+          "mode": "destroy"
+        }
+      }
+    ],
+    "gatheringRealms": [],
+    "gatheringRealmSettings": {
+      "enabled": false,
+      "revealMode": "manual",
+      "modifierVisibility": "visible"
+    }
+  },
+  "recipes": [
+    {
+      "id": "QVRjlfPODo7MTMJS",
+      "name": "Minor Elixir of Mending",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": false,
+      "steps": [
+        {
+          "id": "xv2CD5LO5tyTKnnF",
+          "name": "Distil Vital Tincture",
+          "description": "",
+          "ingredientSets": [
+            {
+              "id": "jM4HzGADU5Zi2Fpi",
+              "name": "",
+              "ingredientGroups": [
+                {
+                  "id": "5CNTvBAc5pa0BAGM",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "0cNkwScRvF64Qj89"
+                      },
+                      "componentId": "0cNkwScRvF64Qj89",
+                      "systemItemId": "0cNkwScRvF64Qj89",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                },
+                {
+                  "id": "HkDyJkEtkxDocT4g",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "yFhPYVZHVG8jWe51"
+                      },
+                      "componentId": "yFhPYVZHVG8jWe51",
+                      "systemItemId": "yFhPYVZHVG8jWe51",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    },
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "Wpx2FiWxUArQyykf"
+                      },
+                      "componentId": "Wpx2FiWxUArQyykf",
+                      "systemItemId": "Wpx2FiWxUArQyykf",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                }
+              ],
+              "ingredients": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "0cNkwScRvF64Qj89"
+                  },
+                  "componentId": "0cNkwScRvF64Qj89",
+                  "systemItemId": "0cNkwScRvF64Qj89",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                },
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "yFhPYVZHVG8jWe51"
+                  },
+                  "componentId": "yFhPYVZHVG8jWe51",
+                  "systemItemId": "yFhPYVZHVG8jWe51",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ],
+              "essences": {},
+              "toolIds": [],
+              "resultMapping": [],
+              "resultGroupId": null
+            }
+          ],
+          "resultGroups": [
+            {
+              "id": "s8WNCvRNfNFCnPP8",
+              "name": "Result Group 1",
+              "checkOutcomeIds": [],
+              "results": [
+                {
+                  "id": "lGymq2xh1LJXaiIK",
+                  "componentId": "GYGuO77sLh8o4gSJ",
+                  "systemItemId": "GYGuO77sLh8o4gSJ",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "propertyMacroUuid": null
+                }
+              ]
+            }
+          ],
+          "toolIds": [
+            "DPrVBjQPxkZ4Ophs"
+          ],
+          "timeRequirement": {
+            "minutes": 0,
+            "hours": 0,
+            "days": 1,
+            "months": 0,
+            "years": 0
+          },
+          "currencyCost": null,
+          "outcomeRouting": null,
+          "resultSelection": null
+        },
+        {
+          "id": "kYtXi2RQX7fkRlbP",
+          "name": "Bind the Drop Essence",
+          "description": "",
+          "ingredientSets": [
+            {
+              "id": "od78zBEt6Ymiff7D",
+              "name": "",
+              "ingredientGroups": [
+                {
+                  "id": "ofyg3dRTQ89shxPo",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "GYGuO77sLh8o4gSJ"
+                      },
+                      "componentId": "GYGuO77sLh8o4gSJ",
+                      "systemItemId": "GYGuO77sLh8o4gSJ",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                },
+                {
+                  "id": "lzPb3oZh14w80ISC",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "CTFiD9BKO1aFjfcz"
+                      },
+                      "componentId": "CTFiD9BKO1aFjfcz",
+                      "systemItemId": "CTFiD9BKO1aFjfcz",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                }
+              ],
+              "ingredients": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "GYGuO77sLh8o4gSJ"
+                  },
+                  "componentId": "GYGuO77sLh8o4gSJ",
+                  "systemItemId": "GYGuO77sLh8o4gSJ",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                },
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "CTFiD9BKO1aFjfcz"
+                  },
+                  "componentId": "CTFiD9BKO1aFjfcz",
+                  "systemItemId": "CTFiD9BKO1aFjfcz",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ],
+              "essences": {
+                "f323f617-fbfa-4a03-93fd-c84323e35f49": 2
+              },
+              "toolIds": [],
+              "resultMapping": [],
+              "resultGroupId": null
+            }
+          ],
+          "resultGroups": [
+            {
+              "id": "Dw7q2ByOUGPVPpNc",
+              "name": "Result Group 1",
+              "checkOutcomeIds": [],
+              "results": [
+                {
+                  "id": "7PddR3bw0nUynGyK",
+                  "componentId": "37CdBhhiV3pS5Azx",
+                  "systemItemId": "37CdBhhiV3pS5Azx",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "propertyMacroUuid": null
+                }
+              ]
+            }
+          ],
+          "toolIds": [
+            "Gf5Afz4TfU0IO4iU"
+          ],
+          "timeRequirement": {
+            "minutes": 0,
+            "hours": 3,
+            "days": 0,
+            "months": 0,
+            "years": 0
+          },
+          "currencyCost": null,
+          "outcomeRouting": null,
+          "resultSelection": null
+        },
+        {
+          "id": "4igp77QkuS7F2QG0",
+          "name": "Bottle the Elixir",
+          "description": "",
+          "ingredientSets": [
+            {
+              "id": "FzyW7FNztfMBzr8v",
+              "name": "",
+              "ingredientGroups": [
+                {
+                  "id": "FKLXLtchlYcd098m",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "37CdBhhiV3pS5Azx"
+                      },
+                      "componentId": "37CdBhhiV3pS5Azx",
+                      "systemItemId": "37CdBhhiV3pS5Azx",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                },
+                {
+                  "id": "zi2Xbx9McgAMEaqY",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "0iaVK2ZZINc2nydF"
+                      },
+                      "componentId": "0iaVK2ZZINc2nydF",
+                      "systemItemId": "0iaVK2ZZINc2nydF",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                }
+              ],
+              "ingredients": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "37CdBhhiV3pS5Azx"
+                  },
+                  "componentId": "37CdBhhiV3pS5Azx",
+                  "systemItemId": "37CdBhhiV3pS5Azx",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                },
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "0iaVK2ZZINc2nydF"
+                  },
+                  "componentId": "0iaVK2ZZINc2nydF",
+                  "systemItemId": "0iaVK2ZZINc2nydF",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ],
+              "essences": {},
+              "toolIds": [],
+              "resultMapping": [],
+              "resultGroupId": null
+            }
+          ],
+          "resultGroups": [
+            {
+              "id": "DVIErMxYxs1aXn8h",
+              "name": "Result Group 1",
+              "checkOutcomeIds": [],
+              "results": [
+                {
+                  "id": "CfFkw4r9MVLoSOj6",
+                  "componentId": "k4zzvsXeVoVV01AO",
+                  "systemItemId": "k4zzvsXeVoVV01AO",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "propertyMacroUuid": null
+                }
+              ]
+            }
+          ],
+          "toolIds": [
+            "XxHkhVammYQlFjN8"
+          ],
+          "timeRequirement": {
+            "minutes": 30,
+            "hours": 0,
+            "days": 0,
+            "months": 0,
+            "years": 0
+          },
+          "currencyCost": null,
+          "outcomeRouting": null,
+          "resultSelection": null
+        }
+      ],
+      "ingredientSets": [],
+      "resultGroups": [],
+      "toolIds": [],
+      "timeRequirement": null,
+      "results": [],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1783333410238,
+        "modified": 1783333410238,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "cCVfXdHeBmC2BaIX",
+      "name": "Smoke-Step Draught",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": false,
+      "steps": [
+        {
+          "id": "1B0iFYqQ81IRjKH3",
+          "name": "Make Shadow Suspension",
+          "description": "",
+          "ingredientSets": [
+            {
+              "id": "t5tESJfW8cRq7UZO",
+              "name": "",
+              "ingredientGroups": [
+                {
+                  "id": "IrDZDjXBjbuadFgo",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "IL5UccmzOR4o3oRP"
+                      },
+                      "componentId": "IL5UccmzOR4o3oRP",
+                      "systemItemId": "IL5UccmzOR4o3oRP",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                },
+                {
+                  "id": "DRybvdoBr91wm1qT",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "4nL6jqixGtvpGz1V"
+                      },
+                      "componentId": "4nL6jqixGtvpGz1V",
+                      "systemItemId": "4nL6jqixGtvpGz1V",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    },
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "L9K93S9TYk0U8KuV"
+                      },
+                      "componentId": "L9K93S9TYk0U8KuV",
+                      "systemItemId": "L9K93S9TYk0U8KuV",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                }
+              ],
+              "ingredients": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "IL5UccmzOR4o3oRP"
+                  },
+                  "componentId": "IL5UccmzOR4o3oRP",
+                  "systemItemId": "IL5UccmzOR4o3oRP",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                },
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "4nL6jqixGtvpGz1V"
+                  },
+                  "componentId": "4nL6jqixGtvpGz1V",
+                  "systemItemId": "4nL6jqixGtvpGz1V",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ],
+              "essences": {},
+              "toolIds": [],
+              "resultMapping": [],
+              "resultGroupId": null
+            }
+          ],
+          "resultGroups": [
+            {
+              "id": "1fFlL2guNyHlIqFa",
+              "name": "Result Group 1",
+              "checkOutcomeIds": [],
+              "results": [
+                {
+                  "id": "7dkM3Y6K9BB2yvbR",
+                  "componentId": "wo08uKSmxq1sl4AS",
+                  "systemItemId": "wo08uKSmxq1sl4AS",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "propertyMacroUuid": null
+                }
+              ]
+            }
+          ],
+          "toolIds": [
+            "DPrVBjQPxkZ4Ophs"
+          ],
+          "timeRequirement": {
+            "minutes": 0,
+            "hours": 1,
+            "days": 0,
+            "months": 0,
+            "years": 0
+          },
+          "currencyCost": null,
+          "outcomeRouting": null,
+          "resultSelection": null
+        },
+        {
+          "id": "3UzsfGbBzfSkTkih",
+          "name": "Quiet the Mixture",
+          "description": "",
+          "ingredientSets": [
+            {
+              "id": "AT2dfWBoEpVylMzx",
+              "name": "",
+              "ingredientGroups": [
+                {
+                  "id": "7sW3iR9XV8NbRO68",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "wo08uKSmxq1sl4AS"
+                      },
+                      "componentId": "wo08uKSmxq1sl4AS",
+                      "systemItemId": "wo08uKSmxq1sl4AS",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                },
+                {
+                  "id": "TkylUoZBbVr1fYF3",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "CTFiD9BKO1aFjfcz"
+                      },
+                      "componentId": "CTFiD9BKO1aFjfcz",
+                      "systemItemId": "CTFiD9BKO1aFjfcz",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                }
+              ],
+              "ingredients": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "wo08uKSmxq1sl4AS"
+                  },
+                  "componentId": "wo08uKSmxq1sl4AS",
+                  "systemItemId": "wo08uKSmxq1sl4AS",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                },
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "CTFiD9BKO1aFjfcz"
+                  },
+                  "componentId": "CTFiD9BKO1aFjfcz",
+                  "systemItemId": "CTFiD9BKO1aFjfcz",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ],
+              "essences": {},
+              "toolIds": [],
+              "resultMapping": [],
+              "resultGroupId": null
+            }
+          ],
+          "resultGroups": [
+            {
+              "id": "MrBZ1AXG0OWPpw4z",
+              "name": "Result Group 1",
+              "checkOutcomeIds": [],
+              "results": [
+                {
+                  "id": "AMS8UoNSiAVIsvLc",
+                  "componentId": "pLS2gof1OjWdzd2j",
+                  "systemItemId": "pLS2gof1OjWdzd2j",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "propertyMacroUuid": null
+                }
+              ]
+            }
+          ],
+          "toolIds": [],
+          "timeRequirement": {
+            "minutes": 10,
+            "hours": 0,
+            "days": 0,
+            "months": 0,
+            "years": 0
+          },
+          "currencyCost": null,
+          "outcomeRouting": null,
+          "resultSelection": null
+        },
+        {
+          "id": "aOpXvPWdFfeKqhLK",
+          "name": "Bind the Void Essence",
+          "description": "",
+          "ingredientSets": [
+            {
+              "id": "Yna9Iu37tv4b6OT8",
+              "name": "",
+              "ingredientGroups": [
+                {
+                  "id": "yC6TM4MoPe3FO4vc",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "pLS2gof1OjWdzd2j"
+                      },
+                      "componentId": "pLS2gof1OjWdzd2j",
+                      "systemItemId": "pLS2gof1OjWdzd2j",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                },
+                {
+                  "id": "AhbFOqxPKpjoesnQ",
+                  "name": "",
+                  "options": [
+                    {
+                      "match": {
+                        "type": "component",
+                        "componentId": "0iaVK2ZZINc2nydF"
+                      },
+                      "componentId": "0iaVK2ZZINc2nydF",
+                      "systemItemId": "0iaVK2ZZINc2nydF",
+                      "itemUuid": null,
+                      "quantity": 1,
+                      "tag": null,
+                      "alternatives": [],
+                      "extractEffects": false,
+                      "effectFilter": null
+                    }
+                  ]
+                }
+              ],
+              "ingredients": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "pLS2gof1OjWdzd2j"
+                  },
+                  "componentId": "pLS2gof1OjWdzd2j",
+                  "systemItemId": "pLS2gof1OjWdzd2j",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                },
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "0iaVK2ZZINc2nydF"
+                  },
+                  "componentId": "0iaVK2ZZINc2nydF",
+                  "systemItemId": "0iaVK2ZZINc2nydF",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ],
+              "essences": {
+                "a97e6789-3abf-43af-8b90-eaa8fdfe82ed": 4
+              },
+              "toolIds": [],
+              "resultMapping": [],
+              "resultGroupId": null
+            }
+          ],
+          "resultGroups": [
+            {
+              "id": "zRWyrZcRyRRnqOUq",
+              "name": "Result Group 1",
+              "checkOutcomeIds": [],
+              "results": [
+                {
+                  "id": "PNzUyPpNcZon9uk2",
+                  "componentId": "CGcfsYwijwhqRCrT",
+                  "systemItemId": "CGcfsYwijwhqRCrT",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "propertyMacroUuid": null
+                }
+              ]
+            }
+          ],
+          "toolIds": [
+            "Gf5Afz4TfU0IO4iU"
+          ],
+          "timeRequirement": {
+            "minutes": 10,
+            "hours": 0,
+            "days": 0,
+            "months": 0,
+            "years": 0
+          },
+          "currencyCost": null,
+          "outcomeRouting": null,
+          "resultSelection": null
+        }
+      ],
+      "ingredientSets": [],
+      "resultGroups": [],
+      "toolIds": [],
+      "timeRequirement": null,
+      "results": [],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1783334028851,
+        "modified": 1783334028851,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    }
+  ]
+}

@@ -1,0 +1,922 @@
+{
+  "fabricateVersion": "0.1.0",
+  "exportedAt": "2026-07-06T12:16:04.080Z",
+  "system": {
+    "id": "FE2LfTdtuhbxeTUq",
+    "name": "Jeweller’s Bench",
+    "description": "A delicate crafting discipline for cutting gems, shaping precious metals, and producing fine personal adornments. Much depends upon the jeweller’s precision. A modest result produces the intended piece, while a higher result allows the crafter to recover offcuts, create matched accessories, add filigree, prepare presentation cases, or finish the work to masterwork standard.",
+    "enabled": true,
+    "resolutionMode": "progressive",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": false,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false
+    },
+    "itemTags": [],
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "item": {
+          "limitUses": false,
+          "destroyWhenExhausted": false
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": false
+      },
+      "currency": {
+        "enabled": false,
+        "spendStrategy": "actorProperty",
+        "providerId": "",
+        "macros": {
+          "canAfford": "",
+          "increment": "",
+          "decrement": ""
+        },
+        "units": []
+      }
+    },
+    "essenceDefinitions": [],
+    "recipeItemDefinitions": [],
+    "craftingCheck": {
+      "enabled": true,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "1d20 + @skills.sur.mod",
+        "checkBreakage": {
+          "triggers": [
+            {
+              "id": "AQcPMQCRWoopJ3me",
+              "condition": {
+                "type": "diceGroup",
+                "groupId": 0,
+                "aggregate": "total",
+                "operator": "==",
+                "value": 1
+              },
+              "outcome": "failure",
+              "breakTools": true
+            }
+          ]
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "salvageResolutionMode": "progressive",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "progressive": {
+        "awardMode": "equal",
+        "allowPlayerReorder": false,
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      }
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "categories": [],
+    "components": [
+      {
+        "id": "yE8Q9v8W3xXuUdDA",
+        "name": "Moonstone",
+        "img": "icons/commodities/gems/pearl-white-oval.webp",
+        "description": "",
+        "sourceItemUuid": "Item.QlZ7EUVUdah07Gld",
+        "sourceUuid": "Item.QlZ7EUVUdah07Gld",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 4,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "Y8Fsun4hLDbueEe6",
+        "name": "Gold Wire",
+        "img": "icons/commodities/metal/hinge-brass.webp",
+        "description": "",
+        "sourceItemUuid": "Item.EFn7hETwfL9hz4Be",
+        "sourceUuid": "Item.EFn7hETwfL9hz4Be",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 3,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "gGED9JE7DofwaOdf",
+        "name": "Silver Ingot",
+        "img": "icons/commodities/metal/ingot-silver.webp",
+        "description": "",
+        "sourceItemUuid": "Item.UjadVETzWu0sXAIn",
+        "sourceUuid": "Item.UjadVETzWu0sXAIn",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 2,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "tC6WDBYS1X9evZ3s",
+        "name": "Garnet",
+        "img": "icons/commodities/gems/gem-faceted-radiant-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.7nP8ATCLk2GoeyRh",
+        "sourceUuid": "Item.7nP8ATCLk2GoeyRh",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 4,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "OG635wBXJhlfPlqS",
+        "name": "Freshwater Pearl",
+        "img": "icons/commodities/gems/pearls-white.webp",
+        "description": "",
+        "sourceItemUuid": "Item.7XEW3vhfirQzBDtf",
+        "sourceUuid": "Item.7XEW3vhfirQzBDtf",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 3,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "XCKW0HpqCc719CwV",
+        "name": "Velvet Lining",
+        "img": "icons/commodities/cloth/cloth-bolt-embroidered-pink.webp",
+        "description": "",
+        "sourceItemUuid": "Item.60Csa28FQ8N4gnxe",
+        "sourceUuid": "Item.60Csa28FQ8N4gnxe",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 2,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "MS3FyM9as7BXkxa2",
+        "name": "Black Enamel",
+        "img": "icons/containers/boxes/crate-tech-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.ZzM0kxucfWhhRVqA",
+        "sourceUuid": "Item.ZzM0kxucfWhhRVqA",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 3,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "NVoDbXaWlqxCGbL7",
+        "name": "Moonstone Ring",
+        "img": "icons/equipment/finger/ring-cabochon-thin-silver-purple.webp",
+        "description": "",
+        "sourceItemUuid": "Item.e21ihbdSs9rCQkZX",
+        "sourceUuid": "Item.e21ihbdSs9rCQkZX",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 4,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "9R6LLqImoUmOPl98",
+        "name": "Garnet Mourning Brooch",
+        "img": "icons/equipment/neck/amulet-round-gold-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.zIIrNavaUcePXrkg",
+        "sourceUuid": "Item.zIIrNavaUcePXrkg",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 5,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "4LizB8L3NXDBKApP",
+        "name": "Pearl Clasp",
+        "img": "icons/commodities/treasure/trinket-totem-bone-green.webp",
+        "description": "",
+        "sourceItemUuid": "Item.UeDkZ7QpG5Whdope",
+        "sourceUuid": "Item.UeDkZ7QpG5Whdope",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 3,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "xwqUP9l3N8mvvodj",
+        "name": "Matched Earring Pair",
+        "img": "icons/commodities/gems/pearl-red-gold.webp",
+        "description": "",
+        "sourceItemUuid": "Item.1yFF8zKpo6sUEJWs",
+        "sourceUuid": "Item.1yFF8zKpo6sUEJWs",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 4,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "ycWPNTzyhNM8RSZV",
+        "name": "Silver Filigree Detail",
+        "img": "icons/commodities/metal/clasp-steel-braid.webp",
+        "description": "",
+        "sourceItemUuid": "Item.lsJfYHZdDSHOZYCM",
+        "sourceUuid": "Item.lsJfYHZdDSHOZYCM",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 3,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "FQEI3A4HnRTWIQk1",
+        "name": "Gemstone Dust",
+        "img": "icons/commodities/materials/powder-teal.webp",
+        "description": "",
+        "sourceItemUuid": "Item.J0yBbpXj2BDD69a5",
+        "sourceUuid": "Item.J0yBbpXj2BDD69a5",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 2,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "MDdbCNuCGxyJQxPi",
+        "name": "Presentation Case",
+        "img": "icons/containers/chest/chest-simple-box-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.lcR8aypW5AoQ0HUI",
+        "sourceUuid": "Item.lcR8aypW5AoQ0HUI",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 3,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "idVpTSLOqBWtpuTS",
+        "name": "Masterwork Appraisal Seal",
+        "img": "icons/sundries/scrolls/scroll-bound-sealed-gold-red.webp",
+        "description": "",
+        "sourceItemUuid": "Item.o8sroFwCDOBoAZqe",
+        "sourceUuid": "Item.o8sroFwCDOBoAZqe",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "difficulty": 6,
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "EYaNX4fBrMZ6dQ3N",
+        "name": "Jeweller’s Tools",
+        "img": "icons/tools/hand/hammer-and-nail.webp",
+        "description": "",
+        "sourceItemUuid": "Item.0JWw5izovGwSFgLa",
+        "sourceUuid": "Item.0JWw5izovGwSFgLa",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": [],
+          "outcomeRouting": {}
+        }
+      },
+      {
+        "id": "buUcgOSBijYaE4c8",
+        "name": "Gem Loupe",
+        "img": "icons/tools/scribal/lens-blue.webp",
+        "description": "",
+        "sourceItemUuid": "Item.x1pqOglF13ip65B0",
+        "sourceUuid": "Item.x1pqOglF13ip65B0",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "oeT1MwKJDyqkEUdI",
+        "name": "Fine Burin",
+        "img": "icons/tools/hand/awl.webp",
+        "description": "",
+        "sourceItemUuid": "Item.U6TDRVmc6STtOCJM",
+        "sourceUuid": "Item.U6TDRVmc6STtOCJM",
+        "fallbackItemIds": [],
+        "tier": null,
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "KMIONM2UMDbrasGx",
+        "label": "",
+        "enabled": true,
+        "componentId": "EYaNX4fBrMZ6dQ3N",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 3
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "h8El3l1vDTszq6qB",
+        "label": "",
+        "enabled": true,
+        "componentId": "buUcgOSBijYaE4c8",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 1
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      },
+      {
+        "id": "VaK34EL27UGajlID",
+        "label": "",
+        "enabled": true,
+        "componentId": "oeT1MwKJDyqkEUdI",
+        "requirement": null,
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 6
+        },
+        "onBreak": {
+          "mode": "flagBroken"
+        }
+      }
+    ],
+    "gatheringRealms": [],
+    "gatheringRealmSettings": {
+      "enabled": false,
+      "revealMode": "manual",
+      "modifierVisibility": "visible"
+    }
+  },
+  "recipes": [
+    {
+      "id": "O9YJRIa0fCp7k4YH",
+      "name": "Moonstone Silverwork Set",
+      "description": "",
+      "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+      "category": "general",
+      "craftingSystemId": "__SYSTEM_ID__",
+      "tags": [],
+      "enabled": true,
+      "locked": false,
+      "recipeItemId": null,
+      "linkedRecipeItemUuid": null,
+      "visibility": null,
+      "complex": false,
+      "steps": [],
+      "ingredientSets": [
+        {
+          "id": "XRnzmdFVsZdSOFEi",
+          "name": "",
+          "ingredientGroups": [
+            {
+              "id": "7TB621ENYtOqhdyO",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "yE8Q9v8W3xXuUdDA"
+                  },
+                  "componentId": "yE8Q9v8W3xXuUdDA",
+                  "systemItemId": "yE8Q9v8W3xXuUdDA",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "H62yfjP4tbtRWh6T",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "Y8Fsun4hLDbueEe6"
+                  },
+                  "componentId": "Y8Fsun4hLDbueEe6",
+                  "systemItemId": "Y8Fsun4hLDbueEe6",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "zZUoaVf93NOFfJ32",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "gGED9JE7DofwaOdf"
+                  },
+                  "componentId": "gGED9JE7DofwaOdf",
+                  "systemItemId": "gGED9JE7DofwaOdf",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            },
+            {
+              "id": "4Ui1U215M1EhYab2",
+              "name": "",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "MS3FyM9as7BXkxa2"
+                  },
+                  "componentId": "MS3FyM9as7BXkxa2",
+                  "systemItemId": "MS3FyM9as7BXkxa2",
+                  "itemUuid": null,
+                  "quantity": 1,
+                  "tag": null,
+                  "alternatives": [],
+                  "extractEffects": false,
+                  "effectFilter": null
+                }
+              ]
+            }
+          ],
+          "ingredients": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "yE8Q9v8W3xXuUdDA"
+              },
+              "componentId": "yE8Q9v8W3xXuUdDA",
+              "systemItemId": "yE8Q9v8W3xXuUdDA",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "Y8Fsun4hLDbueEe6"
+              },
+              "componentId": "Y8Fsun4hLDbueEe6",
+              "systemItemId": "Y8Fsun4hLDbueEe6",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "gGED9JE7DofwaOdf"
+              },
+              "componentId": "gGED9JE7DofwaOdf",
+              "systemItemId": "gGED9JE7DofwaOdf",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            },
+            {
+              "match": {
+                "type": "component",
+                "componentId": "MS3FyM9as7BXkxa2"
+              },
+              "componentId": "MS3FyM9as7BXkxa2",
+              "systemItemId": "MS3FyM9as7BXkxa2",
+              "itemUuid": null,
+              "quantity": 1,
+              "tag": null,
+              "alternatives": [],
+              "extractEffects": false,
+              "effectFilter": null
+            }
+          ],
+          "essences": {},
+          "toolIds": [],
+          "resultMapping": [],
+          "resultGroupId": null
+        }
+      ],
+      "resultGroups": [
+        {
+          "id": "WLXs7uNNQokwjCW2",
+          "name": "Result Group 1",
+          "checkOutcomeIds": [],
+          "results": [
+            {
+              "id": "FAozS8r4fYfmyb73",
+              "componentId": "NVoDbXaWlqxCGbL7",
+              "systemItemId": "NVoDbXaWlqxCGbL7",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "9510RI91trrcAwrF",
+              "componentId": "xwqUP9l3N8mvvodj",
+              "systemItemId": "xwqUP9l3N8mvvodj",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "R2AzFalOTpEpa3mc",
+              "componentId": "ycWPNTzyhNM8RSZV",
+              "systemItemId": "ycWPNTzyhNM8RSZV",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "DdqOpiQJ3MXGIihd",
+              "componentId": "FQEI3A4HnRTWIQk1",
+              "systemItemId": "FQEI3A4HnRTWIQk1",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "sySJcschIWsPm7JN",
+              "componentId": "MDdbCNuCGxyJQxPi",
+              "systemItemId": "MDdbCNuCGxyJQxPi",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            },
+            {
+              "id": "O1hx075tbXcfnMIr",
+              "componentId": "idVpTSLOqBWtpuTS",
+              "systemItemId": "idVpTSLOqBWtpuTS",
+              "itemUuid": null,
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "toolIds": [
+        "KMIONM2UMDbrasGx",
+        "h8El3l1vDTszq6qB"
+      ],
+      "timeRequirement": {
+        "minutes": 0,
+        "hours": 0,
+        "days": 1,
+        "months": 0,
+        "years": 0
+      },
+      "results": [
+        {
+          "id": "FAozS8r4fYfmyb73",
+          "componentId": "NVoDbXaWlqxCGbL7",
+          "systemItemId": "NVoDbXaWlqxCGbL7",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "9510RI91trrcAwrF",
+          "componentId": "xwqUP9l3N8mvvodj",
+          "systemItemId": "xwqUP9l3N8mvvodj",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "R2AzFalOTpEpa3mc",
+          "componentId": "ycWPNTzyhNM8RSZV",
+          "systemItemId": "ycWPNTzyhNM8RSZV",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "DdqOpiQJ3MXGIihd",
+          "componentId": "FQEI3A4HnRTWIQk1",
+          "systemItemId": "FQEI3A4HnRTWIQk1",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "sySJcschIWsPm7JN",
+          "componentId": "MDdbCNuCGxyJQxPi",
+          "systemItemId": "MDdbCNuCGxyJQxPi",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        },
+        {
+          "id": "O1hx075tbXcfnMIr",
+          "componentId": "idVpTSLOqBWtpuTS",
+          "systemItemId": "idVpTSLOqBWtpuTS",
+          "itemUuid": null,
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ],
+      "isVariable": false,
+      "transferEffects": false,
+      "outcomeRouting": null,
+      "resultSelection": null,
+      "checkTierId": null,
+      "currencyCost": null,
+      "teaser": {
+        "enabled": true,
+        "hiddenFields": [
+          "ingredients",
+          "results",
+          "description"
+        ],
+        "revealThreshold": 100,
+        "teaserDescription": ""
+      },
+      "metadata": {
+        "created": 1782670740948,
+        "modified": 1782670740948,
+        "author": "Admin",
+        "version": "1.0.0"
+      }
+    }
+  ]
+}
