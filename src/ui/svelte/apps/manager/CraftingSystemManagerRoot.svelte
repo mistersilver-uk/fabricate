@@ -407,8 +407,9 @@
   // Fixed-type routed success tiers offered to the recipe's "Minimum success tier"
   // override; empty (control hidden) unless the system's real resolution mode is
   // `routedByCheck` + fixed. Gated on `resolutionMode`, not the collapsed
-  // `craftingCheckMode`, so a `routedByIngredients` system (which shares the routed
-  // check config but never reads the field) does not surface a dead control.
+  // `craftingCheckMode`, so a `routedByIngredients` system (which authors its check
+  // on the shared `simple` pass/fail slot and has no outcome tiers) does not surface
+  // a dead control.
   const recipeMinSuccessTierOptions = $derived(
     resolveRecipeFixedOutcomeTierOptions(selectedSystem?.craftingCheck, selectedSystem?.resolutionMode)
   );

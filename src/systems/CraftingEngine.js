@@ -2128,7 +2128,7 @@ export class CraftingEngine {
 
   /**
    * Evaluate a pass/fail crafting check against an arbitrary check sub-config
-   * (`simple` or, for the ingredient-routed mode, `routed`): resolve the DC
+   * (the shared `simple` slot, which backs `simple`/`alchemy`/`routedByIngredients`): resolve the DC
    * (static default, recipe tier, or dynamic macro) via {@link _resolveSimpleCheckDc}
    * — parameterized over `config`, so a recipe `checkTierId` / dynamic-DC macro still
    * applies — then roll and compare (meet-or-exceed / exceed) via the shared

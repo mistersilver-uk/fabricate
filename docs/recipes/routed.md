@@ -145,6 +145,13 @@ Switching between the two routed modes never deletes a recipe.
 Routing data that no longer fits the new mode is kept and flagged in the System Overview so you can re-author it, rather than being silently mis-routed.
 See [Changing the resolution mode]({% link crafting-systems.md %}#feature-toggles).
 
+Fabricate also carries your crafting check across when you switch modes.
+Routed by ingredients uses the same pass or fail check as Simple and Alchemy, while Routed by check uses named outcome tiers instead.
+When you switch a system between Routed by ingredients and Routed by check, Fabricate moves the check's roll formula and DC into the new mode's **Crafting check** editor, as long as you have not already set one up there.
+One case needs your attention.
+If a Routed by ingredients check used a dynamic difficulty, switching into Routed by check drops the dynamic difficulty, because Routed by check does not support one.
+Re-author the DC on the **Crafting check** page after switching into Routed by check so the tier check uses the difficulty you intend.
+
 Recipes are authored through the API only today.
 See the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
