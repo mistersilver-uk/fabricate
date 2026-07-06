@@ -6997,7 +6997,20 @@ export function createAdminStore(services) {
     }
     const recipes = recipeManager.getRecipes({ craftingSystemId: targetId }).map((r) => r.toJSON());
     const version = services.getModuleVersion ? services.getModuleVersion() : '0.0.0';
-    const payload = buildExportPayload(system, recipes, version);
+    // Gathering authoring rides along: the FULL global environment array (the
+    // exporter filters to this system) plus the whole gatheringConfig setting
+    // (the exporter slices this system's block + shared vocabularies).
+    const environmentStore = _getEnvironmentStore();
+    const gatheringEnvironments =
+      typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
+    const gatheringConfig = services.getSetting?.(GATHERING_CONFIG_SETTING) || {};
+    const payload = buildExportPayload(
+      system,
+      recipes,
+      version,
+      gatheringEnvironments,
+      gatheringConfig
+    );
     const filename = makeExportFilename(system.name);
     const json = JSON.stringify(payload, null, 2);
     await services.downloadFile(json, filename);
