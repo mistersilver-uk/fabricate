@@ -3,15 +3,49 @@
  * Handles UUID remapping with deterministic precedence and fallback item ID management.
  */
 import { validateGatheringDropReferences } from './GatheringDropReferenceValidator.js';
+import { resolveImportReferences, REFERENCE_KINDS } from './importReferenceResolver.js';
+
+/** World-setting key for the per-system gathering config (mirrors SETTING_KEYS.GATHERING_CONFIG). */
+const GATHERING_CONFIG_KEY = 'gatheringConfig';
+
+/**
+ * Default external-reference resolver. Wraps the async `fromUuid` (NOT
+ * `fromUuidSync`, which only reliably resolves cached world docs). Returns
+ * `{ uuid }` when the document exists, else `null` (absent). Throws on a
+ * malformed UUID, so the caller wraps in try/catch → treated as absent.
+ */
+async function defaultResolveExternalUuid(uuid) {
+  if (!uuid) return null;
+  const doc = await fromUuid(uuid);
+  return doc ? { uuid: doc.uuid ?? uuid } : null;
+}
 
 export class CompendiumImporter {
   /**
    * @param {object} craftingSystemManager
    * @param {object} recipeManager
+   * @param {object} [seams]
+   * @param {object} [seams.environmentStore] - GatheringEnvironmentStore seam (list/save)
+   * @param {(key: string) => *} [seams.getSetting] - World-setting reader (gatheringConfig)
+   * @param {(key: string, value: *) => Promise<*>} [seams.setSetting] - World-setting writer
+   * @param {() => boolean} [seams.isGM] - GM predicate (F3 fail-fast gate)
+   * @param {(uuid: string) => Promise<null | { uuid: string }>} [seams.resolveExternalUuid]
    */
-  constructor(craftingSystemManager, recipeManager) {
+  constructor(craftingSystemManager, recipeManager, seams = {}) {
     this._craftingSystemManager = craftingSystemManager;
     this._recipeManager = recipeManager;
+    this._environmentStore = seams.environmentStore ?? null;
+    this._getSetting = seams.getSetting ?? null;
+    this._setSetting = seams.setSetting ?? null;
+    // Enforce the GM gate whenever a Foundry `game.user` is present; pure tests
+    // that never install `game.user` are allowed through.
+    this._isGM =
+      seams.isGM ??
+      (() => {
+        const g = globalThis.game;
+        return g?.user ? g.user.isGM === true : true;
+      });
+    this._resolveExternalUuid = seams.resolveExternalUuid ?? defaultResolveExternalUuid;
   }
 
   /**
@@ -30,6 +64,13 @@ export class CompendiumImporter {
       throw new Error('Invalid pack data: missing required "system" field');
     }
 
+    // F3 — GM gate first: fail fast before ANY world-scope write. A non-GM
+    // `game.settings.set` on world scope is server-rejected in V13, which would
+    // leave a partial system + rejected writes if not gated here.
+    if (!this._isGM()) {
+      throw new Error('Only a GM can import a crafting system (world-scope write).');
+    }
+
     const {
       overwriteExisting = false,
       retainFallbackIds = true,
@@ -45,6 +86,9 @@ export class CompendiumImporter {
       components: { total: 0, remapped: [], retained: [], unresolved: [] },
       recipes: { total: recipesData.length, imported: 0, skipped: 0, errors: [] },
       collisions: [],
+      // Structured cross-reference report surfaced to the GM (source items,
+      // scenes, scene-regions, macros, drop-row items, broken internal links).
+      unresolvedReferences: [],
     };
 
     // --- Phase 1: Resolve existing system ---
@@ -154,7 +198,140 @@ export class CompendiumImporter {
       systemId: system.id,
     });
 
+    // --- Phase 5: Gathering authoring (environments + config) ---
+    await this._importGatheringAuthoring(packData, system, recipesData, summary);
+
+    // Fold the component source-item resolution into the unified reference report.
+    this._foldComponentReferences(summary);
+
     return summary;
+  }
+
+  /**
+   * Import the gathering-authoring bundle for the (possibly freshly-created)
+   * system: rebind container ids, resolve/report references, persist environments
+   * via replace-by-system-id (F1), and merge the gatheringConfig slice.
+   * @private
+   */
+  async _importGatheringAuthoring(packData, system, recipesData, summary) {
+    const environments = Array.isArray(packData.gatheringEnvironments)
+      ? structuredClone(packData.gatheringEnvironments)
+      : [];
+    const gatheringConfig =
+      packData.gatheringConfig && typeof packData.gatheringConfig === 'object'
+        ? structuredClone(packData.gatheringConfig)
+        : null;
+
+    // F2 — copy-mode container rebind BEFORE persistence: point every
+    // environment at the (possibly newly generated) system id and rekey the
+    // config slice under it. Task/event/modifier ids are preserved (D3).
+    for (const env of environments) {
+      if (env && typeof env === 'object') env.craftingSystemId = system.id;
+    }
+
+    // Resolve + classify references (external existence + broken-internal), then
+    // report them. Realm scene refs live on the already-created system; the
+    // default resolver never rewrites external UUIDs, so they are reported only.
+    const { resolved, unresolvedReferences } = await resolveImportReferences(
+      { system, recipes: recipesData, gatheringEnvironments: environments, gatheringConfig },
+      { resolveUuid: this._resolveExternalUuid }
+    );
+    summary.unresolvedReferences.push(...unresolvedReferences);
+
+    const resolvedEnvironments = Array.isArray(resolved.gatheringEnvironments)
+      ? resolved.gatheringEnvironments
+      : [];
+    const resolvedConfig = resolved.gatheringConfig;
+
+    await this._persistEnvironments(system.id, resolvedEnvironments);
+    await this._persistGatheringConfig(system.id, resolvedConfig);
+  }
+
+  /**
+   * F1 — replace-by-system-id persistence. Read the ENTIRE global environment
+   * array, remove the target system's existing environments (delete-then-add so
+   * an overwrite re-import never accumulates stale records), splice in the
+   * imported set, and write the merged whole — so other systems' environments
+   * are never clobbered.
+   * @private
+   */
+  async _persistEnvironments(systemId, importedEnvironments) {
+    const store = this._environmentStore;
+    if (!store || typeof store.save !== 'function') return;
+
+    const all =
+      typeof store.list === 'function'
+        ? store.list()
+        : typeof store.load === 'function'
+          ? store.load()
+          : [];
+    const others = (Array.isArray(all) ? all : []).filter(
+      (env) => env?.craftingSystemId !== systemId
+    );
+
+    // Nothing to do when there are neither imported nor pre-existing records for
+    // this system (avoids a redundant global write).
+    if (importedEnvironments.length === 0 && others.length === (all?.length ?? 0)) {
+      return;
+    }
+
+    await store.save([...others, ...importedEnvironments]);
+  }
+
+  /**
+   * Merge the exported `{ system: <slice>, shared: <vocab+conditions> }` config
+   * into the global gatheringConfig setting under the (possibly rebased) system
+   * id, without clobbering other systems or the world's current-condition state.
+   * @private
+   */
+  async _persistGatheringConfig(systemId, config) {
+    if (!this._getSetting || !this._setSetting || !config || typeof config !== 'object') return;
+
+    const slice = config.system && typeof config.system === 'object' ? config.system : {};
+    const shared = config.shared && typeof config.shared === 'object' ? config.shared : {};
+
+    const global = this._getSetting(GATHERING_CONFIG_KEY) || {};
+    const next = {
+      ...global,
+      // replace-by-system-id
+      systems: { ...global.systems, [systemId]: slice },
+      // Seed missing shared vocabularies without overwriting existing ones.
+      vocabularies: { ...shared.vocabularies, ...global.vocabularies },
+      // Preserve the world's current-condition state; only seed when absent.
+      conditions: global.conditions || shared.conditions || {},
+    };
+
+    await this._setSetting(GATHERING_CONFIG_KEY, next);
+  }
+
+  /**
+   * Map the component source-item resolution (remapped/retained/unresolved) into
+   * the unified `unresolvedReferences[]` collection so the report surfaces source
+   * items alongside every other reference kind.
+   * @private
+   */
+  _foldComponentReferences(summary) {
+    const refs = summary.unresolvedReferences;
+    for (const entry of summary.components.remapped) {
+      refs.push({
+        kind: REFERENCE_KINDS.SOURCE_ITEM,
+        ownerType: 'component',
+        ownerId: entry.componentId,
+        ownerName: entry.componentName,
+        referenceValue: entry.oldUuid,
+        disposition: entry.method === 'exact' ? 'retained' : 'remapped',
+      });
+    }
+    for (const entry of summary.components.unresolved) {
+      refs.push({
+        kind: REFERENCE_KINDS.SOURCE_ITEM,
+        ownerType: 'component',
+        ownerId: entry.componentId,
+        ownerName: entry.componentName,
+        referenceValue: entry.sourceItemUuid,
+        disposition: 'reported',
+      });
+    }
   }
 
   async _validateGatheringConfig(systemInput) {

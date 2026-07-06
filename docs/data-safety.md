@@ -14,6 +14,8 @@ Primarily, I've written this document to address valid concerns GM's might have 
 > Fabricate's safeguards are about respecting the data it manages and failing safely when something is wrong.
 > They are not a substitute for your own Foundry backups.
 > Keep regular world backups, just as you would for any module.
+> You can also export an individual crafting system to a file from its manager.
+> See [Import & Export]({% link import-export.md %}).
 
 ---
 

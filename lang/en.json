@@ -923,6 +923,38 @@
       "Title": "Crafting Admin",
       "Selected": "Selected:",
       "NoSystemsYet": "No crafting systems yet",
+      "ImportReport": {
+        "Title": "Import report",
+        "HeadlineNeedsAttention": "Import succeeded — {count} reference(s) need attention.",
+        "HeadlineAllResolved": "Import succeeded — all references resolved.",
+        "EmptyState": "Nothing needs your attention.",
+        "HandledLine": "{count} reference(s) resolved automatically.",
+        "Close": "Close",
+        "Kind": {
+          "sourceItem": "Component source items",
+          "scene": "Scene gates",
+          "sceneRegion": "Scene regions",
+          "macro": "Macros",
+          "dropRowItem": "Drop-row items",
+          "componentLink": "Component links",
+          "taskLink": "Task links",
+          "eventLink": "Event links",
+          "recipeItem": "Recipe item links",
+          "unknown": "Other references"
+        },
+        "OwnerType": {
+          "component": "Component",
+          "environment": "Environment",
+          "realm": "Realm",
+          "dropRow": "Drop row",
+          "tool": "Tool",
+          "essence": "Essence",
+          "recipe": "Recipe",
+          "task": "Task",
+          "event": "Event",
+          "unknown": "Record"
+        }
+      },
       "Actors": {
         "Name": "Actor",
         "None": "No actors available."

@@ -403,3 +403,87 @@ test('validateImportData: accepts the legacy gatheringRegions key on read (pre-1
   assert.equal(result.valid, false, 'legacy gatheringRegions is validated, not silently ignored');
   assert.ok(result.errors.some(e => e.includes('gatheringRealms')), 'reports under the canonical realm name');
 });
+
+// ---------------------------------------------------------------------------
+// #492 — schema v2 envelope + gathering authoring bundle
+// ---------------------------------------------------------------------------
+
+test('buildExportPayload: writes the explicit schemaVersion + runtimeStateIncluded markers', () => {
+  const payload = buildExportPayload(makeSystem(), [], '1.0.0');
+  assert.equal(payload.schemaVersion, 2);
+  assert.equal(payload.runtimeStateIncluded, false);
+  assert.ok(Array.isArray(payload.gatheringEnvironments));
+  assert.ok(payload.gatheringConfig && typeof payload.gatheringConfig === 'object');
+  assert.ok('system' in payload.gatheringConfig && 'shared' in payload.gatheringConfig);
+});
+
+test('buildExportPayload: filters environments to the exported system and strips nodeRuntime', () => {
+  const environments = [
+    { id: 'env-1', craftingSystemId: 'sys-1', name: 'Keep', nodeRuntime: { t: { remaining: 3 } } },
+    { id: 'env-2', craftingSystemId: 'other', name: 'Drop', nodeRuntime: {} }
+  ];
+  const payload = buildExportPayload(makeSystem(), [], '1.0.0', environments, {});
+  assert.equal(payload.gatheringEnvironments.length, 1);
+  assert.equal(payload.gatheringEnvironments[0].id, 'env-1');
+  assert.deepEqual(payload.gatheringEnvironments[0].nodeRuntime, {}, 'nodeRuntime stripped');
+});
+
+test('buildExportPayload: slices this system config + resets current condition state (A1)', () => {
+  const gatheringConfig = {
+    vocabularies: { weather: [{ id: 'clear' }, { id: 'rain' }] },
+    conditions: { weather: 'rain', timeOfDay: 'night' },
+    systems: {
+      'sys-1': {
+        rules: { rewardLimit: 2 },
+        conditions: {
+          weather: { enabled: true, current: 'rain', values: [{ id: 'clear' }, { id: 'rain' }] },
+          timeOfDay: { enabled: true, current: 'night', values: [{ id: 'day' }] }
+        }
+      },
+      'other': { rules: { rewardLimit: 9 } }
+    }
+  };
+  const payload = buildExportPayload(makeSystem(), [], '1.0.0', [], gatheringConfig);
+  // Only this system's slice is exported.
+  assert.equal(payload.gatheringConfig.system.rules.rewardLimit, 2);
+  // Authoring survives; runtime current is reset to defaults.
+  assert.equal(payload.gatheringConfig.system.conditions.weather.enabled, true);
+  assert.equal(payload.gatheringConfig.system.conditions.weather.current, 'clear');
+  assert.equal(payload.gatheringConfig.system.conditions.timeOfDay.current, 'day');
+  // Shared top-level current conditions reset too.
+  assert.equal(payload.gatheringConfig.shared.conditions.weather, 'clear');
+  assert.equal(payload.gatheringConfig.shared.conditions.timeOfDay, 'day');
+});
+
+test('validateImportData: upcasts a legacy payload then accepts it (no schemaVersion)', () => {
+  const result = validateImportData({
+    fabricateVersion: '1.5.0',
+    system: { name: 'Legacy' },
+    recipes: []
+  });
+  assert.equal(result.valid, true);
+});
+
+test('validateImportData: rejects a non-array gatheringEnvironments', () => {
+  const result = validateImportData({
+    schemaVersion: 2,
+    fabricateVersion: '1.0.0',
+    system: { name: 'X' },
+    gatheringEnvironments: { not: 'array' }
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => e.includes('gatheringEnvironments')));
+});
+
+test('prepareForImport: passes gathering bundle through in keep mode', () => {
+  const data = buildExportPayload(
+    makeSystem(),
+    [makeRecipe()],
+    '1.0.0',
+    [{ id: 'env-1', craftingSystemId: 'sys-1', name: 'E', nodeRuntime: {} }],
+    { systems: { 'sys-1': { rules: {} } }, vocabularies: {}, conditions: {} }
+  );
+  const prepared = prepareForImport(data, 'keep');
+  assert.equal(prepared.gatheringEnvironments.length, 1);
+  assert.ok(prepared.gatheringConfig.system);
+});

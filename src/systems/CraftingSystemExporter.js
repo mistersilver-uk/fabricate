@@ -3,17 +3,39 @@
  * Pure functions — no Foundry globals required (testable in isolation).
  */
 
+import { migrateExportPayload } from '../migration/migrateExportPayload.js';
+
+import {
+  FABRICATE_EXPORT_SCHEMA_VERSION,
+  assembleGatheringAuthoringBundle,
+} from './authoringExport.js';
+import { rebindCopyContainerIds } from './importReferenceResolver.js';
+
 const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
 
 /**
- * Build an export payload for a crafting system and its recipes.
+ * Build an export payload for a crafting system, its recipes, and its gathering
+ * authoring model (environments + the per-system `gatheringConfig` slice).
+ *
+ * The envelope carries an explicit integer `schemaVersion` (distinct from
+ * `fabricateVersion`) and a `runtimeStateIncluded: false` marker; runtime/world
+ * state (per-environment `nodeRuntime`, current-condition selection) is stripped
+ * by {@link assembleGatheringAuthoringBundle}.
  *
  * @param {object} system - Normalized system object from CraftingSystemManager
  * @param {object[]} recipes - Recipe objects (plain JSON via recipe.toJSON())
  * @param {string} fabricateVersion - Current module version string
+ * @param {object[]} [gatheringEnvironments=[]] - FULL global environment array (all systems)
+ * @param {object} [gatheringConfig={}] - FULL `gatheringConfig` setting object
  * @returns {object} Export envelope ready for JSON.stringify
  */
-export function buildExportPayload(system, recipes, fabricateVersion) {
+export function buildExportPayload(
+  system,
+  recipes,
+  fabricateVersion,
+  gatheringEnvironments = [],
+  gatheringConfig = {}
+) {
   if (!system || !system.id) {
     throw new Error('Cannot export: system is missing or has no id');
   }
@@ -34,11 +56,17 @@ export function buildExportPayload(system, recipes, fabricateVersion) {
     return r;
   });
 
+  const bundle = assembleGatheringAuthoringBundle(system, gatheringEnvironments, gatheringConfig);
+
   return {
+    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     fabricateVersion,
     exportedAt: new Date().toISOString(),
+    runtimeStateIncluded: false,
     system: exportSystem,
     recipes: exportRecipes,
+    gatheringEnvironments: bundle.gatheringEnvironments,
+    gatheringConfig: bundle.gatheringConfig,
   };
 }
 
@@ -48,18 +76,34 @@ export function buildExportPayload(system, recipes, fabricateVersion) {
  * @param {*} data - Parsed JSON to validate
  * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
  */
-export function validateImportData(data) {
+export function validateImportData(rawData) {
   const errors = [];
   const warnings = [];
 
-  if (!data || typeof data !== 'object') {
+  if (!rawData || typeof rawData !== 'object') {
     errors.push('Import data is not a valid object');
     return { valid: false, errors, warnings };
   }
 
+  // Upcast any legacy (schema 1) payload to the current schema before validating
+  // the v2 shape, so an older `{ fabricateVersion, system, recipes }` export still
+  // validates.
+  const data = migrateExportPayload(rawData);
+
   // Envelope checks
   if (!data.fabricateVersion) {
     warnings.push('Missing fabricateVersion — file may not be a Fabricate export');
+  }
+
+  // Gathering authoring bundle shape (present after migration).
+  if (data.gatheringEnvironments !== undefined && !Array.isArray(data.gatheringEnvironments)) {
+    errors.push('"gatheringEnvironments" field must be an array');
+  }
+  if (
+    data.gatheringConfig !== undefined &&
+    (typeof data.gatheringConfig !== 'object' || Array.isArray(data.gatheringConfig))
+  ) {
+    errors.push('"gatheringConfig" field must be an object');
   }
 
   // System checks
@@ -117,9 +161,21 @@ export function validateImportData(data) {
  *   - 'copy': strip IDs so CompendiumImporter creates fresh ones
  * @returns {object} Pack data shaped for CompendiumImporter
  */
-export function prepareForImport(data, mode = 'keep') {
+export function prepareForImport(rawData, mode = 'keep') {
+  // Upcast legacy payloads so downstream import always sees the v2 fields.
+  const data = migrateExportPayload(rawData);
+
   const system = structuredClone(data.system);
   const recipes = Array.isArray(data.recipes) ? structuredClone(data.recipes) : [];
+  const gatheringEnvironments = Array.isArray(data.gatheringEnvironments)
+    ? structuredClone(data.gatheringEnvironments)
+    : [];
+  const gatheringConfig =
+    data.gatheringConfig && typeof data.gatheringConfig === 'object'
+      ? structuredClone(data.gatheringConfig)
+      : { system: {}, shared: {} };
+
+  const prepared = { system, recipes, gatheringEnvironments, gatheringConfig };
 
   if (mode === 'copy') {
     delete system.id;
@@ -129,9 +185,16 @@ export function prepareForImport(data, mode = 'keep') {
     for (const recipe of recipes) {
       delete recipe.id;
     }
+
+    // Regenerate record-CONTAINER ids (realm ids, environment record ids) and
+    // rewire their internal cross-references, while PRESERVING task / event /
+    // characterModifier ids so environment→library linkages survive (D3). The
+    // craftingSystemId + gatheringConfig system-key are rebound by the importer
+    // once createSystem has generated the fresh system id.
+    rebindCopyContainerIds(prepared);
   }
 
-  return { system, recipes };
+  return prepared;
 }
 
 /**

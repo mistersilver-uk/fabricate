@@ -36,6 +36,7 @@ The player-facing Crafting and Alchemy tabs in the unified Fabricate window are 
 | **Teaser Mode**            | Track discovery progress and return teaser visibility state through the API                                       |
 | **Shopping List**          | Planned player-facing UI. Aggregation support exists as internal utility code                                     |
 | **Effect Transfer**        | Transfer active effects from ingredients to crafted items                                                         |
+| **Import & Export**        | Back up a whole crafting system or move it between worlds as a JSON file                                          |
 | **Macro Integration**      | Customise crafting checks, property generation, and success/failure hooks                                         |
 | **Alchemy Mode**           | Hide recipe names and let players discover formulas by experimentation                                            |
 | **Recipe Graph**           | Planned. Visualise recipe dependencies as an interactive graph in the GM admin panel                             |
@@ -73,6 +74,12 @@ GMs can place Tools and Gathering Tasks directly on the scene as **Scene Region*
 Players activate them by walking a token into the region.
 A non-blocking prompt appears, and clicking **Interact** opens the Fabricate UI.
 See [Canvas Interactables]({% link canvas-interactables.md %}).
+
+## Import and export
+
+You can export a complete crafting system to a JSON file and import it into another world.
+The export carries the whole authoring model, and import reports any references that do not exist in the target world.
+See [Import & Export]({% link import-export.md %}).
 
 ## Having trouble?
 
