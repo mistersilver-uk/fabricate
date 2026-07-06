@@ -166,6 +166,19 @@ describe('UI PR screenshot evidence', () => {
     ]);
   });
 
+  it('maps the system Recipe Visibility card to its own visibility frame', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/recipe/SystemRecipeVisibilityCard.svelte',
+    ]);
+    const ids = views.map(view => view.id);
+    assert.ok(
+      ids.includes('manager-system-recipe-visibility'),
+      'the Recipe Visibility card should route the manager-system-recipe-visibility frame',
+    );
+    const visibilityView = views.find(view => view.id === 'manager-system-recipe-visibility');
+    assert.deepEqual(visibilityView.smokeLabels, ['manager-system-recipe-visibility']);
+  });
+
   it('collects the five recipe-edit frames into five separate files', () => {
     withScreenshotFixtures(
       {

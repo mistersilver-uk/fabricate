@@ -172,6 +172,18 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/systems\/importReportContent\.js$/,
     ],
   },
+  // The system-level Recipe Visibility card (System Overview → Settings tab)
+  // renders in its own `manager-system-recipe-visibility` smoke frame, distinct
+  // from the recipe editor frames. Its file also matches RECIPE_EDIT_MATCHES (it
+  // lives under manager/recipe/), so a card change republishes both this frame
+  // and the recipe-edit frames — this view ensures the card's own frame is the
+  // one that carries the per-recipe learn-cap/visibility evidence.
+  {
+    id: 'manager-system-recipe-visibility',
+    label: 'Manager system settings — Recipe Visibility card',
+    smokeLabels: ['manager-system-recipe-visibility'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/recipe\/SystemRecipeVisibilityCard\.svelte$/],
+  },
   // The recipe editor publishes FOUR distinct frames (overview/identity,
   // ingredients, validation tab, multi-step durations). `collect` emits ONE
   // file per recipe id (it takes the first matching smoke label), so each frame
