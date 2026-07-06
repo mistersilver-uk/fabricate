@@ -566,10 +566,14 @@ test('engine: multi-step time gate — a waiting step does NOT spend currency', 
   const sourceActor = makeDnd5eActor({ id: 'src' });
   const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 5 } });
 
-  // A run manager that always reports the time gate as NOT yet proceedable.
+  // A run manager whose run is ALREADY armed (a pre-seeded timeGate) and whose
+  // gate is NOT yet proceedable: this call is a poll of a maturing gate, not the
+  // START that arms it. Currency was spent at START (a prior call), so this poll
+  // spends nothing.
   const runManager = {
     findActiveRunForRecipe: () => null,
     getActiveRun: () => null,
+    durationToSeconds: () => 3600,
     async createRun() {
       return { id: 'run-1', currentStepIndex: 0, steps: [{ timeGate: { availableAt: 99999 } }] };
     },
@@ -587,7 +591,11 @@ test('engine: multi-step time gate — a waiting step does NOT spend currency', 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   assert.equal(result.success, false, 'still waiting for the time gate');
   assert.match(result.message, /in progress/i);
-  assert.equal(craftingActor.system.currency.gp, 5, 'no currency spent while waiting');
+  assert.equal(
+    craftingActor.system.currency.gp,
+    5,
+    'no currency spent while polling an already-armed, not-yet-matured gate'
+  );
 });
 
 function recipeResultGroups() {

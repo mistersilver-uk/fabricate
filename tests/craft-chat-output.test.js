@@ -25,7 +25,9 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
-  return String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), object);
+  return String(path)
+    .split('.')
+    .reduce((v, k) => (v == null ? undefined : v[k]), object);
 }
 
 globalThis.foundry = { utils: { getProperty, setProperty: () => {} } };
@@ -39,8 +41,13 @@ let chatCreated = [];
 function resetChat() {
   chatCreated = [];
   globalThis.ChatMessage = {
-    create(data) { chatCreated.push(data); return Promise.resolve({ id: `msg-${chatCreated.length}` }); },
-    getSpeaker({ actor } = {}) { return { alias: actor?.name || 'Unknown' }; }
+    create(data) {
+      chatCreated.push(data);
+      return Promise.resolve({ id: `msg-${chatCreated.length}` });
+    },
+    getSpeaker({ actor } = {}) {
+      return { alias: actor?.name || 'Unknown' };
+    },
   };
 }
 
@@ -49,12 +56,12 @@ function buildSystem(chatOutputEnabled = true) {
     id: 'sys-1',
     features: {
       craftingChecks: false,
-      chatOutput: chatOutputEnabled
+      chatOutput: chatOutputEnabled,
     },
     craftingCheck: {
       enabled: false,
-      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
-    }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+    },
   };
 }
 
@@ -64,16 +71,22 @@ function setupGame(chatOutputEnabled = true) {
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({
-        getSystem: (id) => (id === 'sys-1' ? system : null)
+        getSystem: (id) => (id === 'sys-1' ? system : null),
       }),
-      getResolutionModeService: () => null
+      getResolutionModeService: () => null,
     },
     i18n: {
-      localize(key) { i18nKeys.push(key); return key; },
-      format(key, data = {}) { i18nKeys.push(key); return key; }
+      localize(key) {
+        i18nKeys.push(key);
+        return key;
+      },
+      format(key, data = {}) {
+        i18nKeys.push(key);
+        return key;
+      },
     },
     user: { id: 'user-1' },
-    time: { worldTime: 0 }
+    time: { worldTime: 0 },
   };
   return { system, i18nKeys };
 }
@@ -93,8 +106,12 @@ function buildRecipe(systemId = 'sys-1') {
     outcomeRouting: null,
     transferEffects: false,
     getExecutionSteps: null,
-    validate() { return { valid: true, errors: [] }; },
-    toJSON() { return { id: this.id, name: this.name }; }
+    validate() {
+      return { valid: true, errors: [] };
+    },
+    toJSON() {
+      return { id: this.id, name: this.name };
+    },
   };
 }
 
@@ -106,7 +123,9 @@ function buildIngredientItem(name = 'Iron Ingot', quantity = 2) {
     parent: null,
     system: { quantity },
     async delete() {},
-    async update(p) { if (p['system.quantity'] != null) this.system.quantity = p['system.quantity']; }
+    async update(p) {
+      if (p['system.quantity'] != null) this.system.quantity = p['system.quantity'];
+    },
   };
 }
 
@@ -115,25 +134,39 @@ function buildIngredientSet(item) {
   return {
     id: 'set-1',
     matchIngredients(availableItems, matcher) {
-      const matched = availableItems.find(i => i === item);
+      const matched = availableItems.find((i) => i === item);
       if (!matched) return [];
       return [{ item: matched, quantity: 1, ingredient }];
-    }
+    },
   };
 }
 
 function buildEngine(item, ingredientSet, overrideResolution = null) {
   const mockRecipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [], tools: [] },
+      };
     },
-    ingredientMatchesItem(recipe, ingredient, itm) { return itm === item; }
+    ingredientMatchesItem(recipe, ingredient, itm) {
+      return itm === item;
+    },
   };
   const resolutionService = overrideResolution || {
-    validateRecipe() { return { valid: true, errors: [] }; },
-    validateCheckResult() { return true; },
-    resolveResultGroups() { return { groups: [], meta: {} }; },
-    getMode() { return 'simple'; }
+    validateRecipe() {
+      return { valid: true, errors: [] };
+    },
+    validateCheckResult() {
+      return true;
+    },
+    resolveResultGroups() {
+      return { groups: [], meta: {} };
+    },
+    getMode() {
+      return 'simple';
+    },
   };
   return new CraftingEngine(mockRecipeManager, null, resolutionService);
 }
@@ -141,9 +174,13 @@ function buildEngine(item, ingredientSet, overrideResolution = null) {
 function buildActors(item) {
   const sourceActor = { id: 'a1', name: 'Crafter', items: [item] };
   const craftingActor = {
-    id: 'a1', name: 'Crafter', uuid: 'Actor.a1',
+    id: 'a1',
+    name: 'Crafter',
+    uuid: 'Actor.a1',
     items: { contents: [] },
-    async createEmbeddedDocuments() { return []; }
+    async createEmbeddedDocuments() {
+      return [];
+    },
   };
   return { sourceActor, craftingActor };
 }
@@ -160,10 +197,12 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
 
   const consumedIngredients = [
-    { item: { name: 'Iron Ingot', uuid: 'Item.iron', img: 'icons/ingot.png' }, quantity: 3 }
+    { item: { name: 'Iron Ingot', uuid: 'Item.iron', img: 'icons/ingot.png' }, quantity: 3 },
   ];
   const tools = [{ item: { name: 'Forge Hammer', uuid: 'Item.hammer', img: 'icons/hammer.png' } }];
-  const createdResults = [{ name: 'Iron Sword', uuid: 'Item.sword', img: 'icons/sword.png', system: { quantity: 1 } }];
+  const createdResults = [
+    { name: 'Iron Sword', uuid: 'Item.sword', img: 'icons/sword.png', system: { quantity: 1 } },
+  ];
 
   await engine._postCraftChatMessage({
     success: true,
@@ -172,7 +211,7 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
     consumedIngredients,
     tools,
     createdResults,
-    failureReason: undefined
+    failureReason: undefined,
   });
 
   assert.equal(chatCreated.length, 1, 'Exactly one message posted');
@@ -186,6 +225,56 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
   assert.ok(content.includes('Iron Sword'), 'Created result name in content');
   assert.ok(content.includes('src="icons/ingot.png"'), 'consumed ingredient image src');
   assert.ok(content.includes('src="icons/sword.png"'), 'created result image src');
+});
+
+test('_postCraftChatMessage: tools render authored component names (not the matched item) and never duplicate', async () => {
+  // A single owned item can satisfy two tool slots (source/name collision), which
+  // previously printed the item's name twice. The card must instead show each
+  // tool's authored component name.
+  const system = {
+    id: 'sys-1',
+    features: { chatOutput: true },
+    components: [
+      { id: 'c-smith', name: "Smith's Tools", img: 'icons/smith.png' },
+      { id: 'c-hammer', name: "Armourer's Hammer", img: 'icons/hammer.png' },
+    ],
+  };
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: (id) => (id === 'sys-1' ? system : null) }),
+      getResolutionModeService: () => null,
+    },
+    i18n: { localize: (key) => key, format: (key) => key },
+    user: { id: 'user-1' },
+    time: { worldTime: 0 },
+  };
+  resetChat();
+  const engine = new CraftingEngine({});
+
+  // Both slots matched the SAME owned item, but reference different tool components.
+  const sharedItem = { name: "Armourer's Hammer", uuid: 'Item.ah', img: 'icons/hammer-item.png' };
+  const tools = [
+    { tool: { componentId: 'c-smith' }, item: sharedItem },
+    { tool: { componentId: 'c-hammer' }, item: sharedItem },
+    // A genuine duplicate tool (same component) must be listed only once.
+    { tool: { componentId: 'c-hammer' }, item: sharedItem },
+  ];
+
+  await engine._postCraftChatMessage({
+    success: true,
+    craftingActor: buildActor('Akra'),
+    recipe: buildRecipe(),
+    consumedIngredients: [],
+    tools,
+    createdResults: [],
+  });
+
+  assert.equal(chatCreated.length, 1);
+  const content = chatCreated[0].content;
+  assert.ok(content.includes("Smith's Tools"), 'first slot shows its authored component name');
+  const hammerCount = content.split("Armourer's Hammer").length - 1;
+  assert.equal(hammerCount, 1, 'the hammer tool appears exactly once (no item-name duplication)');
+  assert.ok(content.includes('src="icons/smith.png"'), 'tool icon comes from the component');
 });
 
 // ---------------------------------------------------------------------------
@@ -208,7 +297,7 @@ test('_postCraftChatMessage: failure message includes actor, recipe, reason, and
     consumedIngredients,
     tools,
     createdResults: [],
-    failureReason: 'Skill check too low'
+    failureReason: 'Skill check too low',
   });
 
   assert.equal(chatCreated.length, 1, 'Exactly one message posted');
@@ -236,7 +325,7 @@ test('_postCraftChatMessage: does not call ChatMessage.create when chatOutput is
     recipe: buildRecipe(),
     consumedIngredients: [],
     tools: [],
-    createdResults: []
+    createdResults: [],
   });
 
   assert.equal(chatCreated.length, 0, 'ChatMessage.create must NOT be called when toggle is off');
@@ -257,7 +346,7 @@ test('_postCraftChatMessage: calls ChatMessage.create when chatOutput is true', 
     recipe: buildRecipe(),
     consumedIngredients: [],
     tools: [],
-    createdResults: []
+    createdResults: [],
   });
 
   assert.equal(chatCreated.length, 1, 'ChatMessage.create must be called when toggle is on');
@@ -275,14 +364,15 @@ test('_postCraftChatMessage: does not throw when system is not found', async () 
   const recipe = buildRecipe('nonexistent-system-id'); // system not in manager
 
   await assert.doesNotReject(
-    () => engine._postCraftChatMessage({
-      success: true,
-      craftingActor: buildActor(),
-      recipe,
-      consumedIngredients: [],
-      tools: [],
-      createdResults: []
-    }),
+    () =>
+      engine._postCraftChatMessage({
+        success: true,
+        craftingActor: buildActor(),
+        recipe,
+        consumedIngredients: [],
+        tools: [],
+        createdResults: [],
+      }),
     'Should not throw when system is not found'
   );
 
@@ -304,7 +394,7 @@ test('_postCraftChatMessage: uses FABRICATE.Chat.* localization keys', async () 
     recipe: buildRecipe(),
     consumedIngredients: [{ item: { name: 'Iron Ingot' }, quantity: 1 }],
     tools: [],
-    createdResults: [{ name: 'Iron Sword', system: { quantity: 1 } }]
+    createdResults: [{ name: 'Iron Sword', system: { quantity: 1 } }],
   });
 
   assert.ok(i18nKeys.length > 0, 'Localization keys should be used');
@@ -312,7 +402,7 @@ test('_postCraftChatMessage: uses FABRICATE.Chat.* localization keys', async () 
     assert.ok(key.startsWith('FABRICATE.'), `Key "${key}" must start with FABRICATE. namespace`);
   }
   assert.ok(
-    i18nKeys.some(k => k.startsWith('FABRICATE.Chat.')),
+    i18nKeys.some((k) => k.startsWith('FABRICATE.Chat.')),
     'At least one FABRICATE.Chat.* key should be used'
   );
 });
@@ -336,7 +426,11 @@ test('craft(): posts ChatMessage exactly once on success', async () => {
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
   assert.equal(result.success, true, 'craft should succeed');
-  assert.equal(chatCreated.length, 1, 'ChatMessage.create should be called exactly once on success');
+  assert.equal(
+    chatCreated.length,
+    1,
+    'ChatMessage.create should be called exactly once on success'
+  );
 });
 
 test('craft(): a cancelled check aborts with {success:false, cancelled:true} and zero consumption', async () => {
@@ -379,12 +473,22 @@ test('craft(): posts ChatMessage exactly once on check failure', async () => {
   const { sourceActor, craftingActor } = buildActors(item);
 
   const engine = buildEngine(item, ingredientSet);
-  engine._runCraftingCheck = async () => ({ success: false, message: 'Check failed', outcome: null, value: null, data: {} });
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    message: 'Check failed',
+    outcome: null,
+    value: null,
+    data: {},
+  });
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
   assert.equal(result.success, false, 'craft should fail');
-  assert.equal(chatCreated.length, 1, 'ChatMessage.create should be called exactly once on check failure');
+  assert.equal(
+    chatCreated.length,
+    1,
+    'ChatMessage.create should be called exactly once on check failure'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -399,7 +503,11 @@ test('craft(): does not post chat when craftingActor is missing', async () => {
   const result = await engine.craft(null, [buildActor()], buildRecipe(), null, {});
 
   assert.equal(result.success, false, 'craft should return failure');
-  assert.equal(chatCreated.length, 0, 'No chat message for early-exit validation failure (no actor)');
+  assert.equal(
+    chatCreated.length,
+    0,
+    'No chat message for early-exit validation failure (no actor)'
+  );
 });
 
 test('craft(): does not post chat when ingredient check fails (canCraft false)', async () => {
@@ -409,24 +517,42 @@ test('craft(): does not post chat when ingredient check fails (canCraft false)',
   const item = buildIngredientItem('Iron Ingot', 0);
   const recipe = buildRecipe();
   const craftingActor = {
-    id: 'a1', name: 'Crafter', uuid: 'Actor.a1',
+    id: 'a1',
+    name: 'Crafter',
+    uuid: 'Actor.a1',
     items: { contents: [] },
-    async createEmbeddedDocuments() { return []; }
+    async createEmbeddedDocuments() {
+      return [];
+    },
   };
   const sourceActor = { id: 'a1', name: 'Crafter', items: [] };
 
   const mockRecipeManager = {
     canCraft() {
-      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [{ name: 'Iron Ingot' }], essences: [], tools: [] } };
+      return {
+        canCraft: false,
+        satisfiableSet: null,
+        missing: { ingredients: [{ name: 'Iron Ingot' }], essences: [], tools: [] },
+      };
     },
-    ingredientMatchesItem() { return false; }
+    ingredientMatchesItem() {
+      return false;
+    },
   };
 
   const engine = new CraftingEngine(mockRecipeManager, null, {
-    validateRecipe() { return { valid: true, errors: [] }; },
-    validateCheckResult() { return true; },
-    resolveResultGroups() { return { groups: [], meta: {} }; },
-    getMode() { return 'simple'; }
+    validateRecipe() {
+      return { valid: true, errors: [] };
+    },
+    validateCheckResult() {
+      return true;
+    },
+    resolveResultGroups() {
+      return { groups: [], meta: {} };
+    },
+    getMode() {
+      return 'simple';
+    },
   });
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -451,8 +577,12 @@ test('_postCraftChatMessage: failure does not post when chatOutput toggle is off
     consumedIngredients: [],
     tools: [],
     createdResults: [],
-    failureReason: 'Check failed'
+    failureReason: 'Check failed',
   });
 
-  assert.equal(chatCreated.length, 0, 'No failure chat message should be posted when chatOutput toggle is off');
+  assert.equal(
+    chatCreated.length,
+    0,
+    'No failure chat message should be posted when chatOutput toggle is off'
+  );
 });

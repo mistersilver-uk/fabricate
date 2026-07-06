@@ -28,6 +28,35 @@ const MODE_LABEL_KEYS = Object.freeze({
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 
 /**
+ * Defensively drop run models that repeat an `id`, keeping the FIRST occurrence
+ * and warning once per dropped duplicate. The Journal renders its lists with a
+ * keyed `{#each ... (run.id)}`, so a repeated id crashes the whole view with a
+ * Svelte `each_key_duplicate` error. Ids can repeat when legacy/corrupt run data
+ * archived the same run to history more than once; rather than fail the render,
+ * we keep the first (oldest) copy and log the rest.
+ *
+ * @param {object[]} models
+ * @param {string} phase `history` or `active`, for the warning context.
+ * @returns {object[]}
+ */
+function dedupeRunModelsById(models, phase) {
+  const seen = new Set();
+  const deduped = [];
+  for (const model of models) {
+    const id = model?.id;
+    if (id != null && seen.has(id)) {
+      console.warn(
+        `Fabricate | Dropping duplicate ${phase} run "${id}" from the Journal listing (kept the first occurrence).`
+      );
+      continue;
+    }
+    if (id != null) seen.add(id);
+    deduped.push(model);
+  }
+  return deduped;
+}
+
+/**
  * Convert a recipe/step `timeRequirement` (`{minutes,hours,days,months,years}`)
  * into a non-negative second count. Mirrors `CraftingRunManager._durationToSeconds`
  * (months = 30 days, years = 365 days) so the projection's required-time read
@@ -193,7 +222,10 @@ export class RunJournalBuilder {
         : this._gatheringRunSource?.getActiveRuns?.(actor)
     ).map((run) => this._passthroughRunModel({ run, runType: 'gathering', worldTime, terminal }));
 
-    return [...crafting, ...salvage, ...gathering].filter(Boolean);
+    return dedupeRunModelsById(
+      [...crafting, ...salvage, ...gathering].filter(Boolean),
+      terminal ? 'history' : 'active'
+    );
   }
 
   // ---------------------------------------------------------------------------

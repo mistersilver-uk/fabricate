@@ -1,4 +1,8 @@
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  getFabricateFlag,
+  setFabricateFlag,
+  deleteRemovedActiveRunFlags,
+} from '../config/flags.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -41,6 +45,9 @@ export class SalvageRunManager {
 
   async _persist(actor, container) {
     this._cache.set(actor.id, container);
+    // setFlag's recursive merge can't delete removed `active` keys; do it explicitly
+    // so completed/cleared runs don't resurrect on reload (see the shared helper).
+    await deleteRemovedActiveRunFlags(actor, 'salvageRuns', container);
     await setFabricateFlag(actor, 'salvageRuns', container);
   }
 
