@@ -179,6 +179,12 @@ See [Travel: live current-realm sensing](#travel-live-current-realm-sensing).
 Any externally observable side effect driven from it (publishing public hooks, posting chat, writing documents) must be gated to the primary GM (`game.users.activeGM?.id === game.user?.id`, the `isPrimaryGM` seam in `GatheringEngine`) or it duplicates N times.
 Idempotent shared-state updates (stamina regen, node respawn) are already gated this way; the gathering completion-hook publication follows the same rule for matured timed runs.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
+- A DISMISSED manual roll-fulfilment `RollResolver` **resolves — it never rejects** — and silently digital-fills every unfilled die with `term.randomFace()`, so a `try/catch` around `Roll#evaluate({allowInteractive:true})` cannot detect a cancel.
+Detect it via a `RollResolver` subclass recording submit-vs-dismiss: `fabricateDismissed = fulfillable.size > 0 && !submitted` — do NOT use `rendered === false`, which is also `false` for a default-digital client (never rendered) AND after a genuine submit's `close()`, so it false-positive-cancels every digital interactive roll.
+Inject the subclass through a LOCAL `Roll` subclass overriding the static `resolverImplementation` getter (wrap `super.resolverImplementation` to preserve DSN/hardware resolvers), built LAZILY at call time because `globalThis.Roll` is absent headless.
+`allowInteractive: false` fully bypasses the resolver (identical to `Roll.simulate`) — keep it verbatim for the automated/API path.
+Never register the local subclass on `CONFIG.Dice.rolls` / `Roll.defaultImplementation`; and because a chat message serializes the roll's class name, its `toJSON().class` MUST be re-labelled to the registered default's name or a chat/DSN `Roll.fromData` on every client throws "Unable to recreate `<Subclass>` instance".
+See `src/systems/fabricateRoll.js` and the "Interactive Check Rolls" requirement in `openspec/specs/resolution-modes/spec.md`.
 - `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
 - Use `sheet.changeTab(tabName, groupName)` for ApplicationV2 tab switches.
