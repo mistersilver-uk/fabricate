@@ -29,8 +29,14 @@ If the [Dice So Nice](https://foundryvtt.com/packages/dice-so-nice) module is in
 Dice So Nice is optional.
 Without it the roll still posts to chat as a normal roll card, just with no 3D animation.
 
-Clicking **Cancel**, or dismissing the dialog, aborts the attempt with no changes.
-No ingredients, currency, or Tools are consumed, and no run is recorded.
+If you have set Foundry to let you enter your dice rolls by hand, Fabricate hands the check off to Foundry's own roll dialog after you click **Roll**.
+This is Foundry's manual roll fulfilment, chosen from its dice configuration, and it is off by default.
+Enter your roll in Foundry's dialog and the check resolves as normal, still using your chat roll mode and 3D dice.
+Players who let Foundry roll the dice for them see no change and are never shown this extra dialog.
+
+Clicking **Cancel** on Fabricate's prompt aborts the attempt with no changes.
+Dismissing Foundry's roll dialog without entering a roll also aborts the attempt with no changes, and Fabricate shows a warning so the cancelled attempt is not missed.
+In both cases no ingredients, currency, or Tools are consumed, and no run is recorded.
 
 This interactive prompt is the default when you craft from the Crafting tab or gather from the Gathering screen.
 It applies to the crafting, salvage, and gathering checks that run through the shared check step.
