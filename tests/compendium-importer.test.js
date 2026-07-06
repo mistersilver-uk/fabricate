@@ -584,3 +584,106 @@ test('T-097: null pack data throws error', async () => {
     }
   );
 });
+
+// ---------------------------------------------------------------------------
+// #492 — gathering authoring import (F1 replace-by-system-id, F3 GM gate, refs)
+// ---------------------------------------------------------------------------
+
+// Minimal env-store double: persists whatever the importer's replace-by-system-id
+// merge writes (the merge logic lives in the importer, not the store).
+function makeEnvStoreDouble(initial = []) {
+  let envs = structuredClone(initial);
+  return {
+    list: () => structuredClone(envs),
+    save: async (next) => {
+      envs = structuredClone(next);
+      return structuredClone(envs);
+    },
+    _all: () => envs,
+  };
+}
+
+function makeSettingsDouble(initial = {}) {
+  const map = new Map(Object.entries(initial));
+  return {
+    getSetting: (key) => map.get(key),
+    setSetting: async (key, value) => {
+      map.set(key, structuredClone(value));
+    },
+    _map: map,
+  };
+}
+
+test('#492 F1: importing system B keeps system A environments; overwrite does not duplicate B', async () => {
+  globalThis.fromUuid = async () => null;
+  globalThis.game = { ...globalThis.game, packs: [], user: { isGM: true } };
+
+  const envA = { id: 'env-a', craftingSystemId: 'system-A', name: 'A Env', enabled: false };
+  const store = makeEnvStoreDouble([envA]);
+  const settings = makeSettingsDouble();
+
+  const systemManager = makeMockSystemManager();
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager, {
+    environmentStore: store,
+    getSetting: settings.getSetting,
+    setSetting: settings.setSetting,
+    isGM: () => true,
+  });
+
+  const packData = makePackData({
+    recipes: [],
+    gatheringEnvironments: [{ id: 'env-b', craftingSystemId: '__SYSTEM_ID__', name: 'B Env', enabled: false }],
+  });
+
+  await importer.importFromPackData(packData);
+
+  let all = store._all();
+  assert.ok(all.some((e) => e.id === 'env-a'), 'system A environment survives');
+  assert.ok(all.some((e) => e.id === 'env-b'), 'system B environment added');
+  assert.equal(all.length, 2, 'no accumulation on first import');
+
+  // Overwrite re-import of B must not duplicate/accumulate stale B environments.
+  await importer.importFromPackData(packData, { overwriteExisting: true });
+  all = store._all();
+  assert.equal(all.filter((e) => e.id === 'env-b').length, 1, 'B not duplicated on re-import');
+  assert.ok(all.some((e) => e.id === 'env-a'), 'A still present after overwrite');
+  assert.equal(all.length, 2, 'still exactly two environments');
+});
+
+test('#492 F3: a non-GM import fails fast before any world-scope write', async () => {
+  globalThis.fromUuid = async () => null;
+
+  const createdSystems = [];
+  const store = makeEnvStoreDouble([]);
+  const settings = makeSettingsDouble();
+  const systemManager = makeMockSystemManager({ createdSystems });
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager, {
+    environmentStore: store,
+    getSetting: settings.getSetting,
+    setSetting: settings.setSetting,
+    isGM: () => false,
+  });
+
+  await assert.rejects(() => importer.importFromPackData(makePackData()), /Only a GM can import/);
+  assert.equal(createdSystems.length, 0, 'no system created');
+  assert.equal(store._all().length, 0, 'no environments written');
+  assert.equal(settings._map.size, 0, 'no gatheringConfig written');
+});
+
+test('#492: unresolved component source items fold into unresolvedReferences', async () => {
+  globalThis.fromUuid = async () => null; // source item absent
+  globalThis.game = { ...globalThis.game, packs: [], user: { isGM: true } };
+
+  const systemManager = makeMockSystemManager();
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager, { isGM: () => true });
+
+  const summary = await importer.importFromPackData(makePackData({ recipes: [] }));
+
+  const sourceItemRefs = summary.unresolvedReferences.filter((r) => r.kind === 'sourceItem');
+  assert.equal(sourceItemRefs.length, 1);
+  assert.equal(sourceItemRefs[0].disposition, 'reported');
+  assert.equal(sourceItemRefs[0].referenceValue, 'Compendium.source.items.iron-ore');
+});
