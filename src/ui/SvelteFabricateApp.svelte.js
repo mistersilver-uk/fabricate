@@ -219,6 +219,15 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
+      // Player-side "hide unavailable (locked) environments" preference for the
+      // Environments column. Client-scoped, so it persists per client/device
+      // (`localStorage`), not per user account. The component reads/writes it
+      // through these seams rather than touching Foundry globals directly; the
+      // getter defaults to false (show all) when the facade is unavailable.
+      getHideUnavailableEnvironments: () =>
+        game?.fabricate?.getHideUnavailableEnvironments?.() ?? false,
+      setHideUnavailableEnvironments: (value) =>
+        game?.fabricate?.setHideUnavailableEnvironments?.(value),
       getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null,
       // Player-facing Journal seams. The store/components never touch Foundry
       // globals; these wrappers are the single Foundry-facing edge.
