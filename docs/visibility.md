@@ -161,6 +161,41 @@ For example, a spellbook that teaches recipes but is not destroyed in the proces
 You set this in the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
 The option only appears when the system is in knowledge mode.
 
+### Limiting Recipes Learned Per Book
+
+A recipe item can link to several recipes, which makes it a "recipe book".
+By default a book teaches every recipe it links at once.
+You can instead cap how many recipes a player may learn from a single book.
+
+To turn the cap on, open the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
+Under the learning options, turn on **Limited recipes learned per item**.
+Set **Maximum recipes** to the number of recipes one book may teach.
+Turn on **Delete when spent** if you want the book removed once its budget is used up.
+
+While the cap is on, the **Consume item on learn** option is hidden.
+Consuming the book on the first learn would stop it teaching any further recipes, so the two options cannot be used together.
+**Delete when spent** replaces it and removes the book only once its whole budget is spent.
+
+The budget belongs to the physical book rather than to the player.
+Every actor who holds that same book draws from the same remaining budget.
+The budget is not reset when the book changes hands or owners.
+
+### Learning From a Capped Book
+
+When a book has a learn cap, dropping it on an actor no longer teaches every recipe at once.
+The player learns one recipe at a time instead.
+
+Opening the book's item sheet shows a **Learn Recipe** action.
+Clicking it opens a chooser that lists the recipes still available from that book.
+The chooser shows how many recipes remain, for example "2 of 3 remaining".
+The player selects one recipe and confirms with **Learn**.
+They can repeat this until the book's budget is spent.
+Once the budget is spent the **Learn Recipe** action no longer appears.
+If **Delete when spent** is on, the book is removed as soon as its final allowed recipe is learned.
+
+Books without a learn cap are unchanged.
+They still teach every linked recipe as soon as they are dropped on an actor.
+
 ### Drag-and-Drop Learning
 
 Dragging a recipe item onto a crafting actor's sheet is one of the ways players learn recipes.
@@ -182,6 +217,11 @@ A single dropped item can match more than one recipe.
 When this happens, the actor learns every matched recipe in a single operation.
 This makes it straightforward to create "recipe book" items.
 One Alchemist's Compendium, for example, might unlock Healing Salve, Antitoxin, and Smokestick all at once.
+
+This learn-all-on-drop behaviour applies to books without a learn cap.
+A book with a learn cap is not learned on drop.
+Its recipes are chosen one at a time from the book's item sheet instead.
+See [Learning From a Capped Book](#learning-from-a-capped-book).
 
 #### Mixed-System Behavior
 
