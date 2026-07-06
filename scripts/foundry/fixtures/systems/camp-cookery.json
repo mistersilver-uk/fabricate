@@ -17,7 +17,7 @@
       "craftingChecks": false,
       "outcomeRouting": false,
       "effectTransfer": false,
-      "gathering": true,
+      "gathering": false,
       "salvage": true,
       "chatOutput": true,
       "itemPiles": false

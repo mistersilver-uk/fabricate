@@ -1090,7 +1090,8 @@ const SMOKE_SYSTEM_FIXTURES_DIR = join(__dirname, 'foundry', 'fixtures', 'system
  * Import the vendored exported crafting systems into the smoke world so the
  * Systems browser and per-system manager screenshots show several real, varied
  * systems (simple / progressive / routed-by-check / routed-by-ingredients /
- * essences+multi-step) alongside the synthetic Arcane Forge fixture. Glob-driven
+ * essences+multi-step / real-gathering) alongside the synthetic Arcane Forge
+ * fixture. Glob-driven
  * over every `*.json` under scripts/foundry/fixtures/systems/ — no hand-kept
  * id/name list, so no drift surface. Full-profile (Phase D0) only; never runs on
  * the rc/ci budget. Imports in `keep` mode (copyMode unset) so the vendored
@@ -2595,6 +2596,9 @@ async function main() {
           'Masterwork Armory',
           'Runesmith’s Forge',
           "Philosopher's Crucible",
+          // Mythwright carries the real gathering behaviour (6 realms, 10
+          // environments, full gatheringConfig) that Camp Cookery's flag lacked.
+          'Mythwright',
           // Issue #489 craft-execution coverage systems (deterministic names) so a
           // crashed local run does not accumulate duplicate same-named systems.
           'Smoke Simple Forge', 'Smoke Ingredient Router', 'Smoke Check Router',
