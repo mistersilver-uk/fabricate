@@ -29,7 +29,7 @@
  */
 
 import { chromium } from 'playwright';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FABRICATE_THEME_IDS, FABRICATE_THEME_ATTRIBUTE, DEFAULT_FABRICATE_THEME } from '../src/ui/theme.js';
@@ -1077,6 +1077,84 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
       }
     }
   }, { sysId: craftingSetup.systemId, componentMap: craftingSetup.componentMap });
+}
+
+// Directory of exported crafting systems vendored as manager/browser screenshot
+// fixtures (issue #490). Each JSON is an export-with-placeholder: its recipes
+// carry `craftingSystemId: "__SYSTEM_ID__"`, substituted per file at seed time
+// with the JSON's own `system.id` so the imported system keeps that id (keep
+// mode) and the substituted recipes resolve to it rather than orphaning.
+const SMOKE_SYSTEM_FIXTURES_DIR = join(__dirname, 'foundry', 'fixtures', 'systems');
+
+/**
+ * Import the vendored exported crafting systems into the smoke world so the
+ * Systems browser and per-system manager screenshots show several real, varied
+ * systems (simple / progressive / routed-by-check / routed-by-ingredients /
+ * essences+multi-step) alongside the synthetic Arcane Forge fixture. Glob-driven
+ * over every `*.json` under scripts/foundry/fixtures/systems/ — no hand-kept
+ * id/name list, so no drift surface. Full-profile (Phase D0) only; never runs on
+ * the rc/ci budget. Imports in `keep` mode (copyMode unset) so the vendored
+ * system ids are preserved.
+ *
+ * Post-seed guard: after import, every fixture must resolve to a system whose
+ * recipes are present (non-zero) and carry no surviving `__SYSTEM_ID__`
+ * placeholder; a violation records a failed step and throws so the phase fails
+ * loudly rather than silently shipping orphaned recipes.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{ steps: Array<object> }} results
+ */
+async function seedSmokeSystemFixtures(page, results) {
+  const fileNames = (await readdir(SMOKE_SYSTEM_FIXTURES_DIR))
+    .filter(name => name.endsWith('.json'))
+    .sort();
+  const fixtures = [];
+  for (const name of fileNames) {
+    const raw = await readFile(join(SMOKE_SYSTEM_FIXTURES_DIR, name), 'utf8');
+    const systemId = JSON.parse(raw).system?.id;
+    if (!systemId) {
+      throw new Error(`Smoke system fixture ${name} is missing system.id`);
+    }
+    // Substitute the placeholder in the loader (not the vendored file) so the
+    // JSONs stay faithful export-with-placeholder artifacts.
+    const patched = raw.replaceAll('__SYSTEM_ID__', systemId);
+    if (patched.includes('__SYSTEM_ID__')) {
+      throw new Error(`Smoke system fixture ${name} still contains __SYSTEM_ID__ after substitution`);
+    }
+    fixtures.push({ name, systemId, patched });
+  }
+
+  const imported = await page.evaluate(async (files) => {
+    const results = [];
+    for (const file of files) {
+      await game.fabricate.importSystemFromFile(file.patched, { overwriteExisting: true });
+      const rm = game.fabricate.getRecipeManager();
+      const recipes = rm.getRecipes?.({ craftingSystemId: file.systemId }) ?? [];
+      const orphanedPlaceholder = recipes.some(recipe =>
+        String(recipe?.craftingSystemId ?? '') === '__SYSTEM_ID__'
+        || JSON.stringify(recipe ?? {}).includes('__SYSTEM_ID__')
+      );
+      results.push({
+        name: file.name,
+        systemId: file.systemId,
+        recipeCount: recipes.length,
+        orphanedPlaceholder
+      });
+    }
+    return results;
+  }, fixtures);
+
+  const failures = imported.filter(entry => entry.recipeCount < 1 || entry.orphanedPlaceholder);
+  if (failures.length > 0) {
+    const detail = `Imported system fixtures failed the post-seed guard: ${JSON.stringify(failures)}`;
+    results.steps.push({ step: 'seed-smoke-system-fixtures', passed: false, error: detail });
+    throw new Error(detail);
+  }
+  results.steps.push({ step: 'seed-smoke-system-fixtures', passed: true, imported });
+  process.stdout.write(
+    `Phase D0: imported ${imported.length} exported system fixtures `
+    + `(${imported.map(entry => `${entry.name}=${entry.recipeCount} recipes`).join(', ')}).\n`
+  );
 }
 
 /**
@@ -2502,8 +2580,21 @@ async function main() {
         // before cleanup leaves an orphan under the renamed name, so purge BOTH
         // names — otherwise duplicate same-named systems accumulate and the promote
         // source picker can default to a tool-less duplicate.
+        // Adds the five exported systems vendored as screenshot fixtures (issue
+        // #490) so a crashed/renamed prior run cannot accumulate duplicates. The
+        // import is also id-idempotent (fixed ids + keep-mode + overwriteExisting),
+        // but the name-based purge is the belt-and-suspenders the harness uses.
         const staleSystemNames = new Set([
-          'Arcane Forge', "The Herbalist's Compendium",
+          'Arcane Forge',
+          "The Herbalist's Compendium",
+          // Apostrophes match the vendored `system.name` bytes exactly (curly
+          // U+2019 for Jeweller's/Runesmith's, straight for Philosopher's) so the
+          // name-based purge actually matches.
+          'Camp Cookery',
+          'Jeweller’s Bench',
+          'Masterwork Armory',
+          'Runesmith’s Forge',
+          "Philosopher's Crucible",
           // Issue #489 craft-execution coverage systems (deterministic names) so a
           // crashed local run does not accumulate duplicate same-named systems.
           'Smoke Simple Forge', 'Smoke Ingredient Router', 'Smoke Check Router',
@@ -3632,6 +3723,11 @@ async function main() {
           return previousExperimentalFeatures;
         }, craftingSetup.systemId);
         await seedSmokeGatheringLibrary(page, craftingSetup);
+        // Import the five vendored exported systems (issue #490) so the Systems
+        // browser and per-system manager screenshots show real, varied systems
+        // alongside the synthetic Arcane Forge fixture. Full-profile only, so the
+        // rc/ci budget and timing are unaffected.
+        await seedSmokeSystemFixtures(page, results);
 
         await page.evaluate(() => {
           globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
