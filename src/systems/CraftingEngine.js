@@ -2461,6 +2461,30 @@ export class CraftingEngine {
 
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
 
+    // Tools render by their AUTHORED name (the referenced component), not the
+    // matched item's name: a single owned item can satisfy more than one tool
+    // slot (source/name collision), which would otherwise print the same item
+    // name twice. Fall back to the matched item's name when the component can't
+    // be resolved. De-dupe by component id so a tool is never listed twice.
+    const componentById = new Map(
+      (system.components || []).map((component) => [component?.id, component])
+    );
+    const toolEntries = [];
+    const seenToolKeys = new Set();
+    for (const pair of tools || []) {
+      // Skip virtual-present canvas tools (no owned item) — no chip to render.
+      if (!pair?.item) continue;
+      const componentId = pair.tool?.componentId || pair.tool?.systemItemId || null;
+      const component = componentId ? componentById.get(componentId) : null;
+      const key = componentId || pair.item?.uuid || pair.item?.name || null;
+      if (key && seenToolKeys.has(key)) continue;
+      if (key) seenToolKeys.add(key);
+      toolEntries.push({
+        name: component?.name || pair.item?.name || '',
+        img: component?.img || pair.item?.img || '',
+      });
+    }
+
     // Resolve to a plain, Foundry-free model, then render via the shared pure
     // builder (mirrors the gathering card: resolve names/images here, format there).
     const content = buildCraftingChatContent(
@@ -2478,14 +2502,7 @@ export class CraftingEngine {
           img: item?.img || '',
           quantity: Number(quantity || 1),
         })),
-        // Skip virtual-present canvas tools (no owned item) so they don't render
-        // an empty-named chip.
-        tools: (tools || [])
-          .filter(({ item }) => !!item)
-          .map(({ item }) => ({
-            name: item?.name || '',
-            img: item?.img || '',
-          })),
+        tools: toolEntries,
         failureReason: failureReason || '',
       },
       localize
