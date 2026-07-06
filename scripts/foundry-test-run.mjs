@@ -1080,6 +1080,845 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
 }
 
 /**
+ * Seed the craft-execution coverage fixtures for issue #489.
+ *
+ * These are ALWAYS-RUN (rc/ci included): the crafts, tool breakages, salvage,
+ * and negative gating below are cheap `page.evaluate` calls with no screenshots,
+ * so they maximise CI coverage without materially moving the rc budget. Because
+ * crafting resolution mode is a SYSTEM-level property (`getMode(recipe)` reads
+ * `system.resolutionMode`), each mode needs its own system:
+ *
+ *  - "Smoke Simple Forge"        — `simple` mode; hosts the simple craft, both
+ *                                  tool-breakage recipes (`breakageChance` +
+ *                                  `limitedUses`), the negative tool-gating
+ *                                  recipe, and a `salvageResolutionMode: 'simple'`
+ *                                  salvageable component.
+ *  - "Smoke Ingredient Router"   — `routedByIngredients`; a recipe with TWO
+ *                                  ingredient sets mapping to DIFFERENT result
+ *                                  groups (proves set→group routing).
+ *  - "Smoke Check Router"        — `routedByCheck` with a deterministic
+ *                                  `1d20 + 20` → Masterwork routed check and a
+ *                                  recipe with TWO result groups on different
+ *                                  tiers (proves tier→group routing, not the
+ *                                  single-group exemption).
+ *  - "Smoke Progressive Forge"   — `progressive` with a `1d20 + 20` progressive
+ *                                  check; a low-difficulty result awarded in a
+ *                                  single deterministic advance.
+ *
+ * It also seeds a guaranteed-success (`dropRate: 100`) gather task + scene-less
+ * environment under the EXISTING Arcane Forge system so one execute-and-assert
+ * gather can run under rc/ci via `startGatheringAttempt` (no UI / roll prompt).
+ *
+ * The crafter's inventory is topped up with each recipe's ingredients, the two
+ * breakable tools (the `limitedUses` chisel pre-seeded to `maxUses - 1` so a
+ * single craft crosses the threshold), and the salvageable component — every
+ * inventory copy carries `flags.core.sourceId` so the engine matches it to the
+ * managed component.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{ systemId: string, componentMap: Record<string,string> }} craftingSetup
+ * @param {string} crafterId
+ * @returns {Promise<object>} Fixture ids (systems, recipes, world items, tools, gather refs).
+ */
+async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
+  return await page.evaluate(async ({ arcaneSystemId, mysticHerbComponentId, crafterId }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    const rm = game.fabricate.getRecipeManager();
+    const crafter = game.actors.get(crafterId);
+    if (!crafter) throw new Error(`Execution fixtures: crafter ${crafterId} not found`);
+
+    const rawItemTypes = game.documentTypes?.Item ?? game.system?.documentTypes?.Item ?? [];
+    const itemTypes = Array.from(rawItemTypes);
+    const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
+
+    // ── 1. World items ──────────────────────────────────────────────────────
+    const worldSpecs = [
+      // simple system
+      { name: 'Smoke Plank', img: 'icons/commodities/wood/lumber-stack.webp' },
+      { name: 'Smoke Crate', img: 'icons/containers/boxes/box-gift-white.webp' },
+      { name: 'Smoke Mallet', img: 'icons/tools/hand/hammer-cobbler-steel-grey.webp' },
+      { name: 'Smoke Toy', img: 'icons/commodities/wood/wood-blocks-stacked.webp' },
+      { name: 'Smoke Chisel', img: 'icons/tools/hand/chisel-steel-grey.webp' },
+      { name: 'Smoke Dowel', img: 'icons/commodities/wood/pole-cut-brown.webp' },
+      { name: 'Smoke Anvil', img: 'icons/tools/smithing/anvil.webp' },
+      { name: 'Smoke Bracket', img: 'icons/commodities/metal/fragments-iron.webp' },
+      { name: 'Smoke Relic', img: 'icons/commodities/treasure/broken-crown-gold.webp' },
+      { name: 'Smoke Shard', img: 'icons/commodities/gems/gem-fragments-red.webp' },
+      // routedByIngredients system
+      { name: 'Smoke Ingot A', img: 'icons/commodities/metal/ingot-worn-silver.webp' },
+      { name: 'Smoke Ingot B', img: 'icons/commodities/metal/ingot-stack-gold.webp' },
+      { name: 'Smoke Ring', img: 'icons/equipment/finger/ring-band-engraved-gold.webp' },
+      { name: 'Smoke Amulet', img: 'icons/equipment/neck/amulet-round-engraved-gold.webp' },
+      // routedByCheck system
+      { name: 'Smoke Bar', img: 'icons/commodities/metal/ingot-plain-steel.webp' },
+      { name: 'Smoke Masterwork Blade', img: 'icons/weapons/swords/sword-guard-blue.webp' },
+      { name: 'Smoke Standard Blade', img: 'icons/weapons/swords/greatsword-blue.webp' },
+      // progressive system
+      { name: 'Smoke Clay', img: 'icons/commodities/stone/clay-nugget-grey.webp' },
+      { name: 'Smoke Brick', img: 'icons/commodities/stone/stone-worked-grey.webp' }
+    ];
+    const createdItems = await Item.createDocuments(
+      worldSpecs.map((s) => ({ name: s.name, type: itemType, img: s.img }))
+    );
+    const world = {};
+    for (const item of createdItems) world[item.name] = item;
+    const executionItemIds = createdItems.map((i) => i.id);
+
+    // Register a set of world items as managed components on a system, giving
+    // each the supplied difficulty (progressive result awarding needs difficulty
+    // >= 1; it is inert for the other modes).
+    const registerComponents = async (systemId, names, difficulty = 1) => {
+      const map = {};
+      for (const name of names) {
+        const result = await csm.addItemFromUuid(systemId, world[name].uuid);
+        map[name] = result.item.id;
+        await csm.updateItem(systemId, map[name], { difficulty });
+      }
+      return map;
+    };
+
+    // Inventory copies matched to the managed component by `flags.core.sourceId`.
+    const invCopies = (name, qty, extraFabricateFlags = null) =>
+      Array.from({ length: qty }, () => ({
+        name: world[name].name,
+        type: world[name].type,
+        img: world[name].img,
+        flags: {
+          core: { sourceId: world[name].uuid },
+          ...(extraFabricateFlags ? { fabricate: extraFabricateFlags } : {})
+        }
+      }));
+
+    // ── 2. SIMPLE system (+ breakage / limitedUses / negative-gating / salvage) ─
+    const simpleSystem = await csm.createSystem({
+      name: 'Smoke Simple Forge',
+      description: 'Issue #489: simple-mode crafts, tool breakage, and salvage execution coverage.'
+    });
+    const simpleSystemId = simpleSystem.id;
+    const simpleMap = await registerComponents(simpleSystemId, [
+      'Smoke Plank', 'Smoke Crate', 'Smoke Mallet', 'Smoke Toy',
+      'Smoke Chisel', 'Smoke Dowel', 'Smoke Anvil', 'Smoke Bracket',
+      'Smoke Relic', 'Smoke Shard'
+    ]);
+    const malletToolId = 'smoke-mallet-tool';
+    const chiselToolId = 'smoke-chisel-tool';
+    const anvilToolId = 'smoke-anvil-tool';
+    const chiselMaxUses = 2;
+    await csm.updateSystem(simpleSystemId, {
+      resolutionMode: 'simple',
+      salvageResolutionMode: 'simple',
+      tools: [
+        {
+          // Always breaks (rng()*100 ∈ [0,100) < 100) → deterministic breakageChance break.
+          id: malletToolId,
+          label: 'Smoke Mallet',
+          enabled: true,
+          componentId: simpleMap['Smoke Mallet'],
+          breakage: { mode: 'breakageChance', breakageChance: 100 },
+          onBreak: { mode: 'flagBroken' }
+        },
+        {
+          // limitedUses: applyUsage increments FIRST, then evaluateBreakage compares
+          // post-increment `timesUsed >= maxUses`. The assertion crafts this recipe
+          // `maxUses` (2) times — the first craft (timesUsed 1 < 2) does NOT break,
+          // the second (timesUsed 2 >= 2) crosses the threshold and breaks. This
+          // "craft maxUses times" variant avoids pre-seeding the double-nested
+          // `flags.fabricate.fabricate.toolUsage` accessor from item-creation data.
+          id: chiselToolId,
+          label: 'Smoke Chisel',
+          enabled: true,
+          componentId: simpleMap['Smoke Chisel'],
+          breakage: { mode: 'limitedUses', maxUses: chiselMaxUses },
+          onBreak: { mode: 'flagBroken' }
+        },
+        {
+          // Required by the negative-gating recipe; the crafter never holds it.
+          id: anvilToolId,
+          label: 'Smoke Anvil',
+          enabled: true,
+          componentId: simpleMap['Smoke Anvil'],
+          breakage: { mode: 'immune' },
+          onBreak: { mode: 'flagBroken' }
+        }
+      ]
+    });
+    // Salvage config on Smoke Relic: simple mode (deterministic success, no
+    // timeRequirement, no tools) → exactly one result group per validateSalvage.
+    await csm.updateItem(simpleSystemId, simpleMap['Smoke Relic'], {
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [{
+          id: 'smoke-relic-parts',
+          name: 'Salvaged Parts',
+          results: [{ id: 'smoke-shard-result', componentId: simpleMap['Smoke Shard'], quantity: 2 }]
+        }]
+      }
+    });
+
+    const simpleRecipe = await rm.createRecipe({
+      name: 'Smoke Assemble Crate',
+      description: 'Simple-mode craft: one ingredient set, one result group.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/containers/boxes/box-gift-white.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          name: 'Plank',
+          options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Plank'] } }]
+        }]
+      }],
+      resultGroups: [{
+        name: 'Crate',
+        results: [{ componentId: simpleMap['Smoke Crate'], quantity: 1 }]
+      }]
+    });
+    const breakageRecipe = await rm.createRecipe({
+      name: 'Smoke Carve Toy',
+      description: 'Simple-mode craft whose breakageChance tool always breaks.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/commodities/wood/wood-blocks-stacked.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          name: 'Plank',
+          options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Plank'] } }]
+        }]
+      }],
+      resultGroups: [{ name: 'Toy', results: [{ componentId: simpleMap['Smoke Toy'], quantity: 1 }] }]
+    });
+    await rm.updateRecipe(breakageRecipe.id, { toolIds: [malletToolId] });
+    const limitedUsesRecipe = await rm.createRecipe({
+      name: 'Smoke Turn Dowel',
+      description: 'Simple-mode craft whose limitedUses tool breaks at its maxUses threshold.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/commodities/wood/pole-cut-brown.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          name: 'Plank',
+          options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Plank'] } }]
+        }]
+      }],
+      resultGroups: [{ name: 'Dowel', results: [{ componentId: simpleMap['Smoke Dowel'], quantity: 1 }] }]
+    });
+    await rm.updateRecipe(limitedUsesRecipe.id, { toolIds: [chiselToolId] });
+    const negativeToolRecipe = await rm.createRecipe({
+      name: 'Smoke Bend Bracket',
+      description: 'Simple-mode craft requiring a tool the crafter does not hold (negative gating).',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/commodities/metal/fragments-iron.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          name: 'Plank',
+          options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Plank'] } }]
+        }]
+      }],
+      resultGroups: [{ name: 'Bracket', results: [{ componentId: simpleMap['Smoke Bracket'], quantity: 1 }] }]
+    });
+    await rm.updateRecipe(negativeToolRecipe.id, { toolIds: [anvilToolId] });
+
+    // ── 3. ROUTED-BY-INGREDIENTS system (multi-set → differing groups) ──────
+    const ingredientRouterSystem = await csm.createSystem({
+      name: 'Smoke Ingredient Router',
+      description: 'Issue #489: routedByIngredients multi-set routing coverage.'
+    });
+    const ingredientRouterSystemId = ingredientRouterSystem.id;
+    const routerMap = await registerComponents(ingredientRouterSystemId, [
+      'Smoke Ingot A', 'Smoke Ingot B', 'Smoke Ring', 'Smoke Amulet'
+    ]);
+    await csm.updateSystem(ingredientRouterSystemId, { resolutionMode: 'routedByIngredients' });
+    const setAId = 'smoke-set-a';
+    const setBId = 'smoke-set-b';
+    const ringGroupId = 'smoke-group-ring';
+    const amuletGroupId = 'smoke-group-amulet';
+    const ingredientRoutedRecipe = await rm.createRecipe({
+      name: 'Smoke Cast Jewelry',
+      description: 'routedByIngredients: each ingredient set maps to a different result group.',
+      craftingSystemId: ingredientRouterSystemId,
+      img: 'icons/equipment/finger/ring-band-engraved-gold.webp',
+      complex: true,
+      ingredientSets: [
+        {
+          id: setAId,
+          name: 'Silver route',
+          resultGroupId: ringGroupId,
+          ingredientGroups: [{
+            name: 'Ingot A',
+            options: [{ quantity: 1, match: { type: 'component', componentId: routerMap['Smoke Ingot A'] } }]
+          }]
+        },
+        {
+          id: setBId,
+          name: 'Gold route',
+          resultGroupId: amuletGroupId,
+          ingredientGroups: [{
+            name: 'Ingot B',
+            options: [{ quantity: 1, match: { type: 'component', componentId: routerMap['Smoke Ingot B'] } }]
+          }]
+        }
+      ],
+      resultGroups: [
+        { id: ringGroupId, name: 'Ring', results: [{ componentId: routerMap['Smoke Ring'], quantity: 1 }] },
+        { id: amuletGroupId, name: 'Amulet', results: [{ componentId: routerMap['Smoke Amulet'], quantity: 1 }] }
+      ]
+    });
+
+    // ── 4. ROUTED-BY-CHECK system (multi-group → different tiers) ───────────
+    const checkRouterSystem = await csm.createSystem({
+      name: 'Smoke Check Router',
+      description: 'Issue #489: routedByCheck multi-group tier routing coverage.'
+    });
+    const checkRouterSystemId = checkRouterSystem.id;
+    const checkMap = await registerComponents(checkRouterSystemId, [
+      'Smoke Bar', 'Smoke Masterwork Blade', 'Smoke Standard Blade'
+    ]);
+    await csm.updateSystem(checkRouterSystemId, {
+      resolutionMode: 'routedByCheck',
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          type: 'relative',
+          // 1d20 + 20 (21-40) vs dc 12 always meets Masterwork (dc 5) → deterministic tier.
+          rollFormula: '1d20 + 20',
+          dc: 12,
+          thresholdMode: 'meet',
+          relativeOutcomes: [
+            { id: 'craft-masterwork', name: 'Masterwork', success: true, breakTools: false, dc: 5 },
+            { id: 'craft-standard', name: 'Standard', success: true, breakTools: false, dc: 0 },
+            { id: 'craft-ruined', name: 'Ruined', success: false, breakTools: true, dc: -5 }
+          ]
+        }
+      }
+    });
+    const masterGroupId = 'smoke-group-master';
+    const standardGroupId = 'smoke-group-standard';
+    const checkRoutedRecipe = await rm.createRecipe({
+      name: 'Smoke Forge Blade',
+      description: 'routedByCheck: two result groups mapped to different outcome tiers.',
+      craftingSystemId: checkRouterSystemId,
+      img: 'icons/weapons/swords/sword-guard-blue.webp',
+      complex: true,
+      ingredientSets: [{
+        name: 'Stock',
+        ingredientGroups: [{
+          name: 'Bar',
+          options: [{ quantity: 1, match: { type: 'component', componentId: checkMap['Smoke Bar'] } }]
+        }]
+      }],
+      resultGroups: [
+        {
+          id: masterGroupId,
+          name: 'Masterwork Blade',
+          checkOutcomeIds: ['craft-masterwork'],
+          results: [{ componentId: checkMap['Smoke Masterwork Blade'], quantity: 1 }]
+        },
+        {
+          id: standardGroupId,
+          name: 'Standard Blade',
+          checkOutcomeIds: ['craft-standard'],
+          results: [{ componentId: checkMap['Smoke Standard Blade'], quantity: 1 }]
+        }
+      ]
+    });
+
+    // ── 5. PROGRESSIVE system (single deterministic advance) ────────────────
+    const progressiveSystem = await csm.createSystem({
+      name: 'Smoke Progressive Forge',
+      description: 'Issue #489: progressive budget-vs-difficulty completion coverage.'
+    });
+    const progressiveSystemId = progressiveSystem.id;
+    const progressiveMap = await registerComponents(
+      progressiveSystemId,
+      ['Smoke Clay', 'Smoke Brick'],
+      1
+    );
+    await csm.updateSystem(progressiveSystemId, {
+      resolutionMode: 'progressive',
+      features: { craftingChecks: true },
+      craftingCheck: {
+        enabled: true,
+        // 1d20 + 20 budget (21-40) far exceeds the Smoke Brick difficulty (1) so a
+        // single advance awards it (progressive is budget-vs-difficulty, not tiered).
+        progressive: { rollFormula: '1d20 + 20', awardMode: 'equal' }
+      }
+    });
+    const progressiveRecipe = await rm.createRecipe({
+      name: 'Smoke Mold Brick',
+      description: 'progressive: one low-difficulty result awarded in a single advance.',
+      craftingSystemId: progressiveSystemId,
+      img: 'icons/commodities/stone/stone-worked-grey.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          name: 'Clay',
+          options: [{ quantity: 1, match: { type: 'component', componentId: progressiveMap['Smoke Clay'] } }]
+        }]
+      }],
+      resultGroups: [{
+        name: 'Brick',
+        results: [{ id: 'smoke-brick-result', componentId: progressiveMap['Smoke Brick'], quantity: 1 }]
+      }]
+    });
+
+    // ── 6. Crafter inventory top-up ─────────────────────────────────────────
+    await crafter.createEmbeddedDocuments('Item', [
+      ...invCopies('Smoke Plank', 5),                 // simple(1) + breakage(1) + limitedUses(2) crafts; negative consumes none
+      ...invCopies('Smoke Mallet', 1),                // breakageChance tool
+      ...invCopies('Smoke Chisel', 1),                // limitedUses tool (broken by crafting maxUses times)
+      ...invCopies('Smoke Relic', 1),                 // salvageable component
+      ...invCopies('Smoke Ingot A', 1),               // routedByIngredients set A
+      ...invCopies('Smoke Ingot B', 1),               // routedByIngredients set B (asserted NOT produced)
+      ...invCopies('Smoke Bar', 1),                   // routedByCheck stock
+      ...invCopies('Smoke Clay', 1)                   // progressive stock
+    ]);
+
+    // ── 7. Always-run guaranteed-success gather (Arcane Forge, scene-less) ──
+    // A dropRate:100 d100 task under a scene-less manual environment so the
+    // rc/ci gather-inventory-delta assertion via startGatheringAttempt is
+    // deterministic (no scene gate, no tool gate, no roll prompt).
+    const rcGatherTaskId = 'smoke-rc-forage';
+    const config = foundry.utils.deepClone(game.settings.get('fabricate', 'gatheringConfig') || {});
+    config.systems = config.systems || {};
+    const arcaneConfig = config.systems[arcaneSystemId] || {};
+    const existingTasks = Array.isArray(arcaneConfig.tasks) ? arcaneConfig.tasks : [];
+    config.systems[arcaneSystemId] = {
+      ...arcaneConfig,
+      tasks: [
+        ...existingTasks.filter((task) => task?.id !== rcGatherTaskId),
+        {
+          id: rcGatherTaskId,
+          name: 'Smoke RC Forage',
+          description: 'Guaranteed-drop forage for the rc/ci gather-delta assertion.',
+          img: 'icons/consumables/plants/herb-tied-bundle-green.webp',
+          enabled: true,
+          region: 'northreach',
+          biomes: ['forest'],
+          weather: ['rain'],
+          timeOfDay: ['dusk'],
+          itemSelectionMode: 'highestRankedDrop',
+          dropRows: [{
+            id: 'smoke-rc-drop',
+            componentId: mysticHerbComponentId,
+            quantity: 1,
+            dropRate: 100,
+            enabled: true
+          }]
+        }
+      ]
+    };
+    await game.settings.set('fabricate', 'gatheringConfig', config);
+
+    const environmentStore = game.fabricate.getGatheringEnvironmentStore();
+    // rc/ci gather env: MANUAL composition force-includes ONLY the guaranteed task
+    // and NO events, so the always-run inventory-delta assertion cannot be
+    // perturbed by a hazardous event flipping the outcome.
+    const rcGatherEnvironment = await environmentStore.create({
+      craftingSystemId: arcaneSystemId,
+      name: 'Smoke RC Meadow',
+      description: 'Scene-less guaranteed-success environment for the rc/ci gather-delta assertion.',
+      img: 'icons/consumables/plants/grass-leaves-green.webp',
+      enabled: true,
+      selectionMode: 'targeted',
+      sceneUuid: '',
+      compositionMode: 'manual',
+      region: 'northreach',
+      biomes: ['forest'],
+      forcedTaskIds: [rcGatherTaskId]
+    });
+    // Full-profile hazard env: AUTOMATIC composition + matching region/biome, so it
+    // composes BOTH the guaranteed task and the seeded hazardous smoke-bramble-event
+    // (which matches northreach/forest/rain/dusk). Scene-less so a headless GM can
+    // attempt it (Azure Grove's sceneUuid gate blocks every viewer). The hazard
+    // assertion forces the event dropRate to 100 for a deterministic fire.
+    const hazardEnvironment = await environmentStore.create({
+      craftingSystemId: arcaneSystemId,
+      name: 'Smoke Hazard Grove',
+      description: 'Scene-less environment that composes the hazardous Bramble Snare event for #489.',
+      img: 'icons/magic/nature/root-vine-thorned-fire-purple.webp',
+      enabled: true,
+      selectionMode: 'targeted',
+      sceneUuid: '',
+      region: 'northreach',
+      biomes: ['forest'],
+      eventPolicy: 'successWithEvent',
+      eventSelectionMode: 'highestRankedDrop'
+    });
+
+    return {
+      executionItemIds,
+      executionSystemIds: [
+        simpleSystemId, ingredientRouterSystemId, checkRouterSystemId, progressiveSystemId
+      ],
+      executionRecipeIds: [
+        simpleRecipe.id, breakageRecipe.id, limitedUsesRecipe.id, negativeToolRecipe.id,
+        ingredientRoutedRecipe.id, checkRoutedRecipe.id, progressiveRecipe.id
+      ],
+      simple: {
+        systemId: simpleSystemId,
+        simpleRecipeId: simpleRecipe.id,
+        breakageRecipeId: breakageRecipe.id,
+        limitedUsesRecipeId: limitedUsesRecipe.id,
+        negativeToolRecipeId: negativeToolRecipe.id,
+        malletComponentId: simpleMap['Smoke Mallet'],
+        chiselComponentId: simpleMap['Smoke Chisel'],
+        relicComponentId: simpleMap['Smoke Relic']
+      },
+      ingredientRouted: {
+        recipeId: ingredientRoutedRecipe.id,
+        chosenSetId: setAId
+      },
+      checkRouted: { recipeId: checkRoutedRecipe.id },
+      progressive: { recipeId: progressiveRecipe.id },
+      gather: { environmentId: rcGatherEnvironment.id, taskId: rcGatherTaskId },
+      hazard: { environmentId: hazardEnvironment.id, taskId: rcGatherTaskId }
+    };
+  }, {
+    arcaneSystemId: craftingSetup.systemId,
+    mysticHerbComponentId: craftingSetup.componentMap['Mystic Herb'],
+    crafterId
+  });
+}
+
+/**
+ * Execute and assert the issue #489 craft-execution coverage scenarios.
+ *
+ * Runs the crafts, tool breakages, salvage, negative gating, and the
+ * guaranteed-success gather entirely via the runtime API (no UI/screenshots),
+ * returning one `{ step, passed, error? }` record per scenario for the caller to
+ * fold into `results.steps` (a failed record fails the run via the final
+ * step-failure gate).
+ *
+ * @param {import('playwright').Page} page
+ * @param {object} fixtures Result of {@link seedSmokeCraftExecutionFixtures}.
+ * @param {string} crafterId
+ * @returns {Promise<Array<{step: string, passed: boolean, error?: string}>>}
+ */
+async function runCraftExecutionAsserts(page, fixtures, crafterId) {
+  return await page.evaluate(async ({ fixtures, crafterId }) => {
+    const steps = [];
+    const record = (step, passed, error) => steps.push({ step, passed, ...(error ? { error } : {}) });
+
+    const engine = game.fabricate.getCraftingEngine();
+    const rm = game.fabricate.getRecipeManager();
+    const crafter = game.actors.get(crafterId);
+
+    const countByName = (name) => crafter.items.contents
+      .filter((i) => i.name === name)
+      .reduce((sum, i) => sum + (Number(i.system?.quantity) || 1), 0);
+    const toolItem = (name) => crafter.items.contents.find((i) => i.name === name) || null;
+    // Mirror src/gatheringToolRuntime.js isToolBroken so the assertion reads the
+    // flag through the same defensive accessors the runtime writes/reads it with.
+    const isBroken = (item) =>
+      item?.getFlag?.('fabricate', 'toolBroken') === true
+      || item?.getFlag?.('fabricate', 'fabricate.toolBroken') === true
+      || foundry.utils.getProperty(item, 'flags.fabricate.toolBroken') === true
+      || foundry.utils.getProperty(item, 'flags.fabricate.fabricate.toolBroken') === true;
+
+    // ── simple craft ────────────────────────────────────────────────────────
+    try {
+      const before = countByName('Smoke Crate');
+      const recipe = rm.getRecipe(fixtures.simple.simpleRecipeId);
+      const result = await game.fabricate.craft(crafter, recipe, { componentSourceActors: [crafter] });
+      const after = countByName('Smoke Crate');
+      if (!result.success) throw new Error(`craft failed: ${result.message}`);
+      if (after !== before + 1) throw new Error(`Smoke Crate inventory ${before} -> ${after}, expected +1`);
+      record('exec-craft-simple', true);
+    } catch (err) {
+      record('exec-craft-simple', false, err.message);
+    }
+
+    // ── routedByCheck multi-group (Masterwork produced, Standard NOT) ────────
+    try {
+      const masterBefore = countByName('Smoke Masterwork Blade');
+      const standardBefore = countByName('Smoke Standard Blade');
+      const recipe = rm.getRecipe(fixtures.checkRouted.recipeId);
+      const result = await game.fabricate.craft(crafter, recipe, { componentSourceActors: [crafter] });
+      const masterAfter = countByName('Smoke Masterwork Blade');
+      const standardAfter = countByName('Smoke Standard Blade');
+      if (!result.success) throw new Error(`craft failed: ${result.message}`);
+      if (masterAfter !== masterBefore + 1) {
+        throw new Error(`Masterwork Blade ${masterBefore} -> ${masterAfter}, expected +1 (selected tier group)`);
+      }
+      if (standardAfter !== standardBefore) {
+        throw new Error(`Standard Blade ${standardBefore} -> ${standardAfter}, expected unchanged (unselected tier group)`);
+      }
+      record('exec-craft-routed-by-check', true);
+    } catch (err) {
+      record('exec-craft-routed-by-check', false, err.message);
+    }
+
+    // ── routedByIngredients multi-set (chosen set's Ring, NOT Amulet) ────────
+    try {
+      const ringBefore = countByName('Smoke Ring');
+      const amuletBefore = countByName('Smoke Amulet');
+      const recipe = rm.getRecipe(fixtures.ingredientRouted.recipeId);
+      const result = await game.fabricate.craft(crafter, recipe, {
+        componentSourceActors: [crafter],
+        ingredientSetId: fixtures.ingredientRouted.chosenSetId
+      });
+      const ringAfter = countByName('Smoke Ring');
+      const amuletAfter = countByName('Smoke Amulet');
+      if (!result.success) throw new Error(`craft failed: ${result.message}`);
+      if (ringAfter !== ringBefore + 1) {
+        throw new Error(`Smoke Ring ${ringBefore} -> ${ringAfter}, expected +1 (chosen set's group)`);
+      }
+      if (amuletAfter !== amuletBefore) {
+        throw new Error(`Smoke Amulet ${amuletBefore} -> ${amuletAfter}, expected unchanged (other set's group)`);
+      }
+      record('exec-craft-routed-by-ingredients', true);
+    } catch (err) {
+      record('exec-craft-routed-by-ingredients', false, err.message);
+    }
+
+    // ── progressive (single deterministic advance awards the result) ─────────
+    try {
+      const before = countByName('Smoke Brick');
+      const recipe = rm.getRecipe(fixtures.progressive.recipeId);
+      const result = await game.fabricate.craft(crafter, recipe, { componentSourceActors: [crafter] });
+      const after = countByName('Smoke Brick');
+      if (!result.success) throw new Error(`craft failed: ${result.message}`);
+      if (after !== before + 1) throw new Error(`Smoke Brick ${before} -> ${after}, expected +1`);
+      record('exec-craft-progressive', true);
+    } catch (err) {
+      record('exec-craft-progressive', false, err.message);
+    }
+
+    // ── breakageChance tool break (flagBroken + " (broken)" suffix) ──────────
+    try {
+      const recipe = rm.getRecipe(fixtures.simple.breakageRecipeId);
+      const result = await game.fabricate.craft(crafter, recipe, { componentSourceActors: [crafter] });
+      if (!result.success) throw new Error(`craft failed: ${result.message}`);
+      const mallet = toolItem('Smoke Mallet (broken)') || toolItem('Smoke Mallet');
+      if (!mallet) throw new Error('Smoke Mallet tool item not found after craft');
+      if (!isBroken(mallet)) {
+        throw new Error('Smoke Mallet toolBroken flag not set after breakageChance craft');
+      }
+      if (!mallet.name.endsWith(' (broken)')) {
+        throw new Error(`Smoke Mallet name "${mallet.name}" missing " (broken)" suffix`);
+      }
+      record('exec-tool-breakage-chance', true);
+    } catch (err) {
+      record('exec-tool-breakage-chance', false, err.message);
+    }
+
+    // ── limitedUses tool break at the maxUses threshold-crossing craft ───────
+    // maxUses is 2: craft twice. The first (post-increment timesUsed 1 < 2) must
+    // NOT break; the second (timesUsed 2 >= 2) crosses the threshold and breaks.
+    try {
+      const recipe = rm.getRecipe(fixtures.simple.limitedUsesRecipeId);
+      const first = await game.fabricate.craft(crafter, recipe, { componentSourceActors: [crafter] });
+      if (!first.success) throw new Error(`first craft failed: ${first.message}`);
+      const chiselAfterFirst = toolItem('Smoke Chisel (broken)') || toolItem('Smoke Chisel');
+      if (!chiselAfterFirst) throw new Error('Smoke Chisel tool item not found after first craft');
+      if (isBroken(chiselAfterFirst)) {
+        throw new Error('Smoke Chisel broke before reaching maxUses (sub-threshold craft)');
+      }
+      const second = await game.fabricate.craft(crafter, recipe, { componentSourceActors: [crafter] });
+      if (!second.success) throw new Error(`second craft failed: ${second.message}`);
+      const chisel = toolItem('Smoke Chisel (broken)') || toolItem('Smoke Chisel');
+      if (!chisel) throw new Error('Smoke Chisel tool item not found after second craft');
+      if (!isBroken(chisel)) {
+        throw new Error('Smoke Chisel toolBroken flag not set at maxUses threshold craft');
+      }
+      if (!chisel.name.endsWith(' (broken)')) {
+        throw new Error(`Smoke Chisel name "${chisel.name}" missing " (broken)" suffix`);
+      }
+      record('exec-tool-breakage-limited-uses', true);
+    } catch (err) {
+      record('exec-tool-breakage-limited-uses', false, err.message);
+    }
+
+    // ── negative tool-gating (required tool absent → success:false) ──────────
+    try {
+      const recipe = rm.getRecipe(fixtures.simple.negativeToolRecipeId);
+      const bracketBefore = countByName('Smoke Bracket');
+      const result = await game.fabricate.craft(crafter, recipe, { componentSourceActors: [crafter] });
+      const bracketAfter = countByName('Smoke Bracket');
+      if (result.success !== false) throw new Error('craft succeeded but the required tool is absent');
+      if (!/tool/i.test(result.message || '')) {
+        throw new Error(`failure message "${result.message}" is not a tool-gating reason`);
+      }
+      if (bracketAfter !== bracketBefore) {
+        throw new Error(`Smoke Bracket ${bracketBefore} -> ${bracketAfter}, expected no product on gated craft`);
+      }
+      record('exec-negative-tool-gating', true);
+    } catch (err) {
+      record('exec-negative-tool-gating', false, err.message);
+    }
+
+    // ── salvage (results non-null + result component lands in inventory) ─────
+    try {
+      const shardBefore = countByName('Smoke Shard');
+      const result = await engine.salvage(
+        crafter.uuid,
+        fixtures.simple.systemId,
+        fixtures.simple.relicComponentId,
+        { skipTimeGate: true }
+      );
+      const shardAfter = countByName('Smoke Shard');
+      if (!result.success) throw new Error(`salvage failed: ${result.message}`);
+      if (result.results == null) throw new Error('salvage results is null (expected non-null)');
+      if (shardAfter <= shardBefore) {
+        throw new Error(`Smoke Shard ${shardBefore} -> ${shardAfter}, expected increase from salvage`);
+      }
+      record('exec-salvage-run', true);
+    } catch (err) {
+      record('exec-salvage-run', false, err.message);
+    }
+
+    // ── guaranteed-success gather (inventory increase via startGatheringAttempt) ─
+    try {
+      await game.fabricate.setSelectedGatheringActorId(crafterId);
+      const before = countByName('Mystic Herb');
+      const result = await game.fabricate.startGatheringAttempt({
+        rememberedActorId: crafterId,
+        environmentId: fixtures.gather.environmentId,
+        taskId: fixtures.gather.taskId
+      });
+      const after = countByName('Mystic Herb');
+      if (result?.accepted !== true) {
+        const reason = result?.blockedReasons?.[0]?.code || result?.blockedReasons?.[0] || 'unknown';
+        throw new Error(`gather not accepted (state=${result?.state}, blocked=${JSON.stringify(reason)})`);
+      }
+      if (after <= before) {
+        throw new Error(`Mystic Herb ${before} -> ${after}, expected increase from guaranteed-success gather`);
+      }
+      record('exec-gather-inventory-delta', true);
+    } catch (err) {
+      record('exec-gather-inventory-delta', false, err.message);
+    }
+
+    return steps;
+  }, { fixtures, crafterId });
+}
+
+/**
+ * Full-profile-only gather assertions for issue #489: the seeded 0%-drop
+ * ("empty") gather, the scene-blocked gather, and the hazardous "Bramble Snare"
+ * event firing. These rely on fixtures seeded only under RUN_SCREENSHOT_PHASES
+ * (`seedSmokeGatheringLibrary` + the player environment fixtures), so the caller
+ * gates this behind the full profile.
+ *
+ * The hazardous-event gather runs against the scene-less "Smoke Hazard Grove"
+ * environment, which composes the SAME seeded `smoke-bramble-event` by
+ * condition/biome matching, rather than Azure Grove: Azure Grove carries a
+ * `sceneUuid`, and the gathering scene-access gate (`createGatheringSceneAccess`)
+ * blocks EVERY viewer — GM included — from attempting unless the linked scene is
+ * the active scene with one of the actor's tokens on it, which a headless smoke
+ * run cannot satisfy.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{ systemId: string }} craftingSetup
+ * @param {{ environmentId: string, taskId: string }} gatherFixture Hazard env/task.
+ * @param {string} crafterId
+ * @returns {Promise<Array<{step: string, passed: boolean, error?: string}>>}
+ */
+async function runFullProfileGatherAsserts(page, craftingSetup, gatherFixture, crafterId) {
+  return await page.evaluate(async ({ arcaneSystemId, hazardEnvironmentId, hazardTaskId, crafterId }) => {
+    const steps = [];
+    const record = (step, passed, error) => steps.push({ step, passed, ...(error ? { error } : {}) });
+    const crafter = game.actors.get(crafterId);
+    await game.fabricate.setSelectedGatheringActorId(crafterId);
+    const countByName = (name) => crafter.items.contents
+      .filter((i) => i.name === name)
+      .reduce((sum, i) => sum + (Number(i.system?.quantity) || 1), 0);
+
+    const environmentStore = game.fabricate.getGatheringEnvironmentStore();
+    const envByName = (name) =>
+      (environmentStore.list?.() || []).find((env) => env?.name === name) || null;
+
+    // ── 0%-drop ("empty") gather: accepted, but no items awarded ─────────────
+    try {
+      const witheredEnv = envByName('Withered Patch');
+      if (!witheredEnv) throw new Error('Withered Patch environment not seeded (full profile)');
+      const before = countByName('Mystic Herb');
+      const result = await game.fabricate.startGatheringAttempt({
+        rememberedActorId: crafterId,
+        environmentId: witheredEnv.id,
+        taskId: 'smoke-withered-search'
+      });
+      const after = countByName('Mystic Herb');
+      if (result?.accepted !== true) {
+        throw new Error(`empty gather not accepted (state=${result?.state})`);
+      }
+      const created = Array.isArray(result.createdResults) ? result.createdResults : [];
+      if (created.length !== 0 || after !== before) {
+        throw new Error(`0%-drop gather awarded items (createdResults=${created.length}, inv ${before}->${after})`);
+      }
+      record('exec-gather-empty', true);
+    } catch (err) {
+      record('exec-gather-empty', false, err.message);
+    }
+
+    // ── scene-blocked gather: not accepted, scene-block reason ───────────────
+    try {
+      const sunkenEnv = envByName('Sunken Ruins');
+      if (!sunkenEnv) throw new Error('Sunken Ruins environment not seeded (full profile)');
+      const result = await game.fabricate.startGatheringAttempt({
+        rememberedActorId: crafterId,
+        environmentId: sunkenEnv.id,
+        taskId: 'smoke-sunken-survey'
+      });
+      if (result?.accepted === true) throw new Error('scene-blocked gather was accepted');
+      const reasons = JSON.stringify(result?.blockedReasons || []);
+      if (!/SCENE/i.test(reasons)) {
+        throw new Error(`scene-blocked gather reason not scene-related: ${reasons}`);
+      }
+      record('exec-gather-scene-blocked', true);
+    } catch (err) {
+      record('exec-gather-scene-blocked', false, err.message);
+    }
+
+    // ── hazardous "Bramble Snare" event fires (deterministic dropRate) ───────
+    try {
+      // Force the seeded hazardous event to fire deterministically: raise its
+      // dropRate to 100 for this assertion (restored afterwards) so the d100
+      // event throw always lands.
+      const config = foundry.utils.deepClone(game.settings.get('fabricate', 'gatheringConfig') || {});
+      const systemConfig = config.systems?.[arcaneSystemId] || {};
+      const events = Array.isArray(systemConfig.events) ? systemConfig.events : [];
+      const brambleIndex = events.findIndex((event) => event?.id === 'smoke-bramble-event');
+      if (brambleIndex < 0) throw new Error('smoke-bramble-event not seeded (full profile)');
+      const originalDropRate = events[brambleIndex].dropRate;
+      events[brambleIndex] = { ...events[brambleIndex], dropRate: 100 };
+      config.systems[arcaneSystemId] = { ...systemConfig, events };
+      await game.settings.set('fabricate', 'gatheringConfig', config);
+      try {
+        const result = await game.fabricate.startGatheringAttempt({
+          rememberedActorId: crafterId,
+          environmentId: hazardEnvironmentId,
+          taskId: hazardTaskId
+        });
+        if (result?.accepted !== true) throw new Error(`hazard gather not accepted (state=${result?.state})`);
+        const firedEvents = result?.checkResult?.events || [];
+        const fired = firedEvents.some((event) => event?.id === 'smoke-bramble-event')
+          || JSON.stringify(firedEvents).includes('Bramble Snare');
+        if (!fired) {
+          throw new Error(`Bramble Snare did not fire (events=${JSON.stringify(firedEvents)})`);
+        }
+        record('exec-gather-hazard-event', true);
+      } finally {
+        const restore = foundry.utils.deepClone(game.settings.get('fabricate', 'gatheringConfig') || {});
+        const restoreSystem = restore.systems?.[arcaneSystemId] || {};
+        const restoreEvents = Array.isArray(restoreSystem.events) ? restoreSystem.events : [];
+        const idx = restoreEvents.findIndex((event) => event?.id === 'smoke-bramble-event');
+        if (idx >= 0) {
+          restoreEvents[idx] = { ...restoreEvents[idx], dropRate: originalDropRate };
+          restore.systems[arcaneSystemId] = { ...restoreSystem, events: restoreEvents };
+          await game.settings.set('fabricate', 'gatheringConfig', restore);
+        }
+      }
+    } catch (err) {
+      record('exec-gather-hazard-event', false, err.message);
+    }
+
+    return steps;
+  }, {
+    arcaneSystemId: craftingSetup.systemId,
+    hazardEnvironmentId: gatherFixture.environmentId,
+    hazardTaskId: gatherFixture.taskId,
+    crafterId
+  });
+}
+
+/**
  * Exercise manager system edit controls without saving destructive changes.
  * @param {import('playwright').Page} page
  * @param {string} systemId
@@ -1430,7 +2269,13 @@ const cleanup = {
   sceneIds: [],
   systemId: null,
   blockedSystemId: null,
-  recipeIds: []
+  recipeIds: [],
+  // Issue #489 craft-execution coverage fixtures: dedicated per-mode crafting
+  // systems (simple / routedByIngredients / routedByCheck / progressive) and
+  // their world items. Recipes are pushed onto `recipeIds`; the rc-profile
+  // gather task/env live under the existing Arcane Forge system (cleaned with it).
+  executionSystemIds: [],
+  executionItemIds: []
 };
 
 async function main() {
@@ -1646,7 +2491,13 @@ async function main() {
         // before cleanup leaves an orphan under the renamed name, so purge BOTH
         // names — otherwise duplicate same-named systems accumulate and the promote
         // source picker can default to a tool-less duplicate.
-        const staleSystemNames = new Set(['Arcane Forge', "The Herbalist's Compendium"]);
+        const staleSystemNames = new Set([
+          'Arcane Forge', "The Herbalist's Compendium",
+          // Issue #489 craft-execution coverage systems (deterministic names) so a
+          // crashed local run does not accumulate duplicate same-named systems.
+          'Smoke Simple Forge', 'Smoke Ingredient Router', 'Smoke Check Router',
+          'Smoke Progressive Forge'
+        ]);
         const staleSystems = allSystems.filter(s => staleSystemNames.has(s.name));
         for (const sys of staleSystems) {
           console.log(`Cleaning stale crafting system: ${sys.name} (${sys.id})`);
@@ -1674,10 +2525,12 @@ async function main() {
           await User.deleteDocuments(staleUsers.map(u => u.id));
         }
 
-        // 3. Clean stale items
+        // 3. Clean stale items (the fixed smoke set plus the issue #489
+        //    craft-execution world items, all uniquely 'Smoke '-prefixed).
         const staleItems = game.items.contents.filter(i =>
           ['Iron Ore', 'Mystic Herb', 'Dragon Scale', 'Empty Vial',
            'Iron Sword', 'Healing Potion', 'Dragon Scale Armor'].includes(i.name)
+          || (typeof i.name === 'string' && i.name.startsWith('Smoke '))
         );
         if (staleItems.length > 0) {
           console.log(`Cleaning ${staleItems.length} stale test items`);
@@ -2676,6 +3529,27 @@ async function main() {
 
       results.steps.push({ step: 'create-crafting-system', passed: true });
       process.stdout.write(`Phase C complete: System "${craftingSetup.systemId}" with ${craftingSetup.recipeIds.length} recipes.\n`);
+
+      // Issue #489: seed the craft-execution coverage fixtures (dedicated per-mode
+      // systems, tool-breakage recipes, a salvageable component, crafter inventory,
+      // and a guaranteed-success gather env/task). Always-run so the execute-and-
+      // assert scenarios in Phase E run under rc/ci too.
+      let executionFixtures = null;
+      try {
+        process.stdout.write('  Seeding craft-execution coverage fixtures (#489)...\n');
+        executionFixtures = await seedSmokeCraftExecutionFixtures(page, craftingSetup, cleanup.crafterId);
+        cleanup.executionSystemIds = executionFixtures.executionSystemIds;
+        cleanup.executionItemIds = executionFixtures.executionItemIds;
+        cleanup.recipeIds = [...cleanup.recipeIds, ...executionFixtures.executionRecipeIds];
+        results.steps.push({ step: 'seed-craft-execution-fixtures', passed: true });
+        process.stdout.write(
+          `  Seeded ${executionFixtures.executionSystemIds.length} execution systems and ` +
+          `${executionFixtures.executionRecipeIds.length} recipes.\n`
+        );
+      } catch (err) {
+        results.steps.push({ step: 'seed-craft-execution-fixtures', passed: false, error: err.message });
+        process.stderr.write(`Seeding craft-execution fixtures failed: ${err.message}\n`);
+      }
 
       // Feature-gate negative test (toggle gathering off, assert button hides,
       // toggle back on). Belongs in `full` only — `rc` proves the positive
@@ -4505,6 +5379,37 @@ async function main() {
           if (crafter) crafter.sheet.close();
         }, cleanup.crafterId);
 
+        // ── Issue #489: execute-and-assert coverage (always-run, rc/ci) ────────
+        // Cheap API crafts, tool breakages, salvage, negative gating, and one
+        // guaranteed-success gather — no screenshots, so they run in every
+        // profile. A failed scenario is recorded as a failed step and fails the
+        // run via the final step-failure gate.
+        if (executionFixtures) {
+          process.stdout.write('  Running craft-execution coverage asserts (#489)...\n');
+          const execSteps = await runCraftExecutionAsserts(page, executionFixtures, cleanup.crafterId);
+          for (const step of execSteps) {
+            results.steps.push(step);
+            process.stdout.write(`    ${step.passed ? 'PASS' : 'FAIL'} ${step.step}${step.error ? `: ${step.error}` : ''}\n`);
+          }
+
+          // Full-profile-only gather assertions: the 0%-drop ("empty") and
+          // scene-blocked gathers, plus the hazardous "Bramble Snare" event
+          // firing — all rely on fixtures seeded only under RUN_SCREENSHOT_PHASES.
+          if (RUN_FULL_ONLY_GATHERING_STATES) {
+            process.stdout.write('  Running full-profile gather asserts (#489)...\n');
+            const gatherSteps = await runFullProfileGatherAsserts(
+              page, craftingSetup, executionFixtures.hazard, cleanup.crafterId
+            );
+            for (const step of gatherSteps) {
+              results.steps.push(step);
+              process.stdout.write(`    ${step.passed ? 'PASS' : 'FAIL'} ${step.step}${step.error ? `: ${step.error}` : ''}\n`);
+            }
+          }
+        } else {
+          process.stdout.write('  Skipping #489 execution asserts: fixtures not seeded.\n');
+          results.steps.push({ step: 'exec-coverage', passed: false, error: 'Execution fixtures not seeded' });
+        }
+
         // ── Player Journal capture ────────────────────────────────────────────
         // The Phase E craft above produced at least one terminal crafting run for
         // the crafter, so the player Journal screen has a populated, selectable run
@@ -4645,6 +5550,21 @@ async function main() {
           if (csm) {
             try { await csm.deleteSystem(cleanupData.systemId); } catch { /* already deleted */ }
           }
+        }
+
+        // Delete the issue #489 craft-execution coverage systems (and any gather
+        // environments/items they own). Their recipes are already in recipeIds
+        // above; the Arcane Forge rc gather env/task are cleaned with systemId.
+        if (Array.isArray(cleanupData.executionSystemIds) && cleanupData.executionSystemIds.length > 0) {
+          const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
+          const csm = game.fabricate?.getCraftingSystemManager?.();
+          for (const executionSystemId of cleanupData.executionSystemIds) {
+            try { await environmentStore?.cleanupByCraftingSystem?.(executionSystemId); } catch { /* ok */ }
+            try { await csm?.deleteSystem(executionSystemId); } catch { /* already deleted */ }
+          }
+        }
+        if (Array.isArray(cleanupData.executionItemIds) && cleanupData.executionItemIds.length > 0) {
+          try { await Item.deleteDocuments(cleanupData.executionItemIds); } catch { /* ok */ }
         }
 
         // Delete the dedicated broken system seeded for the overview/banner captures
