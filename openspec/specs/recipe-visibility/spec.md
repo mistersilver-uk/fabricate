@@ -320,8 +320,9 @@ It **counts across all actors** that hold the document and is **not reset** on t
 
 #### Player-Selected Learning For Capped Recipe Items
 
-A recipe item whose system has `knowledge.learn.limitRecipes === true` (a **capped recipe item**) does not auto-learn every linked recipe on drop.
-Instead the player learns one linked, not-yet-learned recipe at a time, up to the remaining budget, through the item-sheet learn picker.
+A recipe item whose system has an **effective** learn cap (`knowledge.learn.limitRecipes === true` AND a finite positive `maxRecipes`) is a **capped recipe item** and does not auto-learn every linked recipe on drop.
+A system that toggled `limitRecipes` on but carries a missing or invalid `maxRecipes` is not treated as capped -- it fails closed to the uncapped auto-learn path rather than bricking its recipes with a zero budget.
+Instead a capped recipe item requires the player to learn one linked, not-yet-learned recipe at a time, up to the remaining budget, through the item-sheet learn picker.
 
 - Capped-system recipes surface the item-sheet picker **regardless of `knowledge.learn.dragDropEnabled`** -- the picker is the only learn path for a capped recipe item, so `dragDropEnabled` no longer gates whether the manual affordance appears for it.
 - Each learn from a capped recipe item writes one `learnedRecipes` entry, increments the document's learn budget count, and, when the budget is then spent, removes the item if `destroyWhenSpent === true`.
