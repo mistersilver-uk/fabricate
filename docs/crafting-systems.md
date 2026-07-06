@@ -314,6 +314,22 @@ Fabricate iterates over every Item document in the pack and adds each one.
 - If an item's recorded original source link is broken, Fabricate links to the imported item instead, remembers the broken link as a fallback, and warns once for the bulk import.
 - Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
 
+#### Import from the Compendium Directory
+
+You can also import an entire Item compendium without opening the admin panel.
+As a GM, right-click an Item compendium in Foundry's **Compendium Directory** sidebar and choose **Import Items into Crafting System**.
+
+1. Right-click the Item compendium in the Compendium Directory sidebar
+2. Choose **Import Items into Crafting System**
+3. Pick the target crafting system in the picker dialog and confirm with **Import**
+
+The picker always opens so the import is a deliberate choice rather than a single click, even when only one crafting system exists.
+If no crafting system exists yet, Fabricate tells you to create one in the Crafting System Manager first, and nothing is imported.
+
+This action is offered only to GMs, and only on compendiums that hold Item documents.
+It runs the same import as the bulk pack drop, so it adds new components, updates registered ones in place, skips items already up to date, and reports the same added, updated, and skipped summary.
+Broken original source links fall back to the imported item and warn once for the whole import, exactly as the drop-based bulk import does.
+
 #### Folder drop
 
 Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder.

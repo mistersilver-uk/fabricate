@@ -81,6 +81,9 @@ The `Gathering` button is hidden when no crafting system exposes gathering.
 ### Compendium Directory
 
 Provide GM action to import all items from a compendium into a crafting system.
+The action is a GM-only entry in the Foundry Compendium Directory context menu, offered on an Item compendium pack (the right-clicked pack is the compendium to import from) and hidden for non-GMs and for non-Item packs.
+Choosing it opens a target-system picker where the GM confirms which crafting system receives the items, so the import is a deliberate commit rather than a single-click action.
+The action reuses the existing bulk-import primitive and its de-duplication and update/skip reporting rather than reimplementing them.
 Items with the same UUID or sourceUuid are de-duplicated on import.
 If an imported Item's recorded canonical source UUID no longer resolves,
 Fabricate falls back to the live dropped Item UUID.
