@@ -51,6 +51,8 @@ game.fabricate.getGatheringDropBreakdown({ environmentId, taskId }) // Task drop
 game.fabricate.listSelectableActors()       // Player-character actors for the actor-selection bar
 game.fabricate.getSelectedGatheringActorId() // Persisted remembered gathering actor id
 game.fabricate.setSelectedGatheringActorId(id) // Persist the remembered gathering actor id
+game.fabricate.getHideUnavailableEnvironments() // Player "hide unavailable environments" toggle (per client/device)
+game.fabricate.setHideUnavailableEnvironments(value) // Persist that toggle (per client/device)
 game.fabricate.getGatheringConditions()     // Current gathering weather/time and vocabularies
 game.fabricate.setGatheringWeather(weatherTag) // GM-only gathering weather update
 game.fabricate.setGatheringTimeOfDay(timeOfDayTag) // GM-only gathering time update
@@ -153,6 +155,27 @@ Hooks.once('fabricate.ready', () => {
   An owned non-player-character actor stays attempt-authorized through `listGatheringForActor` / `startGatheringAttempt` but does not appear in the bar.
 - `getSelectedGatheringActorId()` reads the persisted remembered selection from the `fabricate.lastGatheringActor` client setting, returning `''` when unset.
 - `setSelectedGatheringActorId(id)` persists the remembered selection to that same client setting.
+
+### Hide Unavailable Environments Toggle
+
+These methods back the player-side **Hide unavailable** toggle in the Gathering app's Environments column.
+The toggle is a view-only presentation preference.
+It hides only listings the engine reports as `locked === true` (disabled environments, plus location-gated environments the party is not in).
+It never changes saved data, the engine listing, or GM configuration.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const hidden = game.fabricate.getHideUnavailableEnvironments(); // false by default
+  await game.fabricate.setHideUnavailableEnvironments(true);
+});
+```
+
+- `getHideUnavailableEnvironments()` reads the `fabricate.gatheringHideUnavailableEnvironments` client setting, returning `false` when unset.
+- `setHideUnavailableEnvironments(value)` persists the boolean preference to that same setting.
+
+The setting is `scope: 'client'`, so it persists in the browser's `localStorage`.
+The choice is remembered per client/device, not per user account.
+The same account opening Fabricate on a second device or browser starts from the default (off).
 
 ### Gathering Economy Block
 
@@ -290,6 +313,7 @@ Fabricate stores data in Foundry's settings and flags:
 | Client setting | `fabricate.favouriteRecipes` | Favourite recipe IDs for the current client |
 | Client setting | `fabricate.recentlyCrafted` | Recently crafted recipe entries for the current client |
 | Client setting | `fabricate.progressiveResultOrder` | Per-recipe player reorder preferences for progressive mode results (Object, default `{}`) |
+| Client setting | `fabricate.gatheringHideUnavailableEnvironments` | Player "hide unavailable (locked) environments" toggle for the Gathering app Environments column (Boolean, default `false`, per client/device) |
 | Actor flag | `fabricate.craftingRuns.active` | In-progress crafting runs |
 | Actor flag | `fabricate.craftingRuns.history` | Completed crafting runs |
 | Actor flag | `fabricate.gatheringRuns.active` | In-progress gathering runs |

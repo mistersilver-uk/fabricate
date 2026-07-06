@@ -204,7 +204,12 @@ export class RecipeManager {
   /**
    * Delete a recipe
    * @param {string} recipeId - Recipe ID to delete
-   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
+   * @param {{notify?: boolean, emitChange?: boolean, cleanupFlags?: boolean}} [options]
+   *   Set `notify=false` for batch callers that emit their own summary. Set
+   *   `cleanupFlags=false` when a batch caller (e.g. `CraftingSystemManager.deleteSystem`)
+   *   deletes many recipes and then runs its OWN single bulk actor-flag cleanup pass,
+   *   so the per-recipe `_cleanupFlagsAfterRecipeMutation` fan-out (N recipes × M actors
+   *   flag scans) is not repeated once per recipe.
    */
   async deleteRecipe(recipeId, options = {}) {
     this._assertGM('delete recipe');
@@ -216,7 +221,9 @@ export class RecipeManager {
 
     this.recipes.delete(recipeId);
     await this.save();
-    await this._cleanupFlagsAfterRecipeMutation();
+    if (options.cleanupFlags !== false) {
+      await this._cleanupFlagsAfterRecipeMutation();
+    }
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${recipe.name}" deleted`);
     }
