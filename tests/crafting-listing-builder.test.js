@@ -387,6 +387,33 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(recipe.check.optional, false);
   });
 
+  it('routedByCheck + fixed: DC is nulled (tiers match by value range, not DC)', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12, type: 'fixed' }, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.dc, null);
+  });
+
+  it('routedByCheck + relative: DC is preserved', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12, type: 'relative' }, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.dc, 12);
+  });
+
+  it('routedByIngredients + fixed: DC is preserved (pass/fail gate still uses it)', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12, type: 'fixed' }, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.dc, 12);
+  });
+
   it('routedByIngredients: no routed formula → optional (no check runs)', () => {
     const system = makeSystem({
       resolutionMode: 'routedByIngredients',

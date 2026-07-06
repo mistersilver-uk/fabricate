@@ -203,7 +203,7 @@
         <ChecksValidationTab sections={validationSections} />
       {:else if activeTab === 'crafting' && craftingRouted}
         <div data-checks-panel="crafting">
-          <CraftingCheckEditor value={craftingCheck} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+          <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
         </div>
       {:else if activeTab === 'crafting' && craftingSimple}
         <div data-checks-panel="crafting">

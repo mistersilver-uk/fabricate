@@ -10,7 +10,8 @@
     routedSuccessTierOptions,
     routedHasOutcomeTiers,
     routedOutcomeTierNames,
-    resolveRecipeCheckTierOptions
+    resolveRecipeCheckTierOptions,
+    resolveRecipeFixedOutcomeTierOptions
   } from '../../../../utils/routedOutcomeKeywords.js';
   import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
@@ -394,6 +395,11 @@
   // dynamic-dc, progressive and unknown modes offer nothing. See the pure helper.
   const recipeCheckTierOptions = $derived(
     resolveRecipeCheckTierOptions(selectedSystem?.craftingCheck, craftingCheckMode)
+  );
+  // Fixed-type routed success tiers offered to the recipe's "Minimum success tier"
+  // override; empty (control hidden) for every non-fixed case.
+  const recipeMinSuccessTierOptions = $derived(
+    resolveRecipeFixedOutcomeTierOptions(selectedSystem?.craftingCheck, craftingCheckMode)
   );
 
   // Routed-check outcome tiers (active type) offered to the recipe editor's
@@ -4540,6 +4546,7 @@
         essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
+        minSuccessTierOptions={recipeMinSuccessTierOptions}
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}

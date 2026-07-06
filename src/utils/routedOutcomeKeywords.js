@@ -177,6 +177,33 @@ export function resolveRecipeCheckTierOptions(craftingCheck, craftingCheckMode) 
 }
 
 /**
+ * The success outcome tiers offered to a recipe's "Minimum success tier" dropdown,
+ * for a FIXED-type routed crafting check only. A recipe may demand a minimum tier so
+ * that a shared fixed check carries different difficulty per recipe; a roll landing
+ * below the chosen tier fails the craft outright. Only success tiers (`success ===
+ * true`) with an id are offered — a failure tier is not a meaningful "minimum for
+ * success" — ranked ascending by `start` (the fixed-tier rank) so the dropdown reads
+ * low → high.
+ *
+ * Returns `[]` for every non-fixed case (relative type, simple/progressive/null
+ * mode), so the editor control auto-hides unless the system runs a routed fixed
+ * check. Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
+ *
+ * @param {?{routed?: {type?: string, fixedOutcomes?: Array}}} craftingCheck
+ * @param {?string} craftingCheckMode the active crafting-check mode
+ * @returns {Array<{id: string, name: string, start: number}>}
+ */
+export function resolveRecipeFixedOutcomeTierOptions(craftingCheck, craftingCheckMode) {
+  if (craftingCheckMode !== 'routed') return [];
+  const routed = craftingCheck?.routed;
+  if (routed?.type !== 'fixed') return [];
+  return (Array.isArray(routed.fixedOutcomes) ? routed.fixedOutcomes : [])
+    .filter((tier) => tier?.id && tier.success === true)
+    .map((tier) => ({ id: tier.id, name: tier.name || tier.id, start: Number(tier.start) }))
+    .sort((a, b) => a.start - b.start);
+}
+
+/**
  * All NON-EMPTY outcome-tier NAMES of a routed check's active type — success AND
  * failure tiers — in author order. The active list is the `fixedOutcomes` when
  * `type === 'fixed'`, else `relativeOutcomes`. This is the single source of truth

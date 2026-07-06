@@ -31,6 +31,10 @@
     onChooseImage = () => {},
     isMultiStep = false,
     checkTierOptions = [],
+    // Success outcome tiers of a fixed-type routed check, ranked low→high. Non-empty
+    // only for a routed+fixed system, so the "Minimum success tier" control below
+    // auto-hides everywhere else.
+    minSuccessTierOptions = [],
     // True when the system's recipe-visibility list mode is `player`: unlocks the
     // per-recipe "restrict to specific users" editor below.
     playerListMode = false,
@@ -152,6 +156,23 @@
                 <option value={tier.id}>{(tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')) + ` (DC ${tier.dc})`}</option>
               {/each}
             </select>
+          </label>
+        {/if}
+        {#if minSuccessTierOptions.length > 0}
+          <label class="manager-field" data-recipe-min-success-tier>
+            <span>{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTier', 'Minimum success tier')}</span>
+            <select
+              data-recipe-field="minSuccessOutcomeId"
+              value={recipe?.minSuccessOutcomeId || ''}
+              onchange={(event) => onUpdateRecipe({ minSuccessOutcomeId: event.currentTarget.value || null })}
+              disabled={saving}
+            >
+              <option value="">{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTierNone', 'No override (use rolled tier)')}</option>
+              {#each minSuccessTierOptions as tier (tier.id)}
+                <option value={tier.id}>{tier.name}</option>
+              {/each}
+            </select>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTierHint', 'Fail the craft outright when the roll lands below this tier. Fixed-type routed checks only.')}</p>
           </label>
         {/if}
       </div>

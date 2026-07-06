@@ -449,8 +449,11 @@ export class CraftingListingBuilder {
       rollFormula.length > 0 && craftingActor
         ? this._resolveCheckFormula(rollFormula, craftingActor)
         : null;
+    // A routedByCheck fixed check matches by value range, not DC, so it has no
+    // meaningful DC — null it so the player card hides its DC chip (its `hasDc` gate).
+    const routedFixed = mode === 'routedByCheck' && config.type === 'fixed';
     return {
-      dc: config.dc ?? null,
+      dc: routedFixed ? null : (config.dc ?? null),
       rollFormula: rollFormula.length > 0 ? rollFormula : null,
       resolvedFormula: resolution?.display ?? null,
       formulaResolved: resolution ? resolution.resolved === true : null,

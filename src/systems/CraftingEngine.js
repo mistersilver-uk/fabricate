@@ -2230,13 +2230,18 @@ export class CraftingEngine {
       // A total below every relative threshold clamps to the lowest tier, so a
       // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
       clampToNearest: true,
+      // Fixed-type only: a recipe may require a minimum success tier; a roll below it
+      // fails the craft outright. Null for relative / unset recipes (no-op).
+      minOutcomeId: recipe?.minSuccessOutcomeId ?? null,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
         name: recipe?.name,
         activity: 'Crafting',
         img: this._resolveRecipePromptImg(recipe),
-        dc,
+        // Fixed-type routed checks match by value range, not DC, so the prompt must
+        // not advertise a (meaningless) DC. Undefined suppresses the chip + flavor.
+        dc: routed.type === 'fixed' ? undefined : dc,
       }),
     });
     return this._markEngineEvaluated(result);
