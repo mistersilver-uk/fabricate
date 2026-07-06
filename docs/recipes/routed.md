@@ -30,8 +30,10 @@ Use this when different materials should make different things.
 For example, the same gold band could become a Ring of Fire Resistance with a ruby, or a Ring of Frost Resistance with a sapphire.
 
 The crafting check is **optional** in this mode, the same as Simple mode.
+It is authored on the **Crafting check** page with the same pass or fail editor Simple mode uses: a roll formula, a DC, a meet or exceed comparison, a static or dynamic difficulty, and per-recipe check tiers.
 If you configure a roll formula, the check still rolls when a player crafts, but it never changes which result group is produced.
 If you configure no roll formula, the craft proceeds with no check.
+Because it uses the same pass or fail check as Simple mode, a Routed by ingredients recipe can pick a per-recipe **Check tier** to shift its DC (but not the outcome-tier controls used by Routed by check).
 
 When a recipe has a single result group, you do not need to tie an ingredient set to it.
 The single result group is produced whenever the recipe is crafted.

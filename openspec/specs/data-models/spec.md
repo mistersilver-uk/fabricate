@@ -118,6 +118,12 @@ CraftingSystem = {
     // Per-resolution-mode check sub-objects authored in the GM Checks tab; the
     // active one is selected by resolutionMode. (Shapes: SimpleCheck / RoutedCheck /
     // CheckBreakage defined below.)
+    // Slot ownership: `simple` is the SHARED optional pass/fail crafting-check slot
+    // — it backs the `simple`, `alchemy`, AND `routedByIngredients` modes' check (it
+    // is NOT a 1:1 slot<->mode identity; do not read it as "the simple-mode check").
+    // `routed` backs ONLY `routedByCheck`'s tier-routing check. `progressive` backs
+    // `progressive`. (The 1.10.0 migration moved routedByIngredients' pass/fail config
+    // from `routed` to `simple`; see the migration requirement below.)
     simple: SimpleCheck,
     routed: RoutedCheck,
     progressive: {
@@ -318,6 +324,14 @@ The `outcomeTier` condition matches when the resolved tier/outcome is in `tierId
 25. **`consumeCatalystsOnFail` interaction on the failure path** (issue 419): breakage on a FAILED attempt runs only when `consumption.consumeCatalystsOnFail === true` — identical to how the legacy `breakTools` force-break is gated today.
 A matched `checkDriven` trigger on a failed attempt therefore breaks tools only when `consumeCatalystsOnFail === true`.
 On the SUCCESS path breakage always applies (no such gate exists there).
+
+26. **Crafting-check slot ownership.** `craftingCheck.simple` is the shared optional pass/fail crafting-check slot: it backs the `simple`, `alchemy`, AND `routedByIngredients` modes' check (it is not a 1:1 slot↔mode identity — do not read it as "the simple-mode check").
+`craftingCheck.routed` backs ONLY `routedByCheck`'s tier-routing check.
+`craftingCheck.progressive` backs `progressive`.
+The runtime reads the slot matching the mode (`CraftingEngine._runCraftingCheck` / `_resolveCraftingCheckBreakage`, `RunJournalBuilder._checkConfigForMode`, `CraftingListingBuilder._buildCheck`), and the GM Checks editor binds `routedByIngredients` to the `SimpleCraftingCheckEditor` (`craftingCheck.simple`), reserving the tier `CraftingCheckEditor` for `routedByCheck`.
+27. **Crafting-check slot migration.** The 1.10.0 startup migration (`migrateMoveRoutedByIngredientsCheck`) moves a `routedByIngredients` system's pass/fail fields (`rollFormula`, `dc`, `thresholdMode`, `tiers`, `checkBreakage`) from `craftingCheck.routed` to `craftingCheck.simple` when the simple slot is unauthored (tier ids preserved so recipe `checkTierId` references survive; the routed slot's formula is cleared), operating on the raw persisted shape; it is guarded (never clobbers an authored simple slot) and idempotent.
+The symmetric `CraftingSystemManager.updateSystem` slot movement runs when a system's mode crosses the `routedByIngredients` boundary (into RI: `routed → simple`; out of RI into `routedByCheck`: `simple → routed`), guarded to fill only an unauthored destination each direction.
+Caveat: a `dcMode: 'dynamic'` simple check moved into `routedByCheck` loses its dynamic DC (the routed slot has no `dcMode`), and the resulting static `routed.dc` should be re-authored by the GM.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
@@ -1511,7 +1525,8 @@ They are unrelated mechanisms.
 
 The crafting-check macro / built-in adapter path has been removed.
 A crafting check is now usable IFF its resolution mode has an authored roll formula (`craftingCheck.simple|routed|progressive.rollFormula`); the engine rolls that formula and evaluates the outcome itself.
-There is no macro-return contract — when a required check (progressive, or `routedByCheck` mode) has no authored roll formula the attempt fails loudly with zero mutation (the required-check guard), and an optional check (simple or `routedByIngredients`) with no formula is a no-op.
+There is no macro-return contract — when a required check (progressive, or `routedByCheck` mode) has no authored roll formula the attempt fails loudly with zero mutation (the required-check guard), and an optional check (simple, alchemy, or `routedByIngredients`) with no formula is a no-op.
+The `routedByIngredients` optional pass/fail check reads `craftingCheck.simple.rollFormula` (the same shared slot as `simple`/`alchemy`), not `craftingCheck.routed`.
 
 `routedByCheck` mode keys on the engine-evaluated outcome tier NAME produced by rolling `craftingCheck.routed.rollFormula`.
 The same outcome-name normalization the provider routing applies (engine-evaluated, not a macro return):
