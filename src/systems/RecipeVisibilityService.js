@@ -7,6 +7,7 @@ const LEARN_RECIPE_MESSAGES = {
   linkedItemRequired: 'FABRICATE.Knowledge.LinkedItemRequired',
   alreadyLearned: 'FABRICATE.Knowledge.AlreadyLearned',
   noMatchingItem: 'FABRICATE.Knowledge.NoMatchingItem',
+  learnBudgetSpent: 'FABRICATE.Knowledge.LearnBudgetSpent',
   learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe',
   learnedRecipes: 'FABRICATE.Knowledge.LearnedRecipes',
   learnedRecipesPartial: 'FABRICATE.Knowledge.LearnedRecipesPartial',
@@ -535,6 +536,29 @@ export class RecipeVisibilityService {
     };
   }
 
+  // Whether a recipe's crafting system caps how many recipes may be learned from
+  // one recipe item (issue 511).
+  _isRecipeItemLearnCapped(recipe) {
+    const system = this._getCraftingSystem(recipe);
+    const knowledge = this._getKnowledgeConfig(system);
+    return knowledge?.learn?.limitRecipes === true;
+  }
+
+  // The finite positive learn cap for a capped recipe, or undefined.
+  _getLearnCapForRecipe(recipe) {
+    const system = this._getCraftingSystem(recipe);
+    const knowledge = this._getKnowledgeConfig(system);
+    if (knowledge?.learn?.limitRecipes !== true) return;
+    const max = Number(knowledge?.learn?.maxRecipes);
+    return Number.isFinite(max) && max > 0 ? max : undefined;
+  }
+
+  // FN1 (issue 511) — capped-system recipes surface the item-sheet picker path
+  // ('manual') REGARDLESS of `dragDropEnabled`, and are NEVER auto-learned on
+  // drop ('auto'). Uncapped recipes keep the original split: auto-learn when
+  // `dragDropEnabled === true`, else the manual sheet path. This lets one dropped
+  // book auto-learn its uncapped-system recipes while routing only the
+  // capped-system ones to the picker (DN2).
   _isRecipeEligibleForOwnedItemLearning(recipe, mode = 'auto') {
     if (!recipe || recipe.enabled === false) return false;
 
@@ -545,9 +569,16 @@ export class RecipeVisibilityService {
     const knowledge = this._getKnowledgeConfig(system);
     if (!['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned')) return false;
 
+    const capped = knowledge?.learn?.limitRecipes === true;
     const dragDropEnabled = knowledge?.learn?.dragDropEnabled !== false;
-    if (mode === 'manual') return dragDropEnabled === false;
-    return dragDropEnabled === true;
+
+    if (mode === 'manual') {
+      // The picker surfaces capped systems always; uncapped systems only when
+      // auto-drop is off.
+      return capped || dragDropEnabled === false;
+    }
+    // Auto-drop learns only uncapped systems that opt into drag-and-drop.
+    return capped === false && dragDropEnabled === true;
   }
 
   _getOwnedItemLearningCandidates({ ownedItem, mode = 'auto' } = {}) {
@@ -623,7 +654,13 @@ export class RecipeVisibilityService {
       return this._buildOwnedItemLearningResult({ actor, ownedItem, mode, silent: true });
     }
 
-    const matchedRecipes = this._getOwnedItemLearningCandidates({ ownedItem, mode });
+    // Capped-system recipes are learned one-at-a-time through the item-sheet
+    // picker (getLearnableRecipesFromItem / learnOneRecipeFromItem), never in the
+    // bulk drop/manual path, so they are suppressed here per matched recipe
+    // (DN2). Uncapped matched recipes in the same drop still learn in bulk.
+    const matchedRecipes = this._getOwnedItemLearningCandidates({ ownedItem, mode }).filter(
+      (recipe) => !this._isRecipeItemLearnCapped(recipe)
+    );
     const learnedMap = this._getLearnedMap(actor);
     const alreadyLearnedRecipes = [];
     const learnableRecipes = [];
@@ -636,6 +673,9 @@ export class RecipeVisibilityService {
       }
     }
 
+    // `consumeOnLearn` is ignored for capped books (superseded by
+    // `destroyWhenSpent`), but capped recipes are already excluded above, so this
+    // only ever sees uncapped recipes (UN4).
     const consumedItem = learnableRecipes.some((recipe) => {
       const system = this._getCraftingSystem(recipe);
       const knowledge = this._getKnowledgeConfig(system);
@@ -717,6 +757,127 @@ export class RecipeVisibilityService {
       alreadyLearnedRecipes: preview.alreadyLearnedRecipes,
       consumedItem: preview.consumedItem === true,
     });
+  }
+
+  /**
+   * Read-only view of the capped recipes a player can still learn from one owned
+   * recipe item (issue 511). Returns the item's linked, capped-system recipes the
+   * actor has not yet learned, plus the item-document's remaining learn budget
+   * (`remainingBudget = maxRecipes − count`). The recipe list is empty and
+   * `remainingBudget` is `0` once the budget is spent. Only capped-system recipes
+   * participate — uncapped recipes learn in bulk via `learnRecipesFromOwnedItem`.
+   *
+   * @param {object} args
+   * @param {object} args.ownedItem
+   * @param {object|null} [args.actor]
+   * @returns {{recipes: object[], remainingBudget: number, maxRecipes: number|undefined, count: number}}
+   */
+  getLearnableRecipesFromItem({
+    ownedItem,
+    actor = ownedItem?.parent || ownedItem?.actor || null,
+  } = {}) {
+    const empty = { recipes: [], remainingBudget: 0, maxRecipes: undefined, count: 0 };
+    if (!ownedItem || !actor) return empty;
+    if (!this._isActorOwnedItem(ownedItem, actor)) return empty;
+
+    const cappedCandidates = this._getOwnedItemLearningCandidates({
+      ownedItem,
+      mode: 'manual',
+    }).filter((recipe) => this._isRecipeItemLearnCapped(recipe));
+    if (cappedCandidates.length === 0) return empty;
+
+    // The budget is per item-document instance (mirrors recipeItemUsage). When
+    // several capped systems link the same physical item, use the most permissive
+    // cap; in practice one book links to one system's recipes.
+    const caps = cappedCandidates
+      .map((recipe) => this._getLearnCapForRecipe(recipe))
+      .filter((value) => Number.isFinite(value));
+    const maxRecipes = caps.length > 0 ? Math.max(...caps) : undefined;
+    const count = this._getRecipeItemLearnCount(ownedItem);
+    const remainingBudget = Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - count) : 0;
+
+    const learnedMap = this._getLearnedMap(actor);
+    const unlearned = cappedCandidates.filter((recipe) => !learnedMap?.[recipe.id]);
+
+    return {
+      recipes: remainingBudget > 0 ? unlearned : [],
+      remainingBudget,
+      maxRecipes,
+      count,
+    };
+  }
+
+  /**
+   * Learn exactly one capped recipe from an owned recipe item (issue 511),
+   * enforcing the per-document learn budget. Validates the link, that the recipe
+   * is not already learned, and that `remainingBudget > 0`; writes one
+   * `learnedRecipes` entry, increments the item-document learn count, and deletes
+   * the item when the count reaches `maxRecipes` iff `destroyWhenSpent`. For
+   * capped books `consumeOnLearn` is ignored.
+   *
+   * @param {object} args
+   * @param {object} args.recipe
+   * @param {object} args.ownedItem
+   * @param {object|null} [args.actor]
+   * @returns {Promise<{success: boolean, message: string, messageData?: object, destroyed?: boolean, remainingBudget?: number}>}
+   */
+  async learnOneRecipeFromItem({
+    recipe,
+    ownedItem,
+    actor = ownedItem?.parent || ownedItem?.actor || null,
+  } = {}) {
+    if (!recipe || !ownedItem || !actor) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.linkedItemRequired };
+    }
+    if (
+      !this._isActorOwnedItem(ownedItem, actor) ||
+      !this._isMatchingRecipeItem(recipe, ownedItem)
+    ) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
+    }
+    if (!this._isRecipeItemLearnCapped(recipe)) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.linkedItemRequired };
+    }
+
+    const learnedMap = this._getLearnedMap(actor);
+    if (learnedMap?.[recipe.id]) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
+    }
+
+    const maxRecipes = this._getLearnCapForRecipe(recipe);
+    const count = this._getRecipeItemLearnCount(ownedItem);
+    const remainingBudget = Number.isFinite(maxRecipes) ? maxRecipes - count : 0;
+    if (remainingBudget <= 0) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.learnBudgetSpent };
+    }
+
+    const next = {
+      ...learnedMap,
+      [recipe.id]: {
+        learnedAt: Date.now(),
+        sourceItemUuid: ownedItem.uuid,
+      },
+    };
+    await this._setLearnedMap(actor, next);
+
+    const nextCount = count + 1;
+    await this._setRecipeItemLearnCount(ownedItem, nextCount);
+
+    const knowledge = this._getKnowledgeConfig(this._getCraftingSystem(recipe));
+    const spent = Number.isFinite(maxRecipes) && nextCount >= maxRecipes;
+    let destroyed = false;
+    if (spent && knowledge?.learn?.destroyWhenSpent === true) {
+      await ownedItem.delete?.();
+      destroyed = true;
+    }
+
+    return {
+      success: true,
+      message: LEARN_RECIPE_MESSAGES.learnedRecipe,
+      messageData: { name: recipe.name },
+      destroyed,
+      remainingBudget: Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - nextCount) : 0,
+    };
   }
 
   async applyRecipeItemUseOnCraft({ recipe, craftingActor, componentSourceActors = [] }) {

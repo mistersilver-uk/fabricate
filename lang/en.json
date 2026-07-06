@@ -909,6 +909,7 @@
       "LinkedItemRequired": "Recipe item link is required to learn this recipe",
       "AlreadyLearned": "Recipe is already learned",
       "NoMatchingItem": "No matching recipe item available to learn",
+      "LearnBudgetSpent": "This recipe item has no learning uses left.",
       "LearnedRecipe": "Learned recipe: {name}",
       "LearnedRecipes": "{actor} learned {count} recipes: {recipes}",
       "LearnedRecipesPartial": "{actor} learned {count} new recipes: {recipes}",
