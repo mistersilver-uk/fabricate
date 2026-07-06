@@ -147,6 +147,69 @@ test('CraftingRunManager.completeRun never archives a duplicate history id (lega
   );
 });
 
+// Foundry's setFlag performs a RECURSIVE MERGE that never removes keys deleted
+// from an object, so a run removed from `active` would linger in the stored flag
+// and resurrect on reload. This actor reproduces that merge (and the `-=` deletion
+// that `_persist` must issue to counter it); the default FakeActor.setFlag simply
+// replaces the value and cannot catch the regression.
+class MergeActor {
+  constructor(name = 'Merge') {
+    this.id = `id-${name}`;
+    this.name = name;
+    this.uuid = `Actor.${name}`;
+    this._stored = null; // the persisted craftingRuns container
+    this.updateCalls = [];
+  }
+
+  getFlag(_scope, key) {
+    return String(key).endsWith('craftingRuns') ? this._stored : undefined;
+  }
+
+  async setFlag(_scope, _key, value) {
+    // Recursive-merge `active` (never deletes), replace `history` (array replace).
+    const priorActive = this._stored?.active ?? {};
+    this._stored = {
+      active: { ...priorActive, ...(value?.active ?? {}) },
+      history: Array.isArray(value?.history) ? value.history : (this._stored?.history ?? []),
+    };
+    return value;
+  }
+
+  async update(data) {
+    this.updateCalls.push(data);
+    for (const path of Object.keys(data)) {
+      const match = /craftingRuns\.active\.-=(.+)$/.exec(path);
+      if (match && this._stored?.active) delete this._stored.active[match[1]];
+    }
+  }
+}
+
+test('CraftingRunManager._persist deletes removed active runs from the stored flag (setFlag merge cannot)', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new MergeActor();
+
+  const run = await manager.createRun(actor, singleStepRecipe('m'), [actor], 'user-1');
+  assert.ok(actor._stored.active[run.id], 'the new run persisted into the stored active map');
+
+  // Simulate a reload: drop the in-memory cache so completion re-reads the flag.
+  manager.invalidateCache();
+  await manager.completeRun(actor, run, 'succeeded');
+
+  assert.ok(
+    !actor._stored.active[run.id],
+    'the completed run is actually removed from the stored active map (not just in memory)'
+  );
+  assert.equal(Object.keys(actor._stored.active).length, 0, 'no stale active run lingers');
+  assert.equal(actor._stored.history.length, 1, 'the run is archived to history exactly once');
+  assert.ok(
+    actor.updateCalls.some((data) =>
+      Object.keys(data).some((path) => path.includes(`active.-=${run.id}`))
+    ),
+    'the persist path issued a Foundry -= deletion for the removed run'
+  );
+});
+
 test('CraftingRunManager.removeRunsForSystem purges active and history entries for the system', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();
