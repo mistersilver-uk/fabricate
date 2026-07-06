@@ -405,11 +405,11 @@ export class CraftingListingBuilder {
     let config;
     switch (mode) {
       case 'simple':
-      case 'alchemy': {
+      case 'alchemy':
+      case 'routedByIngredients': {
         config = checks.simple;
         break;
       }
-      case 'routedByIngredients':
       case 'routedByCheck': {
         config = checks.routed;
         break;

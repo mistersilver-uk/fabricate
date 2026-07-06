@@ -72,10 +72,15 @@
 
   let activeTab = $state('crafting');
 
-  const craftingRouted = $derived(
-    resolutionMode === 'routedByIngredients' || resolutionMode === 'routedByCheck'
+  // Only `routedByCheck` uses the tier-routing CraftingCheckEditor. `routedByIngredients`
+  // authors its optional pass/fail check via the shared SimpleCraftingCheckEditor
+  // (bound to `craftingCheck.simple`), alongside `simple`/`alchemy`.
+  const craftingRouted = $derived(resolutionMode === 'routedByCheck');
+  const craftingSimple = $derived(
+    resolutionMode === 'simple' ||
+      resolutionMode === 'alchemy' ||
+      resolutionMode === 'routedByIngredients'
   );
-  const craftingSimple = $derived(resolutionMode === 'simple' || resolutionMode === 'alchemy');
   const craftingProgressive = $derived(resolutionMode === 'progressive');
   const salvageRouted = $derived(salvageResolutionMode === 'routed');
   const salvageProgressive = $derived(salvageResolutionMode === 'progressive');

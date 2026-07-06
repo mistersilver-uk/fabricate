@@ -299,6 +299,41 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('offers the recipe "Check tier" (DC-tier) dropdown to a routedByIngredients recipe (simple tiers)', async () => {
+    // A routedByIngredients system now uses the shared simple pass/fail check, so the
+    // root's `_craftingCheckMode` maps it to 'simple' and `resolveRecipeCheckTierOptions`
+    // sources these tier options from `craftingCheck.simple.tiers`. The Overview tab
+    // renders the "Check tier" dropdown whenever it receives those options.
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        onUpdateRecipe: (patch) => patches.push(patch),
+        checkTierOptions: [
+          { id: 'tier-easy', name: 'Easy', dc: 8 },
+          { id: 'tier-hard', name: 'Hard', dc: 20 },
+        ],
+      })
+    );
+    const tierField = target.querySelector('[data-recipe-check-tier]');
+    assert.ok(tierField, 'the Check tier dropdown renders for a RI recipe with simple tiers');
+    const select = tierField.querySelector('[data-recipe-field="checkTierId"]');
+    // Default option + the two simple tiers.
+    const values = [...select.querySelectorAll('option')].map((o) => o.value);
+    assert.deepEqual(values, ['', 'tier-easy', 'tier-hard']);
+    // It is the DC-tier control, NOT the routedByCheck-only "Minimum success tier"
+    // (minSuccessOutcomeId) control.
+    assert.equal(
+      target.querySelector('[data-recipe-field="minSuccessOutcomeId"]'),
+      null,
+      'routedByIngredients gets no minimum-success-tier control'
+    );
+    select.value = 'tier-hard';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(patches.at(-1), { checkTierId: 'tier-hard' }, 'selecting a tier stages checkTierId');
+    editHarness.remount();
+  });
+
   it('renders the identity inputs in Overview and no recipe-item card', async () => {
     const target = await editHarness.mount(identityProps());
     assert.ok(target.querySelector('[data-recipe-field="name"]'), 'name input renders');

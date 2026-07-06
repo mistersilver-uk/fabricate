@@ -160,6 +160,8 @@
   let checkRoutedBaseline = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
   // svelte-ignore state_referenced_locally
   let lastChecksSystemId = $viewState.selectedSystem?.id || '';
+  // svelte-ignore state_referenced_locally
+  let lastChecksResolutionMode = $viewState.selectedSystem?.resolutionMode || 'simple';
   let checkRoutedSaving = $state(false);
   const checkRoutedDirty = $derived(
     JSON.stringify(checkRoutedDraft) !== JSON.stringify(checkRoutedBaseline)
@@ -333,11 +335,17 @@
 
   // Which crafting check editor is active for the selected system, and whether it
   // has unsaved staged edits — drives the single top-right Save button.
+  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients`
+  // shares the simple pass/fail slot with `simple`/`alchemy`, so it routes dirty
+  // tracking + Save through the simple draft (`store.saveCraftingCheckSimple`) and its
+  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. The separate
+  // `recipeRouted` derivation (multi-set / route enablement) still covers both routed
+  // modes.
   const craftingCheckMode = $derived(
     (function _craftingCheckMode(resolution) {
-      if (recipeRouted) return 'routed';
+      if (resolution === 'routedByCheck') return 'routed';
       if (resolution === 'progressive') return 'progressive';
-      if (['simple', 'alchemy'].includes(resolution)) return 'simple';
+      if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
       return null;
     })(selectedSystem?.resolutionMode || 'simple')
   );
@@ -432,16 +440,30 @@
 
   // Reseed the routed + simple check drafts and baselines when the selected system
   // changes (not on every refresh of the same system, so a save never clobbers an
-  // open draft).
+  // open draft) OR when the SAME system's resolution mode changes. The latter is a
+  // data-loss guard: `CraftingSystemManager.updateSystem` moves the persisted
+  // crafting-check config across slots when a mode crosses the `routedByIngredients`
+  // boundary (routed↔simple), so the editor must re-read both crafting-check slots
+  // from the persisted system — otherwise a stale/empty draft would be Saved back and
+  // clobber the migrated config.
   $effect(() => {
-    if (selectedSystemId === lastChecksSystemId) return;
+    const resolutionMode = selectedSystem?.resolutionMode || 'simple';
+    const systemChanged = selectedSystemId !== lastChecksSystemId;
+    const resolutionModeChanged =
+      !systemChanged && resolutionMode !== lastChecksResolutionMode;
+    if (!systemChanged && !resolutionModeChanged) return;
     lastChecksSystemId = selectedSystemId;
+    lastChecksResolutionMode = resolutionMode;
     checkRoutedDraft = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
     checkRoutedBaseline = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
     checkSimpleDraft = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
     checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
     checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
     checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
+    // A same-system resolution-mode change never touches the salvage/gathering
+    // checks; only reseed those on a genuine system switch so an open salvage/
+    // gathering draft is not clobbered by a crafting-mode change.
+    if (!systemChanged) return;
     const nextSalvage = selectedSystem?.salvageCraftingCheck;
     salvageSimpleDraft = cloneSimpleCheck(nextSalvage?.simple);
     salvageSimpleBaseline = cloneSimpleCheck(nextSalvage?.simple);

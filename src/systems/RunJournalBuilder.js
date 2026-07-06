@@ -443,7 +443,8 @@ export class RunJournalBuilder {
   _checkConfigForMode(system, mode) {
     const check = system?.craftingCheck;
     if (mode === 'progressive') return check?.progressive;
-    if (mode === 'routedByIngredients' || mode === 'routedByCheck') return check?.routed;
+    if (mode === 'routedByCheck') return check?.routed;
+    // simple / alchemy / routedByIngredients all read the shared simple slot.
     return check?.simple;
   }
 

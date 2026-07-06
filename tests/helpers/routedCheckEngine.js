@@ -94,16 +94,39 @@ export function defaultRouted(overrides = {}) {
 export const ROUTED_ACTOR = { id: 'a1', name: 'Crafter', items: [] };
 
 /**
+ * Build a default simple (pass/fail) crafting-check config — the shared optional
+ * pass/fail slot that backs `simple`/`alchemy`/`routedByIngredients`. Pass
+ * `dc`/`thresholdMode`/`dcMode`/`macroUuid`/`tiers`/`checkBreakage` overrides as
+ * needed. Kept alongside {@link defaultRouted} so `routedByIngredients` suites can
+ * author the simple slot without re-stating the shape.
+ */
+export function defaultSimple(overrides = {}) {
+  return {
+    rollFormula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    dcMode: 'static',
+    macroUuid: null,
+    tiers: [],
+    checkBreakage: { triggers: [] },
+    ...overrides,
+  };
+}
+
+/**
  * Construct a `CraftingEngine` wired to a single routed system whose
- * `craftingCheck.routed` is the supplied config, and install the `game.fabricate`
- * manager/resolution-service stubs `_runCraftingCheck` reads. Returns
- * `{ engine, system }`.
+ * `craftingCheck.routed` (and optionally `craftingCheck.simple`) is the supplied
+ * config, and install the `game.fabricate` manager/resolution-service stubs
+ * `_runCraftingCheck` reads. Returns `{ engine, system }`.
  *
- * `craftingCheck` overrides merge into `{ enabled, routed }` so a test can add a
- * sibling `simple`/`progressive` block without re-stating the routed block.
+ * `simple` is an additive param: pass it to author the shared pass/fail slot (used by
+ * `routedByIngredients` suites, whose check now reads `craftingCheck.simple`). Both
+ * `routed` and `simple` can coexist so a test can prove which slot the engine reads.
+ * `craftingCheck` overrides merge last, over `{ enabled, routed, simple }`.
  */
 export function makeRoutedEngine({
   routed,
+  simple = undefined,
   // The routed crafting-check engine path is driven by the `routedByCheck` mode now
   // (the routing basis is a property of the mode, not a per-recipe provider). The
   // legacy `provider` param is retained for call-site compat but no longer read by
@@ -118,7 +141,12 @@ export function makeRoutedEngine({
     id: 'sys-1',
     resolutionMode,
     features,
-    craftingCheck: { enabled, routed, ...craftingCheck },
+    craftingCheck: {
+      enabled,
+      ...(routed === undefined ? {} : { routed }),
+      ...(simple === undefined ? {} : { simple }),
+      ...craftingCheck,
+    },
   };
   const systemManager = { getSystem: () => system };
   const resolutionService = {

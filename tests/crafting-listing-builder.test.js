@@ -376,15 +376,16 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(recipe.check.usable, false);
   });
 
-  it('routedByIngredients: an authored routed check reads as required (it is rolled and can fail)', () => {
+  it('routedByIngredients: an authored simple check reads as required (it is rolled and can fail)', () => {
     const system = makeSystem({
       resolutionMode: 'routedByIngredients',
-      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12 }, progressive: {} },
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 12 }, routed: {}, progressive: {} },
     });
     const { recipe } = buildOne({ system });
     assert.equal(recipe.check.usable, true);
-    assert.equal(recipe.check.mandatory, true, 'an active routed check is not optional');
+    assert.equal(recipe.check.mandatory, true, 'an active simple check is not optional');
     assert.equal(recipe.check.optional, false);
+    assert.equal(recipe.check.dc, 12, 'the pass/fail gate uses the simple DC');
   });
 
   it('routedByCheck + fixed: DC is nulled (tiers match by value range, not DC)', () => {
@@ -405,16 +406,7 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(recipe.check.dc, 12);
   });
 
-  it('routedByIngredients + fixed: DC is preserved (pass/fail gate still uses it)', () => {
-    const system = makeSystem({
-      resolutionMode: 'routedByIngredients',
-      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12, type: 'fixed' }, progressive: {} },
-    });
-    const { recipe } = buildOne({ system });
-    assert.equal(recipe.check.dc, 12);
-  });
-
-  it('routedByIngredients: no routed formula → optional (no check runs)', () => {
+  it('routedByIngredients: no simple formula → optional (no check runs)', () => {
     const system = makeSystem({
       resolutionMode: 'routedByIngredients',
       craftingCheck: { simple: {}, routed: {}, progressive: {} },
