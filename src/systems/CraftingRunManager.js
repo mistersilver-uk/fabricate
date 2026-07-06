@@ -238,11 +238,11 @@ export class CraftingRunManager {
    * @param {number} stepIndex
    * @param {{ selectedIngredientSetId?: string|null, currencySpends?: Array,
    *   resolvedEssences?: object, consumedSummary?: Array }} prepared
-   * @returns {Promise<object>} the run
+   * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
    */
   async markStepPrepared(actor, run, stepIndex, prepared = {}) {
     const step = run.steps?.[stepIndex];
-    if (!step) return run;
+    if (!step) return null;
     step.preparedConsumption = {
       selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
       currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],

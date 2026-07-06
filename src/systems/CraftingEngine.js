@@ -237,10 +237,11 @@ export class CraftingEngine {
           // Components were already consumed at START; the run legitimately stays
           // active while its gate matures — not a phantom.
           resolved = true;
+          const stepLabel = step.name || `Step ${stepIndex + 1}`;
           return {
             success: false,
             results: null,
-            message: `Step "${step.name || `Step ${stepIndex + 1}`}" is still in progress (${remaining}s remaining)`,
+            message: `Step "${stepLabel}" is still in progress (${remaining}s remaining)`,
           };
         }
         // FINISH: gate matured. Run the check and create results WITHOUT
@@ -845,12 +846,13 @@ export class CraftingEngine {
       0,
       Math.ceil(Number(gate?.availableAt || 0) - Number(game.time?.worldTime || 0))
     );
+    const stepLabel = step.name || `Step ${stepIndex + 1}`;
     return {
       resolved: true,
       result: {
         success: false,
         results: null,
-        message: `Step "${step.name || `Step ${stepIndex + 1}`}" is still in progress (${remaining}s remaining)`,
+        message: `Step "${stepLabel}" is still in progress (${remaining}s remaining)`,
       },
     };
   }
@@ -1114,6 +1116,7 @@ export class CraftingEngine {
       createdResults: resultItems,
     });
 
+    const stepLabel = step.name || `step ${stepIndex + 1}`;
     return {
       resolved: true,
       result: {
@@ -1122,7 +1125,7 @@ export class CraftingEngine {
         message:
           completedRun?.status === 'succeeded'
             ? `Successfully crafted ${recipe.name}`
-            : `Completed ${step.name || `step ${stepIndex + 1}`} for ${recipe.name}`,
+            : `Completed ${stepLabel} for ${recipe.name}`,
       },
     };
   }
@@ -1722,8 +1725,7 @@ export class CraftingEngine {
             ...checkResult,
             resolutionMeta: resolved?.meta || {},
           },
-          step,
-          precomputedEssences
+          { step, precomputedEssences }
         );
 
         if (resultItem) {
@@ -1749,8 +1751,7 @@ export class CraftingEngine {
     toolItems,
     recipe,
     checkResult = null,
-    step = null,
-    precomputedEssences = null
+    { step = null, precomputedEssences = null } = {}
   ) {
     // Get the source item
     let sourceItem;
@@ -3014,8 +3015,7 @@ export class CraftingEngine {
           consumedItems,
           toolValidation.tools,
           salvageRecipeView,
-          checkResult,
-          null
+          checkResult
         );
         if (created) resultItems.push(created);
       }
