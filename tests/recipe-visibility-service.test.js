@@ -1336,6 +1336,53 @@ test('511.P2.9 - regression: an uncapped drop still learns every matched recipe 
   assert.equal(service._getRecipeItemLearnCount(item), 0);
 });
 
+test('511.P2.10 - getLearnableRecipesFromItem uses the most permissive cap when two capped systems share one item', () => {
+  // A single physical document shares ONE learn-count; when two capped systems
+  // link it with different caps, the most-permissive cap governs the budget.
+  const systemA = buildCappedSystem({ id: 'sys-a', maxRecipes: 2, sourceItemUuid: 'shared-source' });
+  const systemB = buildCappedSystem({ id: 'sys-b', maxRecipes: 5, sourceItemUuid: 'shared-source' });
+  const recipes = [
+    buildCappedRecipe({ id: 'a-1', craftingSystemId: 'sys-a' }),
+    buildCappedRecipe({ id: 'b-1', craftingSystemId: 'sys-b' })
+  ];
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'shared-source' });
+  const actor = new FakeActor({ id: 'actor-1', items: [item] });
+  const service = buildService({ systems: { 'sys-a': systemA, 'sys-b': systemB }, recipes });
+
+  const state = service.getLearnableRecipesFromItem({ ownedItem: item, actor });
+
+  assert.equal(state.maxRecipes, 5);
+  assert.equal(state.remainingBudget, 5);
+  assert.deepEqual(state.recipes.map(r => r.id).sort(), ['a-1', 'b-1']);
+});
+
+test('511.P2.11 - a limitRecipes system with an invalid maxRecipes fails closed to the uncapped learn path (not bricked)', async () => {
+  // limitRecipes is ON but maxRecipes is missing — the recipe must stay learnable
+  // via the normal (unlimited) path rather than yielding a permanent 0 budget.
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false, dragDropEnabled: true, limitRecipes: true }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+  });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'actor-1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  // Not routed to the capped picker (no effective cap)...
+  assert.deepEqual(service.getLearnableRecipesFromItem({ ownedItem: item, actor }).recipes, []);
+  // ...but still learnable through the normal unlimited drop path.
+  const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+  assert.deepEqual(result.learnedRecipes.map(r => r.id), ['r-a']);
+  assert.equal(service._getRecipeItemLearnCount(item), 0);
+});
+
 test('511.P2.E2E - full flow: capped drop suppressed, pick K, refuse (K+1), destroy-when-spent', async () => {
   const cappedSystem = buildCappedSystem({ id: 'capped-system', maxRecipes: 2, destroyWhenSpent: true, sourceItemUuid: 'shared-source' });
   const uncappedSystem = buildMockSystem({

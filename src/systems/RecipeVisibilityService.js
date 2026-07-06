@@ -536,12 +536,14 @@ export class RecipeVisibilityService {
     };
   }
 
-  // Whether a recipe's crafting system caps how many recipes may be learned from
-  // one recipe item (issue 511).
+  // Whether a recipe's crafting system has an EFFECTIVE learn cap (issue 511):
+  // `limitRecipes === true` AND a finite positive `maxRecipes`. A system that
+  // toggled `limitRecipes` on but carries an invalid/missing `maxRecipes` is
+  // NOT treated as capped — it fails closed to the uncapped/unlimited learn path
+  // (mirroring how `_filterNonExhausted` treats an invalid `maxUses` as
+  // unlimited) rather than bricking its linked recipes with a zero budget.
   _isRecipeItemLearnCapped(recipe) {
-    const system = this._getCraftingSystem(recipe);
-    const knowledge = this._getKnowledgeConfig(system);
-    return knowledge?.learn?.limitRecipes === true;
+    return Number.isFinite(this._getLearnCapForRecipe(recipe));
   }
 
   // The finite positive learn cap for a capped recipe, or undefined.
@@ -569,7 +571,9 @@ export class RecipeVisibilityService {
     const knowledge = this._getKnowledgeConfig(system);
     if (!['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned')) return false;
 
-    const capped = knowledge?.learn?.limitRecipes === true;
+    // Effective cap only — a `limitRecipes` system with an invalid `maxRecipes`
+    // behaves as uncapped here (fails closed to the normal learn path).
+    const capped = this._isRecipeItemLearnCapped(recipe);
     const dragDropEnabled = knowledge?.learn?.dragDropEnabled !== false;
 
     if (mode === 'manual') {
