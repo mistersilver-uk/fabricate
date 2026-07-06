@@ -69,10 +69,6 @@
     return (recipes || []).filter((recipe) => String(recipe?.recipeItemId || '') === id);
   }
 
-  const totalLinkedRecipes = $derived(
-    (recipes || []).filter((recipe) => String(recipe?.recipeItemId || '') !== '').length
-  );
-
   function setLimitUses(next) {
     if (next) {
       onSaveVisibilityConfig({ limitUses: true, maxUses: Math.max(1, maxUses) });
@@ -234,10 +230,13 @@
       <div class="manager-books-scrolls-list" role="list">
         {#each recipeItems as item (item.id)}
           {@const linked = linkedRecipes(item)}
+          <!-- The listitem role lives on a plain wrapper div (codebase convention);
+               the interactive card stays a native <button aria-pressed>, so screen
+               readers announce a pressable control with its selected state. -->
+          <div class="manager-books-scrolls-listitem" role="listitem">
           <button
             type="button"
             class={`manager-inspector-card manager-books-scrolls-card ${selectedRecipeItemId === item.id ? 'is-selected' : ''}`}
-            role="listitem"
             aria-pressed={selectedRecipeItemId === item.id}
             data-books-scrolls-item={item.id}
             onclick={() => onSelectRecipeItem(item.id)}
@@ -287,6 +286,7 @@
               <span class="manager-muted manager-books-scrolls-unlinked">{text('FABRICATE.Admin.Manager.BooksScrolls.NoLinkedRecipes', 'No recipes link to this item yet.')}</span>
             {/if}
           </button>
+          </div>
         {/each}
       </div>
     {/if}

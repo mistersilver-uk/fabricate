@@ -4336,9 +4336,9 @@
                   {#each craftingNavItems as craftingItem (craftingItem.id)}
                     <button
                       type="button"
-                      class={`manager-nav-subitem ${activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
+                      class={`manager-nav-subitem ${isCraftingRoute && activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
                       id={`manager-crafting-nav-${craftingItem.id}`}
-                      aria-current={activeCraftingTab === craftingItem.id ? 'page' : undefined}
+                      aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id ? 'page' : undefined}
                       onclick={() => openCraftingSection(craftingItem.id)}
                     >
                       <i class={craftingItem.icon} aria-hidden="true"></i>

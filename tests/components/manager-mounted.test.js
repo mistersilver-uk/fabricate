@@ -6035,6 +6035,37 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
   });
 
+  it('does not mark a Crafting subitem active while the group is expanded over a non-crafting route', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    // On Components (a non-crafting route), manually expand the collapsed Crafting
+    // group via its toggle.
+    navButton('Components').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
+    target.querySelector('#manager-nav-crafting + .manager-nav-toggle').click();
+    await tick();
+    flushSync();
+
+    // The submenu is shown, but no subitem falsely reports the active/current page
+    // (the state is guarded by isCraftingRoute, mirroring the Gathering group).
+    assert.ok(target.querySelector('#manager-crafting-submenu'), 'submenu expands from a non-crafting route');
+    assert.equal(craftingSubitem('Recipes').getAttribute('aria-current'), null);
+    assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), false);
+    assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), null);
+    assert.equal(craftingSubitem('Books & Scrolls').getAttribute('aria-current'), null);
+  });
+
   // Navigate the mounted manager to the Books & Scrolls surface via the Crafting
   // group and return the surface root for querying.
   async function openBooksScrolls(calls, storeOptions = {}) {
