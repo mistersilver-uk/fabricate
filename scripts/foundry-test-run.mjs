@@ -186,6 +186,29 @@ async function handleRollPromptIfPresent(page, label) {
 }
 
 /**
+ * A UI-triggered craft now opens a confirmation dialog before dispatch (issue
+ * 61). When present, capture it for screenshot evidence and click Confirm so the
+ * craft proceeds and the run summary resolves. Returns false (no-op) when the
+ * dialog is absent — e.g. a future skip-confirmation preference, or a
+ * non-craftable recipe that never reached dispatch.
+ */
+async function handleCraftConfirmIfPresent(page, label) {
+  const dialog = page
+    .locator('.application.dialog:has([data-confirm-section]), .dialog:has([data-confirm-section])')
+    .first();
+  try {
+    await dialog.waitFor({ state: 'visible', timeout: 2500 });
+  } catch {
+    return false;
+  }
+  await screenshot(page, label);
+  const confirmBtn = dialog.locator('button[data-action="yes"]').first();
+  await confirmBtn.click().catch(() => {});
+  await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  return true;
+}
+
+/**
  * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme
  * setting's onChange (applyFabricateTheme) does: set the theme attribute on the
  * document element and every `.fabricate` root. This re-themes the real app via
@@ -4397,7 +4420,10 @@ async function main() {
           const craftButton = appShell.locator('[data-crafting-craft][data-crafting-craft-disabled="false"]').first();
           if (await craftButton.count() > 0) {
             await craftButton.click().catch(() => {});
-            // A UI craft now opens the interactive roll prompt: capture it, then
+            // A UI craft first opens the craft confirmation dialog (issue 61):
+            // capture it, then click Confirm so the craft dispatches.
+            await handleCraftConfirmIfPresent(page, 'player-crafting-confirm');
+            // The craft then opens the interactive roll prompt: capture it, then
             // click Roll so the run summary resolves and the overlay clears.
             await handleRollPromptIfPresent(page, 'player-crafting-roll-prompt');
             await appShell.locator('[data-crafting-run-summary]').first()
