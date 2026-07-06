@@ -677,8 +677,8 @@ describe('CraftingSystemManager source contract', () => {
       'root should derive selected-system placeholder nav from selection and feature gates'
     );
     assert.ok(rootSource.includes('recipesRouteEnabled'), 'root should derive the recipes route from the experimental feature gate');
-    assert.ok(rootSource.includes("(view === 'recipes' || view === 'recipe-edit') && !recipesAvailable"), 'route normalization should reject recipes (and the recipe-edit subroute) while the experimental gate is disabled');
-    assert.ok(rootSource.includes("if (view === 'recipes' && !recipesRouteEnabled) return;"), 'setView should refuse direct recipes navigation while disabled');
+    assert.ok(rootSource.includes("(view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings') && !recipesAvailable"), 'route normalization should reject recipes (and the recipe-edit subroute) while the experimental gate is disabled');
+    assert.ok(rootSource.includes("if ((view === 'recipes' || view === 'crafting-settings') && !recipesRouteEnabled) return;"), 'setView should refuse direct recipes/crafting navigation while disabled');
     assert.ok(rootSource.includes("{#if recipesRouteEnabled}"), 'recipes should not be hard-wired as an always-active rail route');
     assert.ok(
       rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),

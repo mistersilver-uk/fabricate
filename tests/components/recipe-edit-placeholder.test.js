@@ -102,20 +102,27 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     assert.ok(rootSource.includes('onEditRecipe={(id) => editRecipe(id)}'), 'RecipesBrowserView should receive onEditRecipe');
   });
 
-  it('keeps the Recipes nav active on the recipe-edit subroute', () => {
+  it('keeps the Crafting nav group active on the recipe-edit subroute', () => {
+    // Recipes now nests inside the gated Crafting nav group (issue 511); the
+    // parent tracks any crafting child route and recipe-edit maps to the Recipes
+    // sub-item via the activeCraftingTab default branch.
     assert.ok(
-      rootSource.includes("currentView === 'recipes' || currentView === 'recipe-edit' ? 'is-active'"),
-      'nav is-active expression should include recipe-edit'
+      rootSource.includes("|| currentView === 'recipe-edit'"),
+      'isCraftingRoute should include recipe-edit'
     );
     assert.ok(
-      rootSource.includes("currentView === 'recipes' || currentView === 'recipe-edit' ? 'page'"),
-      'nav aria-current expression should include recipe-edit'
+      rootSource.includes("aria-current={isCraftingRoute ? 'page' : undefined}"),
+      'crafting parent aria-current should track isCraftingRoute'
+    );
+    assert.ok(
+      rootSource.includes("currentView === 'crafting-settings' ? 'settings' : 'recipes'"),
+      'activeCraftingTab should map recipe-edit (default) to the recipes sub-item'
     );
   });
 
   it('redirects recipe-edit like recipes (fallback to system-edit) in normalizedActiveView', () => {
     assert.ok(
-      rootSource.includes("if ((view === 'recipes' || view === 'recipe-edit') && !recipesAvailable) return 'system-edit'"),
+      rootSource.includes("if ((view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings') && !recipesAvailable) return 'system-edit'"),
       'normalizedActiveView should treat recipe-edit like recipes and fall back to system-edit'
     );
   });

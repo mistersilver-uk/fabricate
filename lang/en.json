@@ -1286,6 +1286,10 @@
           "SystemsShort": "Systems",
           "Components": "Components",
           "Recipes": "Recipes",
+          "Crafting": "Crafting",
+          "ExpandCrafting": "Expand crafting menu",
+          "CollapseCrafting": "Collapse crafting menu",
+          "BooksScrolls": "Books & Scrolls",
           "Environments": "Gathering",
           "ExpandGathering": "Expand gathering menu",
           "CollapseGathering": "Collapse gathering menu",
@@ -1297,6 +1301,18 @@
           "Checks": "Checks",
           "Rules": "Rules",
           "Graph": "Graph"
+        },
+        "Crafting": {
+          "CraftingTabs": {
+            "Label": "Crafting sections",
+            "Settings": "Settings",
+            "Recipes": "Recipes",
+            "BooksScrolls": "Books & Scrolls",
+            "SettingsPlaceholderTitle": "Crafting settings",
+            "SettingsPlaceholderHint": "Recipe visibility is configured on the System Overview page. This section is reserved for future system-level crafting rules.",
+            "SettingsLinks": "Crafting settings links",
+            "OpenSystemOverview": "Open System Overview"
+          }
         },
         "Recipe": {
           "Kicker": "Recipes View",

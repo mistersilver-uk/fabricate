@@ -234,6 +234,19 @@ function gatheringToggle() {
   return target.querySelector('.manager-nav-toggle');
 }
 
+// The gated Crafting nav group (issue 511) nests Recipes as a sub-route. Clicking
+// the "Crafting" parent from a non-crafting route routes straight to Recipes and
+// expands the group; the parent also carries the recipes count badge.
+function craftingParent() {
+  return navButton('Crafting');
+}
+
+function craftingSubitem(labelText) {
+  return Array.from(target.querySelectorAll('#manager-crafting-submenu .manager-nav-subitem')).find(
+    (button) => button.textContent.includes(labelText)
+  );
+}
+
 // Mount the manager, route to Recipes, and open the recipe-edit route for r1.
 // Assigns the module-level `mounted`/`target` (so afterEach can clean up) and
 // returns the mounted target for the caller to query.
@@ -248,7 +261,7 @@ async function openRecipeEditor(calls, storeOptions = {}) {
     },
   });
   flushSync();
-  navButton('Recipes').click();
+  craftingParent().click();
   await tick();
   flushSync();
   target.querySelector('[data-recipe-id="r1"] .manager-icon-button').click();
@@ -3837,7 +3850,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    const recipesNav = navButton('Recipes');
+    const recipesNav = craftingParent();
     assert.equal(recipesNav.disabled, false);
     assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '2');
     for (const label of ['Graph']) {
@@ -3846,7 +3859,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
     }
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
@@ -3910,7 +3923,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         'System Overview',
-        'Recipes',
+        'Crafting',
         'Components',
         'Tags & Categories',
         'Essences',
@@ -3938,7 +3951,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -4142,7 +4155,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -4183,7 +4196,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -5704,7 +5717,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -5742,7 +5755,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     for (let i = 0; i < 6; i++) await Promise.resolve();
     await tick();
     flushSync();
@@ -5787,7 +5800,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await Promise.resolve();
     await Promise.resolve();
     await tick();
@@ -5903,6 +5916,96 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Air');
     assert.ok(target.textContent.includes('Save failed.'));
+  });
+
+  it('renders the gated Crafting nav group only when experimental features are on', async () => {
+    // Experimental OFF: no Crafting group; Recipes shows as a disabled placeholder.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { experimentalFeaturesEnabled: false }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    assert.equal(target.querySelector('#manager-nav-crafting'), null, 'Crafting group hidden when experimental off');
+    assert.equal(Boolean(craftingParent()), false, 'no Crafting parent button when experimental off');
+  });
+
+  it('exposes the Crafting group with Gathering-parity a11y and nested Settings + Recipes', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    // Collapsed by default: parent present, submenu absent.
+    const parent = target.querySelector('#manager-nav-crafting');
+    assert.ok(parent, 'Crafting parent renders when experimental on');
+    assert.equal(parent.getAttribute('aria-expanded'), 'false');
+    assert.equal(parent.querySelector('.manager-nav-count').textContent.trim(), '2');
+    const toggle = target.querySelector('#manager-nav-crafting + .manager-nav-toggle');
+    assert.equal(toggle.getAttribute('aria-controls'), 'manager-crafting-submenu');
+    assert.equal(toggle.getAttribute('aria-label'), 'Expand crafting menu');
+    assert.equal(target.querySelector('#manager-crafting-submenu'), null);
+
+    // Clicking the parent routes to Recipes and expands the submenu.
+    parent.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.equal(parent.getAttribute('aria-expanded'), 'true');
+    const submenu = target.querySelector('#manager-crafting-submenu');
+    assert.ok(submenu, 'crafting submenu renders when expanded');
+    assert.equal(
+      target.querySelector('#manager-nav-crafting + .manager-nav-toggle').getAttribute('aria-label'),
+      'Collapse crafting menu'
+    );
+    const craftingItems = Array.from(submenu.querySelectorAll('.manager-nav-subitem'));
+    assert.deepEqual(
+      craftingItems.map((item) => item.querySelector('.manager-nav-label')?.textContent.trim()),
+      ['Settings', 'Recipes']
+    );
+    assert.deepEqual(
+      craftingItems.map((item) => item.id),
+      ['manager-crafting-nav-settings', 'manager-crafting-nav-recipes']
+    );
+    assert.equal(craftingSubitem('Recipes').getAttribute('aria-current'), 'page');
+    assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), true);
+    assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), null);
+
+    // Settings routes to the placeholder that cross-references System Overview.
+    craftingSubitem('Settings').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'crafting-settings');
+    assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-crafting-settings-placeholder]'), 'settings placeholder renders');
+    assert.ok(
+      target.textContent.includes('Recipe visibility is configured on the System Overview page'),
+      'settings placeholder cross-references System Overview'
+    );
+    assert.ok(
+      target.querySelector('[data-crafting-settings-open-overview]'),
+      'settings placeholder offers an Open System Overview action'
+    );
+    // The inspector aside is suppressed on the placeholder route.
+    assert.equal(target.querySelector('.manager-inspector'), null);
+
+    // Recipes sub-item routes back to the recipes browser.
+    craftingSubitem('Recipes').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
   });
 
   it('routes to the environments browser and opens the forced v2 editor route', async () => {
@@ -9027,7 +9130,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    const recipesNav = navButton('Recipes');
+    const recipesNav = craftingParent();
     assert.equal(recipesNav.disabled, false);
     assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
     for (const label of ['Graph']) {
@@ -9036,7 +9139,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
     }
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -9079,7 +9182,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
