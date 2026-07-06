@@ -1,4 +1,8 @@
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  getFabricateFlag,
+  setFabricateFlag,
+  deleteRemovedActiveRunFlags,
+} from '../config/flags.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -79,43 +83,10 @@ export class CraftingRunManager {
 
   async _persist(actor, container) {
     this._cache.set(actor.id, container);
-    await this._deleteRemovedActiveRuns(actor, container);
+    // setFlag's recursive merge can't delete removed `active` keys; do it explicitly
+    // so completed/discarded runs don't resurrect on reload (see the shared helper).
+    await deleteRemovedActiveRunFlags(actor, 'craftingRuns', container);
     await setFabricateFlag(actor, 'craftingRuns', container);
-  }
-
-  /**
-   * `setFabricateFlag` writes through `setFlag`, whose recursive merge NEVER
-   * removes keys that were deleted from `active`. Left unaddressed, a completed or
-   * discarded run lingers in the persisted `active` map forever, resurfaces on
-   * reload, and can be re-finished (double-archiving to history and crashing the
-   * Journal's keyed each). Explicitly delete the removed active keys with
-   * Foundry's `-=` syntax before the merge write, mirroring the gathering flag.
-   *
-   * The stored path is `flags.fabricate.fabricate.craftingRuns` — `setFabricateFlag`
-   * normalizes the key to `fabricate.craftingRuns`, which `expandObject` nests
-   * under the `fabricate` scope.
-   * @private
-   */
-  async _deleteRemovedActiveRuns(actor, container) {
-    if (typeof actor.update !== 'function') return;
-    const stored = getFabricateFlag(actor, 'craftingRuns', null);
-    const storedActive =
-      stored?.active && typeof stored.active === 'object' && !Array.isArray(stored.active)
-        ? stored.active
-        : {};
-    const nextActive =
-      container?.active && typeof container.active === 'object' && !Array.isArray(container.active)
-        ? container.active
-        : {};
-    const updates = {};
-    for (const runId of Object.keys(storedActive)) {
-      if (!(runId in nextActive)) {
-        updates[`flags.fabricate.fabricate.craftingRuns.active.-=${runId}`] = null;
-      }
-    }
-    if (Object.keys(updates).length > 0) {
-      await actor.update(updates);
-    }
   }
 
   invalidateCache(actorId = null) {
