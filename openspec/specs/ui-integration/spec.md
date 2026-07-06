@@ -225,6 +225,9 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
 - Progressive settings (`awardMode`, `allowPlayerReorder`) (progressive only)
 
+For a `routedByCheck` system whose routed check `type` is `fixed`, the Checks editor hides the DC field and the meet/exceed comparison, because fixed tiers match by explicit value range rather than against a DC.
+The DC and comparison stay shown for relative-type routed checks, for `routedByIngredients` (whose pass/fail gate uses the DC), and for the salvage check editor.
+
 Mode semantics are defined in `004`.
 
 ##### Check Tool-Breakage Controls
@@ -657,6 +660,10 @@ The Locked toggle, Category, the Step Structure UI, and the Step Editor remain d
 - Locked toggle — deferred
 
 In Manager, the recipe-edit identity card additionally edits a player-facing image (via the FilePicker) and an `enabled` on/off toggle alongside Name and Description.
+
+The Overview tab additionally offers an optional **Minimum success tier** dropdown, shown only when the selected system runs a `routedByCheck` check whose routed `type` is `fixed`.
+Its options are that fixed check's success outcome tiers ranked ascending by `start`, preceded by a default `No override (use rolled tier)` entry, and it authors the recipe's `minSuccessOutcomeId`.
+Selecting a tier makes a craft that rolls below it fail outright (see `004`); the control is hidden for relative-type checks and for non-`routedByCheck` systems.
 
 ### Visibility Form
 

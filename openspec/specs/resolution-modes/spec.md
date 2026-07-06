@@ -127,6 +127,17 @@ The outcome is produced by the system's configured routed crafting check, whose 
 - `outcome` is trim-normalized and case-insensitive.
 - **Relative tier clamp:** when the routed check uses **relative** outcome tiers and the rolled total meets no tier's effective threshold (`baseDc + outcome.dc`), the outcome is the lowest (closest) tier rather than an empty/null outcome, so a recipe tier or dynamic DC that raises the base difficulty never yields a rolled-but-unrouted craft.
 The clamp is relative-only; **fixed** tiers keep the "outside every range → no outcome" behaviour (their ranges are authored explicitly).
+- **Fixed tiers carry no DC.**
+Fixed outcome tiers own explicit, non-overlapping `[start, end]` value ranges and the roll total is matched by range, so the check DC and the meet/exceed `thresholdMode` comparison are unused in fixed mode — DC and the comparison are relative-only.
+The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it) and relative-type routed checks; only `routedByCheck` with `type: "fixed"` drops it.
+- **Per-recipe minimum success tier (fixed only).**
+A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value.
+When set, a craft whose naturally-rolled tier ranks below the required tier fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
+The default (null/unset) imposes no override, so the outcome is the tier actually rolled.
+A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
+A stale or unknown `minSuccessOutcomeId` no-ops.
+The gate is fixed-type only; relative-type routed checks ignore it.
+It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected — only the crafting `routedByCheck` caller threads the recipe's minimum.
 - **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
 Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.

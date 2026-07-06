@@ -45,9 +45,16 @@ A crafting check is **required** in this mode.
 
 The check rolls the routed crafting check you configured on the system, then maps the roll to one of the named outcome tiers you defined there.
 The matched tier's name is the outcome that selects the result.
-The base difficulty comes from the recipe's selected tier, or from a dynamic difficulty if you set one up, the same way a simple check resolves its difficulty.
+How the roll maps to a tier depends on whether the check's tiers are relative or fixed.
+See [Relative and fixed tiers]({% link crafting-checks.md %}#relative-and-fixed-tiers) for the difference.
+
+With relative tiers, the base difficulty comes from the recipe's selected tier, or from a dynamic difficulty if you set one up, the same way a simple check resolves its difficulty.
 A recipe tier or dynamic difficulty shifts every outcome threshold up or down together.
 A roll that falls below every tier still lands your lowest tier, so raising the difficulty never leaves a craft with no outcome at all.
+
+With fixed tiers, each tier owns a fixed segment of the roll value range and the roll is matched by range.
+A fixed check has no DC, so the recipe tier and dynamic difficulty do not change it.
+A recipe can still carry its own difficulty on a fixed check by requiring a minimum success tier, described below.
 
 Use this when the quality of the result should depend on a roll.
 For example, a forging recipe might give a Masterwork Longsword on a great roll, a plain Longsword on an average one, and a Bent Blade on a poor one.
@@ -86,6 +93,24 @@ A craft that succeeds in this case never reports a setup problem, and the recipe
 
 In a multi-step recipe, each step is checked on its own.
 A step with a single result group uses the no-mapping rule, while a step with several result groups needs each success outcome routed to a result.
+
+### Minimum success tier for fixed routed checks
+
+Fixed outcome tiers are shared by every recipe in the system.
+A recipe can raise its own difficulty on top of that shared check by requiring a minimum success tier.
+
+Set it with the **Minimum success tier** dropdown on the recipe editor's Overview tab.
+The dropdown appears only when the system uses a Routed by check crafting check with fixed tiers.
+It lists the check's success tiers from lowest to highest, and it defaults to **No override (use rolled tier)**.
+
+While the default is selected, the recipe uses whichever tier the roll lands in, the same as any other recipe.
+When you pick a minimum tier, a roll that lands below it fails the craft outright.
+The craft takes its normal failure path, so ingredients are consumed and no result is produced, exactly as a failed check would.
+A roll that lands on the chosen tier or higher produces its result as usual.
+
+This lets recipes that share one fixed check carry different difficulty.
+An easy recipe can leave the override off, while a demanding one can require a higher tier before it succeeds.
+The setting has no effect on relative checks or in Routed by ingredients mode, which is why the control is hidden there.
 
 ---
 

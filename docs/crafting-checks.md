@@ -51,10 +51,28 @@ See [Routed Modes]({% link recipes/routed.md %}) for how that outcome is matched
 In Routed by ingredients mode the same outcome tiers can be configured, but the outcome never selects the result.
 The ingredients used select the result instead, and the check is optional.
 
+### Relative and fixed tiers
+
+A routed check's outcome tiers are authored as either **Relative** or **Fixed**, chosen with the **Tier type** control in the check editor.
+The two types map the roll to an outcome in different ways.
+
+**Relative** tiers are positioned against a DC.
+Each tier threshold is expressed relative to the recipe's difficulty, for example DC -5 or DC +10.
 The base difficulty comes from the recipe's selected tier, or from a dynamic difficulty macro when you set one up.
 This is the same difficulty source a simple check uses.
-When the tiers are relative, the recipe tier or dynamic difficulty shifts every tier threshold together, so a harder recipe makes every outcome harder to reach.
+The recipe tier or dynamic difficulty shifts every tier threshold together, so a harder recipe makes every outcome harder to reach.
 A roll that falls below every relative tier still maps to the lowest tier, so a higher difficulty never produces a craft with no outcome.
+The check editor shows the **DC** and the meet-or-exceed comparison for relative tiers, because both take part in matching.
+
+**Fixed** tiers own non-overlapping segments of the roll value range instead.
+Each tier covers a fixed span of possible roll totals, and the roll is matched to whichever tier's range contains its total.
+A fixed check has no DC, so the recipe tier and dynamic difficulty do not move its thresholds.
+The check editor hides the **DC** and the meet-or-exceed comparison when a Routed by check system uses fixed tiers, because a DC is meaningless in that mode.
+The player's check card and the interactive roll prompt likewise drop the DC chip for a fixed routed check.
+
+Fixed tiers are shared across every recipe in the system.
+A recipe can still carry its own difficulty on top of a fixed check by setting a minimum success tier.
+See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
 
 Developers configuring a custom check for a non-D&D-5e system should refer to the API reference for the expected setup.
 

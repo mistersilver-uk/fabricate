@@ -569,6 +569,13 @@ Recipe = {
     provider: "ingredientSet" | "check",
   },
 
+  // Optional minimum success tier for a fixed-type routed check: the id of a fixed
+  // success outcome tier. When set, a craft whose rolled tier ranks below it (fixed
+  // tiers rank by `start`) fails outright. Null/unset = no override (outcome = the
+  // rolled tier). Meaningful only for routedByCheck with a fixed-type check; ignored
+  // otherwise. Semantics in 004.
+  minSuccessOutcomeId?: string | null,
+
   visibility?: {
     restricted: boolean,
     allowedUserIds?: string[],  // Required when restricted is true. Empty array = hidden from all non-GM users.
@@ -614,6 +621,9 @@ An empty array is valid and means no non-GM user may see the recipe.
 10. If knowledge mode includes item matching or learning, `recipeItemId` should be configured for player craftability.
 11. If `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
 12. If `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
+13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `004`); it defaults to `null`.
+It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
+An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
 
 ### Validation Guidance
 
