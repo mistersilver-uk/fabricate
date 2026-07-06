@@ -37,6 +37,7 @@
     essenceOptions = [],
     itemTags = [],
     checkTierOptions = [],
+    minSuccessTierOptions = [],
     // Result routing (routed systems): the per-recipe routing mode (provider) and
     // the system's routed-check outcome tiers {id,name} for the result-set
     // assignment controls.
@@ -234,6 +235,7 @@
             onChooseImage={chooseImage}
             {isMultiStep}
             {checkTierOptions}
+            {minSuccessTierOptions}
             {playerListMode}
             {worldUsers}
             {onUpdateRecipe}

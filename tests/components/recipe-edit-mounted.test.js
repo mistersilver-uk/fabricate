@@ -334,6 +334,37 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('threads the "Minimum success tier" dropdown through RecipeEditView to the Overview tab', async () => {
+    // Regression: the root derives minSuccessTierOptions for a routedByCheck+fixed
+    // system, but RecipeEditView must FORWARD them to RecipeOverviewTab. When the
+    // wrapper silently dropped the prop, the control never rendered even with the
+    // check saved — this mounts through the wrapper so a missing forward fails here.
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        onUpdateRecipe: (patch) => patches.push(patch),
+        minSuccessTierOptions: [
+          { id: 'tier-b', name: 'b', start: 2 },
+          { id: 'tier-c', name: 'c', start: 3 },
+        ],
+      })
+    );
+    const field = target.querySelector('[data-recipe-min-success-tier]');
+    assert.ok(field, 'the Minimum success tier dropdown renders when the wrapper forwards the options');
+    const select = field.querySelector('[data-recipe-field="minSuccessOutcomeId"]');
+    const values = [...select.querySelectorAll('option')].map((o) => o.value);
+    assert.deepEqual(values, ['', 'tier-b', 'tier-c'], 'default option + the two success tiers');
+    select.value = 'tier-c';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1),
+      { minSuccessOutcomeId: 'tier-c' },
+      'selecting a tier stages minSuccessOutcomeId'
+    );
+    editHarness.remount();
+  });
+
   it('renders the identity inputs in Overview and no recipe-item card', async () => {
     const target = await editHarness.mount(identityProps());
     assert.ok(target.querySelector('[data-recipe-field="name"]'), 'name input renders');
