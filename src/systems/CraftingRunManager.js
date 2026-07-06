@@ -20,6 +20,18 @@ export class CraftingRunManager {
     return Number(game.time?.worldTime || 0);
   }
 
+  /**
+   * Public accessor for the number of seconds a step's `timeRequirement`
+   * resolves to. The crafting engine uses this to decide whether a step is
+   * genuinely time-gated (> 0 seconds) BEFORE arming a gate, so it can consume
+   * components at START rather than at FINISH.
+   * @param {object|null} timeRequirement
+   * @returns {number} seconds (0 for an empty / instant requirement)
+   */
+  durationToSeconds(timeRequirement = null) {
+    return this._durationToSeconds(timeRequirement);
+  }
+
   _durationToSeconds(timeRequirement = null) {
     if (!timeRequirement || typeof timeRequirement !== 'object') return 0;
     const minutes = Number(timeRequirement.minutes || 0);
@@ -50,6 +62,12 @@ export class CraftingRunManager {
       updatedAt: this._nowWorldTime(),
       completedAt: undefined,
       timeGate: undefined,
+      // preparedConsumption: the START-phase snapshot for a time-gated step whose
+      // components (and currency) are consumed when the gate is ARMED. Populated
+      // by markStepPrepared; read by the engine at FINISH so the resume can
+      // transfer essences and build results/chat/history without re-reading the
+      // (now-deleted) source items. Undefined for non-timed / instant steps.
+      preparedConsumption: undefined,
       selectedIngredientSetId: undefined,
       lastCheckResult: undefined,
       consumedIngredients: [],
@@ -166,6 +184,40 @@ export class CraftingRunManager {
     run.status = 'waitingTime';
     step.status = 'waitingTime';
     step.updatedAt = worldTime;
+    await this.updateRun(actor, run);
+    return run;
+  }
+
+  /**
+   * Persist the START-phase consumption snapshot for a time-gated step.
+   *
+   * A step whose time requirement resolves to > 0 seconds consumes its
+   * components (and currency) when its gate is ARMED, then resumes at maturity to
+   * run the crafting check and create results. This stores what was consumed so
+   * the resume can transfer essences and build the result / chat / history entry
+   * without re-reading the source items (which are already deleted).
+   *
+   * @param {Actor} actor
+   * @param {object} run
+   * @param {number} stepIndex
+   * @param {{ selectedIngredientSetId?: string|null, currencySpends?: Array,
+   *   resolvedEssences?: object, consumedSummary?: Array }} prepared
+   * @returns {Promise<object>} the run
+   */
+  async markStepPrepared(actor, run, stepIndex, prepared = {}) {
+    const step = run.steps?.[stepIndex];
+    if (!step) return run;
+    step.preparedConsumption = {
+      selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
+      currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],
+      resolvedEssences:
+        prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
+          ? prepared.resolvedEssences
+          : {},
+      consumedSummary: Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [],
+    };
+    step.selectedIngredientSetId = prepared.selectedIngredientSetId ?? step.selectedIngredientSetId;
+    step.updatedAt = this._nowWorldTime();
     await this.updateRun(actor, run);
     return run;
   }
