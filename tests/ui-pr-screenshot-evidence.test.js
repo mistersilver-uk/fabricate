@@ -120,6 +120,21 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[0].smokeLabels, ['player-inventory']);
   });
 
+  it('maps the #492 import-report render files to the manager-import-report recipe', () => {
+    for (const file of [
+      'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+      'src/systems/importReportContent.js',
+    ]) {
+      const views = mapChangedFilesToViews([file]);
+      assert.ok(
+        views.some(view => view.id === 'manager-import-report'),
+        `${file} should map to the manager-import-report recipe`,
+      );
+    }
+    const view = VIEW_RECIPES.find(recipe => recipe.id === 'manager-import-report');
+    assert.deepEqual(view.smokeLabels, ['manager-import-report']);
+  });
+
   it('maps a recipe editor file to all five recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',
