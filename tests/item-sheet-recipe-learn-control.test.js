@@ -15,6 +15,7 @@ const {
   buildConfirmContent,
   buildV1HeaderButton,
   buildV2HeaderControl,
+  getCappedLearnState,
   getManualPreview,
   registerItemSheetRecipeLearnControl
 } = await import('../src/ui/ItemSheetRecipeLearnControl.js');
@@ -364,6 +365,112 @@ describe('ItemSheetRecipeLearnControl', () => {
 
     assert.equal(result, false);
     assert.equal(actor.getFlag('fabricate', 'fabricate.learnedRecipes'), undefined);
+  });
+
+  function buildCappedSystem({ id = 'system-1', maxRecipes = 2, destroyWhenSpent = false, dragDropEnabled = true } = {}) {
+    return {
+      id,
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'learned',
+          item: { limitUses: false },
+          learn: { consumeOnLearn: true, dragDropEnabled, limitRecipes: true, maxRecipes, destroyWhenSpent }
+        }
+      },
+      recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'shared-source' }]
+    };
+  }
+
+  function createCappedScenario({ maxRecipes = 2, destroyWhenSpent = false } = {}) {
+    const item = new FakeItem();
+    const actor = new FakeActor({ items: [item] });
+    const recipes = [
+      buildRecipe({ id: 'r-a', name: 'Recipe A' }),
+      buildRecipe({ id: 'r-b', name: 'Recipe B' })
+    ];
+    const service = buildService({
+      systems: { 'system-1': buildCappedSystem({ maxRecipes, destroyWhenSpent }) },
+      recipes
+    });
+    return { item, actor, service };
+  }
+
+  it('shows the header learn control for a capped book even when drag-drop is enabled (FN1)', () => {
+    // dragDropEnabled ON would hide the uncapped manual control, but a capped book
+    // must still surface the picker.
+    const { item, service } = createCappedScenario();
+    const deps = makeDeps();
+
+    assert.ok(getCappedLearnState({ document: item }, service, globalThis.game));
+    assert.ok(buildV2HeaderControl({ document: item }, service, deps));
+  });
+
+  it('capped book opens the chooser and learns exactly one per selection via the injected seam (never globalThis.confirm)', async () => {
+    const { item, actor, service } = createCappedScenario({ maxRecipes: 2 });
+    const selectCalls = [];
+    let rendered = 0;
+    const originalConfirm = globalThis.confirm;
+    globalThis.confirm = () => {
+      throw new Error('globalThis.confirm must never be used');
+    };
+    try {
+      const registration = registerItemSheetRecipeLearnControl(service, makeDeps({
+        selectDialog: async (options) => {
+          selectCalls.push(options);
+          return 'r-b';
+        },
+        confirmDialog: async () => {
+          throw new Error('confirmDialog must not be used for a capped book');
+        }
+      }));
+      const sheet = { document: item, render: () => { rendered += 1; } };
+
+      const result = await registration.handleLearn(sheet);
+
+      assert.equal(result, true);
+      assert.equal(selectCalls.length, 1);
+      assert.deepEqual(selectCalls[0].options.map(option => option.value).sort(), ['r-a', 'r-b']);
+      // The budget readout is passed through to the selection seam.
+      assert.match(selectCalls[0].content, /SelectRecipeBudget/);
+      // The consume warning is never shown for a capped book.
+      assert.doesNotMatch(selectCalls[0].content, /ConsumeWarning/);
+
+      const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+      assert.deepEqual(Object.keys(learned), ['r-b']);
+      assert.equal(service._getRecipeItemLearnCount(item), 1);
+      assert.equal(rendered, 1);
+    } finally {
+      globalThis.confirm = originalConfirm;
+    }
+  });
+
+  it('cancelling the capped chooser is a no-op', async () => {
+    const { item, actor, service } = createCappedScenario();
+    const registration = registerItemSheetRecipeLearnControl(service, makeDeps({
+      selectDialog: async () => null
+    }));
+
+    const result = await registration.handleLearn({ document: item, render() {} });
+
+    assert.equal(result, false);
+    assert.equal(actor.getFlag('fabricate', 'fabricate.learnedRecipes'), undefined);
+    assert.equal(service._getRecipeItemLearnCount(item), 0);
+  });
+
+  it('does not re-render the sheet after destroy-when-spent deletes the item (FN3)', async () => {
+    const { item, service } = createCappedScenario({ maxRecipes: 1, destroyWhenSpent: true });
+    let rendered = 0;
+    const registration = registerItemSheetRecipeLearnControl(service, makeDeps({
+      selectDialog: async () => 'r-a'
+    }));
+    const sheet = { document: item, render: () => { rendered += 1; } };
+
+    const result = await registration.handleLearn(sheet);
+
+    assert.equal(result, true);
+    assert.equal(item.deleted, true);
+    assert.equal(rendered, 0, 'the deleted document is never re-rendered');
   });
 
   it('does not learn twice while a manual confirm dialog is in flight', async () => {

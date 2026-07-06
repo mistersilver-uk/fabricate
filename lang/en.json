@@ -918,7 +918,13 @@
       "ManualLearnAction": "Learn Recipe",
       "ManualLearnConfirmTitle": "Learn Recipes",
       "ManualLearnConfirmBody": "{actor} will learn {count} recipe(s) from {item}: {recipes}.",
-      "ManualLearnConsumeWarning": "This will consume {item}."
+      "ManualLearnConsumeWarning": "This will consume {item}.",
+      "SelectRecipeTitle": "Learn a Recipe",
+      "SelectRecipePrompt": "Choose a recipe to learn from {item}.",
+      "SelectRecipeBudget": "{remaining} of {max} remaining.",
+      "SelectRecipeLabel": "Recipe",
+      "SelectRecipeConfirm": "Learn",
+      "SelectRecipeCancel": "Cancel"
     },
     "Admin": {
       "Title": "Crafting Admin",

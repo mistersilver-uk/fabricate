@@ -1336,6 +1336,65 @@ test('511.P2.9 - regression: an uncapped drop still learns every matched recipe 
   assert.equal(service._getRecipeItemLearnCount(item), 0);
 });
 
+test('511.P2.E2E - full flow: capped drop suppressed, pick K, refuse (K+1), destroy-when-spent', async () => {
+  const cappedSystem = buildCappedSystem({ id: 'capped-system', maxRecipes: 2, destroyWhenSpent: true, sourceItemUuid: 'shared-source' });
+  const uncappedSystem = buildMockSystem({
+    id: 'uncapped-system',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false, dragDropEnabled: true }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'shared-source' }]
+  });
+  const recipes = [
+    buildCappedRecipe({ id: 'cap-a', name: 'Cap A', craftingSystemId: 'capped-system' }),
+    buildCappedRecipe({ id: 'cap-b', name: 'Cap B', craftingSystemId: 'capped-system' }),
+    buildCappedRecipe({ id: 'cap-c', name: 'Cap C', craftingSystemId: 'capped-system' }),
+    buildCappedRecipe({ id: 'free-x', name: 'Free X', craftingSystemId: 'uncapped-system' })
+  ];
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'shared-source' });
+  const actor = new FakeActor({ id: 'actor-1', items: [item] });
+  const service = buildService({
+    systems: { 'capped-system': cappedSystem, 'uncapped-system': uncappedSystem },
+    recipes
+  });
+
+  // 1) Drop the book: only the uncapped recipe auto-learns; capped ones are held
+  //    for the picker, and the learn budget is untouched.
+  await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+  assert.deepEqual(Object.keys(actor.getFlag('fabricate', 'fabricate.learnedRecipes')), ['free-x']);
+  assert.equal(service._getRecipeItemLearnCount(item), 0);
+
+  // 2) The player sees the capped candidates with the full budget.
+  let state = service.getLearnableRecipesFromItem({ ownedItem: item, actor });
+  assert.deepEqual(state.recipes.map(r => r.id), ['cap-a', 'cap-b', 'cap-c']);
+  assert.equal(state.remainingBudget, 2);
+
+  // 3) Pick two of them (K = maxRecipes).
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: item, actor })).success, true);
+  state = service.getLearnableRecipesFromItem({ ownedItem: item, actor });
+  assert.equal(state.remainingBudget, 1);
+  assert.deepEqual(state.recipes.map(r => r.id), ['cap-b', 'cap-c']);
+
+  const finalLearn = await service.learnOneRecipeFromItem({ recipe: recipes[1], ownedItem: item, actor });
+  assert.equal(finalLearn.success, true);
+  // destroy-when-spent removed the book on the final learn.
+  assert.equal(finalLearn.destroyed, true);
+  assert.equal(item.deleted, true);
+
+  // 4) Budget spent: no candidates remain and the (K+1)th learn is refused.
+  state = service.getLearnableRecipesFromItem({ ownedItem: item, actor });
+  assert.deepEqual(state.recipes, []);
+  assert.equal(state.remainingBudget, 0);
+  const refused = await service.learnOneRecipeFromItem({ recipe: recipes[2], ownedItem: item, actor });
+  assert.equal(refused.success, false);
+  assert.equal(refused.message, 'FABRICATE.Knowledge.LearnBudgetSpent');
+});
+
 // ---------------------------------------------------------------------------
 // AC7 — Edge cases
 // ---------------------------------------------------------------------------
