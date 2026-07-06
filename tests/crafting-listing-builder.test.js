@@ -262,6 +262,41 @@ describe('CraftingListingBuilder — teaser redaction (non-leak)', () => {
   });
 });
 
+describe('CraftingListingBuilder — category projection (issue 514)', () => {
+  it('projects the reserved general category + its localized label for an uncategorized recipe', () => {
+    // makeRecipe() authors no category → normalizeRecipeCategory defaults to general.
+    const { recipe } = buildOne();
+    assert.equal(recipe.category, 'general', 'defaults to the reserved general token');
+    assert.equal(
+      recipe.categoryLabel,
+      'FABRICATE.Common.General',
+      'general localizes (never a bare token) — passthrough localize returns the key'
+    );
+  });
+
+  it('surfaces a custom category token verbatim as its own label (no prettify)', () => {
+    const { recipe } = buildOne({
+      entries: [{ recipe: makeRecipe({ category: 'weapons' }), access: { reason: 'ok' } }],
+    });
+    assert.equal(recipe.category, 'weapons', 'custom token is the raw filter-match key');
+    assert.equal(recipe.categoryLabel, 'weapons', 'custom token is surfaced verbatim, not prettified');
+  });
+
+  it('rides category + categoryLabel on the shared base so a teaser carries them too', () => {
+    const { recipe } = buildOne({
+      entries: [
+        {
+          recipe: makeRecipe({ category: 'potions' }),
+          access: { reason: 'teaser', teaserState: { hiddenFields: ['ingredients', 'results', 'description'] } },
+        },
+      ],
+    });
+    assert.equal(recipe.redaction.redacted, true, 'the teaser is redacted');
+    assert.equal(recipe.category, 'potions', 'category rides on ...base onto the teaser model');
+    assert.equal(recipe.categoryLabel, 'potions', 'categoryLabel rides on ...base onto the teaser model');
+  });
+});
+
 describe('CraftingListingBuilder — recipe image (matches GM Manager precedence)', () => {
   it('resolves a linked recipe item image when img is the default placeholder', () => {
     // The reported bug: a recipe whose icon lives on a linked item keeps the default
@@ -341,18 +376,37 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(recipe.check.usable, false);
   });
 
-  it('routedByIngredients: an authored routed check reads as required (it is rolled and can fail)', () => {
+  it('routedByIngredients: an authored simple check reads as required (it is rolled and can fail)', () => {
     const system = makeSystem({
       resolutionMode: 'routedByIngredients',
-      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12 }, progressive: {} },
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 12 }, routed: {}, progressive: {} },
     });
     const { recipe } = buildOne({ system });
     assert.equal(recipe.check.usable, true);
-    assert.equal(recipe.check.mandatory, true, 'an active routed check is not optional');
+    assert.equal(recipe.check.mandatory, true, 'an active simple check is not optional');
     assert.equal(recipe.check.optional, false);
+    assert.equal(recipe.check.dc, 12, 'the pass/fail gate uses the simple DC');
   });
 
-  it('routedByIngredients: no routed formula → optional (no check runs)', () => {
+  it('routedByCheck + fixed: DC is nulled (tiers match by value range, not DC)', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12, type: 'fixed' }, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.dc, null);
+  });
+
+  it('routedByCheck + relative: DC is preserved', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12, type: 'relative' }, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.dc, 12);
+  });
+
+  it('routedByIngredients: no simple formula → optional (no check runs)', () => {
     const system = makeSystem({
       resolutionMode: 'routedByIngredients',
       craftingCheck: { simple: {}, routed: {}, progressive: {} },

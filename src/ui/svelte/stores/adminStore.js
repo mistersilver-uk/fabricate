@@ -1474,6 +1474,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       resultSelection: raw.resultSelection || null,
       outcomeRouting: raw.outcomeRouting || null,
       checkTierId: raw.checkTierId ?? null,
+      minSuccessOutcomeId: raw.minSuccessOutcomeId ?? null,
       complex: raw.complex === true,
       toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),

@@ -37,6 +37,11 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 Custom recipe categories organize recipe browsing and authoring, and item tags allow component labeling plus tag-based ingredient matching.
 The reserved **General** recipe category is always present and is not stored in the custom category list.
 
+In the player recipe browser, each recipe that belongs to a custom category shows that category as a small label on its row.
+Recipes in the reserved **General** category show no label, so the default bucket does not tag every row.
+A **Category** filter, placed above the crafting-system filter, lets players narrow the list to a single category.
+The filter offers only the categories that appear in the player's visible recipes, sorted alphabetically with **General** pinned last, and its default **All categories** option shows the full list.
+
 ### Feature Toggles
 
 Each system can independently enable or disable optional features.
@@ -308,6 +313,22 @@ Fabricate iterates over every Item document in the pack and adds each one.
 - A summary notification reports how many items were added, updated, and skipped.
 - If an item's recorded original source link is broken, Fabricate links to the imported item instead, remembers the broken link as a fallback, and warns once for the bulk import.
 - Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
+
+#### Import from the Compendium Directory
+
+You can also import an entire Item compendium without opening the admin panel.
+As a GM, right-click an Item compendium in Foundry's **Compendium Directory** sidebar and choose **Import Items into Crafting System**.
+
+1. Right-click the Item compendium in the Compendium Directory sidebar
+2. Choose **Import Items into Crafting System**
+3. Pick the target crafting system in the picker dialog and confirm with **Import**
+
+The picker always opens so the import is a deliberate choice rather than a single click, even when only one crafting system exists.
+If no crafting system exists yet, Fabricate tells you to create one in the Crafting System Manager first, and nothing is imported.
+
+This action is offered only to GMs, and only on compendiums that hold Item documents.
+It runs the same import as the bulk pack drop, so it adds new components, updates registered ones in place, skips items already up to date, and reports the same added, updated, and skipped summary.
+Broken original source links fall back to the imported item and warn once for the whole import, exactly as the drop-based bulk import does.
 
 #### Folder drop
 

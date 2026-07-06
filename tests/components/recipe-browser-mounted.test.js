@@ -230,6 +230,87 @@ describe('RecipeBrowser mounted behavior', () => {
     );
   });
 
+  it('renders the category badge with the localized label (not the raw token) on a non-general row', async () => {
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1', category: 'weapons', categoryLabel: 'Weapons' })],
+      totalCount: 1,
+    });
+    const badge = target.querySelector('[data-recipe-id="r1"] .crafting-recipe-row-category');
+    assert.ok(badge, 'a non-general row shows the category badge');
+    assert.equal(badge.textContent.trim(), 'Weapons', 'badge text is the categoryLabel, not the raw token');
+    assert.equal(badge.getAttribute('title'), 'Weapons', 'full label available via title on hover');
+  });
+
+  it('suppresses the category badge for a general recipe (keyed on category, not redaction)', async () => {
+    const target = await harness.mount({
+      // A general recipe that is NOT redacted → badge must still be suppressed.
+      recipes: [recipe({ id: 'r1', category: 'general', categoryLabel: 'General' })],
+      totalCount: 1,
+    });
+    const row = target.querySelector('[data-recipe-id="r1"]');
+    assert.equal(
+      row.querySelector('.crafting-recipe-row-category'),
+      null,
+      'the reserved general bucket is not badged'
+    );
+  });
+
+  it('renders the category badge on an uncraftable/danger row too', async () => {
+    const target = await harness.mount({
+      recipes: [
+        recipe({
+          id: 'r1',
+          browseStatus: 'missingMaterials',
+          category: 'weapons',
+          categoryLabel: 'Weapons',
+        }),
+      ],
+      totalCount: 1,
+    });
+    const row = target.querySelector('[data-recipe-id="r1"]');
+    assert.ok(row.classList.contains('is-uncraftable'), 'row is the danger layout');
+    const badge = row.querySelector('.crafting-recipe-row-category');
+    assert.ok(badge, 'the category badge renders in the uncraftable layout');
+    assert.equal(badge.textContent.trim(), 'Weapons');
+  });
+
+  it('renders the category dropdown with an all-categories option and forwards the change', async () => {
+    const chosen = [];
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      categories: [
+        { id: 'armor', name: 'Armor' },
+        { id: 'weapons', name: 'Weapons' },
+      ],
+      onCategoryChange: (id) => chosen.push(id),
+    });
+
+    const select = target.querySelector('.crafting-browser-filter-category select');
+    assert.ok(select, 'category dropdown renders');
+    const options = select.querySelectorAll('option');
+    assert.equal(options.length, 3, 'all-categories + one option per distinct category');
+    assert.equal(options[0].value, '', 'the first option is the value="" all-categories option');
+
+    select.value = 'weapons';
+    select.dispatchEvent(new window.Event('change', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(chosen, ['weapons'], 'category change forwards the selected id');
+  });
+
+  it('hides the category dropdown when no categories are supplied', async () => {
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      categories: [],
+    });
+    assert.equal(
+      target.querySelector('.crafting-browser-filter-category'),
+      null,
+      'no category dropdown without categories'
+    );
+  });
+
   it('shows a no-matches message while searching with no results', async () => {
     const target = await harness.mount({ recipes: [], totalCount: 0, search: 'zzz' });
     const empty = target.querySelector('[data-crafting-browser-empty]');

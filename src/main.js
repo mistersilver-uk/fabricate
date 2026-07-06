@@ -25,7 +25,7 @@ import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
-import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
+import { renderDialog, viewScene, localize as bridgeLocalize } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
@@ -60,6 +60,7 @@ import {
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
+import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
@@ -1476,6 +1477,37 @@ class Fabricate {
   }
 
   /**
+   * Whether the player has opted to hide unavailable (locked) gathering
+   * environments in the Environments column.
+   *
+   * Backed by the `GATHERING_HIDE_UNAVAILABLE` setting, which is
+   * `scope: 'client'`. A client-scoped setting persists in that browser's
+   * `localStorage`, so this preference is per client/device, not per user.
+   * The same account on a second device or browser starts at the default
+   * (off). Defaults to false (show all).
+   *
+   * @returns {boolean}
+   */
+  getHideUnavailableEnvironments() {
+    return getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE) === true;
+  }
+
+  /**
+   * Persist the player's "hide unavailable environments" preference.
+   *
+   * Writes the client-scoped `GATHERING_HIDE_UNAVAILABLE` setting, so the
+   * choice is remembered per client/device (`localStorage`) and does not
+   * follow the user account to another device. This is a view-only preference
+   * and changes no saved data, the engine listing, or GM configuration.
+   *
+   * @param {boolean} value Whether to hide unavailable (locked) environments.
+   * @returns {Promise<boolean>}
+   */
+  setHideUnavailableEnvironments(value) {
+    return setSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE, value === true);
+  }
+
+  /**
    * Start a gathering attempt for the current user.
    *
    * The raw GatheringEngine remains module-internal so all public attempts use
@@ -2079,6 +2111,29 @@ Hooks.once('init', async () => {
   console.log('Fabricate | Init Hook');
   registerFabricateConfig();
   bindFabricateGlobal();
+});
+
+// GM-only Compendium Directory bulk-import action. Registered at module
+// top-level (NOT in the `ready` body): the CompendiumDirectory entry context
+// menu is built exactly once in `_onFirstRender`, which runs during the sidebar
+// force-render BEFORE `Hooks.callAll('ready')`, so a `ready`-body listener could
+// miss the one-time build. This differs from the `renderItemDirectory`
+// header-button wiring below, which legitimately re-runs on every render.
+// The listener MUTATES `contextOptions` in place and returns nothing.
+Hooks.on('getCompendiumContextOptions', (application, contextOptions) => {
+  contextOptions.push(buildCompendiumImportContextOption({
+    localize: bridgeLocalize,
+    isGM: () => game.user?.isGM,
+    isItemPack: (id) => game.packs.get(id)?.documentName === 'Item',
+    getPackName: (id) => {
+      const pack = game.packs.get(id);
+      return pack?.title ?? pack?.metadata?.label ?? id;
+    },
+    getSystems: () => game.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [],
+    promptSelectSystem: promptSelectCraftingSystem,
+    importPack: (systemId, packId) => game.fabricate.getCraftingSystemManager().addItemsFromPack(systemId, packId),
+    notify: ui.notifications
+  }));
 });
 
 // Hook into Foundry's ready event

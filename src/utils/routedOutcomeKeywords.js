@@ -177,6 +177,39 @@ export function resolveRecipeCheckTierOptions(craftingCheck, craftingCheckMode) 
 }
 
 /**
+ * The success outcome tiers offered to a recipe's "Minimum success tier" dropdown,
+ * for a FIXED-type routed crafting check only. A recipe may demand a minimum tier so
+ * that a shared fixed check carries different difficulty per recipe; a roll landing
+ * below the chosen tier fails the craft outright. Only success tiers (`success ===
+ * true`) with an id are offered — a failure tier is not a meaningful "minimum for
+ * success" — ranked ascending by `start` (the fixed-tier rank) so the dropdown reads
+ * low → high.
+ *
+ * Returns `[]` for every case other than `routedByCheck` + fixed, so the editor
+ * control auto-hides otherwise. The gate is the system's real `resolutionMode`, NOT
+ * the collapsed check-shape mode, because the minimum-tier gate is only threaded
+ * through the `routedByCheck` runtime path (`_runRoutedCheck`); `routedByIngredients`
+ * now authors its check on the shared `craftingCheck.simple` pass/fail slot and has
+ * no outcome tiers, so it never reads `minSuccessOutcomeId` and surfacing the control
+ * there would author a dead value. Names are returned raw (empty when unnamed) so the UI applies its own
+ * "Unnamed tier" label rather than leaking a tier's generated secret id. Pure (no
+ * `$derived`/Foundry deps) so it can be unit-tested directly.
+ *
+ * @param {?{routed?: {type?: string, fixedOutcomes?: Array}}} craftingCheck
+ * @param {?string} resolutionMode the system's crafting `resolutionMode`
+ * @returns {Array<{id: string, name: string, start: number}>}
+ */
+export function resolveRecipeFixedOutcomeTierOptions(craftingCheck, resolutionMode) {
+  if (resolutionMode !== 'routedByCheck') return [];
+  const routed = craftingCheck?.routed;
+  if (routed?.type !== 'fixed') return [];
+  return (Array.isArray(routed.fixedOutcomes) ? routed.fixedOutcomes : [])
+    .filter((tier) => tier?.id && tier.success === true)
+    .map((tier) => ({ id: tier.id, name: tier.name || '', start: Number(tier.start) }))
+    .sort((a, b) => a.start - b.start);
+}
+
+/**
  * All NON-EMPTY outcome-tier NAMES of a routed check's active type — success AND
  * failure tiers — in author order. The active list is the `fixedOutcomes` when
  * `type === 'fixed'`, else `relativeOutcomes`. This is the single source of truth
