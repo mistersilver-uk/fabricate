@@ -315,7 +315,7 @@
       {
         "id": "MS3FyM9as7BXkxa2",
         "name": "Black Enamel",
-        "img": "icons/containers/boxes/crate-tech-red.webp",
+        "img": "icons/commodities/materials/powder-black.webp",
         "description": "",
         "sourceItemUuid": "Item.ZzM0kxucfWhhRVqA",
         "sourceUuid": "Item.ZzM0kxucfWhhRVqA",
@@ -543,7 +543,7 @@
       {
         "id": "oeT1MwKJDyqkEUdI",
         "name": "Fine Burin",
-        "img": "icons/tools/hand/awl.webp",
+        "img": "icons/tools/hand/awl-steel-brown.webp",
         "description": "",
         "sourceItemUuid": "Item.U6TDRVmc6STtOCJM",
         "sourceUuid": "Item.U6TDRVmc6STtOCJM",

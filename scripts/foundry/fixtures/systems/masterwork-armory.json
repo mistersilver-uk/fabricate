@@ -389,7 +389,7 @@
       {
         "id": "iSrz7b0QDOYvjUFd",
         "name": "Brass Trim",
-        "img": "icons/commodities/metal/plate-mount-round-copper.webp",
+        "img": "icons/commodities/metal/ingot-stamped-copper.webp",
         "description": "",
         "sourceItemUuid": "Item.dFCW22llH71BJoxG",
         "sourceUuid": "Item.dFCW22llH71BJoxG",
@@ -674,7 +674,7 @@
       {
         "id": "CKAKs0dHwBfqjDs0",
         "name": "Scrap Metal",
-        "img": "icons/commodities/metal/plate-scored-steel.webp",
+        "img": "icons/commodities/metal/mail-plate-steel.webp",
         "description": "",
         "sourceItemUuid": "Item.bOCkqtL2vcCOTI45",
         "sourceUuid": "Item.bOCkqtL2vcCOTI45",
@@ -693,7 +693,7 @@
       {
         "id": "pPZO57262CXQcyv4",
         "name": "Armourer’s Hammer",
-        "img": "icons/tools/hand/hammer-simple-wood.webp",
+        "img": "icons/tools/smithing/hammer-maul-steel-grey.webp",
         "description": "",
         "sourceItemUuid": "Item.WR2W0dFEETEEntvB",
         "sourceUuid": "Item.WR2W0dFEETEEntvB",
@@ -731,7 +731,7 @@
       {
         "id": "NQk3rrF850G7ZBJt",
         "name": "Shield Press",
-        "img": "icons/tools/smithing/handle-brass.webp",
+        "img": "icons/tools/smithing/plate-steel-grey.webp",
         "description": "",
         "sourceItemUuid": "Item.zOIAEl1N2sq4rfZs",
         "sourceUuid": "Item.zOIAEl1N2sq4rfZs",
