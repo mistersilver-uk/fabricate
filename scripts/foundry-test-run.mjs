@@ -1488,10 +1488,11 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
           description: 'Guaranteed-drop forage for the rc/ci gather-delta assertion.',
           img: 'icons/consumables/plants/herb-tied-bundle-green.webp',
           enabled: true,
+          // No weather/timeOfDay constraints (like the meadowlands library tasks):
+          // the direct start path does not apply CONDITIONS_BLOCKED, and leaving them
+          // off keeps this "guaranteed-success" task honestly unconditional.
           region: 'northreach',
           biomes: ['forest'],
-          weather: ['rain'],
-          timeOfDay: ['dusk'],
           itemSelectionMode: 'highestRankedDrop',
           dropRows: [{
             id: 'smoke-rc-drop',
@@ -1523,10 +1524,13 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       forcedTaskIds: [rcGatherTaskId]
     });
     // Full-profile hazard env: AUTOMATIC composition + matching region/biome, so it
-    // composes BOTH the guaranteed task and the seeded hazardous smoke-bramble-event
-    // (which matches northreach/forest/rain/dusk). Scene-less so a headless GM can
-    // attempt it (Azure Grove's sceneUuid gate blocks every viewer). The hazard
-    // assertion forces the event dropRate to 100 for a deterministic fire.
+    // composes BOTH the guaranteed task and the seeded hazardous smoke-bramble-event.
+    // The env MUST carry a hazardous danger level: automatic event composition only
+    // includes events up to the env's danger rank (evaluateDangerField:
+    // eventRank <= dangerRank(envLevel)), so a default 'safe' env would never compose
+    // the hazardous (rank 2) event — mirroring the Azure Grove fixture's dangerTags.
+    // Scene-less so a headless GM can attempt it (Azure Grove's sceneUuid gate blocks
+    // every viewer). The hazard assertion forces the event dropRate to 100 to fire.
     const hazardEnvironment = await environmentStore.create({
       craftingSystemId: arcaneSystemId,
       name: 'Smoke Hazard Grove',
@@ -1537,6 +1541,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       sceneUuid: '',
       region: 'northreach',
       biomes: ['forest'],
+      dangerTags: ['hazardous'],
       eventPolicy: 'successWithEvent',
       eventSelectionMode: 'highestRankedDrop'
     });
@@ -1562,7 +1567,10 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       },
       ingredientRouted: {
         recipeId: ingredientRoutedRecipe.id,
-        chosenSetId: setAId
+        // Deliberately the SECOND set → the Amulet group (resultGroups[1], NOT the
+        // first group), so the assertion proves the router selects a non-index-0
+        // group by set assignment rather than always emitting resultGroups[0].
+        chosenSetId: setBId
       },
       checkRouted: { recipeId: checkRoutedRecipe.id },
       progressive: { recipeId: progressiveRecipe.id },
@@ -1644,7 +1652,10 @@ async function runCraftExecutionAsserts(page, fixtures, crafterId) {
       record('exec-craft-routed-by-check', false, err.message);
     }
 
-    // ── routedByIngredients multi-set (chosen set's Ring, NOT Amulet) ────────
+    // ── routedByIngredients multi-set (chosen 2nd set's Amulet, NOT Ring) ────
+    // The chosen set (set B) maps to the Amulet group, which is resultGroups[1] —
+    // NOT the first group — so this fails against an "always emit resultGroups[0]"
+    // bug, proving set→group routing selects a non-index-0 group.
     try {
       const ringBefore = countByName('Smoke Ring');
       const amuletBefore = countByName('Smoke Amulet');
@@ -1656,11 +1667,11 @@ async function runCraftExecutionAsserts(page, fixtures, crafterId) {
       const ringAfter = countByName('Smoke Ring');
       const amuletAfter = countByName('Smoke Amulet');
       if (!result.success) throw new Error(`craft failed: ${result.message}`);
-      if (ringAfter !== ringBefore + 1) {
-        throw new Error(`Smoke Ring ${ringBefore} -> ${ringAfter}, expected +1 (chosen set's group)`);
+      if (amuletAfter !== amuletBefore + 1) {
+        throw new Error(`Smoke Amulet ${amuletBefore} -> ${amuletAfter}, expected +1 (chosen set's non-first group)`);
       }
-      if (amuletAfter !== amuletBefore) {
-        throw new Error(`Smoke Amulet ${amuletBefore} -> ${amuletAfter}, expected unchanged (other set's group)`);
+      if (ringAfter !== ringBefore) {
+        throw new Error(`Smoke Ring ${ringBefore} -> ${ringAfter}, expected unchanged (other set's group / resultGroups[0])`);
       }
       record('exec-craft-routed-by-ingredients', true);
     } catch (err) {
