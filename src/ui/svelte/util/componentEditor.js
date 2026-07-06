@@ -14,9 +14,26 @@ function compareComponentEditorEssenceOptions(left, right) {
   });
 }
 
+// Component essences persist as an object map ({ essenceId: quantity }), but the
+// admin store's item cards project them into an array of { id, quantity } entries
+// for the browser display. The editor is fed both shapes (the raw component from
+// the standalone editor, the item card from the manager), so coerce either into a
+// plain id -> quantity map before looking up per-definition quantities. Missing this
+// zeroed every field when an item card was edited and wiped the essences on save.
+function toEssenceQuantityMap(currentEssences) {
+  if (Array.isArray(currentEssences)) {
+    const map = {};
+    for (const entry of currentEssences) {
+      if (entry && entry.id != null) map[entry.id] = entry.quantity;
+    }
+    return map;
+  }
+  return currentEssences && typeof currentEssences === 'object' ? currentEssences : {};
+}
+
 export function buildEditableEssenceOptions(essenceDefinitions = [], currentEssences = {}) {
   const definitions = Array.isArray(essenceDefinitions) ? essenceDefinitions : [];
-  const quantities = currentEssences && typeof currentEssences === 'object' ? currentEssences : {};
+  const quantities = toEssenceQuantityMap(currentEssences);
 
   return definitions
     .map(def => ({

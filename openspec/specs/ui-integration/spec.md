@@ -848,6 +848,15 @@ Each
   (resolved through the resolution-mode label keys — the raw `simple` token is
   never surfaced to the UI), `browseStatus`, per-set `ingredientSets[].craftability`,
   an optional `check` descriptor, `outcomeTiers`, and `result`.
+- Each `RecipeListingModel` also carries `category` (the normalized category token;
+  `general` for the reserved/default bucket) and a `categoryLabel` display string.
+- The label rule is exact: the reserved `general` token is localized to
+  `FABRICATE.Common.General` and is never shown as a bare token, while a custom
+  category token is surfaced verbatim as its own label (GM free-text; no prettify
+  or title-casing).
+- `category`/`categoryLabel` ride on the shared `base` projection, so they are
+  present on Discovery-Mode teaser models too (category is GM-authored grouping
+  metadata, not a redacted spoiler field).
 - The listing exposes `counts.available` / `counts.total` for header summaries.
 
 ##### Browse Status
@@ -906,7 +915,19 @@ Each
 
 #### Recipe List
 
-- Filter/search controls (category/tags if enabled)
+- A search box plus the favourites-only, craftable-only, crafting-system, and
+  category filter controls narrow the list.
+- Each row shows a neutral category badge for non-`general` categories, in both the
+  normal and the uncraftable row layouts.
+- The badge is suppressed for `general` recipes so the default bucket is not tagged
+  with a redundant "General" chip; its text is the localized/verbatim `categoryLabel`,
+  never the raw token.
+- A single-level category filter dropdown sits above the crafting-system filter.
+- The category dropdown is client-local browse state with an "All categories"
+  default; its options are the distinct categories present in the player's visible
+  recipes, sorted non-`general` A→Z with "General" pinned last.
+- Category grouping headers and nested/expandable category folders are explicitly
+  deferred follow-ups; this first cut ships the badge and filter only.
 - Row status badges from `006` evaluation, drawn from the `browseStatus`
   vocabulary:
   - Available
@@ -1094,7 +1115,14 @@ Because the gathering listing resolves a remembered actor against its ownership 
 ### Environment List
 
 - Show only environments whose owning crafting system has `features.gathering === true`.
-- Hide disabled environments for non-GM users.
+- Disabled environments surface to all viewers (players and GMs alike) as non-interactive **locked teasers** (identity-only, unselectable), never as selectable environments; their tasks, weights, and composition internals are redacted.
+- The Environments column provides a **player-side, client-persisted "hide unavailable" toggle** rendered as Fabricate's pill switch (a `<button>` with a track/knob and an On/Off state label, matching the GM apps' `manager-status-toggle`) on its own row beneath the search field, with a preceding descriptive label that is the switch's accessible name.
+When enabled it hides exactly the **locked** listings (engine `locked === true`): disabled environments and location-gated environments the party is not in (out-of-realm or scene-gated).
+It **does not** hide in-realm, selectable environments whose individual tasks are merely blocked (e.g. stamina- or tool-blocked) — those remain visible with their blocked reasons.
+The toggle defaults **off** (show all), changes only the viewing client's presentation (never saved data, the engine listing, or GM configuration), and persists **per client/device** via a client-scoped (`localStorage`) setting.
+It is independent of selection mode: a merely masked (blind) environment that is otherwise reachable stays visible, while a blind environment that is also locked is hidden with the rest.
+The visible label is the control's accessible name and surfaces the hidden count.
+When the toggle hides every remaining environment (but a search filter did not), the column shows a distinct "all unavailable environments hidden" empty state with an in-place control to show them again, kept distinct from the search "no matches" empty state.
 - Support search plus biome, risk/status, and availability filters where data exists.
 Geography is not a player browse filter (the inert legacy `environment.region` free-text string is not echoed to the player listing).
 - If an environment is scene-gated, show whether the selected actor currently meets the scene/token requirements.
@@ -1123,8 +1151,9 @@ While Scene Region automation is unimplemented, the `Travel actor` source is pre
 
 The player Gathering app makes location-gated availability understandable.
 
-- Available environments sort before unavailable location-gated environments.
-Unavailable environments may remain visible when safe, with clear blocked reasons.
+- Available environments sort before locked (disabled or out-of-realm/scene-gated) environments.
+Locked environments remain visible by default (when safe, with clear blocked reasons); the player may opt to hide all currently-locked (out-of-reach) environments via the client-persisted "hide unavailable" Environments-column toggle described under Environment List.
+This toggle targets only `locked === true` listings and never hides in-realm, task-blocked environments.
 - Known destination guidance may list realm names; secret or undiscovered destination guidance must use undiscovered placeholders and counts.
 - Guidance must distinguish the location blocker from weather, time, tool, stamina, node, scene, permission, duplicate-run, and visibility blockers where practical.
 - Environment cards/details must not leak hidden blind task names, hidden results, hidden events, provider diagnostics, GM-only notes, or secret undiscovered realm names.

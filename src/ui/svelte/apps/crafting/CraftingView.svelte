@@ -93,6 +93,9 @@
   function onSystemChange(systemId) {
     store?.setSystemFilter(systemId);
   }
+  function onCategoryChange(category) {
+    store?.setCategoryFilter(category);
+  }
   function onChoose(setId) {
     store?.chooseIngredientSet(setId);
   }
@@ -167,6 +170,8 @@
           craftableOnly={store?.craftableOnly ?? false}
           systemFilter={store?.systemFilter ?? null}
           systems={store?.availableSystems ?? []}
+          categoryFilter={store?.categoryFilter ?? null}
+          categories={store?.availableCategories ?? []}
           favouriteIds={store?.favouriteIds ?? []}
           {onSelect}
           {onSearch}
@@ -175,6 +180,7 @@
           {onToggleFavourites}
           {onToggleCraftable}
           {onSystemChange}
+          {onCategoryChange}
           onPageChange={(index) => store?.setPage(index)}
           onPageSizeChange={(size) => store?.setPageSize(size)}
         />
