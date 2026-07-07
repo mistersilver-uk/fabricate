@@ -933,8 +933,15 @@ export class RecipeVisibilityService {
 
     // An EFFECTIVE cap (enabled + finite positive max) routes through the
     // budget-enforcing capped path; an invalid cap falls through to uncapped.
-    if (this._isRecipeItemLearnCapped(recipe) && Number.isFinite(this._getLearnCapForRecipe(recipe))) {
-      return this.learnOneRecipeFromItem({ recipe, ownedItem: selected.item, actor: craftingActor });
+    if (
+      this._isRecipeItemLearnCapped(recipe) &&
+      Number.isFinite(this._getLearnCapForRecipe(recipe))
+    ) {
+      return this.learnOneRecipeFromItem({
+        recipe,
+        ownedItem: selected.item,
+        actor: craftingActor,
+      });
     }
 
     const next = {

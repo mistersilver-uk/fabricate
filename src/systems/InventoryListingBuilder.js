@@ -21,9 +21,9 @@
  * component's detail.
  */
 
+import { getFabricateFlag } from '../config/flags.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { getItemSourceReferences } from '../utils/sourceUuid.js';
-import { getFabricateFlag } from '../config/flags.js';
 
 // Knowledge modes in which a recipe item (book) can teach a recipe. In these
 // modes owning the book surfaces a Learn affordance in the inventory; other modes
@@ -132,8 +132,10 @@ export class InventoryListingBuilder {
     const rows = [];
     const systems = this.craftingSystemManager?.getSystems?.() ?? [];
     for (const system of Array.isArray(systems) ? systems : []) {
-      rows.push(...this._buildSystemRows(system, sources, allowedRecipeIds));
-      rows.push(...this._buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds, isGM));
+      rows.push(
+        ...this._buildSystemRows(system, sources, allowedRecipeIds),
+        ...this._buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds)
+      );
     }
 
     rows.sort((left, right) => stringOrEmpty(left?.name).localeCompare(stringOrEmpty(right?.name)));
@@ -388,7 +390,7 @@ export class InventoryListingBuilder {
    * the player owns none.
    * @private
    */
-  _buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds = null, isGM = false) {
+  _buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds = null) {
     const definitions = Array.isArray(system?.recipeItemDefinitions)
       ? system.recipeItemDefinitions
       : [];
@@ -562,7 +564,9 @@ export class InventoryListingBuilder {
     // use limit is suppressed, mirroring the learn-limit suppression below.
     let uses = null;
     const maxUses =
-      grantsByItem && knowledge?.item?.limitUses === true ? finitePositive(knowledge?.item?.maxUses) : null;
+      grantsByItem && knowledge?.item?.limitUses === true
+        ? finitePositive(knowledge?.item?.maxUses)
+        : null;
     if (maxUses != null) {
       const used = Number(getFabricateFlag(item, 'recipeItemUsage', {})?.timesUsed || 0);
       uses = { max: maxUses, used, remaining: Math.max(0, maxUses - used) };
@@ -590,8 +594,8 @@ export class InventoryListingBuilder {
    */
   _resolveRecipeImg(system, recipe) {
     const recipeItemImg = recipe?.recipeItemId
-      ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)?.img ||
-        ''
+      ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)
+          ?.img || ''
       : '';
     return recipeItemImg || recipe?.img || '';
   }
