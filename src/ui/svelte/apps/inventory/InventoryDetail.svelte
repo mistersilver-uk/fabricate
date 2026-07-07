@@ -255,14 +255,18 @@
         <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.NoRecipes')}</p>
       {:else if bookRecipes.length === 1}
         {@const recipe = bookRecipes[0]}
-        <div class="inventory-detail-single-recipe" data-inventory-learn-recipe={recipe.id}>
-          <div class="inventory-detail-recipe-headline">
-            <CraftingThumb src={recipe.img ?? ''} alt="" size={40} />
-            <span class="inventory-detail-row-name">{recipe.name}</span>
+        <div class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
+          <div class="inventory-detail-accordion-header">
+            <span class="inventory-detail-book-recipe-static">
+              <CraftingThumb src={recipe.img ?? ''} alt="" size={40} />
+              <span class="inventory-detail-row-name">{recipe.name}</span>
+            </span>
             {@render learnControl(recipe)}
           </div>
           {#if recipe.description}
-            <p class="inventory-detail-recipe-desc">{recipe.description}</p>
+            <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
+              <p class="inventory-detail-recipe-desc">{recipe.description}</p>
+            </div>
           {/if}
         </div>
       {:else}
@@ -831,17 +835,11 @@
     color: var(--fab-text);
   }
 
-  .inventory-detail-single-recipe {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .inventory-detail-recipe-headline {
+  /* The static (non-toggle) headline for a single-recipe book, mirroring the
+     accordion toggle's layout so both row types are identical. */
+  .inventory-detail-book-recipe-static {
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: var(--fab-space-3);
@@ -927,7 +925,16 @@
     gap: 6px;
   }
 
+  /* A book recipe row matches the standalone right-sidebar rows exactly: the item
+     is the bordered box with the same 56px min-height (border-box, so the border
+     is included like `.inventory-detail-row`), and the header fills it so a
+     collapsed row is identical in height to a Sources / Used-by / Produced-by row.
+     When expanded the item grows past the floor to fit the description body. */
   .inventory-detail-accordion-item {
+    box-sizing: border-box;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
@@ -935,6 +942,7 @@
   }
 
   .inventory-detail-accordion-header {
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
     gap: var(--fab-space-3);
