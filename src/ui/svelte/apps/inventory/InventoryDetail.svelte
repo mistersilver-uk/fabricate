@@ -122,6 +122,12 @@
     return filteredRecipes.slice(clamped * size, clamped * size + size);
   });
 
+  // "N unit remaining", singular only at exactly one (0 and >1 use the plural).
+  function remainingText(remaining, oneKey, manyKey) {
+    const value = Number(remaining ?? 0);
+    const key = value === 1 ? oneKey : manyKey;
+    return localize(`FABRICATE.App.Inventory.Detail.${key}`, { remaining: value });
+  }
   function canLearn(recipe) {
     return !recipe?.learned && !budgetSpent;
   }
@@ -231,10 +237,7 @@
             <div class="inventory-detail-limit" data-inventory-limit="learning">
               <span class="inventory-detail-limit-label">{localize('FABRICATE.App.Inventory.Detail.LearningLimitLabel')}</span>
               <span class="inventory-detail-limit-value" data-inventory-learning-budget>
-                {localize('FABRICATE.App.Inventory.Detail.LearningBudget', {
-                  remaining: Number(learningLimit.remaining ?? 0),
-                  max: Number(learningLimit.max ?? 0),
-                })}
+                {remainingText(learningLimit.remaining, 'LearningRemainingOne', 'LearningRemainingMany')}
               </span>
             </div>
           {/if}
@@ -242,10 +245,7 @@
             <div class="inventory-detail-limit" data-inventory-limit="uses">
               <span class="inventory-detail-limit-label">{localize('FABRICATE.App.Inventory.Detail.UsesLimitLabel')}</span>
               <span class="inventory-detail-limit-value" data-inventory-uses-budget>
-                {localize('FABRICATE.App.Inventory.Detail.UsesValue', {
-                  used: Number(usesLimit.used ?? 0),
-                  max: Number(usesLimit.max ?? 0),
-                })}
+                {remainingText(usesLimit.remaining, 'UsesRemainingOne', 'UsesRemainingMany')}
               </span>
             </div>
           {/if}

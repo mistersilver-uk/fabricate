@@ -716,13 +716,25 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     assert.equal(bookRow(listing), null);
   });
 
-  it('projects an item-only book as a non-learnable row (held for craft access)', () => {
-    const listing = bookBuilder({ system: bookSystem({ knowledge: { mode: 'item' } }) }).buildListing({
-      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+  it('projects an item-only book as a non-learnable row and suppresses its learning limit', () => {
+    // Even with a learn cap configured, an item-only book must not show a learning
+    // limit — it grants access by being held, not by learning.
+    const system = bookSystem({
+      knowledge: {
+        mode: 'item',
+        item: { limitUses: true, maxUses: 3 },
+        learn: { limitRecipes: true, maxRecipes: 2 },
+      },
+    });
+    const book = bookItem('Item.book1', 1, { recipeItemUsage: { timesUsed: 1 } });
+    const listing = bookBuilder({ system }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [book]),
     });
     const row = bookRow(listing);
     assert.ok(row, 'an item-only book still appears in the inventory');
     assert.equal(row.learnable, false, 'an item-only book offers no Learn affordance');
+    assert.equal(row.limits.learning, null, 'no learning limit for an item-only book');
+    assert.deepEqual(row.limits.uses, { max: 3, used: 1, remaining: 2 }, 'the craft-use limit still shows');
     assert.deepEqual(
       row.recipes.map((r) => r.id),
       ['r1', 'r2'],

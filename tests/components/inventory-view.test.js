@@ -399,11 +399,10 @@ describe('InventoryView (mounted) — recipe-item books', () => {
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
     // The harness localize mock does not interpolate; it emits `key:{data}`, so
-    // assert the budget carries remaining=0 / max=2 rather than the final phrasing.
+    // assert the budget uses the "N remaining" (plural at 0) key carrying remaining=0.
     const budget = detail.querySelector('[data-inventory-learning-budget]').textContent;
-    assert.match(budget, /LearningBudget/, 'renders the learning-budget string');
+    assert.match(budget, /LearningRemainingMany/, 'renders the pluralized remaining string at 0');
     assert.match(budget, /"remaining":0/, 'budget carries remaining = 0');
-    assert.match(budget, /"max":2/, 'budget carries max = 2');
     assert.equal(
       detail.querySelector('[data-inventory-learn="r1"]').disabled,
       true,

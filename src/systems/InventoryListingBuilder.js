@@ -499,7 +499,7 @@ export class InventoryListingBuilder {
         producedBy: [],
         contributors: [],
         recipes: linkedRecipes,
-        limits: this._recipeItemLimits(knowledge, item),
+        limits: this._recipeItemLimits(knowledge, item, learnable),
       });
     }
 
@@ -545,7 +545,7 @@ export class InventoryListingBuilder {
    * invalid cap as uncapped.
    * @private
    */
-  _recipeItemLimits(knowledge, item) {
+  _recipeItemLimits(knowledge, item, learnable = false) {
     const finitePositive = (value) => {
       const num = Number(value);
       return Number.isFinite(num) && num > 0 ? num : null;
@@ -558,9 +558,13 @@ export class InventoryListingBuilder {
       uses = { max: maxUses, used, remaining: Math.max(0, maxUses - used) };
     }
 
+    // The learn budget only applies when the book can teach — an item-only book is
+    // never "learned from", so its learning limit is suppressed.
     let learning = null;
     const maxRecipes =
-      knowledge?.learn?.limitRecipes === true ? finitePositive(knowledge?.learn?.maxRecipes) : null;
+      learnable && knowledge?.learn?.limitRecipes === true
+        ? finitePositive(knowledge?.learn?.maxRecipes)
+        : null;
     if (maxRecipes != null) {
       const learned = Number(getFabricateFlag(item, 'recipeItemLearning', {})?.learnedCount || 0);
       learning = { max: maxRecipes, learned, remaining: Math.max(0, maxRecipes - learned) };
