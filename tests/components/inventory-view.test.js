@@ -333,7 +333,7 @@ function makeBookServices(book, { learningRecipeId = null } = {}) {
   return { services, calls, store };
 }
 
-function makeBook(recipes, limits = { uses: null, learning: null }) {
+function makeBook(recipes, limits = { uses: null, learning: null }, learnable = true) {
   return {
     key: 'recipeitem:sys:def-1',
     recipeItemId: 'def-1',
@@ -347,6 +347,7 @@ function makeBook(recipes, limits = { uses: null, learning: null }) {
     isEssenceSource: false,
     isTool: false,
     isRecipeItem: true,
+    learnable,
     totalQuantity: 1,
     sources: [{ actorId: 'a1', actorName: 'Akra', actorImg: null, quantity: 1 }],
     essences: [],
@@ -468,5 +469,21 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     const detail = target.querySelector('[data-inventory-recipe-item]');
     assert.ok(detail.querySelector('[data-inventory-recipe-accordion]'), 'still an accordion');
     assert.equal(detail.querySelector('[data-inventory-recipe-search]'), null, 'no search for a small book');
+  });
+
+  it('lists an item-only (non-learnable) book without Learn controls', async () => {
+    const recipes = [
+      { id: 'r1', name: 'Forge Breastplate', description: 'A cuirass.', img: null, learned: false },
+      { id: 'r2', name: 'Temper Longsword', description: '', img: null, learned: false },
+    ];
+    const { services } = makeBookServices(makeBook(recipes, { uses: null, learning: null }, false));
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assert.ok(detail, 'the item-only book still renders in the inventory');
+    assert.match(detail.textContent, /Forge Breastplate/, 'it still lists its recipes');
+    assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item-only mode');
+    assert.equal(detail.querySelector('[data-inventory-learned="r1"]'), null, 'no Learned chip in item-only mode');
   });
 });

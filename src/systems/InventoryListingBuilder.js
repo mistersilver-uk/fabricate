@@ -392,8 +392,13 @@ export class InventoryListingBuilder {
 
     const visibility = system?.recipeVisibility ?? {};
     const knowledge = visibility?.knowledge ?? {};
+    // A recipe item is an inventory row in any knowledge list mode — it is a book
+    // the player owns regardless of how it grants access. `learnable` gates the
+    // Learn affordance: only `learned` / `itemOrLearned` modes teach from it; an
+    // item-only mode book grants craft access by being held, so it lists its
+    // recipes and craft-use limit but offers no Learn button.
     if (visibility?.listMode !== 'knowledge') return [];
-    if (!LEARN_CAPABLE_MODES.has(knowledge?.mode || 'itemOrLearned')) return [];
+    const learnable = LEARN_CAPABLE_MODES.has(knowledge?.mode || 'itemOrLearned');
 
     const systemId = stringOrNull(system?.id);
     const systemName = stringOrEmpty(system?.name);
@@ -485,6 +490,7 @@ export class InventoryListingBuilder {
         isEssenceSource: false,
         isTool: false,
         isRecipeItem: true,
+        learnable,
         totalQuantity,
         sources: rowSources,
         essences: [],

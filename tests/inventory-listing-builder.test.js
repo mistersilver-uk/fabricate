@@ -687,6 +687,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     assert.equal(listing.counts.recipeItems, 1);
     // Books are counted apart from components.
     assert.equal(listing.counts.components, 0);
+    assert.equal(row.learnable, true, 'a learned-mode book is learnable');
   });
 
   it('matches a book duplicated from a world template via _stats.duplicateSource', () => {
@@ -715,11 +716,18 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     assert.equal(bookRow(listing), null);
   });
 
-  it('does not project book rows for an item-only knowledge mode (nothing to learn)', () => {
+  it('projects an item-only book as a non-learnable row (held for craft access)', () => {
     const listing = bookBuilder({ system: bookSystem({ knowledge: { mode: 'item' } }) }).buildListing({
       craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
     });
-    assert.equal(bookRow(listing), null);
+    const row = bookRow(listing);
+    assert.ok(row, 'an item-only book still appears in the inventory');
+    assert.equal(row.learnable, false, 'an item-only book offers no Learn affordance');
+    assert.deepEqual(
+      row.recipes.map((r) => r.id),
+      ['r1', 'r2'],
+      'it still lists the recipes it grants access to'
+    );
   });
 
   it('omits a book the player does not own', () => {

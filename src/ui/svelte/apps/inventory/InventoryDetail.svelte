@@ -78,6 +78,10 @@
 
   // --- Recipe-item "book" learning state -------------------------------------
   const isRecipeItem = $derived(item?.isRecipeItem === true);
+  // Learn controls appear only when the book's system can teach (learned /
+  // itemOrLearned). An item-only book still lists its recipes + craft-use limit,
+  // but grants access by being held, so it offers no Learn affordance.
+  const learnable = $derived(item?.learnable === true);
   const bookDescription = $derived(String(item?.description ?? '').trim());
   const bookRecipes = $derived(Array.isArray(item?.recipes) ? item.recipes : []);
   const usesLimit = $derived(item?.limits?.uses ?? null);
@@ -261,7 +265,7 @@
               <CraftingThumb src={recipe.img ?? ''} alt="" size={40} />
               <span class="inventory-detail-row-name">{recipe.name}</span>
             </span>
-            {@render learnControl(recipe)}
+            {#if learnable}{@render learnControl(recipe)}{/if}
           </div>
           {#if recipe.description}
             <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
@@ -306,7 +310,7 @@
                       aria-hidden="true"
                     ></i>
                   </button>
-                  {@render learnControl(recipe)}
+                  {#if learnable}{@render learnControl(recipe)}{/if}
                 </div>
                 {#if expanded}
                   <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
