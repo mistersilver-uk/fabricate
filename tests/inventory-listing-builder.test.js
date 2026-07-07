@@ -749,7 +749,28 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     assert.equal(bookRow(listing), null);
   });
 
-  it('reports learning and use limits from the owned document counters', () => {
+  it('reports both learning and use limits for an item-or-learned book', () => {
+    // Item-or-learned grants access both ways, so both limits are meaningful.
+    const system = bookSystem({
+      knowledge: {
+        mode: 'itemOrLearned',
+        item: { limitUses: true, maxUses: 3 },
+        learn: { limitRecipes: true, maxRecipes: 2 },
+      },
+    });
+    const book = bookItem('Item.book1', 1, {
+      recipeItemLearning: { learnedCount: 1 },
+      recipeItemUsage: { timesUsed: 2 },
+    });
+    const listing = bookBuilder({ system }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [book]),
+    });
+    const row = bookRow(listing);
+    assert.deepEqual(row.limits.learning, { max: 2, learned: 1, remaining: 1 });
+    assert.deepEqual(row.limits.uses, { max: 3, used: 2, remaining: 1 });
+  });
+
+  it('suppresses the craft-use limit for a learn-only (learned) book', () => {
     const system = bookSystem({
       knowledge: {
         mode: 'learned',
@@ -766,7 +787,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     });
     const row = bookRow(listing);
     assert.deepEqual(row.limits.learning, { max: 2, learned: 1, remaining: 1 });
-    assert.deepEqual(row.limits.uses, { max: 3, used: 2, remaining: 1 });
+    assert.equal(row.limits.uses, null, 'a learn-only book is never used to craft');
   });
 
   it('treats an enabled-but-invalid cap as uncapped (no learning limit)', () => {

@@ -31,6 +31,10 @@ import { getFabricateFlag } from '../config/flags.js';
 // book is not projected as a learnable inventory row.
 const LEARN_CAPABLE_MODES = new Set(['learned', 'itemOrLearned']);
 
+// Knowledge modes in which the book grants crafting access by being held — the
+// only modes where its craft-use ("Crafting uses") limit is meaningful.
+const ITEM_ACCESS_MODES = new Set(['item', 'itemOrLearned']);
+
 function stringOrEmpty(value) {
   return typeof value === 'string' ? value : value == null ? '' : String(value);
 }
@@ -398,7 +402,9 @@ export class InventoryListingBuilder {
     // item-only mode book grants craft access by being held, so it lists its
     // recipes and craft-use limit but offers no Learn button.
     if (visibility?.listMode !== 'knowledge') return [];
-    const learnable = LEARN_CAPABLE_MODES.has(knowledge?.mode || 'itemOrLearned');
+    const mode = knowledge?.mode || 'itemOrLearned';
+    const learnable = LEARN_CAPABLE_MODES.has(mode);
+    const grantsByItem = ITEM_ACCESS_MODES.has(mode);
 
     const systemId = stringOrNull(system?.id);
     const systemName = stringOrEmpty(system?.name);
@@ -499,7 +505,7 @@ export class InventoryListingBuilder {
         producedBy: [],
         contributors: [],
         recipes: linkedRecipes,
-        limits: this._recipeItemLimits(knowledge, item, learnable),
+        limits: this._recipeItemLimits(knowledge, item, { learnable, grantsByItem }),
       });
     }
 
@@ -545,14 +551,18 @@ export class InventoryListingBuilder {
    * invalid cap as uncapped.
    * @private
    */
-  _recipeItemLimits(knowledge, item, learnable = false) {
+  _recipeItemLimits(knowledge, item, { learnable = false, grantsByItem = false } = {}) {
     const finitePositive = (value) => {
       const num = Number(value);
       return Number.isFinite(num) && num > 0 ? num : null;
     };
 
+    // The craft-use limit only applies when the book grants access by being held
+    // (item / itemOrLearned) — a learn-only book is never "used" to craft, so its
+    // use limit is suppressed, mirroring the learn-limit suppression below.
     let uses = null;
-    const maxUses = knowledge?.item?.limitUses === true ? finitePositive(knowledge?.item?.maxUses) : null;
+    const maxUses =
+      grantsByItem && knowledge?.item?.limitUses === true ? finitePositive(knowledge?.item?.maxUses) : null;
     if (maxUses != null) {
       const used = Number(getFabricateFlag(item, 'recipeItemUsage', {})?.timesUsed || 0);
       uses = { max: maxUses, used, remaining: Math.max(0, maxUses - used) };
