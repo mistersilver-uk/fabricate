@@ -75,7 +75,6 @@ import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js'
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
-import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
 import {
   handleInteractableSocketMessage,
@@ -675,7 +674,6 @@ class Fabricate {
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
-    registerItemSheetRecipeLearnControl(this.recipeVisibilityService);
 
     this.ready = true;
     this._resolveReady?.();
@@ -1338,6 +1336,37 @@ class Fabricate {
   }
 
   /**
+   * Learn one recipe from an owned recipe-item "book" for the player Inventory
+   * learn affordance. Resolves the crafting actor + component sources (same scope
+   * the inventory listing was computed for), then delegates to the visibility
+   * service, which enforces the per-document learn budget for capped systems and
+   * leaves uncapped books intact.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id (defaults to the
+   *   persisted selection).
+   * @param {string} options.recipeId Recipe to learn.
+   * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
+   * @returns {Promise<{success: boolean, message: string, messageData?: object}>}
+   */
+  async learnRecipeFromInventory({ actorId = null, recipeId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    const recipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!recipe) {
+      return { success: false, message: 'FABRICATE.Knowledge.NoMatchingItem' };
+    }
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    return this.recipeVisibilityService.learnRecipeFromOwnedBook({
+      recipe,
+      craftingActor,
+      componentSourceActors,
+    });
+  }
+
+  /**
    * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.
    * Resolves the crafting actor + component sources from the supplied ids (or the
    * persisted defaults) so the attempt uses the same inventory scope the listing
@@ -1489,7 +1518,10 @@ class Fabricate {
    * @returns {boolean}
    */
   getHideUnavailableEnvironments() {
-    return getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE) === true;
+    // Boolean() rather than `=== true`: the setting is registered `type: Boolean`
+    // so the value is already boolean, and the strict compare trips a static-analysis
+    // false positive (game.settings.get is not typed as boolean).
+    return Boolean(getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE));
   }
 
   /**

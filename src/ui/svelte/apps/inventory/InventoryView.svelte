@@ -50,6 +50,9 @@
   function onOpenRecipe(recipeId) {
     services?.navigateToCraftingRecipe?.(recipeId);
   }
+  function onLearn(recipeId) {
+    return store?.learn?.(recipeId);
+  }
 
   // Refetch on mount and whenever the shared actor selection changes. The shared
   // top bar is the single source of truth for the selected character; persist its
@@ -130,7 +133,12 @@
       </div>
 
       <section class="inventory-view-column inventory-view-column-right" data-inventory-detail>
-        <InventoryDetail item={store?.selectedItem ?? null} {onOpenRecipe} />
+        <InventoryDetail
+          item={store?.selectedItem ?? null}
+          learningRecipeId={store?.learningRecipeId ?? null}
+          {onOpenRecipe}
+          {onLearn}
+        />
       </section>
     </div>
   </div>

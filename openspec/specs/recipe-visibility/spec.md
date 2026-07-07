@@ -301,6 +301,36 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 1. If `consumeOnLearn === true`, consume selected item.
 2. Return the updated access state.
 
+### Recipe-Item Learn Cap
+
+A recipe item may carry a **learn cap** (`knowledge.learn.maxRecipes`, enabled by `knowledge.learn.limitRecipes`).
+The learn cap limits how many of a recipe item's linked recipes may be learned from it, distinct from the item craft-charge limit (`knowledge.item.limitUses`), which caps how many times the item grants crafting access.
+
+Each recipe-item **document instance** tracks a **learn budget** count that mirrors the craft-charge `timesUsed` count (per physical item document, so a stacked `qty > 1` document shares one count).
+The **remaining budget** is `maxRecipes − count`.
+A further recipe is refused once the count reaches `maxRecipes`.
+
+Optional `knowledge.learn.destroyWhenSpent` removes the recipe item when the budget is spent (the count reaches `maxRecipes`).
+`destroyWhenSpent` (learn cap) is deliberately distinct from `destroyWhenExhausted` (item craft-charges); the two flags are independent and are not normalized to one name.
+
+#### Cross-Actor Budget Semantics
+
+The learn budget is per **physical recipe-item document copy**.
+It **counts across all actors** that hold the document and is **not reset** on transfer or ownership change.
+
+#### Player-Selected Learning From The Inventory Tab
+
+Players learn from an owned recipe item one recipe at a time in the player Inventory tab, which is the manual learn surface for every knowledge mode.
+A recipe item whose system has an **effective** learn cap (`knowledge.learn.limitRecipes === true` AND a finite positive `maxRecipes`) is a **capped recipe item** and does not auto-learn every linked recipe on drop.
+A system that toggled `limitRecipes` on but carries a missing or invalid `maxRecipes` is not treated as capped -- it fails closed to the uncapped auto-learn path rather than bricking its recipes with a zero budget.
+
+- Owned recipe items surface in the Inventory listing (`InventoryListingBuilder`) as learnable rows for any `knowledge` list-mode system, carrying their linked recipes (each with a per-actor `learned` flag) and their applicable limits.
+  A `learnable` row flag is set only for `learned` / `itemOrLearned` modes; an item-only book lists its recipes and its craft-use limit but offers no Learn affordance (it grants access by being held).
+- The learning limit is projected only when the book is learnable; the craft-use limit is projected only when the mode grants access by holding the item (`item` / `itemOrLearned`).
+- Learning one recipe (`RecipeVisibilityService.learnRecipeFromOwnedBook`) resolves the owned document deterministically, writes one `learnedRecipes` entry, and — for a capped recipe item — increments the document's learn budget count and removes the item when the budget is then spent if `destroyWhenSpent === true`.
+- `consumeOnLearn` is ignored on this path (it would delete a multi-recipe book on the first learn); only `destroyWhenSpent` on a spent cap removes the book.
+- A capped recipe item is refused a further learn once `count` reaches `maxRecipes`.
+
 ### Drag-and-Drop Learn Configuration
 
 Automatic actor-drop learning is controlled by `recipeVisibility.knowledge.learn.dragDropEnabled`.
@@ -368,6 +398,11 @@ Learning is applied per matched recipe independently:
 - `consumeOnLearn` is evaluated for each newly learned recipe.
 If any learned recipe requires consumption, the dropped owned item must be removed by the end of the operation.
 
+The "learn every linked recipe in a single operation" rule gains an exception applied **per matched recipe**: for a matched recipe whose crafting system has `knowledge.learn.limitRecipes === true` (a **learn cap**, see Recipe-Item Learn Cap below), learning is player-chosen and capped at the remaining budget rather than auto-applied on drop.
+Matched recipes from uncapped systems in the same drop still auto-learn.
+A single dropped recipe item that matches both capped-system and uncapped-system recipes learns the uncapped ones on drop and routes only the capped ones to the Inventory-tab learn path; the drop is never a whole no-op.
+`knowledge.learn.consumeOnLearn` is not applied to a capped recipe item and is hidden for it in the authoring UI -- it is superseded by `knowledge.learn.destroyWhenSpent`.
+
 #### Notifications
 
 After a drag-and-drop learn operation completes, the module must provide user feedback:
@@ -384,10 +419,9 @@ When `dragDropEnabled === false`:
 
 - Drops must never trigger auto-learning from `createItem`, `preCreateItem`, or `dropActorSheetData`.
 - The actor still receives the dropped item through normal Foundry item-drop behaviour.
-- The manual learning affordance is an item-sheet header learn icon/button, as specified in `003-ui-integration.md`.
-- Clicking the manual learn action prompts the user to confirm learning for the owning actor and, on confirmation, runs the same learning operation used by drag-and-drop.
-- The manual path must apply `consumeOnLearn` and remove the item when required.
-- Manual-learning eligibility is also evaluated per matched recipe using that recipe's own `knowledge.learn.dragDropEnabled` setting.
+- The manual learning affordance is the player **Inventory tab**: the owned recipe item appears as a learnable row and each not-yet-learned recipe offers a Learn action (see Player-Selected Learning From The Inventory Tab).
+- The Inventory learn path learns one recipe at a time and does not apply `consumeOnLearn`; a capped book removes itself only when its budget is spent and `destroyWhenSpent === true`.
+- Manual-learning eligibility is evaluated per matched recipe using that recipe's own knowledge configuration.
 In mixed-system worlds, the manual path only includes recipes from systems where `dragDropEnabled === false`.
 
 ## Edge Cases

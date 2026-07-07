@@ -3403,6 +3403,103 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.match(playerNote.textContent, /per-recipe/i);
   });
 
+  it('recipe visibility card renders the learn-cap card and hides consume-on-learn when the cap is on (issue 511)', () => {
+    // Cap OFF: consume-on-learn tile present; learn-cap nested inputs disabled.
+    mountRecipeVisibilityCard({
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'itemOrLearned',
+          item: { limitUses: false },
+          learn: { consumeOnLearn: true, dragDropEnabled: true, limitRecipes: false },
+        },
+      },
+      showKnowledgeOptions: true,
+      onSave: () => {},
+    });
+
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-limit-recipes]'),
+      'the learn-cap Enabled toggle renders'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-max-recipes]'),
+      'the max-recipes stepper renders even when the cap is off'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-destroy-spent]'),
+      'the destroy-when-spent toggle renders'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-max-recipes] input').disabled,
+      true,
+      'the max-recipes input is disabled while the cap is off'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
+      'consume-on-learn shows while the cap is off'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    // Cap ON: consume-on-learn tile hidden; stepper enabled.
+    mountRecipeVisibilityCard({
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'itemOrLearned',
+          item: { limitUses: false },
+          learn: {
+            consumeOnLearn: true,
+            dragDropEnabled: true,
+            limitRecipes: true,
+            maxRecipes: 3,
+          },
+        },
+      },
+      showKnowledgeOptions: true,
+      onSave: () => {},
+    });
+
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
+      null,
+      'consume-on-learn is hidden while the cap is on'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-limit-recipes]'),
+      'the learn-cap card still renders while the cap is on'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-max-recipes] input').disabled,
+      false,
+      'the max-recipes input is enabled while the cap is on'
+    );
+    // The drag-drop tile is unaffected by the cap.
+    assert.ok(target.querySelector('[data-recipe-visibility-drag-drop]'));
+  });
+
+  it('recipe visibility card commits a concrete cap when enabling the learn limit (issue 511)', () => {
+    const emitted = [];
+    mountRecipeVisibilityCard({
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: {
+          mode: 'learned',
+          item: { limitUses: false },
+          learn: { consumeOnLearn: false, dragDropEnabled: true, limitRecipes: false },
+        },
+      },
+      showKnowledgeOptions: true,
+      onSave: (patch) => emitted.push(patch),
+    });
+
+    target.querySelector('[data-recipe-visibility-limit-recipes]').click();
+    assert.deepEqual(emitted.at(-1), { limitRecipes: true, maxRecipes: 1 });
+  });
+
   it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
     // Not in player mode ⇒ no visibility section.
     mountRecipeOverview({
@@ -4068,7 +4165,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('suppresses the recipe-item inspector aside on the recipe-edit route when the knowledge mode is learned', async () => {
+  it('shows the recipe-item inspector aside on the recipe-edit route when the knowledge mode is learned', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -4103,21 +4200,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-main [data-recipe-section="identity"]'),
       'recipe-edit still renders the identity card in the central main'
     );
-    // 'learned' recipes never consume an item, so the recipe-item card is hidden
-    // and the whole inspector aside is suppressed, leaving a full-width main.
-    assert.equal(
+    // Learning a recipe requires it to link a recipe item (the book the player
+    // learns from), and this inspector is the only place that link is authored,
+    // so the recipe-item card must show for 'learned' too — otherwise a
+    // learned-only system has no way to make any recipe learnable.
+    assert.ok(
       target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'),
-      null,
-      'recipe-item card is hidden for the learned knowledge mode'
-    );
-    assert.equal(
-      target.querySelector('.manager-inspector'),
-      null,
-      'the inspector aside is fully suppressed for the learned knowledge mode'
+      'recipe-item card shows for the learned knowledge mode'
     );
     assert.ok(
-      target.textContent.includes('Edit identity for this recipe.'),
-      'learned mode shows the identity-only subtitle'
+      target.querySelector('.manager-inspector'),
+      'the inspector aside is present for the learned knowledge mode'
+    );
+    assert.ok(
+      !target.textContent.includes('Edit identity for this recipe.'),
+      'learned mode no longer shows the identity-only subtitle'
     );
   });
 

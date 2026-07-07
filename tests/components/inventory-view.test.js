@@ -292,3 +292,197 @@ describe('InventoryView (mounted)', () => {
     assert.ok(detail.querySelector('[data-inventory-used-by="u7"]'), 'shows the second-page rows');
   });
 });
+
+// Build a store whose selected item is a recipe-item "book", plus a learn()
+// capture. Only the getters InventoryView/InventoryDetail read are provided.
+function makeBookServices(book, { learningRecipeId = null } = {}) {
+  const calls = { navigate: [], learn: [] };
+  const store = {
+    rows: [book],
+    loading: false,
+    loadedOnce: true,
+    error: null,
+    hasActor: true,
+    search: '',
+    filter: 'all',
+    sort: 'name',
+    filterCounts: { all: 1, components: 0, essences: 0, tools: 0, recipeItems: 1 },
+    page: 0,
+    pageSize: 25,
+    visibleItems: [book],
+    pageItems: [book],
+    selectedItem: book,
+    learningRecipeId,
+    select() {},
+    setSearch() {},
+    setFilter() {},
+    setSort() {},
+    setPage() {},
+    setPageSize() {},
+    load() {},
+    learn: (recipeId) => calls.learn.push(recipeId),
+    tickWorldTime() {},
+  };
+  const services = {
+    inventory: store,
+    craftingSources: { load() {}, setCraftingActor() {}, selectedSourceIds: [] },
+    actorBar: { selectedActorId: 'a1' },
+    setSelectedCraftingActorId() {},
+    navigateToCraftingRecipe: (id) => calls.navigate.push(id),
+  };
+  return { services, calls, store };
+}
+
+function makeBook(recipes, limits = { uses: null, learning: null }, learnable = true) {
+  return {
+    key: 'recipeitem:sys:def-1',
+    recipeItemId: 'def-1',
+    componentId: null,
+    name: "Armorer's Handbook",
+    img: 'icons/book.webp',
+    icon: null,
+    description: 'A worn manual of forge techniques.',
+    tags: [],
+    tier: null,
+    isEssenceSource: false,
+    isTool: false,
+    isRecipeItem: true,
+    learnable,
+    totalQuantity: 1,
+    sources: [{ actorId: 'a1', actorName: 'Akra', actorImg: null, quantity: 1 }],
+    essences: [],
+    usedBy: [],
+    requiredFor: [],
+    producedBy: [],
+    contributors: [],
+    recipes,
+    limits,
+  };
+}
+
+describe('InventoryView (mounted) — recipe-item books', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  it('renders a single-recipe book inline with its description and a Learn button', async () => {
+    const book = makeBook([
+      { id: 'r1', name: 'Forge Breastplate', description: 'A sturdy cuirass.', img: null, learned: false },
+    ]);
+    const { services, calls } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assert.ok(detail, 'renders the book detail');
+    assert.match(detail.textContent, /A worn manual of forge techniques\./, 'shows the book description');
+    assert.match(detail.textContent, /Forge Breastplate/, 'shows the single recipe name');
+    assert.match(detail.textContent, /A sturdy cuirass\./, 'shows the recipe description inline');
+    // No accordion for a single recipe.
+    assert.equal(detail.querySelector('[data-inventory-recipe-accordion]'), null, 'no accordion for one recipe');
+
+    const learn = detail.querySelector('[data-inventory-learn="r1"]');
+    assert.ok(learn, 'renders a Learn button');
+    learn.click();
+    await settle();
+    assert.deepEqual(calls.learn, ['r1'], 'clicking Learn invokes store.learn with the recipe id');
+  });
+
+  it('shows the learning budget and disables Learn when the budget is spent', async () => {
+    const book = makeBook(
+      [{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }],
+      { uses: null, learning: { max: 2, learned: 2, remaining: 0 } }
+    );
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    // The harness localize mock does not interpolate; it emits `key:{data}`, so
+    // assert the budget uses the "N remaining" (plural at 0) key carrying remaining=0.
+    const budget = detail.querySelector('[data-inventory-learning-budget]').textContent;
+    assert.match(budget, /LearningRemainingMany/, 'renders the pluralized remaining string at 0');
+    assert.match(budget, /"remaining":0/, 'budget carries remaining = 0');
+    assert.equal(
+      detail.querySelector('[data-inventory-learn="r1"]').disabled,
+      true,
+      'Learn is disabled when the budget is spent'
+    );
+  });
+
+  it('shows a Learned chip instead of a Learn button for an already-learned recipe', async () => {
+    const book = makeBook([{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: true }]);
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assert.ok(detail.querySelector('[data-inventory-learned="r1"]'), 'renders a Learned chip');
+    assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button when learned');
+  });
+
+  it('renders a multi-recipe book as a searchable accordion that expands to the description', async () => {
+    const recipes = Array.from({ length: 8 }, (_, i) => ({
+      id: `r${i + 1}`,
+      name: `Recipe ${i + 1}`,
+      description: `Description ${i + 1}`,
+      img: null,
+      learned: false,
+    }));
+    const { services } = makeBookServices(makeBook(recipes));
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    const accordion = detail.querySelector('[data-inventory-recipe-accordion]');
+    assert.ok(accordion, 'renders the accordion for multiple recipes');
+    // Search appears once a book teaches more than the smallest page (6).
+    assert.ok(detail.querySelector('[data-inventory-recipe-search]'), 'shows the recipe search over 6 recipes');
+    // First page shows 6 of 8; the pager offers page-size 6/9/12.
+    assert.equal(accordion.querySelectorAll('[data-inventory-learn-recipe]').length, 6, 'first page shows six recipes');
+    assert.ok(detail.querySelector('[data-inventory-recipe-pager]'), 'renders the recipe pager');
+
+    // The row description is collapsed until the header is toggled.
+    assert.equal(detail.querySelector('[data-inventory-recipe-body="r1"]'), null, 'description collapsed by default');
+    detail.querySelector('[data-inventory-learn-recipe="r1"] .inventory-detail-accordion-toggle').click();
+    await settle();
+    assert.match(
+      detail.querySelector('[data-inventory-recipe-body="r1"]').textContent,
+      /Description 1/,
+      'expanding the row reveals the description'
+    );
+  });
+
+  it('does not show the recipe search for a small multi-recipe book (<= 6)', async () => {
+    const recipes = Array.from({ length: 3 }, (_, i) => ({
+      id: `r${i + 1}`,
+      name: `Recipe ${i + 1}`,
+      description: '',
+      img: null,
+      learned: false,
+    }));
+    const { services } = makeBookServices(makeBook(recipes));
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assert.ok(detail.querySelector('[data-inventory-recipe-accordion]'), 'still an accordion');
+    assert.equal(detail.querySelector('[data-inventory-recipe-search]'), null, 'no search for a small book');
+  });
+
+  it('lists an item-only (non-learnable) book without Learn controls', async () => {
+    const recipes = [
+      { id: 'r1', name: 'Forge Breastplate', description: 'A cuirass.', img: null, learned: false },
+      { id: 'r2', name: 'Temper Longsword', description: '', img: null, learned: false },
+    ];
+    const { services } = makeBookServices(makeBook(recipes, { uses: null, learning: null }, false));
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assert.ok(detail, 'the item-only book still renders in the inventory');
+    assert.match(detail.textContent, /Forge Breastplate/, 'it still lists its recipes');
+    assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item-only mode');
+    assert.equal(detail.querySelector('[data-inventory-learned="r1"]'), null, 'no Learned chip in item-only mode');
+  });
+});

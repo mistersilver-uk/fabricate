@@ -109,7 +109,8 @@ Unlinking only removes the link from this recipe.
 It does not delete the item itself.
 
 If the linked item can no longer be found, the card shows an unresolved state and keeps the link so you can repoint it.
-The Recipe item card is shown for knowledge modes that use an owned item (**Item** and **Item or Learned**) and is hidden for **Learned**, where no item is needed.
+The Recipe item card is shown for every knowledge mode — **Item**, **Learned**, and **Item or Learned**.
+Even **Learned** needs a linked item, because a recipe is learned from the book that teaches it.
 
 ### How Matching Works
 
@@ -148,11 +149,12 @@ Learning happens from an owned recipe item.
 A recipe can be learned when it has a linked recipe item, the player owns a matching item, and the recipe has not already been learned.
 When a recipe is learned, Fabricate records it on the actor along with when it was learned and which item taught it.
 
-A player-facing "Learn" action surfaced by the Crafting UI, along with a "Locked" badge for locked recipes, is planned and not yet available.
+Players learn from the **Inventory** tab of the Fabricate window — see [Learning From the Inventory Tab](#learning-from-the-inventory-tab).
+Recipe items can also auto-learn when dropped on an actor — see [Drag-and-Drop Learning](#drag-and-drop-learning).
 
 ### Consume on Learn
 
-By default, the recipe item is consumed (deleted) when the player learns the recipe.
+By default, dropping a recipe item on an actor consumes (deletes) it once its recipes are learned.
 This creates one-time-use "recipe scrolls".
 
 You can choose to keep the item after learning instead.
@@ -160,6 +162,50 @@ For example, a spellbook that teaches recipes but is not destroyed in the proces
 
 You set this in the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
 The option only appears when the system is in knowledge mode.
+Consume on learn applies to drag-and-drop learning.
+Learning one recipe at a time from the Inventory tab never consumes the book — only a spent learn cap with **Delete when spent** removes it.
+
+### Limiting Recipes Learned Per Book
+
+A recipe item can link to several recipes, which makes it a "recipe book".
+By default a book teaches every recipe it links at once.
+You can instead cap how many recipes a player may learn from a single book.
+
+To turn the cap on, open the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
+Under the learning options, turn on **Limited recipes learned per item**.
+Set **Maximum recipes** to the number of recipes one book may teach.
+Turn on **Delete when spent** if you want the book removed once its budget is used up.
+
+While the cap is on, the **Consume item on learn** option is hidden.
+Consuming the book on the first learn would stop it teaching any further recipes, so the two options cannot be used together.
+**Delete when spent** replaces it and removes the book only once its whole budget is spent.
+
+The budget belongs to the physical book rather than to the player.
+Every actor who holds that same book draws from the same remaining budget.
+The budget is not reset when the book changes hands or owners.
+
+### Learning From the Inventory Tab
+
+Players learn recipes from the **Inventory** tab of the Fabricate window.
+Recipe items the player owns appear there alongside components, and the **Recipe items** filter narrows the list to just books.
+
+Selecting a book shows its detail on the right.
+The book's limits appear at the top.
+**Recipes learned** (for example "2 recipes remaining") appears when the book can be learned from and has a learn cap.
+**Crafting uses** (for example "3 uses remaining") appears when the book grants crafting access by being held and has a use cap.
+A learn-only book (mode **Learned**) never shows a use limit, and an item-only book (mode **Item**) never shows a learn limit; **Item or Learned** can show both.
+Below the limits, the book lists the recipes it teaches.
+
+A book with a single recipe shows that recipe's name, description, and a **Learn** button.
+A book with several recipes lists them in an accordion: each row has the recipe's icon, name, and a **Learn** button, and expands to reveal the description.
+Once a book teaches more than six recipes, a search box appears and the list paginates (six, nine, or twelve per page).
+
+Clicking **Learn** on a recipe learns it.
+A learned recipe shows a **Learned** marker instead of a button.
+When a learn cap's budget is spent, the remaining **Learn** buttons are disabled, and if **Delete when spent** is on the book is removed as its final allowed recipe is learned.
+
+An item-only book (a system whose knowledge mode is **Item**) still appears in the Inventory tab and lists the recipes it grants access to, along with its use limit.
+It shows no **Learn** buttons, because it grants access by being held rather than by learning.
 
 ### Drag-and-Drop Learning
 
@@ -183,6 +229,11 @@ When this happens, the actor learns every matched recipe in a single operation.
 This makes it straightforward to create "recipe book" items.
 One Alchemist's Compendium, for example, might unlock Healing Salve, Antitoxin, and Smokestick all at once.
 
+This learn-all-on-drop behaviour applies to books without a learn cap.
+A book with a learn cap is not learned on drop.
+Its recipes are chosen one at a time from the Inventory tab instead.
+See [Learning From the Inventory Tab](#learning-from-the-inventory-tab).
+
 #### Mixed-System Behavior
 
 Learning from a recipe item is decided one recipe at a time, not once for the item as a whole.
@@ -191,18 +242,7 @@ In a world with multiple crafting systems:
 - Recipes from systems with auto-learn turned on are learned when the item is dropped onto the actor.
 - Recipes from systems with auto-learn turned off are left out of auto-learning, even if the same owned item matches them.
 
-This means the same owned item can auto-learn some recipes immediately and still offer manual learning for other matched recipes from differently configured systems.
-
-### Manual Learning On Owned Item Sheets
-
-When a matched recipe belongs to a system where auto-learn is turned off, Fabricate adds a **Learn Recipe** action to the actor-owned item sheet instead of auto-learning on drop.
-
-- The action appears only on actor-owned item sheets.
-- It appears only when the current user can update the owning actor and at least one matched recipe is manually learnable.
-- The action learns only the manual-learning subset: matched recipes from systems where auto-learn is disabled.
-- If the same owned item also matches recipes from auto-learn-enabled systems, those recipes still learn automatically on drop while the remaining manual-only recipes stay available from the item sheet action.
-
-After clicking **Learn Recipe**, Fabricate asks for confirmation and then applies the same consume-on-learn behavior used by drag-and-drop learning.
+This means the same owned item can auto-learn some recipes immediately and still offer manual learning, from the Inventory tab, for other matched recipes from differently configured systems.
 
 #### Notifications
 
@@ -226,7 +266,7 @@ Locked recipes:
 
 - Are visible to all players, so they know the recipe exists
 - Cannot be crafted by anyone other than the GM
-- Are reported as locked to the rest of Fabricate (the planned "Locked" badge is noted above)
+- Are reported as locked to the rest of Fabricate (a "Locked" badge is planned)
 
 ## Broken Systems and Recipes Are Hidden
 

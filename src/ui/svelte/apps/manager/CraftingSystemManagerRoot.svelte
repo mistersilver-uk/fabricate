@@ -1052,11 +1052,16 @@
       return def?.img || '';
     })()
   );
-  // The recipe-item card lives in the global inspector and is shown only when
-  // the system's knowledge mode consumes an item; for 'learned' the aside is
-  // suppressed (full-width main), matching the other suppressed edit views.
+  // The recipe-item card lives in the global inspector and is shown for every
+  // knowledge mode, including 'learned': learning a recipe requires it to link a
+  // recipe item (the book the player learns from) — `learnRecipe` /
+  // `learnRecipesFromOwnedItem` refuse a recipe with no recipe-item reference —
+  // and this inspector is the only place the link is authored. Suppressing it for
+  // 'learned' left learned-only systems with no way to make any recipe learnable.
   const recipeInspectorVisible = $derived(currentView === 'recipe-edit'
-    && (recipeKnowledgeMode === 'item' || recipeKnowledgeMode === 'itemOrLearned'));
+    && (recipeKnowledgeMode === 'item'
+      || recipeKnowledgeMode === 'learned'
+      || recipeKnowledgeMode === 'itemOrLearned'));
   const componentForEdit = $derived(currentView === 'component-edit'
     ? itemCards.find(item => item.id === selectedComponentId) || null
     : null);

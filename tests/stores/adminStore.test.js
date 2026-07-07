@@ -2779,6 +2779,81 @@ describe('createAdminStore', () => {
       assert.equal(rv.knowledge.learn.consumeOnLearn, false);
       assert.equal(rv.knowledge.learn.dragDropEnabled, false);
     });
+
+    it('saveVisibilityConfig threads the recipe-item learn-cap fields (issue 511)', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.recipeVisibility = {
+          listMode: 'knowledge',
+          knowledge: {
+            mode: 'learned',
+            item: { limitUses: false },
+            learn: { consumeOnLearn: true, dragDropEnabled: true },
+          },
+        };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveVisibilityConfig({ limitRecipes: true, maxRecipes: 5, destroyWhenSpent: true });
+
+      const rv = updateArgs.updates.recipeVisibility;
+      assert.equal(rv.knowledge.learn.limitRecipes, true);
+      assert.equal(rv.knowledge.learn.maxRecipes, 5);
+      assert.equal(rv.knowledge.learn.destroyWhenSpent, true);
+    });
+
+    it('saveVisibilityConfig clears the learn cap and preserves consumeOnLearn when limitRecipes turns off', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.recipeVisibility = {
+          listMode: 'knowledge',
+          knowledge: {
+            mode: 'learned',
+            item: { limitUses: false },
+            // A GM who had consumeOnLearn:false before enabling the cap must keep
+            // that choice when the cap is toggled back off (UN4).
+            learn: {
+              consumeOnLearn: false,
+              dragDropEnabled: true,
+              limitRecipes: true,
+              maxRecipes: 3,
+              destroyWhenSpent: true,
+            },
+          },
+        };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveVisibilityConfig({ limitRecipes: false });
+
+      const rv = updateArgs.updates.recipeVisibility;
+      assert.equal(rv.knowledge.learn.limitRecipes, false);
+      assert.equal(rv.knowledge.learn.maxRecipes, undefined);
+      assert.equal(rv.knowledge.learn.destroyWhenSpent, false);
+      assert.equal(rv.knowledge.learn.consumeOnLearn, false);
+    });
   });
 
   // -------------------------------------------------------------------------

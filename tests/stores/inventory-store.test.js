@@ -266,4 +266,88 @@ describe('inventoryStore', () => {
     flushSync();
     assert.equal(store.selectedItem, null);
   });
+
+  it('classifies books under the recipeItems pill and excludes them from components', async () => {
+    const listing = {
+      selectedActorId: 'hero',
+      rows: [
+        row('sys:c1', 'Iron'),
+        row('essence:sys:fire', 'Fire', { isEssenceSource: true }),
+        row('recipeitem:sys:def-1', 'Spellbook', { isRecipeItem: true, recipes: [] }),
+      ],
+    };
+    const { services } = makeServices({ listing });
+    const store = createInventoryStore({ services });
+    await store.load();
+    flushSync();
+
+    store.setFilter('recipeItems');
+    flushSync();
+    assert.deepEqual(
+      store.visibleItems.map((r) => r.key),
+      ['recipeitem:sys:def-1'],
+      'the recipeItems pill lists only books'
+    );
+
+    store.setFilter('components');
+    flushSync();
+    assert.deepEqual(
+      store.visibleItems.map((r) => r.key),
+      ['sys:c1'],
+      'the components pill excludes books and essences'
+    );
+    assert.equal(store.filterCounts.recipeItems, 1);
+  });
+
+  it('learn() calls the seam, reloads on success, and clears the busy id', async () => {
+    const listing = { selectedActorId: 'hero', rows: [row('recipeitem:sys:def-1', 'Book', { isRecipeItem: true })] };
+    const learnCalls = [];
+    const { services, calls } = makeServices({ listing, actorId: 'hero', sourceIds: ['a2'] });
+    services.learnRecipeFromInventory = async (opts) => {
+      learnCalls.push(opts);
+      return { success: true };
+    };
+    const store = createInventoryStore({ services });
+    await store.load();
+    flushSync();
+
+    const before = calls.listInventoryForActor.length;
+    const result = await store.learn('r-a');
+    flushSync();
+
+    assert.equal(result.success, true);
+    assert.deepEqual(learnCalls[0], {
+      actorId: 'hero',
+      recipeId: 'r-a',
+      componentSourceActorIds: ['a2'],
+    });
+    assert.equal(store.learningRecipeId, null, 'busy id cleared after the learn resolves');
+    assert.equal(
+      calls.listInventoryForActor.length,
+      before + 1,
+      'a successful learn quietly reloads the listing'
+    );
+  });
+
+  it('learn() surfaces the failure message through notify and does not reload', async () => {
+    const listing = { selectedActorId: 'hero', rows: [] };
+    const notes = [];
+    const { services, calls } = makeServices({ listing });
+    services.notify = (message) => notes.push(message);
+    services.learnRecipeFromInventory = async () => ({
+      success: false,
+      message: 'FABRICATE.Knowledge.LearnBudgetSpent',
+    });
+    const store = createInventoryStore({ services });
+    await store.load();
+    flushSync();
+
+    const before = calls.listInventoryForActor.length;
+    const result = await store.learn('r-a');
+    flushSync();
+
+    assert.equal(result.success, false);
+    assert.deepEqual(notes, ['FABRICATE.Knowledge.LearnBudgetSpent']);
+    assert.equal(calls.listInventoryForActor.length, before, 'a failed learn does not reload');
+  });
 });

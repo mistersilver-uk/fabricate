@@ -503,11 +503,10 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(target.querySelector('[data-crafting-detail-state="empty"]'), 'empty hint rendered');
   });
 
-  it('renders the blocking-reasons callout and learn affordance when applicable', async () => {
+  it('renders the blocking-reasons callout when applicable', async () => {
     const blocked = recipe({
       browseStatus: 'missingMaterials',
       blockingReasons: ['You are missing some required materials.'],
-      learn: { canLearn: true, consumeOnLearn: true },
     });
     const target = await harness.mount({
       recipe: blocked,
@@ -516,11 +515,6 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     assert.ok(target.querySelector('[data-recipe-blocking]'), 'blocking callout rendered');
-    assert.ok(target.querySelector('[data-recipe-learn]'), 'learn affordance rendered');
-    assert.ok(
-      target.querySelector('[data-recipe-learn-warning]'),
-      'consume-on-learn warning rendered'
-    );
     // A non-craftable recipe still renders a (disabled) craft button.
     const craftButton = target.querySelector('[data-crafting-craft]');
     assert.ok(craftButton, 'craft button present');

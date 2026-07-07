@@ -209,6 +209,9 @@ CraftingSystem = {
       learn?: {
         consumeOnLearn: boolean, // default true
         dragDropEnabled: boolean, // default true; controls actor-drop auto-learn behaviour
+        limitRecipes: boolean,       // default false; enables the per-recipe-item learn cap
+        maxRecipes?: number,         // finite integer > 0; meaningful only when limitRecipes is true
+        destroyWhenSpent?: boolean,  // default false; destroy the recipe item once its learn budget is spent
       },
     },
   },
@@ -448,6 +451,11 @@ Invalid or missing values default to `"global"`.
 3. When `listMode === "global"`, all enabled recipes are visible to all users without restriction or knowledge filtering.
 4. `knowledge.learn.dragDropEnabled` controls automatic learning from actor item drops when knowledge learning is enabled; default is `true`.
 5. If `knowledge.learn.dragDropEnabled` is `false`, automatic actor-drop learning is disabled and manual learn UI affordances must be used.
+6. `knowledge.learn.limitRecipes` enables the per-recipe-item learn cap; default is `false`.
+`knowledge.learn.maxRecipes` is normalized to a finite integer `> 0` and is retained only when `limitRecipes === true`, mirroring how `knowledge.item.maxUses` is retained only when `knowledge.item.limitUses === true`.
+A `limitRecipes === true` system with a missing or invalid `maxRecipes` is treated as uncapped at runtime (fails closed to the unlimited learn path), not as a zero budget.
+7. `knowledge.learn.destroyWhenSpent` removes the recipe item once its learn budget is spent; default is `false`.
+It is deliberately distinct from the item craft-charge flag `knowledge.item.destroyWhenExhausted` and must not be normalized to a shared name.
 
 ## EssenceDefinition
 
@@ -1324,6 +1332,27 @@ Requirements:
 4. When `timesUsed >= maxUses`, the item is exhausted.
 5. If `destroyWhenExhausted` is true, the item is destroyed when exhausted.
 
+### Recipe Item Learning Flag
+
+Tracks how many recipes have been learned from an owned recipe item under the learn cap (issue 511).
+It mirrors the Recipe Item Usage Flag: a distinct counter for the learn-cap mechanic, held on the same physical item document.
+
+```js
+Item.flags.fabricate.recipeItemLearning = {
+  learnedCount: number,
+}
+```
+
+Requirements:
+
+1. `learnedCount` must be a non-negative integer.
+2. The count is tracked per owned item **document** instance, so a stacked `qty > 1` document shares one count.
+3. It accumulates across every actor that holds the document and is **not** reset on transfer or ownership change.
+4. The learn cap is configured in `CraftingSystem.recipeVisibility.knowledge.learn.maxRecipes` (enabled by `limitRecipes`).
+5. When `learnedCount >= maxRecipes`, the learn budget is spent and no further recipe may be learned from the item.
+6. If `knowledge.learn.destroyWhenSpent` is true, the recipe item is destroyed when its budget is spent.
+7. This counter is independent of `recipeItemUsage.timesUsed` (craft-charges); the two are never conflated.
+
 ### Tool Item Usage Flag
 
 Tracks how many times an owned tool item has been used.
@@ -1616,6 +1645,8 @@ The following canonical field names must be used in all new writes:
 | RecipeItemDefinition | `sourceItemUuid` | Template item reference |
 | CraftingSystem | `itemTags` | Array of tag strings |
 | Item flag | `toolUsage.timesUsed` | Tool usage tracking (legacy `catalystItemUsage.timesUsed` read as fallback) |
+| Item flag | `recipeItemUsage.timesUsed` | Recipe-item craft-charge tracking (`knowledge.item` cap) |
+| Item flag | `recipeItemLearning.learnedCount` | Recipe-item learn-cap tracking (`knowledge.learn` cap), per document instance |
 
 ### Legacy Read Aliases
 
