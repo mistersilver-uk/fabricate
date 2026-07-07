@@ -15,6 +15,7 @@ Make behavior changes here, not in the bindings.
 - the work's GitHub issue and its `openspec-delta` block, via `gh issue view`
 - relevant `openspec/specs/`, `src/`, and `tests/` files
 - `skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, API shape, or test seams
+- `skills/fabricate-ux-designer/references/design-system.md` for the `--fab-*` token, component, and pattern reference when the task changes `src/ui/**`, `styles/**`, or any `*.svelte`
 - current git diff when continuing existing work
 
 ## Workflow
