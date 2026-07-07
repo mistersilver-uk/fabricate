@@ -4165,7 +4165,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('suppresses the recipe-item inspector aside on the recipe-edit route when the knowledge mode is learned', async () => {
+  it('shows the recipe-item inspector aside on the recipe-edit route when the knowledge mode is learned', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -4200,21 +4200,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-main [data-recipe-section="identity"]'),
       'recipe-edit still renders the identity card in the central main'
     );
-    // 'learned' recipes never consume an item, so the recipe-item card is hidden
-    // and the whole inspector aside is suppressed, leaving a full-width main.
-    assert.equal(
+    // Learning a recipe requires it to link a recipe item (the book the player
+    // learns from), and this inspector is the only place that link is authored,
+    // so the recipe-item card must show for 'learned' too — otherwise a
+    // learned-only system has no way to make any recipe learnable.
+    assert.ok(
       target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'),
-      null,
-      'recipe-item card is hidden for the learned knowledge mode'
-    );
-    assert.equal(
-      target.querySelector('.manager-inspector'),
-      null,
-      'the inspector aside is fully suppressed for the learned knowledge mode'
+      'recipe-item card shows for the learned knowledge mode'
     );
     assert.ok(
-      target.textContent.includes('Edit identity for this recipe.'),
-      'learned mode shows the identity-only subtitle'
+      target.querySelector('.manager-inspector'),
+      'the inspector aside is present for the learned knowledge mode'
+    );
+    assert.ok(
+      !target.textContent.includes('Edit identity for this recipe.'),
+      'learned mode no longer shows the identity-only subtitle'
     );
   });
 

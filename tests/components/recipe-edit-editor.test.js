@@ -294,8 +294,9 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(
       rootSource.includes("recipeInspectorVisible = $derived(currentView === 'recipe-edit'")
         && rootSource.includes("recipeKnowledgeMode === 'item'")
+        && rootSource.includes("recipeKnowledgeMode === 'learned'")
         && rootSource.includes("recipeKnowledgeMode === 'itemOrLearned'"),
-      'recipeInspectorVisible gates on item / itemOrLearned'
+      'recipeInspectorVisible gates on item / learned / itemOrLearned (every knowledge mode needs the recipe-item link)'
     );
     assert.ok(
       rootSource.includes("(currentView !== 'recipe-edit' || recipeInspectorVisible)"),
