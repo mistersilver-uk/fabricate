@@ -1518,7 +1518,10 @@ class Fabricate {
    * @returns {boolean}
    */
   getHideUnavailableEnvironments() {
-    return getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE) === true;
+    // Boolean() rather than `=== true`: the setting is registered `type: Boolean`
+    // so the value is already boolean, and the strict compare trips a static-analysis
+    // false positive (game.settings.get is not typed as boolean).
+    return Boolean(getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE));
   }
 
   /**
