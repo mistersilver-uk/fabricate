@@ -187,14 +187,6 @@ describe('CraftingListingBuilder — browse status per reason', () => {
     assert.equal(recipe.browseStatus, CRAFTING_BROWSE_STATUS.AVAILABLE);
   });
 
-  it('canLearn only when a non-GM knowledge recipe has an item reference', () => {
-    const recipe = makeRecipe({ recipeItemId: 'item-1' });
-    const { recipe: model } = buildOne({
-      entries: [{ recipe, access: { reason: 'knowledge' } }],
-    });
-    assert.equal(model.learn.canLearn, true);
-    assert.equal(model.learn.consumeOnLearn, true);
-  });
 });
 
 describe('CraftingListingBuilder — system blocked for recipes', () => {
@@ -229,7 +221,6 @@ describe('CraftingListingBuilder — teaser redaction (non-leak)', () => {
     assert.deepEqual(recipe.result.items, [], 'no result items leak');
     assert.equal(recipe.check, null, 'no check leaks');
     assert.equal(recipe.outcomeTiers, null, 'no outcome tiers leak');
-    assert.equal(recipe.learn.canLearn, false);
   });
 
   it('a GM sees the full recipe even when the access reason is teaser', () => {

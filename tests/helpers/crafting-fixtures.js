@@ -39,7 +39,6 @@ export function recipe(overrides = {}) {
     redaction: { redacted: false, hiddenFields: [] },
     flavor: 'A restorative brew.',
     browseStatus: 'available',
-    learn: { canLearn: false, consumeOnLearn: false },
     blockingReasons: [],
     ingredientSets: [{ id: setId, label: 'Option A', craftability: craftability(), products: [] }],
     defaultSetId: setId,

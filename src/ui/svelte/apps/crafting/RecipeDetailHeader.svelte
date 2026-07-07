@@ -1,10 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
   RecipeDetailHeader is the shared header for every recipe-detail mode: the
-  thumbnail, name, mode chip, flavor text, the blocking-reasons callout (when the
-  recipe is not craftable), and the learn affordance (with a consume-on-learn
-  warning). For a redaction teaser it shows only the generic identity + a discovery
-  hint — never any ingredient/result detail.
+  thumbnail, name, mode chip, flavor text, and the blocking-reasons callout (when
+  the recipe is not craftable). For a redaction teaser it shows only the generic
+  identity + a discovery hint — never any ingredient/result detail.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -12,7 +11,7 @@
   import CraftingStatusBadge from './CraftingStatusBadge.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
 
-  let { recipe = null, onLearn = null } = $props();
+  let { recipe = null } = $props();
 
   const name = $derived(String(recipe?.name ?? ''));
   const modeLabel = $derived(String(recipe?.modeLabel ?? ''));
@@ -28,8 +27,6 @@
   const blockingReasons = $derived(
     Array.isArray(recipe?.blockingReasons) ? recipe.blockingReasons : []
   );
-  const canLearn = $derived(recipe?.learn?.canLearn === true);
-  const consumeOnLearn = $derived(recipe?.learn?.consumeOnLearn === true);
 </script>
 
 <header class="crafting-detail-header" data-recipe-header>
@@ -94,25 +91,6 @@
             <li>{reason}</li>
           {/each}
         </ul>
-      </div>
-    {/if}
-
-    {#if canLearn}
-      <div class="crafting-detail-learn" data-recipe-learn>
-        <button
-          type="button"
-          class="crafting-detail-learn-button"
-          onclick={() => onLearn?.()}
-        >
-          <i class="fas fa-book-sparkles" aria-hidden="true"></i>
-          <span>{localize('FABRICATE.App.Crafting.Detail.Learn')}</span>
-        </button>
-        {#if consumeOnLearn}
-          <p class="crafting-detail-learn-warning" data-recipe-learn-warning>
-            <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-            {localize('FABRICATE.App.Crafting.Detail.ConsumeOnLearnWarning')}
-          </p>
-        {/if}
       </div>
     {/if}
   {/if}
@@ -263,42 +241,5 @@
     margin: 0;
     padding-left: 16px;
     font-size: 13px;
-  }
-
-  .crafting-detail-learn {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .crafting-detail-learn-button {
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    height: auto;
-    min-height: 38px;
-    padding: 6px 14px;
-    border: 1px solid var(--fab-accent);
-    border-radius: 8px;
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .crafting-detail-learn-button:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .crafting-detail-learn-warning {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-warning-text);
   }
 </style>

@@ -294,16 +294,10 @@ export class CraftingListingBuilder {
     const browseStatus = this._deriveBrowseStatus({ reason, canCraftMaterials, exhausted });
     const blockingReasons = this._blockingReasons(browseStatus);
 
-    const hasRecipeItemRef = !!(recipe.recipeItemId || recipe.linkedRecipeItemUuid);
-    const knowledgeCfg = system?.recipeVisibility?.knowledge ?? {};
-    const consumeOnLearn = knowledgeCfg?.learn?.consumeOnLearn !== false;
-    const canLearn = !isGM && reason === 'knowledge' && hasRecipeItemRef;
-
     return {
       ...base,
       flavor: stringOrEmpty(recipe.description),
       browseStatus,
-      learn: { canLearn, consumeOnLearn },
       blockingReasons,
       ingredientSets,
       defaultSetId,
@@ -327,7 +321,6 @@ export class CraftingListingBuilder {
       ...base,
       flavor: showDescription ? stringOrEmpty(recipe.description) : '',
       browseStatus: CRAFTING_BROWSE_STATUS.DISCOVERY,
-      learn: { canLearn: false, consumeOnLearn: false },
       blockingReasons: this._blockingReasons(CRAFTING_BROWSE_STATUS.DISCOVERY),
       ingredientSets: showIngredients
         ? recipe.ingredientSets.map((set, idx) => ({

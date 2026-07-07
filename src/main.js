@@ -75,7 +75,6 @@ import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js'
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
-import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
 import {
   handleInteractableSocketMessage,
@@ -675,7 +674,6 @@ class Fabricate {
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
-    registerItemSheetRecipeLearnControl(this.recipeVisibilityService);
 
     this.ready = true;
     this._resolveReady?.();

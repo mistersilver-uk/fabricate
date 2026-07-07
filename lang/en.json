@@ -494,8 +494,6 @@
           "NoOutcomes": "This recipe has no routable outcomes configured.",
           "TierSuccess": "Awards on this result",
           "TierNoAward": "No award",
-          "Learn": "Learn this recipe",
-          "ConsumeOnLearnWarning": "Learning this recipe consumes the source item.",
           "IngredientRoutingHint": "The ingredient option you choose determines what you craft.",
           "ProgressiveHint": "This recipe is crafted over multiple steps.",
           "OptionCraftable": "Craftable",
@@ -914,17 +912,7 @@
       "LearnedRecipes": "{actor} learned {count} recipes: {recipes}",
       "LearnedRecipesPartial": "{actor} learned {count} new recipes: {recipes}",
       "NoNewRecipesLearned": "{actor} already knows the matched recipe item recipes.",
-      "CouldNotLearnRecipe": "Could not learn recipe",
-      "ManualLearnAction": "Learn Recipe",
-      "ManualLearnConfirmTitle": "Learn Recipes",
-      "ManualLearnConfirmBody": "{actor} will learn {count} recipe(s) from {item}: {recipes}.",
-      "ManualLearnConsumeWarning": "This will consume {item}.",
-      "SelectRecipeTitle": "Learn a Recipe",
-      "SelectRecipePrompt": "Choose a recipe to learn from {item}.",
-      "SelectRecipeBudget": "{remaining} of {max} remaining.",
-      "SelectRecipeLabel": "Recipe",
-      "SelectRecipeConfirm": "Learn",
-      "SelectRecipeCancel": "Cancel"
+      "CouldNotLearnRecipe": "Could not learn recipe"
     },
     "Admin": {
       "Title": "Crafting Admin",

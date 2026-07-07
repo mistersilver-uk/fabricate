@@ -22,8 +22,7 @@
     rollResult = null,
     busy = false,
     onChoose = null,
-    onCraft = null,
-    onLearn = null
+    onCraft = null
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
@@ -58,7 +57,7 @@
   </div>
 {:else}
   <div class="crafting-detail" data-crafting-detail-state="selected" data-recipe-detail-mode={mode}>
-    <RecipeDetailHeader {recipe} {onLearn} />
+    <RecipeDetailHeader {recipe} />
     {#if !redacted}
       <div class="crafting-detail-body" data-crafting-detail-scroll>
         <Body {recipe} {selectedSetId} {craftability} {rollResult} {onChoose} />
