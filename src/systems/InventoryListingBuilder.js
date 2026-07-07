@@ -22,6 +22,14 @@
  */
 
 import { findMatchingComponent } from '../utils/essenceResolver.js';
+import { getItemSourceReferences } from '../utils/sourceUuid.js';
+import { getFabricateFlag } from '../config/flags.js';
+
+// Knowledge modes in which a recipe item (book) can teach a recipe. In these
+// modes owning the book surfaces a Learn affordance in the inventory; other modes
+// (item-only access, or a non-knowledge list mode) have nothing to learn, so the
+// book is not projected as a learnable inventory row.
+const LEARN_CAPABLE_MODES = new Set(['learned', 'itemOrLearned']);
 
 function stringOrEmpty(value) {
   return typeof value === 'string' ? value : value == null ? '' : String(value);
@@ -121,11 +129,13 @@ export class InventoryListingBuilder {
     const systems = this.craftingSystemManager?.getSystems?.() ?? [];
     for (const system of Array.isArray(systems) ? systems : []) {
       rows.push(...this._buildSystemRows(system, sources, allowedRecipeIds));
+      rows.push(...this._buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds, isGM));
     }
 
     rows.sort((left, right) => stringOrEmpty(left?.name).localeCompare(stringOrEmpty(right?.name)));
 
-    const componentCount = rows.filter((row) => !row.isEssenceSource).length;
+    const recipeItemCount = rows.filter((row) => row.isRecipeItem === true).length;
+    const essenceCount = rows.filter((row) => row.isEssenceSource === true).length;
     return {
       selectedActorId: actorKey(craftingActor),
       actor: craftingActor ?? null,
@@ -133,8 +143,9 @@ export class InventoryListingBuilder {
       worldTime: Number(this._nowWorldTime() || 0),
       rows,
       counts: {
-        components: componentCount,
-        essences: rows.length - componentCount,
+        components: rows.length - essenceCount - recipeItemCount,
+        essences: essenceCount,
+        recipeItems: recipeItemCount,
         total: rows.length,
       },
     };
@@ -357,6 +368,212 @@ export class InventoryListingBuilder {
     }
 
     return [...componentRows, ...essenceRows];
+  }
+
+  /**
+   * Project one system's owned recipe-item "books" as learnable inventory rows.
+   *
+   * A book row is emitted for each recipe-item definition the source actors own
+   * (matched the same way the runtime learn path matches — by document uuid or
+   * compendium source uuid), when the system's knowledge mode can teach from it
+   * (`learned` / `itemOrLearned`). Each row carries the linked recipes (with a
+   * per-recipe `learned` flag for the crafting actor) plus the book's own
+   * use/learn limits read off a representative owned document, so the detail panel
+   * can render the Learn affordance and the budget readouts. Returns [] when the
+   * system defines no recipe items, is not in a learn-capable knowledge mode, or
+   * the player owns none.
+   * @private
+   */
+  _buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds = null, isGM = false) {
+    const definitions = Array.isArray(system?.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+    if (definitions.length === 0) return [];
+
+    const visibility = system?.recipeVisibility ?? {};
+    const knowledge = visibility?.knowledge ?? {};
+    if (visibility?.listMode !== 'knowledge') return [];
+    if (!LEARN_CAPABLE_MODES.has(knowledge?.mode || 'itemOrLearned')) return [];
+
+    const systemId = stringOrNull(system?.id);
+    const systemName = stringOrEmpty(system?.name);
+
+    // Group the system's recipes by the definition they link (recipe.recipeItemId
+    // → definition id, or recipe.linkedRecipeItemUuid → definition sourceItemUuid).
+    const defBySourceUuid = new Map(
+      definitions.filter((def) => def?.sourceItemUuid).map((def) => [def.sourceItemUuid, def.id])
+    );
+    const recipesByDef = new Map();
+    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
+    for (const recipe of Array.isArray(recipes) ? recipes : []) {
+      if (recipe?.enabled === false) continue;
+      // Non-GM viewers never see an undiscovered (teaser) recipe named on a book.
+      if (allowedRecipeIds && !allowedRecipeIds.has(recipe?.id)) continue;
+      const defId =
+        stringOrNull(recipe?.recipeItemId) ??
+        (recipe?.linkedRecipeItemUuid
+          ? (defBySourceUuid.get(recipe.linkedRecipeItemUuid) ?? null)
+          : null);
+      if (!defId) continue;
+      const list = recipesByDef.get(defId) ?? [];
+      list.push(recipe);
+      recipesByDef.set(defId, list);
+    }
+
+    // Owned books: defId → { def, sources: Map<actorId,{...,qty}>, item }, where
+    // `item` is the first matched document in crafting-actor-first order (the
+    // representative document whose use/learn counters the row reports).
+    const defById = new Map(definitions.filter((def) => def?.id).map((def) => [def.id, def]));
+    const owned = new Map();
+    const orderedSourceIds = sources.map(actorKey);
+    for (const actor of sources) {
+      const key = actorKey(actor);
+      const actorName = stringOrEmpty(actor?.name);
+      const actorImg = stringOrNull(actor?.img);
+      const items = actor?.items ? [...actor.items] : [];
+      for (const item of items) {
+        const def = this._matchRecipeItemDefinition(item, definitions);
+        if (!def?.id) continue;
+        const qty = itemStackQuantity(item);
+        let entry = owned.get(def.id);
+        if (!entry) {
+          entry = { def, sources: new Map(), item };
+          owned.set(def.id, entry);
+        }
+        const current = entry.sources.get(key);
+        if (current) current.qty += qty;
+        else entry.sources.set(key, { actorId: key, name: actorName, img: actorImg, qty });
+      }
+    }
+    if (owned.size === 0) return [];
+
+    const learnedMap = this._getLearnedMapFor(craftingActor);
+    const rows = [];
+    for (const [defId, { def, sources: sourceMap, item }] of owned) {
+      const rowSources = orderedSourceIds
+        .map((id) => sourceMap.get(id))
+        .filter((source) => source && source.qty > 0)
+        .map((source) => ({
+          actorId: source.actorId,
+          actorName: source.name,
+          actorImg: source.img,
+          quantity: source.qty,
+        }));
+      const totalQuantity = rowSources.reduce((sum, source) => sum + source.quantity, 0);
+      if (totalQuantity <= 0) continue;
+
+      const linkedRecipes = (recipesByDef.get(defId) ?? []).map((recipe) => ({
+        id: stringOrNull(recipe?.id),
+        name: stringOrEmpty(recipe?.name),
+        description: stringOrEmpty(recipe?.description),
+        img: stringOrNull(this._resolveRecipeImg(system, recipe)),
+        learned: Boolean(learnedMap?.[recipe?.id]),
+      }));
+
+      rows.push({
+        key: `recipeitem:${systemId}:${defId}`,
+        recipeItemId: stringOrNull(defId),
+        componentId: null,
+        systemId,
+        systemName,
+        name: stringOrEmpty(def?.name),
+        img: stringOrNull(def?.img),
+        icon: null,
+        description: stringOrEmpty(def?.description),
+        tags: [],
+        tier: null,
+        isEssenceSource: false,
+        isTool: false,
+        isRecipeItem: true,
+        totalQuantity,
+        sources: rowSources,
+        essences: [],
+        usedBy: [],
+        requiredFor: [],
+        producedBy: [],
+        contributors: [],
+        recipes: linkedRecipes,
+        limits: this._recipeItemLimits(knowledge, item),
+      });
+    }
+
+    // Keep books grouped last within a system's rows by name (the top-level sort
+    // re-sorts everything by name anyway).
+    void defById;
+    return rows;
+  }
+
+  /**
+   * Resolve the recipe-item definition an owned item matches, mirroring the
+   * runtime learn matcher (`RecipeVisibilityService._isMatchingRecipeItem`): a
+   * definition matches when the definition's `sourceItemUuid` is among the item's
+   * source references — its live uuid, compendium source, or `_stats.duplicateSource`.
+   * The duplicate-source reference is essential: a book dragged from a world
+   * template carries the link only there, and source-uuid-only matching misses it.
+   * @private
+   */
+  _matchRecipeItemDefinition(item, definitions) {
+    if (!item) return null;
+    const refs = getItemSourceReferences(item);
+    if (refs.length === 0) return null;
+    for (const def of definitions) {
+      if (def?.sourceItemUuid && refs.includes(def.sourceItemUuid)) return def;
+    }
+    return null;
+  }
+
+  /**
+   * The crafting actor's learned-recipe map (`{ recipeId: {...} }`), read through
+   * the same fabricate flag the runtime learn path writes. Returns {} when unset.
+   * @private
+   */
+  _getLearnedMapFor(actor) {
+    const learned = getFabricateFlag(actor, 'learnedRecipes', {});
+    return learned && typeof learned === 'object' ? learned : {};
+  }
+
+  /**
+   * The book's use / learn limit readouts from the system knowledge config and a
+   * representative owned document's counters. Each is null unless its cap is
+   * enabled with a finite positive maximum, mirroring how the runtime treats an
+   * invalid cap as uncapped.
+   * @private
+   */
+  _recipeItemLimits(knowledge, item) {
+    const finitePositive = (value) => {
+      const num = Number(value);
+      return Number.isFinite(num) && num > 0 ? num : null;
+    };
+
+    let uses = null;
+    const maxUses = knowledge?.item?.limitUses === true ? finitePositive(knowledge?.item?.maxUses) : null;
+    if (maxUses != null) {
+      const used = Number(getFabricateFlag(item, 'recipeItemUsage', {})?.timesUsed || 0);
+      uses = { max: maxUses, used, remaining: Math.max(0, maxUses - used) };
+    }
+
+    let learning = null;
+    const maxRecipes =
+      knowledge?.learn?.limitRecipes === true ? finitePositive(knowledge?.learn?.maxRecipes) : null;
+    if (maxRecipes != null) {
+      const learned = Number(getFabricateFlag(item, 'recipeItemLearning', {})?.learnedCount || 0);
+      learning = { max: maxRecipes, learned, remaining: Math.max(0, maxRecipes - learned) };
+    }
+
+    return { uses, learning };
+  }
+
+  /**
+   * Resolve a recipe's display image the way the GM Manager / Crafting tab do:
+   * the linked recipe-item image when present, else the recipe's own image.
+   * @private
+   */
+  _resolveRecipeImg(system, recipe) {
+    const recipeItemImg = recipe?.recipeItemId
+      ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)?.img ||
+        ''
+      : '';
+    return recipeItemImg || recipe?.img || '';
   }
 
   /**

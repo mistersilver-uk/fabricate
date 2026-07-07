@@ -1336,6 +1336,37 @@ class Fabricate {
   }
 
   /**
+   * Learn one recipe from an owned recipe-item "book" for the player Inventory
+   * learn affordance. Resolves the crafting actor + component sources (same scope
+   * the inventory listing was computed for), then delegates to the visibility
+   * service, which enforces the per-document learn budget for capped systems and
+   * leaves uncapped books intact.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id (defaults to the
+   *   persisted selection).
+   * @param {string} options.recipeId Recipe to learn.
+   * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
+   * @returns {Promise<{success: boolean, message: string, messageData?: object}>}
+   */
+  async learnRecipeFromInventory({ actorId = null, recipeId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    const recipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!recipe) {
+      return { success: false, message: 'FABRICATE.Knowledge.NoMatchingItem' };
+    }
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    return this.recipeVisibilityService.learnRecipeFromOwnedBook({
+      recipe,
+      craftingActor,
+      componentSourceActors,
+    });
+  }
+
+  /**
    * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.
    * Resolves the crafting actor + component sources from the supplied ids (or the
    * persisted defaults) so the attempt uses the same inventory scope the listing

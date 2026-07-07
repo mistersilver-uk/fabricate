@@ -202,6 +202,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Player Inventory tab seam — owned components/essences across the shared
       // crafting source actors. Foundry-free store consumes this wrapper only.
       listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts) ?? null,
+      // Learn one recipe from an owned recipe-item book (Inventory learn button).
+      learnRecipeFromInventory: (opts = {}) =>
+        game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
       craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
       listCraftingSourceActors: () => game?.fabricate?.listCraftingSourceActors?.() ?? [],
       getCraftingSourceActors: () => game?.fabricate?.getCraftingSourceActors?.() ?? [],

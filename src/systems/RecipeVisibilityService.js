@@ -1,5 +1,5 @@
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
-import { getSourceUuid } from '../utils/sourceUuid.js';
+import { getItemSourceReferences } from '../utils/sourceUuid.js';
 
 const LEARN_RECIPE_MESSAGES = {
   systemNotFound: 'FABRICATE.Knowledge.SystemNotFound',
@@ -60,8 +60,11 @@ export class RecipeVisibilityService {
   _isMatchingRecipeItem(recipe, item) {
     const linked = this._getRecipeItemSourceUuid(recipe);
     if (!linked || !item) return false;
-    const sourceId = getSourceUuid(item);
-    return item.uuid === linked || sourceId === linked;
+    // Match against the item's full source-reference set — live uuid, compendium
+    // source AND `_stats.duplicateSource` — so a book duplicated (dragged) from a
+    // world template still resolves. Source-uuid-only matching loses the link for
+    // world-duplicated copies (the same trap components avoid).
+    return getItemSourceReferences(item).includes(linked);
   }
 
   _isActorOwnedItem(ownedItem, actor) {
@@ -881,6 +884,68 @@ export class RecipeVisibilityService {
       messageData: { name: recipe.name },
       destroyed,
       remainingBudget: Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - nextCount) : 0,
+    };
+  }
+
+  /**
+   * Learn exactly one recipe from a book the crafting actor (or a component-source
+   * actor) owns, for the player Inventory learn affordance (issue 511). Resolves
+   * the owned book document deterministically, then:
+   *  - a capped system enforces the per-document learn budget and destroy-when-spent
+   *    (delegates to {@link learnOneRecipeFromItem});
+   *  - an uncapped system (or a cap toggled on with an invalid `maxRecipes`, which
+   *    fails closed to uncapped) writes one `learnedRecipes` entry and NEVER
+   *    consumes the book — `consumeOnLearn` is ignored here so learning one recipe
+   *    from a multi-recipe book does not strand its remaining recipes.
+   *
+   * @param {object} args
+   * @param {object} args.recipe
+   * @param {object|null} args.craftingActor Where the learned recipe is recorded.
+   * @param {object[]} [args.componentSourceActors] Additional inventory sources.
+   * @returns {Promise<{success: boolean, message: string, messageData?: object, destroyed?: boolean, remainingBudget?: number}>}
+   */
+  async learnRecipeFromOwnedBook({ recipe, craftingActor, componentSourceActors = [] }) {
+    const system = this._getCraftingSystem(recipe);
+    if (!system) return { success: false, message: LEARN_RECIPE_MESSAGES.systemNotFound };
+
+    const knowledge = this._getKnowledgeConfig(system);
+    const mode = knowledge?.mode || 'itemOrLearned';
+    if (!['learned', 'itemOrLearned'].includes(mode)) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.learningDisabled };
+    }
+    if (!this._hasRecipeItemReference(recipe)) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.linkedItemRequired };
+    }
+    if (!craftingActor) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
+    }
+
+    const learnedMap = this._getLearnedMap(craftingActor);
+    if (learnedMap?.[recipe.id]) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
+    }
+
+    // Resolve the owned book document (crafting actor first) the same way the craft
+    // and drop paths do — never trust the GM-bypass matchedItems array.
+    const matches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
+    const selected = this._selectDeterministic(matches);
+    if (!selected) return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
+
+    // An EFFECTIVE cap (enabled + finite positive max) routes through the
+    // budget-enforcing capped path; an invalid cap falls through to uncapped.
+    if (this._isRecipeItemLearnCapped(recipe) && Number.isFinite(this._getLearnCapForRecipe(recipe))) {
+      return this.learnOneRecipeFromItem({ recipe, ownedItem: selected.item, actor: craftingActor });
+    }
+
+    const next = {
+      ...learnedMap,
+      [recipe.id]: { learnedAt: Date.now(), sourceItemUuid: selected.item.uuid },
+    };
+    await this._setLearnedMap(craftingActor, next);
+    return {
+      success: true,
+      message: LEARN_RECIPE_MESSAGES.learnedRecipe,
+      messageData: { name: recipe.name },
     };
   }
 

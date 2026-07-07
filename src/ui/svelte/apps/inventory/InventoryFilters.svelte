@@ -23,7 +23,8 @@
     { id: 'all', labelKey: 'FABRICATE.App.Inventory.Filters.All', icon: 'fa-layer-group' },
     { id: 'components', labelKey: 'FABRICATE.App.Inventory.Filters.Components', icon: 'fa-cube' },
     { id: 'essences', labelKey: 'FABRICATE.App.Inventory.Filters.Essences', icon: 'fa-mortar-pestle' },
-    { id: 'tools', labelKey: 'FABRICATE.App.Inventory.Filters.Tools', icon: 'fa-screwdriver-wrench' }
+    { id: 'tools', labelKey: 'FABRICATE.App.Inventory.Filters.Tools', icon: 'fa-screwdriver-wrench' },
+    { id: 'recipeItems', labelKey: 'FABRICATE.App.Inventory.Filters.RecipeItems', icon: 'fa-book' }
   ];
 
   const SORTS = [

@@ -25,7 +25,13 @@ const DEFAULT_PAGE_SIZE = 25;
 
 // The filter pills. Kept as a local constant so the store never imports the
 // builder's module graph.
-export const INVENTORY_FILTERS = Object.freeze(['all', 'components', 'essences', 'tools']);
+export const INVENTORY_FILTERS = Object.freeze([
+  'all',
+  'components',
+  'essences',
+  'tools',
+  'recipeItems',
+]);
 const VALID_SORTS = new Set(['name', 'quantity', 'type']);
 
 /**
@@ -47,11 +53,15 @@ function matchesQuery(row, query) {
 function matchesFilter(row, filter) {
   switch (filter) {
     case 'components':
-      return row?.isEssenceSource !== true;
+      // Books (recipe items) and essence rows are their own pills, so the
+      // Components pill lists only true crafting components.
+      return row?.isEssenceSource !== true && row?.isRecipeItem !== true;
     case 'essences':
       return row?.isEssenceSource === true;
     case 'tools':
       return row?.isTool === true;
+    case 'recipeItems':
+      return row?.isRecipeItem === true;
     case 'all':
     default:
       return true;
@@ -70,6 +80,9 @@ export function createInventoryStore({ services } = {}) {
   let page = $state(0);
   let pageSize = $state(DEFAULT_PAGE_SIZE);
   let worldTimeTick = $state(0);
+  // The recipe id currently being learned from a book (Inventory learn button),
+  // so the UI can show a busy state and prevent double-submits.
+  let learningRecipeId = $state(null);
 
   /** Resolve the current component-source actor ids, preferring the sibling store. */
   function currentSourceIds() {
@@ -168,6 +181,40 @@ export function createInventoryStore({ services } = {}) {
     }
   }
 
+  /**
+   * Learn one recipe from an owned recipe-item book. Routes through the
+   * `learnRecipeFromInventory` seam (capped systems enforce the per-document
+   * budget); on success the listing is quietly reloaded so the learned flag and
+   * remaining budget update in place, and on failure the service message is
+   * surfaced through the notify seam.
+   *
+   * @param {string} recipeId
+   * @returns {Promise<{success: boolean, message?: string}>}
+   */
+  async function learn(recipeId) {
+    if (!recipeId || learningRecipeId) return { success: false };
+    learningRecipeId = recipeId;
+    try {
+      const result = await services?.learnRecipeFromInventory?.({
+        actorId: currentActorId(),
+        recipeId,
+        componentSourceActorIds: currentSourceIds(),
+      });
+      if (result?.success) {
+        await load(true);
+      } else if (result?.message) {
+        services?.notify?.(result.message);
+      }
+      return result ?? { success: false };
+    } catch (err) {
+      const message = err?.message ?? String(err);
+      services?.notify?.(message);
+      return { success: false, message };
+    } finally {
+      learningRecipeId = null;
+    }
+  }
+
   /** Select an item by key. */
   function select(key) {
     selectedKey = key ?? null;
@@ -243,6 +290,9 @@ export function createInventoryStore({ services } = {}) {
     get selectedKey() {
       return selectedKey;
     },
+    get learningRecipeId() {
+      return learningRecipeId;
+    },
     get worldTimeTick() {
       return worldTimeTick;
     },
@@ -262,6 +312,7 @@ export function createInventoryStore({ services } = {}) {
       return selectedItem;
     },
     load,
+    learn,
     select,
     setSearch,
     setFilter,

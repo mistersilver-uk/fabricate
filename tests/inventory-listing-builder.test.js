@@ -577,3 +577,203 @@ describe('InventoryListingBuilder — tools + produced-by', () => {
     assert.deepEqual(rowByComponent(listing, 'c1').producedBy, []);
   });
 });
+
+describe('InventoryListingBuilder — recipe-item books', () => {
+  // A recipe-item book document: matched by uuid or compendium source uuid, and
+  // exposing the per-document use/learn counters through a fabricate getFlag.
+  function bookItem(uuid, quantity, flags = {}) {
+    return {
+      uuid,
+      _stats: { compendiumSource: uuid },
+      system: quantity == null ? {} : { quantity },
+      getFlag: (scope, key) => {
+        if (scope !== 'fabricate') return undefined;
+        const short = key.startsWith('fabricate.') ? key.slice('fabricate.'.length) : key;
+        return flags[short];
+      },
+    };
+  }
+
+  function bookActor(id, name, items, learned = {}) {
+    return {
+      id,
+      name,
+      img: `icons/${id}.webp`,
+      items,
+      getFlag: (scope, key) => {
+        if (scope !== 'fabricate') return undefined;
+        const short = key.startsWith('fabricate.') ? key.slice('fabricate.'.length) : key;
+        return short === 'learnedRecipes' ? learned : undefined;
+      },
+    };
+  }
+
+  function bookSystem({ knowledge } = {}) {
+    return {
+      id: 'sys-b',
+      name: 'Arcana',
+      enableEssences: false,
+      components: [],
+      recipeItemDefinitions: [
+        {
+          id: 'def-1',
+          name: 'Spellbook',
+          img: 'icons/book.webp',
+          description: 'A tome of spells.',
+          sourceItemUuid: 'Item.book1',
+        },
+      ],
+      recipeVisibility: {
+        listMode: 'knowledge',
+        knowledge: { mode: 'learned', item: {}, learn: {}, ...(knowledge ?? {}) },
+      },
+    };
+  }
+
+  const RECIPES = [
+    { id: 'r1', name: 'Fireball', description: 'Boom.', img: 'icons/fb.webp', craftingSystemId: 'sys-b', recipeItemId: 'def-1' },
+    { id: 'r2', name: 'Ice Lance', description: 'Chill.', img: 'icons/il.webp', craftingSystemId: 'sys-b', recipeItemId: 'def-1' },
+  ];
+
+  function bookBuilder({ system, recipes = RECIPES, recipeVisibility = null } = {}) {
+    const systemList = [system ?? bookSystem()];
+    const recipeManager = {
+      getRecipes: (filters) =>
+        recipes.filter(
+          (r) =>
+            filters?.craftingSystemId === undefined ||
+            r.craftingSystemId === filters.craftingSystemId
+        ),
+    };
+    const craftingSystemManager = {
+      getSystems: () => systemList,
+      getRecipeItemDefinition: (sysId, defId) =>
+        (systemList.find((s) => s.id === sysId)?.recipeItemDefinitions ?? []).find(
+          (d) => d.id === defId
+        ) ?? null,
+    };
+    return new InventoryListingBuilder({
+      recipeManager,
+      craftingSystemManager,
+      recipeVisibility,
+      localize: (key) => key,
+      nowWorldTime: () => 0,
+    });
+  }
+
+  function bookRow(listing) {
+    return listing.rows.find((row) => row.isRecipeItem === true) ?? null;
+  }
+
+  it('projects an owned book as a learnable row with its linked recipes and learned flags', () => {
+    const builder = bookBuilder();
+    const listing = builder.buildListing({
+      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)], { r1: { learnedAt: 1 } }),
+      viewer: { isGM: false },
+    });
+    const row = bookRow(listing);
+    assert.ok(row, 'a book row is projected');
+    assert.equal(row.recipeItemId, 'def-1');
+    assert.equal(row.name, 'Spellbook');
+    assert.equal(row.description, 'A tome of spells.');
+    assert.equal(row.totalQuantity, 1);
+    assert.deepEqual(
+      row.recipes.map((r) => [r.id, r.learned]),
+      [
+        ['r1', true],
+        ['r2', false],
+      ]
+    );
+    assert.equal(listing.counts.recipeItems, 1);
+    // Books are counted apart from components.
+    assert.equal(listing.counts.components, 0);
+  });
+
+  it('matches a book duplicated from a world template via _stats.duplicateSource', () => {
+    // A world item dragged onto an actor carries the link to the template only in
+    // _stats.duplicateSource — its own uuid and compendium source do not match the
+    // definition. The book must still resolve (source-uuid-only matching misses it).
+    const copy = {
+      uuid: 'Actor.a1.Item.copy',
+      _stats: { duplicateSource: 'Item.book1' },
+      system: {},
+      getFlag: () => undefined,
+    };
+    const listing = bookBuilder().buildListing({
+      craftingActor: bookActor('a1', 'Akra', [copy]),
+      viewer: { isGM: false },
+    });
+    assert.ok(bookRow(listing), 'the world-duplicated book is matched by duplicateSource');
+  });
+
+  it('does not project book rows outside a knowledge list mode', () => {
+    const system = bookSystem();
+    system.recipeVisibility.listMode = 'player';
+    const listing = bookBuilder({ system }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+    });
+    assert.equal(bookRow(listing), null);
+  });
+
+  it('does not project book rows for an item-only knowledge mode (nothing to learn)', () => {
+    const listing = bookBuilder({ system: bookSystem({ knowledge: { mode: 'item' } }) }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+    });
+    assert.equal(bookRow(listing), null);
+  });
+
+  it('omits a book the player does not own', () => {
+    const listing = bookBuilder().buildListing({
+      craftingActor: bookActor('a1', 'Akra', [item('Iron', 2)]),
+    });
+    assert.equal(bookRow(listing), null);
+  });
+
+  it('reports learning and use limits from the owned document counters', () => {
+    const system = bookSystem({
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: true, maxUses: 3 },
+        learn: { limitRecipes: true, maxRecipes: 2 },
+      },
+    });
+    const book = bookItem('Item.book1', 1, {
+      recipeItemLearning: { learnedCount: 1 },
+      recipeItemUsage: { timesUsed: 2 },
+    });
+    const listing = bookBuilder({ system }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [book]),
+    });
+    const row = bookRow(listing);
+    assert.deepEqual(row.limits.learning, { max: 2, learned: 1, remaining: 1 });
+    assert.deepEqual(row.limits.uses, { max: 3, used: 2, remaining: 1 });
+  });
+
+  it('treats an enabled-but-invalid cap as uncapped (no learning limit)', () => {
+    const system = bookSystem({
+      knowledge: { mode: 'learned', item: {}, learn: { limitRecipes: true, maxRecipes: 0 } },
+    });
+    const listing = bookBuilder({ system }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+    });
+    assert.equal(bookRow(listing).limits.learning, null);
+  });
+
+  it('hides an undiscovered (teaser) recipe from a non-GM book row', () => {
+    const recipeVisibility = {
+      getVisibleRecipes: () => [
+        { recipe: { id: 'r1' }, access: { reason: 'knowledge' } },
+        { recipe: { id: 'r2' }, access: { reason: 'teaser' } },
+      ],
+    };
+    const listing = bookBuilder({ recipeVisibility }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+      viewer: { isGM: false },
+    });
+    assert.deepEqual(
+      bookRow(listing).recipes.map((r) => r.id),
+      ['r1'],
+      'the teaser recipe r2 is not named on the book'
+    );
+  });
+});

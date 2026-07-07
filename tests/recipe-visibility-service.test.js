@@ -1888,3 +1888,108 @@ test('AC3.6 - _isMatchingRecipeItem returns false when _stats.compendiumSource d
 
   assert.equal(service._isMatchingRecipeItem(recipe, item), false);
 });
+
+// ---------------------------------------------------------------------------
+// 511 — learnRecipeFromOwnedBook (player Inventory learn affordance)
+// ---------------------------------------------------------------------------
+
+function buildUncappedLearnSystem({ consumeOnLearn = true, mode = 'learned' } = {}) {
+  return buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode,
+        item: { limitUses: false },
+        learn: { consumeOnLearn, dragDropEnabled: true },
+      },
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }],
+  });
+}
+
+test('511.INV.1 - learnRecipeFromOwnedBook routes a capped book through the budget-enforced path', async () => {
+  const system = buildCappedSystem({ maxRecipes: 1 });
+  const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.book', compendiumSource: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes });
+
+  const first = await service.learnRecipeFromOwnedBook({ recipe: recipes[0], craftingActor: actor });
+  assert.equal(first.success, true);
+  assert.equal(service._getRecipeItemLearnCount(item), 1);
+
+  // Budget spent — the second learn is refused by the capped path.
+  const second = await service.learnRecipeFromOwnedBook({ recipe: recipes[1], craftingActor: actor });
+  assert.equal(second.success, false);
+  assert.equal(second.message, 'FABRICATE.Knowledge.LearnBudgetSpent');
+});
+
+test('511.INV.2 - learnRecipeFromOwnedBook learns one uncapped recipe and never consumes the book', async () => {
+  const system = buildUncappedLearnSystem({ consumeOnLearn: true });
+  const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.book', compendiumSource: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes });
+
+  const result = await service.learnRecipeFromOwnedBook({ recipe: recipes[0], craftingActor: actor });
+  assert.equal(result.success, true);
+  const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.ok(learned['r-a'], 'the recipe is recorded as learned');
+  // consumeOnLearn is ignored here: the multi-recipe book survives so its other
+  // recipes remain learnable.
+  assert.equal(item.deleteCount, 0, 'the book is not consumed on an uncapped learn');
+});
+
+test('511.INV.3 - learnRecipeFromOwnedBook refuses an already-learned recipe', async () => {
+  const system = buildUncappedLearnSystem();
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.book', compendiumSource: 'Compendium.world.items.book' });
+  const actor = new FakeActor({
+    id: 'a1',
+    items: [item],
+    flagsArg: { fabricate: { learnedRecipes: { 'r-a': { learnedAt: 1 } } } },
+  });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipeFromOwnedBook({ recipe, craftingActor: actor });
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.AlreadyLearned');
+});
+
+test('511.INV.4 - learnRecipeFromOwnedBook refuses when no matching book is owned', async () => {
+  const system = buildUncappedLearnSystem();
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const actor = new FakeActor({ id: 'a1', items: [] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipeFromOwnedBook({ recipe, craftingActor: actor });
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.NoMatchingItem');
+});
+
+test('511.INV.5 - learnRecipeFromOwnedBook refuses when the system cannot teach (item-only mode)', async () => {
+  const system = buildUncappedLearnSystem({ mode: 'item' });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.book', compendiumSource: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipeFromOwnedBook({ recipe, craftingActor: actor });
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.LearningDisabled');
+});
+
+test('511.INV.6 - learnRecipeFromOwnedBook matches a book duplicated from a world template', async () => {
+  const system = buildUncappedLearnSystem();
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  // The owned copy links to the template only via _stats.duplicateSource — its own
+  // uuid and compendium source do not match the definition's sourceItemUuid.
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.copy' });
+  item._stats = { duplicateSource: 'Compendium.world.items.book' };
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipeFromOwnedBook({ recipe, craftingActor: actor });
+  assert.equal(result.success, true, 'a world-duplicated book resolves for learning');
+});
