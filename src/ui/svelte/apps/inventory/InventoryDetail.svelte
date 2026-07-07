@@ -925,24 +925,20 @@
     gap: 6px;
   }
 
-  /* A book recipe row matches the standalone right-sidebar rows exactly: the item
-     is the bordered box with the same 56px min-height (border-box, so the border
-     is included like `.inventory-detail-row`), and the header fills it so a
-     collapsed row is identical in height to a Sources / Used-by / Produced-by row.
-     When expanded the item grows past the floor to fit the description body. */
   .inventory-detail-accordion-item {
-    box-sizing: border-box;
-    min-height: 56px;
-    display: flex;
-    flex-direction: column;
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
     overflow: hidden;
   }
 
+  /* The header carries the row height itself (54px + the item's 1px borders = the
+     56px of a standalone `.inventory-detail-row`), rather than stretching to fill
+     the item. That keeps the thumbnail + name fixed: expanding a row appends the
+     body BELOW the header instead of shrinking it, so nothing shifts up. */
   .inventory-detail-accordion-header {
-    flex: 1 1 auto;
+    box-sizing: border-box;
+    min-height: 54px;
     display: flex;
     align-items: center;
     gap: var(--fab-space-3);
