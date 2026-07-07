@@ -71,6 +71,7 @@ describe('Fabricate theme management', () => {
       IRONBLOOD_FORGE: 'ironblood-forge',
       HEARTH_HERB: 'hearth-herb',
       STARGLASS_ARCANA: 'starglass-arcana',
+      SOVEREIGN: 'sovereign',
       FOUNDRY_NATIVE: 'foundry-native'
     });
     assert.deepEqual(FABRICATE_THEME_CHOICES, {
@@ -79,6 +80,7 @@ describe('Fabricate theme management', () => {
       'ironblood-forge': 'Ironblood Forge',
       'hearth-herb': 'Hearth & Herb',
       'starglass-arcana': 'Starglass Arcana',
+      sovereign: 'Sovereign',
       'foundry-native': 'Foundry Native'
     });
     assert.deepEqual(theme.definition.choices, FABRICATE_THEME_CHOICES);
