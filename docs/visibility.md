@@ -19,7 +19,9 @@ The [list modes below](#list-modes) walk through each approach, starting with th
 ## List Modes
 
 Choose how recipes are exposed to players in the **Recipe Visibility** card.
-You find it on the crafting system's **Settings** tab in the Crafting Admin panel, below the optional features.
+You find it on the **Settings** page of the **Crafting** menu in the Crafting Admin panel, below the resolution-mode cards.
+The Crafting menu is an experimental feature, so recipe visibility is reachable only when **Experimental Features** is turned on for the world.
+See [The Crafting Menu]({% link crafting-systems.md %}#the-crafting-menu).
 The card is hidden for alchemy systems, which do not use recipe visibility.
 The card's list-mode selector offers three modes: **Global**, **Player-specific**, and **Knowledge-based**.
 Every control on the card applies as soon as you change it, so there is no separate save step.
@@ -125,6 +127,7 @@ Re-importing the recipe item from the compendium restores the link.
 ### Limited Uses
 
 Recipe items can have limited uses.
+You set these limits per item on its own page in [Books & Scrolls](#books--scrolls), not once for the whole system.
 
 - You can turn on use tracking for the item.
 - You can set the maximum number of times the item grants access.
@@ -160,8 +163,7 @@ This creates one-time-use "recipe scrolls".
 You can choose to keep the item after learning instead.
 For example, a spellbook that teaches recipes but is not destroyed in the process.
 
-You set this in the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
-The option only appears when the system is in knowledge mode.
+You set this per item on its own page in [Books & Scrolls](#books--scrolls).
 Consume on learn applies to drag-and-drop learning.
 Learning one recipe at a time from the Inventory tab never consumes the book — only a spent learn cap with **Delete when spent** removes it.
 
@@ -171,9 +173,11 @@ A recipe item can link to several recipes, which makes it a "recipe book".
 By default a book teaches every recipe it links at once.
 You can instead cap how many recipes a player may learn from a single book.
 
-To turn the cap on, open the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
+The cap belongs to each book, not to the whole system, so two books in one system can differ.
+One book might be a single-recipe scroll while another is a three-recipe tome.
+To turn the cap on, open the book's own page in [Books & Scrolls](#books--scrolls).
 Under the learning options, turn on **Limited recipes learned per item**.
-Set **Maximum recipes** to the number of recipes one book may teach.
+Set **Maximum recipes** to the number of recipes that one book may teach.
 Turn on **Delete when spent** if you want the book removed once its budget is used up.
 
 While the cap is on, the **Consume item on learn** option is hidden.
@@ -282,21 +286,21 @@ The surface lists every recipe item in the selected system.
 Each item shows its image and name, and the recipes it teaches under **Linked recipes**.
 An item with no linked recipes yet says so, and the whole surface shows an empty state when the system has no recipe items at all.
 
-Each item also shows the current recipe-item rules as read-only chips:
+Each item also shows its own use and learn caps as chips:
 
 - A **Use cap** chip shows how many times the item grants crafting access, or **Unlimited uses** when use tracking is off.
 - A **Learn cap** chip shows how many recipes a player may learn from the item, or **Learn all** when there is no learn cap.
 
-### The Shared Rules
+### Setting an Item's Caps
 
-The use cap, the learn cap, and the consume or destroy behaviour are system-wide rules.
-They apply to every recipe item in the system, not to one item at a time.
-Because of that, you edit them once in the surface's **Recipe item rules** card rather than per item.
-The per-item chips described above only reflect those shared rules, so they are read-only.
+The use cap, the learn cap, and the consume or destroy behaviour belong to each recipe item, not to the whole system.
+Two books in one system can differ, so a one-recipe scroll can sit beside a three-recipe tome.
 
-Every change in the rules card applies immediately, so there is no separate save step.
-These are the same rules you can set in the **Recipe Visibility** card on the **Settings** tab of the Crafting Admin panel.
-Editing them in either place updates the other, because both read and write the one shared configuration.
+Click a row to open that item's own page.
+The breadcrumb reads **Crafting** then **Books & Scrolls** then the item's name, and the page shows the item, its linked recipes, and a card for setting that item's caps.
+Set the use cap, the learn cap, and the consume or destroy behaviour there.
+Every change applies immediately, so there is no separate save step.
+The chips on the list update to match once you go back.
 
 ## Locked Recipes
 

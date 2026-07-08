@@ -19,8 +19,9 @@ This spec governs:
 
 From `002-data-models.md`:
 
-- `CraftingSystem.recipeVisibility`
+- `CraftingSystem.recipeVisibility` (strategy only: `listMode`, `knowledge.mode`, `knowledge.learn.dragDropEnabled`)
 - `CraftingSystem.recipeItemDefinitions`
+- `RecipeItemDefinition.caps` (per-recipe-item use/learn caps)
 - `Recipe.visibility`
 - `Recipe.recipeItemId`
 - `Recipe.locked`
@@ -28,6 +29,7 @@ From `002-data-models.md`:
 - `Item._stats.compendiumSource` (Foundry v12+, primary source UUID field)
 - `Item.flags.core.sourceId` (Foundry v11 and earlier, legacy fallback)
 - `Item.flags.fabricate.recipeItemUsage.timesUsed`
+- `Item.flags.fabricate.recipeItemLearning.learnedCount`
 
 ## Source UUID Resolution
 
@@ -65,6 +67,18 @@ The resolver handles both transparently.
 > Authoring note (no behavioural change): the GM recipe editor (Manager) authors `recipe.recipeItemId` directly — dropping a Foundry Item links or replaces it via `addRecipeItemFromUuid` (which synthesizes or dedups the `RecipeItemDefinition` and resolves its `sourceItemUuid`), and unlinking nulls `recipe.recipeItemId` without deleting the shared definition.
 When the linked definition's `sourceItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the link.
 The matching rules above are unchanged; UI rendering specifics defer to `ui-integration`.
+
+## Recipe-Item Cap Resolution
+
+The use cap (craft charges) and the learn cap are **per recipe item**, not a single system-wide config.
+They are read from the recipe's linked definition (`recipe.recipeItemId` → `RecipeItemDefinition.caps`), so two recipe items in one crafting system may enforce different caps.
+
+Cap resolution **fails closed**: when a recipe has no `recipeItemId`, or the id resolves to no `RecipeItemDefinition`, the caps default to uncapped (unlimited uses, no learn cap, `consumeOnLearn` on).
+An unresolved link therefore never bricks a recipe with a zero budget.
+
+The per-**document** runtime counters are unchanged by this move: craft charges still accumulate in `Item.flags.fabricate.recipeItemUsage.timesUsed`, and the learn budget still accumulates in `Item.flags.fabricate.recipeItemLearning.learnedCount`.
+Both counters live on the physical item document, accumulate across every holder, and survive transfer.
+Only the cap *configuration* moved from the system config onto each recipe item definition.
 
 ## Visibility Evaluation
 
@@ -258,11 +272,11 @@ They must collect candidate items directly against the actor's inventory so they
 
 ## Limited Uses
 
-When `knowledge.item.limitUses === true`:
+When the recipe item's `caps.item.limitUses === true` (resolved per Recipe-Item Cap Resolution):
 
 - Uses are tracked on the matched owned item instance via `timesUsed`.
-- An item is exhausted when `timesUsed >= maxUses`.
-- Exhausted items are ignored for item-based access and may be destroyed on exhaustion depending on settings.
+- An item is exhausted when `timesUsed >= caps.item.maxUses`.
+- Exhausted items are ignored for item-based access and may be destroyed on exhaustion when `caps.item.destroyWhenExhausted === true`.
 
 ### Deterministic Item Selection
 
@@ -298,19 +312,20 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 }
 ```
 
-1. If `consumeOnLearn === true`, consume selected item.
+1. If the recipe item's `caps.learn.consumeOnLearn === true`, consume selected item.
 2. Return the updated access state.
 
 ### Recipe-Item Learn Cap
 
-A recipe item may carry a **learn cap** (`knowledge.learn.maxRecipes`, enabled by `knowledge.learn.limitRecipes`).
-The learn cap limits how many of a recipe item's linked recipes may be learned from it, distinct from the item craft-charge limit (`knowledge.item.limitUses`), which caps how many times the item grants crafting access.
+A recipe item may carry a **learn cap** (`caps.learn.maxRecipes`, enabled by `caps.learn.limitRecipes`), resolved per Recipe-Item Cap Resolution from the recipe's linked definition.
+The learn cap limits how many of that recipe item's linked recipes may be learned from it, distinct from the item craft-charge limit (`caps.item.limitUses`), which caps how many times the item grants crafting access.
+Because caps are per recipe item, one book may be a one-recipe scroll while another in the same system is a three-recipe tome.
 
 Each recipe-item **document instance** tracks a **learn budget** count that mirrors the craft-charge `timesUsed` count (per physical item document, so a stacked `qty > 1` document shares one count).
 The **remaining budget** is `maxRecipes − count`.
 A further recipe is refused once the count reaches `maxRecipes`.
 
-Optional `knowledge.learn.destroyWhenSpent` removes the recipe item when the budget is spent (the count reaches `maxRecipes`).
+Optional `caps.learn.destroyWhenSpent` removes the recipe item when the budget is spent (the count reaches `maxRecipes`).
 `destroyWhenSpent` (learn cap) is deliberately distinct from `destroyWhenExhausted` (item craft-charges); the two flags are independent and are not normalized to one name.
 
 #### Cross-Actor Budget Semantics
@@ -321,14 +336,14 @@ It **counts across all actors** that hold the document and is **not reset** on t
 #### Player-Selected Learning From The Inventory Tab
 
 Players learn from an owned recipe item one recipe at a time in the player Inventory tab, which is the manual learn surface for every knowledge mode.
-A recipe item whose system has an **effective** learn cap (`knowledge.learn.limitRecipes === true` AND a finite positive `maxRecipes`) is a **capped recipe item** and does not auto-learn every linked recipe on drop.
-A system that toggled `limitRecipes` on but carries a missing or invalid `maxRecipes` is not treated as capped -- it fails closed to the uncapped auto-learn path rather than bricking its recipes with a zero budget.
+A recipe item with an **effective** learn cap (its own `caps.learn.limitRecipes === true` AND a finite positive `caps.learn.maxRecipes`) is a **capped recipe item** and does not auto-learn every linked recipe on drop.
+A recipe item that toggled `limitRecipes` on but carries a missing or invalid `maxRecipes` is not treated as capped -- it fails closed to the uncapped auto-learn path rather than bricking its recipes with a zero budget.
 
 - Owned recipe items surface in the Inventory listing (`InventoryListingBuilder`) as learnable rows for any `knowledge` list-mode system, carrying their linked recipes (each with a per-actor `learned` flag) and their applicable limits.
   A `learnable` row flag is set only for `learned` / `itemOrLearned` modes; an item-only book lists its recipes and its craft-use limit but offers no Learn affordance (it grants access by being held).
 - The learning limit is projected only when the book is learnable; the craft-use limit is projected only when the mode grants access by holding the item (`item` / `itemOrLearned`).
-- Learning one recipe (`RecipeVisibilityService.learnRecipeFromOwnedBook`) resolves the owned document deterministically, writes one `learnedRecipes` entry, and — for a capped recipe item — increments the document's learn budget count and removes the item when the budget is then spent if `destroyWhenSpent === true`.
-- `consumeOnLearn` is ignored on this path (it would delete a multi-recipe book on the first learn); only `destroyWhenSpent` on a spent cap removes the book.
+- Learning one recipe (`RecipeVisibilityService.learnRecipeFromOwnedBook`) resolves the owned document deterministically, writes one `learnedRecipes` entry, and — for a capped recipe item — increments the document's learn budget count and removes the item when the budget is then spent if `caps.learn.destroyWhenSpent === true`.
+- `caps.learn.consumeOnLearn` is ignored on this path (it would delete a multi-recipe book on the first learn); only `destroyWhenSpent` on a spent cap removes the book.
 - A capped recipe item is refused a further learn once `count` reaches `maxRecipes`.
 
 ### Drag-and-Drop Learn Configuration
@@ -398,10 +413,10 @@ Learning is applied per matched recipe independently:
 - `consumeOnLearn` is evaluated for each newly learned recipe.
 If any learned recipe requires consumption, the dropped owned item must be removed by the end of the operation.
 
-The "learn every linked recipe in a single operation" rule gains an exception applied **per matched recipe**: for a matched recipe whose crafting system has `knowledge.learn.limitRecipes === true` (a **learn cap**, see Recipe-Item Learn Cap below), learning is player-chosen and capped at the remaining budget rather than auto-applied on drop.
-Matched recipes from uncapped systems in the same drop still auto-learn.
-A single dropped recipe item that matches both capped-system and uncapped-system recipes learns the uncapped ones on drop and routes only the capped ones to the Inventory-tab learn path; the drop is never a whole no-op.
-`knowledge.learn.consumeOnLearn` is not applied to a capped recipe item and is hidden for it in the authoring UI -- it is superseded by `knowledge.learn.destroyWhenSpent`.
+The "learn every linked recipe in a single operation" rule gains an exception applied **per matched recipe**: for a matched recipe whose linked recipe item has `caps.learn.limitRecipes === true` (a **learn cap**, see Recipe-Item Learn Cap below), learning is player-chosen and capped at the remaining budget rather than auto-applied on drop.
+Matched recipes linked to uncapped recipe items in the same drop still auto-learn.
+A single dropped recipe item is one definition with one caps block, so a drop either auto-learns all its linked recipes (uncapped) or routes them all to the Inventory-tab learn path (capped); the drop is never a whole no-op.
+`caps.learn.consumeOnLearn` is not applied to a capped recipe item and is hidden for it in the authoring UI -- it is superseded by `caps.learn.destroyWhenSpent`.
 
 #### Notifications
 

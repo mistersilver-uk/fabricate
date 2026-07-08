@@ -62,6 +62,10 @@ Most optional features are off by default and must be explicitly enabled by a GM
 Toggle optional features in the **Features** card on the System tab of the Crafting Admin panel.
 Each toggle takes effect immediately for all future crafting attempts in that system.
 
+You set the recipe and salvage resolution modes on the **Settings** page of the **Crafting** menu, not on the main System settings page.
+The Crafting menu is an experimental feature, so these cards are reachable only when **Experimental Features** is turned on for the world.
+See [The Crafting Menu](#the-crafting-menu).
+
 Changing the **recipe resolution mode** migrates your recipes to the new mode wherever it can, instead of deleting them all.
 Fabricate reshapes each recipe so it fits the new mode, and only removes a recipe when its structure cannot be made to fit.
 You will be asked to confirm before anything changes.
@@ -133,7 +137,9 @@ See [Effect Transfer]({% link effect-transfer.md %}) for how the feature is enab
 ### Recipe Visibility
 
 Recipe visibility controls which players can see and access recipes through the visibility service and planned player Crafting UI.
-You configure this per crafting system in the **Recipe Visibility** feature card on the System tab of the Crafting Admin panel.
+You configure this per crafting system in the **Recipe Visibility** card on the **Settings** page of the **Crafting** menu.
+The Crafting menu is an experimental feature, so this card is reachable only when **Experimental Features** is turned on for the world.
+See [The Crafting Menu](#the-crafting-menu).
 
 Fabricate supports three list modes:
 
@@ -228,10 +234,12 @@ While it is off, the panel's left menu shows **Recipes** as a disabled **Soon** 
 When Experimental Features is on, that single entry becomes an expandable **Crafting** group in the left menu, in the same style as the **Gathering** group.
 Expand it to reveal three sections.
 
-- **Settings** is a placeholder for future system-level crafting rules.
-  Recipe visibility and the recipe-item rules are still configured in the **Recipe Visibility** card on the System settings page, and the placeholder links you there.
+- **Settings** hosts the system-level crafting rules: the recipe resolution mode, the salvage resolution mode, and the **Recipe Visibility** card.
+  These cards used to live on the System settings page and moved here.
+  Because the whole Crafting group is experimental, they are reachable only while Experimental Features is on.
 - **Recipes** is the existing recipe browser and editor.
-- **Books & Scrolls** is a management surface that lists every recipe item in the system with its linked recipes, use cap, learn cap, and consume or destroy behaviour.
+- **Books & Scrolls** lists every recipe item in the system with its linked recipes and each item's own use and learn caps.
+  Open a recipe item to set that item's caps on its own page.
   See [Books & Scrolls]({% link visibility.md %}#books--scrolls).
 
 ---
