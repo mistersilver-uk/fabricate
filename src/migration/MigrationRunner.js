@@ -20,6 +20,7 @@ import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js'
 import { migrateMoveRoutedByIngredientsCheck } from './migrateMoveRoutedByIngredientsCheck.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
+import { migrateRecipeItemCapsPerItem } from './migrateRecipeItemCapsPerItem.js';
 import { migrateRemoveLegacyCheckSources } from './migrateRemoveLegacyCheckSources.js';
 import { migrateRemoveResultSelectionProviders } from './migrateRemoveResultSelectionProviders.js';
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
@@ -258,6 +259,15 @@ const MIGRATIONS = [
       'craftingCheck.routed to the shared craftingCheck.simple slot (tier ids preserved; routed formula cleared)',
     migrate(data) {
       return migrateMoveRoutedByIngredientsCheck(data);
+    },
+  },
+  {
+    version: '1.11.0',
+    label:
+      'Move recipe-item use/learn caps from the system-wide recipeVisibility.knowledge config ' +
+      'onto each recipe item definition (per-item caps; mode + dragDropEnabled stay system-wide)',
+    migrate(data) {
+      return migrateRecipeItemCapsPerItem(data);
     },
   },
   // Future migrations added here in version order
