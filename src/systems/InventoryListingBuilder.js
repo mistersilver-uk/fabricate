@@ -36,6 +36,10 @@ const LEARN_CAPABLE_MODES = new Set(['learned', 'itemOrLearned']);
 // only modes where its craft-use ("Crafting uses") limit is meaningful.
 const ITEM_ACCESS_MODES = new Set(['item', 'itemOrLearned']);
 
+// Foundry's generic default Item image — treated as "no image" for a recipe so it
+// falls back to the recipe blueprint rather than showing the bag SVG.
+const GENERIC_ITEM_IMAGE = 'icons/svg/item-bag.svg';
+
 function stringOrEmpty(value) {
   return typeof value === 'string' ? value : value == null ? '' : String(value);
 }
@@ -645,9 +649,12 @@ export class InventoryListingBuilder {
    * @private
    */
   _resolveRecipeImg(recipe) {
-    // A book's recipes show their OWN image (defaulting to the alchemical blueprint),
-    // matching the GM app — NOT the book's image (which defaults to a generic bag).
-    return recipe?.img || DEFAULT_RECIPE_IMAGE;
+    // A book's recipes show their OWN image, defaulting to the alchemical blueprint
+    // (matching the GM app). Foundry's generic item-bag default is treated as "no
+    // image" so an imported recipe that never had a real icon falls back to the
+    // blueprint too, never the bag SVG.
+    const img = typeof recipe?.img === 'string' ? recipe.img.trim() : '';
+    return !img || img === GENERIC_ITEM_IMAGE ? DEFAULT_RECIPE_IMAGE : img;
   }
 
   /**

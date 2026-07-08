@@ -299,6 +299,9 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.equal(builder._resolveRecipeImg({ img: 'icons/blade.webp' }), 'icons/blade.webp');
     assert.equal(builder._resolveRecipeImg({ img: '' }), blueprint, 'empty img → blueprint, not a bag');
     assert.equal(builder._resolveRecipeImg({}), blueprint);
+    // Foundry's generic item-bag default is treated as "no image" → blueprint.
+    assert.equal(builder._resolveRecipeImg({ img: 'icons/svg/item-bag.svg' }), blueprint);
+    assert.equal(builder._resolveRecipeImg({ img: '  icons/svg/item-bag.svg  ' }), blueprint);
   });
 
   it('hides undiscovered (teaser) recipes from a non-GM viewer’s used-by list', () => {
