@@ -103,27 +103,28 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   });
 
   it('keeps the Crafting nav group active on the recipe-edit subroute', () => {
-    // Recipes now nests inside the gated Crafting nav group (issue 511); the
-    // parent tracks any crafting child route and recipe-edit maps to the Recipes
-    // sub-item via the activeCraftingTab default branch.
+    // Recipes nests inside the gated Crafting nav group (issue 511, PR-B). The
+    // crafting nav membership + active-tab mapping now live in the shared
+    // crafting/craftingNav.js model, so the root derives the boolean/tab from the
+    // imported helpers rather than an inline route list.
     assert.ok(
-      rootSource.includes("|| currentView === 'recipe-edit'"),
-      'isCraftingRoute should include recipe-edit'
+      rootSource.includes('isCraftingView(currentView)'),
+      'root should derive isCraftingRoute from the shared isCraftingRoute helper'
+    );
+    assert.ok(
+      rootSource.includes('resolveActiveCraftingTab(currentView)'),
+      'root should derive the active crafting tab from the shared activeCraftingTab helper'
     );
     assert.ok(
       rootSource.includes("aria-current={isCraftingRoute ? 'page' : undefined}"),
       'crafting parent aria-current should track isCraftingRoute'
     );
-    assert.ok(
-      rootSource.includes("currentView === 'crafting-settings'") && rootSource.includes("? 'settings'") && rootSource.includes(": 'recipes'"),
-      'activeCraftingTab should map recipe-edit (default) to the recipes sub-item'
-    );
   });
 
   it('redirects recipe-edit like recipes (fallback to system-edit) in normalizedActiveView', () => {
     assert.ok(
-      rootSource.includes("if ((view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings' || view === 'books-scrolls' || view === 'books-scrolls-item') && !recipesAvailable) return 'system-edit'"),
-      'normalizedActiveView should treat recipe-edit like recipes and fall back to system-edit'
+      rootSource.includes('CRAFTING_VIEWS.includes(view) && !recipesAvailable) return'),
+      'normalizedActiveView should treat every crafting view (including recipe-edit) alike and fall back to system-edit'
     );
   });
 

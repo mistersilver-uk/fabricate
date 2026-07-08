@@ -7012,6 +7012,56 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Persist the full recipe-item editor draft in a single call (issue 511, PR-B).
+  // The router owns the draft and passes the complete `{ enabled, sourceItemUuid,
+  // caps }` snapshot; the manager patch accepts these fields. Refreshes projections
+  // (resolved name/img/type + derived recipes[]) on success.
+  async function saveRecipeItem(recipeItemId, patch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeItemId) return false;
+    try {
+      await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, patch);
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to save recipe item:', err);
+      services.notify?.error?.(err?.message || 'Failed to save recipe item');
+      return false;
+    }
+  }
+
+  // Delete a recipe-item definition after a confirm (issue 511, PR-B). Returns
+  // false when cancelled or on error so the editor route can stay open.
+  async function deleteRecipeItemDefinition(recipeItemId) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeItemId) return false;
+    const confirmed = await services.confirmDialog?.({
+      title: services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') || 'Delete recipe item?',
+      content: `<p>${services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteContent') || 'Delete this recipe item? Recipes linked to it will be unlinked.'}</p>`,
+      yes: () => true,
+      no: () => false,
+    });
+    if (!confirmed) return false;
+    try {
+      await systemManager.deleteRecipeItemDefinition(sysId, recipeItemId);
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to delete recipe item:', err);
+      services.notify?.error?.(err?.message || 'Failed to delete recipe item');
+      return false;
+    }
+  }
+
+  function confirmDiscardDirtyRecipeItemDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.RecipeItem.DiscardDirtyContent',
+      'The current recipe item has unsaved changes. Discard them and continue?'
+    );
+  }
+
   async function saveTeaserConfig(teaserConfig) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -7481,6 +7531,9 @@ export function createAdminStore(services) {
     addRecipeItemFromUuid,
     updateRecipeItemCaps,
     setRecipeItemEnabled,
+    saveRecipeItem,
+    deleteRecipeItemDefinition,
+    confirmDiscardDirtyRecipeItemDraft,
     importRecipes,
     exportRecipes,
     exportSystem,

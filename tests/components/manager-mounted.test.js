@@ -84,7 +84,33 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemCapsCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingEffectPanel.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/SegmentedControl.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RosterRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPickerModal.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/AccessTabView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GrantAccessInspector.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPageInspector.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemEditor.svelte');
+  for (const recipeItemComponent of [
+    'RecipeItemEditorTabs',
+    'RecipeItemOverviewTab',
+    'RecipeItemContentsTab',
+    'RecipeItemLimitsTab',
+    'RecipeItemValidationTab',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe-item/${recipeItemComponent}.svelte`);
+  }
+  // Plain crafting modules imported by the nav model + Settings/nav wiring — copied
+  // raw (NOT compiled), the same way recipe/recipeReadiness.js is.
+  for (const craftingModule of ['craftingVisibility.js', 'craftingNav.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/crafting/${craftingModule}`);
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/crafting/${craftingModule}`), 'utf8')
+    );
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
@@ -185,6 +211,7 @@ function compileManagerRoot() {
     'recipeDuration.js',
     'recipeCurrency.js',
     'systemDisambiguation.js',
+    'craftingImageDefaults.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
@@ -689,7 +716,14 @@ function createStore(calls = [], options = {}) {
   applySelectedCurrency(systemDetails, options.selectedCurrency);
   const baseSelectedSystem =
     options.noSystems || options.selected === false ? null : systemDetails.alchemy;
-  const selectedSystem = applyRecipeKnowledgeMode(baseSelectedSystem, options.recipeKnowledgeMode);
+  const selectedSystemWithMode = applyRecipeKnowledgeMode(
+    baseSelectedSystem,
+    options.recipeKnowledgeMode
+  );
+  // Flat visibilityMode (issue 511, PR-B) + any other per-test system overrides.
+  const selectedSystem = selectedSystemWithMode
+    ? { ...selectedSystemWithMode, ...(options.selectedSystemOverrides || {}) }
+    : selectedSystemWithMode;
   const essenceCardsBySystem = {
     alchemy: [
       {
@@ -1071,6 +1105,34 @@ function createStore(calls = [], options = {}) {
     updateRecipeItemCaps: (recipeItemId, patch) => {
       calls.push(['updateRecipeItemCaps', recipeItemId, patch]);
       return options.updateRecipeItemCapsResult ?? true;
+    },
+    setVisibilityMode: (mode) => {
+      calls.push(['setVisibilityMode', mode]);
+      return options.setVisibilityModeResult ?? true;
+    },
+    setRecipeItemEnabled: (recipeItemId, enabled) => {
+      calls.push(['setRecipeItemEnabled', recipeItemId, enabled]);
+      return options.setRecipeItemEnabledResult ?? true;
+    },
+    saveRecipeItem: (recipeItemId, patch) => {
+      calls.push(['saveRecipeItem', recipeItemId, patch]);
+      return options.saveRecipeItemResult ?? true;
+    },
+    deleteRecipeItemDefinition: (recipeItemId) => {
+      calls.push(['deleteRecipeItemDefinition', recipeItemId]);
+      return options.deleteRecipeItemDefinitionResult ?? true;
+    },
+    confirmDiscardDirtyRecipeItemDraft: () => {
+      calls.push(['confirmDiscardDirtyRecipeItemDraft']);
+      return options.confirmDiscardRecipeItemResult ?? 'discard';
+    },
+    getPcRoster: () => {
+      calls.push(['getPcRoster']);
+      return options.pcRoster ?? [];
+    },
+    saveRecipeAccess: (recipeId, grant) => {
+      calls.push(['saveRecipeAccess', recipeId, grant]);
+      return options.saveRecipeAccessResult ?? true;
     },
     setResolutionMode: async (mode) => {
       calls.push(['setResolutionMode', mode]);
@@ -3320,16 +3382,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  it('CraftingSettingsView renders the recipe visibility card for a non-alchemy system and hides it for alchemy', () => {
-    // The recipe visibility + resolution controls moved off System Overview onto the
-    // gated Crafting > Settings page (issue 511).
+  it('CraftingSettingsView renders the recipe resolution and flat visibility-mode cards', () => {
+    // The recipe resolution + flat visibility-mode controls live on the gated
+    // Crafting > Settings page (issue 511, PR-B). Visibility is now a single flat
+    // enum (global/restricted/item/knowledge), not the old listMode card.
     const baseSystem = {
       id: 'sys1',
       name: 'System One',
       resolutionMode: 'simple',
+      visibilityMode: 'knowledge',
       features: {},
-      recipeVisibility: { listMode: 'global' },
-      showRecipeVisibilityKnowledgeOptions: false,
+      craftingEffect: {
+        showAccess: false,
+        showBooksScrolls: true,
+        showLimitedUse: false,
+        showLearningLimits: true,
+        summaryKey: 'FABRICATE.Admin.Manager.Crafting.Effect.SummaryKnowledge',
+      },
     };
     mountCraftingSettingsView({ selectedSystem: baseSystem });
     assert.ok(
@@ -3337,19 +3406,20 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the resolution-mode card renders on Crafting Settings'
     );
     assert.ok(
-      target.querySelector('[data-system-recipe-visibility]'),
-      'the card renders for a non-alchemy system'
+      target.querySelector('[data-crafting-visibility-section]'),
+      'the flat visibility-mode section renders'
     );
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-
-    mountCraftingSettingsView({ selectedSystem: { ...baseSystem, resolutionMode: 'alchemy' } });
-    assert.equal(
-      target.querySelector('[data-system-recipe-visibility]'),
-      null,
-      'the card is hidden for an alchemy system'
+    // All four visibility modes are offered.
+    const visibilityOptions = Array.from(
+      target.querySelectorAll('[data-crafting-visibility-mode-option]')
+    ).map((option) => option.getAttribute('data-crafting-visibility-mode-option'));
+    for (const mode of ['global', 'restricted', 'item', 'knowledge']) {
+      assert.ok(visibilityOptions.includes(mode), `visibility option "${mode}" is offered`);
+    }
+    // The effect panel reflects the active mode's conditional surface.
+    assert.ok(
+      target.querySelector('[data-crafting-settings-context] [data-crafting-effect]'),
+      'the effect panel renders alongside the cards'
     );
   });
 
@@ -5910,14 +5980,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('#manager-nav-crafting + .manager-nav-toggle').getAttribute('aria-label'),
       'Collapse crafting menu'
     );
+    // The Crafting sub-tabs are a conditional set keyed on the system's
+    // visibilityMode (issue 511, PR-B). The default fixture has no visibilityMode
+    // (→ 'knowledge'), so Access is hidden and Books & Scrolls is shown; order is
+    // Recipes · Books & Scrolls · Settings.
     const craftingItems = Array.from(submenu.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       craftingItems.map((item) => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Settings', 'Recipes', 'Books & Scrolls']
+      ['Recipes', 'Books & Scrolls', 'Settings']
     );
     assert.deepEqual(
       craftingItems.map((item) => item.id),
-      ['manager-crafting-nav-settings', 'manager-crafting-nav-recipes', 'manager-crafting-nav-books-scrolls']
+      ['manager-crafting-nav-recipes', 'manager-crafting-nav-books-scrolls', 'manager-crafting-nav-settings']
     );
     assert.equal(craftingSubitem('Recipes').getAttribute('aria-current'), 'page');
     assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), true);
@@ -5998,124 +6072,246 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  it('lists recipe items with linked recipes and per-item cap chips on Books & Scrolls', async () => {
+  // Projected recipe-item fixtures (issue 511, PR-B). The router forwards
+  // `selectedSystem.recipeItemDefinitions` straight to BooksScrollsView, so these
+  // carry the enriched projection fields the surface reads (resolvedName,
+  // derivedType, recipes[], caps).
+  const booksScrollsFixtures = [
+    {
+      id: 'ri1',
+      name: 'Alchemist Cook Book',
+      resolvedName: 'Alchemist Cook Book',
+      resolvedImg: 'icons/sundries/books/book-worn-brown.webp',
+      derivedType: 'Book',
+      sourceItemUuid: 'Compendium.fabricate.items.cook-book',
+      enabled: true,
+      description: 'A well-thumbed book of potion recipes.',
+      recipes: [{ id: 'r1', name: 'Healing Draught', category: 'potions' }],
+      learnedByCount: 2,
+      linkMissing: false,
+      caps: { learn: { limitLearning: true, learningMode: 'once' } },
+    },
+    {
+      id: 'ri2',
+      name: 'Scroll of Elixirs',
+      resolvedName: 'Scroll of Elixirs',
+      resolvedImg: 'icons/sundries/scrolls/scroll-bound-brown.webp',
+      derivedType: 'Scroll',
+      sourceItemUuid: '',
+      enabled: true,
+      description: '',
+      recipes: [],
+      learnedByCount: 0,
+      linkMissing: false,
+      caps: { learn: { limitLearning: false } },
+    },
+  ];
+
+  it('lists recipe items with recipe-count and cap chips and surfaces the item inspector on select', async () => {
     const calls = [];
-    await openBooksScrolls(calls, {
-      // Per-item caps (issue 511): ri1 is a capped cook book, ri2 an uncapped scroll.
-      recipeItemDefinitions: [
-        {
-          id: 'ri1',
-          name: 'Alchemist Cook Book',
-          img: 'icons/sundries/books/book-worn-brown.webp',
-          caps: {
-            item: { limitUses: true, maxUses: 3, destroyWhenExhausted: true },
-            learn: { limitRecipes: true, maxRecipes: 2, destroyWhenSpent: true },
-          },
-        },
-        {
-          id: 'ri2',
-          name: 'Scroll of Elixirs',
-          img: 'icons/sundries/scrolls/scroll-bound-brown.webp',
-          caps: { item: { limitUses: false }, learn: { limitRecipes: false } },
-        },
-      ],
-    });
+    await openBooksScrolls(calls, { recipeItemDefinitions: booksScrollsFixtures });
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assert.ok(target.querySelector('[data-books-scrolls]'), 'Books & Scrolls surface renders');
-    // The parent nav count reflects the recipe-item definitions (2).
+    // The parent nav count reflects the recipes count (2 recipes in the fixture).
     assert.equal(craftingParent().querySelector('.manager-nav-count').textContent.trim(), '2');
-    // The shared system-wide rules card is gone (caps are per-item now).
-    assert.equal(target.querySelector('[data-books-scrolls-rules]'), null);
 
-    // Both recipe items are listed; the first book links recipe r1.
+    // Both recipe items are listed with their own recipe-count + learning chips.
     const cards = Array.from(target.querySelectorAll('[data-books-scrolls-item]'));
     assert.equal(cards.length, 2);
     assert.equal(
-      target.querySelector('[data-books-scrolls-linked-count="ri1"] strong').textContent.trim(),
-      '1'
+      target.querySelector('[data-books-scrolls-recipe-count="ri1"]').textContent.trim(),
+      '1 recipe'
     );
     assert.equal(
-      target.querySelector('[data-books-scrolls-linked-count="ri2"] strong').textContent.trim(),
-      '0'
+      target.querySelector('[data-books-scrolls-recipe-count="ri2"]').textContent.trim(),
+      'No recipes'
     );
-    assert.ok(target.textContent.includes('Healing Draught'), 'linked recipe name is shown');
+    // Knowledge mode (default): the cap chip shows the learning limit.
+    assert.equal(
+      target.querySelector('[data-books-scrolls-cap-chip="ri1"]').getAttribute('data-books-scrolls-cap-limited'),
+      'true'
+    );
+    assert.equal(
+      target.querySelector('[data-books-scrolls-cap-chip="ri2"]').getAttribute('data-books-scrolls-cap-limited'),
+      'false'
+    );
 
-    // Each card's chips reflect that item's OWN caps.
-    assert.equal(
-      target.querySelector('[data-books-scrolls-use-chip="ri1"]').textContent.trim(),
-      'Use cap: 3'
-    );
-    assert.equal(
-      target.querySelector('[data-books-scrolls-learn-chip="ri1"]').textContent.trim(),
-      'Learn cap: 2'
-    );
-    assert.equal(
-      target.querySelector('[data-books-scrolls-use-chip="ri2"]').textContent.trim(),
-      'Unlimited uses'
-    );
-    assert.equal(
-      target.querySelector('[data-books-scrolls-learn-chip="ri2"]').textContent.trim(),
-      'Learn all'
-    );
-    // The inspector aside is suppressed for this surface.
-    assert.equal(target.querySelector('.manager-inspector'), null);
-
-    // Opening a card navigates to that item's per-item caps page.
-    target.querySelector('[data-books-scrolls-item="ri1"]').click();
+    // Toggling a row's enabled flag routes through setRecipeItemEnabled (no draft).
+    target.querySelector('[data-books-scrolls-toggle="ri1"]').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls-item');
-    assert.ok(target.querySelector('[data-books-scrolls-item]'), 'the per-item page renders');
-    assert.ok(target.querySelector('[data-recipe-item-caps]'), 'the per-item caps card renders');
-    assert.ok(target.textContent.includes('Alchemist Cook Book'), 'the item name heads the page');
+    assert.ok(
+      calls.some((call) => call[0] === 'setRecipeItemEnabled' && call[1] === 'ri1' && call[2] === false),
+      'toggling a row calls setRecipeItemEnabled'
+    );
+
+    // Selecting a row surfaces the ItemPageInspector aside for that item.
+    target.querySelector('[data-books-scrolls-select="ri2"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-item-page-inspector]'), 'the item inspector renders on select');
+    assert.equal(
+      target.querySelector('[data-item-page-name]').textContent.trim(),
+      'Scroll of Elixirs'
+    );
+    assert.equal(target.querySelector('[data-item-page-recipe-count]').textContent.trim(), '0');
   });
 
-  it('live-applies per-item cap edits on the Books & Scrolls item page (no draft)', async () => {
+  it('opens the recipe-item editor from a Books & Scrolls row and saves the staged draft', async () => {
+    const calls = [];
+    await openBooksScrolls(calls, { recipeItemDefinitions: booksScrollsFixtures });
+
+    // The pen action opens the full-window recipe-item editor route.
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assert.ok(target.querySelector('[data-recipe-item-editor]'), 'the recipe-item editor body renders');
+    // The router owns the header + footer actions.
+    assert.ok(target.querySelector('[data-recipe-item-back]'), 'Back action renders');
+    assert.ok(target.querySelector('[data-recipe-item-delete]'), 'Delete action renders');
+    const save = target.querySelector('[data-recipe-item-save]');
+    assert.ok(save, 'Save action renders');
+    assert.equal(save.disabled, true, 'Save is disabled until the draft is dirty');
+    // The editor is fed the persisted linked recipe (r1) for ri1.
+    assert.ok(target.textContent.includes('Alchemist Cook Book'), 'the linked item name shows in the editor');
+
+    // Flipping the Overview Enabled toggle stages a draft change → dirty.
+    target.querySelector('[data-recipe-item-enabled]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-recipe-item-dirty]'), 'the Unsaved chip appears when dirty');
+    assert.equal(target.querySelector('[data-recipe-item-save]').disabled, false, 'Save enables when dirty');
+
+    // Saving commits the whole draft in one saveRecipeItem call, then returns to
+    // the Books & Scrolls surface.
+    target.querySelector('[data-recipe-item-save]').click();
+    await tick();
+    flushSync();
+    const saveCall = calls.find((call) => call[0] === 'saveRecipeItem' && call[1] === 'ri1');
+    assert.ok(saveCall, 'Save routes through saveRecipeItem for ri1');
+    assert.equal(saveCall[2].enabled, false, 'the staged enabled change is persisted');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+  });
+
+  it('guards a dirty recipe-item editor exit through the confirm-discard chain', async () => {
     const calls = [];
     await openBooksScrolls(calls, {
-      recipeItemDefinitions: [
-        {
-          id: 'ri1',
-          name: 'Alchemist Cook Book',
-          img: 'icons/sundries/books/book-worn-brown.webp',
-          caps: { item: { limitUses: false }, learn: { limitRecipes: false } },
-        },
-      ],
+      recipeItemDefinitions: booksScrollsFixtures,
+      // Cancel the discard so navigation is blocked and the editor stays open.
+      confirmDiscardRecipeItemResult: 'cancel',
     });
 
-    // Open the item's page.
-    target.querySelector('[data-books-scrolls-item="ri1"]').click();
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls-item');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
 
-    // Enabling the use cap live-applies a concrete cap in one caps patch for THIS item.
-    target.querySelector('[data-books-scrolls-limit-uses]').click();
+    // Make the draft dirty.
+    target.querySelector('[data-recipe-item-enabled]').click();
     await tick();
     flushSync();
-    const useCapCall = calls.find(
-      (call) => call[0] === 'updateRecipeItemCaps' && call[1] === 'ri1' && call[2]?.item?.limitUses === true
-    );
-    assert.ok(useCapCall, 'enabling the use cap should call updateRecipeItemCaps for ri1');
-    assert.equal(useCapCall[2].item.maxUses, 1, 'enabling the use cap should commit a concrete cap');
 
-    // Enabling the learn cap live-applies too.
-    target.querySelector('[data-books-scrolls-limit-recipes]').click();
+    // Attempting to leave via Back consults the confirm-discard guard; cancelling
+    // keeps us on the editor route.
+    target.querySelector('[data-recipe-item-back]').click();
     await tick();
     flushSync();
     assert.ok(
-      calls.some(
-        (call) => call[0] === 'updateRecipeItemCaps' && call[1] === 'ri1' && call[2]?.learn?.limitRecipes === true
-      ),
-      'enabling the learn cap should call updateRecipeItemCaps with learn.limitRecipes:true'
+      calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeItemDraft'),
+      'a dirty exit enters the recipe-item confirm-discard chain'
     );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit',
+      'cancelling the discard keeps the editor open'
+    );
+  });
 
-    // No dirty-draft discard guard is wired for this live-apply surface.
+  it('opens the item picker to create a recipe item and then opens its editor', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          experimentalFeaturesEnabled: true,
+          recipeItemDefinitions: booksScrollsFixtures,
+        }),
+        services: {
+          openCurrentAdmin: () => {},
+          getWorldItemOptions: () => [
+            { uuid: 'Compendium.world.items.tome', name: 'Tome of Wonders', img: '', type: 'book' },
+          ],
+        },
+      },
+    });
+    flushSync();
+    craftingParent().click();
+    await tick();
+    flushSync();
+    craftingSubitem('Books & Scrolls').click();
+    await tick();
+    flushSync();
+
+    // Create opens the router-owned item picker modal.
+    target.querySelector('[data-books-scrolls-create]').click();
+    await tick();
+    flushSync();
+    const pickerRow = document.querySelector('[data-item-picker-row]');
+    assert.ok(pickerRow, 'the item picker lists world items');
+
+    // Picking an item adds the definition and opens its editor.
+    pickerRow.click();
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
     assert.ok(
-      !calls.some((call) => String(call[0]).startsWith('confirmDiscardDirty')),
-      'the live-apply surface should not enter the confirm-discard chain'
+      calls.some((call) => call[0] === 'addRecipeItemFromUuid' && call[2] === 'Compendium.world.items.tome'),
+      'picking an item adds it via addRecipeItemFromUuid'
     );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+  });
+
+  it('exposes the Access sub-tab under restricted visibility and grants a recipe', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          experimentalFeaturesEnabled: true,
+          selectedSystemOverrides: { visibilityMode: 'restricted' },
+          pcRoster: [{ id: 'char1', name: 'Aria', img: '' }],
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    // Restricted visibility surfaces the Access sub-tab (and hides Books & Scrolls).
+    craftingParent().click();
+    await tick();
+    flushSync();
+    assert.ok(craftingSubitem('Access'), 'the Access sub-tab is shown under restricted visibility');
+    assert.equal(craftingSubitem('Books & Scrolls'), undefined, 'Books & Scrolls is hidden under restricted');
+
+    craftingSubitem('Access').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'access');
+    assert.ok(target.querySelector('[data-access-search]'), 'the access list renders');
+    assert.ok(target.querySelectorAll('[data-access-row]').length >= 1, 'recipes are listed');
+
+    // Selecting a recipe surfaces the GrantAccessInspector.
+    target.querySelector('[data-access-row="r1"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-access-roster]'), 'the grant-access inspector renders on select');
   });
 
   it('shows the Books & Scrolls empty state when the system has no recipe items', async () => {
