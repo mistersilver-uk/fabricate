@@ -100,6 +100,21 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[1].smokeLabels, ['player-crafting-stacked']);
   });
 
+  it('maps player alchemy app files to the player-alchemy recipes (incl. chooser + stacked frames)', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/alchemy/AlchemyView.svelte',
+      'src/ui/svelte/apps/alchemy/Workbench.svelte',
+    ]);
+
+    assert.deepEqual(
+      views.map(view => view.id),
+      ['player-alchemy', 'player-alchemy-chooser', 'player-alchemy-stacked']
+    );
+    assert.deepEqual(views[0].smokeLabels, ['player-alchemy-workbench']);
+    assert.deepEqual(views[1].smokeLabels, ['player-alchemy-chooser']);
+    assert.deepEqual(views[2].smokeLabels, ['player-alchemy-stacked']);
+  });
+
   it('maps player journal app files to the fabricate-journal recipe', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/journal/JournalView.svelte',
