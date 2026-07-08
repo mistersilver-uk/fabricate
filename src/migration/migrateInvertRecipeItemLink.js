@@ -56,27 +56,33 @@ export function migrateInvertRecipeItemLink(data = {}) {
     const recipeId = String(recipe.id || '').trim();
     const sysIdx = systemIndex.get(String(recipe.craftingSystemId || ''));
 
-    let resolvedToBook = false;
+    // Track which reverse ref actually resolved the book independently: only the
+    // `linkedRecipeItemUuid` (bySource) path being the resolver makes that uuid a book
+    // alias that may be stripped. If `recipeItemId` resolves the book while a DISTINCT
+    // `linkedRecipeItemUuid` points elsewhere (a standalone alchemy formula item), that
+    // formula link is unrelated and MUST survive.
+    let linkedUuidResolvedBook = false;
     if (recipeId && sysIdx) {
       const recipeItemId = String(recipe.recipeItemId || '').trim();
       let def = recipeItemId ? sysIdx.byId.get(recipeItemId) : null;
       if (!def) {
         const legacyUuid = String(recipe.linkedRecipeItemUuid || '').trim();
-        if (legacyUuid) def = sysIdx.bySource.get(legacyUuid) || null;
+        if (legacyUuid) {
+          def = sysIdx.bySource.get(legacyUuid) || null;
+          if (def) linkedUuidResolvedBook = true;
+        }
       }
-      if (def) {
-        resolvedToBook = true;
-        if (!def.recipeIds.includes(recipeId)) def.recipeIds.push(recipeId);
-      }
+      if (def && !def.recipeIds.includes(recipeId)) def.recipeIds.push(recipeId);
     }
 
     // Book membership now lives on the definition, so drop the book-only `recipeItemId`
-    // reverse ref. `linkedRecipeItemUuid` is a legacy BOOK alias only when it resolved
-    // to a definition; when it does NOT resolve (e.g. a standalone alchemy formula item
-    // that is not a recipe-item definition) it is that recipe's formula-item link and
-    // MUST be preserved.
+    // reverse ref unconditionally. Drop `linkedRecipeItemUuid` ONLY when it was itself the
+    // ref that resolved to a book (a legacy book alias); otherwise preserve it — it is the
+    // recipe's standalone alchemy formula-item link.
     if ('recipeItemId' in recipe) delete recipe.recipeItemId;
-    if (resolvedToBook && 'linkedRecipeItemUuid' in recipe) delete recipe.linkedRecipeItemUuid;
+    if (linkedUuidResolvedBook && 'linkedRecipeItemUuid' in recipe) {
+      delete recipe.linkedRecipeItemUuid;
+    }
   }
 
   return { systems, recipes };

@@ -2297,6 +2297,18 @@ export class CraftingSystemManager {
       return recipes.filter((recipe) => idSet.has(String(recipe?.id)));
     }
 
+    // This definition carries no membership. Only reach for the legacy reverse ref when
+    // the WHOLE system is un-migrated; in a migrated system an empty `recipeIds` means an
+    // empty book, and a recipe's stale `recipeItemId`/`linkedRecipeItemUuid` must not
+    // resurrect a phantom membership (mirrors getRecipeItemDefinitionsContaining).
+    const definitions = Array.isArray(this.getSystem(systemId)?.recipeItemDefinitions)
+      ? this.getSystem(systemId).recipeItemDefinitions
+      : [];
+    const anyMigrated = definitions.some(
+      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
+    );
+    if (anyMigrated) return [];
+
     const definitionId = String(definition.id || '').trim();
     const sourceItemUuid = String(definition.sourceItemUuid || '').trim();
     return recipes.filter((recipe) => {

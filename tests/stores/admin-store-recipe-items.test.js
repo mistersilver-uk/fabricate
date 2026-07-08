@@ -156,6 +156,37 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     assert.equal(bookB.derivedType, 'Scroll'); // 1 recipe
   });
 
+  it('setRecipeBookMembership writes only the changed definitions and skips a no-op', async () => {
+    const capture = [];
+    const system = makeSystem({
+      recipeItemDefinitions: [
+        { id: 'book-a', name: 'A', sourceItemUuid: 'Item.aaa', recipeIds: ['r1'], caps: {} },
+        { id: 'book-b', name: 'B', sourceItemUuid: 'Item.bbb', recipeIds: [], caps: {} },
+        { id: 'book-c', name: 'C', sourceItemUuid: 'Item.ccc', recipeIds: ['r1', 'r2'], caps: {} }
+      ]
+    });
+    const store = createAdminStore(
+      createServices(system, [makeRecipe({ id: 'r1' }), makeRecipe({ id: 'r2' })], capture)
+    );
+    await store.refresh();
+
+    // Want r1 in B and C: remove from A, add to B, C unchanged (already a member).
+    await store.setRecipeBookMembership('r1', ['book-b', 'book-c']);
+    assert.deepEqual(
+      capture.map((c) => c.recipeItemId).sort(),
+      ['book-a', 'book-b'],
+      'only the changed definitions are written (C, already a member, is skipped)'
+    );
+    const patchFor = (id) => capture.find((c) => c.recipeItemId === id).patch.recipeIds;
+    assert.deepEqual(patchFor('book-a'), [], 'r1 removed from A');
+    assert.deepEqual(patchFor('book-b'), ['r1'], 'r1 added to B');
+
+    // Reconciling to the CURRENT membership (r1 already in A and C) writes nothing.
+    capture.length = 0;
+    await store.setRecipeBookMembership('r1', ['book-a', 'book-c']);
+    assert.equal(capture.length, 0, 'a no-op membership change writes nothing');
+  });
+
   it('resolves linked-item name/img/type asynchronously and passes through caps + enabled', async () => {
     const store = buildStore();
     await store.refresh();

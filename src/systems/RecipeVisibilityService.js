@@ -1224,7 +1224,9 @@ export class RecipeVisibilityService {
     await this._setLearnedMap(actor, next);
 
     const nextCount = count + 1;
-    const caps = this._getRecipeItemCaps(recipe);
+    // Read caps from the SPECIFIC owned book being learned from (per-book), not the
+    // recipe's first member book — the destroy-when-spent decision applies to THIS item.
+    const caps = this._getRecipeItemCaps(recipe, definition);
     const spent = Number.isFinite(maxRecipes) && nextCount >= maxRecipes;
     let destroyed = false;
     if (spent && caps.learn.destroyWhenSpent === true) {
@@ -1335,20 +1337,27 @@ export class RecipeVisibilityService {
     const selected = this._selectDeterministic(nonExhausted);
     if (!selected) return;
 
+    // Re-anchor caps to the SPECIFIC book the selected item is (per-book use caps): a
+    // recipe in two item-mode books with differing maxUses/whenSpent must exhaust and
+    // spend the actually-consumed item by ITS book's rules, not the first book's.
+    const selectedCaps = this._getRecipeItemCaps(
+      recipe,
+      this._matchDefinitionForItem(recipe, selected.item)
+    );
     const nextUses = Number(selected.timesUsed || 0) + 1;
-    const maxUses = Number(caps.item.maxUses);
+    const maxUses = Number(selectedCaps.item.maxUses);
     const exhausted = Number.isFinite(maxUses) && maxUses > 0 && nextUses >= maxUses;
 
     // On exhaustion: 'destroyed' deletes the item; 'inert' keeps it but flags it so
     // it no longer grants craftability (it is already excluded by `_filterNonExhausted`
     // once `timesUsed >= maxUses`, so no further gating is needed).
-    if (exhausted && caps.item.whenSpent === 'inert') {
+    if (exhausted && selectedCaps.item.whenSpent === 'inert') {
       await this._markRecipeItemInert(selected.item, nextUses);
       return;
     }
 
     await this._setRecipeItemUsage(selected.item, nextUses);
-    if (exhausted && caps.item.whenSpent === 'destroyed') {
+    if (exhausted && selectedCaps.item.whenSpent === 'destroyed') {
       await selected.item.delete();
     }
   }

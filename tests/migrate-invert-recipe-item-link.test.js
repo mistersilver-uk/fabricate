@@ -47,6 +47,36 @@ test('moves book membership onto definition.recipeIds and strips book-only rever
   assert.equal(byId('r4').linkedRecipeItemUuid, 'Compendium.world.items.formula-x');
 });
 
+test('a recipe with BOTH a book recipeItemId AND a separate alchemy formula link keeps the formula link', () => {
+  // Regression: `resolvedToBook` must not be set by the recipeItemId path and then
+  // strip an unrelated linkedRecipeItemUuid (a standalone alchemy formula item). The
+  // formula link points at an item that is NOT a recipe-item definition, so it survives.
+  const data = {
+    systems: [
+      {
+        id: 'sys-1',
+        recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'Compendium.world.items.book-1' }],
+      },
+    ],
+    recipes: [
+      {
+        id: 'r1',
+        craftingSystemId: 'sys-1',
+        recipeItemId: 'book-1',
+        linkedRecipeItemUuid: 'Compendium.world.items.formula-x',
+      },
+    ],
+  };
+  const out = migrateInvertRecipeItemLink(data);
+  assert.deepEqual(out.systems[0].recipeItemDefinitions[0].recipeIds, ['r1'], 'book membership recorded');
+  assert.equal('recipeItemId' in out.recipes[0], false, 'book-only reverse ref stripped');
+  assert.equal(
+    out.recipes[0].linkedRecipeItemUuid,
+    'Compendium.world.items.formula-x',
+    'the separate alchemy formula link is NOT destroyed'
+  );
+});
+
 test('does not mutate the input payload', () => {
   const input = fixture();
   migrateInvertRecipeItemLink(input);

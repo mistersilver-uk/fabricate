@@ -2424,6 +2424,58 @@ test('LEARN.scope=total - an explicit learnScope drives the shared world pool', 
   assert.equal(pool.get('system-1::book'), 2, 'both learns drew from one shared pool via learnScope=total');
 });
 
+test('LEARN.scope=total - destroyWhenSpent is read from the SPECIFIC book learned from, not the first book', async () => {
+  // A recipe in two total-scope books with OPPOSITE destroy caps. Learning from book B
+  // must honour B's cap, even though book A is the recipe's first member book.
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } },
+    },
+    recipeItemDefinitions: [
+      {
+        id: 'book-a',
+        sourceItemUuid: 'src-a',
+        recipeIds: ['r1'],
+        caps: { item: { limitUses: false }, learn: { limitLearning: true, learnScope: 'total', learnsAllowed: 1, destroyWhenSpent: true } },
+      },
+      {
+        id: 'book-b',
+        sourceItemUuid: 'src-b',
+        recipeIds: ['r1'],
+        caps: { item: { limitUses: false }, learn: { limitLearning: true, learnScope: 'total', learnsAllowed: 1, destroyWhenSpent: false } },
+      },
+    ],
+  });
+  const recipe = buildMockRecipe({ id: 'r1', linkedRecipeItemUuid: null });
+  const service = new RecipeVisibilityService(
+    { getRecipes: () => [recipe] },
+    { getSystem: () => system },
+    makeFakePartyPool()
+  );
+
+  // Learn from book B (destroyWhenSpent:false) — the spending learn must NOT destroy it.
+  const bookB = new FakeItem({ uuid: 'Actor.y.Item.b', sourceId: 'src-b' });
+  const learnB = await service.learnOneRecipeFromItem({
+    recipe,
+    ownedItem: bookB,
+    actor: new FakeActor({ id: 'actor-b', items: [bookB] }),
+  });
+  assert.equal(learnB.success, true);
+  assert.equal(learnB.destroyed, false, "book B honours its own destroyWhenSpent:false, not book A's true");
+
+  // Learn from book A (destroyWhenSpent:true) — the spending learn DOES destroy it.
+  const bookA = new FakeItem({ uuid: 'Actor.x.Item.a', sourceId: 'src-a' });
+  const learnA = await service.learnOneRecipeFromItem({
+    recipe,
+    ownedItem: bookA,
+    actor: new FakeActor({ id: 'actor-a', items: [bookA] }),
+  });
+  assert.equal(learnA.success, true);
+  assert.equal(learnA.destroyed, true, 'book A honours its own destroyWhenSpent:true');
+});
+
 test('LEARN.scope=perInstance - each copy carries its OWN budget (not shared)', async () => {
   const system = buildLearnModeSystem({ learnScope: 'perInstance', learnsAllowed: 1 });
   const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];

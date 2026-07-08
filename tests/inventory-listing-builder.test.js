@@ -673,6 +673,30 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     return listing.rows.find((row) => row.isRecipeItem === true) ?? null;
   }
 
+  it('classifies book learn/craft from the flat visibilityMode (item→craft, knowledge→learn, global/restricted→no rows)', () => {
+    // The 1.12.0 migration stamps `visibilityMode` on every system, so the flat branch —
+    // not the legacy listMode — is the primary runtime path.
+    const rowFor = (visibilityMode) =>
+      bookRow(
+        bookBuilder({ system: { ...bookSystem(), visibilityMode } }).buildListing({
+          craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+          viewer: { isGM: false },
+        })
+      );
+
+    const item = rowFor('item');
+    assert.ok(item, 'item mode still projects a book row');
+    assert.equal(item.learnable, false, 'item mode is not learnable');
+    assert.equal(item.craftable, true, 'item mode grants craft-by-holding');
+
+    const knowledge = rowFor('knowledge');
+    assert.equal(knowledge.learnable, true, 'knowledge mode is learnable');
+    assert.equal(knowledge.craftable, false, 'knowledge mode learns, does not craft-by-holding');
+
+    assert.equal(rowFor('global'), null, 'global mode projects no book rows');
+    assert.equal(rowFor('restricted'), null, 'restricted mode projects no book rows');
+  });
+
   it('projects an owned book as a learnable row with its linked recipes and learned flags', () => {
     const builder = bookBuilder();
     const listing = builder.buildListing({
