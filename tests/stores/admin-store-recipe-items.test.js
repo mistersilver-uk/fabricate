@@ -172,6 +172,30 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     assert.deepEqual(gone.recipes, []);
   });
 
+  it('publishes the async-enriched projection under a NEW selectedSystem reference so the UI re-propagates', async () => {
+    // Regression: the phase-1 (synchronous, empty recipes[]) and phase-2 (async,
+    // enriched) publishes must be DIFFERENT selectedSystem object references. When
+    // phase-2 mutated the phase-1 object in place and re-published the same
+    // reference, Svelte's `selectedSystem` $derived never re-propagated the enriched
+    // recipeItemDefinitions, so the Books & Scrolls recipe counts froze on the empty
+    // phase-1 projection after any refresh (e.g. switching visibility mode).
+    const store = buildStore();
+    const seen = [];
+    const unsub = store.viewState.subscribe((vs) => {
+      if (vs.selectedSystem) seen.push(vs.selectedSystem);
+    });
+    await store.refresh();
+    unsub();
+
+    assert.ok(seen.length >= 2, 'both the sync and async publishes fired');
+    assert.equal(new Set(seen).size, seen.length, 'each selectedSystem publish is a distinct reference');
+    // Sanity: the final published projection carries the enriched recipes[].
+    assert.deepEqual(
+      seen.at(-1).recipeItemDefinitions.find((d) => d.id === 'primer').recipes.map((r) => r.id).sort(),
+      ['r1', 'r2']
+    );
+  });
+
   it('counts distinct world actors that learned any linked recipe', async () => {
     const store = buildStore();
     await store.refresh();

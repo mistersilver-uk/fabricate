@@ -4425,10 +4425,19 @@ export function createAdminStore(services) {
     // list is built. Overwrites the phase-1 synchronous fallback in place so the
     // phase-2 publish carries the fully enriched projection.
     if (selectedSystemData) {
-      selectedSystemData.recipeItemDefinitions = await _enrichRecipeItemLibrary(
-        selectedSystemData.recipeItemDefinitions,
-        recipeListData.recipes
-      );
+      // Build a NEW selectedSystemData for the phase-2 publish rather than mutating
+      // the phase-1 object in place. The two publishes must be DIFFERENT references:
+      // Svelte's `selectedSystem` `$derived` only re-propagates the enriched
+      // recipeItemDefinitions to the UI when the parent object's reference changes,
+      // so an in-place mutation left the Books & Scrolls counts stuck on the phase-1
+      // empty projection after any refresh (e.g. switching visibility mode).
+      selectedSystemData = {
+        ...selectedSystemData,
+        recipeItemDefinitions: await _enrichRecipeItemLibrary(
+          selectedSystemData.recipeItemDefinitions,
+          recipeListData.recipes
+        ),
+      };
     }
 
     // The derived system-validation report. Reads the system's recipes /
