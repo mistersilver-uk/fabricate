@@ -105,14 +105,57 @@ export class RecipeVisibilityService {
     return actor?.testUserPermission?.(viewer, 'OWNER') === true;
   }
 
-  _getRecipeItemDefinition(recipe) {
+  // The book/scroll definitions a recipe belongs to (issue 511 many-to-many). Canonical
+  // read is each definition's `recipeIds[]`; a system with no membership authored yet
+  // (fully un-migrated) falls back to the recipe's legacy single reverse ref. Returns a
+  // SET — a recipe may live in several books, each with its own caps.
+  _getRecipeItemDefinitions(recipe) {
     const system = this._getCraftingSystem(recipe);
-    if (!system || !recipe?.recipeItemId) return null;
-    return (
-      this.craftingSystemManager?.getRecipeItemDefinition?.(system.id, recipe.recipeItemId) ||
-      (system.recipeItemDefinitions || []).find((def) => def.id === recipe.recipeItemId) ||
-      null
+    if (!system) return [];
+    const definitions = system.recipeItemDefinitions || [];
+    const rid = String(recipe?.id || '');
+
+    const byMembership = definitions.filter((def) =>
+      (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
     );
+    if (byMembership.length > 0) return byMembership;
+
+    // Only fall back when NO book in the system carries membership yet.
+    const anyMigrated = definitions.some(
+      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
+    );
+    if (anyMigrated) return [];
+
+    const recipeItemId = String(recipe?.recipeItemId || '').trim();
+    if (recipeItemId) {
+      const def = definitions.find((d) => String(d.id) === recipeItemId);
+      return def ? [def] : [];
+    }
+    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+    if (legacyUuid) {
+      const def = definitions.find((d) => String(d.sourceItemUuid || '') === legacyUuid);
+      return def ? [def] : [];
+    }
+    return [];
+  }
+
+  // A single representative definition (the recipe's first member book) — used for
+  // system-wide defaults/previews. Learn/use paths anchor caps on the SELECTED book via
+  // `_matchDefinitionForItem`, not this.
+  _getRecipeItemDefinition(recipe) {
+    return this._getRecipeItemDefinitions(recipe)[0] || null;
+  }
+
+  // Every source uuid that identifies one of the recipe's member books.
+  _getRecipeItemSourceUuids(recipe) {
+    const uuids = new Set();
+    for (const def of this._getRecipeItemDefinitions(recipe)) {
+      const src = String(def?.sourceItemUuid || '').trim();
+      if (src) uuids.add(src);
+    }
+    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+    if (legacyUuid) uuids.add(legacyUuid);
+    return uuids;
   }
 
   _getRecipeItemSourceUuid(recipe) {
@@ -122,17 +165,34 @@ export class RecipeVisibilityService {
   }
 
   _hasRecipeItemReference(recipe) {
-    return Boolean(recipe?.recipeItemId || recipe?.linkedRecipeItemUuid);
+    return (
+      this._getRecipeItemDefinitions(recipe).length > 0 ||
+      Boolean(recipe?.recipeItemId) ||
+      Boolean(recipe?.linkedRecipeItemUuid)
+    );
   }
 
   _isMatchingRecipeItem(recipe, item) {
-    const linked = this._getRecipeItemSourceUuid(recipe);
-    if (!linked || !item) return false;
+    if (!item) return false;
+    const uuids = this._getRecipeItemSourceUuids(recipe);
+    if (uuids.size === 0) return false;
     // Match against the item's full source-reference set — live uuid, compendium
     // source AND `_stats.duplicateSource` — so a book duplicated (dragged) from a
-    // world template still resolves. Source-uuid-only matching loses the link for
-    // world-duplicated copies (the same trap components avoid).
-    return getItemSourceReferences(item).includes(linked);
+    // world template still resolves. A recipe matches if the item is ANY of its books.
+    const refs = getItemSourceReferences(item);
+    return refs.some((ref) => uuids.has(ref));
+  }
+
+  // The member book definition that a specific owned item IS (by source ref), so the
+  // learn/use paths read caps from the book actually being read. Falls back to the
+  // recipe's first member book.
+  _matchDefinitionForItem(recipe, item) {
+    const defs = this._getRecipeItemDefinitions(recipe);
+    if (!item) return defs[0] || null;
+    const refs = getItemSourceReferences(item);
+    return (
+      defs.find((def) => refs.includes(String(def?.sourceItemUuid || '').trim())) || defs[0] || null
+    );
   }
 
   _isActorOwnedItem(ownedItem, actor) {
@@ -179,28 +239,29 @@ export class RecipeVisibilityService {
   // The learning-limit SCOPE for a recipe's linked recipe item: 'perInstance' (the
   // cap applies to each physical copy of the item) or 'total' (one shared world pool
   // across every copy of the source item).
-  _getRecipeItemLearnScope(recipe) {
-    return this._getRecipeItemCaps(recipe).learn.learnScope || 'perInstance';
+  _getRecipeItemLearnScope(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    return this._getRecipeItemCaps(recipe, definition).learn.learnScope || 'perInstance';
   }
 
   // The recipeId a reader must already have learned before this recipe (or null).
-  _getRecipeItemPrerequisite(recipe) {
-    return this._getRecipeItemCaps(recipe).learn.prerequisite || null;
+  _getRecipeItemPrerequisite(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    return this._getRecipeItemCaps(recipe, definition).learn.prerequisite || null;
   }
 
   // A reader satisfies a recipe's prerequisite when it is unset, or the actor has
   // already learned the prerequisite recipe.
-  _isPrerequisiteMet(recipe, actor) {
-    const prerequisiteId = this._getRecipeItemPrerequisite(recipe);
+  _isPrerequisiteMet(recipe, actor, definition = this._getRecipeItemDefinition(recipe)) {
+    const prerequisiteId = this._getRecipeItemPrerequisite(recipe, definition);
     if (!prerequisiteId) return true;
     return !!this._getLearnedMap(actor)?.[prerequisiteId];
   }
 
-  // The shared-pool key for a party-mode recipe item — system-scoped so two systems
-  // linking the same physical item keep independent shared budgets.
-  _partyLearnPoolKey(recipe) {
+  // The shared-pool key for a `total`-scope recipe item — system + book-definition
+  // scoped, so distinct books (and distinct systems) keep independent shared budgets.
+  _partyLearnPoolKey(recipe, definition = this._getRecipeItemDefinition(recipe)) {
     const system = this._getCraftingSystem(recipe);
-    const itemKey = recipe?.recipeItemId || recipe?.linkedRecipeItemUuid || 'unknown';
+    const itemKey =
+      definition?.id || recipe?.recipeItemId || recipe?.linkedRecipeItemUuid || 'unknown';
     return `${system?.id || 'unknown'}::${itemKey}`;
   }
 
@@ -237,8 +298,8 @@ export class RecipeVisibilityService {
   // (the same permissive default `_getKnowledgeConfig` fell back to, and consistent
   // with the invalid-cap → unlimited convention). `mode` and `dragDropEnabled` stay
   // system-wide and are read from `_getKnowledgeConfig`, never from here.
-  _getRecipeItemCaps(recipe) {
-    const caps = this._getRecipeItemDefinition(recipe)?.caps;
+  _getRecipeItemCaps(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    const caps = definition?.caps;
     const item = caps?.item || {};
     const learn = caps?.learn || {};
 
@@ -749,13 +810,13 @@ export class RecipeVisibilityService {
   // NOT treated as capped — it fails closed to the uncapped/unlimited learn path
   // (mirroring how `_filterNonExhausted` treats an invalid `maxUses` as
   // unlimited) rather than bricking its linked recipes with a zero budget.
-  _isRecipeItemLearnCapped(recipe) {
-    return Number.isFinite(this._getLearnCapForRecipe(recipe));
+  _isRecipeItemLearnCapped(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    return Number.isFinite(this._getLearnCapForRecipe(recipe, definition));
   }
 
   // The finite positive learn cap for a capped recipe, or undefined.
-  _getLearnCapForRecipe(recipe) {
-    const caps = this._getRecipeItemCaps(recipe);
+  _getLearnCapForRecipe(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    const caps = this._getRecipeItemCaps(recipe, definition);
     if (caps.learn.limitRecipes !== true) return;
     const max = Number(caps.learn.maxRecipes);
     return Number.isFinite(max) && max > 0 ? max : undefined;
@@ -993,25 +1054,33 @@ export class RecipeVisibilityService {
     if (!ownedItem || !actor) return empty;
     if (!this._isActorOwnedItem(ownedItem, actor)) return empty;
 
+    // Caps are read from THIS owned book (the one being read) per recipe — a recipe may
+    // live in several books, and several systems can share one physical item, so each
+    // recipe's cap resolves against the book that IS this item (many-to-many).
     const cappedCandidates = this._getOwnedItemLearningCandidates({
       ownedItem,
       mode: 'manual',
-    }).filter((recipe) => this._isRecipeItemLearnCapped(recipe));
+    }).filter((recipe) =>
+      this._isRecipeItemLearnCapped(recipe, this._matchDefinitionForItem(recipe, ownedItem))
+    );
     if (cappedCandidates.length === 0) return empty;
 
     // When several capped systems link the same physical item, use the most
     // permissive cap; in practice one book links to one system's recipes.
     const caps = cappedCandidates
-      .map((recipe) => this._getLearnCapForRecipe(recipe))
+      .map((recipe) =>
+        this._getLearnCapForRecipe(recipe, this._matchDefinitionForItem(recipe, ownedItem))
+      )
       .filter((value) => Number.isFinite(value));
     const maxRecipes = caps.length > 0 ? Math.max(...caps) : undefined;
     // The spent count is scope-aware: `perInstance` reads the per-copy document
     // count; `total` reads the shared world pool (which the per-copy count never
     // reflects), so the reader sees the real remaining budget for either scope.
     const primary = cappedCandidates[0];
+    const primaryDefinition = this._matchDefinitionForItem(primary, ownedItem);
     const count =
-      this._getRecipeItemLearnScope(primary) === 'total'
-        ? this._partyLearnPool.get(this._partyLearnPoolKey(primary))
+      this._getRecipeItemLearnScope(primary, primaryDefinition) === 'total'
+        ? this._partyLearnPool.get(this._partyLearnPoolKey(primary, primaryDefinition))
         : this._getRecipeItemLearnCount(ownedItem);
     const remainingBudget = Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - count) : 0;
 
@@ -1054,7 +1123,10 @@ export class RecipeVisibilityService {
     ) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
     }
-    if (!this._isRecipeItemLearnCapped(recipe)) {
+    // Caps/scope/prerequisite come from the SPECIFIC owned book being read — a recipe
+    // may belong to several books, each with its own economy (many-to-many).
+    const definition = this._matchDefinitionForItem(recipe, ownedItem);
+    if (!this._isRecipeItemLearnCapped(recipe, definition)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.linkedItemRequired };
     }
 
@@ -1063,17 +1135,24 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
     }
 
-    if (!this._isPrerequisiteMet(recipe, actor)) {
+    if (!this._isPrerequisiteMet(recipe, actor, definition)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.prerequisiteNotMet };
     }
 
-    const maxRecipes = this._getLearnCapForRecipe(recipe);
+    const maxRecipes = this._getLearnCapForRecipe(recipe, definition);
 
     // `total` scope draws from ONE shared world pool (across every copy of the source
     // item) instead of the per-copy document count, so every actor spends the same
     // budget.
-    if (this._getRecipeItemLearnScope(recipe) === 'total') {
-      return this._learnOnePartyRecipe({ recipe, ownedItem, actor, learnedMap, maxRecipes });
+    if (this._getRecipeItemLearnScope(recipe, definition) === 'total') {
+      return this._learnOnePartyRecipe({
+        recipe,
+        ownedItem,
+        actor,
+        learnedMap,
+        maxRecipes,
+        definition,
+      });
     }
 
     const count = this._getRecipeItemLearnCount(ownedItem);
@@ -1094,7 +1173,7 @@ export class RecipeVisibilityService {
     const nextCount = count + 1;
     await this._setRecipeItemLearnCount(ownedItem, nextCount);
 
-    const caps = this._getRecipeItemCaps(recipe);
+    const caps = this._getRecipeItemCaps(recipe, definition);
     const spent = Number.isFinite(maxRecipes) && nextCount >= maxRecipes;
     let destroyed = false;
     if (spent && caps.learn.destroyWhenSpent === true) {
@@ -1115,8 +1194,15 @@ export class RecipeVisibilityService {
   // shared slot is reserved via the GM-authoritative pool BEFORE the learn is
   // recorded, so a non-GM (or otherwise failed) increment fails closed — the actor
   // does not learn and the shared budget is not forked.
-  async _learnOnePartyRecipe({ recipe, ownedItem, actor, learnedMap, maxRecipes }) {
-    const key = this._partyLearnPoolKey(recipe);
+  async _learnOnePartyRecipe({
+    recipe,
+    ownedItem,
+    actor,
+    learnedMap,
+    maxRecipes,
+    definition = this._matchDefinitionForItem(recipe, ownedItem),
+  }) {
+    const key = this._partyLearnPoolKey(recipe, definition);
     const count = this._partyLearnPool.get(key);
     const remainingBudget = Number.isFinite(maxRecipes) ? maxRecipes - count : 0;
     if (remainingBudget <= 0) {
@@ -1203,11 +1289,13 @@ export class RecipeVisibilityService {
     const selected = this._selectDeterministic(matches);
     if (!selected) return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
 
-    // An EFFECTIVE cap (enabled + finite positive max) routes through the
-    // budget-enforcing capped path; an invalid cap falls through to uncapped.
+    // An EFFECTIVE cap (enabled + finite positive max) on the SELECTED book routes
+    // through the budget-enforcing capped path; an invalid cap falls through to
+    // uncapped.
+    const selectedDefinition = this._matchDefinitionForItem(recipe, selected.item);
     if (
-      this._isRecipeItemLearnCapped(recipe) &&
-      Number.isFinite(this._getLearnCapForRecipe(recipe))
+      this._isRecipeItemLearnCapped(recipe, selectedDefinition) &&
+      Number.isFinite(this._getLearnCapForRecipe(recipe, selectedDefinition))
     ) {
       return this.learnOneRecipeFromItem({
         recipe,

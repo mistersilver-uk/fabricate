@@ -411,26 +411,47 @@ export class InventoryListingBuilder {
     const systemId = stringOrNull(system?.id);
     const systemName = stringOrEmpty(system?.name);
 
-    // Group the system's recipes by the definition they link (recipe.recipeItemId
-    // → definition id, or recipe.linkedRecipeItemUuid → definition sourceItemUuid).
-    const defBySourceUuid = new Map(
-      definitions.filter((def) => def?.sourceItemUuid).map((def) => [def.sourceItemUuid, def.id])
-    );
-    const recipesByDef = new Map();
+    // Group the system's recipes by the book that contains them. Canonical read is
+    // each definition's `recipeIds[]` (many-to-many — a recipe may appear under several
+    // books). Falls back to the legacy reverse ref (`recipe.recipeItemId`, or
+    // `linkedRecipeItemUuid → definition sourceItemUuid`) only when no book carries
+    // membership yet.
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
-    for (const recipe of Array.isArray(recipes) ? recipes : []) {
-      if (recipe?.enabled === false) continue;
+    const recipeList = Array.isArray(recipes) ? recipes : [];
+    const eligible = (recipe) => {
+      if (recipe?.enabled === false) return false;
       // Non-GM viewers never see an undiscovered (teaser) recipe named on a book.
-      if (allowedRecipeIds && !allowedRecipeIds.has(recipe?.id)) continue;
-      const defId =
-        stringOrNull(recipe?.recipeItemId) ??
-        (recipe?.linkedRecipeItemUuid
-          ? (defBySourceUuid.get(recipe.linkedRecipeItemUuid) ?? null)
-          : null);
-      if (!defId) continue;
-      const list = recipesByDef.get(defId) ?? [];
-      list.push(recipe);
-      recipesByDef.set(defId, list);
+      return !(allowedRecipeIds && !allowedRecipeIds.has(recipe?.id));
+    };
+    const recipesByDef = new Map();
+    const anyMigrated = definitions.some(
+      (def) => Array.isArray(def?.recipeIds) && def.recipeIds.length > 0
+    );
+    if (anyMigrated) {
+      const recipeById = new Map(recipeList.map((recipe) => [stringOrNull(recipe?.id), recipe]));
+      for (const def of definitions) {
+        if (!def?.id) continue;
+        const members = (Array.isArray(def.recipeIds) ? def.recipeIds : [])
+          .map((id) => recipeById.get(stringOrNull(id)))
+          .filter((recipe) => recipe && eligible(recipe));
+        if (members.length > 0) recipesByDef.set(def.id, members);
+      }
+    } else {
+      const defBySourceUuid = new Map(
+        definitions.filter((def) => def?.sourceItemUuid).map((def) => [def.sourceItemUuid, def.id])
+      );
+      for (const recipe of recipeList) {
+        if (!eligible(recipe)) continue;
+        const defId =
+          stringOrNull(recipe?.recipeItemId) ??
+          (recipe?.linkedRecipeItemUuid
+            ? (defBySourceUuid.get(recipe.linkedRecipeItemUuid) ?? null)
+            : null);
+        if (!defId) continue;
+        const list = recipesByDef.get(defId) ?? [];
+        list.push(recipe);
+        recipesByDef.set(defId, list);
+      }
     }
 
     // Owned books: defId → { def, sources: Map<actorId,{...,qty}>, item }, where

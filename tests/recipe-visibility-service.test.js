@@ -2458,6 +2458,52 @@ test('LEARN.scope=total - getLearnableRecipesFromItem reports remaining from the
   assert.equal(service.getLearnableRecipesFromItem({ ownedItem: copy, actor }).remainingBudget, 2);
 });
 
+test('511.M2M - a recipe in two books is matched via either, with caps read per book', () => {
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } },
+    },
+    recipeItemDefinitions: [
+      {
+        id: 'book-a',
+        sourceItemUuid: 'src-a',
+        recipeIds: ['r1'],
+        caps: { item: { limitUses: false }, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 1 } },
+      },
+      {
+        id: 'book-b',
+        sourceItemUuid: 'src-b',
+        recipeIds: ['r1'],
+        caps: { item: { limitUses: false }, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 3 } },
+      },
+    ],
+  });
+  // Membership lives on the books (recipeIds); the recipe carries no reverse ref.
+  const recipe = buildMockRecipe({ id: 'r1', linkedRecipeItemUuid: null });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const bookA = new FakeItem({ uuid: 'Actor.x.Item.a', sourceId: 'src-a' });
+  const actorA = new FakeActor({ id: 'actor-a', items: [bookA] });
+  const bookB = new FakeItem({ uuid: 'Actor.y.Item.b', sourceId: 'src-b' });
+  const actorB = new FakeActor({ id: 'actor-b', items: [bookB] });
+
+  // Visible/matched via EITHER book.
+  assert.equal(
+    service.evaluateRecipeAccess({ recipe, viewer: { isGM: false, id: 'u1' }, craftingActor: actorA }).knowledge.hasMatchedItem,
+    true
+  );
+  assert.equal(
+    service.evaluateRecipeAccess({ recipe, viewer: { isGM: false, id: 'u2' }, craftingActor: actorB }).knowledge.hasMatchedItem,
+    true
+  );
+
+  // The learn cap is read from the SPECIFIC book being read.
+  assert.equal(service.getLearnableRecipesFromItem({ ownedItem: bookA, actor: actorA }).maxRecipes, 1, 'book A cap');
+  assert.equal(service.getLearnableRecipesFromItem({ ownedItem: bookB, actor: actorB }).maxRecipes, 3, 'book B cap');
+});
+
 test('LEARN.party - a non-GM (failed) shared-counter write fails closed without learning', async () => {
   const system = buildLearnModeSystem({ learningMode: 'party', learnsAllowed: 5 });
   const recipe = buildCappedRecipe({ id: 'r-a' });

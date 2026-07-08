@@ -310,10 +310,21 @@ function collectBrokenInternalReferences(payload, out) {
     }
   }
 
-  // Recipe recipeItemId → recipeItemDefinitions.
+  // Recipe recipeItemId → recipeItemDefinitions (legacy reverse ref; absent once a
+  // world is migrated to book-side membership).
   for (const recipe of arrayOf(payload.recipes)) {
     if (recipe?.recipeItemId && !recipeItemIds.has(recipe.recipeItemId)) {
       push(REFERENCE_KINDS.RECIPE_ITEM, 'recipe', recipe, recipe.recipeItemId);
+    }
+  }
+
+  // Book membership: each definition's recipeIds → recipes (issue 511 many-to-many).
+  const recipeIds = idSet(payload.recipes);
+  for (const def of arrayOf(system.recipeItemDefinitions)) {
+    for (const rid of arrayOf(def?.recipeIds)) {
+      if (rid && !recipeIds.has(rid)) {
+        push(REFERENCE_KINDS.RECIPE_ITEM, 'recipeItem', def, rid);
+      }
     }
   }
 }

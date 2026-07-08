@@ -16,6 +16,7 @@ import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
+import { migrateInvertRecipeItemLink } from './migrateInvertRecipeItemLink.js';
 import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
 import { migrateMoveRoutedByIngredientsCheck } from './migrateMoveRoutedByIngredientsCheck.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
@@ -278,6 +279,15 @@ const MIGRATIONS = [
       'from the legacy recipeVisibility.listMode + knowledge.mode pair (recipeVisibility kept)',
     migrate(data) {
       return migrateVisibilityModeEnum(data);
+    },
+  },
+  {
+    version: '1.13.0',
+    label:
+      'Invert the recipe ↔ recipe-item link: move book/scroll membership onto each ' +
+      'definition as recipeIds[] (many-to-many) and strip recipe.recipeItemId / linkedRecipeItemUuid',
+    migrate(data) {
+      return migrateInvertRecipeItemLink(data);
     },
   },
   // Future migrations added here in version order

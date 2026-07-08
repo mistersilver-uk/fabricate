@@ -1010,6 +1010,16 @@ export class CraftingSystemManager {
       // Per-recipe-item enable toggle (issue 511, PR-B). Defaults on; a disabled
       // definition still round-trips but the library UI can hide/skip it.
       enabled: entry.enabled !== false,
+      // Book membership (issue 511): the recipe ids this book/scroll contains — the
+      // canonical, many-to-many link (a recipe may belong to several books). Distinct
+      // from the visibility-teaser `recipeIds` fragment elsewhere. Deduped id list.
+      recipeIds: Array.from(
+        new Set(
+          (Array.isArray(entry.recipeIds) ? entry.recipeIds : [])
+            .map((rid) => String(rid || '').trim())
+            .filter(Boolean)
+        )
+      ),
       caps: this._normalizeRecipeItemCaps(entry.caps),
     };
   }
@@ -1666,6 +1676,17 @@ export class CraftingSystemManager {
       definition.enabled = patch.enabled !== false;
     }
 
+    // Book membership (issue 511 many-to-many): replace the contained-recipe id set.
+    if (Object.prototype.hasOwnProperty.call(patch, 'recipeIds')) {
+      definition.recipeIds = Array.from(
+        new Set(
+          (Array.isArray(patch.recipeIds) ? patch.recipeIds : [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean)
+        )
+      );
+    }
+
     const capsPatch = patch?.caps || {};
     definition.caps = this._normalizeRecipeItemCaps({
       item: this._mergeCapsSection(definition.caps?.item, capsPatch.item, [
@@ -2262,18 +2283,62 @@ export class CraftingSystemManager {
     );
   }
 
+  // The recipes a book/scroll contains. Canonical source is the definition's
+  // `recipeIds[]` (issue 511 many-to-many). Falls back to the legacy reverse ref
+  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → sourceItemUuid`) only for
+  // un-migrated definitions that carry no `recipeIds` yet.
   _getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition) {
     if (!definition || !this.recipeManager?.getRecipes) return [];
+    const recipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
+
+    const recipeIds = Array.isArray(definition.recipeIds) ? definition.recipeIds : [];
+    if (recipeIds.length > 0) {
+      const idSet = new Set(recipeIds.map((id) => String(id)));
+      return recipes.filter((recipe) => idSet.has(String(recipe?.id)));
+    }
+
     const definitionId = String(definition.id || '').trim();
     const sourceItemUuid = String(definition.sourceItemUuid || '').trim();
-
-    return this.recipeManager.getRecipes({ craftingSystemId: systemId }).filter((recipe) => {
+    return recipes.filter((recipe) => {
       const recipeItemId = String(recipe?.recipeItemId || '').trim();
       const linkedRecipeItemUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
       return (
         recipeItemId === definitionId ||
         (!recipeItemId && !!sourceItemUuid && linkedRecipeItemUuid === sourceItemUuid)
       );
+    });
+  }
+
+  // Forward membership query (issue 511 many-to-many): the definitions of `systemId`
+  // that contain `recipeId`. Canonical read is each definition's `recipeIds[]`; when a
+  // system carries no membership yet (fully un-migrated) it falls back to resolving the
+  // recipe's legacy reverse ref (`recipeItemId` / `linkedRecipeItemUuid`) to its book.
+  getRecipeItemDefinitionsContaining(systemId, recipeId) {
+    const system = this.getSystem(systemId);
+    if (!system || !recipeId) return [];
+    const rid = String(recipeId);
+    const definitions = Array.isArray(system.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+
+    const byMembership = definitions.filter((def) =>
+      (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
+    );
+    if (byMembership.length > 0) return byMembership;
+
+    // Only fall back for a system that has no membership authored anywhere.
+    const anyMigrated = definitions.some(
+      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
+    );
+    if (anyMigrated) return [];
+
+    const recipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!recipe) return [];
+    const recipeItemId = String(recipe.recipeItemId || '').trim();
+    const legacyUuid = String(recipe.linkedRecipeItemUuid || '').trim();
+    return definitions.filter((def) => {
+      if (recipeItemId) return String(def.id) === recipeItemId;
+      return !!legacyUuid && String(def.sourceItemUuid || '') === legacyUuid;
     });
   }
 

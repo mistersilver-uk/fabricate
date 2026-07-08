@@ -1449,10 +1449,15 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
 
   const prepared = recipes.map((recipe) => {
     const display = _buildRecipeBrowserDisplay(recipe);
-    const recipeItemId = recipe.recipeItemId || '';
-    const recipeItemDefinition = recipeItemId
-      ? systemManager.getRecipeItemDefinition?.(selectedSystem.id, recipeItemId) || null
-      : null;
+    // Book membership (many-to-many): the books that contain this recipe. The
+    // legacy scalar `recipeItemId`/name/img reflect the FIRST containing book.
+    const containingDefinitions = _recipeItemDefinitionsContaining(
+      selectedSystem.recipeItemDefinitions,
+      recipe
+    );
+    const recipeItemIds = containingDefinitions.map((def) => String(def.id));
+    const recipeItemDefinition = containingDefinitions[0] || null;
+    const recipeItemId = recipeItemDefinition ? String(recipeItemDefinition.id) : '';
     // Plain authoring data for the recipe editor's step-mode UI. Sourced from
     // toJSON() so step / top-level shapes match Recipe._normalizeStep exactly.
     // The multi-step editor reads `steps` (and migrates the top-level fields into
@@ -1500,7 +1505,9 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
       // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
       incomplete: _isRecipeIncomplete(recipe),
-      // Canonical recipe-item linkage (never the legacy uuid alias).
+      // Book membership: all books containing this recipe (many-to-many), plus the
+      // first book's id/name/img/source for legacy single-link consumers.
+      recipeItemIds,
       recipeItemId,
       recipeItemName: recipeItemDefinition?.name || '',
       recipeItemImg: recipeItemDefinition?.img || '',
@@ -1602,6 +1609,22 @@ function _recipeItemTypeFromRecipeCount(count) {
   return 'Incomplete';
 }
 
+// The recipe-item definitions of a system that CONTAIN a recipe (issue 511
+// many-to-many). Canonical read is each definition's `recipeIds[]`; only a system
+// with no membership authored yet falls back to the recipe's book-only `recipeItemId`.
+function _recipeItemDefinitionsContaining(definitions, recipe) {
+  const defs = Array.isArray(definitions) ? definitions : [];
+  const rid = String(recipe?.id || '');
+  const byMembership = defs.filter((def) =>
+    (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
+  );
+  if (byMembership.length > 0) return byMembership;
+  const anyMigrated = defs.some((def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0);
+  if (anyMigrated) return [];
+  const recipeItemId = String(recipe?.recipeItemId || '').trim();
+  return recipeItemId ? defs.filter((def) => String(def.id) === recipeItemId) : [];
+}
+
 // Synchronous fallback projection painted immediately in refresh phase 1. The
 // resolved name/img/type, linked `recipes[]`, and `learnedByCount` are filled in
 // asynchronously by `_enrichRecipeItemLibrary` before the phase-2 publish.
@@ -1613,6 +1636,8 @@ function _projectRecipeItemDefinitionSync(def) {
     img: def?.img || '',
     description: def?.description || '',
     enabled: def?.enabled !== false,
+    // Book membership (issue 511 many-to-many) — the recipe ids this book contains.
+    recipeIds: Array.isArray(def?.recipeIds) ? def.recipeIds.map((id) => String(id)) : [],
     caps: _clonePlain(def?.caps || {}),
     resolvedName: def?.name || _recipeItemLabelFromUuid(sourceItemUuid) || 'Recipe item',
     resolvedImg: def?.img || 'icons/svg/item-bag.svg',
@@ -1667,17 +1692,21 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
   if (items.length === 0) return [];
 
   const recipeList = Array.isArray(recipes) ? recipes : [];
+  const recipeById = new Map();
+  // Legacy reverse-ref index — fallback for definitions with no `recipeIds` yet.
   const recipesByItemId = new Map();
   for (const recipe of recipeList) {
+    recipeById.set(String(recipe?.id), recipe);
     const key = String(recipe?.recipeItemId || '');
     if (!key) continue;
     if (!recipesByItemId.has(key)) recipesByItemId.set(key, []);
-    recipesByItemId.get(key).push({
-      id: recipe.id,
-      name: recipe.name,
-      category: recipe.category || '',
-    });
+    recipesByItemId.get(key).push(recipe);
   }
+  const toRecipeRef = (recipe) => ({
+    id: recipe.id,
+    name: recipe.name,
+    category: recipe.category || '',
+  });
 
   const actorIndex = _buildLearnedRecipeActorIndex();
   const resolved = await Promise.all(
@@ -1686,7 +1715,13 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
 
   return items.map((item, index) => {
     const { doc, missing } = resolved[index];
-    const linkedRecipes = recipesByItemId.get(String(item.id)) || [];
+    // Canonical membership: the book's `recipeIds`. Fall back to the legacy reverse
+    // ref only for a definition that carries none yet (un-migrated).
+    const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
+    const linkedRecipes =
+      memberIds.length > 0
+        ? memberIds.map((id) => recipeById.get(String(id))).filter(Boolean).map(toRecipeRef)
+        : (recipesByItemId.get(String(item.id)) || []).map(toRecipeRef);
     const learnedActors = new Set();
     for (const recipe of linkedRecipes) {
       const actorsForRecipe = actorIndex.get(recipe.id);
@@ -7014,6 +7049,33 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Set which books/scrolls a recipe belongs to from the recipe side (issue 511
+  // many-to-many). Reconciles each definition's `recipeIds` so the recipe is a member
+  // of exactly `bookIds`. Writes only the definitions that actually change (via
+  // updateRecipeItemDefinition — no "Recipe updated" toast), then refreshes.
+  async function setRecipeBookMembership(recipeId, bookIds = []) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeId) return;
+    const rid = String(recipeId);
+    const wanted = new Set((Array.isArray(bookIds) ? bookIds : []).map((id) => String(id)));
+    const system = systemManager.getSystem?.(sysId);
+    const definitions = Array.isArray(system?.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+    let changed = false;
+    for (const def of definitions) {
+      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) => String(id));
+      const has = currentIds.includes(rid);
+      const want = wanted.has(String(def.id));
+      if (has === want) continue;
+      const next = want ? [...new Set([...currentIds, rid])] : currentIds.filter((id) => id !== rid);
+      await systemManager.updateRecipeItemDefinition(sysId, def.id, { recipeIds: next });
+      changed = true;
+    }
+    if (changed) await refresh();
+  }
+
   // Enable / disable a single recipe item from the Books & Scrolls library row or
   // item-page toggle (issue 511). Persists only the `enabled` flag and refreshes;
   // navigation to the per-item editor is the router's concern, not the store's.
@@ -7543,6 +7605,7 @@ export function createAdminStore(services) {
     saveRecipeAccess,
     addRecipeItemFromUuid,
     updateRecipeItemCaps,
+    setRecipeBookMembership,
     setRecipeItemEnabled,
     saveRecipeItem,
     deleteRecipeItemDefinition,

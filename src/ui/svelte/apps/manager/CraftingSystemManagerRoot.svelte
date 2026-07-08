@@ -1263,19 +1263,23 @@
     const option = (worldItemOptions || []).find((item) => item.uuid === uuid);
     return option ? { ...option } : { uuid, name: '', img: '', type: '' };
   });
-  // Recipes linked to the edited recipe item (by recipeItemId), and the pool of
-  // recipes that can still be linked. Derived live from the recipe projection.
+  // Recipes contained by the edited recipe item, and the pool that can still be
+  // added. Derived from the DRAFT's `recipeIds` (staged membership), so linking and
+  // unlinking reflect live and only persist on Save.
+  const recipeItemDraftRecipeIds = $derived(
+    new Set((recipeItemDraft?.recipeIds || []).map((id) => String(id)))
+  );
   const recipeItemEditorLinkedRecipes = $derived(
     recipeItemDraft
-      ? ($viewState.recipes || []).filter(
-          (recipe) => String(recipe?.recipeItemId || '') === String(recipeItemDraft.id)
+      ? ($viewState.recipes || []).filter((recipe) =>
+          recipeItemDraftRecipeIds.has(String(recipe?.id))
         )
       : []
   );
   const recipeItemEditorAvailableRecipes = $derived(
     recipeItemDraft
       ? ($viewState.recipes || []).filter(
-          (recipe) => String(recipe?.recipeItemId || '') !== String(recipeItemDraft.id)
+          (recipe) => !recipeItemDraftRecipeIds.has(String(recipe?.id))
         )
       : []
   );
@@ -2312,8 +2316,35 @@
     return store.addRecipeItemFromUuid?.(selectedSystemId, itemUuid);
   }
 
-  function handleSetRecipeItem(recipeItemId) {
-    patchRecipeDraft({ recipeItemId });
+  // Set the recipe's book membership from the recipe editor (issue 511 many-to-many).
+  // Membership lives on the book, so this reconciles the definitions' `recipeIds`
+  // directly (no "Recipe updated" toast): linking ADDS the recipe to `recipeItemId`;
+  // unlinking (null) REMOVES it from the currently-shown book. Full multi-membership
+  // is managed on the book's Contents tab.
+  async function handleSetRecipeItem(recipeItemId) {
+    const rid = recipeDraft?.id;
+    if (!rid) return false;
+    const liveRecipe = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    const membership = new Set((liveRecipe?.recipeItemIds || []).map((id) => String(id)));
+    if (recipeItemId) {
+      membership.add(String(recipeItemId));
+    } else {
+      const shown = String(liveRecipe?.recipeItemId || '');
+      if (shown) membership.delete(shown);
+    }
+    await store.setRecipeBookMembership?.(rid, [...membership]);
+    // The change is persisted live (book-side), so re-sync the draft's projected
+    // membership on BOTH draft and baseline — keeping the recipe-item card current
+    // without marking the recipe draft dirty for a book change.
+    const updated = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    if (updated) {
+      const patch = {
+        recipeItemId: updated.recipeItemId || '',
+        recipeItemIds: Array.isArray(updated.recipeItemIds) ? updated.recipeItemIds : [],
+      };
+      if (recipeDraft) recipeDraft = { ...recipeDraft, ...patch };
+      if (recipeDraftBaseline) recipeDraftBaseline = { ...recipeDraftBaseline, ...patch };
+    }
     return true;
   }
 
@@ -3423,6 +3454,7 @@
       const result = await store.saveRecipeItem?.(recipeItemDraft.id, {
         enabled: recipeItemDraft.enabled !== false,
         sourceItemUuid: recipeItemDraft.sourceItemUuid ?? null,
+        recipeIds: Array.isArray(recipeItemDraft.recipeIds) ? recipeItemDraft.recipeIds : [],
         caps: recipeItemDraft.caps || {},
       });
       if (result === false) {
@@ -3463,15 +3495,22 @@
     patchRecipeItemDraft({ sourceItemUuid: null });
   }
 
-  // Link / unlink a recipe to the edited recipe item. These persist immediately
-  // (they mutate the recipe's recipeItemId, not the recipe-item draft) and refresh.
+  // Add / remove a recipe on the edited book. Membership lives on the book, so these
+  // STAGE into the recipe-item draft's `recipeIds` (persisted on Save, reverted on
+  // Discard) rather than editing the recipe directly — no "Recipe updated" toast.
   function linkRecipeToItem(recipeId) {
-    if (!recipeItemDraft?.id) return;
-    store.updateRecipe?.(recipeId, { recipeItemId: recipeItemDraft.id });
+    if (!recipeItemDraft?.id || !recipeId) return;
+    const next = new Set((recipeItemDraft.recipeIds || []).map((id) => String(id)));
+    next.add(String(recipeId));
+    patchRecipeItemDraft({ recipeIds: [...next] });
   }
 
   function unlinkRecipeFromItem(recipeId) {
-    store.updateRecipe?.(recipeId, { recipeItemId: null });
+    if (!recipeItemDraft?.id || !recipeId) return;
+    const next = (recipeItemDraft.recipeIds || [])
+      .map((id) => String(id))
+      .filter((id) => id !== String(recipeId));
+    patchRecipeItemDraft({ recipeIds: next });
   }
 
   // Create a new recipe item: open the world-item picker, add the picked item as a

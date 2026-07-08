@@ -132,6 +132,30 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     return createAdminStore(createServices(system, recipes, capture));
   }
 
+  it('derives recipes[] from the definition.recipeIds membership (many-to-many)', async () => {
+    // Migrated shape: membership lives on the books; a recipe may belong to SEVERAL.
+    const system = makeSystem({
+      recipeItemDefinitions: [
+        { id: 'book-a', name: 'Book A', sourceItemUuid: 'Item.aaa', recipeIds: ['r1', 'r2'], caps: {} },
+        { id: 'book-b', name: 'Book B', sourceItemUuid: 'Item.bbb', recipeIds: ['r2'], caps: {} }
+      ]
+    });
+    const recipes = [
+      makeRecipe({ id: 'r1', name: 'Smelt Copper', category: 'smithing' }),
+      makeRecipe({ id: 'r2', name: 'Forge Rivets', category: 'smithing' })
+    ];
+    const store = createAdminStore(createServices(system, recipes, []));
+    await store.refresh();
+    const vs = get(store.viewState);
+
+    const bookA = recipeItemById(vs, 'book-a');
+    assert.deepEqual(bookA.recipes.map((r) => r.id).sort(), ['r1', 'r2']);
+    assert.equal(bookA.derivedType, 'Book'); // 2 recipes
+    const bookB = recipeItemById(vs, 'book-b');
+    assert.deepEqual(bookB.recipes.map((r) => r.id), ['r2']); // r2 is in BOTH books
+    assert.equal(bookB.derivedType, 'Scroll'); // 1 recipe
+  });
+
   it('resolves linked-item name/img/type asynchronously and passes through caps + enabled', async () => {
     const store = buildStore();
     await store.refresh();
