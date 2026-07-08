@@ -67,6 +67,7 @@ import { classifyModeChange } from '../../../migration/migrateRecipeForModeChang
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
+import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1787,12 +1788,19 @@ function _buildSelectedSystemViewData(
   const showRecipeVisibilityKnowledgeOptions = listMode === 'knowledge';
   const showRecipeVisibilityPlayerNote = listMode === 'player';
 
+  // Flat system-level visibility strategy (issue 511, PR-B). `visibilityMode`
+  // gates the whole Crafting surface; `craftingEffect` is the matrix contract
+  // consumed by the Settings effect panel and nav gating alike.
+  const visibilityMode = selectedSystem.visibilityMode || 'knowledge';
+
   return {
     id: selectedSystem.id,
     name: selectedSystem.name,
     description: selectedSystem.description,
     enabled: selectedSystem.enabled !== false,
     resolutionMode: selectedSystem.resolutionMode || 'simple',
+    visibilityMode,
+    craftingEffect: craftingEffect(visibilityMode),
 
     features: {
       recipeCategories: true,
@@ -4433,6 +4441,18 @@ export function createAdminStore(services) {
     await systemManager.updateSystem(sysId, { resolutionMode: nextMode });
     await refresh();
     return true;
+  }
+
+  // Flat system-level visibility strategy (issue 511, PR-B). Non-destructive:
+  // unlike setResolutionMode, switching visibilityMode migrates no recipes and
+  // needs no confirm — it only re-gates the Crafting authoring surface. Just
+  // persist the new enum and refresh so the projection's craftingEffect updates.
+  async function setVisibilityMode(mode) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    await systemManager.updateSystem(sysId, { visibilityMode: mode });
+    await refresh();
   }
 
   // Salvage resolution mode is non-destructive: updateSystem runs only the inline
@@ -7126,6 +7146,7 @@ export function createAdminStore(services) {
     deleteSystem,
     saveSystemDetails,
     setResolutionMode,
+    setVisibilityMode,
     setSalvageResolutionMode,
     setTab,
     selectEnvironment,

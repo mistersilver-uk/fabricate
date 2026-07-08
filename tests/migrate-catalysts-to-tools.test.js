@@ -385,7 +385,7 @@ test('0.6.0 runs from 0.5.0: catalysts become tools + toolIds and version advanc
   assert.equal(systems[0].tools.length, 1);
   // The full runner also applies the later 0.7.0, 0.8.0, and 0.9.0 migrations, so the
   // persisted version advances to the highest migration version.
-  assert.equal(settings.store.get('migrationVersion'), '1.11.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.12.0');
   assert.equal(summary.migratedCatalystCount, 1);
 
   // The transient count field is never persisted onto any setting payload.
@@ -400,7 +400,7 @@ test('version gate: 0.6.0 conversion is NOT re-applied when migrationVersion is 
   const settings = makeSettings({
     migrationVersion: '0.6.0',
     recipes: [{ id: 'r1', craftingSystemId: 'sys-1', catalysts: [{ componentId: 'forge', degradesOnUse: false }] }],
-    craftingSystems: [{ id: 'sys-1' }]
+    craftingSystems: [{ id: 'sys-1', visibilityMode: 'knowledge' }]
   });
   const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
@@ -419,7 +419,7 @@ test('version gate: 0.6.0 conversion is NOT re-applied when migrationVersion is 
   assert.ok(setKeys.includes('recipes'), 'recipes re-persisted by the 1.7.0 catalysts strip');
   assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted (no conversion, no rename)');
   assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted (no task catalysts here)');
-  assert.equal(settings.store.get('migrationVersion'), '1.11.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.12.0');
   assert.equal(summary.migratedCatalystCount, 0);
 });
 

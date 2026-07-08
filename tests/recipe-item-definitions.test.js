@@ -106,6 +106,40 @@ test('_normalizeRecipeVisibility keeps only strategy fields (mode + dragDropEnab
 });
 
 // ---------------------------------------------------------------------------
+// Flat system-level visibility strategy enum (issue 511, PR-B)
+// ---------------------------------------------------------------------------
+
+test('_normalizeVisibilityMode passes through the four valid modes', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  for (const mode of ['global', 'restricted', 'item', 'knowledge']) {
+    assert.equal(manager._normalizeVisibilityMode(mode), mode);
+  }
+});
+
+test('_normalizeVisibilityMode defaults invalid/missing input to knowledge', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  for (const bad of [undefined, null, '', 'player', 'nonsense', 42, {}]) {
+    assert.equal(manager._normalizeVisibilityMode(bad), 'knowledge');
+  }
+});
+
+test('_normalizeSystem emits visibilityMode (default knowledge, valid pass-through)', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  assert.equal(manager._normalizeSystem({ id: 'sys-default' }).visibilityMode, 'knowledge');
+  assert.equal(
+    manager._normalizeSystem({ id: 'sys-item', visibilityMode: 'item' }).visibilityMode,
+    'item'
+  );
+  assert.equal(
+    manager._normalizeSystem({ id: 'sys-bad', visibilityMode: 'bogus' }).visibilityMode,
+    'knowledge'
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Per-recipe-item caps (issue 511) — model normalization
 // ---------------------------------------------------------------------------
 

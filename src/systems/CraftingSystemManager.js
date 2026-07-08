@@ -127,6 +127,10 @@ export class CraftingSystemManager {
       // New spec-first shape
       features,
       itemTags: this._normalizeStringList(system.itemTags ?? system.tags),
+      // Flat system-level visibility strategy (issue 511, PR-B): the single enum
+      // that gates the whole Crafting authoring surface. `recipeVisibility` is
+      // kept alongside it for its residual `knowledge.learn.dragDropEnabled`.
+      visibilityMode: this._normalizeVisibilityMode(system.visibilityMode),
       recipeVisibility: this._normalizeRecipeVisibility(system.recipeVisibility),
       requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
@@ -722,6 +726,16 @@ export class CraftingSystemManager {
   // system-level knobs that gate whether the knowledge/learning machinery runs —
   // remain here. Legacy caps in stored data are dropped by this normalizer and
   // carried onto each definition by the 1.11.0 migration.
+  // Flat system-level visibility strategy enum (issue 511, PR-B). One knob —
+  // `visibilityMode` ∈ {global, restricted, item, knowledge} — gates the whole
+  // Crafting authoring surface (see craftingVisibility.js). Unknown/missing →
+  // `knowledge` (the default), mirroring the inline resolutionMode defaulter.
+  // The legacy `recipeVisibility` block is normalized separately and preserved
+  // for its residual `knowledge.learn.dragDropEnabled`.
+  _normalizeVisibilityMode(value) {
+    return ['global', 'restricted', 'item', 'knowledge'].includes(value) ? value : 'knowledge';
+  }
+
   _normalizeRecipeVisibility(recipeVisibility = {}) {
     const listMode = ['global', 'player', 'knowledge', 'teaser'].includes(
       recipeVisibility?.listMode

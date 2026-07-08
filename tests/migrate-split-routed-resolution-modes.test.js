@@ -148,7 +148,7 @@ test('runs through MigrationRunner from 1.8.0 and lands at the highest version',
     setSetting: async (key, value) => store.set(key, value),
   });
   await runner.run();
-  assert.equal(store.get('migrationVersion'), '1.11.0');
+  assert.equal(store.get('migrationVersion'), '1.12.0');
   // 1 check + 1 ingredientSet → tie → routedByIngredients.
   assert.equal(store.get('craftingSystems')[0].resolutionMode, 'routedByIngredients');
   for (const r of store.get('recipes')) assert.equal(r.resultSelection, undefined);

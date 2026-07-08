@@ -30,6 +30,7 @@ import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutio
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
+import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
 import { isFatalMigrationError } from './migrationErrors.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
@@ -268,6 +269,15 @@ const MIGRATIONS = [
       'onto each recipe item definition (per-item caps; mode + dragDropEnabled stay system-wide)',
     migrate(data) {
       return migrateRecipeItemCapsPerItem(data);
+    },
+  },
+  {
+    version: '1.12.0',
+    label:
+      'Seed the flat system-level visibilityMode enum (global/restricted/item/knowledge) ' +
+      'from the legacy recipeVisibility.listMode + knowledge.mode pair (recipeVisibility kept)',
+    migrate(data) {
+      return migrateVisibilityModeEnum(data);
     },
   },
   // Future migrations added here in version order
