@@ -248,6 +248,10 @@
 
   .manager-books-scrolls-inspector-desc {
     margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    overflow: hidden;
   }
 
   .manager-books-scrolls-stat-grid {

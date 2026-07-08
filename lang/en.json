@@ -1408,7 +1408,11 @@
           "UseSubFree": "Can be read any number of times",
           "UseSubLimited": "{n} use(s) per copy",
           "Uses": "Uses",
-          "UsesFilter": "Uses"
+          "UsesFilter": "Uses",
+          "ColItem": "Recipe item",
+          "ColRecipes": "Recipes",
+          "ColUses": "Uses",
+          "ColLearning": "Learning"
         },
         "Recipe": {
           "Kicker": "Recipes View",

@@ -244,6 +244,12 @@
       </div>
     {:else}
       <div class="manager-books-scrolls-list" role="list">
+        <div class="manager-books-scrolls-head" aria-hidden="true">
+          <span class="manager-books-scrolls-head-cell is-item">{text('FABRICATE.Admin.Manager.BooksScrolls.ColItem', 'Recipe item')}</span>
+          <span class="manager-books-scrolls-head-cell">{text('FABRICATE.Admin.Manager.BooksScrolls.ColRecipes', 'Recipes')}</span>
+          <span class="manager-books-scrolls-head-cell">{isItemMode ? text('FABRICATE.Admin.Manager.BooksScrolls.ColUses', 'Uses') : text('FABRICATE.Admin.Manager.BooksScrolls.ColLearning', 'Learning')}</span>
+          <span class="manager-books-scrolls-head-cell is-status">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+        </div>
         {#each paginatedItems as item (item.id)}
           <div
             class={`manager-books-scrolls-listitem ${isSelected(item) ? 'is-selected' : ''} ${item.enabled === false ? 'is-disabled' : ''}`}
@@ -259,36 +265,32 @@
               onclick={() => onSelectRecipeItem(item.id)}
             >
               <img class="manager-books-scrolls-thumb" src={recipeItemImage(item)} alt="" />
-              <span class="manager-books-scrolls-copy">
-                <span class="manager-books-scrolls-name-row">
-                  <span class="manager-books-scrolls-name" data-books-scrolls-name={item.id} title={item.resolvedName}>{item.resolvedName}</span>
-                  <span class="manager-chip is-neutral manager-books-scrolls-type-pill" data-books-scrolls-type={item.id}>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
+              <span class="manager-books-scrolls-name" data-books-scrolls-name={item.id} title={item.resolvedName}>{item.resolvedName}</span>
+              <span class="manager-chip is-neutral manager-books-scrolls-type-pill" data-books-scrolls-type={item.id}>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
+              {#if item.linkMissing}
+                <span class="manager-chip is-danger manager-books-scrolls-link-chip" data-books-scrolls-link-missing={item.id}>
+                  <i class="fas fa-link-slash" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.Manager.BooksScrolls.LinkMissing', 'Item missing')}</span>
                 </span>
-                <span class="manager-books-scrolls-chips">
-                  <span
-                    class={`manager-chip manager-books-scrolls-recipe-chip ${recipeCount(item) === 0 ? 'is-danger' : ''}`}
-                    data-books-scrolls-recipe-count={item.id}
-                  >
-                    <i class={recipeCount(item) === 0 ? 'fas fa-circle-exclamation' : 'fas fa-scroll'} aria-hidden="true"></i>
-                    <span>{recipeCountLabel(item)}</span>
-                  </span>
-                  <span
-                    class={`manager-chip manager-books-scrolls-cap-chip ${capLimited(item) ? 'is-limited' : 'is-unlimited'}`}
-                    data-books-scrolls-cap-chip={item.id}
-                    data-books-scrolls-cap-limited={capLimited(item)}
-                  >
-                    <i class={isItemMode ? 'fas fa-fire-flame-curved' : 'fas fa-graduation-cap'} aria-hidden="true"></i>
-                    <span>{capChipLabel(item)}</span>
-                  </span>
-                  {#if item.linkMissing}
-                    <span class="manager-chip is-danger manager-books-scrolls-link-chip" data-books-scrolls-link-missing={item.id}>
-                      <i class="fas fa-link-slash" aria-hidden="true"></i>
-                      <span>{text('FABRICATE.Admin.Manager.BooksScrolls.LinkMissing', 'Item missing')}</span>
-                    </span>
-                  {/if}
-                </span>
-              </span>
+              {/if}
             </button>
+
+            <span
+              class={`manager-chip manager-books-scrolls-recipe-chip ${recipeCount(item) === 0 ? 'is-danger' : ''}`}
+              data-books-scrolls-recipe-count={item.id}
+            >
+              <i class={recipeCount(item) === 0 ? 'fas fa-circle-exclamation' : 'fas fa-scroll'} aria-hidden="true"></i>
+              <span>{recipeCountLabel(item)}</span>
+            </span>
+
+            <span
+              class={`manager-chip manager-books-scrolls-cap-chip ${capLimited(item) ? 'is-limited' : 'is-unlimited'}`}
+              data-books-scrolls-cap-chip={item.id}
+              data-books-scrolls-cap-limited={capLimited(item)}
+            >
+              <i class={isItemMode ? 'fas fa-fire-flame-curved' : 'fas fa-graduation-cap'} aria-hidden="true"></i>
+              <span>{capChipLabel(item)}</span>
+            </span>
 
             <div class="manager-books-scrolls-actions">
               <button
@@ -341,17 +343,43 @@
     min-height: 0;
   }
 
+  /* Column table: one parent grid defines the four columns (item · recipes ·
+     uses/learning · status); the header and every row are subgrids of it, so the
+     header labels line up with the cells beneath them regardless of chip width. */
   .manager-books-scrolls-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    column-gap: var(--fab-space-4);
+    row-gap: var(--fab-space-2);
+  }
+
+  .manager-books-scrolls-head,
+  .manager-books-scrolls-listitem {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: center;
+  }
+
+  .manager-books-scrolls-head {
+    padding: 0 var(--fab-space-3) var(--fab-space-1);
+  }
+
+  .manager-books-scrolls-head-cell {
+    justify-self: start;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fab-text-subtle);
+  }
+
+  .manager-books-scrolls-head-cell.is-status {
+    justify-self: end;
   }
 
   .manager-books-scrolls-listitem {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) var(--fab-space-3);
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-mv2-border);
     border-radius: var(--fab-v2-radius-panel);
     background: var(--fab-bg-2);
@@ -371,7 +399,6 @@
     align-items: center;
     justify-content: flex-start;
     gap: var(--fab-space-2);
-    flex: 1;
     min-width: 0;
     padding: 0;
     border: 0;
@@ -400,21 +427,6 @@
     flex: none;
   }
 
-  .manager-books-scrolls-copy {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-1);
-    flex: 1;
-    min-width: 0;
-  }
-
-  .manager-books-scrolls-name-row {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-
   .manager-books-scrolls-name {
     font-weight: 600;
     overflow: hidden;
@@ -427,18 +439,17 @@
     flex: none;
   }
 
-  .manager-books-scrolls-chips {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-chip);
-    flex-wrap: wrap;
+  .manager-books-scrolls-recipe-chip,
+  .manager-books-scrolls-cap-chip {
+    justify-self: start;
+    white-space: nowrap;
   }
 
   .manager-books-scrolls-actions {
     display: flex;
     align-items: center;
+    justify-self: end;
     gap: var(--fab-space-2);
-    flex: none;
   }
 
   /* Limited caps read as a "waiting/attention" warning tint; an uncapped item
