@@ -2075,3 +2075,385 @@ test('511.INV.6 - learnRecipeFromOwnedBook matches a book duplicated from a worl
   const result = await service.learnRecipeFromOwnedBook({ recipe, craftingActor: actor });
   assert.equal(result.success, true, 'a world-duplicated book resolves for learning');
 });
+
+// ---------------------------------------------------------------------------
+// Issue 511 PR-B — flat visibilityMode gating (global/restricted/item/knowledge)
+// ---------------------------------------------------------------------------
+
+test('MODE.global - every recipe is visible and craftable to a non-GM', () => {
+  const system = buildMockSystem({ visibilityMode: 'global' });
+  const recipe = buildMockRecipe({
+    visibility: { restricted: true, allowedUserIds: [] },
+    access: { characterIds: [], playerIds: [] },
+    linkedRecipeItemUuid: 'missing'
+  });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor: new FakeActor({ id: 'a1' }) });
+
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'ok');
+});
+
+test('MODE.restricted.userGrant - a granted player id makes the recipe visible', () => {
+  const system = buildMockSystem({ visibilityMode: 'restricted' });
+  const recipe = buildMockRecipe({ access: { characterIds: [], playerIds: ['user-1'] } });
+  const service = buildService({ system });
+
+  assert.equal(
+    service.evaluateRecipeAccess({ recipe, viewer: { isGM: false, id: 'user-1' } }).visible,
+    true
+  );
+  assert.equal(
+    service.evaluateRecipeAccess({ recipe, viewer: { isGM: false, id: 'user-2' } }).visible,
+    false
+  );
+});
+
+test('MODE.restricted.assignedCharacter - a granted character the viewer is assigned makes it visible', () => {
+  const system = buildMockSystem({ visibilityMode: 'restricted' });
+  const recipe = buildMockRecipe({ access: { characterIds: ['char-1'], playerIds: [] } });
+  const service = buildService({ system });
+
+  const granted = service.evaluateRecipeAccess({
+    recipe,
+    viewer: { isGM: false, id: 'user-1', character: { id: 'char-1' } }
+  });
+  assert.equal(granted.visible, true);
+
+  const ungranted = service.evaluateRecipeAccess({
+    recipe,
+    viewer: { isGM: false, id: 'user-1', character: { id: 'char-9' } }
+  });
+  assert.equal(ungranted.visible, false);
+});
+
+test('MODE.restricted.controlsCharacter - OWNER permission on a granted character makes it visible', () => {
+  const system = buildMockSystem({ visibilityMode: 'restricted' });
+  const recipe = buildMockRecipe({ access: { characterIds: ['char-2'], playerIds: [] } });
+  const service = buildService({ system });
+  const actor = {
+    id: 'char-2',
+    testUserPermission: (viewer, perm) => viewer?.id === 'user-1' && perm === 'OWNER'
+  };
+
+  const originalActors = globalThis.game.actors;
+  globalThis.game.actors = { get: (id) => (id === 'char-2' ? actor : null) };
+  try {
+    assert.equal(
+      service.evaluateRecipeAccess({ recipe, viewer: { isGM: false, id: 'user-1' } }).visible,
+      true
+    );
+    assert.equal(
+      service.evaluateRecipeAccess({ recipe, viewer: { isGM: false, id: 'user-3' } }).visible,
+      false
+    );
+  } finally {
+    globalThis.game.actors = originalActors;
+  }
+});
+
+test('MODE.restricted.gmBypass - a GM always sees a restricted recipe with no grant', () => {
+  const system = buildMockSystem({ visibilityMode: 'restricted' });
+  const recipe = buildMockRecipe({ access: { characterIds: [], playerIds: [] } });
+  const service = buildService({ system });
+
+  assert.equal(
+    service.evaluateRecipeAccess({ recipe, viewer: { isGM: true, id: 'gm-1' } }).visible,
+    true
+  );
+});
+
+test('MODE.restricted.legacyFallback - falls back to visibility.allowedUserIds when access is absent', () => {
+  const system = buildMockSystem({ visibilityMode: 'restricted' });
+  const openRecipe = buildMockRecipe({ visibility: { restricted: false, allowedUserIds: [] } });
+  const closedRecipe = buildMockRecipe({ visibility: { restricted: true, allowedUserIds: ['user-9'] } });
+  const service = buildService({ system });
+  const viewer = { isGM: false, id: 'user-1' };
+
+  assert.equal(service.evaluateRecipeAccess({ recipe: openRecipe, viewer }).visible, true);
+  assert.equal(service.evaluateRecipeAccess({ recipe: closedRecipe, viewer }).visible, false);
+});
+
+test('MODE.item - only a matching owned item grants; a learned-only actor stays hidden', () => {
+  const system = buildMockSystem({
+    visibilityMode: 'item',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'itemOrLearned', item: { limitUses: false }, learn: { consumeOnLearn: false } }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'recipe-item-uuid' }]
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const withItem = service.evaluateRecipeAccess({
+    recipe,
+    viewer,
+    craftingActor: new FakeActor({ id: 'a1', items: [new FakeItem({ uuid: 'recipe-item-uuid' })] })
+  });
+  assert.equal(withItem.visible, true);
+  assert.equal(withItem.craftable, true);
+
+  // Learned but no item: item mode ignores learned state → not visible.
+  const learnedOnly = service.evaluateRecipeAccess({
+    recipe,
+    viewer,
+    craftingActor: new FakeActor({
+      id: 'a2',
+      items: [],
+      flagsArg: { fabricate: { learnedRecipes: { 'recipe-1': { learnedAt: 1 } } } }
+    })
+  });
+  assert.equal(learnedOnly.visible, false);
+});
+
+test('MODE.knowledge - itemOrLearned semantics override a legacy learned-only knowledge.mode', () => {
+  // The flat 'knowledge' mode forces itemOrLearned even though the system's legacy
+  // knowledge.mode is 'learned' — an item alone now grants craftability.
+  const system = buildMockSystem({
+    visibilityMode: 'knowledge',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { consumeOnLearn: false } }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'recipe-item-uuid' }]
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const itemOnly = service.evaluateRecipeAccess({
+    recipe,
+    viewer,
+    craftingActor: new FakeActor({ id: 'a1', items: [new FakeItem({ uuid: 'recipe-item-uuid' })] })
+  });
+  assert.equal(itemOnly.visible, true);
+  assert.equal(itemOnly.craftable, true);
+
+  const learnedOnly = service.evaluateRecipeAccess({
+    recipe,
+    viewer,
+    craftingActor: new FakeActor({
+      id: 'a2',
+      flagsArg: { fabricate: { learnedRecipes: { 'recipe-1': { learnedAt: 1 } } } }
+    })
+  });
+  assert.equal(learnedOnly.craftable, true);
+});
+
+test('MODE.legacyFallback - AC1.7 preserved: absent visibilityMode + listMode maps to global', () => {
+  const system = buildMockSystem({ recipeVisibility: { listMode: undefined } });
+  const recipe = buildMockRecipe({ visibility: { restricted: true, allowedUserIds: [] } });
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({
+    recipe,
+    viewer: { isGM: false, id: 'user-1' },
+    craftingActor: new FakeActor({ id: 'a1' })
+  });
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true);
+});
+
+// ---------------------------------------------------------------------------
+// Issue 511 PR-B — whenSpent: destroyed vs inert on craft exhaustion
+// ---------------------------------------------------------------------------
+
+function buildWhenSpentSystem(whenSpent, maxUses = 2) {
+  return buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'item', item: { limitUses: false }, learn: { consumeOnLearn: false } }
+    },
+    recipeItemDefinitions: [
+      {
+        id: 'book',
+        sourceItemUuid: 'recipe-item-uuid',
+        caps: { item: { limitUses: true, maxUses, whenSpent }, learn: {} }
+      }
+    ]
+  });
+}
+
+test('WHENSPENT.destroyed - the item is deleted when it exhausts', async () => {
+  const system = buildWhenSpentSystem('destroyed', 2);
+  const recipe = buildMockRecipe({ recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const item = new FakeItem({
+    uuid: 'recipe-item-uuid',
+    flagsArg: { fabricate: { recipeItemUsage: { timesUsed: 1 } } }
+  });
+  const service = buildService({ system });
+
+  await service.applyRecipeItemUseOnCraft({ recipe, craftingActor: new FakeActor({ id: 'a1', items: [item] }) });
+
+  assert.equal(item.deleted, true);
+  assert.equal(item.deleteCount, 1);
+});
+
+test('WHENSPENT.inert - the item survives, is flagged inert, and is NOT deleted', async () => {
+  const system = buildWhenSpentSystem('inert', 2);
+  const recipe = buildMockRecipe({ recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const item = new FakeItem({
+    uuid: 'recipe-item-uuid',
+    flagsArg: { fabricate: { recipeItemUsage: { timesUsed: 1 } } }
+  });
+  const service = buildService({ system });
+
+  await service.applyRecipeItemUseOnCraft({ recipe, craftingActor: new FakeActor({ id: 'a1', items: [item] }) });
+
+  assert.equal(item.deleted, false, 'delete is only called for whenSpent: destroyed');
+  const usage = item.getFlag('fabricate', 'fabricate.recipeItemUsage');
+  assert.equal(usage.timesUsed, 2);
+  assert.equal(usage.inert, true);
+});
+
+// ---------------------------------------------------------------------------
+// Issue 511 PR-B — learning modes (once / ntimes / party shared pool) + prerequisite
+// ---------------------------------------------------------------------------
+
+function makeFakePartyPool() {
+  const store = {};
+  return {
+    store,
+    get: (key) => Number(store[key] || 0),
+    increment: async (key) => {
+      store[key] = Number(store[key] || 0) + 1;
+      return true;
+    }
+  };
+}
+
+function buildLearnModeSystem({ learningMode, learnsAllowed, prerequisite = null } = {}) {
+  return buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } }
+    },
+    recipeItemDefinitions: [
+      {
+        id: 'book',
+        sourceItemUuid: 'Compendium.world.items.book',
+        caps: {
+          item: { limitUses: false },
+          learn: { limitLearning: true, learnsAllowed, learningMode, prerequisite }
+        }
+      }
+    ]
+  });
+}
+
+test('LEARN.once - a once-book with a budget of 1 refuses a second learn from the same copy', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'once', learnsAllowed: 1 });
+  const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes });
+
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: item, actor })).success, true);
+  const second = await service.learnOneRecipeFromItem({ recipe: recipes[1], ownedItem: item, actor });
+  assert.equal(second.success, false);
+  assert.equal(second.message, 'FABRICATE.Knowledge.LearnBudgetSpent');
+});
+
+test('LEARN.ntimes - an n-times book learns N from one copy and refuses the (N+1)th', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'ntimes', learnsAllowed: 2 });
+  const recipes = [
+    buildCappedRecipe({ id: 'r-a' }),
+    buildCappedRecipe({ id: 'r-b' }),
+    buildCappedRecipe({ id: 'r-c' })
+  ];
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes });
+
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: item, actor })).success, true);
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[1], ownedItem: item, actor })).success, true);
+  const third = await service.learnOneRecipeFromItem({ recipe: recipes[2], ownedItem: item, actor });
+  assert.equal(third.success, false);
+  assert.equal(service._getRecipeItemLearnCount(item), 2);
+});
+
+test('LEARN.party - two actors share ONE budget across two physical copies', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'party', learnsAllowed: 2 });
+  const recipes = [
+    buildCappedRecipe({ id: 'r-a' }),
+    buildCappedRecipe({ id: 'r-b' }),
+    buildCappedRecipe({ id: 'r-c' })
+  ];
+  const pool = makeFakePartyPool();
+  const recipeManager = { getRecipes: () => recipes };
+  const craftingSystemManager = { getSystem: () => system };
+  const service = new RecipeVisibilityService(recipeManager, craftingSystemManager, pool);
+
+  const copyA = new FakeItem({ uuid: 'Actor.a.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actorA = new FakeActor({ id: 'actor-a', items: [copyA] });
+  const copyB = new FakeItem({ uuid: 'Actor.b.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actorB = new FakeActor({ id: 'actor-b', items: [copyB] });
+
+  // Actor A spends one shared slot, Actor B spends the second — from a different copy.
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: copyA, actor: actorA })).success, true);
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[1], ownedItem: copyB, actor: actorB })).success, true);
+
+  // The shared pool is now spent — a third learn by either actor is refused.
+  const refused = await service.learnOneRecipeFromItem({ recipe: recipes[2], ownedItem: copyA, actor: actorA });
+  assert.equal(refused.success, false);
+  assert.equal(refused.message, 'FABRICATE.Knowledge.LearnBudgetSpent');
+  assert.equal(pool.get('system-1::book'), 2, 'both learns drew from one shared, system-scoped pool');
+});
+
+test('LEARN.party - a non-GM (failed) shared-counter write fails closed without learning', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'party', learnsAllowed: 5 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const degradedPool = { get: () => 0, increment: async () => false };
+  const recipeManager = { getRecipes: () => [recipe] };
+  const craftingSystemManager = { getSystem: () => system };
+  const service = new RecipeVisibilityService(recipeManager, craftingSystemManager, degradedPool);
+  const item = new FakeItem({ uuid: 'Actor.a.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'actor-a', items: [item] });
+
+  const result = await service.learnOneRecipeFromItem({ recipe, ownedItem: item, actor });
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.LearnBudgetSpent');
+  const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.ok(!learned || !learned['r-a'], 'the recipe is not learned when the shared write fails');
+});
+
+test('PREREQ - learning is refused until the prerequisite recipe is learned', async () => {
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } }
+    },
+    recipeItemDefinitions: [
+      { id: 'basic', sourceItemUuid: 'src-basic', caps: { item: { limitUses: false }, learn: {} } },
+      {
+        id: 'advanced',
+        sourceItemUuid: 'src-adv',
+        caps: { item: { limitUses: false }, learn: { prerequisite: 'r-a' } }
+      }
+    ]
+  });
+  const basicRecipe = buildMockRecipe({ id: 'r-a', recipeItemId: 'basic', linkedRecipeItemUuid: null });
+  const advancedRecipe = buildMockRecipe({ id: 'r-b', recipeItemId: 'advanced', linkedRecipeItemUuid: null });
+  const basicBook = new FakeItem({ uuid: 'Actor.a1.Item.basic', sourceId: 'src-basic' });
+  const advancedBook = new FakeItem({ uuid: 'Actor.a1.Item.adv', sourceId: 'src-adv' });
+  const actor = new FakeActor({ id: 'a1', items: [basicBook, advancedBook] });
+  const service = buildService({ system, recipes: [basicRecipe, advancedRecipe] });
+
+  // Prerequisite (r-a) not yet learned → r-b is refused.
+  const blocked = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
+  assert.equal(blocked.success, false);
+  assert.equal(blocked.message, 'FABRICATE.Knowledge.PrerequisiteNotMet');
+
+  // Learn the prerequisite, then r-b succeeds.
+  assert.equal((await service.learnRecipeFromOwnedBook({ recipe: basicRecipe, craftingActor: actor })).success, true);
+  const unblocked = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
+  assert.equal(unblocked.success, true);
+});

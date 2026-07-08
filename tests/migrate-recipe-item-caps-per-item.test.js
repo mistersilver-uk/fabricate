@@ -133,7 +133,17 @@ test('seeded caps survive a _normalizeSystem round-trip', async () => {
   const normalized = manager._normalizeSystem(out.systems[0]);
 
   assert.deepEqual(normalized.recipeItemDefinitions[0].caps, {
-    item: { limitUses: true, maxUses: 3, destroyWhenExhausted: true },
-    learn: { consumeOnLearn: false, limitRecipes: true, maxRecipes: 2, destroyWhenSpent: true },
+    item: { limitUses: true, maxUses: 3, destroyWhenExhausted: true, whenSpent: 'destroyed' },
+    learn: {
+      consumeOnLearn: false,
+      limitRecipes: true,
+      limitLearning: true,
+      maxRecipes: 2,
+      learnsAllowed: 2,
+      // maxRecipes 2 (> 1) migrates the legacy cap to the 'ntimes' learning mode.
+      learningMode: 'ntimes',
+      prerequisite: null,
+      destroyWhenSpent: true,
+    },
   });
 });

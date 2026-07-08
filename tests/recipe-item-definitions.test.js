@@ -153,14 +153,131 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
   });
 
   assert.deepEqual(def.caps, {
-    item: { limitUses: false, maxUses: undefined, destroyWhenExhausted: false },
+    item: {
+      limitUses: false,
+      maxUses: undefined,
+      // Default whenSpent is 'destroyed'; the legacy boolean is kept in sync.
+      destroyWhenExhausted: true,
+      whenSpent: 'destroyed'
+    },
     learn: {
       consumeOnLearn: true,
       limitRecipes: false,
+      limitLearning: false,
       maxRecipes: undefined,
+      learnsAllowed: undefined,
+      learningMode: 'once',
+      prerequisite: null,
       destroyWhenSpent: false
     }
   });
+  // The definition defaults to enabled.
+  assert.equal(def.enabled, true);
+});
+
+// ---------------------------------------------------------------------------
+// Expanded recipe-item model (issue 511, PR-B) — enabled + whenSpent/learningMode
+// ---------------------------------------------------------------------------
+
+test('_normalizeRecipeItemDefinition round-trips enabled:false and defaults it to true', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  assert.equal(manager._normalizeRecipeItemDefinition({ id: 'a', sourceItemUuid: 'u' }).enabled, true);
+  assert.equal(
+    manager._normalizeRecipeItemDefinition({ id: 'b', sourceItemUuid: 'u', enabled: false }).enabled,
+    false
+  );
+  assert.equal(
+    manager._normalizeRecipeItemDefinition({ id: 'c', sourceItemUuid: 'u', enabled: true }).enabled,
+    true
+  );
+});
+
+test('_normalizeRecipeItemCaps derives whenSpent from legacy destroyWhenExhausted when unset', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  const destroyed = manager._normalizeRecipeItemCaps({ item: { destroyWhenExhausted: true } });
+  assert.equal(destroyed.item.whenSpent, 'destroyed');
+  assert.equal(destroyed.item.destroyWhenExhausted, true);
+
+  const inert = manager._normalizeRecipeItemCaps({ item: { destroyWhenExhausted: false } });
+  assert.equal(inert.item.whenSpent, 'inert');
+  assert.equal(inert.item.destroyWhenExhausted, false);
+});
+
+test('_normalizeRecipeItemCaps lets an authored whenSpent win and syncs destroyWhenExhausted', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  // whenSpent wins even when the legacy boolean disagrees.
+  const inert = manager._normalizeRecipeItemCaps({
+    item: { whenSpent: 'inert', destroyWhenExhausted: true }
+  });
+  assert.equal(inert.item.whenSpent, 'inert');
+  assert.equal(inert.item.destroyWhenExhausted, false);
+
+  const destroyed = manager._normalizeRecipeItemCaps({
+    item: { whenSpent: 'destroyed', destroyWhenExhausted: false }
+  });
+  assert.equal(destroyed.item.whenSpent, 'destroyed');
+  assert.equal(destroyed.item.destroyWhenExhausted, true);
+});
+
+test('_normalizeRecipeItemCaps mirrors limitRecipes/maxRecipes to limitLearning/learnsAllowed', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  const legacy = manager._normalizeRecipeItemCaps({
+    learn: { limitRecipes: true, maxRecipes: 4 }
+  });
+  assert.equal(legacy.learn.limitLearning, true);
+  assert.equal(legacy.learn.learnsAllowed, 4);
+  // Migrated from legacy: maxRecipes > 1 → 'ntimes'.
+  assert.equal(legacy.learn.learningMode, 'ntimes');
+
+  // The new fields win and are mirrored back onto the legacy names.
+  const modern = manager._normalizeRecipeItemCaps({
+    learn: { limitLearning: true, learnsAllowed: 2, learningMode: 'party' }
+  });
+  assert.equal(modern.learn.limitRecipes, true);
+  assert.equal(modern.learn.maxRecipes, 2);
+  assert.equal(modern.learn.limitLearning, true);
+  assert.equal(modern.learn.learnsAllowed, 2);
+  assert.equal(modern.learn.learningMode, 'party');
+});
+
+test('_normalizeRecipeItemCaps defaults learningMode once, prerequisite null, and clamps enum', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  const bare = manager._normalizeRecipeItemCaps({});
+  assert.equal(bare.learn.learningMode, 'once');
+  assert.equal(bare.learn.prerequisite, null);
+
+  const bad = manager._normalizeRecipeItemCaps({ learn: { learningMode: 'nonsense' } });
+  assert.equal(bad.learn.learningMode, 'once');
+
+  const prereq = manager._normalizeRecipeItemCaps({ learn: { prerequisite: '  recipe-42  ' } });
+  assert.equal(prereq.learn.prerequisite, 'recipe-42');
+});
+
+test('updateRecipeItemDefinition accepts an enabled patch alongside caps', async () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  manager.save = async () => {};
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Alchemy',
+    recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u' }]
+  }));
+
+  const result = await manager.updateRecipeItemDefinition('sys-1', 'book-1', {
+    enabled: false,
+    caps: { learn: { limitLearning: true, learnsAllowed: 3, learningMode: 'party' } }
+  });
+
+  assert.equal(result.item.enabled, false);
+  assert.equal(result.item.caps.learn.learningMode, 'party');
+  assert.equal(result.item.caps.learn.learnsAllowed, 3);
+  // Legacy fields stay in sync for back-compat consumers.
+  assert.equal(result.item.caps.learn.limitRecipes, true);
+  assert.equal(result.item.caps.learn.maxRecipes, 3);
 });
 
 test('_normalizeRecipeItemDefinition round-trips authored per-item caps', () => {

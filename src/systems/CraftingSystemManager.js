@@ -910,26 +910,75 @@ export class CraftingSystemManager {
   // exactly, so a migrated system round-trips its old values unchanged. `learn`
   // deliberately omits `dragDropEnabled` — that stays a system-level knowledge
   // setting. Absent caps normalize to uncapped (the safe default for new items).
+  // Reconcile the legacy boolean `destroyWhenExhausted` with the new enum
+  // `whenSpent` ('destroyed' | 'inert'), keeping BOTH persisted and in sync (issue
+  // 511, PR-B). The enum wins when authored; otherwise the boolean seeds it; when
+  // neither is present a spent charge defaults to 'destroyed'.
+  _reconcileWhenSpent(item = {}) {
+    const authored = item.whenSpent === 'destroyed' || item.whenSpent === 'inert';
+    if (authored) {
+      return { whenSpent: item.whenSpent, destroyWhenExhausted: item.whenSpent === 'destroyed' };
+    }
+    if (Object.prototype.hasOwnProperty.call(item, 'destroyWhenExhausted')) {
+      const destroyWhenExhausted = item.destroyWhenExhausted === true;
+      return { whenSpent: destroyWhenExhausted ? 'destroyed' : 'inert', destroyWhenExhausted };
+    }
+    return { whenSpent: 'destroyed', destroyWhenExhausted: true };
+  }
+
   _normalizeRecipeItemCaps(caps = {}) {
     const item = caps?.item || {};
     const learn = caps?.learn || {};
+
+    const { whenSpent, destroyWhenExhausted } = this._reconcileWhenSpent(item);
+
+    // `limitLearning` (new) mirrors legacy `limitRecipes`; the new field wins when
+    // authored, otherwise the legacy boolean seeds it. Both are always persisted.
+    const limitLearning = Object.prototype.hasOwnProperty.call(learn, 'limitLearning')
+      ? learn.limitLearning === true
+      : learn.limitRecipes === true;
+
+    // `learnsAllowed` (new) mirrors legacy `maxRecipes` — a finite positive count kept
+    // only while the limit is on. The new field wins when authored.
+    const rawLearns = Object.prototype.hasOwnProperty.call(learn, 'learnsAllowed')
+      ? learn.learnsAllowed
+      : learn.maxRecipes;
+    const learnsAllowed =
+      limitLearning && Number.isFinite(Number(rawLearns)) && Number(rawLearns) > 0
+        ? Number(rawLearns)
+        : undefined;
+
+    // `learningMode` ('once' | 'ntimes' | 'party') is net-new; migrate legacy caps by
+    // reading their count (maxRecipes > 1 → 'ntimes', else 'once'). 'party' is never
+    // reached by migration — only by an authored value.
+    const learningMode = ['once', 'ntimes', 'party'].includes(learn.learningMode)
+      ? learn.learningMode
+      : Number(rawLearns) > 1
+        ? 'ntimes'
+        : 'once';
+
+    const prerequisite =
+      typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
+        ? learn.prerequisite.trim()
+        : null;
+
     return {
       item: {
         limitUses: item.limitUses === true,
         maxUses: Number.isFinite(Number(item.maxUses)) ? Number(item.maxUses) : undefined,
-        destroyWhenExhausted: item.destroyWhenExhausted === true,
+        destroyWhenExhausted,
+        whenSpent,
       },
       learn: {
         consumeOnLearn: learn.consumeOnLearn !== false,
         // `destroyWhenSpent` (learn) is deliberately named distinctly from
         // `destroyWhenExhausted` (item/craft-charges) — do not normalize to one name.
-        limitRecipes: learn.limitRecipes === true,
-        maxRecipes:
-          learn.limitRecipes === true &&
-          Number.isFinite(Number(learn.maxRecipes)) &&
-          Number(learn.maxRecipes) > 0
-            ? Number(learn.maxRecipes)
-            : undefined,
+        limitRecipes: limitLearning,
+        limitLearning,
+        maxRecipes: learnsAllowed,
+        learnsAllowed,
+        learningMode,
+        prerequisite,
         destroyWhenSpent: learn.destroyWhenSpent === true,
       },
     };
@@ -951,6 +1000,9 @@ export class CraftingSystemManager {
       description: this._normalizeComponentDescription(entry.description),
       img: String(entry.img || '').trim() || 'icons/svg/item-bag.svg',
       sourceItemUuid,
+      // Per-recipe-item enable toggle (issue 511, PR-B). Defaults on; a disabled
+      // definition still round-trips but the library UI can hide/skip it.
+      enabled: entry.enabled !== false,
       caps: this._normalizeRecipeItemCaps(entry.caps),
     };
   }
@@ -1589,11 +1641,12 @@ export class CraftingSystemManager {
     };
   }
 
-  // Update a recipe item definition's per-item caps (issue 511). Only the `caps`
-  // block is editable here — a definition's identity (name/img/sourceItemUuid) is
-  // managed by the recipe-item linking flow. The patch's `item`/`learn` partials
-  // merge over the current caps, then the whole block is re-normalized (uncapped
-  // defaults, finite/positive clamps) via `_normalizeRecipeItemCaps`.
+  // Update a recipe item definition's per-item caps and enable state (issue 511).
+  // A definition's identity (name/img/sourceItemUuid) is managed by the recipe-item
+  // linking flow and is not editable here. The patch's `item`/`learn` partials merge
+  // over the current caps, then the whole block is re-normalized (uncapped defaults,
+  // finite/positive clamps, legacy/new field sync) via `_normalizeRecipeItemCaps`.
+  // An `enabled` patch toggles the definition's enable flag.
   async updateRecipeItemDefinition(systemId, recipeItemId, patch = {}) {
     this._assertGM('update recipe item');
     const system = this.getSystem(systemId);
@@ -1602,14 +1655,43 @@ export class CraftingSystemManager {
     const definition = this.getRecipeItemDefinition(systemId, recipeItemId);
     if (!definition) throw new Error(`Recipe item definition not found: ${recipeItemId}`);
 
+    if (Object.prototype.hasOwnProperty.call(patch, 'enabled')) {
+      definition.enabled = patch.enabled !== false;
+    }
+
     const capsPatch = patch?.caps || {};
     definition.caps = this._normalizeRecipeItemCaps({
-      item: { ...definition.caps?.item, ...capsPatch.item },
-      learn: { ...definition.caps?.learn, ...capsPatch.learn },
+      item: this._mergeCapsSection(definition.caps?.item, capsPatch.item, [
+        ['whenSpent', 'destroyWhenExhausted'],
+      ]),
+      learn: this._mergeCapsSection(definition.caps?.learn, capsPatch.learn, [
+        ['limitLearning', 'limitRecipes'],
+        ['learnsAllowed', 'maxRecipes'],
+      ]),
     });
 
     await this.save();
     return { item: { ...definition } };
+  }
+
+  // Merge a caps patch over the stored caps sub-block while keeping the legacy/new
+  // mirror pairs consistent (issue 511, PR-B). When a patch sets ONE member of a
+  // mirror pair (e.g. legacy `limitRecipes` from the old UI, or new `limitLearning`
+  // from the redesigned UI), the stored sibling would otherwise win in the
+  // normalizer and revert the change, so drop the un-patched sibling here and let
+  // `_normalizeRecipeItemCaps` re-derive it from the patched value.
+  _mergeCapsSection(base = {}, patch = {}, mirrorPairs = []) {
+    const merged = { ...base, ...patch };
+    for (const pair of mirrorPairs) {
+      const patchedMembers = pair.filter((field) =>
+        Object.prototype.hasOwnProperty.call(patch, field)
+      );
+      if (patchedMembers.length === 0) continue;
+      for (const field of pair) {
+        if (!patchedMembers.includes(field)) delete merged[field];
+      }
+    }
+    return merged;
   }
 
   async updateSystem(systemId, updates = {}) {
