@@ -144,6 +144,23 @@ test('applyToolUsageAndBreakage: limitedUses increments toolUsage', async () => 
   assert.equal(entry.componentId, 'c');
 });
 
+test('applyToolUsageAndBreakage: limitedUses does NOT break one use early (post-increment count, no double +1)', async () => {
+  // Regression: the apply path increments via applyUsage, so the breakage decision
+  // must read the POST-increment timesUsed (Tool#evaluateBreakage), NOT re-project it
+  // with evaluateToolBreakagePlan's +1. A fresh maxUses:2 tool must survive the first
+  // apply (timesUsed 0→1, 1<2) and break only on the second (1→2, 2>=2).
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 2 }, onBreak: { mode: 'flagBroken' } });
+  const item = new FakeItem({});
+  const first = await applyToolUsageAndBreakage({ tool, item, buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }) });
+  assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 1 });
+  assert.equal(first.broken, false, 'first use (timesUsed 1) is below maxUses 2 → not broken');
+  assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), undefined);
+  const second = await applyToolUsageAndBreakage({ tool, item, buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }) });
+  assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 2 });
+  assert.equal(second.broken, true, 'second use (timesUsed 2) reaches maxUses 2 → broken');
+  assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), true);
+});
+
 test('applyToolUsageAndBreakage: breakageChance (non-limitedUses) writes NO usage flag', async () => {
   const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } });
   const item = new FakeItem({});
