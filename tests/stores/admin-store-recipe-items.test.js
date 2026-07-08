@@ -149,8 +149,19 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     const codex = recipeItemById(vs, 'codex');
     assert.equal(codex.resolvedName, 'Grand Codex');
     assert.equal(codex.enabled, false);
-    // Name "Grand Codex" infers a Tome.
-    assert.equal(codex.derivedType, 'Tome');
+    // codex links exactly one recipe (r3) → Scroll.
+    assert.equal(codex.derivedType, 'Scroll');
+  });
+
+  it('derives the Type from the linked-recipe count (Book 2+, Scroll 1, Incomplete 0)', async () => {
+    const store = buildStore();
+    await store.refresh();
+    const vs = get(store.viewState);
+
+    // primer links r1 + r2 → Book; codex links r3 → Scroll; gone links nothing → Incomplete.
+    assert.equal(recipeItemById(vs, 'primer').derivedType, 'Book');
+    assert.equal(recipeItemById(vs, 'codex').derivedType, 'Scroll');
+    assert.equal(recipeItemById(vs, 'gone').derivedType, 'Incomplete');
   });
 
   it('derives recipes[] via the reverse recipe.recipeItemId ref', async () => {

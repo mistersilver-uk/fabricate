@@ -1590,12 +1590,16 @@ function _recipeItemLabelFromUuid(uuid) {
 
 // Best-effort Book / Scroll / Tome label inferred from the linked item's type
 // and name. Defaults to 'Book' when nothing more specific is detectable.
-function _deriveRecipeItemType(sourceDoc, fallbackName = '') {
-  const type = String(sourceDoc?.type || '').toLowerCase();
-  const name = String(sourceDoc?.name || fallbackName || '').toLowerCase();
-  if (type.includes('scroll') || name.includes('scroll') || name.includes('page')) return 'Scroll';
-  if (name.includes('tome') || name.includes('codex') || name.includes('grimoire')) return 'Tome';
-  return 'Book';
+// Recipe-item "type" is derived purely from how many recipes it grants, so the
+// Books & Scrolls Type pill/filter is diagnostic: a multi-recipe tome is a "Book",
+// a single-recipe item is a "Scroll", and an item with no recipes linked yet is
+// "Incomplete" (distinct from the `linkMissing` broken-link state). Display strings
+// mirror the existing un-localised `derivedType`.
+function _recipeItemTypeFromRecipeCount(count) {
+  const n = Number(count) || 0;
+  if (n >= 2) return 'Book';
+  if (n === 1) return 'Scroll';
+  return 'Incomplete';
 }
 
 // Synchronous fallback projection painted immediately in refresh phase 1. The
@@ -1612,7 +1616,7 @@ function _projectRecipeItemDefinitionSync(def) {
     caps: _clonePlain(def?.caps || {}),
     resolvedName: def?.name || _recipeItemLabelFromUuid(sourceItemUuid) || 'Recipe item',
     resolvedImg: def?.img || 'icons/svg/item-bag.svg',
-    derivedType: _deriveRecipeItemType(null, def?.name),
+    derivedType: _recipeItemTypeFromRecipeCount(0),
     linkMissing: false,
     recipes: [],
     learnedByCount: 0,
@@ -1692,7 +1696,7 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
       ...item,
       resolvedName: doc?.name || item.resolvedName,
       resolvedImg: doc?.img || item.resolvedImg,
-      derivedType: _deriveRecipeItemType(doc, item.resolvedName),
+      derivedType: _recipeItemTypeFromRecipeCount(linkedRecipes.length),
       linkMissing: missing,
       recipes: linkedRecipes,
       learnedByCount: learnedActors.size,

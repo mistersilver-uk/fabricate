@@ -43,9 +43,11 @@
   const enabled = $derived(item?.enabled !== false);
 
   function typeIcon() {
+    // Type is derived from the linked-recipe count: no recipes → Incomplete
+    // (warning), one → Scroll, two or more → Book.
+    if (recipeCount === 0) return 'fas fa-triangle-exclamation';
     const type = String(item?.derivedType || '').toLowerCase();
     if (type.includes('scroll')) return 'fas fa-scroll';
-    if (type.includes('tome')) return 'fas fa-book-atlas';
     return 'fas fa-book';
   }
 
@@ -111,7 +113,7 @@
       <div class="manager-inspector-copy">
         <h3 class="manager-inspector-name" data-item-page-name>{item.resolvedName}</h3>
         <span class="manager-books-scrolls-inspector-meta">
-          <span class="manager-chip is-neutral" data-item-page-type>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
+          <span class={`manager-chip ${recipeCount === 0 ? 'is-danger' : 'is-neutral'}`} data-item-page-type>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
           <button
             type="button"
             class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}

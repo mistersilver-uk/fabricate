@@ -24,7 +24,10 @@ function makeItem(overrides = {}) {
     derivedType: 'Book',
     enabled: true,
     caps: { item: { limitUses: false }, learn: { limitLearning: false } },
-    recipes: [{ id: 'r1', name: 'Smelt Copper', category: 'Smithing' }],
+    recipes: [
+      { id: 'r1', name: 'Smelt Copper', category: 'Smithing' },
+      { id: 'r2', name: 'Forge Rivets', category: 'Smithing' }
+    ],
     learnedByCount: 3,
     linkMissing: false,
     ...overrides
@@ -42,17 +45,28 @@ afterEach(() => harness.remount());
 describe('BooksScrollsView (mounted)', () => {
   it('renders a row per recipe item with name, type pill, and recipe count', async () => {
     const root = await harness.mount({
-      recipeItems: [makeItem(), makeItem({ id: 'scroll', resolvedName: 'Scroll of Soul-Ash', derivedType: 'Scroll', recipes: [] })],
+      recipeItems: [
+        makeItem(),
+        makeItem({ id: 'scroll', resolvedName: 'Scroll of Soul-Ash', derivedType: 'Scroll', recipes: [{ id: 'r9', name: 'Bind Ash', category: 'Arcana' }] }),
+        makeItem({ id: 'empty', resolvedName: 'Blank Codex', derivedType: 'Incomplete', recipes: [] })
+      ],
       visibilityMode: 'knowledge'
     });
 
-    assert.equal(root.querySelectorAll('[data-books-scrolls-item]').length, 2);
+    assert.equal(root.querySelectorAll('[data-books-scrolls-item]').length, 3);
     assert.equal(root.querySelector('[data-books-scrolls-name="primer"]').textContent.trim(), "Journeyman's Primer");
+    // Type pill: Book (2+ recipes) is neutral, Scroll (1) is neutral, Incomplete (0) is danger.
     assert.equal(root.querySelector('[data-books-scrolls-type="primer"]').textContent.trim(), 'Book');
-    assert.equal(root.querySelector('[data-books-scrolls-recipe-count="primer"] span').textContent.trim(), '1 recipe');
+    assert.ok(!root.querySelector('[data-books-scrolls-type="primer"]').classList.contains('is-danger'));
+    assert.equal(root.querySelector('[data-books-scrolls-type="scroll"]').textContent.trim(), 'Scroll');
+    assert.equal(root.querySelector('[data-books-scrolls-recipe-count="primer"] span').textContent.trim(), '2 recipes');
 
-    // Empty linked recipes render the danger "No recipes" chip.
-    const emptyChip = root.querySelector('[data-books-scrolls-recipe-count="scroll"]');
+    // A recipe item with no linked recipes reads as Incomplete (danger) and shows
+    // the danger "No recipes" chip.
+    const incompleteType = root.querySelector('[data-books-scrolls-type="empty"]');
+    assert.equal(incompleteType.textContent.trim(), 'Incomplete');
+    assert.ok(incompleteType.classList.contains('is-danger'));
+    const emptyChip = root.querySelector('[data-books-scrolls-recipe-count="empty"]');
     assert.equal(emptyChip.querySelector('span').textContent.trim(), 'No recipes');
     assert.ok(emptyChip.classList.contains('is-danger'));
   });

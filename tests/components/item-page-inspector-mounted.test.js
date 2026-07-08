@@ -64,6 +64,17 @@ describe('ItemPageInspector (mounted)', () => {
     assert.equal(root.querySelector('[data-item-page-more]').textContent.trim(), '+2 more recipes');
   });
 
+  it('marks a recipe item with no linked recipes as an Incomplete (danger) type', async () => {
+    const root = await harness.mount({
+      item: makeItem({ derivedType: 'Incomplete', recipes: [] }),
+      visibilityMode: 'knowledge'
+    });
+    const typePill = root.querySelector('[data-item-page-type]');
+    assert.equal(typePill.textContent.trim(), 'Incomplete');
+    assert.ok(typePill.classList.contains('is-danger'));
+    assert.equal(root.querySelector('[data-item-page-recipe-count]').textContent.trim(), '0');
+  });
+
   it('fires the edit, enable-toggle, and quick-limit callbacks', async () => {
     let edited = null;
     let toggled = null;

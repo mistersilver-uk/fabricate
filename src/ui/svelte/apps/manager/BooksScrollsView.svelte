@@ -60,13 +60,6 @@
     return item?.resolvedImg || item?.img || 'icons/svg/item-bag.svg';
   }
 
-  function typeIcon(item) {
-    const type = String(item?.derivedType || '').toLowerCase();
-    if (type.includes('scroll')) return 'fas fa-scroll';
-    if (type.includes('tome')) return 'fas fa-book-atlas';
-    return 'fas fa-book';
-  }
-
   function recipeCount(item) {
     return Array.isArray(item?.recipes) ? item.recipes.length : 0;
   }
@@ -266,7 +259,7 @@
             >
               <img class="manager-books-scrolls-thumb" src={recipeItemImage(item)} alt="" />
               <span class="manager-books-scrolls-name" data-books-scrolls-name={item.id} title={item.resolvedName}>{item.resolvedName}</span>
-              <span class="manager-chip is-neutral manager-books-scrolls-type-pill" data-books-scrolls-type={item.id}>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
+              <span class={`manager-chip manager-books-scrolls-type-pill ${recipeCount(item) === 0 ? 'is-danger' : 'is-neutral'}`} data-books-scrolls-type={item.id}>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
               {#if item.linkMissing}
                 <span class="manager-chip is-danger manager-books-scrolls-link-chip" data-books-scrolls-link-missing={item.id}>
                   <i class="fas fa-link-slash" aria-hidden="true"></i>
