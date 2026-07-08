@@ -21,12 +21,13 @@ This guide walks you through installing Fabricate, creating your first crafting 
 ### Theme
 
 Fabricate defaults to the **Fabricate** colour theme.
-The module includes five additional themes:
+The module includes six additional themes:
 
 - **Mythwright**
 - **Ironblood Forge**
 - **Hearth & Herb**
 - **Starglass Arcana**
+- **Sovereign**
 - **Foundry Native**
 
 Open Foundry's module settings for Fabricate and set **Fabricate Theme** to switch palettes.

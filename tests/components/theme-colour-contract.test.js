@@ -19,6 +19,7 @@ const themeSelectors = Object.freeze({
   'ironblood-forge': ':root[data-fabricate-theme="ironblood-forge"],\n.fabricate[data-fabricate-theme="ironblood-forge"]',
   'hearth-herb': ':root[data-fabricate-theme="hearth-herb"],\n.fabricate[data-fabricate-theme="hearth-herb"]',
   'starglass-arcana': ':root[data-fabricate-theme="starglass-arcana"],\n.fabricate[data-fabricate-theme="starglass-arcana"]',
+  sovereign: ':root[data-fabricate-theme="sovereign"],\n.fabricate[data-fabricate-theme="sovereign"]',
   'foundry-native': ':root[data-fabricate-theme="foundry-native"],\n.fabricate[data-fabricate-theme="foundry-native"]'
 });
 const themePaletteAnchors = Object.freeze({
@@ -27,6 +28,7 @@ const themePaletteAnchors = Object.freeze({
   'ironblood-forge': ['#141214', '#1F1A1D', '#2C2428', '#5A4A50', '#F0E2D4', '#C58B5A', '#8E9A8F', '#92A78B', '#A86D66'],
   'hearth-herb': ['#161C19', '#1F2924', '#2B3831', '#53695E', '#F1E9D8', '#C8A36E', '#9BB79E', '#AFC7A4', '#B98378'],
   'starglass-arcana': ['#121824', '#1A2232', '#243147', '#40506B', '#F2ECFF', '#9FC5E8', '#C7A6E6', '#9DC9BD', '#C78A96'],
+  sovereign: ['#0A0E1A', '#101627', '#182036', '#2A3550', '#F2EAD6', '#CFC198', '#E4C066', '#81BE96', '#C96E66'],
   'foundry-native': ['#0C0A14', '#111018', '#30282F', '#2E2833', '#F3F3F5', '#BC8963', '#706B70', '#617054', '#A16C60']
 });
 
