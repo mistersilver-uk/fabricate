@@ -122,7 +122,7 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
 
   it('redirects recipe-edit like recipes (fallback to system-edit) in normalizedActiveView', () => {
     assert.ok(
-      rootSource.includes("if ((view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings' || view === 'books-scrolls') && !recipesAvailable) return 'system-edit'"),
+      rootSource.includes("if ((view === 'recipes' || view === 'recipe-edit' || view === 'crafting-settings' || view === 'books-scrolls' || view === 'books-scrolls-item') && !recipesAvailable) return 'system-edit'"),
       'normalizedActiveView should treat recipe-edit like recipes and fall back to system-edit'
     );
   });

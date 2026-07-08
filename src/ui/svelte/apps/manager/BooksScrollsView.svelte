@@ -7,24 +7,15 @@
   ring, wand, gem, note). "Recipe item" is the canonical noun.
 
   The surface lists every recipe item with its linked recipes (matched by
-  `recipe.recipeItemId`), and surfaces the system-level recipe-item rules — the
-  use cap (craft charges), the learn cap, and the consume/destroy behaviour —
-  from the persisted `recipeVisibility.knowledge` config. Those rules are
-  system-wide (they apply to every recipe item), so they are edited once in a
-  shared rules card and reflected per item as read-only chips.
-
-  Editing is LIVE-APPLY: every control passes only its own field to
-  `onSaveVisibilityConfig(patch)`, and the store's object-form
-  `saveVisibilityConfig` merges the rest from the persisted config. There is no
-  dirty draft and no route-exit guard — the surface never stages changes.
+  `recipe.recipeItemId`) and a summary of that item's OWN use/learn caps as
+  read-only chips. Caps are now per recipe item (issue 511) and are edited on the
+  item's own page — opening a row navigates to that per-item page.
 
   Props:
-   - recipeItems: `selectedSystem.recipeItemDefinitions` ({ id, name, img, description }).
+   - recipeItems: `selectedSystem.recipeItemDefinitions` ({ id, name, img, caps }).
    - recipes: the system's recipes (used to count/label linked recipes per item).
-   - recipeVisibility: the system's `{ listMode, knowledge: { mode, item, learn } }`.
    - selectedSystemName: the system's display name (kicker).
-   - selectedRecipeItemId / onSelectRecipeItem: row selection highlight.
-   - onSaveVisibilityConfig(patch): live-apply a single-field config patch.
+   - onOpenRecipeItem(id): open the per-item caps page.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -32,30 +23,14 @@
   let {
     recipeItems = [],
     recipes = [],
-    recipeVisibility = {},
     selectedSystemName = '',
-    selectedRecipeItemId = '',
-    onSelectRecipeItem = () => {},
-    onSaveVisibilityConfig = () => {}
+    onOpenRecipeItem = () => {}
   } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-
-  const knowledge = $derived(recipeVisibility?.knowledge || {});
-  const limitUses = $derived(knowledge?.item?.limitUses === true);
-  const maxUses = $derived(
-    Number.isFinite(Number(knowledge?.item?.maxUses)) ? Number(knowledge.item.maxUses) : 1
-  );
-  const destroyWhenExhausted = $derived(knowledge?.item?.destroyWhenExhausted === true);
-  const consumeOnLearn = $derived(knowledge?.learn?.consumeOnLearn !== false);
-  const limitRecipes = $derived(knowledge?.learn?.limitRecipes === true);
-  const maxRecipes = $derived(
-    Number.isFinite(Number(knowledge?.learn?.maxRecipes)) ? Number(knowledge.learn.maxRecipes) : 1
-  );
-  const destroyWhenSpent = $derived(knowledge?.learn?.destroyWhenSpent === true);
 
   function recipeItemImage(item) {
     return item?.img || 'icons/svg/item-bag.svg';
@@ -69,151 +44,29 @@
     return (recipes || []).filter((recipe) => String(recipe?.recipeItemId || '') === id);
   }
 
-  function setLimitUses(next) {
-    if (next) {
-      onSaveVisibilityConfig({ limitUses: true, maxUses: Math.max(1, maxUses) });
-    } else {
-      onSaveVisibilityConfig({ limitUses: false });
-    }
+  function useCapLabel(item) {
+    const cap = item?.caps?.item || {};
+    const max = Number.isFinite(Number(cap.maxUses)) ? Number(cap.maxUses) : 1;
+    return cap.limitUses === true
+      ? text('FABRICATE.Admin.Manager.BooksScrolls.UseCapChip', 'Use cap: {n}').replace('{n}', max)
+      : text('FABRICATE.Admin.Manager.BooksScrolls.UseCapNone', 'Unlimited uses');
   }
 
-  function setLimitRecipes(next) {
-    if (next) {
-      onSaveVisibilityConfig({ limitRecipes: true, maxRecipes: Math.max(1, maxRecipes) });
-    } else {
-      onSaveVisibilityConfig({ limitRecipes: false });
-    }
-  }
-
-  function adjustMaxUses(delta) {
-    onSaveVisibilityConfig({ maxUses: Math.max(1, maxUses + delta) });
-  }
-
-  function adjustMaxRecipes(delta) {
-    onSaveVisibilityConfig({ maxRecipes: Math.max(1, maxRecipes + delta) });
+  function learnCapLabel(item) {
+    const cap = item?.caps?.learn || {};
+    const max = Number.isFinite(Number(cap.maxRecipes)) ? Number(cap.maxRecipes) : 1;
+    return cap.limitRecipes === true
+      ? text('FABRICATE.Admin.Manager.BooksScrolls.LearnCapChip', 'Learn cap: {n}').replace('{n}', max)
+      : text('FABRICATE.Admin.Manager.BooksScrolls.LearnCapNone', 'Learn all');
   }
 </script>
-
-<!-- A compact live-apply boolean toggle used by the rules card. `onToggle(next)`
-     lets the cap toggles commit a concrete cap alongside the flag. -->
-{#snippet ruleToggle(dataField, ariaKey, ariaFallback, on, onToggle, disabled)}
-  <button
-    type="button"
-    class={`manager-status-toggle ${on ? 'is-on' : 'is-off'}${disabled ? ' is-disabled' : ''}`}
-    aria-pressed={on}
-    aria-label={text(ariaKey, ariaFallback)}
-    disabled={disabled}
-    {...{ [dataField]: true }}
-    onclick={() => onToggle(!on)}
-  >
-    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-    <span class="manager-status-toggle-label">{on
-      ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-      : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
-  </button>
-{/snippet}
-
-{#snippet ruleStepper(dataField, ariaKey, ariaFallback, decAriaKey, decAriaFallback, incAriaKey, incAriaFallback, value, onDec, onInc, onInput, disabled)}
-  <div class="manager-recipe-visibility-stepper" {...{ [dataField]: true }}>
-    <button type="button" class="manager-icon-button" disabled={disabled} aria-label={text(decAriaKey, decAriaFallback)} onclick={onDec}><i class="fas fa-minus" aria-hidden="true"></i></button>
-    <input type="number" min="1" step="1" value={value} disabled={disabled} aria-label={text(ariaKey, ariaFallback)} oninput={onInput} />
-    <button type="button" class="manager-icon-button" disabled={disabled} aria-label={text(incAriaKey, incAriaFallback)} onclick={onInc}><i class="fas fa-plus" aria-hidden="true"></i></button>
-  </div>
-{/snippet}
 
 <main class="manager-main manager-books-scrolls-main" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls')} data-books-scrolls>
   <section class="manager-section-header">
     <div class="manager-heading">
       <p class="manager-kicker">{selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</p>
       <h2 class="manager-title">{text('FABRICATE.Admin.Manager.BooksScrolls.Library', 'Books & Scrolls')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.BooksScrolls.LibraryHint', 'Every recipe item in this system — books, scrolls, or any item type — with its linked recipes and the shared recipe-item rules.')}</p>
-    </div>
-  </section>
-
-  <section class="manager-inspector-card manager-books-scrolls-rules" data-books-scrolls-rules aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Rules', 'Recipe item rules')}>
-    <div class="manager-inspector-title-row">
-      <span class="manager-inspector-icon" aria-hidden="true"><i class="fas fa-sliders"></i></span>
-      <div class="manager-inspector-copy">
-        <p class="manager-kicker">{text('FABRICATE.Admin.Manager.BooksScrolls.RulesKicker', 'System-wide')}</p>
-        <h3 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.BooksScrolls.Rules', 'Recipe item rules')}</h3>
-      </div>
-    </div>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.BooksScrolls.RulesHint', 'These rules apply to every recipe item in this system. Changes apply immediately.')}</p>
-
-    <div class="manager-rules-stack">
-      <div class="manager-rule-row" data-books-scrolls-limit-uses-row>
-        <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-repeat"></i></span>
-        <span class="manager-rule-copy">
-          <strong>{text('FABRICATE.Admin.Manager.BooksScrolls.UseCap', 'Limited uses of recipe items')}</strong>
-          <span>{text('FABRICATE.Admin.Manager.BooksScrolls.UseCapHint', 'Cap how many times a recipe item grants crafting access.')}</span>
-        </span>
-        <span class="manager-rule-field">
-          {@render ruleToggle('data-books-scrolls-limit-uses', 'FABRICATE.Admin.Manager.BooksScrolls.UseCap', 'Limited uses of recipe items', limitUses, setLimitUses, false)}
-        </span>
-      </div>
-      <div class="manager-rule-row" class:is-disabled={!limitUses} data-books-scrolls-max-uses-row>
-        <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-hashtag"></i></span>
-        <span class="manager-rule-copy">
-          <strong>{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemMaxUses', 'Maximum uses')}</strong>
-        </span>
-        <span class="manager-rule-field">
-          {@render ruleStepper('data-books-scrolls-max-uses', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemMaxUses', 'Maximum uses', 'FABRICATE.Admin.Manager.System.RecipeVisibility.MaxUsesDecrease', 'Decrease maximum uses', 'FABRICATE.Admin.Manager.System.RecipeVisibility.MaxUsesIncrease', 'Increase maximum uses', maxUses, () => adjustMaxUses(-1), () => adjustMaxUses(1), (event) => onSaveVisibilityConfig({ maxUses: Math.max(1, Number(event.target.value || 1)) }), !limitUses)}
-        </span>
-      </div>
-      <div class="manager-rule-row" class:is-disabled={!limitUses} data-books-scrolls-destroy-exhausted-row>
-        <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-trash"></i></span>
-        <span class="manager-rule-copy">
-          <strong>{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete when exhausted')}</strong>
-        </span>
-        <span class="manager-rule-field">
-          {@render ruleToggle('data-books-scrolls-destroy-exhausted', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete when exhausted', destroyWhenExhausted, (next) => onSaveVisibilityConfig({ destroyWhenExhausted: next }), !limitUses)}
-        </span>
-      </div>
-
-      <div class="manager-rule-row" data-books-scrolls-limit-recipes-row>
-        <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-graduation-cap"></i></span>
-        <span class="manager-rule-copy">
-          <strong>{text('FABRICATE.Admin.Manager.BooksScrolls.LearnCap', 'Limited recipes learned per item')}</strong>
-          <span>{text('FABRICATE.Admin.Manager.BooksScrolls.LearnCapHint', 'Cap how many recipes a player can learn from one recipe item.')}</span>
-        </span>
-        <span class="manager-rule-field">
-          {@render ruleToggle('data-books-scrolls-limit-recipes', 'FABRICATE.Admin.Manager.BooksScrolls.LearnCap', 'Limited recipes learned per item', limitRecipes, setLimitRecipes, false)}
-        </span>
-      </div>
-      <div class="manager-rule-row" class:is-disabled={!limitRecipes} data-books-scrolls-max-recipes-row>
-        <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-hashtag"></i></span>
-        <span class="manager-rule-copy">
-          <strong>{text('FABRICATE.Admin.Manager.System.RecipeVisibility.MaxRecipes', 'Maximum recipes')}</strong>
-        </span>
-        <span class="manager-rule-field">
-          {@render ruleStepper('data-books-scrolls-max-recipes', 'FABRICATE.Admin.Manager.System.RecipeVisibility.MaxRecipes', 'Maximum recipes', 'FABRICATE.Admin.Manager.System.RecipeVisibility.MaxRecipesDecrease', 'Decrease maximum recipes', 'FABRICATE.Admin.Manager.System.RecipeVisibility.MaxRecipesIncrease', 'Increase maximum recipes', maxRecipes, () => adjustMaxRecipes(-1), () => adjustMaxRecipes(1), (event) => onSaveVisibilityConfig({ maxRecipes: Math.max(1, Number(event.target.value || 1)) }), !limitRecipes)}
-        </span>
-      </div>
-      <div class="manager-rule-row" class:is-disabled={!limitRecipes} data-books-scrolls-destroy-spent-row>
-        <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-trash"></i></span>
-        <span class="manager-rule-copy">
-          <strong>{text('FABRICATE.Admin.Manager.System.RecipeVisibility.DestroyWhenSpent', 'Delete when spent')}</strong>
-        </span>
-        <span class="manager-rule-field">
-          {@render ruleToggle('data-books-scrolls-destroy-spent', 'FABRICATE.Admin.Manager.System.RecipeVisibility.DestroyWhenSpent', 'Delete when spent', destroyWhenSpent, (next) => onSaveVisibilityConfig({ destroyWhenSpent: next }), !limitRecipes)}
-        </span>
-      </div>
-
-      <!-- Consume-on-learn is incompatible with a learn cap (it deletes the item
-           on the first learn), so it is hidden while the cap is on — the
-           learn-cap Destroy-when-spent option replaces it. -->
-      {#if !limitRecipes}
-        <div class="manager-rule-row" data-books-scrolls-consume-on-learn-row>
-          <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-wand-magic-sparkles"></i></span>
-          <span class="manager-rule-copy">
-            <strong>{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearn', 'Consume item on learn')}</strong>
-            <span>{text('FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearnHint', 'Delete the recipe item when a player learns it.')}</span>
-          </span>
-          <span class="manager-rule-field">
-            {@render ruleToggle('data-books-scrolls-consume-on-learn', 'FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearn', 'Consume item on learn', consumeOnLearn, (next) => onSaveVisibilityConfig({ consumeOnLearn: next }), false)}
-          </span>
-        </div>
-      {/if}
+      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.BooksScrolls.LibraryHint', 'Every recipe item in this system — books, scrolls, or any item type — with its linked recipes. Open one to set its use and learn caps.')}</p>
     </div>
   </section>
 
@@ -231,15 +84,15 @@
         {#each recipeItems as item (item.id)}
           {@const linked = linkedRecipes(item)}
           <!-- The listitem role lives on a plain wrapper div (codebase convention);
-               the interactive card stays a native <button aria-pressed>, so screen
-               readers announce a pressable control with its selected state. -->
+               the interactive card stays a native <button>, so screen readers
+               announce a pressable control that opens the item's page. -->
           <div class="manager-books-scrolls-listitem" role="listitem">
           <button
             type="button"
-            class={`manager-inspector-card manager-books-scrolls-card ${selectedRecipeItemId === item.id ? 'is-selected' : ''}`}
-            aria-pressed={selectedRecipeItemId === item.id}
+            class="manager-inspector-card manager-books-scrolls-card"
             data-books-scrolls-item={item.id}
-            onclick={() => onSelectRecipeItem(item.id)}
+            aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.OpenItem', 'Open {name}').replace('{name}', item.name)}
+            onclick={() => onOpenRecipeItem(item.id)}
           >
             <span class="manager-books-scrolls-identity">
               <img class="manager-books-scrolls-thumb" src={recipeItemImage(item)} alt="" />
@@ -252,28 +105,13 @@
             </span>
 
             <span class="manager-chip-row manager-books-scrolls-chips">
-              <span class={`manager-chip ${limitUses ? 'is-active' : 'is-disabled'}`} data-books-scrolls-use-chip={item.id}>
-                {limitUses
-                  ? text('FABRICATE.Admin.Manager.BooksScrolls.UseCapChip', 'Use cap: {n}').replace('{n}', maxUses)
-                  : text('FABRICATE.Admin.Manager.BooksScrolls.UseCapNone', 'Unlimited uses')}
+              <span class={`manager-chip ${item.caps?.item?.limitUses === true ? 'is-active' : 'is-disabled'}`} data-books-scrolls-use-chip={item.id}>
+                {useCapLabel(item)}
               </span>
-              <span class={`manager-chip ${limitRecipes ? 'is-active' : 'is-disabled'}`} data-books-scrolls-learn-chip={item.id}>
-                {limitRecipes
-                  ? text('FABRICATE.Admin.Manager.BooksScrolls.LearnCapChip', 'Learn cap: {n}').replace('{n}', maxRecipes)
-                  : text('FABRICATE.Admin.Manager.BooksScrolls.LearnCapNone', 'Learn all')}
+              <span class={`manager-chip ${item.caps?.learn?.limitRecipes === true ? 'is-active' : 'is-disabled'}`} data-books-scrolls-learn-chip={item.id}>
+                {learnCapLabel(item)}
               </span>
-              {#if limitRecipes ? destroyWhenSpent : consumeOnLearn}
-                <span class="manager-chip" data-books-scrolls-consume-chip={item.id}>
-                  {limitRecipes
-                    ? text('FABRICATE.Admin.Manager.System.RecipeVisibility.DestroyWhenSpent', 'Delete when spent')
-                    : text('FABRICATE.Admin.Manager.System.RecipeVisibility.ConsumeOnLearn', 'Consume item on learn')}
-                </span>
-              {/if}
-              {#if limitUses && destroyWhenExhausted}
-                <span class="manager-chip" data-books-scrolls-destroy-chip={item.id}>
-                  {text('FABRICATE.Admin.Manager.System.RecipeVisibility.ItemDestroyWhenExhausted', 'Delete when exhausted')}
-                </span>
-              {/if}
+              <span class="manager-books-scrolls-open" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
             </span>
 
             {#if linked.length > 0}
@@ -300,14 +138,6 @@
     overflow: hidden;
   }
 
-  .manager-books-scrolls-rules {
-    margin: 0;
-  }
-
-  .manager-books-scrolls-rules .manager-rule-row.is-disabled {
-    opacity: 0.55;
-  }
-
   .manager-books-scrolls-scroll {
     overflow-y: auto;
     min-height: 0;
@@ -330,10 +160,6 @@
     text-align: left;
     align-items: start;
     cursor: pointer;
-  }
-
-  .manager-books-scrolls-card.is-selected {
-    border-color: var(--fab-mv2-accent);
   }
 
   .manager-books-scrolls-identity {
@@ -368,7 +194,14 @@
   .manager-books-scrolls-chips {
     grid-area: chips;
     justify-content: flex-end;
+    align-items: center;
     flex-wrap: wrap;
+  }
+
+  .manager-books-scrolls-open {
+    display: inline-flex;
+    align-items: center;
+    opacity: 0.6;
   }
 
   .manager-books-scrolls-recipes {

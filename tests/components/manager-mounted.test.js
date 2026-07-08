@@ -84,6 +84,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemCapsCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
@@ -1066,6 +1067,10 @@ function createStore(calls = [], options = {}) {
     saveVisibilityConfig: (patch) => {
       calls.push(['saveVisibilityConfig', patch]);
       return options.saveVisibilityConfigResult ?? true;
+    },
+    updateRecipeItemCaps: (recipeItemId, patch) => {
+      calls.push(['updateRecipeItemCaps', recipeItemId, patch]);
+      return options.updateRecipeItemCapsResult ?? true;
     },
     setResolutionMode: async (mode) => {
       calls.push(['setResolutionMode', mode]);
@@ -5993,23 +5998,35 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  it('lists recipe items with linked recipes and shared cap/flag chips on Books & Scrolls', async () => {
+  it('lists recipe items with linked recipes and per-item cap chips on Books & Scrolls', async () => {
     const calls = [];
     await openBooksScrolls(calls, {
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: true, maxUses: 3, destroyWhenExhausted: true },
-          learn: { limitRecipes: true, maxRecipes: 2, destroyWhenSpent: true, dragDropEnabled: true },
+      // Per-item caps (issue 511): ri1 is a capped cook book, ri2 an uncapped scroll.
+      recipeItemDefinitions: [
+        {
+          id: 'ri1',
+          name: 'Alchemist Cook Book',
+          img: 'icons/sundries/books/book-worn-brown.webp',
+          caps: {
+            item: { limitUses: true, maxUses: 3, destroyWhenExhausted: true },
+            learn: { limitRecipes: true, maxRecipes: 2, destroyWhenSpent: true },
+          },
         },
-      },
+        {
+          id: 'ri2',
+          name: 'Scroll of Elixirs',
+          img: 'icons/sundries/scrolls/scroll-bound-brown.webp',
+          caps: { item: { limitUses: false }, learn: { limitRecipes: false } },
+        },
+      ],
     });
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assert.ok(target.querySelector('[data-books-scrolls]'), 'Books & Scrolls surface renders');
     // The parent nav count reflects the recipe-item definitions (2).
     assert.equal(craftingParent().querySelector('.manager-nav-count').textContent.trim(), '2');
+    // The shared system-wide rules card is gone (caps are per-item now).
+    assert.equal(target.querySelector('[data-books-scrolls-rules]'), null);
 
     // Both recipe items are listed; the first book links recipe r1.
     const cards = Array.from(target.querySelectorAll('[data-books-scrolls-item]'));
@@ -6022,10 +6039,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-books-scrolls-linked-count="ri2"] strong').textContent.trim(),
       '0'
     );
-    assert.ok(target.querySelector('[data-books-scrolls-recipe-list="ri1"]'), 'linked recipe list renders for the book');
     assert.ok(target.textContent.includes('Healing Draught'), 'linked recipe name is shown');
 
-    // The shared cap chips reflect the system-level use cap + learn cap.
+    // Each card's chips reflect that item's OWN caps.
     assert.equal(
       target.querySelector('[data-books-scrolls-use-chip="ri1"]').textContent.trim(),
       'Use cap: 3'
@@ -6034,46 +6050,65 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-books-scrolls-learn-chip="ri1"]').textContent.trim(),
       'Learn cap: 2'
     );
-    // Destroy-when-spent (learn cap on) replaces consume-on-learn in the chip row.
-    assert.ok(target.querySelector('[data-books-scrolls-consume-chip="ri1"]'));
     assert.equal(
-      target.querySelector('[data-books-scrolls-consume-chip="ri1"]').textContent.trim(),
-      'Delete when spent'
+      target.querySelector('[data-books-scrolls-use-chip="ri2"]').textContent.trim(),
+      'Unlimited uses'
     );
-    // Consume-on-learn rule row is hidden while the learn cap is on.
-    assert.equal(target.querySelector('[data-books-scrolls-consume-on-learn-row]'), null);
-    // The inspector aside is suppressed for the self-contained surface.
+    assert.equal(
+      target.querySelector('[data-books-scrolls-learn-chip="ri2"]').textContent.trim(),
+      'Learn all'
+    );
+    // The inspector aside is suppressed for this surface.
     assert.equal(target.querySelector('.manager-inspector'), null);
+
+    // Opening a card navigates to that item's per-item caps page.
+    target.querySelector('[data-books-scrolls-item="ri1"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls-item');
+    assert.ok(target.querySelector('[data-books-scrolls-item]'), 'the per-item page renders');
+    assert.ok(target.querySelector('[data-recipe-item-caps]'), 'the per-item caps card renders');
+    assert.ok(target.textContent.includes('Alchemist Cook Book'), 'the item name heads the page');
   });
 
-  it('live-applies recipe-item rule edits on Books & Scrolls via onSave (no draft)', async () => {
+  it('live-applies per-item cap edits on the Books & Scrolls item page (no draft)', async () => {
     const calls = [];
     await openBooksScrolls(calls, {
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: false },
-          learn: { limitRecipes: false, dragDropEnabled: true },
+      recipeItemDefinitions: [
+        {
+          id: 'ri1',
+          name: 'Alchemist Cook Book',
+          img: 'icons/sundries/books/book-worn-brown.webp',
+          caps: { item: { limitUses: false }, learn: { limitRecipes: false } },
         },
-      },
+      ],
     });
 
-    // Enabling the use cap live-applies a concrete cap in one patch.
+    // Open the item's page.
+    target.querySelector('[data-books-scrolls-item="ri1"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls-item');
+
+    // Enabling the use cap live-applies a concrete cap in one caps patch for THIS item.
     target.querySelector('[data-books-scrolls-limit-uses]').click();
     await tick();
     flushSync();
-    const useCapCall = calls.find((call) => call[0] === 'saveVisibilityConfig' && call[1]?.limitUses === true);
-    assert.ok(useCapCall, 'enabling the use cap should call saveVisibilityConfig with limitUses:true');
-    assert.equal(useCapCall[1].maxUses, 1, 'enabling the use cap should commit a concrete cap');
+    const useCapCall = calls.find(
+      (call) => call[0] === 'updateRecipeItemCaps' && call[1] === 'ri1' && call[2]?.item?.limitUses === true
+    );
+    assert.ok(useCapCall, 'enabling the use cap should call updateRecipeItemCaps for ri1');
+    assert.equal(useCapCall[2].item.maxUses, 1, 'enabling the use cap should commit a concrete cap');
 
-    // Enabling the learn cap live-applies too, and hides consume-on-learn.
+    // Enabling the learn cap live-applies too.
     target.querySelector('[data-books-scrolls-limit-recipes]').click();
     await tick();
     flushSync();
     assert.ok(
-      calls.some((call) => call[0] === 'saveVisibilityConfig' && call[1]?.limitRecipes === true),
-      'enabling the learn cap should call saveVisibilityConfig with limitRecipes:true'
+      calls.some(
+        (call) => call[0] === 'updateRecipeItemCaps' && call[1] === 'ri1' && call[2]?.learn?.limitRecipes === true
+      ),
+      'enabling the learn cap should call updateRecipeItemCaps with learn.limitRecipes:true'
     );
 
     // No dirty-draft discard guard is wired for this live-apply surface.
