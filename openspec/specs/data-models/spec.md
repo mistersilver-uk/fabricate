@@ -1381,6 +1381,24 @@ Requirements:
 2. `learnedAt` must be a valid timestamp.
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
 
+### Alchemy Dead-Ends Flag
+
+A sibling actor flag to `learnedRecipes`, holding the per-character workbench tried-dead-end memory.
+
+```js
+Actor.flags.fabricate.alchemyDeadEnds = {
+  [craftingSystemId: string]: string[],   // canonical `componentId:qty|...` signature keys
+}
+```
+
+Requirements:
+
+1. Each array is append-only and deduped — the canonical key of a submitted multiset is added once per (actor x system).
+2. A key is written only when the matched system's `alchemy.showAttemptHistoryToPlayers === true`, on a fizzled (no-match) brew.
+3. The signature key is the sorted `componentId:qty|...` join of the submitted plain-component multiset (the single shared canonical-key helper).
+4. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is doubly nested under `flags.fabricate.fabricate.alchemyDeadEnds` (the flag helpers prefix `fabricate.`), so it is never read via a raw `actor.flags.fabricate.alchemyDeadEnds` path.
+5. It affects only the client workbench status model (flipping `untried` -> `no-reaction`) and grants no recipe visibility (a fizzle matches no enabled recipe).
+
 ### Discovered Gathering Realms Flag
 
 ```js

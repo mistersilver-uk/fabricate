@@ -246,6 +246,10 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 3. Learning is never granted by failed attempts.
 4. No-signature attempts are treated as failed attempts (not misconfiguration errors).
 5. If a matched alchemy attempt cannot route to a valid result group, classify as crafting-system misconfiguration error (GM-fix required), not a player-failure outcome.
+6. The player listing projection (`AlchemyListingBuilder`) surfaces learned recipes plus the undiscovered **count** only.
+The count is derived behind the viewer-enforcing seam via the System-Validity Gate + Listing Algorithm step-2 enabled filter — the client never receives the undiscovered list to count locally, and no undiscovered name/signature/result reaches any client field.
+7. A fizzled attempt MAY record a per-character dead-end key at `Actor.flags.fabricate.alchemyDeadEnds`, gated by `alchemy.showAttemptHistoryToPlayers`.
+This affects only client-side status feedback (flipping `untried` -> `no-reaction`) and NEVER grants visibility — a fizzle matches no enabled recipe (rule 3 preserved).
 
 ## Discovered Recipe Browsing
 
@@ -256,14 +260,18 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 - Show recipes from selected alchemy system where crafting actor has entry in `learnedRecipes`.
 - GM sees all recipes in panel (consistent with GM-sees-all rule).
 - Searchable by recipe name.
-- "Craftable only" filter: shows only recipes whose requirements can be fully satisfied by full inventory quantities (not inventory minus workbench, since auto-fill clears the workbench first).
+- The "Craftable only" filter is DEFERRED this iteration.
 
 ### Craftability Evaluation
 
 - A discovered recipe is craftable when >= 1 ingredient set can be fully satisfied by full inventory quantities.
 - Evaluate against full inventory, not inventory minus workbench, since auto-fill clears the workbench before populating it.
 
-### Auto-Fill
+### Auto-Fill (a select-to-load selection side effect)
+
+Selecting a discovered recipe auto-loads its signature onto the bench — auto-fill is a side effect of selection, not a separate per-recipe button.
+It is scoped to recipes reducible to a concrete plain-component multiset; a rich signature (alternatives/tags/essences/multiple sets) is shown but not auto-filled (the client fails safe to `untried`).
+The algorithm:
 
 1. Clear the workbench.
 2. For each ingredient group in first satisfiable ingredient set:
@@ -279,8 +287,8 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 
 ### Multi-Set Auto-Fill
 
-- If recipe has multiple ingredient sets, try each in order, use first fully satisfiable.
-- If none fully satisfiable, use set satisfying most groups and report remainder.
+- Multiple ingredient sets are not reducible to a concrete plain-component multiset, so a multi-set recipe is NOT auto-filled this iteration (the client fails safe to `untried`); it is still shown with its full signature summary and still brews via the engine.
+Richer client-side auto-fill for multi-set / alternatives / tags / essences is a deferred follow-up.
 
 ### Information Disclosure
 

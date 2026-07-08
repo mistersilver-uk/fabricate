@@ -207,6 +207,13 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 2. Failed attempts include no-signature failures and failed checks.
 3. Player history visibility is controlled by `alchemy.showAttemptHistoryToPlayers`.
 
+The `alchemy.showAttemptHistoryToPlayers` flag now governs two distinct concepts:
+
+- Its existing role gates player **visibility** of the always-recorded run/attempt history (default true).
+- Additionally, it gates **recording** of the per-character workbench dead-end memory (`Actor.flags.fabricate.alchemyDeadEnds`) — an append-only, deduped array of canonical `componentId:qty|...` signature keys per crafting system, written on a fizzled brew.
+
+The dead-end memory is distinct from run history: it is leak-safe (a fizzle matches no enabled recipe, so it grants no recipe visibility) and is consumed only by the workbench status model to flip an `untried` bench to `no-reaction`.
+
 ## Time and Currency Requirements
 
 - If the system-level requirement toggle is disabled, step-level values are ignored.

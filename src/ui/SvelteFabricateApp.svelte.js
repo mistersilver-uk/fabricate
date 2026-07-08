@@ -6,6 +6,7 @@ import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
 import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
 import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
 import { createInventoryStore } from './svelte/stores/inventoryStore.svelte.js';
+import { createAlchemyStore } from './svelte/stores/alchemyStore.svelte.js';
 import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
 import { notifyWarn, localize } from './svelte/util/foundryBridge.js';
 
@@ -206,6 +207,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       learnRecipeFromInventory: (opts = {}) =>
         game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
       craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      // Player Alchemy tab seams — the leak-safe workbench listing + brew submit +
+      // the persisted active-discipline getter/setter. Foundry-free store consumes
+      // these wrappers only.
+      listAlchemyForActor: (opts = {}) => game?.fabricate?.listAlchemyForActor?.(opts) ?? null,
+      submitAlchemyAttempt: (opts = {}) => game?.fabricate?.submitAlchemyAttempt?.(opts) ?? null,
+      getSelectedAlchemySystemId: () => game?.fabricate?.getSelectedAlchemySystemId?.() ?? '',
+      setSelectedAlchemySystemId: (id) => game?.fabricate?.setSelectedAlchemySystemId?.(id),
       listCraftingSourceActors: () => game?.fabricate?.listCraftingSourceActors?.() ?? [],
       getCraftingSourceActors: () => game?.fabricate?.getCraftingSourceActors?.() ?? [],
       getSelectedCraftingActorId: () => game?.fabricate?.getSelectedCraftingActorId?.() ?? '',
@@ -267,6 +275,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // reads the same seams + sibling craftingSources store) so both tabs agree on
     // what the player owns.
     services.inventory = createInventoryStore({ services });
+    // Player Alchemy tab store. Reads the same crafting actor/source selection as
+    // the crafting + inventory stores (so all three agree on what the player owns)
+    // and owns the workbench/discipline state locally.
+    services.alchemy = createAlchemyStore({ services });
     // Cross-tab navigation for the Inventory tab's "Pin for Crafting" / used-by
     // links: select the recipe in the shared crafting store, then switch to the
     // Crafting tab. Both stores are the same singletons the Crafting tab reads, so

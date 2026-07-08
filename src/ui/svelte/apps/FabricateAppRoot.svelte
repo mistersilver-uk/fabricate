@@ -19,6 +19,7 @@
   } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
   import CraftingView from './crafting/CraftingView.svelte';
+  import AlchemyView from './alchemy/AlchemyView.svelte';
   import JournalView from './journal/JournalView.svelte';
   import InventoryView from './inventory/InventoryView.svelte';
   import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
@@ -107,6 +108,7 @@
       () => {
         services?.crafting?.load?.(true);
         services?.inventory?.load?.(true);
+        services?.alchemy?.load?.(true);
       },
       { isRelevantActor: (actorId) => isRelevantCraftingActor(actorId) }
     )
@@ -121,6 +123,7 @@
       services?.craftingSources?.load?.(true);
       services?.crafting?.load?.(true);
       services?.inventory?.load?.(true);
+      services?.alchemy?.load?.(true);
       services?.journal?.load?.(true);
     })
   );
@@ -158,25 +161,20 @@
         {#if activeTab === tab.id}
           {#if tab.id === 'crafting'}
             <CraftingView {services} />
+          {:else if tab.id === 'alchemy'}
+            <!-- FORWARD-COMPAT NOTE: the Alchemy tab does not yet carry its own
+                 header/context bar. When it gains one (analogous to gathering's
+                 weather/time/region in ActorSelectTopBar), the active station-tool
+                 chip should move into THAT bar's RIGHT side, next to the tab's own
+                 context info. Until then the chip rides in the shared
+                 ActorSelectTopBar right bar (see the gathering pattern there). -->
+            <AlchemyView {services} />
           {:else if tab.id === 'gathering'}
             <GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />
           {:else if tab.id === 'journal'}
             <JournalView {services} />
           {:else if tab.id === 'inventory'}
             <InventoryView {services} />
-          {:else}
-            <!-- Shared placeholder for the (future) Alchemy tab.
-                 FORWARD-COMPAT NOTE: when the planned Alchemy tab
-                 gains its own header/context bar (analogous to gathering's
-                 weather/time/region in ActorSelectTopBar), the active station-tool
-                 chip should move into THAT bar's RIGHT side, next to the tab's own
-                 context info. Until then the chip rides in the shared
-                 ActorSelectTopBar right bar (see the gathering pattern there). -->
-            <div class="fabricate-app-placeholder">
-              <i class="fas {tab.icon}" aria-hidden="true"></i>
-              <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>
-              <p class="fabricate-app-placeholder-hint">{localize('FABRICATE.App.ComingSoon')}</p>
-            </div>
           {/if}
         {/if}
       {/each}
@@ -269,35 +267,5 @@
     min-width: 0;
     min-height: 0;
     overflow: auto;
-  }
-
-  .fabricate-app-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    color: var(--fab-text-muted);
-    opacity: 0.6;
-  }
-
-  .fabricate-app-placeholder i {
-    font-size: 36px;
-  }
-
-  .fabricate-app-placeholder p {
-    margin: 0;
-  }
-
-  .fabricate-app-placeholder-title {
-    font-size: 18px;
-    font-weight: 600;
-  }
-
-  .fabricate-app-placeholder-hint {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
   }
 </style>

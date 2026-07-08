@@ -46,12 +46,12 @@ describe('Fabricate app wiring for the gathering tab', () => {
     );
   });
 
-  it('renders GatheringView on the gathering tab while other tabs keep the placeholder', () => {
+  it('renders GatheringView on the gathering tab (every tab now routes to a real view)', () => {
     assert.ok(rootSource.includes("import GatheringView from './gathering/GatheringView.svelte'"), 'root should import GatheringView');
     assert.ok(rootSource.includes('services = null'), 'root should accept a services prop');
     assert.ok(rootSource.includes("tab.id === 'gathering'"), 'root should branch on the gathering tab');
     assert.ok(rootSource.includes('<GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />'), 'root should render GatheringView with services + the scoped env/task');
-    assert.ok(rootSource.includes('fabricate-app-placeholder'), 'other tabs should keep the placeholder');
+    assert.ok(!rootSource.includes('fabricate-app-placeholder'), 'the coming-soon placeholder is gone now the alchemy tab is implemented');
   });
 });
 

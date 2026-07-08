@@ -1058,11 +1058,18 @@ Each
 
 ### Alchemy Tab
 
+The player Alchemy tab is an IMPLEMENTED route (it replaced the earlier `{:else}` "Coming soon" placeholder in `FabricateAppRoot.svelte`).
+Its content mounts inside `.fabricate-app-content` — the shell's 84px nav rail is NOT part of this grid — so the content is a **three-column** layout `known . workbench . inventory` mirroring the Crafting/Gathering views.
+The sides are compressible (`minmax(230px,280px)` each) with a floored, growable centre (`minmax(340px,1fr)`) so the 340px workbench floor coexists with the 1024px minimum window; it stacks at the `@container (max-width:900px)` breakpoint with the **workbench leading** the stacked order.
+It uses `--fab-*` design tokens only (no hex — see the theme-colour contract).
+
+The a11y contract: the status pill is `aria-live="polite"`; `+` add and `x` remove are real focusable `<button>`s (right-click remove has no keyboard path, so the `x` is the required parity affordance); unavailable inventory rows carry the `disabled` attribute; the drop zone has an accessible name/role plus a non-color dragover cue (a thicker dashed border); chooser cards and "Switch discipline" are real buttons; on Switch, focus moves to the chooser heading; the ready-state `brewpulse` animation honors `prefers-reduced-motion`.
+
 #### Alchemy System Selector
 
-- Shown only when multiple alchemy-mode systems exist.
-- Auto-selects if exactly one alchemy system is available.
-- Persisted in client settings.
+- Shown only when multiple alchemy-mode systems exist; a chooser card per system carries `N known . M total` and an Enter action, and a "Switch discipline" button (shown only with more than one system) returns to the chooser and resets the per-selection workbench state.
+- Auto-enters if exactly one alchemy system is available.
+- Persisted in the `fabricate.lastAlchemySystem` client setting.
 
 #### Component Palette
 
@@ -1079,21 +1086,25 @@ Each
 - Each unique component appears once; adding increments the badge count.
 - Supports: add from palette, remove (right-click or direct action), clear all, submit.
 - Submit triggers signature matching per existing Signature Resolution rules in `004`.
+- Drives the **five-mode status model** (`empty` / `assembling` / `ready` / `untried` / `no-reaction`, per `resolution-modes`) governing the status pill, Produces panel, and Brew button; client mode is advisory and fails safe to `untried` for any non-concrete signature (the engine is authoritative on brew).
+- A brew-in-flight busy/disabled guard on Brew prevents double-submit (mirrors CraftingView's `busy` guard).
 
 #### Discovered Recipes Panel
 
-- Always visible on the right side, with empty state when no recipes have been discovered.
-- Shows recipes from selected alchemy system where crafting actor has entry in `learnedRecipes`.
-- GM sees all recipes in panel (consistent with GM-sees-all rule).
+- Always visible on the left, with a zero-known empty state when no recipes have been discovered.
+- Shows recipes from the selected alchemy system where the crafting actor has an entry in `learnedRecipes` (GM sees all, consistent with GM-sees-all).
 - Searchable by recipe name.
-- "Craftable only" filter: shows only recipes whose requirements can be fully satisfied by palette quantities.
-- Auto-fill action per recipe: populates the workbench from the recipe's ingredient requirements (per Auto-Fill algorithm in `006`).
+- Selecting a known recipe **auto-loads** its signature onto the bench (a selection side effect, not a per-recipe button), scoped to recipes reducible to a concrete plain-component multiset.
+- The "Craftable only" filter is DEFERRED this iteration.
+- The undiscovered-recipe **count** (never names/results/signatures) is shown in a footer.
 - Visibility and learning semantics defined in `006`.
 
-#### Active Runs and History
+#### Active Runs and History (cross-reference reconciliation)
 
-- Filtered to alchemy systems only.
-- The unified Journal screen (see *Journal App*) also surfaces these runs alongside crafting, gathering, and salvage runs; an alchemy run is redacted there for a viewer who has not discovered its recipe.
+- The alchemy tab does NOT host runs or history.
+Run monitoring remains a Journal concern (see *Journal App*); the tab's internal fizzle dead-end memory is not run history.
+- The unified Journal screen surfaces alchemy runs alongside crafting, gathering, and salvage runs; an alchemy run is redacted there for a viewer who has not discovered its recipe.
+- Forward-compat: the active station-tool chip stays in `ActorSelectTopBar` this iteration (the alchemy tab has no header/context bar yet); it migrates to an alchemy header bar if/when one is added.
 
 #### Excluded from Alchemy Tab
 
@@ -1105,7 +1116,9 @@ Each
 ### Alchemy Attempt Feedback
 
 - Must not leak hidden recipe metadata on invalid combinations or failed attempts.
-- No-signature attempts are shown as failed attempts with specific feedback and ingredient consumption.
+- An untried bench and a remembered-fizzle bench are distinguished ONLY by the per-character dead-end memory: an untried set reads `untried` (no confirmation that a reaction exists), and only a remembered fizzle reads `no-reaction`.
+A fizzle brew runs no check and shows no roll animation.
+- No-signature attempts are shown as failed attempts with specific feedback and ingredient consumption per `alchemy.consumeOnFail`.
 - If a matched attempt cannot route to a valid result group, show a misconfiguration error state (GM fix required) rather than a normal player-failure outcome.
 
 ### Learn Flow

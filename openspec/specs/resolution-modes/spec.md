@@ -248,25 +248,41 @@ Signature matching MUST resolve each submission to at most one component through
 - Submit triggers signature matching per existing Signature Resolution rules.
 - On submit, a quantity badge of N contributes N unit submissions (one per unit), so occurrence-based signature matching and consumption observe the displayed quantity.
 
+#### Workbench Status Model (five modes)
+
+- The bench drives a five-mode status model that governs the status pill, the Produces panel, and the Brew affordance: `empty`; `assembling` (the bench is a strict subset of a selected known recipe's signature); `ready` (the bench equals a known signature); `untried` (the bench matches no known recipe AND is not a remembered fizzle); `no-reaction` (the bench matches no known recipe AND IS a remembered fizzle).
+- The projected learned-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, set-level essence requirements, and multiple ingredient sets.
+- **Client mode is advisory; the engine is authoritative on brew.** The client fails safe to `untried` for any signature not reducible to a concrete plain-component multiset (single ingredient set, single-option groups, no essence-only requirement) and NEVER emits a false `ready`/`assembling`.
+The same caveat applies to select-to-load auto-fill.
+- **Hidden dead-end rule.** Undiscovered recipes and never-tried dead-ends BOTH present as `untried`.
+The player projection exposes only learned recipes plus the **count** of undiscovered recipes; no status text, Produces panel, or styling leaks the existence, result, or signature of an undiscovered recipe.
+- **Per-character x system tried-dead-end memory.** `Actor.flags.fabricate.alchemyDeadEnds` is an append-only, deduped array of canonical `componentId:qty|...` keys per system, written on a fizzled brew only when `alchemy.showAttemptHistoryToPlayers === true`.
+It is the ONLY thing that flips `untried` -> `no-reaction`; it grants no visibility (a fizzle matches no enabled recipe) and is consumed solely by the client status model.
+
 #### Alchemy System Selection
 
-- Required when multiple alchemy-mode systems exist.
-- Selector shows only `resolutionMode === "alchemy"` systems.
-- Determines which components appear in palette.
-- Auto-selects if exactly one alchemy system.
-- Persisted in client settings (like `lastCraftingActor` and `lastComponentSources`).
+- Required when multiple alchemy-mode (crafting) systems exist: a chooser presents one card per system (icon, name, `N known . M total`, blurb, Enter).
+- A "Switch" affordance returns to the chooser and resets the per-selection workbench state (bench, selection, last-brew, search); it is shown only when more than one alchemy system exists.
+- Selector shows only `resolutionMode === "alchemy"` systems and determines which components appear in the palette.
+- Auto-enters when exactly one alchemy system exists.
+- Persisted in the `fabricate.lastAlchemySystem` client setting (like `lastCraftingActor` and `lastComponentSources`).
+Canonical text uses "alchemy (crafting) system"; "discipline" is reserved for player-facing copy only.
 
 #### Discovered Recipes Panel
 
 - Panel is always visible, even when no recipes have been discovered yet.
-- Shows an encouraging empty state message (e.g., "No recipes discovered yet — experiment with ingredients to discover new recipes").
+- Shows an encouraging empty state message (e.g., "No recipes discovered yet — experiment on the bench to discover recipes").
 - Once recipes are discovered, the empty state is replaced by the searchable list.
-- "Craftable only" filter and auto-fill action are defined in `003` and `006`.
+- Selecting a known recipe **auto-loads** its signature onto the bench (auto-fill is a selection side effect, not a separate per-recipe button), scoped to recipes reducible to a concrete plain-component multiset.
+- The "Craftable only" filter is DEFERRED this iteration.
 
 #### Tab Feature Scope
 
-- Includes: palette, workbench, discovered recipes panel (always visible, with craftable-only filter and auto-fill), active runs, history.
+- Includes: component inventory, workbench, and the known-recipes list.
+- Recorded run/attempt **history stays a Journal concern** — the tab has NO history panel and NO active-runs surface.
+Its only local memory is the internal fizzle dead-end set (which is not run history).
 - Excludes: shopping list, recipe browsing, recents, favourites.
+- This is a deliberate narrowing from the earlier "active runs, history" scope.
 
 ### Validation
 

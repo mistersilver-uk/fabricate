@@ -1,8 +1,10 @@
+import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
 import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakageRuntime.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
@@ -1219,6 +1221,18 @@ export class CraftingEngine {
     const shouldConsume = alchemyCfg.consumeOnFail !== false;
 
     if (!matchResult.matched) {
+      // Fizzle: this concrete submitted multiset matches NO enabled recipe. Record
+      // a per-character x system dead-end key (gated by showAttemptHistoryToPlayers)
+      // so the workbench can flip this exact set from `untried` -> `no-reaction` on a
+      // re-brew. The fizzle branch runs NO check and returns `disposition:'no-match'`
+      // with no roll, so the UI must not show a roll animation on this path.
+      await this._recordAlchemyDeadEnd(
+        craftingActor,
+        systemId,
+        submittedItems,
+        components,
+        alchemyCfg
+      );
       if (shouldConsume) {
         await this._consumeSubmittedAlchemyItems(componentSourceActors, submittedItems);
       }
@@ -1413,6 +1427,62 @@ export class CraftingEngine {
         }
       }
     }
+  }
+
+  /**
+   * Map submitted items to a plain-component multiset `{ componentId: units }` by
+   * matching each submission's source references against the system components,
+   * mirroring the per-unit occurrence counting {@link _matchAlchemySignature} uses.
+   * A submission that resolves to no component is skipped.
+   * @private
+   */
+  _submittedComponentMultiset(submittedItems, components) {
+    const componentByRef = new Map();
+    for (const component of Array.isArray(components) ? components : []) {
+      for (const ref of getComponentSourceReferences(component)) {
+        if (!componentByRef.has(ref)) componentByRef.set(ref, component.id);
+      }
+    }
+    const multiset = {};
+    for (const item of Array.isArray(submittedItems) ? submittedItems : []) {
+      const refs = new Set(getItemSourceReferences(item));
+      if (item?.sourceUuid) refs.add(item.sourceUuid);
+      let componentId = null;
+      for (const ref of refs) {
+        if (componentByRef.has(ref)) {
+          componentId = componentByRef.get(ref);
+          break;
+        }
+      }
+      if (!componentId) continue;
+      multiset[componentId] = (multiset[componentId] || 0) + 1;
+    }
+    return multiset;
+  }
+
+  /**
+   * Record a fizzled alchemy attempt's canonical signature key on the crafting
+   * actor, under a per-system append-only, deduped array
+   * (`alchemyDeadEnds[craftingSystemId] = [signatureKey]`). Written ONLY when the
+   * system's `showAttemptHistoryToPlayers` is true, via `getFabricateFlag` /
+   * `setFabricateFlag` (the effective stored path is doubly-nested under
+   * `flags.fabricate.fabricate.alchemyDeadEnds`). No-ops on an empty key, a
+   * duplicate key, or an actor without flag support.
+   * @private
+   */
+  async _recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, components, alchemyCfg) {
+    if (alchemyCfg?.showAttemptHistoryToPlayers !== true) return;
+    if (!systemId || typeof craftingActor?.setFlag !== 'function') return;
+    const key = canonicalSignatureKey(this._submittedComponentMultiset(submittedItems, components));
+    if (!key) return;
+    const deadEnds = getFabricateFlag(craftingActor, 'alchemyDeadEnds', {});
+    const current = deadEnds && typeof deadEnds === 'object' ? deadEnds : {};
+    const forSystem = Array.isArray(current[systemId]) ? current[systemId] : [];
+    if (forSystem.includes(key)) return;
+    await setFabricateFlag(craftingActor, 'alchemyDeadEnds', {
+      ...current,
+      [systemId]: [...forSystem, key],
+    });
   }
 
   /**

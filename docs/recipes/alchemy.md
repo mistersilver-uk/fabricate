@@ -21,8 +21,8 @@ Use alchemy mode for systems where recipes are secrets, such as a witch's grimoi
 
 Alchemy recipes and systems are authored mainly through the API today.
 An early GM recipe editor in the Crafting Admin panel can edit a recipe's identity and link a recipe item, but full recipe authoring is still in progress.
-A player-facing Alchemy tab is planned and not yet available.
-Alchemy crafting works through the API today.
+Players craft alchemy from the Alchemy Workbench, a tab in the Fabricate window.
+See [The Alchemy Workbench](#the-alchemy-workbench) below.
 
 A submitted combination is a set of items chosen by the player for a crafting character.
 Fabricate uses those items to match recipes and to consume the submitted inventory when the system is set up to do so.
@@ -85,6 +85,109 @@ That learned state can be read to show discovered recipes and help players repro
 
 This setting also lives under the system's Alchemy options.
 See the [System Manager API reference]({% link api/system-manager.md %}) for the API that updates a system.
+
+---
+
+## The Alchemy Workbench
+
+The Alchemy Workbench is where players experiment with alchemy.
+It is a tab in the Fabricate window, alongside Crafting, Gathering, and the other player tabs.
+Open the Fabricate window, choose the Alchemy tab, then pick a character you own in the actor-selection bar at the top.
+
+The workbench has three columns.
+
+- **Known recipes** on the left lists every recipe this character has discovered, with the ingredients and result for each.
+- **Workbench** in the middle is the bench where you place components and brew them.
+- **Your components** on the right lists the alchemy components this character is carrying.
+
+On a narrow window the three columns stack, with the workbench on top.
+
+### Choosing a discipline
+
+Each alchemy crafting system is presented to players as a **discipline**.
+
+When only one alchemy discipline is set up, the workbench opens straight into it.
+When more than one exists, Fabricate first shows a **Choose a discipline** screen with a card for each one.
+Each card shows the discipline's name and how many of its recipes you have discovered out of the total that exist.
+Choose a card and select **Enter** to open that discipline's workbench.
+
+Once you are in a discipline, a **Switch discipline** button lets you return to the chooser and pick another.
+Switching clears the bench and your current selection, and everything on screen then refers to the new discipline.
+The workbench remembers the last discipline you used on this device.
+
+### Learning recipes
+
+A character learns alchemy recipes in two ways.
+
+- **By experimentation.** Combine components on the bench and brew them.
+If the combination matches a recipe, that recipe is discovered and added to your Known recipes list.
+- **By reading books and scrolls.** Some recipes are taught by an in-world item, such as a recipe book or a scroll.
+Learn these from the **Inventory** tab, and they appear in your Known recipes list too.
+See [Recipe Discovery]({% link how-to/recipe-discovery.md %}) for how books and scrolls are set up and learned.
+
+Until a character has discovered a recipe, the Known recipes list shows an encouraging empty state that invites them to experiment on the bench.
+
+Below the list, a count tells you how many recipes in this discipline are still undiscovered.
+You are never shown the names, ingredients, or results of a recipe you have not discovered.
+That count is the only hint that there is more to find.
+
+### Building a combination
+
+Add a component to the bench by tapping it in Your components, or by dragging it onto the bench.
+Each component in Your components shows how many are available, which is how many you are carrying minus how many you have already placed.
+Placing a component reduces the available count, and a component with none available cannot be added.
+
+Remove a placed component with its remove control, or by right-clicking it.
+**Clear** empties the bench in one step.
+
+Selecting a recipe in your Known recipes list loads its ingredients onto the bench when the recipe uses a single, fixed set of components, so you can brew a recipe you already know without hunting for its parts.
+A recipe that accepts alternative or optional ingredients still shows its full ingredient list for you to assemble by hand.
+
+### Reading the status
+
+As you build a combination, a status message describes what Fabricate can tell you about it.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Status | What it means |
+|:------------|:-------------------------------------------------------------------------|
+| Empty | Nothing is on the bench yet. Place components to begin. |
+| Assembling | The bench is part of a recipe you know. Add the components it still needs. |
+| Ready | The bench exactly matches a recipe you know. It is ready to brew. |
+| Untried | You have not brewed this exact combination before. Brew it to find out what it does. |
+| No reaction | You have brewed this exact combination before and it produced nothing. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+{: .note }
+> For recipes that accept alternative or optional ingredients, the status can stay on **Untried** even when your combination would work.
+Brewing still checks the combination properly, so you can always brew and see what happens.
+
+### You are never told a combination does nothing until you try it
+
+Alchemy keeps its secrets.
+An undiscovered recipe and a combination that truly makes nothing look exactly the same before you brew them.
+Both read as **Untried**.
+The workbench never hints that a mix is a dead end, and it never hints that an undiscovered recipe is close.
+
+A combination reads **No reaction** only after this character has already brewed that exact combination and seen it fizzle.
+Fabricate remembers a character's fizzled combinations so it can tell them apart from combinations they have never tried.
+This memory is kept per character, and it is turned on by the GM's **Show attempt history to players** option for the alchemy system.
+When that option is off, a combination that makes nothing keeps reading as **Untried** every time, and the workbench never confirms that it is a dead end.
+
+### Brewing
+
+**Brew** submits the components on the bench as an attempt for the selected character.
+
+- If the combination matches a recipe, that recipe is crafted.
+Its ingredients are consumed, its results are created, and a newly discovered recipe is added to your Known recipes list.
+- If the combination matches nothing, the attempt fizzles.
+Whether the components are consumed then depends on the system's [Consume on Fail](#consume-on-fail) setting.
+
+When the alchemy system uses a crafting check, brewing a matching recipe prompts you to roll, the same way a check works elsewhere in Fabricate.
+A combination that fizzles never runs a check, so there is no roll when an untried mix turns out to make nothing.
+
+A banner confirms the outcome after each brew, telling you whether you discovered a recipe, brewed a known one, or the mixture fizzled.
 
 ---
 

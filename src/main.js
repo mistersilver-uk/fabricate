@@ -30,6 +30,7 @@ import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
+import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
 import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
@@ -41,6 +42,8 @@ import {
   resolveGatheringResultSource,
   gatheringRunItemRef
 } from './gatheringResultCreation.js';
+import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
+import { findStackableMatch } from './utils/sourceUuid.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSceneAccess,
@@ -1316,6 +1319,127 @@ class Fabricate {
       ingredientSetId,
       interactive,
     });
+  }
+
+  /**
+   * Lazily build (and cache) the {@link AlchemyListingBuilder} that projects the
+   * leak-safe player Alchemy workbench view. Mirrors
+   * {@link Fabricate#_getCraftingListingBuilder}: a Foundry-global-free read-side
+   * collaborator wired with the existing managers. `localize` is injected here.
+   *
+   * @returns {AlchemyListingBuilder}
+   * @private
+   */
+  _getAlchemyListingBuilder() {
+    if (this._alchemyListingBuilder) return this._alchemyListingBuilder;
+    this._alchemyListingBuilder = new AlchemyListingBuilder({
+      recipeManager: this.recipeManager,
+      craftingSystemManager: this.craftingSystemManager,
+      localize: (key, data) =>
+        data !== undefined
+          ? (game.i18n?.format?.(key, data) ?? key)
+          : (game.i18n?.localize?.(key) ?? key),
+    });
+    return this._alchemyListingBuilder;
+  }
+
+  /**
+   * Build the leak-safe player Alchemy workbench listing for the current user and
+   * selected crafting actor + component sources, scoped to `craftingSystemId`. The
+   * current Foundry user is always the viewer (GM bypass honoured by the builder),
+   * and the actor is resolved through the SAME owner gate as crafting
+   * ({@link Fabricate#_resolveCraftingActor}) — a non-owner viewer's actor resolves
+   * to null, so the builder returns a denied, empty listing (never another user's
+   * inventory or fizzle memory).
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.actorId] Crafting actor id; defaults to the
+   *   persisted last-crafting selection when omitted.
+   * @param {string|null} [options.craftingSystemId] The chosen alchemy (crafting) system.
+   * @param {string[]|null} [options.componentSourceActorIds] Additional inventory
+   *   source actor ids; defaults to the persisted component-source set.
+   * @returns {object} Leak-safe alchemy listing model.
+   */
+  listAlchemyForActor({ actorId = null, craftingSystemId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    return this._getAlchemyListingBuilder().buildListing({
+      craftingActor,
+      componentSourceActors,
+      viewer: game.user,
+      craftingSystemId,
+    });
+  }
+
+  /**
+   * Submit a workbench of components as an alchemy brew attempt. Owner-scoped like
+   * {@link Fabricate#craftRecipe}: resolves the crafting actor + component sources
+   * (or persisted defaults), maps each submitted component id to an owned item unit
+   * on the sources, then delegates to {@link CraftingEngine#craftAlchemy}, which is
+   * authoritative — it matches against ALL enabled recipes (known + undiscovered),
+   * discovers + consumes + produces on a match, and fizzles (no check, no roll,
+   * `disposition:'no-match'`) otherwise.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id.
+   * @param {string} options.craftingSystemId Alchemy system to match against.
+   * @param {string[]} [options.submittedComponentIds] One component id per placed
+   *   unit (a stack of N contributes the id N times).
+   * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
+   * @param {boolean} [options.interactive] Prompt an interactive roll on a matched
+   *   brew (the workbench passes true). Defaults to false for API/automation. A
+   *   fizzle runs no check, so this flag never triggers a roll on the fizzle path.
+   * @returns {Promise<object>} The craftAlchemy result.
+   */
+  async submitAlchemyAttempt({
+    actorId = null,
+    craftingSystemId = null,
+    submittedComponentIds = [],
+    componentSourceActorIds = null,
+    interactive = false,
+  } = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    if (!craftingActor) {
+      return { success: false, results: null, message: 'No crafting actor selected', disposition: 'error' };
+    }
+    const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
+    const system = this.craftingSystemManager?.getSystem?.(craftingSystemId) ?? null;
+    const components = Array.isArray(system?.components) ? system.components : [];
+    const submittedItems = resolveAlchemySubmissions(sources, components, submittedComponentIds);
+    if (submittedItems.length === 0) {
+      return { success: false, results: null, message: 'FABRICATE.App.Alchemy.NoIngredients', disposition: 'error' };
+    }
+    return await this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
+      craftingSystemId,
+      interactive,
+    });
+  }
+
+  /**
+   * Read the persisted last-selected alchemy system (`LAST_ALCHEMY_SYSTEM` client
+   * setting). Returns an empty string when unset.
+   *
+   * @returns {string}
+   */
+  getSelectedAlchemySystemId() {
+    return getSetting(SETTING_KEYS.LAST_ALCHEMY_SYSTEM) || '';
+  }
+
+  /**
+   * Persist the selected alchemy system (`LAST_ALCHEMY_SYSTEM`).
+   *
+   * @param {string} id Crafting system id to persist.
+   * @returns {*}
+   */
+  setSelectedAlchemySystemId(id) {
+    return setSetting(SETTING_KEYS.LAST_ALCHEMY_SYSTEM, id ?? '');
   }
 
   /**
