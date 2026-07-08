@@ -144,6 +144,76 @@ test('_normalizeRecipeVisibility keeps destroyWhenSpent distinct from the item d
   assert.equal(normalized.knowledge.learn.destroyWhenSpent, false);
 });
 
+// ---------------------------------------------------------------------------
+// Per-recipe-item caps (issue 511) — model normalization
+// ---------------------------------------------------------------------------
+
+test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is authored', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  const def = manager._normalizeRecipeItemDefinition({
+    id: 'recipe-item-1',
+    name: 'Formula Book',
+    sourceItemUuid: 'Compendium.world.formulas.book-1'
+  });
+
+  assert.deepEqual(def.caps, {
+    item: { limitUses: false, maxUses: undefined, destroyWhenExhausted: false },
+    learn: {
+      consumeOnLearn: true,
+      limitRecipes: false,
+      maxRecipes: undefined,
+      destroyWhenSpent: false
+    }
+  });
+});
+
+test('_normalizeRecipeItemDefinition round-trips authored per-item caps', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  const def = manager._normalizeRecipeItemDefinition({
+    id: 'recipe-item-1',
+    name: 'Formula Book',
+    sourceItemUuid: 'Compendium.world.formulas.book-1',
+    caps: {
+      item: { limitUses: true, maxUses: 3, destroyWhenExhausted: true },
+      learn: {
+        consumeOnLearn: false,
+        limitRecipes: true,
+        maxRecipes: 2,
+        destroyWhenSpent: true
+      }
+    }
+  });
+
+  assert.equal(def.caps.item.limitUses, true);
+  assert.equal(def.caps.item.maxUses, 3);
+  assert.equal(def.caps.item.destroyWhenExhausted, true);
+  assert.equal(def.caps.learn.consumeOnLearn, false);
+  assert.equal(def.caps.learn.limitRecipes, true);
+  assert.equal(def.caps.learn.maxRecipes, 2);
+  assert.equal(def.caps.learn.destroyWhenSpent, true);
+});
+
+test('_normalizeRecipeItemCaps keeps a finite positive learn maxRecipes only when limitRecipes is on', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  const capOff = manager._normalizeRecipeItemCaps({
+    learn: { limitRecipes: false, maxRecipes: 4 }
+  });
+  assert.equal(capOff.learn.maxRecipes, undefined);
+
+  const nonPositive = manager._normalizeRecipeItemCaps({
+    learn: { limitRecipes: true, maxRecipes: 0 }
+  });
+  assert.equal(nonPositive.learn.maxRecipes, undefined);
+
+  const enabled = manager._normalizeRecipeItemCaps({
+    learn: { limitRecipes: true, maxRecipes: 4 }
+  });
+  assert.equal(enabled.learn.maxRecipes, 4);
+});
+
 test('addRecipeItemFromUuid adds a recipe item definition without creating a component', async () => {
   globalThis.fromUuid = async (uuid) => ({
     documentName: 'Item',

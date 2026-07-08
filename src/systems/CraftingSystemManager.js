@@ -902,6 +902,38 @@ export class CraftingSystemManager {
     return normalized;
   }
 
+  // Per-recipe-item use/learn caps (issue 511). Each recipe item definition owns
+  // its own caps rather than sharing one system-wide config, so a cookbook and a
+  // scroll can differ. The `item` (craft-charge) and `learn` sub-shapes mirror the
+  // legacy system-wide `recipeVisibility.knowledge.item` / `.learn` normalization
+  // exactly, so a migrated system round-trips its old values unchanged. `learn`
+  // deliberately omits `dragDropEnabled` — that stays a system-level knowledge
+  // setting. Absent caps normalize to uncapped (the safe default for new items).
+  _normalizeRecipeItemCaps(caps = {}) {
+    const item = caps?.item || {};
+    const learn = caps?.learn || {};
+    return {
+      item: {
+        limitUses: item.limitUses === true,
+        maxUses: Number.isFinite(Number(item.maxUses)) ? Number(item.maxUses) : undefined,
+        destroyWhenExhausted: item.destroyWhenExhausted === true,
+      },
+      learn: {
+        consumeOnLearn: learn.consumeOnLearn !== false,
+        // `destroyWhenSpent` (learn) is deliberately named distinctly from
+        // `destroyWhenExhausted` (item/craft-charges) — do not normalize to one name.
+        limitRecipes: learn.limitRecipes === true,
+        maxRecipes:
+          learn.limitRecipes === true &&
+          Number.isFinite(Number(learn.maxRecipes)) &&
+          Number(learn.maxRecipes) > 0
+            ? Number(learn.maxRecipes)
+            : undefined,
+        destroyWhenSpent: learn.destroyWhenSpent === true,
+      },
+    };
+  }
+
   _normalizeRecipeItemDefinition(entry, usedIds = new Set()) {
     if (!entry || typeof entry !== 'object') return null;
 
@@ -918,6 +950,7 @@ export class CraftingSystemManager {
       description: this._normalizeComponentDescription(entry.description),
       img: String(entry.img || '').trim() || 'icons/svg/item-bag.svg',
       sourceItemUuid,
+      caps: this._normalizeRecipeItemCaps(entry.caps),
     };
   }
 
