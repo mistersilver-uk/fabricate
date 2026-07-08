@@ -19,11 +19,14 @@ This spec governs:
 
 From `002-data-models.md`:
 
-- `CraftingSystem.recipeVisibility` (strategy only: `listMode`, `knowledge.mode`, `knowledge.learn.dragDropEnabled`)
+- `CraftingSystem.visibilityMode` (canonical flat strategy: `global` | `restricted` | `item` | `knowledge`)
+- `CraftingSystem.recipeVisibility` (legacy strategy, superseded by `visibilityMode`; read as a derivation fallback: `listMode`, `knowledge.mode`, `knowledge.learn.dragDropEnabled`)
 - `CraftingSystem.recipeItemDefinitions`
-- `RecipeItemDefinition.caps` (per-recipe-item use/learn caps)
-- `Recipe.visibility`
-- `Recipe.recipeItemId`
+- `RecipeItemDefinition.recipeIds` (canonical recipe↔book membership, many-to-many)
+- `RecipeItemDefinition.caps` (per-recipe-item use/learn caps, including `caps.learn.prerequisite`)
+- `Recipe.access` (canonical restricted-mode grants: `characterIds`, `playerIds`)
+- `Recipe.visibility` (legacy restricted-mode player list; `access` read-forward source)
+- `Recipe.recipeItemId` (legacy; removed by the 1.13.0 migration, read as an un-migrated fallback)
 - `Recipe.locked`
 - `Actor.flags.fabricate.learnedRecipes`
 - `Item._stats.compendiumSource` (Foundry v12+, primary source UUID field)
@@ -64,20 +67,43 @@ The second condition covers compendium-derived copies.
 On Foundry v12+, `_stats.compendiumSource` carries this value; on v11, `flags.core.sourceId` carries it.
 The resolver handles both transparently.
 
-> Authoring note (no behavioural change): the GM recipe editor (Manager) authors `recipe.recipeItemId` directly — dropping a Foundry Item links or replaces it via `addRecipeItemFromUuid` (which synthesizes or dedups the `RecipeItemDefinition` and resolves its `sourceItemUuid`), and unlinking nulls `recipe.recipeItemId` without deleting the shared definition.
-When the linked definition's `sourceItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the link.
+> Authoring note (issue 511, PR-B): recipe↔book membership is authored **book-side** on the Books & Scrolls item Contents tab — each recipe item definition owns a `recipeIds[]` list of the recipes it contains.
+The recipe editor no longer writes a book link.
+When a definition's `sourceItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the reference.
 The matching rules above are unchanged; UI rendering specifics defer to `ui-integration`.
+
+## Visibility Mode (Canonical Strategy)
+
+`CraftingSystem.visibilityMode` is the **canonical** recipe-visibility strategy (issue 511, PR-B): a single flat enum `global` | `restricted` | `item` | `knowledge` that supersedes the legacy compound `recipeVisibility.listMode` + `knowledge.mode` pair.
+
+- `global` — every enabled recipe is visible to all players.
+- `restricted` — recipes are gated by per-recipe/character grants (the legacy `player` list mode; see Restricted Visibility below).
+- `item` — a player may craft a recipe only while holding a book/scroll linked to it; the book grants **crafting-by-holding** (a use cap may apply) and offers no Learn affordance.
+- `knowledge` — a player must **learn** the recipe from a linked book/scroll; the book offers a Learn affordance (a learn cap may apply).
+
+Resolution: when a system carries an authored `visibilityMode`, it wins; otherwise the runtime derives one from the legacy fields — `player` → `restricted`, `knowledge`+`item` → `item`, `knowledge`+(`learned`|`itemOrLearned`) → `knowledge`, `global` → `global`, missing/unknown → `global` (`teaser` keeps its own Discovery-Mode runtime).
+The `1.12.0` migration seeds `visibilityMode` from the legacy block once (mapping `player`→`restricted`, `knowledge`+`item`→`item`, `knowledge`+learning→`knowledge`, `teaser`→`global`, absent/invalid→`knowledge`) and leaves `recipeVisibility` in place for its residual `dragDropEnabled`.
+
+The player book affordances (Learn vs Craft) are classified from this flat mode by the inventory builder: `item` books list Craft controls and their craft-use limit, `knowledge` books list Learn controls and their learn limit, and `global`/`restricted` systems project no book rows.
+
+## Recipe↔Book Membership
+
+The recipes a book/scroll contains are the canonical many-to-many membership `RecipeItemDefinition.recipeIds[]` (issue 511, PR-B) — a recipe may belong to several books, and each book carries its own caps.
+The runtime reads `recipeIds[]`; it falls back to the legacy scalar reverse ref (`recipe.recipeItemId`, or `recipe.linkedRecipeItemUuid` → a definition `sourceItemUuid`) **only** for a fully un-migrated system where no book carries `recipeIds` yet.
+The `1.13.0` migration inverts each recipe's former book onto `recipeIds` and strips `recipe.recipeItemId` unconditionally; it strips `recipe.linkedRecipeItemUuid` only when that uuid itself resolved a book, preserving a `linkedRecipeItemUuid` that instead links a standalone alchemy formula item.
 
 ## Recipe-Item Cap Resolution
 
 The use cap (craft charges) and the learn cap are **per recipe item**, not a single system-wide config.
-They are read from the recipe's linked definition (`recipe.recipeItemId` → `RecipeItemDefinition.caps`), so two recipe items in one crafting system may enforce different caps.
+They are read from the recipe's member book definition (`RecipeItemDefinition.recipeIds` → that definition's `caps`), so two books in one crafting system may enforce different caps.
+Because membership is many-to-many, the learn/use paths anchor caps on the **specific owned book** the reader holds (`_matchDefinitionForItem` selects the definition whose `sourceItemUuid` matches the owned item), falling back to the recipe's first member book.
 
-Cap resolution **fails closed**: when a recipe has no `recipeItemId`, or the id resolves to no `RecipeItemDefinition`, the caps default to uncapped (unlimited uses, no learn cap, `consumeOnLearn` on).
+Cap resolution **fails closed**: when a recipe resolves to no `RecipeItemDefinition`, the caps default to uncapped (unlimited uses, no learn cap, `consumeOnLearn` on).
 An unresolved link therefore never bricks a recipe with a zero budget.
 
-The per-**document** runtime counters are unchanged by this move: craft charges still accumulate in `Item.flags.fabricate.recipeItemUsage.timesUsed`, and the learn budget still accumulates in `Item.flags.fabricate.recipeItemLearning.learnedCount`.
+The per-**document** runtime counters are unchanged by this move: craft charges accumulate in `Item.flags.fabricate.recipeItemUsage.timesUsed`, and the `perInstance`-scope learn budget accumulates in `Item.flags.fabricate.recipeItemLearning.learnedCount`.
 Both counters live on the physical item document, accumulate across every holder, and survive transfer.
+A `caps.learn.learnScope === "total"` learn cap instead draws every actor's learns from one GM-authoritative shared world pool keyed `system::defId` (the recipe-item party learn pool), not the per-document counter.
 Only the cap *configuration* moved from the system config onto each recipe item definition.
 
 ## Visibility Evaluation
@@ -138,24 +164,29 @@ Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentS
    - GM sees all recipes.
    - Non-GM sees all enabled recipes.
 No restriction or knowledge filtering is applied.
-4. If `listMode === "player"`:
-   - GM sees all recipes, including restricted recipes with empty allow-lists.
-   - Non-GM sees recipes where `visibility.restricted === false`, or where `allowedUserIds` includes the viewer's user ID.
-   - When `visibility.restricted === true` and `allowedUserIds` is empty, no non-GM user can see the recipe.
-5. If `listMode === "knowledge"`:
+4. If the mode is `restricted` (flat `visibilityMode === "restricted"`, or the legacy `listMode === "player"`):
+   - GM sees all recipes, including restricted recipes with no grants.
+   - A non-GM sees a recipe when the recipe's per-recipe `access` grant admits them (`_isRecipeVisibleByAccessGrant`): the viewer's **user id** is in `access.playerIds`, OR the viewer **controls** an actor in `access.characterIds`.
+   - "Controls" (`_viewerControlsCharacter`) means the actor is the viewer's assigned character (`viewer.character`) OR the viewer holds Foundry `OWNER` permission on it.
+   - When a recipe has both grant lists empty (and no legacy fallback), no non-GM user can see it.
+   - Legacy fallback: when a recipe carries no `access` grant object, the old `visibility.restricted` / `allowedUserIds` player-list gate applies (an unrestricted recipe is visible; otherwise the viewer's user id must be in `allowedUserIds`).
+5. If the mode is `item` or `knowledge` (flat `visibilityMode`, or the legacy `listMode === "knowledge"`):
    - Evaluate knowledge access for each recipe.
    - Keep only recipes where access is granted.
 6. Keep locked recipes visible but not craftable for non-GMs.
 
 ### Restricted Visibility Examples
 
-| `restricted` | `allowedUserIds` | GM sees? | Player "abc" sees? | Notes                                                                            |
-|--------------|------------------|----------|--------------------|----------------------------------------------------------------------------------|
-| `false`      | (any)            | Yes      | Yes                | Unrestricted; allow-list ignored                                                 |
-| `true`       | `["abc", "def"]` | Yes      | Yes                | Player is in allow-list                                                          |
-| `true`       | `["def"]`        | Yes      | No                 | Player is not in allow-list                                                      |
-| `true`       | `[]`             | Yes      | No                 | Valid config: hidden from all non-GM users                                       |
-| `true`       | missing/null     | Yes      | No                 | Invalid shape: treated as validation error at save time; runtime treats as empty |
+Restricted mode grants access through the per-recipe `access = { characterIds, playerIds }` object.
+The examples below use viewer `U` (user id `"U"`) who controls actor `A` (assigned character or `OWNER`).
+
+| `access.playerIds` | `access.characterIds` | GM sees? | Viewer `U` sees? | Notes                                                    |
+|--------------------|-----------------------|----------|------------------|----------------------------------------------------------|
+| `["U"]`            | `[]`                  | Yes      | Yes              | `U`'s user id is granted directly                        |
+| `[]`               | `["A"]`               | Yes      | Yes              | `U` controls a granted character                         |
+| `["X"]`            | `["B"]`               | Yes      | No               | `U` is not granted and controls no granted character     |
+| `[]`               | `[]`                  | Yes      | No               | No grants: hidden from all non-GM users                  |
+| (no `access`)      | (no `access`)         | Yes      | per legacy       | Falls back to `visibility.restricted` / `allowedUserIds` |
 
 ### Crafting Guard Algorithm
 
@@ -172,11 +203,11 @@ Before starting/resuming a run and before each step:
    - non-GM users cannot bypass visibility by directly targeting hidden recipe IDs.
 2. Re-run listing visibility checks for the active mode.
 3. For non-GM users, reject locked recipes regardless of list mode.
-4. If `listMode === "global"`, no additional filtering beyond step 3.
+4. If the mode is `global`, no additional filtering beyond step 3.
 Non-GM users may craft any unlocked, enabled recipe.
-5. If `listMode === "player"`, re-run restricted visibility checks.
-Reject if the viewer is not in `allowedUserIds` for a restricted recipe.
-6. If `listMode === "knowledge"`, re-run knowledge access evaluation.
+5. If the mode is `restricted`, re-run the access-grant check.
+Reject when the recipe's `access` grant does not admit the viewer — the viewer's user id is not in `access.playerIds` and the viewer controls no actor in `access.characterIds` (legacy fallback: not in `allowedUserIds` for a restricted recipe).
+6. If the mode is `item` or `knowledge`, re-run knowledge access evaluation.
 Reject if knowledge access is denied.
 7. Reject execution when any guard fails.
 
@@ -250,9 +281,9 @@ Algorithm:
 1. If the viewer is GM, grant access.
 2. Compute `hasLearned` from `Actor.flags.fabricate.learnedRecipes`.
 3. Compute `hasMatchedItem`:
-   - If `recipeItemId` missing: false.
-   - Resolve `recipeItemDefinition` from `craftingSystem.recipeItemDefinitions`.
-   - If the definition is missing: false.
+   - If the recipe belongs to no recipe item definition (no `recipeIds` membership, and no legacy `recipeItemId`/`linkedRecipeItemUuid` fallback): false.
+   - Resolve the recipe's member `recipeItemDefinition`(s) from `craftingSystem.recipeItemDefinitions`.
+   - If no definition resolves: false.
    - Else, gather candidate items from crafting actor plus component sources (if allowed).
    - Keep candidates matching by UUID or `resolveSourceUuid(candidate)`.
    - If limited uses are enabled, keep only non-exhausted candidates.
@@ -276,7 +307,8 @@ When the recipe item's `caps.item.limitUses === true` (resolved per Recipe-Item 
 
 - Uses are tracked on the matched owned item instance via `timesUsed`.
 - An item is exhausted when `timesUsed >= caps.item.maxUses`.
-- Exhausted items are ignored for item-based access and may be destroyed on exhaustion when `caps.item.destroyWhenExhausted === true`.
+- Exhausted items are ignored for item-based access.
+On exhaustion the item's `caps.item.whenSpent` decides its fate: `"destroyed"` (the legacy `destroyWhenExhausted === true`) removes the item, while `"inert"` (the default) keeps it but records the exhaustion so it stops granting craftability.
 
 ### Deterministic Item Selection
 
@@ -290,11 +322,12 @@ When a single matched instance must be mutated (increment or consume), choose:
 
 ### Preconditions
 
-- Mode is `learned` or `itemOrLearned`.
-- Recipe has `recipeItemId`.
-- The referenced recipe item definition exists.
+- Mode grants learning (flat `visibilityMode === "knowledge"`, or the legacy `learned` / `itemOrLearned` knowledge sub-mode).
+- Recipe belongs to a recipe item definition (`recipeIds` membership, or a legacy `recipeItemId`/`linkedRecipeItemUuid` fallback).
+- The member recipe item definition exists.
 - Recipe is not yet learned for the selected crafting actor.
 - At least one matched, owned recipe item exists.
+- The recipe's learn **prerequisite** is satisfied (see Learn Prerequisite below).
 
 The "at least one matched, owned recipe item exists" precondition is evaluated against the crafting actor's actual inventory for every viewer, including a GM.
 The learn operation must collect and filter candidate items directly rather than reusing the GM access-grant's matched-items output (which is empty — see GM Access-Grant Semantics).
@@ -314,6 +347,13 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 
 1. If the recipe item's `caps.learn.consumeOnLearn === true`, consume selected item.
 2. Return the updated access state.
+
+### Learn Prerequisite
+
+A recipe item's learn cap may name a **prerequisite** recipe (`caps.learn.prerequisite`, a recipe id, resolved per Recipe-Item Cap Resolution).
+When set, a reader may only learn the recipe once the crafting actor has **already learned** the prerequisite recipe (`RecipeVisibilityService._isPrerequisiteMet` checks `Actor.flags.fabricate.learnedRecipes[prerequisite]`).
+An unset/empty prerequisite is always satisfied.
+Every learn path enforces this gate (drag-and-drop learn, the Inventory-tab learn, and the craft-time learn): a learn attempt against an unmet prerequisite is refused with the `FABRICATE.Knowledge.PrerequisiteNotMet` outcome and writes no `learnedRecipes` entry.
 
 ### Recipe-Item Learn Cap
 

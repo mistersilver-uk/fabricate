@@ -141,15 +141,19 @@ You configure this per crafting system in the **Recipe Visibility** card on the 
 The Crafting menu is an experimental feature, so this card is reachable only when **Experimental Features** is turned on for the world.
 See [The Crafting Menu](#the-crafting-menu).
 
-Fabricate supports three list modes:
+Each system uses one of four visibility modes:
 
-| List mode           | Description                                                      |
-|:--------------------|:-----------------------------------------------------------------|
-| Global (default)    | All recipes visible to all users                                 |
-| Player              | GM restricts individual recipes to named players                 |
-| Knowledge           | Recipes discovered through gameplay via recipe items or learning |
+| Visibility mode  | Description                                                                 |
+|:-----------------|:---------------------------------------------------------------------------|
+| Global (default) | All recipes visible to all users                                           |
+| Restricted       | GM grants individual recipes to specific characters and players            |
+| Item             | Players craft a recipe only while holding a book or scroll linked to it    |
+| Knowledge        | Players learn a recipe from a book or scroll before they can craft it      |
 
-For full details on each mode, knowledge sub-options, recipe items, the learn flow, and configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
+Selecting a mode applies at once and never rewrites your recipes.
+The mode you choose decides which extra surfaces appear in the **Crafting** menu, such as the **Access** section for Restricted mode or **Books & Scrolls** limits for Item and Knowledge modes.
+
+For full details on each mode, recipe items, the learn flow, and configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
 
 ### Alchemy Mode
 
@@ -232,14 +236,19 @@ It only appears when **Experimental Features** is turned on for the world in Fab
 While it is off, the panel's left menu shows **Recipes** as a disabled **Soon** item and does not show the Crafting group or Books & Scrolls.
 
 When Experimental Features is on, that single entry becomes an expandable **Crafting** group in the left menu, in the same style as the **Gathering** group.
-Expand it to reveal three sections.
+Expand it to reveal its sections.
+**Settings** and **Recipes** are always present, and the system's [visibility mode](#recipe-visibility) decides which of the other two sections appear.
 
 - **Settings** hosts the system-level crafting rules: the recipe resolution mode, the salvage resolution mode, and the **Recipe Visibility** card.
   These cards used to live on the System settings page and moved here.
   Because the whole Crafting group is experimental, they are reachable only while Experimental Features is on.
 - **Recipes** is the existing recipe browser and editor.
-- **Books & Scrolls** lists every recipe item in the system with its linked recipes and each item's own use and learn caps.
-  Open a recipe item to set that item's caps on its own page.
+- **Access** appears only in **Restricted** visibility mode.
+  It is where you grant individual recipes to specific characters and players.
+  See [Restricted Mode]({% link visibility.md %}#restricted-mode).
+- **Books & Scrolls** appears only in **Item** and **Knowledge** visibility modes.
+  It lists every recipe item in the system with its linked recipes and each item's own use and learn caps.
+  Open a recipe item to set that item's caps and its recipe list on its own page.
   See [Books & Scrolls]({% link visibility.md %}#books--scrolls).
 
 ---
