@@ -261,7 +261,9 @@
   .manager-recipe-item-editor {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-rows: minmax(0, 1fr);
     min-height: 0;
+    height: 100%;
     gap: 0;
   }
 
@@ -270,6 +272,8 @@
     flex-direction: column;
     gap: var(--fab-space-3);
     min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
     padding: var(--fab-space-4);
   }
 
@@ -281,6 +285,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-4);
+    min-height: 0;
+    overflow-y: auto;
     padding: var(--fab-space-4);
     background: var(--fab-bg-2);
     border-left: 1px solid var(--fab-border);
@@ -472,7 +478,6 @@
   }
 
   .manager-recipe-item-rail-note {
-    margin-top: auto;
     display: flex;
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
