@@ -1329,7 +1329,7 @@
           "Effect": {
             "SummaryGlobal": "Every recipe is visible to all players.",
             "SummaryRestricted": "Grant recipes to specific characters or players in the Access tab.",
-            "SummaryItem": "Players craft from recipes only while holding the linked item.",
+            "SummaryItem": "Players craft from recipes only while holding the linked item. Configure usage limits in the Books & Scrolls editor.",
             "SummaryKnowledge": "Players learn recipes by reading books and scrolls. Configure learning limits in the Books & Scrolls editor."
           }
         },
@@ -3433,7 +3433,8 @@
           "Summary": "{chars} characters · {players} players",
           "Table": "Recipe access table",
           "Title": "Recipe access",
-          "ToggleNamed": "Toggle access for {name}"
+          "ToggleNamed": "Toggle access for {name}",
+          "RolePlayer": "Player"
         },
         "CraftingEffect": {
           "AccessSubTab": "Player & character access",

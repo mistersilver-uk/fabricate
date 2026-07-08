@@ -40,7 +40,12 @@ function makeCharacters(n) {
 }
 
 function makePlayers(n) {
-  return Array.from({ length: n }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}` }));
+  return Array.from({ length: n }, (_, i) => ({
+    id: `p${i + 1}`,
+    name: `Player ${i + 1}`,
+    role: i === 0 ? 'Game Master' : 'Player',
+    color: '#3366cc'
+  }));
 }
 
 before(() => harness.setup());
@@ -59,11 +64,14 @@ describe('GrantAccessInspector (mounted)', () => {
     assert.ok(root.querySelector('[data-access-roster="players"]'));
     assert.equal(root.querySelectorAll('[data-access-character-row]').length, 2);
     assert.equal(root.querySelectorAll('[data-access-player-row]').length, 2);
-    // Players carry a stable "Seat N" subtitle.
+    // Players show the user's human-readable role as the subtitle and tint the
+    // leading icon with the user's colour.
     assert.equal(
       root.querySelector('[data-access-roster="players"] .manager-roster-subtitle').textContent.trim(),
-      'Seat 1'
+      'Game Master'
     );
+    const playerIcon = root.querySelector('[data-access-roster="players"] .manager-roster-icon i');
+    assert.ok(playerIcon.getAttribute('style')?.includes('#3366cc'), 'player icon tinted with the user colour');
   });
 
   it('shows the "no one has access yet" summary when nothing is granted', async () => {

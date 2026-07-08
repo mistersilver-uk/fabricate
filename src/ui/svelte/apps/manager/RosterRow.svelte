@@ -21,6 +21,7 @@
     name = '',
     subtitle = '',
     icon = 'fas fa-user',
+    iconColor = '',
     granted = false,
     onToggle = () => {},
     ariaLabel = '',
@@ -34,7 +35,7 @@
 </script>
 
 <div class="manager-roster-row" {...dataAttr ? { [dataAttr]: true } : {}}>
-  <span class="manager-roster-icon" aria-hidden="true"><i class={icon}></i></span>
+  <span class="manager-roster-icon" aria-hidden="true"><i class={icon} style={iconColor ? `color: ${iconColor}` : undefined}></i></span>
   <div class="manager-roster-copy">
     <span class="manager-roster-name">{name}</span>
     {#if subtitle}<span class="manager-roster-subtitle">{subtitle}</span>{/if}

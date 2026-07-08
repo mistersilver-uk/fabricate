@@ -6341,6 +6341,17 @@
   margin: 0;
 }
 
+/* Recipe-access rows are native <button>s, so Foundry core's fixed button height
+   would clamp them and overlap the stacked name + grant chip. Restore auto height
+   here in the global sheet (a component-scoped override is unreliable against the
+   Foundry core `button` rule) — issue 511. */
+.fabricate-manager .manager-access-row {
+  height: auto;
+  min-height: 56px;
+  line-height: normal;
+  align-items: center;
+}
+
 .fabricate-manager .manager-gathering-panel {
   display: grid;
   gap: var(--fab-space-3);

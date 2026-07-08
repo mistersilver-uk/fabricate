@@ -10,7 +10,7 @@
   Props:
    - recipe: the selected recipe row ({ id, name, img, category, access, accessSummary }).
    - characters: player-character roster [{ id, name, img, subtitle? }].
-   - players: world-user roster [{ id, name, seat? }].
+   - players: world-user roster [{ id, name, role?, color? }].
    - onSaveAccess(recipeId, { characterIds, playerIds }): persists the full snapshot.
 -->
 <script>
@@ -97,20 +97,22 @@
     persist([...grantedCharacterIds], playerIds);
   }
 
-  // Player roster rows carry a stable "Seat N" subtitle derived from their order
-  // in the full roster (index-based), so paging/searching never shifts a seat.
-  const playerRows = $derived((players || []).map((player, index) => ({
+  // Player roster rows show the user's human-readable role (GM / Player / Trusted
+  // Player / …) as the subtitle and tint the leading icon with that user's Foundry
+  // colour, both sourced from the game users data.
+  const playerRows = $derived((players || []).map((player) => ({
     id: player.id,
     name: player.name,
-    subtitle: player.seat
-      || text('FABRICATE.Admin.Manager.Access.Seat', 'Seat {n}').replace('{n}', index + 1),
-    icon: 'fas fa-user'
+    subtitle: player.role || text('FABRICATE.Admin.Manager.Access.RolePlayer', 'Player'),
+    icon: 'fas fa-user',
+    iconColor: player.color || ''
   })));
   const characterRows = $derived((characters || []).map((character) => ({
     id: character.id,
     name: character.name,
     subtitle: character.subtitle || '',
-    icon: 'fas fa-user'
+    icon: 'fas fa-user',
+    iconColor: ''
   })));
 
   function pageSlice(rows, query, page) {
@@ -164,7 +166,7 @@
   }
 </script>
 
-<aside class="manager-inspector manager-access-inspector" aria-label={text('FABRICATE.Admin.Manager.Access.GrantTitle', 'Grant access')}>
+<div class="manager-access-inspector" data-access-inspector>
   {#if !recipe}
     <div class="manager-empty">
       <div>
@@ -219,6 +221,7 @@
                 name={row.name}
                 subtitle={row.subtitle}
                 icon={row.icon}
+                iconColor={row.iconColor || ''}
                 granted={section.granted.has(row.id)}
                 onToggle={(next) => section.onToggle(row.id, next)}
                 ariaLabel={text('FABRICATE.Admin.Manager.Access.ToggleNamed', 'Toggle access for {name}').replace('{name}', row.name)}
@@ -261,7 +264,7 @@
       </section>
     {/each}
   {/if}
-</aside>
+</div>
 
 <style>
   .manager-access-inspector {

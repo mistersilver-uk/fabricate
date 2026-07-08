@@ -97,7 +97,7 @@
   });
 </script>
 
-<aside class="manager-inspector manager-books-scrolls-inspector" data-item-page-inspector aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.ItemPage', 'Item page')}>
+<div class="manager-books-scrolls-inspector" data-item-page-inspector>
   {#if !item}
     <div class="manager-inspector-empty" data-item-page-empty>
       <i class="fas fa-book-sparkles" aria-hidden="true"></i>
@@ -214,7 +214,7 @@
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.EditRecipeItem', 'Edit recipe item')}</span>
     </button>
   {/if}
-</aside>
+</div>
 
 <style>
   .manager-books-scrolls-inspector {
