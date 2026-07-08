@@ -1325,6 +1325,12 @@
             "KnowledgeDesc": "A character must learn the recipe from a scroll or book using the item. Only mode where learning limits appear in the Books & Scrolls editor.",
             "Restricted": "Restricted",
             "RestrictedDesc": "Recipes can be made visible to specific characters or players."
+          },
+          "Effect": {
+            "SummaryGlobal": "Every recipe is visible to all players.",
+            "SummaryRestricted": "Grant recipes to specific characters or players in the Access tab.",
+            "SummaryItem": "Players craft from recipes only while holding the linked item.",
+            "SummaryKnowledge": "Players learn recipes by reading books and scrolls. Configure learning limits in the Books & Scrolls editor."
           }
         },
         "BooksScrolls": {
@@ -3430,11 +3436,11 @@
           "ToggleNamed": "Toggle access for {name}"
         },
         "CraftingEffect": {
-          "AccessSubTab": "Access sub-tab",
-          "BooksScrollsSubTab": "Books & Scrolls sub-tab",
+          "AccessSubTab": "Player & character access",
+          "BooksScrollsSubTab": "Books & Scrolls",
           "Hidden": "Hidden",
-          "LearningLimitsControl": "Learning limits control",
-          "LimitedUseControl": "Limited use control",
+          "LearningLimitsControl": "Learning limits",
+          "LimitedUseControl": "Limited use",
           "Shown": "Shown",
           "Title": "Effect on this system",
           "Visible": "Visible"
@@ -3543,12 +3549,20 @@
           "Save": "Save recipe item",
           "SelectItem": "Select a recipe item",
           "Tabs": {
-            "Label": "Recipe item editor sections"
+            "Label": "Recipe item editor sections",
+            "Overview": "Overview",
+            "Contents": "Contents",
+            "Limits": "Limits",
+            "Validation": "Validation"
           },
           "Validation": {
             "AllPass": "All checks pass",
             "CriticalCount": "{count} Critical",
-            "Title": "Validation"
+            "Title": "Validation",
+            "ItemLinked": "A game-world item is linked",
+            "RecipeLinked": "At least one recipe is linked",
+            "UsesValid": "Use count is valid",
+            "LearnsValid": "Learning limit is valid"
           }
         }
       },
