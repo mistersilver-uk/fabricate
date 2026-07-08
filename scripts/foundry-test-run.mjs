@@ -1136,26 +1136,26 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // simple system
       { name: 'Smoke Plank', img: 'icons/commodities/wood/lumber-stack.webp' },
       { name: 'Smoke Crate', img: 'icons/containers/boxes/box-gift-white.webp' },
-      { name: 'Smoke Mallet', img: 'icons/tools/hand/hammer-cobbler-steel-grey.webp' },
-      { name: 'Smoke Toy', img: 'icons/commodities/wood/wood-blocks-stacked.webp' },
-      { name: 'Smoke Chisel', img: 'icons/tools/hand/chisel-steel-grey.webp' },
-      { name: 'Smoke Dowel', img: 'icons/commodities/wood/pole-cut-brown.webp' },
+      { name: 'Smoke Mallet', img: 'icons/tools/hand/hammer-cobbler-steel.webp' },
+      { name: 'Smoke Toy', img: 'icons/commodities/wood/blocks-cut-brown.webp' },
+      { name: 'Smoke Chisel', img: 'icons/tools/hand/chisel-steel-brown.webp' },
+      { name: 'Smoke Dowel', img: 'icons/commodities/wood/lumber-plank-brown.webp' },
       { name: 'Smoke Anvil', img: 'icons/tools/smithing/anvil.webp' },
-      { name: 'Smoke Bracket', img: 'icons/commodities/metal/fragments-iron.webp' },
-      { name: 'Smoke Relic', img: 'icons/commodities/treasure/broken-crown-gold.webp' },
+      { name: 'Smoke Bracket', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
+      { name: 'Smoke Relic', img: 'icons/commodities/treasure/crown-gold-laurel-wreath.webp' },
       { name: 'Smoke Shard', img: 'icons/commodities/gems/gem-fragments-red.webp' },
       // routedByIngredients system
-      { name: 'Smoke Ingot A', img: 'icons/commodities/metal/ingot-worn-silver.webp' },
-      { name: 'Smoke Ingot B', img: 'icons/commodities/metal/ingot-stack-gold.webp' },
-      { name: 'Smoke Ring', img: 'icons/equipment/finger/ring-band-engraved-gold.webp' },
+      { name: 'Smoke Ingot A', img: 'icons/commodities/metal/ingot-engraved-silver.webp' },
+      { name: 'Smoke Ingot B', img: 'icons/commodities/metal/ingot-gold.webp' },
+      { name: 'Smoke Ring', img: 'icons/equipment/finger/ring-band-engraved-lines-gold.webp' },
       { name: 'Smoke Amulet', img: 'icons/equipment/neck/amulet-round-engraved-gold.webp' },
       // routedByCheck system
       { name: 'Smoke Bar', img: 'icons/commodities/metal/ingot-plain-steel.webp' },
       { name: 'Smoke Masterwork Blade', img: 'icons/weapons/swords/sword-guard-blue.webp' },
       { name: 'Smoke Standard Blade', img: 'icons/weapons/swords/greatsword-blue.webp' },
       // progressive system
-      { name: 'Smoke Clay', img: 'icons/commodities/stone/clay-nugget-grey.webp' },
-      { name: 'Smoke Brick', img: 'icons/commodities/stone/stone-worked-grey.webp' }
+      { name: 'Smoke Clay', img: 'icons/commodities/stone/clay-grey.webp' },
+      { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' }
     ];
     const createdItems = await Item.createDocuments(
       worldSpecs.map((s) => ({ name: s.name, type: itemType, img: s.img }))
@@ -1276,7 +1276,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       name: 'Smoke Carve Toy',
       description: 'Simple-mode craft whose breakageChance tool always breaks.',
       craftingSystemId: simpleSystemId,
-      img: 'icons/commodities/wood/wood-blocks-stacked.webp',
+      img: 'icons/commodities/wood/blocks-cut-brown.webp',
       ingredientSets: [{
         ingredientGroups: [{
           name: 'Plank',
@@ -1290,7 +1290,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       name: 'Smoke Turn Dowel',
       description: 'Simple-mode craft whose limitedUses tool breaks at its maxUses threshold.',
       craftingSystemId: simpleSystemId,
-      img: 'icons/commodities/wood/pole-cut-brown.webp',
+      img: 'icons/commodities/wood/lumber-plank-brown.webp',
       ingredientSets: [{
         ingredientGroups: [{
           name: 'Plank',
@@ -1304,7 +1304,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       name: 'Smoke Bend Bracket',
       description: 'Simple-mode craft requiring a tool the crafter does not hold (negative gating).',
       craftingSystemId: simpleSystemId,
-      img: 'icons/commodities/metal/fragments-iron.webp',
+      img: 'icons/commodities/metal/fragments-steel-barbed.webp',
       ingredientSets: [{
         ingredientGroups: [{
           name: 'Plank',
@@ -1333,7 +1333,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       name: 'Smoke Cast Jewelry',
       description: 'routedByIngredients: each ingredient set maps to a different result group.',
       craftingSystemId: ingredientRouterSystemId,
-      img: 'icons/equipment/finger/ring-band-engraved-gold.webp',
+      img: 'icons/equipment/finger/ring-band-engraved-lines-gold.webp',
       complex: true,
       ingredientSets: [
         {
@@ -1444,7 +1444,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       name: 'Smoke Mold Brick',
       description: 'progressive: one low-difficulty result awarded in a single advance.',
       craftingSystemId: progressiveSystemId,
-      img: 'icons/commodities/stone/stone-worked-grey.webp',
+      img: 'icons/commodities/stone/masonry-bricks-brown.webp',
       ingredientSets: [{
         ingredientGroups: [{
           name: 'Clay',
@@ -4876,7 +4876,7 @@ async function main() {
             const scene = await Scene.create({
               name: 'Fabricate Empty Interactables Scene',
               active: false,
-              background: { src: 'icons/environment/settlement/wizard-tower.webp' }
+              background: { src: 'icons/environment/settlement/tower-stone-blue.webp' }
             });
             await scene.activate();
             return scene.id;
