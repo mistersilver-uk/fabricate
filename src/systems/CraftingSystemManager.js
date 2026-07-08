@@ -1575,6 +1575,29 @@ export class CraftingSystemManager {
     };
   }
 
+  // Update a recipe item definition's per-item caps (issue 511). Only the `caps`
+  // block is editable here — a definition's identity (name/img/sourceItemUuid) is
+  // managed by the recipe-item linking flow. The patch's `item`/`learn` partials
+  // merge over the current caps, then the whole block is re-normalized (uncapped
+  // defaults, finite/positive clamps) via `_normalizeRecipeItemCaps`.
+  async updateRecipeItemDefinition(systemId, recipeItemId, patch = {}) {
+    this._assertGM('update recipe item');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const definition = this.getRecipeItemDefinition(systemId, recipeItemId);
+    if (!definition) throw new Error(`Recipe item definition not found: ${recipeItemId}`);
+
+    const capsPatch = patch?.caps || {};
+    definition.caps = this._normalizeRecipeItemCaps({
+      item: { ...(definition.caps?.item || {}), ...(capsPatch.item || {}) },
+      learn: { ...(definition.caps?.learn || {}), ...(capsPatch.learn || {}) },
+    });
+
+    await this.save();
+    return { item: { ...definition } };
+  }
+
   async updateSystem(systemId, updates = {}) {
     this._assertGM('update crafting system');
     const current = this.getSystem(systemId);

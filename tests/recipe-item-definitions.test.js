@@ -317,6 +317,55 @@ test('deleteRecipeItemDefinition removes the system recipe item and clears affec
   assert.equal(recipesSaved, true);
 });
 
+test('updateRecipeItemDefinition merges and normalizes a caps patch, persisting it', async () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  manager.save = async () => {};
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Alchemy',
+    recipeItemDefinitions: [{
+      id: 'book-1',
+      name: 'Formula Book',
+      sourceItemUuid: 'Compendium.world.formulas.book-1'
+    }]
+  }));
+
+  const result = await manager.updateRecipeItemDefinition('sys-1', 'book-1', {
+    caps: { learn: { limitRecipes: true, maxRecipes: 3 } }
+  });
+
+  assert.equal(result.item.caps.learn.limitRecipes, true);
+  assert.equal(result.item.caps.learn.maxRecipes, 3);
+  const stored = manager.getRecipeItemDefinition('sys-1', 'book-1');
+  assert.equal(stored.caps.learn.maxRecipes, 3);
+  // The untouched item sub-block keeps its uncapped defaults.
+  assert.equal(stored.caps.item.limitUses, false);
+});
+
+test('updateRecipeItemDefinition drops an invalid maxRecipes via normalization', async () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  manager.save = async () => {};
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Alchemy',
+    recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u' }]
+  }));
+
+  const result = await manager.updateRecipeItemDefinition('sys-1', 'book-1', {
+    caps: { learn: { limitRecipes: true, maxRecipes: 0 } }
+  });
+
+  assert.equal(result.item.caps.learn.maxRecipes, undefined);
+});
+
+test('updateRecipeItemDefinition throws for a missing definition', async () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  manager.save = async () => {};
+  manager.systems.set('sys-1', manager._normalizeSystem({ id: 'sys-1', name: 'A' }));
+
+  await assert.rejects(() => manager.updateRecipeItemDefinition('sys-1', 'nope', { caps: {} }));
+});
+
 test('RecipeVisibilityService matches recipeItemId through the system recipe item definition', () => {
   const system = {
     id: 'sys-1',

@@ -6773,7 +6773,6 @@ export function createAdminStore(services) {
 
     const existing = system.recipeVisibility || {};
     const currentKnowledge = existing.knowledge || {};
-    const currentItem = currentKnowledge.item || {};
     const currentLearn = currentKnowledge.learn || {};
     const normalizedConfig =
       typeof configOrListMode === 'object' && configOrListMode !== null
@@ -6784,77 +6783,43 @@ export function createAdminStore(services) {
             consumeOnLearn,
             ...extras,
           };
+    // Recipe visibility is now STRATEGY-ONLY (issue 511): list mode, knowledge
+    // mode, and drag-drop learning. The per-recipe-item use/learn caps moved to
+    // the recipe item definitions (`updateRecipeItemCaps`); this store no longer
+    // reads or writes `knowledge.item` / the learn-cap fields.
     const nextListMode = normalizedConfig.listMode || existing.listMode || 'global';
     const nextKnowledgeMode =
       normalizedConfig.knowledgeMode || currentKnowledge.mode || 'itemOrLearned';
-    const nextLimitUses =
-      normalizedConfig.limitUses !== undefined
-        ? normalizedConfig.limitUses === true
-        : currentItem.limitUses === true;
-    const rawMaxUses =
-      normalizedConfig.maxUses !== undefined ? normalizedConfig.maxUses : currentItem.maxUses;
-    const nextMaxUses =
-      nextLimitUses && Number.isFinite(Number(rawMaxUses)) && Number(rawMaxUses) > 0
-        ? Number(rawMaxUses)
-        : undefined;
-    const nextDestroyWhenExhausted = nextLimitUses
-      ? normalizedConfig.destroyWhenExhausted !== undefined
-        ? normalizedConfig.destroyWhenExhausted === true
-        : currentItem.destroyWhenExhausted === true
-      : false;
-    // `consumeOnLearn` is always merged from the patch or the persisted value —
-    // never zeroed while the learn cap is on — so toggling `limitRecipes` off
-    // again preserves the GM's prior consume-on-learn choice (issue 511, UN4).
-    const nextConsumeOnLearn =
-      normalizedConfig.consumeOnLearn !== undefined
-        ? normalizedConfig.consumeOnLearn !== false
-        : currentLearn.consumeOnLearn !== false;
     const nextDragDropEnabled =
       normalizedConfig.dragDropEnabled !== undefined
         ? normalizedConfig.dragDropEnabled !== false
         : currentLearn.dragDropEnabled !== false;
-    // Recipe-item learn cap (issue 511), mirroring the item-cap cascade above.
-    const nextLimitRecipes =
-      normalizedConfig.limitRecipes !== undefined
-        ? normalizedConfig.limitRecipes === true
-        : currentLearn.limitRecipes === true;
-    const rawMaxRecipes =
-      normalizedConfig.maxRecipes !== undefined
-        ? normalizedConfig.maxRecipes
-        : currentLearn.maxRecipes;
-    const nextMaxRecipes =
-      nextLimitRecipes && Number.isFinite(Number(rawMaxRecipes)) && Number(rawMaxRecipes) > 0
-        ? Number(rawMaxRecipes)
-        : undefined;
-    const nextDestroyWhenSpent = nextLimitRecipes
-      ? normalizedConfig.destroyWhenSpent !== undefined
-        ? normalizedConfig.destroyWhenSpent === true
-        : currentLearn.destroyWhenSpent === true
-      : false;
     const recipeVisibility = {
       ...existing,
       listMode: nextListMode,
       knowledge: {
         ...currentKnowledge,
         mode: nextKnowledgeMode,
-        item: {
-          ...currentItem,
-          limitUses: nextLimitUses,
-          maxUses: nextMaxUses,
-          destroyWhenExhausted: nextDestroyWhenExhausted,
-        },
         learn: {
           ...currentLearn,
-          consumeOnLearn: nextConsumeOnLearn,
           dragDropEnabled: nextDragDropEnabled,
-          limitRecipes: nextLimitRecipes,
-          maxRecipes: nextMaxRecipes,
-          destroyWhenSpent: nextDestroyWhenSpent,
         },
       },
     };
 
     await systemManager.updateSystem(sysId, { recipeVisibility });
+    await refresh();
+  }
+
+  // Live-apply a per-recipe-item caps patch (issue 511). The Books & Scrolls
+  // per-item page calls this with single-field patches (e.g. `{ item: { limitUses } }`
+  // or `{ learn: { maxRecipes } }`); the manager merges the rest from the persisted
+  // definition, so the surface stages no dirty draft.
+  async function updateRecipeItemCaps(recipeItemId, capsPatch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeItemId) return;
+    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, { caps: capsPatch });
     await refresh();
   }
 
@@ -7281,6 +7246,7 @@ export function createAdminStore(services) {
     toggleRecipeEnabled,
     updateRecipe,
     addRecipeItemFromUuid,
+    updateRecipeItemCaps,
     importRecipes,
     exportRecipes,
     exportSystem,
