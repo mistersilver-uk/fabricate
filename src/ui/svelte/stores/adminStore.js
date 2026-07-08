@@ -6985,58 +6985,6 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  async function saveVisibilityConfig(
-    configOrListMode,
-    knowledgeMode,
-    consumeOnLearn,
-    extras = {}
-  ) {
-    const systemManager = services.getCraftingSystemManager();
-    const sysId = get(selectedSystemId);
-    if (!sysId) return;
-    const system = systemManager.getSystem(sysId);
-    if (!system) return;
-
-    const existing = system.recipeVisibility || {};
-    const currentKnowledge = existing.knowledge || {};
-    const currentLearn = currentKnowledge.learn || {};
-    const normalizedConfig =
-      typeof configOrListMode === 'object' && configOrListMode !== null
-        ? configOrListMode
-        : {
-            listMode: configOrListMode,
-            knowledgeMode,
-            consumeOnLearn,
-            ...extras,
-          };
-    // Recipe visibility is now STRATEGY-ONLY (issue 511): list mode, knowledge
-    // mode, and drag-drop learning. The per-recipe-item use/learn caps moved to
-    // the recipe item definitions (`updateRecipeItemCaps`); this store no longer
-    // reads or writes `knowledge.item` / the learn-cap fields.
-    const nextListMode = normalizedConfig.listMode || existing.listMode || 'global';
-    const nextKnowledgeMode =
-      normalizedConfig.knowledgeMode || currentKnowledge.mode || 'itemOrLearned';
-    const nextDragDropEnabled =
-      normalizedConfig.dragDropEnabled !== undefined
-        ? normalizedConfig.dragDropEnabled !== false
-        : currentLearn.dragDropEnabled !== false;
-    const recipeVisibility = {
-      ...existing,
-      listMode: nextListMode,
-      knowledge: {
-        ...currentKnowledge,
-        mode: nextKnowledgeMode,
-        learn: {
-          ...currentLearn,
-          dragDropEnabled: nextDragDropEnabled,
-        },
-      },
-    };
-
-    await systemManager.updateSystem(sysId, { recipeVisibility });
-    await refresh();
-  }
-
   // Live-apply a per-recipe-item caps patch (issue 511). The Books & Scrolls
   // per-item page calls this with single-field patches (e.g. `{ item: { limitUses } }`
   // or `{ learn: { maxRecipes } }`); the manager merges the rest from the persisted
@@ -7594,7 +7542,6 @@ export function createAdminStore(services) {
     clearCurrencyMacro,
     seedCurrencyUnitPresets,
     saveAlchemyConfig,
-    saveVisibilityConfig,
     saveTeaserConfig,
     createRecipe,
     deleteRecipe,

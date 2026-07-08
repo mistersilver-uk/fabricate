@@ -2708,79 +2708,6 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.alchemy.showAttemptHistoryToPlayers, false);
     });
 
-    it('saveVisibilityConfig merges with existing visibility config', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.recipeVisibility = {
-          listMode: 'global',
-          knowledge: { mode: 'itemOrLearned', learn: { consumeOnLearn: true } },
-        };
-      }
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        },
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.saveVisibilityConfig('knowledge', 'learned', false);
-      assert.ok(updateArgs !== null);
-      const rv = updateArgs.updates.recipeVisibility;
-      assert.equal(rv.listMode, 'knowledge');
-      assert.equal(rv.knowledge.mode, 'learned');
-    });
-
-    it('saveVisibilityConfig writes strategy fields only (list mode, knowledge mode, drag-drop)', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.recipeVisibility = {
-          listMode: 'knowledge',
-          knowledge: {
-            mode: 'itemOrLearned',
-            learn: { dragDropEnabled: true },
-          },
-        };
-      }
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        },
-      });
-
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      // Per-item caps (limitUses/maxUses/limitRecipes/...) are no longer accepted
-      // here — they live on the recipe item definitions (issue 511).
-      await store.saveVisibilityConfig({
-        listMode: 'knowledge',
-        knowledgeMode: 'itemOrLearned',
-        dragDropEnabled: false,
-        limitUses: true,
-        maxUses: 3,
-        limitRecipes: true,
-        maxRecipes: 5,
-      });
-
-      const rv = updateArgs.updates.recipeVisibility;
-      assert.equal(rv.listMode, 'knowledge');
-      assert.equal(rv.knowledge.mode, 'itemOrLearned');
-      assert.equal(rv.knowledge.learn.dragDropEnabled, false);
-      // The caps fields are not written to the system-wide config.
-      assert.equal('item' in rv.knowledge, false);
-      assert.equal('limitRecipes' in rv.knowledge.learn, false);
-      assert.equal('maxUses' in rv.knowledge.learn, false);
-    });
-
     it('updateRecipeItemCaps delegates a caps patch to the manager for the selected system', async () => {
       let updateCall = null;
       const services = createMockServices();
@@ -2922,7 +2849,6 @@ describe('createAdminStore', () => {
         'setCurrencyMacro',
         'clearCurrencyMacro',
         'seedCurrencyUnitPresets',
-        'saveVisibilityConfig',
         'saveTeaserConfig',
         'deleteRecipe',
         'duplicateRecipe',

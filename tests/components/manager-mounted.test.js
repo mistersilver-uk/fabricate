@@ -31,7 +31,6 @@ let ChecksViewComponent;
 let RecipeOverviewTabComponent;
 let SystemEditViewComponent;
 let CraftingSettingsViewComponent;
-let SystemRecipeVisibilityCardComponent;
 let mounted;
 let target;
 
@@ -133,7 +132,6 @@ function compileManagerRoot() {
     'RecipeRoutingAssignment',
     'RecipeResultItemRow',
     'RecipeToolsSection',
-    'SystemRecipeVisibilityCard',
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);
   }
@@ -1098,10 +1096,6 @@ function createStore(calls = [], options = {}) {
       applySystemEnabled(id, enabled);
     },
     saveSystemDetails: (name, description) => calls.push(['saveSystemDetails', name, description]),
-    saveVisibilityConfig: (patch) => {
-      calls.push(['saveVisibilityConfig', patch]);
-      return options.saveVisibilityConfigResult ?? true;
-    },
     updateRecipeItemCaps: (recipeItemId, patch) => {
       calls.push(['updateRecipeItemCaps', recipeItemId, patch]);
       return options.updateRecipeItemCapsResult ?? true;
@@ -1609,13 +1603,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     CraftingSettingsViewComponent = (
       await import(
         pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte.js'))
-      )
-    ).default;
-    SystemRecipeVisibilityCardComponent = (
-      await import(
-        pathToFileURL(
-          join(tempRoot, 'src/ui/svelte/apps/manager/recipe/SystemRecipeVisibilityCard.svelte.js')
-        )
       )
     ).default;
     ToolsBrowserViewComponent = (
@@ -3366,14 +3353,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  function mountRecipeVisibilityCard(props) {
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(SystemRecipeVisibilityCardComponent, { target, props });
-    flushSync();
-    return target;
-  }
-
   function mountRecipeOverview(props) {
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -3422,107 +3401,6 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the effect panel renders alongside the cards'
     );
   });
-
-  it('recipe visibility card list-mode select emits a listMode-only save patch', () => {
-    const emitted = [];
-    mountRecipeVisibilityCard({
-      recipeVisibility: { listMode: 'global' },
-      showKnowledgeOptions: false,
-      onSave: (patch) => emitted.push(patch),
-    });
-    const select = target.querySelector('[data-recipe-visibility-list-mode]');
-    assert.ok(select, 'the list-mode select renders');
-    assert.equal(select.value, 'global', 'reflects the current list mode');
-
-    select.value = 'knowledge';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    assert.deepEqual(emitted.at(-1), { listMode: 'knowledge' });
-  });
-
-  it('recipe visibility card shows knowledge sub-rows only in knowledge mode', () => {
-    mountRecipeVisibilityCard({
-      recipeVisibility: { listMode: 'global' },
-      showKnowledgeOptions: false,
-      onSave: () => {},
-    });
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-knowledge]'),
-      null,
-      'no knowledge sub-rows outside knowledge mode'
-    );
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-
-    const emitted = [];
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: true, maxUses: 3, destroyWhenExhausted: false },
-          learn: { consumeOnLearn: true, dragDropEnabled: true },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: (patch) => emitted.push(patch),
-    });
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-knowledge-mode]'),
-      'the knowledge-mode select renders in knowledge mode'
-    );
-    // Per-item use/learn caps moved to Books & Scrolls (issue 511); only the
-    // system-wide drag-drop learning switch remains on this card.
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-limit-uses]'),
-      null,
-      'the item limit-uses toggle no longer lives on the visibility card'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
-      null,
-      'the consume-on-learn toggle no longer lives on the visibility card'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-drag-drop]'),
-      'the drag-drop learning toggle renders for itemOrLearned'
-    );
-
-    // The drag-drop toggle passes only its own field.
-    target.querySelector('[data-recipe-visibility-drag-drop]').click();
-    assert.deepEqual(emitted.at(-1), { dragDropEnabled: false });
-  });
-
-  it('recipe visibility card shows a per-mode note under the list-mode select', () => {
-    // The note now lives inside the List mode card (under the select) and has an
-    // equivalent for every mode, so the option labels can stay terse.
-    mountRecipeVisibilityCard({
-      recipeVisibility: { listMode: 'global' },
-      showKnowledgeOptions: false,
-      onSave: () => {},
-    });
-    const globalNote = target.querySelector('[data-recipe-visibility-list-mode-note]');
-    assert.ok(globalNote, 'a mode note renders in global mode');
-    assert.match(globalNote.textContent, /visible to all players/i);
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-
-    mountRecipeVisibilityCard({
-      recipeVisibility: { listMode: 'player' },
-      showKnowledgeOptions: false,
-      onSave: () => {},
-    });
-    const playerNote = target.querySelector('[data-recipe-visibility-list-mode-note]');
-    assert.ok(playerNote, 'a mode note renders in player mode');
-    assert.match(playerNote.textContent, /per-recipe/i);
-  });
-
-  // The per-item use/learn cap controls (limit-uses, learn-cap, consume-on-learn)
-  // moved off the system-wide visibility card to the Books & Scrolls per-item page
-  // (issue 511); their mounted coverage lives with that page's caps card.
 
   it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
     // Not in player mode ⇒ no visibility section.
