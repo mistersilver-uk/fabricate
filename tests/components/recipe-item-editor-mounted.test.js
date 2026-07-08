@@ -96,7 +96,8 @@ describe('RecipeItemEditor (mounted)', () => {
       visibilityMode: 'item'
     });
     assert.match(root.querySelector('[data-recipe-item-preview-badge]').textContent, /5 uses/);
-    assert.match(root.querySelector('[data-recipe-item-preview-cta]').textContent, /2/);
+    // Item mode: the CTA is USE-based (maxUses cap), not "read & learn".
+    assert.match(root.querySelector('[data-recipe-item-preview-cta]').textContent, /Use up to 5 times/i);
     const rules = root.querySelector('[data-recipe-item-rules]').textContent;
     assert.match(rules, /5 uses per copy/);
     assert.match(rules, /inert/i);

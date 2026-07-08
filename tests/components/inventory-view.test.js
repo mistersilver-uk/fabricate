@@ -527,4 +527,22 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item-only mode');
     assert.equal(detail.querySelector('[data-inventory-learned="r1"]'), null, 'no Learned chip in item-only mode');
   });
+
+  it('shows a USE-based CTA in item mode (not Read & learn)', async () => {
+    const book = makeBook(
+      [{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }],
+      { uses: { max: 3, used: 1, remaining: 2 }, learning: null },
+      false
+    );
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const cta = target.querySelector('[data-inventory-recipe-item] [data-inventory-read-learn]');
+    assert.ok(cta, 'renders the CTA in item mode');
+    // The harness localize mock emits `key:{data}`; assert the Use-based key + remaining.
+    assert.match(cta.textContent, /UseMore/, 'item mode uses the "Use N more times" label');
+    assert.match(cta.textContent, /"remaining":2/);
+    assert.doesNotMatch(cta.textContent, /ReadLearn/, 'not a read & learn label in item mode');
+  });
 });

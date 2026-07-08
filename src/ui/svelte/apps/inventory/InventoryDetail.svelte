@@ -114,17 +114,27 @@
   const learnRemaining = $derived(learningLimit ? Number(learningLimit.remaining ?? 0) : null);
   const readLearnLabel = $derived.by(() => {
     if (recipeTotal === 0) return localize('FABRICATE.App.Inventory.Detail.NoRecipes');
-    if (learnable && learnRemaining != null && learnRemaining < recipeTotal) {
+    // Item mode (non-learnable): the held book grants crafting access, so the CTA is
+    // USE-based, reflecting how many times it can still be used.
+    if (!learnable) {
+      if (!usesLimit) return localize('FABRICATE.App.Inventory.Detail.UseAnytime');
+      const remaining = Number(usesLimit.remaining ?? 0);
+      const max = Number(usesLimit.max ?? 0);
+      if (remaining <= 0) return localize('FABRICATE.App.Inventory.Detail.UseSpent');
+      if (max === 1) return localize('FABRICATE.App.Inventory.Detail.UseOnce');
+      if (remaining === 1) return localize('FABRICATE.App.Inventory.Detail.UseOneMore');
+      return localize('FABRICATE.App.Inventory.Detail.UseMore', { remaining });
+    }
+    // Knowledge mode: read & learn.
+    if (learnRemaining != null && learnRemaining < recipeTotal) {
       return localize('FABRICATE.App.Inventory.Detail.ReadLearnUpTo', {
         remaining: Math.max(0, learnRemaining),
         total: recipeTotal,
       });
     }
-    if (learnable) {
-      return localize('FABRICATE.App.Inventory.Detail.ReadLearnAll', { total: recipeTotal });
-    }
-    return localize('FABRICATE.App.Inventory.Detail.ViewRecipes', { total: recipeTotal });
+    return localize('FABRICATE.App.Inventory.Detail.ReadLearnAll', { total: recipeTotal });
   });
+  const readLearnIcon = $derived(learnable ? 'fas fa-book-open-reader' : 'fas fa-screwdriver-wrench');
   function toggleRecipesExpanded() {
     recipesExpanded = !recipesExpanded;
   }
@@ -287,7 +297,7 @@
         aria-expanded={recipesExpanded}
         onclick={toggleRecipesExpanded}
       >
-        <i class="fas fa-book-open-reader" aria-hidden="true"></i>
+        <i class={readLearnIcon} aria-hidden="true"></i>
         <span class="inventory-detail-read-learn-label">{recipesExpanded
           ? localize('FABRICATE.App.Inventory.Detail.HideRecipes')
           : readLearnLabel}</span>
@@ -858,28 +868,30 @@
     overflow: hidden;
   }
 
-  /* The "Read & learn" call-to-action that expands the recipe list — mirrors the
-     GM "How players see it" preview CTA. */
+  /* The "Read & learn" (knowledge) / "Use" (item) call-to-action that expands the
+     recipe list — mirrors the GM "How players see it" preview CTA: a large, centered,
+     solid-accent button. */
   .inventory-detail-read-learn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--fab-space-2);
     width: 100%;
     box-sizing: border-box;
-    padding: 10px 14px;
-    border: 1px solid var(--fab-accent);
+    padding: 13px 16px;
+    min-height: 48px;
+    border: 1px solid var(--fab-accent-border);
     border-radius: 8px;
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-    font-size: 13px;
-    font-weight: 600;
+    background: var(--fab-accent);
+    color: var(--fab-on-accent);
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
-    text-align: left;
+    text-align: center;
   }
 
   .inventory-detail-read-learn:hover {
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
+    filter: brightness(1.08);
   }
 
   .inventory-detail-read-learn:focus-visible {
@@ -888,13 +900,16 @@
   }
 
   .inventory-detail-read-learn-label {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .inventory-detail-read-learn-caret {
     flex: 0 0 auto;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .inventory-detail-limits {

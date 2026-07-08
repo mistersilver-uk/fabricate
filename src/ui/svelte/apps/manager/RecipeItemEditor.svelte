@@ -135,6 +135,13 @@
     if (recipeCount === 0) {
       return text('FABRICATE.Admin.Manager.RecipeItem.Preview.NoRecipes', 'No recipes to learn');
     }
+    // Item mode: the held book grants crafting access, so the CTA is USE-based, not
+    // learn-based (previews the use cap the player sees).
+    if (modeItem) {
+      if (!limitUses) return text('FABRICATE.Admin.Manager.RecipeItem.Preview.UseAnytime', 'Use anytime');
+      if (maxUses === 1) return text('FABRICATE.Admin.Manager.RecipeItem.Preview.UseOnce', 'Use once');
+      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.UseUpTo', 'Use up to {n} times').replace('{n}', String(maxUses));
+    }
     // When a learning cap actually restricts (below the total), the reader picks up to
     // the cap; otherwise they can read & learn everything.
     if (limitLearning && learnsAllowed < recipeCount) {

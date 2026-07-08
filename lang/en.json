@@ -434,7 +434,12 @@
           "ReadLearnUpTo": "Read & learn up to {remaining} of {total}",
           "ReadLearnAll": "Read & learn {total} recipes",
           "ViewRecipes": "View {total} recipes",
-          "HideRecipes": "Hide recipes"
+          "HideRecipes": "Hide recipes",
+          "UseAnytime": "Use anytime",
+          "UseOnce": "Use once",
+          "UseOneMore": "Use one more time",
+          "UseMore": "Use {remaining} more times",
+          "UseSpent": "No uses left"
         }
       },
       "ActorBar": {
@@ -3550,7 +3555,10 @@
             "SingleUse": "Single use",
             "LearnUpToTotal": "Learn up to {n} total",
             "LearnUpToPerCopy": "Learn up to {n} per copy",
-            "ReadLearnUpTo": "Read & learn up to {n} of {total}"
+            "ReadLearnUpTo": "Read & learn up to {n} of {total}",
+            "UseAnytime": "Use anytime",
+            "UseOnce": "Use once",
+            "UseUpTo": "Use up to {n} times"
           },
           "Rail": {
             "EffectiveRules": "Effective rules",
