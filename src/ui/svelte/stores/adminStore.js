@@ -1557,6 +1557,137 @@ async function _sourceMissingForUuid(uuid) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Books & Scrolls recipe-item projection (issue 511)
+//
+// The library surface reads each recipe item enriched with its resolved
+// game-world item (name/img/type), its linked recipes (reverse ref via
+// `recipe.recipeItemId`), and how many world actors have learned any of those
+// recipes. Resolution touches `fromUuid`, so it is done ONCE per refresh and
+// batched with `Promise.all` (never inside a Svelte `$derived`/`$effect`).
+// ---------------------------------------------------------------------------
+
+// Human label for a recipe item whose linked game-world item has not resolved
+// yet (or was deleted) — the trailing UUID segment, matching the manager's own
+// `_labelFromUuid`.
+function _recipeItemLabelFromUuid(uuid) {
+  if (!uuid) return '';
+  const parts = String(uuid).split('.');
+  return parts.at(-1) || '';
+}
+
+// Best-effort Book / Scroll / Tome label inferred from the linked item's type
+// and name. Defaults to 'Book' when nothing more specific is detectable.
+function _deriveRecipeItemType(sourceDoc, fallbackName = '') {
+  const type = String(sourceDoc?.type || '').toLowerCase();
+  const name = String(sourceDoc?.name || fallbackName || '').toLowerCase();
+  if (type.includes('scroll') || name.includes('scroll') || name.includes('page')) return 'Scroll';
+  if (name.includes('tome') || name.includes('codex') || name.includes('grimoire')) return 'Tome';
+  return 'Book';
+}
+
+// Synchronous fallback projection painted immediately in refresh phase 1. The
+// resolved name/img/type, linked `recipes[]`, and `learnedByCount` are filled in
+// asynchronously by `_enrichRecipeItemLibrary` before the phase-2 publish.
+function _projectRecipeItemDefinitionSync(def) {
+  const sourceItemUuid = def?.sourceItemUuid || '';
+  return {
+    id: def?.id || '',
+    sourceItemUuid,
+    img: def?.img || '',
+    description: def?.description || '',
+    enabled: def?.enabled !== false,
+    caps: _clonePlain(def?.caps || {}),
+    resolvedName: def?.name || _recipeItemLabelFromUuid(sourceItemUuid) || 'Recipe item',
+    resolvedImg: def?.img || 'icons/svg/item-bag.svg',
+    derivedType: _deriveRecipeItemType(null, def?.name),
+    linkMissing: false,
+    recipes: [],
+    learnedByCount: 0,
+  };
+}
+
+// Resolve one linked game-world item. Returns `{ doc, missing }`; `missing` is
+// true only when a uuid is present but cannot be resolved (deleted/broken link).
+async function _resolveRecipeItemSource(uuid) {
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return { doc: null, missing: false };
+  try {
+    const doc = await globalThis.fromUuid(uuid);
+    return { doc: doc || null, missing: !doc };
+  } catch (_) {
+    return { doc: null, missing: true };
+  }
+}
+
+// Build a `recipeId -> Set(actorId)` index of learned recipes across every world
+// actor (best-effort; `game.*` may be unavailable in headless contexts → empty).
+function _buildLearnedRecipeActorIndex() {
+  const index = new Map();
+  const raw = globalThis.game?.actors;
+  const actors = Array.isArray(raw?.contents)
+    ? raw.contents
+    : Array.isArray(raw)
+      ? raw
+      : typeof raw?.[Symbol.iterator] === 'function'
+        ? [...raw]
+        : [];
+  for (const actor of actors) {
+    const learned = actor?.flags?.fabricate?.learnedRecipes;
+    if (!learned || typeof learned !== 'object') continue;
+    const actorId = actor.id || actor._id || '';
+    for (const recipeId of Object.keys(learned)) {
+      if (!index.has(recipeId)) index.set(recipeId, new Set());
+      index.get(recipeId).add(actorId);
+    }
+  }
+  return index;
+}
+
+// Enrich the synchronously-projected recipe items with async-resolved
+// name/img/type plus their derived `recipes[]` and `learnedByCount`. Called once
+// per refresh from the async phase; `fromUuid` resolution is batched.
+async function _enrichRecipeItemLibrary(projectedItems, recipes) {
+  const items = Array.isArray(projectedItems) ? projectedItems : [];
+  if (items.length === 0) return [];
+
+  const recipeList = Array.isArray(recipes) ? recipes : [];
+  const recipesByItemId = new Map();
+  for (const recipe of recipeList) {
+    const key = String(recipe?.recipeItemId || '');
+    if (!key) continue;
+    if (!recipesByItemId.has(key)) recipesByItemId.set(key, []);
+    recipesByItemId.get(key).push({
+      id: recipe.id,
+      name: recipe.name,
+      category: recipe.category || '',
+    });
+  }
+
+  const actorIndex = _buildLearnedRecipeActorIndex();
+  const resolved = await Promise.all(
+    items.map((item) => _resolveRecipeItemSource(item.sourceItemUuid))
+  );
+
+  return items.map((item, index) => {
+    const { doc, missing } = resolved[index];
+    const linkedRecipes = recipesByItemId.get(String(item.id)) || [];
+    const learnedActors = new Set();
+    for (const recipe of linkedRecipes) {
+      const actorsForRecipe = actorIndex.get(recipe.id);
+      if (actorsForRecipe) for (const actorId of actorsForRecipe) learnedActors.add(actorId);
+    }
+    return {
+      ...item,
+      resolvedName: doc?.name || item.resolvedName,
+      resolvedImg: doc?.img || item.resolvedImg,
+      derivedType: _deriveRecipeItemType(doc, item.resolvedName),
+      linkMissing: missing,
+      recipes: linkedRecipes,
+      learnedByCount: learnedActors.size,
+    };
+  });
+}
+
 async function _buildItemCards(
   systemManager,
   selectedSystem,
@@ -1906,8 +2037,12 @@ function _buildSelectedSystemViewData(
         : null,
 
     recipeVisibility: selectedSystem.recipeVisibility || {},
+    // Books & Scrolls library projection (issue 511). Painted synchronously with
+    // stored name/img fallbacks; refresh() overwrites this with the async-enriched
+    // shape (resolved name/img/type, derived recipes[], learnedByCount) before the
+    // phase-2 publish. Never resolve `fromUuid` here — this runs synchronously.
     recipeItemDefinitions: Array.isArray(selectedSystem.recipeItemDefinitions)
-      ? selectedSystem.recipeItemDefinitions
+      ? selectedSystem.recipeItemDefinitions.map(_projectRecipeItemDefinitionSync)
       : [],
     teaserConfig: selectedSystem.teaserConfig || {
       enabled: false,
@@ -4272,6 +4407,17 @@ export function createAdminStore(services) {
     }
 
     const environmentState = await _buildEnvironmentState(selectedSystem);
+
+    // Books & Scrolls library (issue 511): batch-resolve each recipe item's linked
+    // game-world item and derive its recipes[]/learnedByCount now that the recipe
+    // list is built. Overwrites the phase-1 synchronous fallback in place so the
+    // phase-2 publish carries the fully enriched projection.
+    if (selectedSystemData) {
+      selectedSystemData.recipeItemDefinitions = await _enrichRecipeItemLibrary(
+        selectedSystemData.recipeItemDefinitions,
+        recipeListData.recipes
+      );
+    }
 
     // The derived system-validation report. Reads the system's recipes /
     // components and the environments just listed (each annotated with its
@@ -6843,6 +6989,17 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Enable / disable a single recipe item from the Books & Scrolls library row or
+  // item-page toggle (issue 511). Persists only the `enabled` flag and refreshes;
+  // navigation to the per-item editor is the router's concern, not the store's.
+  async function setRecipeItemEnabled(recipeItemId, enabled) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeItemId) return;
+    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, { enabled: enabled !== false });
+    await refresh();
+  }
+
   async function saveTeaserConfig(teaserConfig) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -7268,6 +7425,7 @@ export function createAdminStore(services) {
     updateRecipe,
     addRecipeItemFromUuid,
     updateRecipeItemCaps,
+    setRecipeItemEnabled,
     importRecipes,
     exportRecipes,
     exportSystem,
