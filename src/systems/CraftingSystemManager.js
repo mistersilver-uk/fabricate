@@ -1590,8 +1590,8 @@ export class CraftingSystemManager {
 
     const capsPatch = patch?.caps || {};
     definition.caps = this._normalizeRecipeItemCaps({
-      item: { ...(definition.caps?.item || {}), ...(capsPatch.item || {}) },
-      learn: { ...(definition.caps?.learn || {}), ...(capsPatch.learn || {}) },
+      item: { ...definition.caps?.item, ...capsPatch.item },
+      learn: { ...definition.caps?.learn, ...capsPatch.learn },
     });
 
     await this.save();

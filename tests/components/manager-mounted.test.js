@@ -30,6 +30,7 @@ let ToolsBrowserViewComponent;
 let ChecksViewComponent;
 let RecipeOverviewTabComponent;
 let SystemEditViewComponent;
+let CraftingSettingsViewComponent;
 let SystemRecipeVisibilityCardComponent;
 let mounted;
 let target;
@@ -82,6 +83,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
@@ -117,6 +119,16 @@ function compileManagerRoot() {
     );
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
+  // Plain module imported by CraftingSettingsView — copied raw (NOT compiled), the
+  // same way recipe/recipeReadiness.js is, so the mounted import resolves.
+  {
+    const moduleDestination = join(tempRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js');
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js'), 'utf8')
+    );
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
@@ -1525,6 +1537,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     SystemEditViewComponent = (
       await import(
         pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte.js'))
+      )
+    ).default;
+    CraftingSettingsViewComponent = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte.js'))
       )
     ).default;
     SystemRecipeVisibilityCardComponent = (
@@ -3274,6 +3291,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
+  function mountCraftingSettingsView(props) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(CraftingSettingsViewComponent, { target, props });
+    flushSync();
+    return target;
+  }
+
   function mountRecipeVisibilityCard(props) {
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -3290,7 +3315,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  it('SystemEditView renders the recipe visibility card for a non-alchemy system and hides it for alchemy', () => {
+  it('CraftingSettingsView renders the recipe visibility card for a non-alchemy system and hides it for alchemy', () => {
+    // The recipe visibility + resolution controls moved off System Overview onto the
+    // gated Crafting > Settings page (issue 511).
     const baseSystem = {
       id: 'sys1',
       name: 'System One',
@@ -3299,7 +3326,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       recipeVisibility: { listMode: 'global' },
       showRecipeVisibilityKnowledgeOptions: false,
     };
-    mountSystemEditView({ selectedSystem: baseSystem });
+    mountCraftingSettingsView({ selectedSystem: baseSystem });
+    assert.ok(
+      target.querySelector('[data-crafting-resolution-mode]'),
+      'the resolution-mode card renders on Crafting Settings'
+    );
     assert.ok(
       target.querySelector('[data-system-recipe-visibility]'),
       'the card renders for a non-alchemy system'
@@ -3309,7 +3340,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = null;
     target.remove();
 
-    mountSystemEditView({ selectedSystem: { ...baseSystem, resolutionMode: 'alchemy' } });
+    mountCraftingSettingsView({ selectedSystem: { ...baseSystem, resolutionMode: 'alchemy' } });
     assert.equal(
       target.querySelector('[data-system-recipe-visibility]'),
       null,
@@ -3366,55 +3397,26 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-recipe-visibility-knowledge-mode]'),
       'the knowledge-mode select renders in knowledge mode'
     );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-limit-uses]'),
-      'the item limit-uses toggle renders for itemOrLearned'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-max-uses]'),
-      'the max-uses stepper renders when limitUses is on'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
-      'the consume-on-learn toggle renders for itemOrLearned'
-    );
-
-    // Turning the limit-uses toggle OFF passes only that field; the store
-    // cascade clears the cap.
-    target.querySelector('[data-recipe-visibility-limit-uses]').click();
-    assert.deepEqual(emitted.at(-1), { limitUses: false });
-  });
-
-  it('recipe visibility card commits a concrete cap when enabling limited uses', () => {
-    // Enabling limited uses without a stored maxUses must persist a real cap
-    // (>= 1); otherwise the runtime treats the undefined cap as unlimited while
-    // the card displays "1".
-    const emitted = [];
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: false },
-          learn: { consumeOnLearn: true, dragDropEnabled: true },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: (patch) => emitted.push(patch),
-    });
-
-    // The stepper stays visible but disabled until limited uses is on (faded,
-    // non-interactive) rather than appearing/disappearing.
-    const stepper = target.querySelector('[data-recipe-visibility-max-uses]');
-    assert.ok(stepper, 'the max-uses stepper is present even when limitUses is off');
+    // Per-item use/learn caps moved to Books & Scrolls (issue 511); only the
+    // system-wide drag-drop learning switch remains on this card.
     assert.equal(
-      stepper.querySelector('input').disabled,
-      true,
-      'the max-uses input is disabled when limitUses is off'
+      target.querySelector('[data-recipe-visibility-limit-uses]'),
+      null,
+      'the item limit-uses toggle no longer lives on the visibility card'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
+      null,
+      'the consume-on-learn toggle no longer lives on the visibility card'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-visibility-drag-drop]'),
+      'the drag-drop learning toggle renders for itemOrLearned'
     );
 
-    target.querySelector('[data-recipe-visibility-limit-uses]').click();
-    assert.deepEqual(emitted.at(-1), { limitUses: true, maxUses: 1 });
+    // The drag-drop toggle passes only its own field.
+    target.querySelector('[data-recipe-visibility-drag-drop]').click();
+    assert.deepEqual(emitted.at(-1), { dragDropEnabled: false });
   });
 
   it('recipe visibility card shows a per-mode note under the list-mode select', () => {
@@ -3443,102 +3445,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.match(playerNote.textContent, /per-recipe/i);
   });
 
-  it('recipe visibility card renders the learn-cap card and hides consume-on-learn when the cap is on (issue 511)', () => {
-    // Cap OFF: consume-on-learn tile present; learn-cap nested inputs disabled.
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: false },
-          learn: { consumeOnLearn: true, dragDropEnabled: true, limitRecipes: false },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: () => {},
-    });
-
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-limit-recipes]'),
-      'the learn-cap Enabled toggle renders'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-max-recipes]'),
-      'the max-recipes stepper renders even when the cap is off'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-destroy-spent]'),
-      'the destroy-when-spent toggle renders'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-max-recipes] input').disabled,
-      true,
-      'the max-recipes input is disabled while the cap is off'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
-      'consume-on-learn shows while the cap is off'
-    );
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-
-    // Cap ON: consume-on-learn tile hidden; stepper enabled.
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: false },
-          learn: {
-            consumeOnLearn: true,
-            dragDropEnabled: true,
-            limitRecipes: true,
-            maxRecipes: 3,
-          },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: () => {},
-    });
-
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
-      null,
-      'consume-on-learn is hidden while the cap is on'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-limit-recipes]'),
-      'the learn-cap card still renders while the cap is on'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-max-recipes] input').disabled,
-      false,
-      'the max-recipes input is enabled while the cap is on'
-    );
-    // The drag-drop tile is unaffected by the cap.
-    assert.ok(target.querySelector('[data-recipe-visibility-drag-drop]'));
-  });
-
-  it('recipe visibility card commits a concrete cap when enabling the learn limit (issue 511)', () => {
-    const emitted = [];
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'learned',
-          item: { limitUses: false },
-          learn: { consumeOnLearn: false, dragDropEnabled: true, limitRecipes: false },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: (patch) => emitted.push(patch),
-    });
-
-    target.querySelector('[data-recipe-visibility-limit-recipes]').click();
-    assert.deepEqual(emitted.at(-1), { limitRecipes: true, maxRecipes: 1 });
-  });
+  // The per-item use/learn cap controls (limit-uses, learn-cap, consume-on-learn)
+  // moved off the system-wide visibility card to the Books & Scrolls per-item page
+  // (issue 511); their mounted coverage lives with that page's caps card.
 
   it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
     // Not in player mode ⇒ no visibility section.
@@ -6009,22 +5918,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), true);
     assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), null);
 
-    // Settings routes to the placeholder that cross-references System Overview.
+    // Settings routes to the real crafting-rules page (resolution mode + visibility).
     craftingSubitem('Settings').click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'crafting-settings');
     assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), 'page');
-    assert.ok(target.querySelector('[data-crafting-settings-placeholder]'), 'settings placeholder renders');
+    assert.ok(target.querySelector('[data-crafting-settings]'), 'crafting settings page renders');
     assert.ok(
-      target.textContent.includes('Recipe visibility is configured on the System Overview page'),
-      'settings placeholder cross-references System Overview'
+      target.querySelector('[data-crafting-resolution-mode]'),
+      'the recipe resolution-mode card renders on Crafting Settings'
     );
-    assert.ok(
-      target.querySelector('[data-crafting-settings-open-overview]'),
-      'settings placeholder offers an Open System Overview action'
-    );
-    // The inspector aside is suppressed on the placeholder route.
+    // The inspector aside is suppressed on the crafting-settings route.
     assert.equal(target.querySelector('.manager-inspector'), null);
 
     // Recipes sub-item routes back to the recipes browser.
@@ -10670,50 +10575,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       .querySelector('.manager-system-edit-form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-    // The resolution-mode card IS the selector: one radio row per mode, all four in order,
-    // each with a non-empty description, and the active row matching the system's mode.
-    const modeCard = target.querySelector('#manager-system-resolution-mode');
-    assert.ok(modeCard, 'resolution-mode radiogroup card should render');
-    const activeMode = (card) =>
-      card.querySelector('.manager-resolution-option.is-active')?.dataset
-        .systemResolutionModeOption;
-    const modeRows = [...modeCard.querySelectorAll('[data-system-resolution-mode-option]')];
-    assert.deepEqual(
-      modeRows.map((row) => row.dataset.systemResolutionModeOption),
-      ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'],
-      'the card lists all five modes in order'
-    );
-    assert.ok(
-      modeRows.every(
-        (row) => row.querySelector('.manager-resolution-option-desc')?.textContent.trim().length > 0
-      ),
-      'each mode row has a non-empty description'
-    );
-    assert.ok(
-      modeRows.every((row) =>
-        row.querySelector('input[type="radio"][name="manager-system-resolution-mode"]')
-      ),
-      'each mode row wraps a real radio input'
-    );
+    // Resolution mode moved to the gated Crafting > Settings page (issue 511), so
+    // System Overview no longer carries the resolution-mode card. Identity save and
+    // the optional-feature toggles still live here.
     assert.equal(
-      activeMode(modeCard),
-      'alchemy',
-      'the active row matches the system resolution mode'
-    );
-
-    const routedRadio = modeCard.querySelector(
-      '[data-system-resolution-mode-option="routedByCheck"] input[type="radio"]'
-    );
-    routedRadio.checked = true;
-    routedRadio.dispatchEvent(new Event('change', { bubbles: true }));
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(
-      activeMode(modeCard),
-      'routedByCheck',
-      'selecting the routed-by-check radio moves the active highlight'
+      target.querySelector('#manager-system-resolution-mode'),
+      null,
+      'the resolution-mode card is no longer on System Overview'
     );
 
     target.querySelector('[data-feature-key="gathering"] .manager-status-toggle').click();
@@ -10726,7 +10594,6 @@ describe('CraftingSystemManager mounted behavior', () => {
           call[2] === 'Updated potion work'
       )
     );
-    assert.ok(calls.some((call) => call[0] === 'setResolutionMode' && call[1] === 'routedByCheck'));
     assert.ok(
       calls.some(
         (call) => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false
@@ -10860,31 +10727,45 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('renders the salvage resolution-mode card (simple/progressive/routed) and routes its change', async () => {
-    // Alchemy has no salvageResolutionMode (absent ⇒ simple, the default).
-    const { calls } = await mountCurrencyEditor();
+    // The resolution cards live on the gated Crafting > Settings page now (issue 511).
+    const calls = [];
+    mountCraftingSettingsView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'Alchemy',
+        resolutionMode: 'alchemy',
+        features: { salvage: true },
+        recipeVisibility: { listMode: 'global' },
+        showRecipeVisibilityKnowledgeOptions: false,
+      },
+      onSetSalvageResolutionMode: (mode) => {
+        calls.push(['setSalvageResolutionMode', mode]);
+        return true;
+      },
+    });
 
-    const salvageCard = target.querySelector('[data-system-salvage-resolution-mode]');
+    const salvageCard = target.querySelector('[data-crafting-salvage-resolution-mode]');
     const rows = assertResolutionCard(salvageCard, {
-      optionAttr: 'data-system-salvage-resolution-mode-option',
-      groupName: 'manager-system-salvage-resolution-mode',
+      optionAttr: 'data-crafting-salvage-resolution-mode-option',
+      groupName: 'manager-crafting-salvage-resolution-mode',
       expectedValues: ['simple', 'progressive', 'routed'],
     });
     assert.equal(rows.length, 3, 'salvage card offers exactly three options');
 
     // Simple is the default, so it is the checked radio for a simple/absent system.
     const checked = salvageCard.querySelector(
-      'input[type="radio"][name="manager-system-salvage-resolution-mode"]:checked'
+      'input[type="radio"][name="manager-crafting-salvage-resolution-mode"]:checked'
     );
     assert.ok(checked, 'a salvage radio is checked for a simple/absent system');
     assert.equal(
-      checked.closest('[data-system-salvage-resolution-mode-option]').dataset
-        .systemSalvageResolutionModeOption,
+      checked.closest('[data-crafting-salvage-resolution-mode-option]').dataset
+        .craftingSalvageResolutionModeOption,
       'simple',
       'simple is the default selected salvage mode'
     );
 
     const routedRadio = salvageCard.querySelector(
-      '[data-system-salvage-resolution-mode-option="routed"] input[type="radio"]'
+      '[data-crafting-salvage-resolution-mode-option="routed"] input[type="radio"]'
     );
     routedRadio.checked = true;
     routedRadio.dispatchEvent(new Event('change', { bubbles: true }));
@@ -11431,28 +11312,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-feature-key="craftingChecks"]'), null);
     assert.equal(target.querySelector('[data-feature-key="outcomeRouting"]'), null);
 
-    const modeCard = target.querySelector('#manager-system-resolution-mode');
-    const activeMode = () =>
-      modeCard.querySelector('.manager-resolution-option.is-active')?.dataset
-        .systemResolutionModeOption;
-    assert.equal(activeMode(), 'alchemy');
-    const progressiveRadio = modeCard.querySelector(
-      '[data-system-resolution-mode-option="progressive"] input[type="radio"]'
-    );
-    progressiveRadio.checked = true;
-    progressiveRadio.dispatchEvent(new Event('change', { bubbles: true }));
-    await Promise.resolve();
-    await tick();
-    flushSync();
-    // A rejected change reverts the selection: the active row and checked radio return to the system's mode.
-    assert.equal(activeMode(), 'alchemy');
-    assert.equal(
-      modeCard.querySelector('input[type="radio"][name="manager-system-resolution-mode"]:checked')
-        ?.value,
-      'alchemy',
-      'the rejected change re-checks the previously-selected radio'
-    );
-
+    // Resolution-mode rollback moved to the Crafting Settings page (issue 511); the
+    // optional-feature toggle rollback still lives on System Overview.
     const gathering = target.querySelector('[data-feature-key="gathering"] .manager-status-toggle');
     assert.equal(gathering.getAttribute('aria-pressed'), 'true');
     gathering.click();
@@ -11461,11 +11322,49 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(gathering.getAttribute('aria-pressed'), 'true');
 
-    assert.ok(calls.some((call) => call[0] === 'setResolutionMode' && call[1] === 'progressive'));
     assert.ok(
       calls.some(
         (call) => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false
       )
+    );
+  });
+
+  it('CraftingSettingsView rolls back the resolution radio when the store rejects the change', async () => {
+    // The resolution-mode confirm-then-migrate flow can be cancelled (store returns
+    // false); the card must revert to the system's mode (issue 511).
+    mountCraftingSettingsView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'Alchemy',
+        resolutionMode: 'alchemy',
+        features: {},
+        recipeVisibility: { listMode: 'global' },
+        showRecipeVisibilityKnowledgeOptions: false,
+      },
+      onSetResolutionMode: async () => false,
+    });
+
+    const modeCard = target.querySelector('#manager-crafting-resolution-mode');
+    const activeMode = () =>
+      modeCard.querySelector('.manager-resolution-option.is-active')?.dataset
+        .craftingResolutionModeOption;
+    assert.equal(activeMode(), 'alchemy');
+
+    const progressiveRadio = modeCard.querySelector(
+      '[data-crafting-resolution-mode-option="progressive"] input[type="radio"]'
+    );
+    progressiveRadio.checked = true;
+    progressiveRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(activeMode(), 'alchemy', 'a rejected change reverts to the system mode');
+    assert.equal(
+      modeCard.querySelector('input[type="radio"][name="manager-crafting-resolution-mode"]:checked')
+        ?.value,
+      'alchemy',
+      'the rejected change re-checks the previously-selected radio'
     );
   });
 

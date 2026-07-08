@@ -13,8 +13,6 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import IconPicker from '../../components/IconPicker.svelte';
-  import ResolutionModeCard from './ResolutionModeCard.svelte';
-  import SystemRecipeVisibilityCard from './recipe/SystemRecipeVisibilityCard.svelte';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';
 
@@ -38,10 +36,7 @@
     onSelectIssue = () => {},
     onShowSystemOverview = () => {},
     onSaveDetails = () => {},
-    onSetResolutionMode = async () => true,
-    onSetSalvageResolutionMode = async () => true,
     onToggleFeature = async () => true,
-    onSaveVisibilityConfig = () => {},
     characterModifierLibrary = [],
     characterModifierPresetsSupported = false,
     onAddCharacterModifier = async () => null,
@@ -322,17 +317,10 @@
 
   let systemNameValue = $state('');
   let systemDescriptionValue = $state('');
-  let systemResolutionModeValue = $state('simple');
-  // Salvage defaults to `simple` (one result group, optional pass/fail check).
-  // The stored mode is already normalized to `simple`/`routed`/`progressive`, so
-  // the matching radio is always selected.
-  let systemSalvageResolutionModeValue = $state('simple');
 
   $effect(() => {
     systemNameValue = selectedSystem?.name ?? '';
     systemDescriptionValue = selectedSystem?.description ?? '';
-    systemResolutionModeValue = selectedSystem?.resolutionMode ?? 'simple';
-    systemSalvageResolutionModeValue = selectedSystem?.salvageResolutionMode ?? 'simple';
   });
 
   const featureDefinitions = [
@@ -343,24 +331,6 @@
     { systemKey: 'propertyMacros', storeKey: 'propertyMacros', labelKey: 'FABRICATE.Admin.Manager.Feature.PropertyMacros', fallback: 'Property macros', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.PropertyMacros', hintFallback: 'Allows macro-backed component property behavior.' },
     { systemKey: 'effectTransfer', storeKey: 'effectTransfer', labelKey: 'FABRICATE.Admin.Manager.Feature.EffectTransfer', fallback: 'Effect transfer', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.EffectTransfer', hintFallback: 'Allows crafted results to inherit effects from source components.' },
     { systemKey: 'chatOutput', storeKey: 'chatOutput', labelKey: 'FABRICATE.Admin.Manager.Feature.ChatOutput', fallback: 'Chat output', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.ChatOutput', hintFallback: 'Posts a summary chat card after crafting and gathering attempts.' }
-  ];
-
-  const resolutionModeOptions = [
-    { value: 'simple', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimple', fallback: 'Simple', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimpleDesc', descFallback: 'One ingredient set and one result group, with an optional pass/fail check.' },
-    { value: 'routedByIngredients', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByIngredients', fallback: 'Routed by ingredients', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByIngredientsDesc', descFallback: 'Multiple ingredient sets and result groups; the chosen ingredient set selects which result group is produced. The crafting check is optional.' },
-    { value: 'routedByCheck', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByCheck', fallback: 'Routed by check', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByCheckDesc', descFallback: 'Multiple ingredient sets and result groups; the crafting check outcome selects which result group is produced. Requires a crafting check.' },
-    { value: 'progressive', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive', fallback: 'Progressive', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressiveDesc', descFallback: 'One ingredient set and one ordered result group; a numeric check awards every result whose difficulty threshold is met.' },
-    { value: 'alchemy', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy', fallback: 'Alchemy', descKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemyDesc', descFallback: 'Players submit ingredient combinations directly to discover hidden recipes; one result is selected per attempt.' }
-  ];
-
-  // Salvage has exactly one ingredient, so ingredient-set routing is meaningless;
-  // `alchemy` is also not offered. The default `simple` returns one result group
-  // with an optional pass/fail salvage check. For routed, the canonical persisted
-  // token stays `routed`; the display name is "Routed by check".
-  const salvageResolutionModeOptions = [
-    { value: 'simple', labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionSimple', fallback: 'Simple', descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionSimpleDesc', descFallback: 'One result group, with an optional pass/fail salvage check.' },
-    { value: 'progressive', labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionProgressive', fallback: 'Progressive', descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionProgressiveDesc', descFallback: 'One ordered result group; a numeric salvage check awards every result whose difficulty threshold is met.' },
-    { value: 'routed', labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionRouted', fallback: 'Routed by check', descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionRoutedDesc', descFallback: 'Multiple result groups; the salvage check outcome selects which result group is returned.' }
   ];
 
   const visibleFeatures = $derived(featureDefinitions.filter(feature => hasFeatureKey(selectedSystem, feature.systemKey)));
@@ -377,25 +347,6 @@
   function handleSubmit(event) {
     event.preventDefault();
     onSaveDetails(systemNameValue, systemDescriptionValue);
-  }
-
-  async function handleResolutionModeChange(nextValue) {
-    const nextMode = nextValue || 'simple';
-    systemResolutionModeValue = nextMode;
-    const didApply = await onSetResolutionMode(nextMode);
-    if (didApply === false) {
-      systemResolutionModeValue = selectedSystem?.resolutionMode ?? 'simple';
-    }
-  }
-
-  async function handleSalvageResolutionModeChange(nextValue) {
-    const previousValue = systemSalvageResolutionModeValue;
-    const nextMode = nextValue || 'progressive';
-    systemSalvageResolutionModeValue = nextMode;
-    const didApply = await onSetSalvageResolutionMode(nextMode);
-    if (didApply === false) {
-      systemSalvageResolutionModeValue = previousValue;
-    }
   }
 
   async function handleToggleFeature(feature) {
@@ -455,33 +406,6 @@
             <span>{text('FABRICATE.Admin.SystemSettings.Description', 'Description')}</span>
             <textarea id="manager-system-description" rows="4" bind:value={systemDescriptionValue}></textarea>
           </label>
-          <ResolutionModeCard
-            cardId="manager-system-resolution-mode"
-            legendKey="FABRICATE.Admin.SystemSettings.ResolutionMode"
-            legendFallback="Recipe resolution mode"
-            hintKey="FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint"
-            hintFallback="Changing resolution mode migrates recipes to the new mode where possible and only deletes recipes that cannot be migrated, after a confirmation that reports the counts."
-            options={resolutionModeOptions}
-            selectedValue={systemResolutionModeValue}
-            groupName="manager-system-resolution-mode"
-            dataAttr="data-system-resolution-mode"
-            optionDataAttr="data-system-resolution-mode-option"
-            onChange={handleResolutionModeChange}
-          />
-          {#if selectedSystem.features?.salvage === true}
-            <ResolutionModeCard
-              legendKey="FABRICATE.Admin.SystemSettings.SalvageResolutionMode"
-              legendFallback="Salvage resolution mode"
-              hintKey="FABRICATE.Admin.SystemSettings.SalvageResolutionModeHint"
-              hintFallback="Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled."
-              options={salvageResolutionModeOptions}
-              selectedValue={systemSalvageResolutionModeValue}
-              groupName="manager-system-salvage-resolution-mode"
-              dataAttr="data-system-salvage-resolution-mode"
-              optionDataAttr="data-system-salvage-resolution-mode-option"
-              onChange={handleSalvageResolutionModeChange}
-            />
-          {/if}
         </div>
       </section>
 
@@ -529,14 +453,6 @@
           </div>
         </div>
       </section>
-
-      {#if selectedSystem.resolutionMode !== 'alchemy'}
-        <SystemRecipeVisibilityCard
-          recipeVisibility={selectedSystem.recipeVisibility}
-          showKnowledgeOptions={selectedSystem.showRecipeVisibilityKnowledgeOptions}
-          onSave={onSaveVisibilityConfig}
-        />
-      {/if}
 
       {#if gatheringEnabled}
         <section class="manager-edit-card manager-character-modifier-card" data-system-character-modifiers aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title', 'Character modifiers')}>

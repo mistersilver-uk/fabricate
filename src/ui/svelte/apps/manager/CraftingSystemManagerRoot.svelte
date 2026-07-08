@@ -34,6 +34,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import BooksScrollsView from './BooksScrollsView.svelte';
+  import CraftingSettingsView from './CraftingSettingsView.svelte';
   import RecipeEditView from './RecipeEditView.svelte';
   import RecipeItemInspector from './RecipeItemInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
@@ -1200,8 +1201,8 @@
       labelFallback: 'Settings',
       titleKey: 'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle',
       titleFallback: 'Crafting settings',
-      hintKey: 'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderHint',
-      hintFallback: 'Recipe visibility is configured on the System Overview page. This section is reserved for future system-level crafting rules.'
+      hintKey: 'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsHint',
+      hintFallback: 'System-level crafting rules: resolution mode and recipe visibility.'
     },
     {
       id: 'recipes',
@@ -4745,24 +4746,12 @@
     {:else if currentView === 'crafting-settings' && selectedSystem}
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle', 'Crafting settings')}>
         <section class="manager-environment-editor-shell">
-          <section class="manager-inspector-card" data-crafting-settings-placeholder>
-            <div class="manager-inspector-title-row is-hero-large">
-              <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-                <i class="fas fa-sliders"></i>
-              </span>
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}</p>
-                <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle', 'Crafting settings')}</h2>
-              </div>
-            </div>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderHint', 'Recipe visibility is configured on the System Overview page. This section is reserved for future system-level crafting rules.')}</p>
-            <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsLinks', 'Crafting settings links')}>
-              <button type="button" class="manager-button is-primary" data-crafting-settings-open-overview onclick={() => editSystem(selectedSystem.id)}>
-                <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.OpenSystemOverview', 'Open System Overview')}</span>
-              </button>
-            </div>
-          </section>
+          <CraftingSettingsView
+            {selectedSystem}
+            onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
+            onSetSalvageResolutionMode={(nextMode) => store.setSalvageResolutionMode?.(nextMode)}
+            onSaveVisibilityConfig={(cfg) => store.saveVisibilityConfig?.(cfg)}
+          />
         </section>
       </main>
     {:else if currentView === 'books-scrolls' && selectedSystem}
@@ -4802,10 +4791,7 @@
         onSelectIssue={(issue) => selectOverviewIssue(issue)}
         onShowSystemOverview={showSystemOverview}
         onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
-        onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
-        onSetSalvageResolutionMode={(nextMode) => store.setSalvageResolutionMode?.(nextMode)}
         onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
-        onSaveVisibilityConfig={(cfg) => store.saveVisibilityConfig?.(cfg)}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         {characterModifierPresetsSupported}
         onAddCharacterModifier={onAddCharacterModifier}

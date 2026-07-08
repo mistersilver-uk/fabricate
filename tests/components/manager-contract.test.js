@@ -11,6 +11,8 @@ const essenceBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/Essence
 const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte');
 const tagsCategoriesPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
 const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte');
+const craftingSettingsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
+const resolutionModeOptionsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js');
 const systemsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
 const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
 const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
@@ -29,6 +31,8 @@ const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
 const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
+const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
+const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
 const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
@@ -42,7 +46,7 @@ const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerSource = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
+const managerSource = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, craftingSettingsSource, resolutionModeOptionsSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
 
 function catalogValue(key) {
   return key.split('.').reduce((node, part) => node?.[part], lang);
@@ -547,14 +551,15 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('renames the recipe resolution-mode legend and offers a salvage resolution-mode card', () => {
-    // The recipe card legend is renamed; its only consumer is this legend.
+    // The recipe card legend is renamed; its consumer is now the Crafting Settings
+    // page (issue 511 moved the resolution cards off System Overview).
     assert.equal(lang.FABRICATE.Admin.SystemSettings.ResolutionMode, 'Recipe resolution mode');
-    assert.ok(systemEditSource.includes("legendFallback=\"Recipe resolution mode\""), 'system edit inline fallback should match the renamed value');
+    assert.ok(craftingSettingsSource.includes("legendFallback=\"Recipe resolution mode\""), 'crafting settings inline fallback should match the renamed value');
 
     // Salvage card source hooks: fieldset + option attribute names and the radio group name.
-    assert.ok(systemEditSource.includes('data-system-salvage-resolution-mode'), 'system edit should declare the salvage fieldset hook');
-    assert.ok(systemEditSource.includes('data-system-salvage-resolution-mode-option'), 'system edit should declare the salvage option hook');
-    assert.ok(systemEditSource.includes('manager-system-salvage-resolution-mode'), 'system edit should use the dedicated salvage radio group name');
+    assert.ok(craftingSettingsSource.includes('data-crafting-salvage-resolution-mode'), 'crafting settings should declare the salvage fieldset hook');
+    assert.ok(craftingSettingsSource.includes('data-crafting-salvage-resolution-mode-option'), 'crafting settings should declare the salvage option hook');
+    assert.ok(craftingSettingsSource.includes('manager-crafting-salvage-resolution-mode'), 'crafting settings should use the dedicated salvage radio group name');
 
     // New salvage i18n keys are present and non-empty.
     for (const key of [
@@ -575,17 +580,17 @@ describe('CraftingSystemManager source contract', () => {
 
     // Salvage option-set guard: the salvage options offer simple (default) +
     // progressive + routed, but never alchemy (no ingredient-set routing).
-    const salvageOptionsMatch = systemEditSource.match(/salvageResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
-    assert.ok(salvageOptionsMatch, 'system edit should define a salvageResolutionModeOptions array');
+    const salvageOptionsMatch = resolutionModeOptionsSource.match(/salvageResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
+    assert.ok(salvageOptionsMatch, 'the shared module should define a salvageResolutionModeOptions array');
     const salvageOptionsBlock = salvageOptionsMatch[1];
     assert.ok(salvageOptionsBlock.includes("value: 'simple'"), 'salvage should offer simple');
     assert.ok(salvageOptionsBlock.includes("value: 'progressive'"), 'salvage should offer progressive');
     assert.ok(salvageOptionsBlock.includes("value: 'routed'"), 'salvage should offer routed');
     assert.ok(!salvageOptionsBlock.includes("value: 'alchemy'"), 'salvage should NOT offer alchemy');
 
-    // Persistence wiring threaded from the root through the edit view to the store.
-    assert.ok(systemEditSource.includes('onSetSalvageResolutionMode'), 'system edit should accept the salvage persistence prop');
-    assert.ok(rootSource.includes('store.setSalvageResolutionMode?.'), 'root should pass the salvage callback through to the system-edit view');
+    // Persistence wiring threaded from the root through the crafting settings view to the store.
+    assert.ok(craftingSettingsSource.includes('onSetSalvageResolutionMode'), 'crafting settings should accept the salvage persistence prop');
+    assert.ok(rootSource.includes('store.setSalvageResolutionMode?.'), 'root should pass the salvage callback through to the crafting settings view');
   });
 
   it('offers a gathering resolution-mode card with d100 selectable and progressive/routed coming soon', () => {
