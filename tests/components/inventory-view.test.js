@@ -333,7 +333,7 @@ function makeBookServices(book, { learningRecipeId = null } = {}) {
   return { services, calls, store };
 }
 
-function makeBook(recipes, limits = { uses: null, learning: null }, learnable = true) {
+function makeBook(recipes, limits = { uses: null, learning: null }, learnable = true, craftable = false) {
   return {
     key: 'recipeitem:sys:def-1',
     recipeItemId: 'def-1',
@@ -348,6 +348,7 @@ function makeBook(recipes, limits = { uses: null, learning: null }, learnable = 
     isTool: false,
     isRecipeItem: true,
     learnable,
+    craftable,
     totalQuantity: 1,
     sources: [{ actorId: 'a1', actorName: 'Akra', actorImg: null, quantity: 1 }],
     essences: [],
@@ -528,21 +529,33 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.equal(detail.querySelector('[data-inventory-learned="r1"]'), null, 'no Learned chip in item-only mode');
   });
 
-  it('shows a USE-based CTA in item mode (not Read & learn)', async () => {
+  it('shows a Craft CTA + Craft buttons (not Learn) in item mode, plus a uses chip', async () => {
     const book = makeBook(
       [{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }],
       { uses: { max: 3, used: 1, remaining: 2 }, learning: null },
-      false
+      false, // not learnable
+      true // craftable (item mode)
     );
-    const { services } = makeBookServices(book);
+    const { services, calls } = makeBookServices(book);
     const target = await harness.mount({ services });
     await settle();
 
-    const cta = target.querySelector('[data-inventory-recipe-item] [data-inventory-read-learn]');
-    assert.ok(cta, 'renders the CTA in item mode');
-    // The harness localize mock emits `key:{data}`; assert the Use-based key + remaining.
-    assert.match(cta.textContent, /UseMore/, 'item mode uses the "Use N more times" label');
-    assert.match(cta.textContent, /"remaining":2/);
-    assert.doesNotMatch(cta.textContent, /ReadLearn/, 'not a read & learn label in item mode');
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    // Uses chip under the name.
+    assert.ok(detail.querySelector('[data-inventory-uses-chip]'), 'shows a uses chip');
+    // The CTA is Craft-based, not read & learn.
+    const cta = detail.querySelector('[data-inventory-read-learn]');
+    assert.match(cta.textContent, /CraftRecipes/, 'item mode uses the "Craft N recipes" label');
+    assert.doesNotMatch(cta.textContent, /ReadLearn/);
+
+    cta.click();
+    await settle();
+    // The per-recipe control is Craft (wired to navigate to the recipe), not Learn.
+    assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item mode');
+    const craft = detail.querySelector('[data-inventory-craft="r1"]');
+    assert.ok(craft, 'renders a Craft button');
+    craft.click();
+    await settle();
+    assert.deepEqual(calls.navigate, ['r1'], 'Craft navigates to the recipe to craft it');
   });
 });

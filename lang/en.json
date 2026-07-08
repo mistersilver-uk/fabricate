@@ -439,7 +439,9 @@
           "UseOnce": "Use once",
           "UseOneMore": "Use one more time",
           "UseMore": "Use {remaining} more times",
-          "UseSpent": "No uses left"
+          "UseSpent": "No uses left",
+          "CraftRecipes": "Craft {total} recipes",
+          "CraftAction": "Craft"
         }
       },
       "ActorBar": {
@@ -3432,7 +3434,7 @@
           "FilterLabel": "Filter recipes by access",
           "FilterNone": "No access",
           "Filters": "Access filters",
-          "GrantChip": "{chars} char · {players} player",
+          "GrantChip": "{chars} character · {players} player",
           "GrantTitle": "Grant access",
           "Hint": "Grant individual recipes to specific characters or players. Only granted recipes are visible to them.",
           "Inspector": "Grant access inspector",
@@ -3558,7 +3560,8 @@
             "ReadLearnUpTo": "Read & learn up to {n} of {total}",
             "UseAnytime": "Use anytime",
             "UseOnce": "Use once",
-            "UseUpTo": "Use up to {n} times"
+            "UseUpTo": "Use up to {n} times",
+            "CraftRecipes": "Craft {n} recipes"
           },
           "Rail": {
             "EffectiveRules": "Effective rules",

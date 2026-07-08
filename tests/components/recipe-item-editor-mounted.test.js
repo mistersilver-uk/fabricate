@@ -95,9 +95,9 @@ describe('RecipeItemEditor (mounted)', () => {
       activeTab: 'overview',
       visibilityMode: 'item'
     });
+    // Item mode: the use cap is the badge under the name; the CTA is CRAFT-based.
     assert.match(root.querySelector('[data-recipe-item-preview-badge]').textContent, /5 uses/);
-    // Item mode: the CTA is USE-based (maxUses cap), not "read & learn".
-    assert.match(root.querySelector('[data-recipe-item-preview-cta]').textContent, /Use up to 5 times/i);
+    assert.match(root.querySelector('[data-recipe-item-preview-cta]').textContent, /Craft 2 recipes/i);
     const rules = root.querySelector('[data-recipe-item-rules]').textContent;
     assert.match(rules, /5 uses per copy/);
     assert.match(rules, /inert/i);

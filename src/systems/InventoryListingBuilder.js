@@ -399,13 +399,19 @@ export class InventoryListingBuilder {
 
     const visibility = system?.recipeVisibility ?? {};
     const knowledge = visibility?.knowledge ?? {};
-    // A recipe item is an inventory row in any knowledge list mode — it is a book
-    // the player owns regardless of how it grants access. `learnable` gates the
-    // Learn affordance: only `learned` / `itemOrLearned` modes teach from it; an
-    // item-only mode book grants craft access by being held, so it lists its
-    // recipes and craft-use limit but offers no Learn button.
-    if (visibility?.listMode !== 'knowledge') return [];
-    const mode = knowledge?.mode || 'itemOrLearned';
+    // Resolve the effective book access mode from the flat `visibilityMode` enum when
+    // present (issue 511) — `item` → item-access, `knowledge` → item + learning —
+    // falling back to the legacy `recipeVisibility.listMode`/`knowledge.mode` pair.
+    // `learnable` gates the Learn affordance (learned / itemOrLearned); `grantsByItem`
+    // gates the held-book craft affordance + its craft-use limit. A flat `item` book
+    // therefore lists Craft controls, never Learn.
+    const flat = system?.visibilityMode;
+    let mode;
+    if (flat === 'item') mode = 'item';
+    else if (flat === 'knowledge') mode = 'itemOrLearned';
+    else if (['global', 'restricted'].includes(flat)) return [];
+    else if (visibility?.listMode === 'knowledge') mode = knowledge?.mode || 'itemOrLearned';
+    else return [];
     const learnable = LEARN_CAPABLE_MODES.has(mode);
     const grantsByItem = ITEM_ACCESS_MODES.has(mode);
 
@@ -521,6 +527,10 @@ export class InventoryListingBuilder {
         isTool: false,
         isRecipeItem: true,
         learnable,
+        // Item-mode books grant crafting by being held (not learning): the player
+        // crafts their recipes directly. Exclusive with `learnable` so the UI shows
+        // one affordance — Learn (knowledge) or Craft (item).
+        craftable: grantsByItem && !learnable,
         totalQuantity,
         sources: rowSources,
         essences: [],

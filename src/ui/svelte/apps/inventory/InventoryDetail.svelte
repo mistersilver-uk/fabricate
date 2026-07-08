@@ -110,31 +110,31 @@
   // The CTA label mirrors the GM preview: "Read & learn up to {n} of {total}" when a
   // learn cap restricts, "Read & learn {total}" when learnable without a cap, and
   // "View {total} recipes" for an item-only (non-learnable) book.
+  // Item-mode books grant crafting by being held: the CTA + per-recipe buttons CRAFT
+  // (navigate to the recipe) rather than Learn. Exclusive with `learnable`.
+  const craftable = $derived(item?.craftable === true);
   const recipeTotal = $derived(bookRecipes.length);
   const learnRemaining = $derived(learningLimit ? Number(learningLimit.remaining ?? 0) : null);
   const readLearnLabel = $derived.by(() => {
     if (recipeTotal === 0) return localize('FABRICATE.App.Inventory.Detail.NoRecipes');
-    // Item mode (non-learnable): the held book grants crafting access, so the CTA is
-    // USE-based, reflecting how many times it can still be used.
-    if (!learnable) {
-      if (!usesLimit) return localize('FABRICATE.App.Inventory.Detail.UseAnytime');
-      const remaining = Number(usesLimit.remaining ?? 0);
-      const max = Number(usesLimit.max ?? 0);
-      if (remaining <= 0) return localize('FABRICATE.App.Inventory.Detail.UseSpent');
-      if (max === 1) return localize('FABRICATE.App.Inventory.Detail.UseOnce');
-      if (remaining === 1) return localize('FABRICATE.App.Inventory.Detail.UseOneMore');
-      return localize('FABRICATE.App.Inventory.Detail.UseMore', { remaining });
+    if (craftable) {
+      return localize('FABRICATE.App.Inventory.Detail.CraftRecipes', { total: recipeTotal });
     }
-    // Knowledge mode: read & learn.
-    if (learnRemaining != null && learnRemaining < recipeTotal) {
+    if (learnable && learnRemaining != null && learnRemaining < recipeTotal) {
       return localize('FABRICATE.App.Inventory.Detail.ReadLearnUpTo', {
         remaining: Math.max(0, learnRemaining),
         total: recipeTotal,
       });
     }
-    return localize('FABRICATE.App.Inventory.Detail.ReadLearnAll', { total: recipeTotal });
+    if (learnable) return localize('FABRICATE.App.Inventory.Detail.ReadLearnAll', { total: recipeTotal });
+    return localize('FABRICATE.App.Inventory.Detail.ViewRecipes', { total: recipeTotal });
   });
-  const readLearnIcon = $derived(learnable ? 'fas fa-book-open-reader' : 'fas fa-screwdriver-wrench');
+  const readLearnIcon = $derived(
+    craftable ? 'fas fa-hammer' : learnable ? 'fas fa-book-open-reader' : 'fas fa-list'
+  );
+  function craftRecipe(recipeId) {
+    if (recipeId) onOpenRecipe?.(recipeId);
+  }
   function toggleRecipesExpanded() {
     recipesExpanded = !recipesExpanded;
   }
@@ -242,6 +242,18 @@
   {/if}
 {/snippet}
 
+{#snippet craftControl(recipe)}
+  <button
+    type="button"
+    class="inventory-detail-craft-btn"
+    data-inventory-craft={recipe.id}
+    onclick={() => craftRecipe(recipe.id)}
+  >
+    <i class="fas fa-hammer" aria-hidden="true"></i>
+    <span>{localize('FABRICATE.App.Inventory.Detail.CraftAction')}</span>
+  </button>
+{/snippet}
+
 {#if !item}
   <div class="inventory-detail-empty" data-inventory-detail-empty>
     <i class="fas fa-boxes-stacked" aria-hidden="true"></i>
@@ -258,6 +270,12 @@
         </p>
         <div class="inventory-detail-chips">
           <span class="inventory-chip inventory-chip-type">{localize('FABRICATE.App.Inventory.Detail.TypeRecipeItem')}</span>
+          {#if usesLimit}
+            <span class="inventory-chip inventory-chip-uses" data-inventory-uses-chip>
+              <i class="fas fa-fire-flame-curved" aria-hidden="true"></i>
+              {remainingText(usesLimit.remaining, 'UsesRemainingOne', 'UsesRemainingMany')}
+            </span>
+          {/if}
         </div>
         {#if bookDescription}
           <p class="inventory-detail-book-desc">{bookDescription}</p>
@@ -318,7 +336,7 @@
               <CraftingThumb src={recipe.img ?? ''} alt="" size={40} />
               <span class="inventory-detail-row-name">{recipe.name}</span>
             </span>
-            {#if learnable}{@render learnControl(recipe)}{/if}
+            {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(recipe)}{/if}
           </div>
           {#if recipe.description}
             <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
@@ -363,7 +381,7 @@
                       aria-hidden="true"
                     ></i>
                   </button>
-                  {#if learnable}{@render learnControl(recipe)}{/if}
+                  {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(recipe)}{/if}
                 </div>
                 {#if expanded}
                   <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
@@ -959,7 +977,8 @@
   }
 
   /* The Learn button + the Learned chip share the trailing slot in a recipe row. */
-  .inventory-detail-learn-btn {
+  .inventory-detail-learn-btn,
+  .inventory-detail-craft-btn {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -975,12 +994,14 @@
     white-space: nowrap;
   }
 
-  .inventory-detail-learn-btn:hover:not(:disabled) {
+  .inventory-detail-learn-btn:hover:not(:disabled),
+  .inventory-detail-craft-btn:hover:not(:disabled) {
     background: var(--fab-accent);
     color: var(--fab-on-accent);
   }
 
-  .inventory-detail-learn-btn:focus-visible {
+  .inventory-detail-learn-btn:focus-visible,
+  .inventory-detail-craft-btn:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
@@ -988,6 +1009,10 @@
   .inventory-detail-learn-btn:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  .inventory-chip-uses i {
+    font-size: 10px;
   }
 
   .inventory-detail-learned {
