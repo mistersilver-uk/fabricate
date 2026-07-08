@@ -616,7 +616,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     };
   }
 
-  function bookSystem({ knowledge } = {}) {
+  function bookSystem({ knowledge, caps } = {}) {
     return {
       id: 'sys-b',
       name: 'Arcana',
@@ -629,6 +629,9 @@ describe('InventoryListingBuilder — recipe-item books', () => {
           img: 'icons/book.webp',
           description: 'A tome of spells.',
           sourceItemUuid: 'Item.book1',
+          // Per-item caps (issue 511) — the canonical source the builder reads for the
+          // book's use/learn limits + access badge.
+          caps: caps ?? { item: {}, learn: {} },
         },
       ],
       recipeVisibility: {
@@ -752,11 +755,8 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     // Even with a learn cap configured, an item-only book must not show a learning
     // limit — it grants access by being held, not by learning.
     const system = bookSystem({
-      knowledge: {
-        mode: 'item',
-        item: { limitUses: true, maxUses: 3 },
-        learn: { limitRecipes: true, maxRecipes: 2 },
-      },
+      knowledge: { mode: 'item' },
+      caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitRecipes: true, maxRecipes: 2 } },
     });
     const book = bookItem('Item.book1', 1, { recipeItemUsage: { timesUsed: 1 } });
     const listing = bookBuilder({ system }).buildListing({
@@ -784,11 +784,8 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   it('reports both learning and use limits for an item-or-learned book', () => {
     // Item-or-learned grants access both ways, so both limits are meaningful.
     const system = bookSystem({
-      knowledge: {
-        mode: 'itemOrLearned',
-        item: { limitUses: true, maxUses: 3 },
-        learn: { limitRecipes: true, maxRecipes: 2 },
-      },
+      knowledge: { mode: 'itemOrLearned' },
+      caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitRecipes: true, maxRecipes: 2 } },
     });
     const book = bookItem('Item.book1', 1, {
       recipeItemLearning: { learnedCount: 1 },
@@ -804,11 +801,8 @@ describe('InventoryListingBuilder — recipe-item books', () => {
 
   it('suppresses the craft-use limit for a learn-only (learned) book', () => {
     const system = bookSystem({
-      knowledge: {
-        mode: 'learned',
-        item: { limitUses: true, maxUses: 3 },
-        learn: { limitRecipes: true, maxRecipes: 2 },
-      },
+      knowledge: { mode: 'learned' },
+      caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitRecipes: true, maxRecipes: 2 } },
     });
     const book = bookItem('Item.book1', 1, {
       recipeItemLearning: { learnedCount: 1 },
@@ -824,7 +818,8 @@ describe('InventoryListingBuilder — recipe-item books', () => {
 
   it('treats an enabled-but-invalid cap as uncapped (no learning limit)', () => {
     const system = bookSystem({
-      knowledge: { mode: 'learned', item: {}, learn: { limitRecipes: true, maxRecipes: 0 } },
+      knowledge: { mode: 'learned' },
+      caps: { item: {}, learn: { limitRecipes: true, maxRecipes: 0 } },
     });
     const listing = bookBuilder({ system }).buildListing({
       craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),

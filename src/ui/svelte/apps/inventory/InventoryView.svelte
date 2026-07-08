@@ -53,6 +53,9 @@
   function onLearn(recipeId) {
     return store?.learn?.(recipeId);
   }
+  function onLearnAll(recipeIds) {
+    return store?.learnAll?.(recipeIds);
+  }
 
   // Refetch on mount and whenever the shared actor selection changes. The shared
   // top bar is the single source of truth for the selected character; persist its
@@ -138,6 +141,7 @@
           learningRecipeId={store?.learningRecipeId ?? null}
           {onOpenRecipe}
           {onLearn}
+          {onLearnAll}
         />
       </section>
     </div>

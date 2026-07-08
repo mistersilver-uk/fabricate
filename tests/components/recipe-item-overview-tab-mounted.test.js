@@ -35,13 +35,14 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('RecipeItemOverviewTab (mounted)', () => {
-  it('renders the filled link chip with name, uuid, copy and unlink', async () => {
+  it('renders the filled link chip with name, copy and unlink (no raw UUID text)', async () => {
     const root = await harness.mount({
       recipeItem: { id: 'ri1', enabled: true, caps: { item: {}, learn: {} } },
       linkedItem: LINKED_ITEM
     });
     assert.ok(root.querySelector('[data-recipe-item-link]'), 'expected the filled link chip');
-    assert.equal(root.querySelector('[data-recipe-item-uuid]').textContent.trim(), 'Item.abc');
+    // The raw UUID text is no longer shown — the Copy button carries it.
+    assert.equal(root.querySelector('[data-recipe-item-uuid]'), null);
     assert.equal(root.querySelector('[data-recipe-item-name]').textContent.trim(), 'Ashfall Compendium');
     assert.equal(root.querySelector('[data-recipe-item-description]').textContent.trim(), 'A heavy tome.');
     assert.ok(root.querySelector('[data-recipe-item-copy-uuid]'));

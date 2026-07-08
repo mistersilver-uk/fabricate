@@ -10,6 +10,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-item-editor-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/recipeItemAccessBadge.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

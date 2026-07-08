@@ -215,6 +215,41 @@ export function createInventoryStore({ services } = {}) {
     }
   }
 
+  /**
+   * Learn several recipes from an owned book in one action — the knowledge-mode
+   * "Read & learn all N recipes" convenience (only offered when the reader can learn
+   * everything). Learns sequentially through the same per-recipe seam, stopping on the
+   * first failure (surfacing its message), and reloads once at the end.
+   *
+   * @param {string[]} recipeIds
+   * @returns {Promise<{success: boolean}>}
+   */
+  async function learnAll(recipeIds = []) {
+    const ids = (Array.isArray(recipeIds) ? recipeIds : []).filter(Boolean);
+    if (!ids.length || learningRecipeId) return { success: false };
+    learningRecipeId = '*';
+    try {
+      let anyLearned = false;
+      for (const recipeId of ids) {
+        const result = await services?.learnRecipeFromInventory?.({
+          actorId: currentActorId(),
+          recipeId,
+          componentSourceActorIds: currentSourceIds(),
+        });
+        if (result?.success) {
+          anyLearned = true;
+        } else {
+          if (result?.message) services?.notify?.(result.message);
+          break;
+        }
+      }
+      if (anyLearned) await load(true);
+      return { success: anyLearned };
+    } finally {
+      learningRecipeId = null;
+    }
+  }
+
   /** Select an item by key. */
   function select(key) {
     selectedKey = key ?? null;
@@ -313,6 +348,7 @@ export function createInventoryStore({ services } = {}) {
     },
     load,
     learn,
+    learnAll,
     select,
     setSearch,
     setFilter,

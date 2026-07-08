@@ -539,7 +539,28 @@ export class InventoryListingBuilder {
         producedBy: [],
         contributors: [],
         recipes: linkedRecipes,
-        limits: this._recipeItemLimits(knowledge, item, { learnable, grantsByItem }),
+        // Per-item access caps (issue 511) for the book-detail access badge + the
+        // learn-all convenience CTA, read from the canonical per-item `def.caps` and
+        // suppressed by applicability: the use cap only for a held (item) book, the
+        // learn cap only for a teachable book.
+        caps: {
+          item: grantsByItem
+            ? { limitUses: def?.caps?.item?.limitUses === true, maxUses: def?.caps?.item?.maxUses }
+            : { limitUses: false },
+          learn: learnable
+            ? {
+                limitLearning:
+                  def?.caps?.learn?.limitLearning === true ||
+                  def?.caps?.learn?.limitRecipes === true,
+                learnsAllowed: def?.caps?.learn?.learnsAllowed ?? def?.caps?.learn?.maxRecipes,
+                learnScope: def?.caps?.learn?.learnScope,
+                learningMode: def?.caps?.learn?.learningMode,
+              }
+            : { limitLearning: false },
+        },
+        // Runtime remaining budgets (per owned document) — greys out a spent Learn
+        // control. `caps` above drives the access badge + the learn-all convenience.
+        limits: this._recipeItemLimits(def, item, { learnable, grantsByItem }),
       });
     }
 
@@ -579,38 +600,37 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * The book's use / learn limit readouts from the system knowledge config and a
-   * representative owned document's counters. Each is null unless its cap is
-   * enabled with a finite positive maximum, mirroring how the runtime treats an
-   * invalid cap as uncapped.
+   * The book's use / learn limit readouts from its canonical per-item `def.caps` and a
+   * representative owned document's runtime counters. Each is null unless its cap is
+   * enabled with a finite positive maximum (an invalid cap is treated as uncapped), and
+   * is suppressed when the mode does not apply (use only for a held book, learn only for
+   * a teachable book). The `remaining` is per-document; a `total`-scope learn budget is
+   * enforced against the shared world pool at learn time, so this remaining is a lower
+   * bound used only to grey out the Learn control.
    * @private
    */
-  _recipeItemLimits(knowledge, item, { learnable = false, grantsByItem = false } = {}) {
+  _recipeItemLimits(def, item, { learnable = false, grantsByItem = false } = {}) {
+    const itemCaps = def?.caps?.item || {};
+    const learnCaps = def?.caps?.learn || {};
     const finitePositive = (value) => {
       const num = Number(value);
       return Number.isFinite(num) && num > 0 ? num : null;
     };
 
-    // The craft-use limit only applies when the book grants access by being held
-    // (item / itemOrLearned) — a learn-only book is never "used" to craft, so its
-    // use limit is suppressed, mirroring the learn-limit suppression below.
     let uses = null;
     const maxUses =
-      grantsByItem && knowledge?.item?.limitUses === true
-        ? finitePositive(knowledge?.item?.maxUses)
-        : null;
+      grantsByItem && itemCaps.limitUses === true ? finitePositive(itemCaps.maxUses) : null;
     if (maxUses != null) {
       const used = Number(getFabricateFlag(item, 'recipeItemUsage', {})?.timesUsed || 0);
       uses = { max: maxUses, used, remaining: Math.max(0, maxUses - used) };
     }
 
-    // The learn budget only applies when the book can teach — an item-only book is
-    // never "learned from", so its learning limit is suppressed.
     let learning = null;
-    const maxRecipes =
-      learnable && knowledge?.learn?.limitRecipes === true
-        ? finitePositive(knowledge?.learn?.maxRecipes)
-        : null;
+    const learnLimited =
+      learnable && (learnCaps.limitLearning === true || learnCaps.limitRecipes === true);
+    const maxRecipes = learnLimited
+      ? finitePositive(learnCaps.learnsAllowed ?? learnCaps.maxRecipes)
+      : null;
     if (maxRecipes != null) {
       const learned = Number(getFabricateFlag(item, 'recipeItemLearning', {})?.learnedCount || 0);
       learning = { max: maxRecipes, learned, remaining: Math.max(0, maxRecipes - learned) };

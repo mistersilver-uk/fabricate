@@ -25,6 +25,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { recipeItemAccessBadge } from '../../util/recipeItemAccessBadge.js';
   import RecipeItemEditorTabs from './recipe-item/RecipeItemEditorTabs.svelte';
   import RecipeItemOverviewTab from './recipe-item/RecipeItemOverviewTab.svelte';
   import RecipeItemContentsTab from './recipe-item/RecipeItemContentsTab.svelte';
@@ -120,16 +121,16 @@
     return match ? String(match.name || id) : id;
   });
 
-  const previewBadge = $derived.by(() => {
-    if (modeItem) {
-      return limitUses
-        ? { label: maxUses === 1 ? text('FABRICATE.Admin.Manager.RecipeItem.Preview.SingleUse', 'Single use') : text('FABRICATE.Admin.Manager.RecipeItem.Preview.NUses', '{n} uses').replace('{n}', String(maxUses)), icon: 'fas fa-fire-flame-curved', tone: 'warning' }
-        : { label: text('FABRICATE.Admin.Manager.RecipeItem.Preview.RereadAnytime', 'Reread anytime'), icon: 'fas fa-infinity', tone: 'info' };
-    }
-    return limitLearning
-      ? { label: learnShort(), icon: 'fas fa-user-check', tone: 'warning' }
-      : { label: text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely'), icon: 'fas fa-book', tone: 'success' };
-  });
+  // Preview badge via the shared helper so the GM "How players see it" preview and the
+  // player Inventory book detail render IDENTICAL badges under every mode/cap combo.
+  const gmBadgeText = (key, fallback, data) =>
+    text(key, fallback).replace('{n}', String(data?.n ?? ''));
+  const previewBadge = $derived(
+    recipeItemAccessBadge(
+      { mode: modeItem ? 'item' : 'knowledge', item: itemCaps, learn: learnCaps },
+      gmBadgeText
+    )
+  );
 
   const readLabel = $derived.by(() => {
     if (recipeCount === 0) {

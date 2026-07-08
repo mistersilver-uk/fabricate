@@ -381,7 +381,7 @@
           "Components": "Components",
           "Essences": "Essences",
           "Tools": "Tools",
-          "RecipeItems": "Recipe items",
+          "RecipeItems": "Books & Scrolls",
           "SortLabel": "Sort",
           "SortName": "Name",
           "SortQuantity": "Quantity",
@@ -441,7 +441,8 @@
           "UseMore": "Use {remaining} more times",
           "UseSpent": "No uses left",
           "CraftRecipes": "Craft {total} recipes",
-          "CraftAction": "Craft"
+          "CraftAction": "Craft",
+          "ReadLearnAllRecipes": "Read & learn all {total} recipes"
         }
       },
       "ActorBar": {

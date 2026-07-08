@@ -197,6 +197,7 @@ function compileManagerRoot() {
 
   for (const utilPath of [
     'foundryBridge.js',
+    'recipeItemAccessBadge.js',
     'essenceIcons.js',
     'fontAwesomeFreeClassicIcons.js',
     'iconPickerPopover.js',

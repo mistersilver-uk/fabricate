@@ -103,7 +103,6 @@
         </span>
         <span class="manager-recipe-item-link-copy">
           <span class="manager-recipe-item-link-name">{itemName || uuid}</span>
-          <span class="manager-recipe-item-uuid" data-recipe-item-uuid>{uuid}</span>
         </span>
         <button
           type="button"
@@ -276,14 +275,6 @@
     white-space: nowrap;
   }
 
-  .manager-recipe-item-uuid {
-    font-family: var(--fab-font-mono, monospace);
-    font-size: 0.66rem;
-    color: var(--fab-text-subtle);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 
   .manager-recipe-item-dropzone {
     display: flex;

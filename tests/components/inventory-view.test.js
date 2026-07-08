@@ -17,6 +17,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/recipeItemAccessBadge.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
@@ -296,7 +297,7 @@ describe('InventoryView (mounted)', () => {
 // Build a store whose selected item is a recipe-item "book", plus a learn()
 // capture. Only the getters InventoryView/InventoryDetail read are provided.
 function makeBookServices(book, { learningRecipeId = null } = {}) {
-  const calls = { navigate: [], learn: [] };
+  const calls = { navigate: [], learn: [], learnAll: [] };
   const store = {
     rows: [book],
     loading: false,
@@ -321,6 +322,7 @@ function makeBookServices(book, { learningRecipeId = null } = {}) {
     setPageSize() {},
     load() {},
     learn: (recipeId) => calls.learn.push(recipeId),
+    learnAll: (recipeIds) => calls.learnAll.push(recipeIds),
     tickWorldTime() {},
   };
   const services = {
@@ -333,7 +335,13 @@ function makeBookServices(book, { learningRecipeId = null } = {}) {
   return { services, calls, store };
 }
 
-function makeBook(recipes, limits = { uses: null, learning: null }, learnable = true, craftable = false) {
+function makeBook(
+  recipes,
+  limits = { uses: null, learning: null },
+  learnable = true,
+  craftable = false,
+  caps = { item: { limitUses: false }, learn: { limitLearning: false } }
+) {
   return {
     key: 'recipeitem:sys:def-1',
     recipeItemId: 'def-1',
@@ -357,6 +365,7 @@ function makeBook(recipes, limits = { uses: null, learning: null }, learnable = 
     producedBy: [],
     contributors: [],
     recipes,
+    caps,
     limits,
   };
 }
@@ -375,9 +384,6 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
-    detail.querySelector('[data-inventory-read-learn]')?.click();
-    await settle();
     assert.ok(detail, 'renders the book detail');
     assert.match(detail.textContent, /A worn manual of forge techniques\./, 'shows the book description');
     assert.match(detail.textContent, /Forge Breastplate/, 'shows the single recipe name');
@@ -392,52 +398,50 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.deepEqual(calls.learn, ['r1'], 'clicking Learn invokes store.learn with the recipe id');
   });
 
-  it('collapses the recipe list behind a Read & learn CTA that expands it', async () => {
+  it('always shows the recipe list + a "learn all" convenience for an unlimited book', async () => {
     const book = makeBook([
       { id: 'r1', name: 'Forge Breastplate', description: 'A cuirass.', img: null, learned: false },
     ]);
-    const { services } = makeBookServices(book);
+    const { services, calls } = makeBookServices(book);
     const target = await harness.mount({ services });
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    const cta = detail.querySelector('[data-inventory-read-learn]');
-    assert.ok(cta, 'renders the Read & learn CTA');
-    // Collapsed by default — the recipe list is not rendered.
-    assert.equal(detail.querySelector('[data-inventory-learn-recipe]'), null, 'recipe list collapsed by default');
-    assert.equal(cta.getAttribute('aria-expanded'), 'false');
-
-    cta.click();
+    // No reveal CTA — the recipe list is shown immediately with per-recipe Learn.
+    assert.equal(detail.querySelector('[data-inventory-read-learn]'), null, 'no reveal CTA');
+    assert.ok(detail.querySelector('[data-inventory-learn-recipe="r1"]'), 'the recipe list is shown');
+    assert.ok(detail.querySelector('[data-inventory-learn="r1"]'), 'per-recipe Learn is shown');
+    // An unlimited learnable book offers the "Read & learn all N" convenience.
+    const learnAll = detail.querySelector('[data-inventory-learn-all]');
+    assert.ok(learnAll, 'shows the learn-all convenience');
+    learnAll.click();
     await settle();
-    assert.ok(detail.querySelector('[data-inventory-learn-recipe="r1"]'), 'the CTA expands the recipe list');
-    assert.equal(
-      detail.querySelector('[data-inventory-read-learn]').getAttribute('aria-expanded'),
-      'true'
-    );
+    assert.deepEqual(calls.learnAll, [['r1']], 'learn-all passes the unlearned recipe ids');
   });
 
-  it('shows the learning budget and disables Learn when the budget is spent', async () => {
+  it('always shows the list, hides learn-all, and disables Learn when the budget is spent', async () => {
     const book = makeBook(
       [{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }],
-      { uses: null, learning: { max: 2, learned: 2, remaining: 0 } }
+      { uses: null, learning: { max: 2, learned: 2, remaining: 0 } },
+      true,
+      false,
+      { item: { limitUses: false }, learn: { limitLearning: true, learnsAllowed: 2 } }
     );
     const { services } = makeBookServices(book);
     const target = await harness.mount({ services });
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
-    detail.querySelector('[data-inventory-read-learn]')?.click();
-    await settle();
-    // The harness localize mock does not interpolate; it emits `key:{data}`, so
-    // assert the budget uses the "N remaining" (plural at 0) key carrying remaining=0.
-    const budget = detail.querySelector('[data-inventory-learning-budget]').textContent;
-    assert.match(budget, /LearningRemainingMany/, 'renders the pluralized remaining string at 0');
-    assert.match(budget, /"remaining":0/, 'budget carries remaining = 0');
+    assert.ok(detail.querySelector('[data-inventory-learn-recipe="r1"]'), 'the recipe list is shown');
     assert.equal(
       detail.querySelector('[data-inventory-learn="r1"]').disabled,
       true,
       'Learn is disabled when the budget is spent'
+    );
+    assert.equal(
+      detail.querySelector('[data-inventory-learn-all]'),
+      null,
+      'no learn-all convenience when the budget is spent'
     );
   });
 
@@ -448,9 +452,6 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
-    detail.querySelector('[data-inventory-read-learn]')?.click();
-    await settle();
     assert.ok(detail.querySelector('[data-inventory-learned="r1"]'), 'renders a Learned chip');
     assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button when learned');
   });
@@ -468,9 +469,6 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
-    detail.querySelector('[data-inventory-read-learn]')?.click();
-    await settle();
     const accordion = detail.querySelector('[data-inventory-recipe-accordion]');
     assert.ok(accordion, 'renders the accordion for multiple recipes');
     // Search appears once a book teaches more than the smallest page (6).
@@ -503,9 +501,6 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
-    detail.querySelector('[data-inventory-read-learn]')?.click();
-    await settle();
     assert.ok(detail.querySelector('[data-inventory-recipe-accordion]'), 'still an accordion');
     assert.equal(detail.querySelector('[data-inventory-recipe-search]'), null, 'no search for a small book');
   });
@@ -520,37 +515,34 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
-    detail.querySelector('[data-inventory-read-learn]')?.click();
-    await settle();
     assert.ok(detail, 'the item-only book still renders in the inventory');
     assert.match(detail.textContent, /Forge Breastplate/, 'it still lists its recipes');
     assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item-only mode');
     assert.equal(detail.querySelector('[data-inventory-learned="r1"]'), null, 'no Learned chip in item-only mode');
   });
 
-  it('shows a Craft CTA + Craft buttons (not Learn) in item mode, plus a uses chip', async () => {
+  it('item mode: always shows the list with Craft buttons, an access badge, and no reveal/learn-all', async () => {
     const book = makeBook(
       [{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }],
       { uses: { max: 3, used: 1, remaining: 2 }, learning: null },
       false, // not learnable
-      true // craftable (item mode)
+      true, // craftable (item mode)
+      { item: { limitUses: true, maxUses: 3 }, learn: { limitLearning: false } }
     );
     const { services, calls } = makeBookServices(book);
     const target = await harness.mount({ services });
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    // Uses chip under the name.
-    assert.ok(detail.querySelector('[data-inventory-uses-chip]'), 'shows a uses chip');
-    // The CTA is Craft-based, not read & learn.
-    const cta = detail.querySelector('[data-inventory-read-learn]');
-    assert.match(cta.textContent, /CraftRecipes/, 'item mode uses the "Craft N recipes" label');
-    assert.doesNotMatch(cta.textContent, /ReadLearn/);
+    // The use cap is shown as the access badge (matching the GM preview), not a pill.
+    const badge = detail.querySelector('[data-inventory-access-badge]');
+    assert.ok(badge, 'shows the access badge');
+    assert.match(badge.textContent, /NUses/, 'the badge reads the use cap');
+    // No reveal CTA and no learn-all convenience in item mode.
+    assert.equal(detail.querySelector('[data-inventory-read-learn]'), null, 'no reveal CTA');
+    assert.equal(detail.querySelector('[data-inventory-learn-all]'), null, 'no learn-all in item mode');
 
-    cta.click();
-    await settle();
-    // The per-recipe control is Craft (wired to navigate to the recipe), not Learn.
+    // The list is shown immediately with per-recipe Craft (not Learn), wired to navigate.
     assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item mode');
     const craft = detail.querySelector('[data-inventory-craft="r1"]');
     assert.ok(craft, 'renders a Craft button');
