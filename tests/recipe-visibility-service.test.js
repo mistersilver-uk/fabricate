@@ -165,7 +165,7 @@ function buildMockRecipe(overrides = {}) {
 }
 
 function buildMockSystem(overrides = {}) {
-  return {
+  const system = {
     recipeVisibility: {
       listMode: 'player',
       knowledge: {
@@ -177,6 +177,28 @@ function buildMockSystem(overrides = {}) {
     },
     ...overrides
   };
+  // Per-item caps (issue 511): the service now reads use/learn caps from the
+  // recipe's linked recipe item definition, not the system-wide knowledge config.
+  // These fixtures still declare caps under knowledge.item / knowledge.learn, so
+  // mirror those onto each recipe item definition — exactly as the 1.11.0 migration
+  // does at load time — keeping the fixtures exercising real cap behaviour. A
+  // definition that already carries its own `caps` is left untouched.
+  const knowledge = system.recipeVisibility?.knowledge || {};
+  const seededCaps = {
+    item: { ...(knowledge.item || {}) },
+    learn: {
+      consumeOnLearn: knowledge.learn?.consumeOnLearn,
+      limitRecipes: knowledge.learn?.limitRecipes,
+      maxRecipes: knowledge.learn?.maxRecipes,
+      destroyWhenSpent: knowledge.learn?.destroyWhenSpent
+    }
+  };
+  if (Array.isArray(system.recipeItemDefinitions)) {
+    system.recipeItemDefinitions = system.recipeItemDefinitions.map((def) =>
+      def && def.caps ? def : { ...def, caps: seededCaps }
+    );
+  }
+  return system;
 }
 
 function buildService({ system = null, systems = null, recipes = [] } = {}) {
@@ -541,9 +563,10 @@ test('AC4.4 - applyRecipeItemUseOnCraft increments timesUsed and destroys item w
         item: { limitUses: true, maxUses: 2, destroyWhenExhausted: true },
         learn: { consumeOnLearn: false }
       }
-    }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'recipe-item-uuid' }]
   });
-  const recipe = buildMockRecipe({ linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const recipe = buildMockRecipe({ recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
   // Item with timesUsed: 1 (so incrementing to 2 hits maxUses)
   const item = new FakeItem({
     uuid: 'recipe-item-uuid',
@@ -681,9 +704,10 @@ test('AC6.1 - learnRecipe writes learnedAt and sourceItemUuid to actor flag', as
         item: { limitUses: false },
         learn: { consumeOnLearn: false }
       }
-    }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'recipe-item-uuid' }]
   });
-  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
   const item = new FakeItem({ uuid: 'recipe-item-uuid' });
   const craftingActor = new FakeActor({ id: 'actor-1', items: [item] });
   const viewer = { isGM: false, id: 'user-1' };
@@ -1381,6 +1405,64 @@ test('511.P2.11 - a limitRecipes system with an invalid maxRecipes fails closed 
   const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
   assert.deepEqual(result.learnedRecipes.map(r => r.id), ['r-a']);
   assert.equal(service._getRecipeItemLearnCount(item), 0);
+});
+
+test('511.P2.PERITEM - two books in ONE system enforce independent per-item caps', async () => {
+  // The core per-item behaviour (issue 511): caps live on the recipe item
+  // DEFINITION, so a system can hold a strict 1-recipe scroll and a generous
+  // 3-recipe tome side by side. This is impossible under the old system-wide cap.
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned', learn: { dragDropEnabled: true } } },
+    recipeItemDefinitions: [
+      {
+        id: 'scroll',
+        sourceItemUuid: 'src-scroll',
+        caps: { item: { limitUses: false }, learn: { limitRecipes: true, maxRecipes: 1 } }
+      },
+      {
+        id: 'tome',
+        sourceItemUuid: 'src-tome',
+        caps: { item: { limitUses: false }, learn: { limitRecipes: true, maxRecipes: 3 } }
+      }
+    ]
+  });
+  const recipes = [
+    buildMockRecipe({ id: 'scroll-r', craftingSystemId: 'system-1', recipeItemId: 'scroll', linkedRecipeItemUuid: null }),
+    buildMockRecipe({ id: 'tome-r1', craftingSystemId: 'system-1', recipeItemId: 'tome', linkedRecipeItemUuid: null }),
+    buildMockRecipe({ id: 'tome-r2', craftingSystemId: 'system-1', recipeItemId: 'tome', linkedRecipeItemUuid: null })
+  ];
+  const scrollItem = new FakeItem({ uuid: 'Actor.a1.Item.scroll', sourceId: 'src-scroll' });
+  const tomeItem = new FakeItem({ uuid: 'Actor.a1.Item.tome', sourceId: 'src-tome' });
+  const actor = new FakeActor({ id: 'a1', items: [scrollItem, tomeItem] });
+  const service = buildService({ system, recipes });
+
+  assert.equal(service.getLearnableRecipesFromItem({ ownedItem: scrollItem, actor }).maxRecipes, 1);
+  assert.equal(service.getLearnableRecipesFromItem({ ownedItem: tomeItem, actor }).maxRecipes, 3);
+
+  // The scroll spends its 1-recipe budget independently of the tome.
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: scrollItem, actor })).success, true);
+  const scrollSpent = await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: scrollItem, actor });
+  assert.equal(scrollSpent.success, false);
+  // The tome still has its full budget.
+  assert.equal(service.getLearnableRecipesFromItem({ ownedItem: tomeItem, actor }).remainingBudget, 3);
+});
+
+test('511.P2.FAILCLOSED - a recipe whose recipeItemId resolves to no definition is uncapped', () => {
+  // Fail-closed convention: an unresolved recipe item definition yields uncapped
+  // caps rather than a zero budget or a throw.
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned', learn: { dragDropEnabled: true } } },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'src-book' }]
+  });
+  const recipe = buildMockRecipe({ id: 'r-ghost', craftingSystemId: 'system-1', recipeItemId: 'does-not-exist', linkedRecipeItemUuid: null });
+  const service = buildService({ system, recipes: [recipe] });
+
+  // No effective learn cap → not routed to the capped picker.
+  assert.equal(service._isRecipeItemLearnCapped(recipe), false);
+  // Use cap resolves uncapped, so knowledge is never "exhausted".
+  assert.equal(service.isKnowledgeItemExhausted({ recipe, craftingActor: null }), false);
 });
 
 test('511.P2.E2E - full flow: capped drop suppressed, pick K, refuse (K+1), destroy-when-spent', async () => {

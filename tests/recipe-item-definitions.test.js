@@ -81,52 +81,10 @@ test('_extractSourceDescription skips object fallback text instead of returning 
 });
 
 // ---------------------------------------------------------------------------
-// Recipe-item learn cap (issue 511) — model normalization
+// System-wide recipe visibility strategy (issue 511) — caps moved off knowledge
 // ---------------------------------------------------------------------------
 
-test('_normalizeRecipeVisibility extends the learn block with the learn-cap fields', () => {
-  const manager = new CraftingSystemManager({ getRecipes: () => [] });
-
-  const normalized = manager._normalizeRecipeVisibility({
-    listMode: 'knowledge',
-    knowledge: {
-      mode: 'itemOrLearned',
-      learn: { consumeOnLearn: true, dragDropEnabled: true }
-    }
-  });
-
-  // Absent learn-cap fields normalize to a disabled cap.
-  assert.equal(normalized.knowledge.learn.limitRecipes, false);
-  assert.equal(normalized.knowledge.learn.maxRecipes, undefined);
-  assert.equal(normalized.knowledge.learn.destroyWhenSpent, false);
-});
-
-test('_normalizeRecipeVisibility keeps a finite positive maxRecipes only when limitRecipes is on', () => {
-  const manager = new CraftingSystemManager({ getRecipes: () => [] });
-
-  const enabled = manager._normalizeRecipeVisibility({
-    listMode: 'knowledge',
-    knowledge: { mode: 'learned', learn: { limitRecipes: true, maxRecipes: 4, destroyWhenSpent: true } }
-  });
-  assert.equal(enabled.knowledge.learn.limitRecipes, true);
-  assert.equal(enabled.knowledge.learn.maxRecipes, 4);
-  assert.equal(enabled.knowledge.learn.destroyWhenSpent, true);
-
-  // maxRecipes is dropped when the cap is off, or when non-finite / non-positive.
-  const capOff = manager._normalizeRecipeVisibility({
-    listMode: 'knowledge',
-    knowledge: { mode: 'learned', learn: { limitRecipes: false, maxRecipes: 4 } }
-  });
-  assert.equal(capOff.knowledge.learn.maxRecipes, undefined);
-
-  const nonPositive = manager._normalizeRecipeVisibility({
-    listMode: 'knowledge',
-    knowledge: { mode: 'learned', learn: { limitRecipes: true, maxRecipes: 0 } }
-  });
-  assert.equal(nonPositive.knowledge.learn.maxRecipes, undefined);
-});
-
-test('_normalizeRecipeVisibility keeps destroyWhenSpent distinct from the item destroyWhenExhausted', () => {
+test('_normalizeRecipeVisibility keeps only strategy fields (mode + dragDropEnabled); caps are gone', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
   const normalized = manager._normalizeRecipeVisibility({
@@ -134,14 +92,17 @@ test('_normalizeRecipeVisibility keeps destroyWhenSpent distinct from the item d
     knowledge: {
       mode: 'itemOrLearned',
       item: { limitUses: true, maxUses: 2, destroyWhenExhausted: true },
-      learn: { limitRecipes: true, maxRecipes: 2, destroyWhenSpent: false }
+      learn: { consumeOnLearn: false, dragDropEnabled: false, limitRecipes: true, maxRecipes: 2 }
     }
   });
 
-  // The two destroy flags are independent — the item is destroyed on exhaustion
-  // but the book is not destroyed when its learn budget is spent.
-  assert.equal(normalized.knowledge.item.destroyWhenExhausted, true);
-  assert.equal(normalized.knowledge.learn.destroyWhenSpent, false);
+  assert.equal(normalized.listMode, 'knowledge');
+  assert.equal(normalized.knowledge.mode, 'itemOrLearned');
+  assert.equal(normalized.knowledge.learn.dragDropEnabled, false);
+  // The per-item caps no longer live on the system-wide config.
+  assert.equal('item' in normalized.knowledge, false);
+  assert.equal('consumeOnLearn' in normalized.knowledge.learn, false);
+  assert.equal('limitRecipes' in normalized.knowledge.learn, false);
 });
 
 // ---------------------------------------------------------------------------

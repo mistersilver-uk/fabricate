@@ -715,6 +715,13 @@ export class CraftingSystemManager {
     };
   }
 
+  // System-wide recipe visibility STRATEGY only (issue 511). The recipe-item
+  // use/learn caps that used to live under `knowledge.item` / `knowledge.learn`
+  // are now per-recipe-item (`recipeItemDefinition.caps`, see
+  // `_normalizeRecipeItemCaps`); only `mode` and `learn.dragDropEnabled` — the
+  // system-level knobs that gate whether the knowledge/learning machinery runs —
+  // remain here. Legacy caps in stored data are dropped by this normalizer and
+  // carried onto each definition by the 1.11.0 migration.
   _normalizeRecipeVisibility(recipeVisibility = {}) {
     const listMode = ['global', 'player', 'knowledge', 'teaser'].includes(
       recipeVisibility?.listMode
@@ -728,28 +735,8 @@ export class CraftingSystemManager {
         mode: ['item', 'learned', 'itemOrLearned'].includes(knowledge?.mode)
           ? knowledge.mode
           : 'itemOrLearned',
-        item: {
-          limitUses: knowledge?.item?.limitUses === true,
-          maxUses: Number.isFinite(Number(knowledge?.item?.maxUses))
-            ? Number(knowledge.item.maxUses)
-            : undefined,
-          destroyWhenExhausted: knowledge?.item?.destroyWhenExhausted === true,
-        },
         learn: {
-          consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false,
           dragDropEnabled: knowledge?.learn?.dragDropEnabled !== false,
-          // Recipe-item learn cap (issue 511). Mirrors the sibling item cap
-          // (limitUses / maxUses / destroyWhenExhausted). `destroyWhenSpent`
-          // (learn) is deliberately named distinctly from `destroyWhenExhausted`
-          // (item/craft-charges) — do not normalize them to one name.
-          limitRecipes: knowledge?.learn?.limitRecipes === true,
-          maxRecipes:
-            knowledge?.learn?.limitRecipes === true &&
-            Number.isFinite(Number(knowledge?.learn?.maxRecipes)) &&
-            Number(knowledge.learn.maxRecipes) > 0
-              ? Number(knowledge.learn.maxRecipes)
-              : undefined,
-          destroyWhenSpent: knowledge?.learn?.destroyWhenSpent === true,
         },
       },
     };

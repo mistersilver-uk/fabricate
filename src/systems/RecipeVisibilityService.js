@@ -118,10 +118,33 @@ export class RecipeVisibilityService {
     return (
       system?.recipeVisibility?.knowledge || {
         mode: 'itemOrLearned',
-        item: { limitUses: false },
-        learn: { consumeOnLearn: true },
+        learn: { dragDropEnabled: true },
       }
     );
+  }
+
+  // Per-recipe-item use/learn caps (issue 511). Caps live on the recipe's linked
+  // recipe item definition (`definition.caps`) rather than one system-wide config,
+  // so two books in the same system can differ. Resolves via the recipe's
+  // `recipeItemId`; a recipe with no resolvable definition FAILS CLOSED to uncapped
+  // (the same permissive default `_getKnowledgeConfig` fell back to, and consistent
+  // with the invalid-cap → unlimited convention). `mode` and `dragDropEnabled` stay
+  // system-wide and are read from `_getKnowledgeConfig`, never from here.
+  _getRecipeItemCaps(recipe) {
+    const caps = this._getRecipeItemDefinition(recipe)?.caps;
+    return {
+      item: {
+        limitUses: caps?.item?.limitUses === true,
+        maxUses: caps?.item?.maxUses,
+        destroyWhenExhausted: caps?.item?.destroyWhenExhausted === true,
+      },
+      learn: {
+        consumeOnLearn: caps?.learn?.consumeOnLearn !== false,
+        limitRecipes: caps?.learn?.limitRecipes === true,
+        maxRecipes: caps?.learn?.maxRecipes,
+        destroyWhenSpent: caps?.learn?.destroyWhenSpent === true,
+      },
+    };
   }
 
   _collectCandidateItems(recipe, craftingActor, componentSourceActors = []) {
@@ -195,10 +218,11 @@ export class RecipeVisibilityService {
       };
     }
 
+    const caps = this._getRecipeItemCaps(recipe);
     const learnedMap = this._getLearnedMap(craftingActor);
     const hasLearned = !!learnedMap?.[recipe.id];
     const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
-    const matchedItems = this._filterNonExhausted(allMatches, knowledge?.item || {});
+    const matchedItems = this._filterNonExhausted(allMatches, caps.item);
     const hasMatchedItem = matchedItems.length > 0;
 
     const mode = knowledge?.mode || 'itemOrLearned';
@@ -234,12 +258,11 @@ export class RecipeVisibilityService {
    * @returns {boolean}
    */
   isKnowledgeItemExhausted({ recipe, craftingActor, componentSourceActors = [] }) {
-    const system = this._getCraftingSystem(recipe);
-    const knowledge = this._getKnowledgeConfig(system);
-    if (!knowledge?.item?.limitUses) return false;
+    const caps = this._getRecipeItemCaps(recipe);
+    if (!caps.item.limitUses) return false;
     const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
     if (allMatches.length === 0) return false;
-    const nonExhausted = this._filterNonExhausted(allMatches, knowledge.item);
+    const nonExhausted = this._filterNonExhausted(allMatches, caps.item);
     return nonExhausted.length === 0;
   }
 
@@ -512,8 +535,9 @@ export class RecipeVisibilityService {
     // bypass path, which would make a GM who genuinely owns a matching item fail
     // with `noMatchingItem`. Collecting candidates here means a GM (or player)
     // who owns a match can learn, while one who owns none still cannot.
+    const caps = this._getRecipeItemCaps(recipe);
     const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
-    const matchedItems = this._filterNonExhausted(allMatches, knowledge?.item || {});
+    const matchedItems = this._filterNonExhausted(allMatches, caps.item);
     const selected = this._selectDeterministic(matchedItems);
     if (!selected) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
@@ -528,7 +552,7 @@ export class RecipeVisibilityService {
     };
     await this._setLearnedMap(craftingActor, next);
 
-    if (knowledge?.learn?.consumeOnLearn === true) {
+    if (caps.learn.consumeOnLearn === true) {
       await selected.item.delete();
     }
 
@@ -551,10 +575,9 @@ export class RecipeVisibilityService {
 
   // The finite positive learn cap for a capped recipe, or undefined.
   _getLearnCapForRecipe(recipe) {
-    const system = this._getCraftingSystem(recipe);
-    const knowledge = this._getKnowledgeConfig(system);
-    if (knowledge?.learn?.limitRecipes !== true) return;
-    const max = Number(knowledge?.learn?.maxRecipes);
+    const caps = this._getRecipeItemCaps(recipe);
+    if (caps.learn.limitRecipes !== true) return;
+    const max = Number(caps.learn.maxRecipes);
     return Number.isFinite(max) && max > 0 ? max : undefined;
   }
 
@@ -870,10 +893,10 @@ export class RecipeVisibilityService {
     const nextCount = count + 1;
     await this._setRecipeItemLearnCount(ownedItem, nextCount);
 
-    const knowledge = this._getKnowledgeConfig(this._getCraftingSystem(recipe));
+    const caps = this._getRecipeItemCaps(recipe);
     const spent = Number.isFinite(maxRecipes) && nextCount >= maxRecipes;
     let destroyed = false;
-    if (spent && knowledge?.learn?.destroyWhenSpent === true) {
+    if (spent && caps.learn.destroyWhenSpent === true) {
       await ownedItem.delete?.();
       destroyed = true;
     }
@@ -965,19 +988,20 @@ export class RecipeVisibilityService {
     const knowledge = this._getKnowledgeConfig(system);
     const mode = knowledge?.mode || 'itemOrLearned';
     if (!['item', 'itemOrLearned'].includes(mode)) return;
-    if (!knowledge?.item?.limitUses) return;
+    const caps = this._getRecipeItemCaps(recipe);
+    if (!caps.item.limitUses) return;
 
     const matches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
-    const nonExhausted = this._filterNonExhausted(matches, knowledge.item);
+    const nonExhausted = this._filterNonExhausted(matches, caps.item);
     const selected = this._selectDeterministic(nonExhausted);
     if (!selected) return;
 
     const nextUses = Number(selected.timesUsed || 0) + 1;
     await this._setRecipeItemUsage(selected.item, nextUses);
 
-    const maxUses = Number(knowledge?.item?.maxUses);
+    const maxUses = Number(caps.item.maxUses);
     const exhausted = Number.isFinite(maxUses) && maxUses > 0 && nextUses >= maxUses;
-    if (exhausted && knowledge?.item?.destroyWhenExhausted === true) {
+    if (exhausted && caps.item.destroyWhenExhausted === true) {
       await selected.item.delete();
     }
   }
