@@ -32,6 +32,11 @@ export class Recipe {
     this.recipeItemId = data.recipeItemId || null;
     this.linkedRecipeItemUuid = data.linkedRecipeItemUuid || null;
     this.visibility = this._normalizeVisibility(data.visibility);
+    // Per-recipe access grants (Books & Scrolls `restricted` visibility mode):
+    // which specific characters and players may see/read this recipe. Runtime
+    // enforcement reads this in restricted mode. Read-forward seeds player grants
+    // from the legacy `visibility.allowedUserIds` when no explicit grant exists.
+    this.access = this._normalizeAccess(data.access, data.visibility);
 
     // Input requirements (at least one set must be satisfied)
     this.ingredientSets = (data.ingredientSets || []).map((s) =>
@@ -384,6 +389,10 @@ export class Recipe {
       recipeItemId: this.recipeItemId,
       linkedRecipeItemUuid: this.linkedRecipeItemUuid,
       visibility: this.visibility,
+      access: {
+        characterIds: [...this.access.characterIds],
+        playerIds: [...this.access.playerIds],
+      },
       complex: this.complex,
       steps: this.steps.map((step) => ({
         ...step,
@@ -530,19 +539,44 @@ export class Recipe {
    * Coerce a value into a deduped array of trimmed, non-empty id strings.
    * Tolerant of non-array / nullish input (returns []).
    * @param {unknown} value
+   * @param {{stringsOnly?: boolean}} [options] When `stringsOnly` is true,
+   *   non-string entries are ignored rather than coerced (used by access grants,
+   *   whose ids are always authored as strings).
    * @returns {string[]}
    */
-  _normalizeIdList(value) {
+  _normalizeIdList(value, { stringsOnly = false } = {}) {
     if (!Array.isArray(value)) return [];
     const seen = new Set();
     const out = [];
     for (const raw of value) {
+      if (stringsOnly && typeof raw !== 'string') continue;
       const id = String(raw ?? '').trim();
       if (!id || seen.has(id)) continue;
       seen.add(id);
       out.push(id);
     }
     return out;
+  }
+
+  /**
+   * Normalize per-recipe access grants into `{ characterIds, playerIds }`, each a
+   * deduped array of non-empty id strings (non-strings are ignored). When the
+   * access grant is absent or fully empty, player grants are read-forward from the
+   * legacy `visibility.allowedUserIds` (pre-access recipes stored granted users
+   * there), so restricted-mode enforcement keeps showing the recipe to the same
+   * players after the runtime switches to reading `access`.
+   * @param {unknown} access
+   * @param {unknown} visibility
+   * @returns {{characterIds: string[], playerIds: string[]}}
+   */
+  _normalizeAccess(access, visibility) {
+    const source = access && typeof access === 'object' ? access : {};
+    const characterIds = this._normalizeIdList(source.characterIds, { stringsOnly: true });
+    let playerIds = this._normalizeIdList(source.playerIds, { stringsOnly: true });
+    if (characterIds.length === 0 && playerIds.length === 0) {
+      playerIds = this._normalizeIdList(visibility?.allowedUserIds, { stringsOnly: true });
+    }
+    return { characterIds, playerIds };
   }
 
   _normalizeStep(step = {}, idx = 0) {

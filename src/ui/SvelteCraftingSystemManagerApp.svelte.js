@@ -287,6 +287,17 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter(actor => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
+      // Player-character actors ({ id, name, img }), name-sorted, for the per-recipe
+      // "grant access to specific characters" roster under the `restricted`
+      // visibility mode. A character is a player-character per
+      // `game.fabricate.isPlayerCharacterActor` (actor.type === 'character'),
+      // with a plain type fallback so the store never touches classification logic.
+      getPlayerCharacterActors: () =>
+        Array.from(game.actors?.contents || [])
+          .filter(actor => game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character')
+          .map(actor => ({ id: actor.id, name: actor.name, img: actor.img || '' }))
+          .filter(actor => actor.id && actor.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
       // Game-world Items ({ uuid, name, img, type }), name-sorted, for the
       // ItemPickerModal (Books & Scrolls links a recipe item to a world Item).
       getWorldItemOptions: () =>

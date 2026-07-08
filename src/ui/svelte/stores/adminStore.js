@@ -1483,6 +1483,18 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       // the per-recipe restriction editor can seed, stage, and save an edit. Without
       // it `recipeDraft.visibility` is undefined and edits cannot be persisted.
       visibility: raw.visibility || null,
+      // Per-recipe access grants (restricted visibility mode): the normalized
+      // `{ characterIds, playerIds }` snapshot the Access tab seeds and saves, plus
+      // a `{ characterCount, playerCount }` summary the recipe rows render as the
+      // "N char · N player" grant chip (or "No access" when both are 0).
+      access: {
+        characterIds: Array.isArray(raw.access?.characterIds) ? raw.access.characterIds : [],
+        playerIds: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds : [],
+      },
+      accessSummary: {
+        characterCount: Array.isArray(raw.access?.characterIds) ? raw.access.characterIds.length : 0,
+        playerCount: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds.length : 0,
+      },
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
@@ -7090,6 +7102,47 @@ export function createAdminStore(services) {
     }
   }
 
+  /**
+   * The player-character roster for the Access tab's Characters list. Sourced
+   * through the injected service so the store never touches `game.*`. Returns
+   * `[{ id, name, img }]` (name-sorted) or `[]` when the service is absent.
+   * The Players roster reuses the existing `worldUsers` projection.
+   * @returns {Array<{id: string, name: string, img: string}>}
+   */
+  function getPcRoster() {
+    return services.getPlayerCharacterActors?.() || [];
+  }
+
+  /**
+   * Persist a recipe's full access grant. The whole `access` object is replaced
+   * (updateRecipe does a shallow top-level merge), so callers must always pass the
+   * complete `{ characterIds, playerIds }` snapshot — never a partial patch.
+   * Mirrors toggleRecipeEnabled: allowIncomplete so an authoring shell's grant can
+   * be edited before it is craftable, then refreshes projections.
+   * @param {string} recipeId
+   * @param {{characterIds?: string[], playerIds?: string[]}} access
+   * @returns {Promise<boolean>}
+   */
+  async function saveRecipeAccess(recipeId, access = {}) {
+    const recipeManager = services.getRecipeManager();
+    const characterIds = Array.isArray(access.characterIds) ? access.characterIds : [];
+    const playerIds = Array.isArray(access.playerIds) ? access.playerIds : [];
+
+    try {
+      await recipeManager.updateRecipe(
+        recipeId,
+        { access: { characterIds, playerIds } },
+        { allowIncomplete: true }
+      );
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to save recipe access:', err);
+      services.notify?.error?.(err?.message || 'Failed to update recipe access');
+      return false;
+    }
+  }
+
   async function updateRecipe(recipeId, updates = {}, options = {}) {
     const recipeManager = services.getRecipeManager();
     const sysId = get(selectedSystemId);
@@ -7423,6 +7476,8 @@ export function createAdminStore(services) {
     duplicateRecipe,
     toggleRecipeEnabled,
     updateRecipe,
+    getPcRoster,
+    saveRecipeAccess,
     addRecipeItemFromUuid,
     updateRecipeItemCaps,
     setRecipeItemEnabled,
