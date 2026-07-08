@@ -287,6 +287,18 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter(actor => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
+      // Game-world Items ({ uuid, name, img, type }), name-sorted, for the
+      // ItemPickerModal (Books & Scrolls links a recipe item to a world Item).
+      getWorldItemOptions: () =>
+        Array.from(game.items?.contents || [])
+          .map(item => ({
+            uuid: item.uuid,
+            name: item.name,
+            img: item.img || '',
+            type: item.type || ''
+          }))
+          .filter(item => item.uuid && item.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
       pickImagePath: async (currentPath = '') => {
         const FilePickerClass = foundry?.applications?.apps?.FilePicker?.implementation
           || foundry?.applications?.apps?.FilePicker
