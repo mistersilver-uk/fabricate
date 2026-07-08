@@ -288,9 +288,14 @@ export async function applyToolUsageAndBreakage({
 } = {}) {
   await tool.applyUsage(item);
   const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
+  // `applyUsage` has already incremented the persisted `timesUsed`, so the
+  // breakage decision must read the POST-increment count via `Tool#evaluateBreakage`
+  // (its documented contract). Using the plan-phase projector `evaluateToolBreakagePlan`
+  // here would add a second +1 on top of the applied increment and break `limitedUses`
+  // tools one use early (e.g. maxUses:2 breaking on the first craft).
   const breakageResult = planned
     ? { mode: planned.mode, broken: planned.broken, evidence: planned.evidence }
-    : await evaluateToolBreakagePlan(tool, { actor, item, evaluateExpression });
+    : await tool.evaluateBreakage({ actor, item, evaluateExpression });
   const entry = {
     componentId: tool.componentId,
     itemRef,
