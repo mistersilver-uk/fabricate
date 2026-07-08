@@ -117,7 +117,9 @@
     border: 0;
   }
 
-  .manager-segment:focus-within {
+  /* `:has(:focus-visible)` (not `:focus-within`) so a MOUSE click on a segment doesn't
+     leave a persistent ring — the visually-hidden radio keeps focus after click. */
+  .manager-segment:has(:focus-visible) {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }

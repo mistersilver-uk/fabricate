@@ -241,10 +241,12 @@
                 <span>{previewBadge.label}</span>
               </span>
             </div>
-            <button type="button" class="manager-recipe-item-preview-cta" data-recipe-item-preview-cta disabled={recipeCount === 0}>
+            <!-- Presentational only: a preview of the player's CTA, not an action here.
+                 Rendered as a non-interactive element so it isn't a focusable dead button. -->
+            <div class="manager-recipe-item-preview-cta" class:is-disabled={recipeCount === 0} data-recipe-item-preview-cta>
               <i class="fas fa-book-open" aria-hidden="true"></i>
               <span>{readLabel}</span>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -288,6 +290,21 @@
     min-height: 0;
     height: 100%;
     gap: 0;
+  }
+
+  /* Stack the 320px preview rail below the editor body when the manager SHELL narrows
+     (container query — a Foundry window resizes independently of the viewport), so the
+     content column isn't squeezed near the minimum window width. */
+  @container fabricate-manager (max-width: 900px) {
+    .manager-recipe-item-editor {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+
+    .manager-recipe-item-editor-rail {
+      border-left: 0;
+      border-top: 1px solid var(--fab-border);
+    }
   }
 
   .manager-recipe-item-editor-body {
@@ -411,7 +428,7 @@
   .manager-recipe-item-preview-badge.is-info {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
-    color: var(--fab-info);
+    color: var(--fab-info-text);
   }
 
   .manager-recipe-item-preview-badge.is-success {
@@ -433,7 +450,11 @@
     color: var(--fab-on-accent);
     font-weight: 700;
     font-size: 0.75rem;
-    cursor: pointer;
+    cursor: default;
+  }
+
+  .manager-recipe-item-preview-cta.is-disabled {
+    opacity: 0.6;
   }
 
   .manager-recipe-item-preview-cta:disabled {
@@ -467,7 +488,7 @@
   }
 
   .manager-recipe-item-rule-icon.is-info {
-    color: var(--fab-info);
+    color: var(--fab-info-text);
   }
 
   .manager-recipe-item-rule-icon.is-success {

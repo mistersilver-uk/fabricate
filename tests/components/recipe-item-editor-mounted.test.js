@@ -118,7 +118,10 @@ describe('RecipeItemEditor (mounted)', () => {
   it('shows the no-recipes CTA and disables it when nothing is linked inside', async () => {
     const root = await harness.mount({ recipeItem: draft(), linkedItem: LINKED_ITEM, linkedRecipes: [], activeTab: 'overview', visibilityMode: 'item' });
     const cta = root.querySelector('[data-recipe-item-preview-cta]');
-    assert.equal(cta.disabled, true);
+    // The preview CTA is presentational (a preview of the player's control), not an
+    // interactive button — it must not be a focusable/activatable dead affordance.
+    assert.equal(cta.tagName, 'DIV', 'preview CTA is non-interactive');
+    assert.ok(cta.classList.contains('is-disabled'), 'the no-recipes CTA is visually disabled');
     assert.match(cta.textContent, /No recipes/i);
   });
 });

@@ -308,7 +308,10 @@
     overflow-y: auto;
   }
 
-  @media (max-width: 900px) {
+  /* Key the collapse off the manager SHELL width (`fabricate-manager` container),
+     not the viewport — a Foundry window resizes independently of the browser viewport,
+     so a viewport @media never fires when the GM shrinks the Fabricate window. */
+  @container fabricate-manager (max-width: 900px) {
     .crafting-settings-layout {
       grid-template-columns: minmax(0, 1fr);
     }

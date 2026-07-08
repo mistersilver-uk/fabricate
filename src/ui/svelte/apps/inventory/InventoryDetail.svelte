@@ -1083,6 +1083,10 @@
     align-items: center;
     gap: var(--fab-space-3);
     padding: 0;
+    /* Defuse Foundry's fixed global button height so the 40px thumb isn't clamped/misaligned
+       (matches the min-height the sibling recipe/read-learn buttons pin). */
+    height: auto;
+    min-height: 40px;
     border: none;
     background: none;
     color: var(--fab-text);
