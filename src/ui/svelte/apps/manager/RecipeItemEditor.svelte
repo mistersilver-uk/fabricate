@@ -457,10 +457,6 @@
     opacity: 0.6;
   }
 
-  .manager-recipe-item-preview-cta:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
 
   .manager-recipe-item-rules-list {
     display: flex;
