@@ -7,6 +7,7 @@
 export const resolutionModeOptions = [
   {
     value: 'simple',
+    icon: 'fas fa-wand-magic-sparkles',
     labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimple',
     fallback: 'Simple',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimpleDesc',
@@ -14,6 +15,7 @@ export const resolutionModeOptions = [
   },
   {
     value: 'routedByIngredients',
+    icon: 'fas fa-layer-group',
     labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByIngredients',
     fallback: 'Routed by ingredients',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByIngredientsDesc',
@@ -22,6 +24,7 @@ export const resolutionModeOptions = [
   },
   {
     value: 'routedByCheck',
+    icon: 'fas fa-dice-d20',
     labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByCheck',
     fallback: 'Routed by check',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByCheckDesc',
@@ -30,6 +33,7 @@ export const resolutionModeOptions = [
   },
   {
     value: 'progressive',
+    icon: 'fas fa-bars-progress',
     labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive',
     fallback: 'Progressive',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressiveDesc',
@@ -38,6 +42,7 @@ export const resolutionModeOptions = [
   },
   {
     value: 'alchemy',
+    icon: 'fas fa-flask',
     labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy',
     fallback: 'Alchemy',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemyDesc',
@@ -53,6 +58,7 @@ export const resolutionModeOptions = [
 export const salvageResolutionModeOptions = [
   {
     value: 'simple',
+    icon: 'fas fa-wand-magic-sparkles',
     labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionSimple',
     fallback: 'Simple',
     descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionSimpleDesc',
@@ -60,6 +66,7 @@ export const salvageResolutionModeOptions = [
   },
   {
     value: 'progressive',
+    icon: 'fas fa-bars-progress',
     labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionProgressive',
     fallback: 'Progressive',
     descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionProgressiveDesc',
@@ -68,6 +75,7 @@ export const salvageResolutionModeOptions = [
   },
   {
     value: 'routed',
+    icon: 'fas fa-dice-d20',
     labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionRouted',
     fallback: 'Routed by check',
     descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionRoutedDesc',

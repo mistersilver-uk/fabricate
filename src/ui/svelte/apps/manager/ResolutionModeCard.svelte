@@ -38,8 +38,15 @@
     groupName = '',
     dataAttr = '',
     optionDataAttr = '',
+    // 'config-card' opts into the icon-tile + 2-column card grid layout (with the
+    // radio rendered as a dot and the legend visually hidden because the host
+    // renders its own section heading). Any other value keeps the default compact
+    // single-column rows used by the gathering resolution surface.
+    variant = '',
     onChange = () => {}
   } = $props();
+
+  const isConfigCard = $derived(variant === 'config-card');
 
   function text(key, fallback) {
     const value = localize(key);
@@ -54,7 +61,7 @@
 
 <fieldset
   id={cardId}
-  class="manager-field is-wide manager-resolution-mode-card"
+  class={`manager-field is-wide manager-resolution-mode-card ${isConfigCard ? 'is-config-cards' : ''}`}
   {...{ [dataAttr]: true }}
 >
   <legend class="manager-resolution-mode-legend">{text(legendKey, legendFallback)}</legend>
@@ -78,6 +85,9 @@
           disabled={option.disabled === true}
           onchange={(event) => handleChange(option, event)}
         />
+        {#if isConfigCard && option.icon}
+          <span class="manager-resolution-option-icon" aria-hidden="true"><i class={option.icon}></i></span>
+        {/if}
         <span class="manager-resolution-option-body">
           <span class="manager-resolution-option-name">
             {text(option.labelKey, option.fallback)}

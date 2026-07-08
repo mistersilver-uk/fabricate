@@ -4944,6 +4944,83 @@
   outline-offset: 2px;
 }
 
+/* Config-card variant (Crafting settings — recipe resolution, recipe visibility,
+   salvage resolution): an icon tile + 2-column card grid with the radio rendered
+   as a right-aligned dot. The host page renders its own section heading, so the
+   fieldset legend is visually hidden (kept for the fieldset's accessible name).
+   Opt-in only (variant="config-card"); the gathering surface keeps the compact
+   default rows. Issue 511. */
+.fabricate-manager .manager-resolution-mode-card.is-config-cards {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 10px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-overlay-light-08);
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
+  order: 1;
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  background: var(--fab-bg-3);
+  color: var(--fab-mv2-accent);
+  font-size: 0.95rem;
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-body {
+  order: 2;
+  flex: 1 1 auto;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio'] {
+  order: 3;
+  align-self: flex-start;
+  margin-top: 0.1rem;
+}
+
+@container (max-width: 620px) {
+  .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .fabricate-manager .manager-resolution-option-body {
   display: flex;
   flex-direction: column;

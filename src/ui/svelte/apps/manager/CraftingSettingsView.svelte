@@ -158,6 +158,7 @@
               groupName="manager-crafting-resolution-mode"
               dataAttr="data-crafting-resolution-mode"
               optionDataAttr="data-crafting-resolution-mode-option"
+              variant="config-card"
               onChange={handleResolutionModeChange}
             />
           </section>
@@ -177,6 +178,7 @@
               groupName="manager-crafting-visibility-mode"
               dataAttr="data-crafting-visibility-mode"
               optionDataAttr="data-crafting-visibility-mode-option"
+              variant="config-card"
               onChange={(mode) => onSetVisibilityMode(mode)}
             />
           </section>
@@ -199,6 +201,7 @@
                 groupName="manager-crafting-salvage-resolution-mode"
                 dataAttr="data-crafting-salvage-resolution-mode"
                 optionDataAttr="data-crafting-salvage-resolution-mode-option"
+                variant="config-card"
                 onChange={handleSalvageResolutionModeChange}
               />
             </section>
