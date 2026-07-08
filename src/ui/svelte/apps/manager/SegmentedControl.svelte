@@ -6,8 +6,8 @@
   accessible; the radios are visually hidden and their `<label>` segments carry
   the styling. Purely presentational and prop-driven.
 
-  Used for whenSpent (Destroyed / Becomes inert) and learningMode
-  (Once per reader / N times per reader / Party-wide).
+  Used for whenSpent (Destroyed / Becomes inert) and the learning-limit scope
+  (Per copy / Across all copies).
 
   Props:
    - options: [{ value, labelKey, fallback, icon? }] — the segments, in order.

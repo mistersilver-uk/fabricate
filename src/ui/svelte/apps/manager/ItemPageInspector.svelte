@@ -67,7 +67,13 @@
     const raw = Number(learn.learnsAllowed ?? learn.maxRecipes);
     return Number.isFinite(raw) && raw > 0 ? raw : 1;
   });
-  const learningMode = $derived(item?.caps?.learn?.learningMode || '');
+  const learnScope = $derived(
+    ['perInstance', 'total'].includes(item?.caps?.learn?.learnScope)
+      ? item.caps.learn.learnScope
+      : item?.caps?.learn?.learningMode === 'party'
+        ? 'total'
+        : 'perInstance'
+  );
 
   const quickLimited = $derived(isItemMode ? useLimited : learnLimited);
 
@@ -82,8 +88,6 @@
       return useLimited ? String(maxUses) : '∞';
     }
     if (!learnLimited) return text('FABRICATE.Admin.Manager.BooksScrolls.Free', 'Free');
-    if (learningMode === 'party') return text('FABRICATE.Admin.Manager.BooksScrolls.Party', 'Party');
-    if (learningMode === 'once') return '1×';
     return `${learnsAllowed}×`;
   });
 
@@ -93,9 +97,12 @@
         ? text('FABRICATE.Admin.Manager.BooksScrolls.UseSubLimited', '{n} use(s) per copy').replace('{n}', maxUses)
         : text('FABRICATE.Admin.Manager.BooksScrolls.UseSubFree', 'Can be read any number of times');
     }
-    return learnLimited
-      ? text('FABRICATE.Admin.Manager.BooksScrolls.LearnSubLimited', 'Learning is capped per copy')
-      : text('FABRICATE.Admin.Manager.BooksScrolls.LearnSubFree', 'Recipes can be learned freely');
+    if (!learnLimited) {
+      return text('FABRICATE.Admin.Manager.BooksScrolls.LearnSubFree', 'Recipes can be learned freely');
+    }
+    return learnScope === 'total'
+      ? text('FABRICATE.Admin.Manager.BooksScrolls.LearnSubTotal', 'Shared cap across all copies')
+      : text('FABRICATE.Admin.Manager.BooksScrolls.LearnSubLimited', 'Learning is capped per copy');
   });
 </script>
 

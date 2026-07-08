@@ -948,14 +948,20 @@ export class CraftingSystemManager {
         ? Number(rawLearns)
         : undefined;
 
-    // `learningMode` ('once' | 'ntimes' | 'party') is net-new; migrate legacy caps by
-    // reading their count (maxRecipes > 1 → 'ntimes', else 'once'). 'party' is never
-    // reached by migration — only by an authored value.
-    const learningMode = ['once', 'ntimes', 'party'].includes(learn.learningMode)
-      ? learn.learningMode
-      : Number(rawLearns) > 1
-        ? 'ntimes'
-        : 'once';
+    // `learnScope` ('perInstance' | 'total') is the canonical cap scope: `perInstance`
+    // limits how many recipes may be learned from a SINGLE copy of the item in a
+    // character's inventory; `total` limits how many may be learned across EVERY copy
+    // of the source recipe item (a shared world pool). Prefer an authored `learnScope`,
+    // otherwise derive it from the legacy `learningMode` ('party' → total, else
+    // perInstance). `learningMode` is kept as a synced legacy mirror
+    // (total → 'party'; perInstance → 'ntimes' when N>1, else 'once').
+    const learnScope = ['perInstance', 'total'].includes(learn.learnScope)
+      ? learn.learnScope
+      : learn.learningMode === 'party'
+        ? 'total'
+        : 'perInstance';
+    const learningMode =
+      learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
 
     const prerequisite =
       typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
@@ -977,6 +983,7 @@ export class CraftingSystemManager {
         limitLearning,
         maxRecipes: learnsAllowed,
         learnsAllowed,
+        learnScope,
         learningMode,
         prerequisite,
         destroyWhenSpent: learn.destroyWhenSpent === true,

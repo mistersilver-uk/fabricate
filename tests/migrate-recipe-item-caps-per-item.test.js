@@ -140,7 +140,9 @@ test('seeded caps survive a _normalizeSystem round-trip', async () => {
       limitLearning: true,
       maxRecipes: 2,
       learnsAllowed: 2,
-      // maxRecipes 2 (> 1) migrates the legacy cap to the 'ntimes' learning mode.
+      // A legacy per-document cap maps to the per-copy scope; maxRecipes 2 (> 1) keeps
+      // the legacy 'ntimes' learning-mode mirror.
+      learnScope: 'perInstance',
       learningMode: 'ntimes',
       prerequisite: null,
       destroyWhenSpent: true,

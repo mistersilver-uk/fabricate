@@ -1412,7 +1412,10 @@
           "ColItem": "Recipe item",
           "ColRecipes": "Recipes",
           "ColUses": "Uses",
-          "ColLearning": "Learning"
+          "ColLearning": "Learning",
+          "LearnTotal": "{n} total",
+          "LearnPerCopy": "{n} / copy",
+          "LearnSubTotal": "Shared cap across all copies"
         },
         "Recipe": {
           "Kicker": "Recipes View",
@@ -3475,13 +3478,13 @@
             "ExplainParty": "The party as a whole can learn from this item {times}, no matter who reads it.",
             "Increment": "Increase",
             "Inert": "Becomes inert",
-            "LearningHint": "How often a reader may learn the recipes inside — independent of how many times the item can be opened.",
+            "LearningHint": "How many recipes may be learned from this item — independent of how many times the item can be opened.",
             "LearningLimit": "Learning limit",
             "LearningTitle": "Learning",
             "LearnsAllowed": "Learns allowed",
             "LimitedLearning": "Limited learning",
-            "LimitedLearningOff": "Off — readers can learn from this freely.",
-            "LimitedLearningOn": "On — a reader can only learn from this a set number of times.",
+            "LimitedLearningOff": "Off — readers can learn every recipe in this item freely.",
+            "LimitedLearningOn": "On — a limited number of recipes can be learned from this item.",
             "LimitedUse": "Limited use",
             "LimitedUseOff": "Off — this item can be read any number of times.",
             "LimitedUseOn": "On — a copy is spent as it’s read.",
@@ -3495,11 +3498,20 @@
             "Times": "times",
             "Title": "Limits",
             "UnitPerReader": "per reader",
-            "UnitTotal": "total",
+            "UnitTotal": "total · shared",
             "UsesHint": "How many times a single copy of this item can be read before it’s spent.",
             "UsesPerCopy": "Uses per copy",
             "UsesTitle": "Uses",
-            "WhenSpent": "When the last use is spent"
+            "WhenSpent": "When the last use is spent",
+            "ScopePerCopy": "Per copy",
+            "ScopeTotal": "Across all copies",
+            "AppliesTo": "Limit applies",
+            "RecipesAllowed": "Recipes allowed",
+            "UnitPerCopy": "per copy",
+            "Recipe": "recipe",
+            "Recipes": "recipes",
+            "ExplainTotal": "Up to {recipes} can be learned in total across every copy of this item, no matter who reads them.",
+            "ExplainPerCopy": "Each copy of this item teaches up to {recipes}; the reader picks which."
           },
           "Overview": {
             "CopyUuid": "Copy UUID",
@@ -3531,7 +3543,10 @@
             "RecipePlural": "recipes",
             "RecipeSingular": "recipe",
             "RereadAnytime": "Reread anytime",
-            "SingleUse": "Single use"
+            "SingleUse": "Single use",
+            "LearnUpToTotal": "Learn up to {n} total",
+            "LearnUpToPerCopy": "Learn up to {n} per copy",
+            "ReadLearnUpTo": "Read & learn up to {n} of {total}"
           },
           "Rail": {
             "EffectiveRules": "Effective rules",

@@ -91,8 +91,8 @@
   }
 
   // Learning chip (knowledge visibility mode). Prefers the new `caps.learn` shape
-  // (`limitLearning` / `learningMode` / `learnsAllowed`) and falls back to the
-  // legacy `limitRecipes` / `maxRecipes` fields.
+  // (`limitLearning` / `learnScope` / `learnsAllowed`) and falls back to the legacy
+  // `limitRecipes` / `maxRecipes` / `learningMode` fields.
   function learnLimited(item) {
     const learn = item?.caps?.learn || {};
     return learn.limitLearning === true || learn.limitRecipes === true;
@@ -104,12 +104,19 @@
     return Number.isFinite(raw) && raw > 0 ? raw : 1;
   }
 
+  function learnScopeOf(item) {
+    const learn = item?.caps?.learn || {};
+    if (learn.learnScope === 'perInstance' || learn.learnScope === 'total') return learn.learnScope;
+    return learn.learningMode === 'party' ? 'total' : 'perInstance';
+  }
+
   function learnChipLabel(item) {
     if (!learnLimited(item)) return text('FABRICATE.Admin.Manager.BooksScrolls.LearnFreely', 'Learn freely');
-    const mode = item?.caps?.learn?.learningMode;
-    if (mode === 'once') return text('FABRICATE.Admin.Manager.BooksScrolls.LearnOnce', 'Learn once');
-    if (mode === 'party') return text('FABRICATE.Admin.Manager.BooksScrolls.PartyLearn', 'Party learn');
-    return text('FABRICATE.Admin.Manager.BooksScrolls.LearnTimes', '{n}× learn').replace('{n}', learnsAllowed(item));
+    const n = learnsAllowed(item);
+    if (learnScopeOf(item) === 'total') {
+      return text('FABRICATE.Admin.Manager.BooksScrolls.LearnTotal', '{n} total').replace('{n}', n);
+    }
+    return text('FABRICATE.Admin.Manager.BooksScrolls.LearnPerCopy', '{n} / copy').replace('{n}', n);
   }
 
   function capChipLabel(item) {

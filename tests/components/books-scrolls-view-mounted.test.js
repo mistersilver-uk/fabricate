@@ -80,22 +80,22 @@ describe('BooksScrollsView (mounted)', () => {
   });
 
   it('shows the LEARNING chip in knowledge mode and switches with visibilityMode', async () => {
-    const item = makeItem({ caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitLearning: true, learningMode: 'once' } } });
+    const item = makeItem({ caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 1 } } });
 
     const knowledge = await harness.mount({ recipeItems: [item], visibilityMode: 'knowledge' });
-    assert.equal(capChipText(knowledge, 'primer'), 'Learn once');
+    assert.equal(capChipText(knowledge, 'primer'), '1 / copy');
 
     harness.remount();
     const itemMode = await harness.mount({ recipeItems: [item], visibilityMode: 'item' });
     assert.equal(capChipText(itemMode, 'primer'), '3 uses');
   });
 
-  it('renders the party-learn and unlimited/free chip variants', async () => {
-    const party = await harness.mount({
-      recipeItems: [makeItem({ caps: { learn: { limitLearning: true, learningMode: 'party' } } })],
+  it('renders the total-scope and free chip variants', async () => {
+    const total = await harness.mount({
+      recipeItems: [makeItem({ caps: { learn: { limitLearning: true, learnScope: 'total', learnsAllowed: 4 } } })],
       visibilityMode: 'knowledge'
     });
-    assert.equal(capChipText(party, 'primer'), 'Party learn');
+    assert.equal(capChipText(total, 'primer'), '4 total');
 
     harness.remount();
     const free = await harness.mount({

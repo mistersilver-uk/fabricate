@@ -21,7 +21,7 @@ function itemDraft(overrides = {}) {
   return { id: 'ri1', caps: { item: { limitUses: false, maxUses: 3, whenSpent: 'destroyed', ...overrides }, learn: {} } };
 }
 function learnDraft(overrides = {}) {
-  return { id: 'ri1', caps: { item: {}, learn: { limitLearning: false, learningMode: 'once', learnsAllowed: 1, ...overrides } } };
+  return { id: 'ri1', caps: { item: {}, learn: { limitLearning: false, learnScope: 'perInstance', learnsAllowed: 1, ...overrides } } };
 }
 
 before(() => harness.setup());
@@ -68,24 +68,24 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     assert.deepEqual(patches, [{ caps: { item: { whenSpent: 'inert' } } }]);
   });
 
-  it('emits a limitLearning patch and a learningMode patch', async () => {
+  it('emits a learnScope patch from the segmented control', async () => {
     const patches = [];
-    const root = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learningMode: 'once' }), visibilityMode: 'knowledge', onPatch: (p) => patches.push(p) });
-    const ntimes = root.querySelector('[data-recipe-item-learning-mode-option="ntimes"] input[type="radio"]');
-    ntimes.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    assert.deepEqual(patches, [{ caps: { learn: { learningMode: 'ntimes' } } }]);
+    const root = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learnScope: 'perInstance' }), visibilityMode: 'knowledge', onPatch: (p) => patches.push(p) });
+    const total = root.querySelector('[data-recipe-item-learn-scope-option="total"] input[type="radio"]');
+    total.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    assert.deepEqual(patches, [{ caps: { learn: { learnScope: 'total' } } }]);
   });
 
-  it('disables and pins the learns stepper to 1 in once mode', async () => {
-    const root = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learningMode: 'once', learnsAllowed: 5 }), visibilityMode: 'knowledge' });
-    assert.equal(root.querySelector('[data-recipe-item-learns-value]').textContent.trim(), '1');
-    assert.equal(root.querySelector('[data-recipe-item-learns-inc]').disabled, true);
-    assert.equal(root.querySelector('[data-recipe-item-learns-dec]').disabled, true);
+  it('keeps the learns stepper active in both scopes (no forced pin)', async () => {
+    const root = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learnScope: 'perInstance', learnsAllowed: 5 }), visibilityMode: 'knowledge' });
+    assert.equal(root.querySelector('[data-recipe-item-learns-value]').textContent.trim(), '5');
+    assert.equal(root.querySelector('[data-recipe-item-learns-inc]').disabled, false);
+    assert.equal(root.querySelector('[data-recipe-item-learns-dec]').disabled, false);
   });
 
-  it('steps learns allowed in ntimes mode', async () => {
+  it('steps recipes allowed', async () => {
     const patches = [];
-    const root = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learningMode: 'ntimes', learnsAllowed: 2 }), visibilityMode: 'knowledge', onPatch: (p) => patches.push(p) });
+    const root = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learnScope: 'perInstance', learnsAllowed: 2 }), visibilityMode: 'knowledge', onPatch: (p) => patches.push(p) });
     assert.equal(root.querySelector('[data-recipe-item-learns-value]').textContent.trim(), '2');
     root.querySelector('[data-recipe-item-learns-inc]').click();
     assert.deepEqual(patches, [{ caps: { learn: { learnsAllowed: 3 } } }]);
@@ -94,7 +94,7 @@ describe('RecipeItemLimitsTab (mounted)', () => {
   it('emits a prerequisite patch (id or null) from the selector', async () => {
     const patches = [];
     const root = await harness.mount({
-      recipeItem: learnDraft({ limitLearning: true, learningMode: 'ntimes', learnsAllowed: 2 }),
+      recipeItem: learnDraft({ limitLearning: true, learnScope: 'perInstance', learnsAllowed: 2 }),
       visibilityMode: 'knowledge',
       linkedRecipes: [{ id: 'r1', name: 'Alloy Bronze' }],
       onPatch: (p) => patches.push(p)
@@ -106,10 +106,13 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     assert.deepEqual(patches, [{ caps: { learn: { prerequisite: 'r1' } } }]);
   });
 
-  it('renders a live learning explanation that reflects the mode', async () => {
-    const root = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learningMode: 'party', learnsAllowed: 4 }), visibilityMode: 'knowledge' });
-    const explain = root.querySelector('[data-recipe-item-learn-explain]').textContent;
-    assert.match(explain, /party/i);
-    assert.match(explain, /4/);
+  it('renders a live learning explanation that reflects the scope', async () => {
+    const total = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learnScope: 'total', learnsAllowed: 4 }), visibilityMode: 'knowledge' });
+    const totalText = total.querySelector('[data-recipe-item-learn-explain]').textContent;
+    assert.match(totalText, /total/i);
+    assert.match(totalText, /4/);
+    harness.remount();
+    const perCopy = await harness.mount({ recipeItem: learnDraft({ limitLearning: true, learnScope: 'perInstance', learnsAllowed: 2 }), visibilityMode: 'knowledge' });
+    assert.match(perCopy.querySelector('[data-recipe-item-learn-explain]').textContent, /copy/i);
   });
 });

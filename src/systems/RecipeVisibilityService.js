@@ -176,10 +176,11 @@ export class RecipeVisibilityService {
     });
   }
 
-  // The learning-limit mode for a recipe's linked recipe item: 'once' (per actor),
-  // 'ntimes' (per physical document), or 'party' (one shared world pool).
-  _getRecipeItemLearningMode(recipe) {
-    return this._getRecipeItemCaps(recipe).learn.learningMode || 'once';
+  // The learning-limit SCOPE for a recipe's linked recipe item: 'perInstance' (the
+  // cap applies to each physical copy of the item) or 'total' (one shared world pool
+  // across every copy of the source item).
+  _getRecipeItemLearnScope(recipe) {
+    return this._getRecipeItemCaps(recipe).learn.learnScope || 'perInstance';
   }
 
   // The recipeId a reader must already have learned before this recipe (or null).
@@ -258,11 +259,15 @@ export class RecipeVisibilityService {
       (learn.limitLearning === undefined && learn.limitRecipes === true);
     const rawLearns = learn.learnsAllowed === undefined ? learn.maxRecipes : learn.learnsAllowed;
     const learnsAllowed = Number.isFinite(Number(rawLearns)) ? Number(rawLearns) : undefined;
-    const learningMode = ['once', 'ntimes', 'party'].includes(learn.learningMode)
-      ? learn.learningMode
-      : Number(rawLearns) > 1
-        ? 'ntimes'
-        : 'once';
+    // `learnScope` ('perInstance' | 'total') — prefer the new field, else derive from
+    // the legacy `learningMode` ('party' → total shared world pool, else per-copy).
+    const learnScope = ['perInstance', 'total'].includes(learn.learnScope)
+      ? learn.learnScope
+      : learn.learningMode === 'party'
+        ? 'total'
+        : 'perInstance';
+    const learningMode =
+      learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
     const prerequisite =
       typeof learn.prerequisite === 'string' && learn.prerequisite ? learn.prerequisite : null;
 
@@ -283,6 +288,7 @@ export class RecipeVisibilityService {
         destroyWhenSpent: learn.destroyWhenSpent === true,
         limitLearning,
         learnsAllowed,
+        learnScope,
         learningMode,
         prerequisite,
       },
@@ -993,14 +999,20 @@ export class RecipeVisibilityService {
     }).filter((recipe) => this._isRecipeItemLearnCapped(recipe));
     if (cappedCandidates.length === 0) return empty;
 
-    // The budget is per item-document instance (mirrors recipeItemUsage). When
-    // several capped systems link the same physical item, use the most permissive
-    // cap; in practice one book links to one system's recipes.
+    // When several capped systems link the same physical item, use the most
+    // permissive cap; in practice one book links to one system's recipes.
     const caps = cappedCandidates
       .map((recipe) => this._getLearnCapForRecipe(recipe))
       .filter((value) => Number.isFinite(value));
     const maxRecipes = caps.length > 0 ? Math.max(...caps) : undefined;
-    const count = this._getRecipeItemLearnCount(ownedItem);
+    // The spent count is scope-aware: `perInstance` reads the per-copy document
+    // count; `total` reads the shared world pool (which the per-copy count never
+    // reflects), so the reader sees the real remaining budget for either scope.
+    const primary = cappedCandidates[0];
+    const count =
+      this._getRecipeItemLearnScope(primary) === 'total'
+        ? this._partyLearnPool.get(this._partyLearnPoolKey(primary))
+        : this._getRecipeItemLearnCount(ownedItem);
     const remainingBudget = Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - count) : 0;
 
     const learnedMap = this._getLearnedMap(actor);
@@ -1057,9 +1069,10 @@ export class RecipeVisibilityService {
 
     const maxRecipes = this._getLearnCapForRecipe(recipe);
 
-    // `party` mode draws from ONE shared world pool instead of the per-document
-    // count, so every actor spends the same budget.
-    if (this._getRecipeItemLearningMode(recipe) === 'party') {
+    // `total` scope draws from ONE shared world pool (across every copy of the source
+    // item) instead of the per-copy document count, so every actor spends the same
+    // budget.
+    if (this._getRecipeItemLearnScope(recipe) === 'total') {
       return this._learnOnePartyRecipe({ recipe, ownedItem, actor, learnedMap, maxRecipes });
     }
 

@@ -62,8 +62,16 @@
   const maxUses = $derived(Number.isFinite(itemCaps.maxUses) ? itemCaps.maxUses : 1);
   const whenSpent = $derived(itemCaps.whenSpent === 'inert' ? 'inert' : 'destroyed');
   const limitLearning = $derived(learnCaps.limitLearning === true);
-  const learningMode = $derived(['once', 'ntimes', 'party'].includes(learnCaps.learningMode) ? learnCaps.learningMode : 'once');
-  const learnsAllowed = $derived(Number.isFinite(learnCaps.learnsAllowed) ? learnCaps.learnsAllowed : 1);
+  const learnScope = $derived(
+    ['perInstance', 'total'].includes(learnCaps.learnScope)
+      ? learnCaps.learnScope
+      : learnCaps.learningMode === 'party'
+        ? 'total'
+        : 'perInstance'
+  );
+  const learnsAllowed = $derived(
+    Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0 ? learnCaps.learnsAllowed : 1
+  );
 
   const recipeCount = $derived(Array.isArray(linkedRecipes) ? linkedRecipes.length : 0);
   const hasItem = $derived(Boolean(linkedItem?.uuid || recipeItem?.sourceItemUuid));
@@ -81,8 +89,7 @@
       checks.push({ id: 'usesValid', ok: !limitUses || maxUses >= 1 });
     }
     if (modeKnowledge) {
-      const ntimes = limitLearning && learningMode === 'ntimes';
-      checks.push({ id: 'learnsValid', ok: !ntimes || learnsAllowed >= 1 });
+      checks.push({ id: 'learnsValid', ok: !limitLearning || learnsAllowed >= 1 });
     }
     return checks;
   });
@@ -100,9 +107,10 @@
   // ---- Right rail: preview + effective rules --------------------------------
   function learnShort() {
     if (!limitLearning) return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely');
-    if (learningMode === 'once') return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnOnceEach', 'Learn once each');
-    if (learningMode === 'ntimes') return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnNEach', 'Learn {n}× each').replace('{n}', String(learnsAllowed));
-    return text('FABRICATE.Admin.Manager.RecipeItem.Preview.PartyLearnsOnce', 'Party learns once');
+    if (learnScope === 'total') {
+      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnUpToTotal', 'Learn up to {n} total').replace('{n}', String(learnsAllowed));
+    }
+    return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnUpToPerCopy', 'Learn up to {n} per copy').replace('{n}', String(learnsAllowed));
   }
 
   const prereqName = $derived.by(() => {
@@ -123,13 +131,23 @@
       : { label: text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely'), icon: 'fas fa-book', tone: 'success' };
   });
 
-  const readLabel = $derived(recipeCount === 0
-    ? text('FABRICATE.Admin.Manager.RecipeItem.Preview.NoRecipes', 'No recipes to learn')
-    : text('FABRICATE.Admin.Manager.RecipeItem.Preview.ReadLearn', 'Read & learn {n} {noun}')
-        .replace('{n}', String(recipeCount))
-        .replace('{noun}', recipeCount === 1
-          ? text('FABRICATE.Admin.Manager.RecipeItem.Preview.RecipeSingular', 'recipe')
-          : text('FABRICATE.Admin.Manager.RecipeItem.Preview.RecipePlural', 'recipes')));
+  const readLabel = $derived.by(() => {
+    if (recipeCount === 0) {
+      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.NoRecipes', 'No recipes to learn');
+    }
+    // When a learning cap actually restricts (below the total), the reader picks up to
+    // the cap; otherwise they can read & learn everything.
+    if (limitLearning && learnsAllowed < recipeCount) {
+      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.ReadLearnUpTo', 'Read & learn up to {n} of {total}')
+        .replace('{n}', String(learnsAllowed))
+        .replace('{total}', String(recipeCount));
+    }
+    return text('FABRICATE.Admin.Manager.RecipeItem.Preview.ReadLearn', 'Read & learn {n} {noun}')
+      .replace('{n}', String(recipeCount))
+      .replace('{noun}', recipeCount === 1
+        ? text('FABRICATE.Admin.Manager.RecipeItem.Preview.RecipeSingular', 'recipe')
+        : text('FABRICATE.Admin.Manager.RecipeItem.Preview.RecipePlural', 'recipes'));
+  });
 
   const effectiveRules = $derived.by(() => {
     const rules = [];

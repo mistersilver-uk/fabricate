@@ -166,6 +166,7 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
       limitLearning: false,
       maxRecipes: undefined,
       learnsAllowed: undefined,
+      learnScope: 'perInstance',
       learningMode: 'once',
       prerequisite: null,
       destroyWhenSpent: false
@@ -258,6 +259,25 @@ test('_normalizeRecipeItemCaps defaults learningMode once, prerequisite null, an
   assert.equal(prereq.learn.prerequisite, 'recipe-42');
 });
 
+test('_normalizeRecipeItemCaps derives learnScope (per-copy vs total) with legacy mode fallback', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  const scope = (learn) => manager._normalizeRecipeItemCaps({ learn }).learn;
+
+  // Default and legacy per-document modes → per-copy scope.
+  assert.equal(scope({}).learnScope, 'perInstance');
+  assert.equal(scope({ learningMode: 'once' }).learnScope, 'perInstance');
+  assert.equal(scope({ learningMode: 'ntimes' }).learnScope, 'perInstance');
+  // Legacy shared world pool → total scope.
+  assert.equal(scope({ learningMode: 'party' }).learnScope, 'total');
+  // An authored learnScope wins over the legacy mode; the legacy mirror follows it.
+  const total = scope({ learnScope: 'total', limitLearning: true, learnsAllowed: 4 });
+  assert.equal(total.learnScope, 'total');
+  assert.equal(total.learningMode, 'party');
+  const perCopy = scope({ learnScope: 'perInstance', limitLearning: true, learnsAllowed: 4 });
+  assert.equal(perCopy.learnScope, 'perInstance');
+  assert.equal(perCopy.learningMode, 'ntimes');
+});
+
 test('updateRecipeItemDefinition accepts an enabled patch alongside caps', async () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   manager.save = async () => {};
@@ -269,13 +289,14 @@ test('updateRecipeItemDefinition accepts an enabled patch alongside caps', async
 
   const result = await manager.updateRecipeItemDefinition('sys-1', 'book-1', {
     enabled: false,
-    caps: { learn: { limitLearning: true, learnsAllowed: 3, learningMode: 'party' } }
+    caps: { learn: { limitLearning: true, learnsAllowed: 3, learnScope: 'total' } }
   });
 
   assert.equal(result.item.enabled, false);
-  assert.equal(result.item.caps.learn.learningMode, 'party');
+  assert.equal(result.item.caps.learn.learnScope, 'total');
   assert.equal(result.item.caps.learn.learnsAllowed, 3);
   // Legacy fields stay in sync for back-compat consumers.
+  assert.equal(result.item.caps.learn.learningMode, 'party');
   assert.equal(result.item.caps.learn.limitRecipes, true);
   assert.equal(result.item.caps.learn.maxRecipes, 3);
 });

@@ -36,7 +36,7 @@ const LINKED_RECIPES = [
 ];
 
 function draft(overrides = {}) {
-  return { id: 'ri1', sourceItemUuid: 'Item.abc', enabled: true, caps: { item: { limitUses: false, maxUses: 3, whenSpent: 'destroyed' }, learn: { limitLearning: false, learningMode: 'once', learnsAllowed: 1 } }, ...overrides };
+  return { id: 'ri1', sourceItemUuid: 'Item.abc', enabled: true, caps: { item: { limitUses: false, maxUses: 3, whenSpent: 'destroyed' }, learn: { limitLearning: false, learnScope: 'perInstance', learnsAllowed: 1 } }, ...overrides };
 }
 
 before(() => harness.setup());
@@ -104,13 +104,13 @@ describe('RecipeItemEditor (mounted)', () => {
 
   it('shows knowledge-mode preview and rules when the visibility mode is knowledge', async () => {
     const root = await harness.mount({
-      recipeItem: draft({ caps: { item: {}, learn: { limitLearning: true, learningMode: 'ntimes', learnsAllowed: 3 } } }),
+      recipeItem: draft({ caps: { item: {}, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 3 } } }),
       linkedItem: LINKED_ITEM,
       linkedRecipes: LINKED_RECIPES,
       activeTab: 'overview',
       visibilityMode: 'knowledge'
     });
-    assert.match(root.querySelector('[data-recipe-item-preview-badge]').textContent, /3×/);
+    assert.match(root.querySelector('[data-recipe-item-preview-badge]').textContent, /up to 3 per copy/i);
     assert.match(root.querySelector('[data-recipe-item-rules]').textContent, /every recipe/i);
   });
 

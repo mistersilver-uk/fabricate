@@ -1,9 +1,10 @@
 /**
- * Shared, world-level "party" learn pool for recipe items (issue 511, PR-B).
+ * Shared, world-level "total" learn pool for recipe items (issue 511, PR-B).
  *
- * A recipe item whose `learn.learningMode === 'party'` draws every actor's learns
- * from ONE shared budget keyed by the recipe-item definition, rather than a
- * per-actor (`once`) or per-document (`ntimes`) count. The counter therefore lives
+ * A recipe item whose `learn.learnScope === 'total'` draws every actor's learns
+ * from ONE shared budget keyed by the recipe-item definition (i.e. across every copy
+ * of the source item), rather than the per-copy (`perInstance`) document count. The
+ * counter therefore lives
  * at world scope, and — like every other externally-observable world write in the
  * module — its increments are GM-authoritative: only a GM mutates the shared count,
  * and a non-GM path degrades safely (the write is skipped and reported as failed)

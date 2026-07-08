@@ -60,8 +60,8 @@
       checks.push({ id: 'usesValid', ok: item.limitUses !== true || (Number.isFinite(item.maxUses) && item.maxUses >= 1) });
     }
     if (visibilityMode === 'knowledge') {
-      const ntimes = learn.limitLearning === true && learn.learningMode === 'ntimes';
-      checks.push({ id: 'learnsValid', ok: !ntimes || (Number.isFinite(learn.learnsAllowed) && learn.learnsAllowed >= 1) });
+      const limited = learn.limitLearning === true;
+      checks.push({ id: 'learnsValid', ok: !limited || (Number.isFinite(learn.learnsAllowed) && learn.learnsAllowed >= 1) });
     }
     return checks;
   });

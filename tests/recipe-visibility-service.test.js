@@ -2327,7 +2327,7 @@ function makeFakePartyPool() {
   };
 }
 
-function buildLearnModeSystem({ learningMode, learnsAllowed, prerequisite = null } = {}) {
+function buildLearnModeSystem({ learningMode, learnScope, learnsAllowed, prerequisite = null } = {}) {
   return buildMockSystem({
     id: 'system-1',
     recipeVisibility: {
@@ -2340,7 +2340,7 @@ function buildLearnModeSystem({ learningMode, learnsAllowed, prerequisite = null
         sourceItemUuid: 'Compendium.world.items.book',
         caps: {
           item: { limitUses: false },
-          learn: { limitLearning: true, learnsAllowed, learningMode, prerequisite }
+          learn: { limitLearning: true, learnsAllowed, learnScope, learningMode, prerequisite }
         }
       }
     ]
@@ -2404,6 +2404,58 @@ test('LEARN.party - two actors share ONE budget across two physical copies', asy
   assert.equal(refused.success, false);
   assert.equal(refused.message, 'FABRICATE.Knowledge.LearnBudgetSpent');
   assert.equal(pool.get('system-1::book'), 2, 'both learns drew from one shared, system-scoped pool');
+});
+
+test('LEARN.scope=total - an explicit learnScope drives the shared world pool', async () => {
+  const system = buildLearnModeSystem({ learnScope: 'total', learnsAllowed: 2 });
+  const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' }), buildCappedRecipe({ id: 'r-c' })];
+  const pool = makeFakePartyPool();
+  const service = new RecipeVisibilityService({ getRecipes: () => recipes }, { getSystem: () => system }, pool);
+
+  const copyA = new FakeItem({ uuid: 'Actor.a.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actorA = new FakeActor({ id: 'actor-a', items: [copyA] });
+  const copyB = new FakeItem({ uuid: 'Actor.b.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actorB = new FakeActor({ id: 'actor-b', items: [copyB] });
+
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: copyA, actor: actorA })).success, true);
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[1], ownedItem: copyB, actor: actorB })).success, true);
+  const refused = await service.learnOneRecipeFromItem({ recipe: recipes[2], ownedItem: copyA, actor: actorA });
+  assert.equal(refused.success, false);
+  assert.equal(pool.get('system-1::book'), 2, 'both learns drew from one shared pool via learnScope=total');
+});
+
+test('LEARN.scope=perInstance - each copy carries its OWN budget (not shared)', async () => {
+  const system = buildLearnModeSystem({ learnScope: 'perInstance', learnsAllowed: 1 });
+  const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];
+  // A shared pool that would throw if consulted — per-copy scope must never touch it.
+  const pool = { get: () => 0, increment: async () => { throw new Error('per-copy must not use the shared pool'); } };
+  const service = new RecipeVisibilityService({ getRecipes: () => recipes }, { getSystem: () => system }, pool);
+
+  const copyA = new FakeItem({ uuid: 'Actor.a.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actorA = new FakeActor({ id: 'actor-a', items: [copyA] });
+  const copyB = new FakeItem({ uuid: 'Actor.b.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actorB = new FakeActor({ id: 'actor-b', items: [copyB] });
+
+  // Copy A spends its single learn; a second learn from A is refused (its budget is gone).
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: copyA, actor: actorA })).success, true);
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[1], ownedItem: copyA, actor: actorA })).success, false);
+  // Copy B still has its OWN full budget — an independent per-copy count.
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: copyB, actor: actorB })).success, true);
+});
+
+test('LEARN.scope=total - getLearnableRecipesFromItem reports remaining from the shared pool', async () => {
+  const system = buildLearnModeSystem({ learnScope: 'total', learnsAllowed: 3 });
+  const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];
+  const pool = makeFakePartyPool();
+  const service = new RecipeVisibilityService({ getRecipes: () => recipes }, { getSystem: () => system }, pool);
+  const copy = new FakeItem({ uuid: 'Actor.a.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'actor-a', items: [copy] });
+
+  assert.equal(service.getLearnableRecipesFromItem({ ownedItem: copy, actor }).remainingBudget, 3);
+  // Spending draws from the shared pool; the reported remaining reflects it even
+  // though the per-copy document count is never touched by the total path.
+  await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: copy, actor });
+  assert.equal(service.getLearnableRecipesFromItem({ ownedItem: copy, actor }).remainingBudget, 2);
 });
 
 test('LEARN.party - a non-GM (failed) shared-counter write fails closed without learning', async () => {

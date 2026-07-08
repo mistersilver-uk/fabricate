@@ -7,9 +7,9 @@
                  "Uses per copy" stepper (caps.item.maxUses, min 1) and a "When the
                  last use is spent" SegmentedControl (caps.item.whenSpent).
    - knowledge → Learning card. A "Limited learning" toggle (caps.learn.limitLearning);
-                 when on, a "Learning limit" SegmentedControl (caps.learn.learningMode:
-                 once/ntimes/party), a "Learns allowed" stepper (caps.learn.learnsAllowed,
-                 forced to 1 + disabled when mode='once'), a "Prerequisite to learn"
+                 when on, a "Limit applies" SegmentedControl (caps.learn.learnScope:
+                 perInstance = per copy / total = across all copies), a "Recipes allowed"
+                 stepper (caps.learn.learnsAllowed, min 1), a "Prerequisite to learn"
                  selector (a recipe id from linkedRecipes/availableRecipes, or None),
                  and a live plain-English explanation.
 
@@ -50,23 +50,28 @@
   const whenSpent = $derived(itemCaps.whenSpent === 'inert' ? 'inert' : 'destroyed');
 
   const limitLearning = $derived(learnCaps.limitLearning === true);
-  const learningMode = $derived(['once', 'ntimes', 'party'].includes(learnCaps.learningMode) ? learnCaps.learningMode : 'once');
-  const learnsAllowed = $derived(Number.isFinite(learnCaps.learnsAllowed) ? learnCaps.learnsAllowed : 1);
+  // Canonical cap scope: 'perInstance' (per copy in a character's inventory) or
+  // 'total' (shared across every copy of the source item). Falls back to deriving
+  // from the legacy `learningMode` so un-normalized drafts still read correctly.
+  const learnScope = $derived(
+    ['perInstance', 'total'].includes(learnCaps.learnScope)
+      ? learnCaps.learnScope
+      : learnCaps.learningMode === 'party'
+        ? 'total'
+        : 'perInstance'
+  );
+  const learnsAllowed = $derived(
+    Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0 ? learnCaps.learnsAllowed : 1
+  );
   const prerequisite = $derived(learnCaps.prerequisite ? String(learnCaps.prerequisite) : '');
-
-  // In 'once' mode the learns count is meaningless (each reader learns exactly once),
-  // so the stepper is disabled and pinned to 1.
-  const learnsActive = $derived(learningMode !== 'once');
-  const learnsDisplay = $derived(learningMode === 'once' ? 1 : learnsAllowed);
 
   const WHEN_SPENT_OPTIONS = [
     { value: 'destroyed', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Destroyed', fallback: 'Destroyed' },
     { value: 'inert', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Inert', fallback: 'Becomes inert' }
   ];
-  const LEARNING_MODE_OPTIONS = [
-    { value: 'once', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ModeOnce', fallback: 'Once per reader', icon: 'fas fa-user-check' },
-    { value: 'ntimes', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ModeNTimes', fallback: 'N times per reader', icon: 'fas fa-repeat' },
-    { value: 'party', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ModeParty', fallback: 'Party-wide', icon: 'fas fa-users' }
+  const LEARN_SCOPE_OPTIONS = [
+    { value: 'perInstance', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ScopePerCopy', fallback: 'Per copy', icon: 'fas fa-book' },
+    { value: 'total', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ScopeTotal', fallback: 'Across all copies', icon: 'fas fa-layer-group' }
   ];
 
   // Prerequisite options: prefer the recipes already linked to this item, then any
@@ -84,16 +89,14 @@
   });
 
   const learnExplain = $derived.by(() => {
-    if (learningMode === 'once') {
-      return text('FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainOnce', 'Each eligible character can learn the recipes in this item once. Re-reading grants nothing.');
+    const n = learnsAllowed;
+    const recipes = `${n} ${n === 1
+      ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.Recipe', 'recipe')
+      : text('FABRICATE.Admin.Manager.RecipeItem.Limits.Recipes', 'recipes')}`;
+    if (learnScope === 'total') {
+      return text('FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainTotal', 'Up to {recipes} can be learned in total across every copy of this item, no matter who reads them.').replace('{recipes}', recipes);
     }
-    const times = `${learnsDisplay} ${learnsDisplay === 1
-      ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.Time', 'time')
-      : text('FABRICATE.Admin.Manager.RecipeItem.Limits.Times', 'times')}`;
-    if (learningMode === 'ntimes') {
-      return text('FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainNTimes', 'Each eligible character can learn from this item up to {times}.').replace('{times}', times);
-    }
-    return text('FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainParty', 'The party as a whole can learn from this item {times}, no matter who reads it.').replace('{times}', times);
+    return text('FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainPerCopy', 'Each copy of this item teaches up to {recipes}; the reader picks which.').replace('{recipes}', recipes);
   });
 
   function patchItem(patch) {
@@ -117,11 +120,10 @@
   function toggleLimitLearning() {
     patchLearn({ limitLearning: !limitLearning });
   }
-  function selectLearningMode(value) {
-    patchLearn({ learningMode: value });
+  function selectLearnScope(value) {
+    patchLearn({ learnScope: value });
   }
   function stepLearns(delta) {
-    if (!learnsActive) return;
     const next = Math.max(1, learnsAllowed + delta);
     if (next !== learnsAllowed) patchLearn({ learnsAllowed: next });
   }
@@ -196,15 +198,15 @@
         <i class="fas fa-graduation-cap" aria-hidden="true"></i>
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningTitle', 'Learning')}</h3>
       </div>
-      <p class="manager-muted manager-recipe-item-limits-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningHint', 'How often a reader may learn the recipes inside — independent of how many times the item can be opened.')}</p>
+      <p class="manager-muted manager-recipe-item-limits-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningHint', 'How many recipes may be learned from this item — independent of how many times the item can be opened.')}</p>
 
       <div class="manager-recipe-item-limits-panel">
         <div class="manager-recipe-item-limits-toggle-row">
           <div class="manager-recipe-item-limits-toggle-copy">
             <span class="manager-recipe-item-limits-toggle-title">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearning', 'Limited learning')}</span>
             <span class="manager-recipe-item-limits-toggle-sub">{limitLearning
-              ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearningOn', 'On — a reader can only learn from this a set number of times.')
-              : text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearningOff', 'Off — readers can learn from this freely.')}</span>
+              ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearningOn', 'On — a limited number of recipes can be learned from this item.')
+              : text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearningOff', 'Off — readers can learn every recipe in this item freely.')}</span>
           </div>
           <button
             type="button"
@@ -222,30 +224,28 @@
         {#if limitLearning}
           <div class="manager-recipe-item-limits-detail is-column">
             <div class="manager-recipe-item-learning-limit">
-              <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningLimit', 'Learning limit')}</span>
+              <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo', 'Limit applies')}</span>
               <SegmentedControl
-                options={LEARNING_MODE_OPTIONS}
-                value={learningMode}
-                onChange={selectLearningMode}
-                groupName="recipe-item-learning-mode"
-                ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningLimit', 'Learning limit')}
-                dataAttr="data-recipe-item-learning-mode"
-                optionDataAttr="data-recipe-item-learning-mode-option"
+                options={LEARN_SCOPE_OPTIONS}
+                value={learnScope}
+                onChange={selectLearnScope}
+                groupName="recipe-item-learn-scope"
+                ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo', 'Limit applies')}
+                dataAttr="data-recipe-item-learn-scope"
+                optionDataAttr="data-recipe-item-learn-scope-option"
               />
             </div>
 
             <div class="manager-recipe-item-learning-row">
               <div class="manager-recipe-item-stepper-group">
-                <span class="manager-recipe-item-stepper-label">{learningMode === 'party'
-                  ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.PartyLearns', 'Party learns')
-                  : text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearnsAllowed', 'Learns allowed')}</span>
-                <div class={`manager-recipe-item-stepper ${learnsActive ? '' : 'is-disabled'}`} data-recipe-item-learns-stepper>
-                  <button type="button" class="manager-recipe-item-stepper-button" data-recipe-item-learns-dec disabled={!learnsActive} aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Decrement', 'Decrease')} onclick={() => stepLearns(-1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
-                  <span class="manager-recipe-item-stepper-value" data-recipe-item-learns-value>{learnsDisplay}</span>
-                  <button type="button" class="manager-recipe-item-stepper-button" data-recipe-item-learns-inc disabled={!learnsActive} aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Increment', 'Increase')} onclick={() => stepLearns(1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
-                  <span class="manager-recipe-item-stepper-unit">{learningMode === 'party'
-                    ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.UnitTotal', 'total')
-                    : text('FABRICATE.Admin.Manager.RecipeItem.Limits.UnitPerReader', 'per reader')}</span>
+                <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RecipesAllowed', 'Recipes allowed')}</span>
+                <div class="manager-recipe-item-stepper" data-recipe-item-learns-stepper>
+                  <button type="button" class="manager-recipe-item-stepper-button" data-recipe-item-learns-dec aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Decrement', 'Decrease')} onclick={() => stepLearns(-1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
+                  <span class="manager-recipe-item-stepper-value" data-recipe-item-learns-value>{learnsAllowed}</span>
+                  <button type="button" class="manager-recipe-item-stepper-button" data-recipe-item-learns-inc aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Increment', 'Increase')} onclick={() => stepLearns(1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
+                  <span class="manager-recipe-item-stepper-unit">{learnScope === 'total'
+                    ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.UnitTotal', 'total · shared')
+                    : text('FABRICATE.Admin.Manager.RecipeItem.Limits.UnitPerCopy', 'per copy')}</span>
                 </div>
               </div>
               <div class="manager-recipe-item-limits-divider is-vertical" aria-hidden="true"></div>

@@ -3353,7 +3353,7 @@
   function toggleRecipeItemQuickLimit(recipeItemId, limited) {
     const patch = craftingVisibilityMode === 'item'
       ? { item: { limitUses: limited === true, maxUses: 1 } }
-      : { learn: { limitLearning: limited === true, learningMode: 'once' } };
+      : { learn: { limitLearning: limited === true, learnScope: 'perInstance', learnsAllowed: 1 } };
     store.updateRecipeItemCaps?.(recipeItemId, patch);
   }
 
