@@ -369,6 +369,7 @@
   .manager-books-scrolls-identity {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: var(--fab-space-2);
     flex: 1;
     min-width: 0;
@@ -403,6 +404,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-1);
+    flex: 1;
     min-width: 0;
   }
 
