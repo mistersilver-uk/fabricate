@@ -6352,6 +6352,14 @@
   align-items: center;
 }
 
+/* The shared .manager-search is `flex: 1 1 260px` for the horizontal filter bar;
+   inside the vertical Access roster column that flex-grow stretches the search box
+   tall (and floats its absolutely-positioned icon mid-gap). Pin it to its content
+   height in the roster context — issue 511. */
+.fabricate-manager .manager-access-roster .manager-search {
+  flex: 0 0 auto;
+}
+
 .fabricate-manager .manager-gathering-panel {
   display: grid;
   gap: var(--fab-space-3);
