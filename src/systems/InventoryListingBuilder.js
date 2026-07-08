@@ -21,8 +21,8 @@
  * component's detail.
  */
 
-import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { getFabricateFlag } from '../config/flags.js';
+import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { getItemSourceReferences } from '../utils/sourceUuid.js';
 

@@ -1013,13 +1013,13 @@ export class CraftingSystemManager {
       // Book membership (issue 511): the recipe ids this book/scroll contains — the
       // canonical, many-to-many link (a recipe may belong to several books). Distinct
       // from the visibility-teaser `recipeIds` fragment elsewhere. Deduped id list.
-      recipeIds: Array.from(
-        new Set(
+      recipeIds: [
+        ...new Set(
           (Array.isArray(entry.recipeIds) ? entry.recipeIds : [])
             .map((rid) => String(rid || '').trim())
             .filter(Boolean)
-        )
-      ),
+        ),
+      ],
       caps: this._normalizeRecipeItemCaps(entry.caps),
     };
   }
@@ -1678,13 +1678,13 @@ export class CraftingSystemManager {
 
     // Book membership (issue 511 many-to-many): replace the contained-recipe id set.
     if (Object.prototype.hasOwnProperty.call(patch, 'recipeIds')) {
-      definition.recipeIds = Array.from(
-        new Set(
+      definition.recipeIds = [
+        ...new Set(
           (Array.isArray(patch.recipeIds) ? patch.recipeIds : [])
             .map((id) => String(id || '').trim())
             .filter(Boolean)
-        )
-      );
+        ),
+      ];
     }
 
     const capsPatch = patch?.caps || {};
@@ -2293,7 +2293,7 @@ export class CraftingSystemManager {
 
     const recipeIds = Array.isArray(definition.recipeIds) ? definition.recipeIds : [];
     if (recipeIds.length > 0) {
-      const idSet = new Set(recipeIds.map((id) => String(id)));
+      const idSet = new Set(recipeIds.map(String));
       return recipes.filter((recipe) => idSet.has(String(recipe?.id)));
     }
 
