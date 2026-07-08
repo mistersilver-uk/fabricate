@@ -430,7 +430,11 @@
           "RoleEssence": "Essence",
           "KindRecipe": "Recipe",
           "KindSalvage": "Salvage",
-          "KindGathering": "Gathering"
+          "KindGathering": "Gathering",
+          "ReadLearnUpTo": "Read & learn up to {remaining} of {total}",
+          "ReadLearnAll": "Read & learn {total} recipes",
+          "ViewRecipes": "View {total} recipes",
+          "HideRecipes": "Hide recipes"
         }
       },
       "ActorBar": {

@@ -95,13 +95,39 @@
   let recipePageSize = $state(6);
   let recipePage = $state(0);
   let expandedRecipeId = $state(null);
+  // The recipe list is collapsed behind the "Read & learn" call-to-action (mirroring
+  // the GM "How players see it" preview); the CTA expands it.
+  let recipesExpanded = $state(false);
   // Reset the accordion + recipe browse state whenever the selected book changes.
   $effect(() => {
     void item?.key;
     recipeSearch = '';
     recipePage = 0;
     expandedRecipeId = null;
+    recipesExpanded = false;
   });
+
+  // The CTA label mirrors the GM preview: "Read & learn up to {n} of {total}" when a
+  // learn cap restricts, "Read & learn {total}" when learnable without a cap, and
+  // "View {total} recipes" for an item-only (non-learnable) book.
+  const recipeTotal = $derived(bookRecipes.length);
+  const learnRemaining = $derived(learningLimit ? Number(learningLimit.remaining ?? 0) : null);
+  const readLearnLabel = $derived.by(() => {
+    if (recipeTotal === 0) return localize('FABRICATE.App.Inventory.Detail.NoRecipes');
+    if (learnable && learnRemaining != null && learnRemaining < recipeTotal) {
+      return localize('FABRICATE.App.Inventory.Detail.ReadLearnUpTo', {
+        remaining: Math.max(0, learnRemaining),
+        total: recipeTotal,
+      });
+    }
+    if (learnable) {
+      return localize('FABRICATE.App.Inventory.Detail.ReadLearnAll', { total: recipeTotal });
+    }
+    return localize('FABRICATE.App.Inventory.Detail.ViewRecipes', { total: recipeTotal });
+  });
+  function toggleRecipesExpanded() {
+    recipesExpanded = !recipesExpanded;
+  }
 
   const searchableRecipes = $derived(bookRecipes.length > RECIPE_PAGE_SIZES[0]);
   const filteredRecipes = $derived.by(() => {
@@ -253,6 +279,23 @@
       </section>
     {/if}
 
+    {#if bookRecipes.length > 0}
+      <button
+        type="button"
+        class="inventory-detail-read-learn"
+        data-inventory-read-learn
+        aria-expanded={recipesExpanded}
+        onclick={toggleRecipesExpanded}
+      >
+        <i class="fas fa-book-open-reader" aria-hidden="true"></i>
+        <span class="inventory-detail-read-learn-label">{recipesExpanded
+          ? localize('FABRICATE.App.Inventory.Detail.HideRecipes')
+          : readLearnLabel}</span>
+        <i class="fas inventory-detail-read-learn-caret" class:fa-chevron-up={recipesExpanded} class:fa-chevron-down={!recipesExpanded} aria-hidden="true"></i>
+      </button>
+    {/if}
+
+    {#if recipesExpanded}
     <section class="inventory-detail-section" data-inventory-section="learn">
       <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}</p>
       {#if bookRecipes.length === 0}
@@ -362,6 +405,7 @@
         {/if}
       {/if}
     </section>
+    {/if}
   </div>
 {:else}
   <div class="inventory-detail" data-inventory-detail={item.key}>
@@ -808,6 +852,49 @@
     font-size: 12px;
     line-height: 1.4;
     color: var(--fab-text-muted);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+  }
+
+  /* The "Read & learn" call-to-action that expands the recipe list — mirrors the
+     GM "How players see it" preview CTA. */
+  .inventory-detail-read-learn {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    border: 1px solid var(--fab-accent);
+    border-radius: 8px;
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .inventory-detail-read-learn:hover {
+    background: var(--fab-accent);
+    color: var(--fab-on-accent);
+  }
+
+  .inventory-detail-read-learn:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .inventory-detail-read-learn-label {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .inventory-detail-read-learn-caret {
+    flex: 0 0 auto;
+    font-size: 11px;
   }
 
   .inventory-detail-limits {

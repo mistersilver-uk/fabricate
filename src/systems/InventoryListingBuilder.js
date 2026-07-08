@@ -21,6 +21,7 @@
  * component's detail.
  */
 
+import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { getItemSourceReferences } from '../utils/sourceUuid.js';
@@ -500,7 +501,7 @@ export class InventoryListingBuilder {
         id: stringOrNull(recipe?.id),
         name: stringOrEmpty(recipe?.name),
         description: stringOrEmpty(recipe?.description),
-        img: stringOrNull(this._resolveRecipeImg(system, recipe)),
+        img: stringOrNull(this._resolveRecipeImg(recipe)),
         learned: Boolean(learnedMap?.[recipe?.id]),
       }));
 
@@ -613,12 +614,10 @@ export class InventoryListingBuilder {
    * the linked recipe-item image when present, else the recipe's own image.
    * @private
    */
-  _resolveRecipeImg(system, recipe) {
-    const recipeItemImg = recipe?.recipeItemId
-      ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)
-          ?.img || ''
-      : '';
-    return recipeItemImg || recipe?.img || '';
+  _resolveRecipeImg(recipe) {
+    // A book's recipes show their OWN image (defaulting to the alchemical blueprint),
+    // matching the GM app — NOT the book's image (which defaults to a generic bag).
+    return recipe?.img || DEFAULT_RECIPE_IMAGE;
   }
 
   /**

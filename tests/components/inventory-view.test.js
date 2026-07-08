@@ -374,6 +374,9 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
+    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
+    detail.querySelector('[data-inventory-read-learn]')?.click();
+    await settle();
     assert.ok(detail, 'renders the book detail');
     assert.match(detail.textContent, /A worn manual of forge techniques\./, 'shows the book description');
     assert.match(detail.textContent, /Forge Breastplate/, 'shows the single recipe name');
@@ -388,6 +391,30 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.deepEqual(calls.learn, ['r1'], 'clicking Learn invokes store.learn with the recipe id');
   });
 
+  it('collapses the recipe list behind a Read & learn CTA that expands it', async () => {
+    const book = makeBook([
+      { id: 'r1', name: 'Forge Breastplate', description: 'A cuirass.', img: null, learned: false },
+    ]);
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    const cta = detail.querySelector('[data-inventory-read-learn]');
+    assert.ok(cta, 'renders the Read & learn CTA');
+    // Collapsed by default — the recipe list is not rendered.
+    assert.equal(detail.querySelector('[data-inventory-learn-recipe]'), null, 'recipe list collapsed by default');
+    assert.equal(cta.getAttribute('aria-expanded'), 'false');
+
+    cta.click();
+    await settle();
+    assert.ok(detail.querySelector('[data-inventory-learn-recipe="r1"]'), 'the CTA expands the recipe list');
+    assert.equal(
+      detail.querySelector('[data-inventory-read-learn]').getAttribute('aria-expanded'),
+      'true'
+    );
+  });
+
   it('shows the learning budget and disables Learn when the budget is spent', async () => {
     const book = makeBook(
       [{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }],
@@ -398,6 +425,9 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
+    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
+    detail.querySelector('[data-inventory-read-learn]')?.click();
+    await settle();
     // The harness localize mock does not interpolate; it emits `key:{data}`, so
     // assert the budget uses the "N remaining" (plural at 0) key carrying remaining=0.
     const budget = detail.querySelector('[data-inventory-learning-budget]').textContent;
@@ -417,6 +447,9 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
+    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
+    detail.querySelector('[data-inventory-read-learn]')?.click();
+    await settle();
     assert.ok(detail.querySelector('[data-inventory-learned="r1"]'), 'renders a Learned chip');
     assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button when learned');
   });
@@ -434,6 +467,9 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
+    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
+    detail.querySelector('[data-inventory-read-learn]')?.click();
+    await settle();
     const accordion = detail.querySelector('[data-inventory-recipe-accordion]');
     assert.ok(accordion, 'renders the accordion for multiple recipes');
     // Search appears once a book teaches more than the smallest page (6).
@@ -466,6 +502,9 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
+    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
+    detail.querySelector('[data-inventory-read-learn]')?.click();
+    await settle();
     assert.ok(detail.querySelector('[data-inventory-recipe-accordion]'), 'still an accordion');
     assert.equal(detail.querySelector('[data-inventory-recipe-search]'), null, 'no search for a small book');
   });
@@ -480,6 +519,9 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
+    // The recipe list is collapsed behind the "Read & learn" CTA — expand it.
+    detail.querySelector('[data-inventory-read-learn]')?.click();
+    await settle();
     assert.ok(detail, 'the item-only book still renders in the inventory');
     assert.match(detail.textContent, /Forge Breastplate/, 'it still lists its recipes');
     assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item-only mode');

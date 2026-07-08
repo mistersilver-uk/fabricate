@@ -293,6 +293,14 @@ describe('InventoryListingBuilder — used-by index', () => {
     );
   });
 
+  it('resolves a book recipe image to the recipe’s own image, defaulting to the alchemical blueprint', () => {
+    const { builder } = makeBuilder();
+    const blueprint = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
+    assert.equal(builder._resolveRecipeImg({ img: 'icons/blade.webp' }), 'icons/blade.webp');
+    assert.equal(builder._resolveRecipeImg({ img: '' }), blueprint, 'empty img → blueprint, not a bag');
+    assert.equal(builder._resolveRecipeImg({}), blueprint);
+  });
+
   it('hides undiscovered (teaser) recipes from a non-GM viewer’s used-by list', () => {
     const systemList = [makeSystem()];
     const recipeManager = { getRecipes: () => [recipe] };
