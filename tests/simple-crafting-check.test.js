@@ -288,16 +288,28 @@ test('a non-matching forced-outcome trigger leaves the comparison in charge', as
 
 // ── Gating: simple vs alchemy vs disabled ───────────────────────────────────
 
-test('alchemy mode runs the simple check even when the enabled flag is off', async () => {
+test('alchemy mode with the check disabled does not run (no roll, auto-success), identical to simple', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({ dc: 15 }),
     resolutionMode: 'alchemy',
     enabled: false,
   });
+  stubThrowingRoll();
+  const result = await run(engine);
+  assert.equal(result.success, true, 'a disabled optional check never blocks an alchemy attempt');
+  assert.equal(result.data.dc, undefined, 'the simple check was not evaluated');
+});
+
+test('alchemy mode runs the shared simple pass/fail check when enabled with a roll formula', async () => {
+  const { engine } = makeEngine({
+    simple: defaultSimple({ dc: 15 }),
+    resolutionMode: 'alchemy',
+    enabled: true,
+  });
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
   const result = await run(engine);
-  assert.equal(result.success, true);
-  assert.equal(result.data.dc, 15, 'the simple check ran');
+  assert.equal(result.success, true, '18 >= 15 passes');
+  assert.equal(result.data.dc, 15, 'the shared simple check ran for alchemy');
 });
 
 test('simple mode with the check disabled does not run (no roll, auto-success)', async () => {

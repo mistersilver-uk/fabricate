@@ -2187,18 +2187,19 @@ export class CraftingEngine {
     // routedByIngredients modes: used when a roll formula is configured. The
     // `craftingCheck.simple` slot is the shared optional pass/fail crafting-check
     // slot (it backs all three modes), NOT a simple-mode-only slot. Optional in
-    // simple + routedByIngredients modes (routedByIngredients routes result groups
-    // by ingredient set, so its check never gates routing — it stays an optional
-    // pass/fail layer that runs on an authored formula alone, with no
-    // `checksEnabled` requirement) and always-on in alchemy mode.
+    // simple + alchemy (both gated by the `checksEnabled` master toggle, so a
+    // configured formula only rolls while checks are enabled) and in
+    // routedByIngredients (which routes result groups by ingredient set, so its
+    // check never gates routing — it stays an optional pass/fail layer that runs on
+    // an authored formula alone, with no `checksEnabled` requirement).
     const simpleConfig = system?.craftingCheck?.simple;
     // With an EMPTY `simple.rollFormula` the simple pass/fail check is not usable,
-    // so `useSimpleCheck` is false and (in optional simple / routedByIngredients
-    // mode) the attempt proceeds with no check.
+    // so `useSimpleCheck` is false and (in optional simple / alchemy /
+    // routedByIngredients mode) the attempt proceeds with no check.
     const useSimpleCheck =
       ['simple', 'alchemy', 'routedByIngredients'].includes(mode) &&
       !!simpleConfig?.rollFormula &&
-      (mode === 'alchemy' || mode === 'routedByIngredients' || checksEnabled);
+      (mode === 'routedByIngredients' || checksEnabled);
 
     // Progressive check (Checks editor) for progressive mode: rolls a formula
     // whose total becomes the numeric `value` the progressive result-awarding

@@ -420,6 +420,28 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(buildOne({ system: enabled }).recipe.check.mandatory, true, 'checks enabled → required');
   });
 
+  it('alchemy mode: the check is optional, identical to simple (disabled → optional, enabled → required)', () => {
+    const disabled = makeSystem({
+      resolutionMode: 'alchemy',
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
+    });
+    const off = buildOne({ system: disabled }).recipe.check;
+    assert.equal(off.usable, true);
+    assert.equal(off.optional, true, 'an alchemy check with checks disabled is optional, like simple');
+    assert.equal(off.mandatory, false, 'alchemy is not a mandatory-check mode');
+
+    const enabled = makeSystem({
+      resolutionMode: 'alchemy',
+      features: { craftingChecks: true },
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
+    });
+    assert.equal(
+      buildOne({ system: enabled }).recipe.check.mandatory,
+      true,
+      'an authored alchemy check is required only when checks are enabled, like simple'
+    );
+  });
+
   it('resolves the check formula against the actor via the injected resolver', () => {
     const system = makeSystem({
       craftingCheck: {

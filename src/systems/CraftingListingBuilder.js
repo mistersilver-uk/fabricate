@@ -67,10 +67,11 @@ const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
 
 /**
  * Modes whose crafting check is mandatory (the attempt fails without an authored
- * roll formula). The routedByCheck/progressive modes require a check; alchemy runs an
- * always-on check. Simple and routedByIngredients treat the check as optional.
+ * roll formula). Only routedByCheck and progressive require a check. Simple,
+ * alchemy, and routedByIngredients treat the crafting check as an optional pass/fail
+ * layer backed by the shared `craftingCheck.simple` slot.
  */
-const MANDATORY_CHECK_MODES = new Set(['routedByCheck', 'progressive', 'alchemy']);
+const MANDATORY_CHECK_MODES = new Set(['routedByCheck', 'progressive']);
 
 function stringOrEmpty(value) {
   return typeof value === 'string' ? value : value == null ? '' : String(value);
@@ -424,8 +425,8 @@ export class CraftingListingBuilder {
     // the mode requires a check to be configured. Otherwise a routed-by-ingredients
     // recipe with an authored simple pass/fail check + DC reads "Optional" even though it is
     // always rolled and can fail. Active when: the mode requires a check
-    // (routedByCheck / progressive / alchemy); routedByIngredients with an authored
-    // formula (no enabled toggle); or simple with a formula AND checks enabled.
+    // (routedByCheck / progressive); routedByIngredients with an authored
+    // formula (no enabled toggle); or simple/alchemy with a formula AND checks enabled.
     const requiredByMode = MANDATORY_CHECK_MODES.has(mode);
     const checksEnabled =
       system?.features?.craftingChecks === true || system?.craftingCheck?.enabled === true;

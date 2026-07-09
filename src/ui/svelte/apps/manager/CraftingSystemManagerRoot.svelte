@@ -344,10 +344,10 @@
   const checkActivation = $derived({
     crafting: {
       mode: selectedSystem?.resolutionMode || 'simple',
-      // The crafting check is optional in simple and routedByIngredients (it runs
-      // only when a roll formula is authored); routedByCheck and progressive REQUIRE
-      // it, so they are non-optional.
-      optional: ['simple', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
+      // The crafting check is optional in simple, alchemy, and routedByIngredients
+      // (it runs only when a roll formula is authored and checks are enabled);
+      // routedByCheck and progressive REQUIRE it, so they are non-optional.
+      optional: ['simple', 'alchemy', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
       enabled: selectedSystem?.craftingCheck?.enabled === true
     },
     salvage: {

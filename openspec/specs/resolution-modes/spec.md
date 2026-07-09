@@ -54,7 +54,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 | `routedByIngredients` | one or more     | one or more                 | optional           | `IngredientSet.resultGroupId`       |
 | `routedByCheck`       | one or more     | one or more                 | required           | system routed-check outcome         |
 | `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
-| `alchemy`             | one or more     | one or more                 | provider-dependent | recipe `resultSelection.provider`   |
+| `alchemy`             | one or more     | one or more                 | optional           | recipe `resultSelection.provider`   |
 
 ## Player-Facing Mode Labels
 
@@ -210,6 +210,8 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 The `ingredientSet` provider routes by `IngredientSet.resultGroupId` and the `check` provider routes by the crafting-check outcome name (the same routing contracts the `routedByIngredients`/`routedByCheck` modes apply at the mode level).
 - Multi-step recipes are not supported.
 - `consumeOnFail` defaults to true for failed attempts.
+- The crafting check is the same optional pass/fail check as `simple` mode, stored in the shared `craftingCheck.simple` slot, and runs only when `craftingCheck.simple.rollFormula` is authored and crafting checks are enabled.
+- The check is never mandatory in alchemy: a missing roll formula or a disabled check means no check runs and the signature match applies its result set directly (a signature match is the only gate on a successful attempt).
 
 ### Signature Resolution
 
