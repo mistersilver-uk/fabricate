@@ -254,6 +254,30 @@ test('chooser summaries span every enabled alchemy system with N known . M total
   assert.equal(summaries['sys-b'].totalCount, 1);
 });
 
+test('a resolved actor with no discipline chosen (>1 systems) is NOT no-actor and carries selectedActorId', () => {
+  // Regression: the empty (chooser) listing must report the resolved actor.
+  // AlchemyView checks no-actor BEFORE needsChooser, and a null selectedActorId
+  // reads as no-actor — which made the discipline chooser unreachable whenever an
+  // actor was selected but no discipline chosen yet.
+  const a = singleSystemSetup();
+  const potion = plainRecipe('potion', 'Healing Potion', 'sys-b', { emberroot: 2 }, 'springwater', 1);
+  const systemB = makeSystem('sys-b', 'Distillation', [potion], COMPONENTS);
+  const actor = makeActor('pc', { learned: { vigor: {} } });
+
+  const listing = build(
+    [
+      { system: a.system, recipes: a.recipes },
+      { system: systemB, recipes: [potion] },
+    ],
+    { craftingActor: actor, viewer: { isGM: false }, craftingSystemId: null }
+  );
+
+  assert.equal(listing.denied, false, 'a resolved owner is not denied');
+  assert.equal(listing.activeSystemId, null, 'no discipline is active yet');
+  assert.ok(listing.selectedActorId, 'the resolved actor is reported so the view is not no-actor');
+  assert.equal(listing.systems.length, 2, 'both disciplines are offered in the chooser');
+});
+
 test('NON-OWNER read-leak: a null crafting actor yields a denied, empty listing (chooser still safe)', () => {
   const { system, recipes } = singleSystemSetup();
   // A non-owner viewer resolves upstream to a null crafting actor.

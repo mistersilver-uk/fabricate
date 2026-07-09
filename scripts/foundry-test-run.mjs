@@ -5701,13 +5701,32 @@ async function main() {
           });
           await page.waitForTimeout(300);
 
+          // The alchemy listing resolves its actor from the shared top-bar
+          // selection, and the no-actor state precedes the chooser in AlchemyView.
+          // Wait for the bar to finish selecting an actor so we land on the
+          // discipline chooser rather than the no-actor placeholder.
+          await appShell.locator('[data-actor-bar-state="ready"]')
+            .first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+
           await appShell.locator('.fabricate-app-nav-item:has-text("Alchemy")').first().click();
           await appShell.locator('.fabricate-app-nav-item.active:has-text("Alchemy")')
             .first().waitFor({ state: 'visible', timeout: 10_000 });
 
-          // Two alchemy systems → the discipline chooser renders first.
-          await appShell.locator('.alchemy-chooser').first()
-            .waitFor({ state: 'visible', timeout: 10_000 });
+          // Let the view settle out of its loading state. With two seeded
+          // disciplines the chooser renders; if a discipline is already active
+          // (persisted selection), use the "Switch discipline" control to return
+          // to the chooser.
+          await appShell
+            .locator('#fabricate-app [data-alchemy-state]:not([data-alchemy-state="loading"]), #fabricate-app .alchemy-chooser')
+            .first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+          const alchemyChooser = appShell.locator('.alchemy-chooser').first();
+          if (!(await alchemyChooser.isVisible().catch(() => false))) {
+            const switchDiscipline = appShell.locator('[data-alchemy-switch]').first();
+            if (await switchDiscipline.count() > 0) {
+              await switchDiscipline.click().catch(() => {});
+            }
+          }
+          await alchemyChooser.waitFor({ state: 'visible', timeout: 12_000 });
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'player-alchemy-chooser');
 

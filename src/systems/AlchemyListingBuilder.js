@@ -113,7 +113,17 @@ export class AlchemyListingBuilder {
       ? systems.find((system) => system.id === craftingSystemId) || null
       : null;
     if (!activeSystem) {
-      return this._emptyListing({ craftingSystemId, systems: chooserSystems, denied: false });
+      // A resolvable owner with no discipline chosen yet (the >1-system chooser
+      // case): report the resolved actor so the view distinguishes "choose a
+      // discipline" (needsChooser) from the genuine no-actor state. Without this
+      // the chooser is unreachable — `AlchemyView` checks no-actor before
+      // needsChooser, and a null selectedActorId reads as no-actor.
+      return this._emptyListing({
+        craftingSystemId,
+        systems: chooserSystems,
+        denied: false,
+        craftingActor,
+      });
     }
 
     const sources = this._dedupeActors([
@@ -148,10 +158,10 @@ export class AlchemyListingBuilder {
     };
   }
 
-  _emptyListing({ craftingSystemId, systems, denied }) {
+  _emptyListing({ craftingSystemId, systems, denied, craftingActor = null }) {
     return {
       denied,
-      selectedActorId: null,
+      selectedActorId: craftingActor ? actorKey(craftingActor) : null,
       activeSystemId: craftingSystemId ?? null,
       activeSystemName: '',
       systems,
