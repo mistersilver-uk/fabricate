@@ -3936,7 +3936,8 @@ async function main() {
         for (const selector of [
           '#manager-system-name',
           '#manager-system-description',
-          '#manager-system-resolution-mode',
+          // Recipe-resolution mode moved to the Crafting Settings section
+          // (#511 Books & Scrolls); it is no longer a system-edit control.
           '[data-edit-control="advanced-options"]',
           '[data-feature-key="gathering"]'
         ]) {
