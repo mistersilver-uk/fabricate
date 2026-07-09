@@ -291,11 +291,11 @@
         <!-- Character prerequisites apply whether or not the learn COUNT is
              limited, so this sits outside the `limitLearning` block. -->
         <div class="manager-recipe-item-character-prereqs" data-recipe-item-character-prereqs>
-          <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisites', 'Character prerequisites to learn')}</span>
+          <span id="recipe-item-character-prereqs-label" class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisites', 'Character prerequisites to learn')}</span>
           {#if characterPrerequisites.length === 0}
             <p class="manager-muted" data-recipe-item-character-prereqs-empty>{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesEmpty', 'No character prerequisites defined yet — add them in System Settings first.')}</p>
           {:else}
-            <div class="manager-recipe-item-character-prereq-list">
+            <div class="manager-recipe-item-character-prereq-list" role="group" aria-labelledby="recipe-item-character-prereqs-label">
               {#each characterPrerequisites as prereq (prereq.id)}
                 <label class="manager-recipe-item-character-prereq-option" data-recipe-item-character-prereq={prereq.id}>
                   <input
@@ -351,6 +351,8 @@
   }
 
   .manager-recipe-item-character-prereq-preview {
+    flex: 0 1 auto;
+    min-width: 0;
     color: var(--fab-mv2-text-muted);
     font-family: var(--fab-font-mono, monospace);
     font-size: 0.78rem;

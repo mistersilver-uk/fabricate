@@ -63,6 +63,20 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     assert.deepEqual(patches, [{ caps: { learn: { characterPrerequisiteIds: ['p1'] } } }]);
   });
 
+  it('toggles a character prerequisite OFF, emitting an empty caps.learn array', async () => {
+    const patches = [];
+    const root = await harness.mount({
+      recipeItem: learnDraft({ characterPrerequisiteIds: ['p1'] }),
+      visibilityMode: 'knowledge',
+      characterPrerequisites: [{ id: 'p1', name: 'Expert', path: 'x', op: 'gte', value: 1 }],
+      onPatch: (p) => patches.push(p),
+    });
+    const box = root.querySelector('[data-recipe-item-character-prereq="p1"] input');
+    assert.equal(box.checked, true, 'starts checked');
+    box.click();
+    assert.deepEqual(patches, [{ caps: { learn: { characterPrerequisiteIds: [] } } }]);
+  });
+
   it('shows an empty-state when no character prerequisites are defined', async () => {
     const root = await harness.mount({
       recipeItem: learnDraft(),

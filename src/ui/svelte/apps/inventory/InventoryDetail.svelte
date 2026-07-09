@@ -123,8 +123,12 @@
       ? item.caps.learn.learnsAllowed
       : null
   );
+  // Exclude gate-blocked recipes (issue 544) so "Learn all" never sends a recipe
+  // the runtime will refuse (which would halt the batch mid-way).
   const unlearnedRecipeIds = $derived(
-    bookRecipes.filter((recipe) => !recipe?.learned).map((recipe) => recipe.id)
+    bookRecipes
+      .filter((recipe) => !recipe?.learned && !recipe?.learnBlocked)
+      .map((recipe) => recipe.id)
   );
   const canLearnAll = $derived(
     learnable &&

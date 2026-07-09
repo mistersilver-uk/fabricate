@@ -215,6 +215,50 @@ test('getLearnableRecipesFromItem: a blocked capped recipe is filtered from the 
   assert.deepEqual(state.recipes, [], 'no recipe offered when the gate fails');
 });
 
+test('learnRecipeFromOwnedBook: gates on the OWNED book, not the recipe’s first-member book (multi-book)', async () => {
+  // recipe-1 belongs to two books with different character prerequisites. book-a
+  // (owned) is ungated; book-b (first-member, unowned) is gated on p-expert.
+  const system = {
+    id: 'system-1',
+    resolutionMode: 'simple',
+    characterPrerequisites: [EXPERT],
+    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned', learn: {} } },
+    recipeItemDefinitions: [
+      {
+        id: 'book-b',
+        sourceItemUuid: 'Compendium.world.items.book-b',
+        recipeIds: ['recipe-1'],
+        caps: { item: {}, learn: { characterPrerequisiteIds: ['p-expert'] } },
+      },
+      {
+        id: 'book-a',
+        sourceItemUuid: 'Compendium.world.items.book-a',
+        recipeIds: ['recipe-1'],
+        caps: { item: {}, learn: { characterPrerequisiteIds: [] } },
+      },
+    ],
+  };
+  const recipe = buildRecipe({ recipeItemId: undefined });
+  // The actor owns ONLY book-a and fails p-expert.
+  const ownedA = new FakeItem({ uuid: 'Actor.a1.Item.a', sourceId: 'Compendium.world.items.book-a' });
+  const actor = new FakeActor({ items: [ownedA], rollData: { skills: { cra: { rank: 0 } } } });
+  const result = await buildService(system, [recipe]).learnRecipeFromOwnedBook({
+    recipe,
+    craftingActor: actor,
+  });
+  assert.equal(result.success, true, 'gates on the owned (ungated) book, not the gated first-member book');
+
+  // Reverse: owning the gated book-b while failing → blocked.
+  const ownedB = new FakeItem({ uuid: 'Actor.a1.Item.b', sourceId: 'Compendium.world.items.book-b' });
+  const actor2 = new FakeActor({ items: [ownedB], rollData: { skills: { cra: { rank: 0 } } } });
+  const blocked = await buildService(system, [recipe]).learnRecipeFromOwnedBook({
+    recipe,
+    craftingActor: actor2,
+  });
+  assert.equal(blocked.success, false);
+  assert.equal(blocked.message, 'FABRICATE.Knowledge.CharacterPrerequisiteNotMet');
+});
+
 test('learnRecipeOnCraft: a blocked actor does not auto-learn on craft', async () => {
   const system = buildSystem();
   const recipe = buildRecipe();

@@ -814,15 +814,6 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.prerequisiteNotMet };
     }
 
-    const characterGate = this._meetsCharacterPrerequisites(recipe, craftingActor);
-    if (!characterGate.met) {
-      return {
-        success: false,
-        message: LEARN_RECIPE_MESSAGES.characterPrerequisiteNotMet,
-        messageData: { name: recipe.name, reason: characterGate.reason },
-      };
-    }
-
     // Learning consumes/anchors a real owned recipe item, so we must evaluate
     // the actor's actual inventory directly rather than trusting
     // `evaluateKnowledgeAccess().matchedItems` — that array is empty on the GM
@@ -835,6 +826,21 @@ export class RecipeVisibilityService {
     const selected = this._selectDeterministic(matchedItems);
     if (!selected) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
+    }
+
+    // Character-prerequisite gate is per-book — evaluate against the owned book
+    // (issue 544), not the recipe's first-member book.
+    const characterGate = this._meetsCharacterPrerequisites(
+      recipe,
+      craftingActor,
+      this._matchDefinitionForItem(recipe, selected.item)
+    );
+    if (!characterGate.met) {
+      return {
+        success: false,
+        message: LEARN_RECIPE_MESSAGES.characterPrerequisiteNotMet,
+        messageData: { name: recipe.name, reason: characterGate.reason },
+      };
     }
 
     const next = {
@@ -1366,15 +1372,6 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.prerequisiteNotMet };
     }
 
-    const characterGate = this._meetsCharacterPrerequisites(recipe, craftingActor);
-    if (!characterGate.met) {
-      return {
-        success: false,
-        message: LEARN_RECIPE_MESSAGES.characterPrerequisiteNotMet,
-        messageData: { name: recipe.name, reason: characterGate.reason },
-      };
-    }
-
     // Resolve the owned book document (crafting actor first) the same way the craft
     // and drop paths do — never trust the GM-bypass matchedItems array.
     const matches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
@@ -1385,6 +1382,24 @@ export class RecipeVisibilityService {
     // through the budget-enforcing capped path; an invalid cap falls through to
     // uncapped.
     const selectedDefinition = this._matchDefinitionForItem(recipe, selected.item);
+
+    // The character-prerequisite gate is per-book, so evaluate it against the book
+    // the actor actually owns (issue 544) — a recipe can belong to several books
+    // with different prerequisites. (The capped branch re-checks inside
+    // learnOneRecipeFromItem against the same selected book.)
+    const characterGate = this._meetsCharacterPrerequisites(
+      recipe,
+      craftingActor,
+      selectedDefinition
+    );
+    if (!characterGate.met) {
+      return {
+        success: false,
+        message: LEARN_RECIPE_MESSAGES.characterPrerequisiteNotMet,
+        messageData: { name: recipe.name, reason: characterGate.reason },
+      };
+    }
+
     if (
       this._isRecipeItemLearnCapped(recipe, selectedDefinition) &&
       Number.isFinite(this._getLearnCapForRecipe(recipe, selectedDefinition))
