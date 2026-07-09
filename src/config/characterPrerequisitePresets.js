@@ -21,10 +21,12 @@
  */
 const PREREQUISITE_DISPLAY = Object.freeze({
   expertCrafter: { label: 'Expert Crafter', icon: 'fa-solid fa-screwdriver-wrench' },
+  journeymanCrafter: { label: 'Journeyman Crafter', icon: 'fa-solid fa-screwdriver-wrench' },
   smithsTools: { label: "Proficient with Smith's Tools", icon: 'fa-solid fa-hammer' },
   proficientArcana: { label: 'Proficient in Arcana', icon: 'fa-solid fa-hat-wizard' },
   trainedInCrafting: { label: 'Trained in Crafting', icon: 'fa-solid fa-screwdriver-wrench' },
   strongEnough: { label: 'Strong Enough', icon: 'fa-solid fa-dumbbell' },
+  hillGiantStrength: { label: 'Hill Giant Strength', icon: 'fa-solid fa-hand-fist' },
 });
 
 /**
@@ -60,12 +62,12 @@ function buildPresetBundle(conditions) {
 export const DND5E_CHARACTER_PREREQUISITE_PRESETS = buildPresetBundle({
   // dnd5e skill/tool proficiency lives on `<skill|tool>.value` as a 0/0.5/1/2
   // multiplier (0 = not proficient, 0.5 = half, 1 = proficient, 2 = expertise);
-  // proficient-or-better is ≥ 1. Ability presets read the ability score
-  // (`abilities.<key>.value`).
+  // proficient-or-better is ≥ 1. An ability score is `abilities.<key>.value`; its
+  // derived modifier is `abilities.<key>.mod`.
   smithsTools: { path: 'tools.smith.value', op: 'gte', value: 1 },
   proficientArcana: { path: 'skills.arc.value', op: 'gte', value: 1 },
-  expertCrafter: { path: 'abilities.int.value', op: 'gte', value: 13 },
-  strongEnough: { path: 'abilities.str.value', op: 'gte', value: 15 },
+  journeymanCrafter: { path: 'abilities.int.mod', op: 'gte', value: 2 },
+  hillGiantStrength: { path: 'abilities.str.value', op: 'gte', value: 21 },
 });
 
 /**
