@@ -682,7 +682,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   it('flags a book’s recipes learnBlocked when the reader fails its character prerequisites (issue 544)', () => {
     const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 };
     const system = {
-      ...bookSystem({ caps: { item: {}, learn: { characterPrerequisiteIds: ['p-expert'] } } }),
+      ...bookSystem({ caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: ['p-expert'] } } }),
       characterPrerequisites: [EXPERT],
     };
     const actorWithRollData = (rank) => ({
@@ -703,6 +703,150 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       viewer: { isGM: false },
     });
     assert.ok(bookRow(passing).recipes.every((r) => r.learnBlocked === false), 'passing reader unblocked');
+  });
+
+  it('surfaces per-book requirements (Required Knowledge + Learning prerequisites) with met/unmet (issue 544)', () => {
+    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', icon: 'fas fa-hat-wizard', path: 'skills.cra.rank', op: 'gte', value: 2 };
+    const NOVICE = { id: 'p-fail', name: 'Master Only', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    const system = {
+      ...bookSystem({
+        caps: {
+          item: {},
+          learn: {
+            limitLearning: true,
+            // r-known is already learned; r-unknown is not; ghost doesn't resolve.
+            prerequisiteIds: ['r-known', 'r-unknown', 'ghost'],
+            // p-expert passes at rank 3; p-fail fails; p-missing doesn't resolve.
+            characterPrerequisiteIds: ['p-expert', 'p-fail', 'p-missing'],
+          },
+        },
+      }),
+      characterPrerequisites: [EXPERT, NOVICE],
+    };
+    // Extra recipes so Required Knowledge ids resolve to names.
+    const recipes = [
+      ...RECIPES,
+      { id: 'r-known', name: 'Cantrip', craftingSystemId: 'sys-b' },
+      { id: 'r-unknown', name: 'Ritual', craftingSystemId: 'sys-b' },
+    ];
+    const actor = {
+      ...bookActor('a1', 'Akra', [bookItem('Item.book1', 1)], { 'r-known': { learnedAt: 1 } }),
+      getRollData: () => ({ skills: { cra: { rank: 3 } } }),
+    };
+
+    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    const reqs = row.requirements;
+    // Dangling ids (ghost recipe, p-missing prereq) are skipped (fail-open): 2 + 2 = 4.
+    assert.equal(reqs.length, 4, 'dangling requirement ids are skipped');
+
+    const known = reqs.find((r) => r.id === 'r-known');
+    assert.deepEqual(
+      { kind: known.kind, name: known.name, icon: known.icon, met: known.met },
+      { kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-scroll', met: true }
+    );
+    const unknown = reqs.find((r) => r.id === 'r-unknown');
+    assert.equal(unknown.met, false, 'an unlearned required recipe is unmet');
+
+    const expert = reqs.find((r) => r.id === 'p-expert');
+    assert.deepEqual(
+      { kind: expert.kind, name: expert.name, icon: expert.icon, met: expert.met },
+      { kind: 'character', name: 'Expert Crafter', icon: 'fas fa-hat-wizard', met: true }
+    );
+    const failing = reqs.find((r) => r.id === 'p-fail');
+    assert.equal(failing.met, false, 'a failed character prerequisite is unmet');
+
+    // learnBlocked folds in Required Knowledge AND character prereqs; the reason lists
+    // ONLY the unmet requirement names.
+    assert.ok(row.recipes.every((r) => r.learnBlocked === true), 'book is blocked while any requirement is unmet');
+    assert.equal(row.recipes[0].learnBlockedReason, 'Ritual, Master Only');
+  });
+
+  it('has no requirements and is not learnBlocked when Limited learning is off (issue 544)', () => {
+    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    const system = {
+      ...bookSystem({
+        caps: {
+          item: {},
+          // Both gates configured but Limited learning OFF ⇒ neither enforced.
+          learn: { limitLearning: false, prerequisiteIds: ['r-unknown'], characterPrerequisiteIds: ['p-expert'] },
+        },
+      }),
+      characterPrerequisites: [EXPERT],
+    };
+    const recipes = [...RECIPES, { id: 'r-unknown', name: 'Ritual', craftingSystemId: 'sys-b' }];
+    const actor = {
+      ...bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+      getRollData: () => ({ skills: { cra: { rank: 0 } } }),
+    };
+    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    assert.deepEqual(row.requirements, [], 'no requirements when Limited learning is off');
+    assert.ok(row.recipes.every((r) => r.learnBlocked === false), 'not blocked when Limited learning is off');
+  });
+
+  it('does not surface requirements or learnBlocked on a craft-only (item-mode) book (issue 544)', () => {
+    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    // An item-mode book is CRAFTED by being held, never learned; its stored learn caps
+    // (even with limitLearning on + prereq ids) are inert and must not leak chips.
+    const system = {
+      ...bookSystem({
+        caps: {
+          item: { limitUses: false },
+          learn: { limitLearning: true, prerequisiteIds: ['r-unknown'], characterPrerequisiteIds: ['p-expert'] },
+        },
+      }),
+      visibilityMode: 'item',
+      characterPrerequisites: [EXPERT],
+    };
+    const recipes = [...RECIPES, { id: 'r-unknown', name: 'Ritual', craftingSystemId: 'sys-b' }];
+    const actor = {
+      ...bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+      getRollData: () => ({ skills: { cra: { rank: 0 } } }),
+    };
+    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    assert.equal(row.learnable, false, 'the item-mode book is not learnable');
+    assert.deepEqual(row.requirements, [], 'no requirement chips on a craft-only book');
+    assert.ok(row.recipes.every((r) => r.learnBlocked === false), 'recipes are not learn-blocked on a craft-only book');
+  });
+
+  it('redacts an undiscovered required-knowledge recipe name but still counts + blocks it (issue 544)', () => {
+    const system = {
+      ...bookSystem({
+        caps: {
+          item: {},
+          // r-secret is a teaser recipe the non-GM reader has NOT discovered.
+          learn: { limitLearning: true, prerequisiteIds: ['r-secret'] },
+        },
+      }),
+    };
+    const recipes = [...RECIPES, { id: 'r-secret', name: 'Forbidden Ritual', craftingSystemId: 'sys-b' }];
+    // The visibility service marks r-secret a teaser (undiscovered) for this reader,
+    // so it is excluded from the allowed set; r1/r2 stay visible.
+    const recipeVisibility = {
+      getVisibleRecipes: () => [
+        { recipe: { id: 'r1' }, access: { reason: 'ok' } },
+        { recipe: { id: 'r2' }, access: { reason: 'ok' } },
+        { recipe: { id: 'r-secret' }, access: { reason: 'teaser' } },
+      ],
+    };
+    const actor = bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]);
+    const row = bookRow(
+      bookBuilder({ system, recipes, recipeVisibility }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: false },
+      })
+    );
+    const secret = row.requirements.find((r) => r.id === 'r-secret');
+    assert.ok(secret, 'the undiscovered required recipe is still a requirement');
+    assert.equal(secret.met, false, 'still counts as unmet');
+    assert.equal(secret.name, 'a hidden recipe', 'its name is redacted to the generic label');
+    assert.ok(!/Forbidden Ritual/.test(secret.name), 'the real teaser name is not disclosed');
+    assert.ok(row.recipes.every((r) => r.learnBlocked === true), 'it still blocks learning');
+
+    // A GM (allowedRecipeIds null) sees the real name.
+    const gmRow = bookRow(
+      bookBuilder({ system, recipes, recipeVisibility }).buildListing({ craftingActor: actor, viewer: { isGM: true } })
+    );
+    assert.equal(gmRow.requirements.find((r) => r.id === 'r-secret').name, 'Forbidden Ritual', 'the GM sees the real name');
   });
 
   it('classifies book learn/craft from the flat visibilityMode (item→craft, knowledge→learn, global/restricted→no rows)', () => {

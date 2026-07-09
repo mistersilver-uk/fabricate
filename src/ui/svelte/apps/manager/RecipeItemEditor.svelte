@@ -26,6 +26,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { recipeItemAccessBadge } from '../../util/recipeItemAccessBadge.js';
+  import { prerequisitePreview } from '../../../../systems/characterPrerequisites.js';
   import RecipeItemEditorTabs from './recipe-item/RecipeItemEditorTabs.svelte';
   import RecipeItemOverviewTab from './recipe-item/RecipeItemOverviewTab.svelte';
   import RecipeItemContentsTab from './recipe-item/RecipeItemContentsTab.svelte';
@@ -117,9 +118,10 @@
     return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnUpToPerCopy', 'Learn up to {n} per copy').replace('{n}', String(learnsAllowed));
   }
 
-  // Requirements rail (issue 544): read-only chips mirroring the two learning gates
-  // authored on the Limits tab. Both are toggle-gated, so they only surface when
-  // `limitLearning` is on — matching runtime enforcement (learn freely when off).
+  // Learning requirements (issue 544): read-only chips mirroring the two learning
+  // gates authored on the Limits tab, surfaced in both the "How players see it"
+  // preview card and the Effective-rules list. Both are toggle-gated, so they only
+  // populate when `limitLearning` is on — matching runtime enforcement.
 
   // Required Knowledge → recipe name chips. Defensive over the array-or-legacy-single
   // shape; a name falls back to the id when the recipe can't be resolved.
@@ -140,13 +142,13 @@
     return ids.map((id) => {
       const key = String(id);
       const match = byId.get(key);
-      return { id: key, name: match ? String(match.name || key) : key };
+      return { id: key, name: match ? String(match.name || key) : key, icon: 'fas fa-scroll' };
     });
   });
 
   // Learning prerequisites → character-prerequisite chips carrying each prereq's own
-  // icon. Ids that no longer resolve to a definition are dropped (fail-open, matching
-  // runtime), so the preview never shows a dangling gate.
+  // icon plus a human-readable `preview` (@path op value). Ids that no longer resolve
+  // to a definition are dropped (fail-open, matching runtime).
   const learningPrerequisiteChips = $derived.by(() => {
     if (!limitLearning) return [];
     const ids = Array.isArray(learnCaps.characterPrerequisiteIds)
@@ -157,12 +159,16 @@
     return ids
       .map((id) => byId.get(String(id)))
       .filter(Boolean)
-      .map((p) => ({ id: String(p.id), name: String(p.name || p.id), icon: p.icon || 'fas fa-user-check' }));
+      .map((p) => ({
+        id: String(p.id),
+        name: String(p.name || p.id),
+        icon: p.icon || 'fas fa-user-check',
+        preview: prerequisitePreview(p),
+      }));
   });
 
-  const hasRequirements = $derived(
-    requiredKnowledgeChips.length > 0 || learningPrerequisiteChips.length > 0
-  );
+  // Combined read-only chip list for the preview card ("Needs: <name>").
+  const requirementChips = $derived([...requiredKnowledgeChips, ...learningPrerequisiteChips]);
 
   // Preview badge via the shared helper so the GM "How players see it" preview and the
   // player Inventory book detail render IDENTICAL badges under every mode/cap combo.
@@ -209,8 +215,15 @@
       rules.push(limitLearning
         ? { icon: 'fas fa-user-check', tone: 'accent', title: learnShort(), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.AppliesEveryRecipe', 'Applies to every recipe') }
         : { icon: 'fas fa-book', tone: 'success', title: text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely'), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NoCapLearning', 'No cap on learning') });
-      // Required Knowledge / Learning prerequisites are surfaced as read-only chips in
-      // the Requirements rail section below, not as a text rule here.
+      // Required Knowledge / Learning prerequisites become one "Needs: <name>" row each
+      // (only when Limited learning is on — matching runtime toggle-gating).
+      const needsTitle = (name) => text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledge', 'Needs: {name}').replace('{name}', name);
+      for (const chip of requiredKnowledgeChips) {
+        rules.push({ icon: 'fas fa-scroll', tone: 'muted', title: needsTitle(chip.name), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledgeSub', 'Must already be known') });
+      }
+      for (const chip of learningPrerequisiteChips) {
+        rules.push({ icon: chip.icon, tone: 'muted', title: needsTitle(chip.name), sub: chip.preview || text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsPrereqSub', 'Character requirement') });
+      }
     }
     return rules;
   });
@@ -291,6 +304,16 @@
               <i class="fas fa-book-open" aria-hidden="true"></i>
               <span>{readLabel}</span>
             </div>
+            {#if requirementChips.length > 0}
+              <div class="manager-recipe-item-preview-needs" data-recipe-item-preview-needs role="list" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Preview.RequirementsLabel', 'Learning requirements')}>
+                {#each requirementChips as chip (chip.id)}
+                  <span class="manager-chip manager-selected-tag-pill manager-recipe-item-needs-chip" role="listitem" data-recipe-item-needs-chip={chip.id}>
+                    <i class={chip.icon} aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.RecipeItem.Preview.Needs', 'Needs: {name}').replace('{name}', chip.name)}</span>
+                  </span>
+                {/each}
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -308,38 +331,6 @@
             {/each}
           </div>
         </div>
-
-        {#if hasRequirements}
-          <div class="manager-recipe-item-rail-section" data-recipe-item-requirements>
-            <span class="manager-recipe-item-rail-title">{text('FABRICATE.Admin.Manager.RecipeItem.Rail.Requirements', 'Requirements')}</span>
-            {#if requiredKnowledgeChips.length > 0}
-              <div class="manager-recipe-item-requirements-group">
-                <span class="manager-recipe-item-requirements-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge', 'Required Knowledge')}</span>
-                <div class="manager-selected-tag-row" data-recipe-item-required-knowledge-chips role="list">
-                  {#each requiredKnowledgeChips as chip (chip.id)}
-                    <span class="manager-chip manager-selected-tag-pill" role="listitem" data-recipe-item-required-knowledge-chip={chip.id}>
-                      <i class="fas fa-scroll" aria-hidden="true"></i>
-                      <span>{chip.name}</span>
-                    </span>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-            {#if learningPrerequisiteChips.length > 0}
-              <div class="manager-recipe-item-requirements-group">
-                <span class="manager-recipe-item-requirements-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites', 'Learning prerequisites')}</span>
-                <div class="manager-selected-tag-row" data-recipe-item-learning-prereq-chips role="list">
-                  {#each learningPrerequisiteChips as chip (chip.id)}
-                    <span class="manager-chip manager-selected-tag-pill" role="listitem" data-recipe-item-learning-prereq-chip={chip.id}>
-                      <i class={chip.icon} aria-hidden="true"></i>
-                      <span>{chip.name}</span>
-                    </span>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-          </div>
-        {/if}
 
         <div class="manager-recipe-item-rail-note">
           <i class="fas fa-circle-check" aria-hidden="true"></i>
@@ -422,20 +413,23 @@
     color: var(--fab-text-subtle);
   }
 
-  /* Requirements rail (issue 544): read-only Required-Knowledge / Learning-prereq
-     chip groups. Chips reuse the global success-ramp `.manager-selected-tag-pill`. */
-  .manager-recipe-item-requirements-group {
+  /* "Needs: <name>" requirement chips inside the "How players see it" preview card
+     (issue 544): read-only, informational (no met/unmet — the GM preview has no
+     actor). Reuse the global `.manager-selected-tag-pill` SHAPE, but override its
+     success ramp to a NEUTRAL surface (a green chip would wrongly imply "met") and
+     restore symmetric right padding (the pill trims it for a remove button these
+     read-only chips don't carry). */
+  .manager-recipe-item-preview-needs {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--fab-space-1);
   }
 
-  .manager-recipe-item-requirements-label {
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--fab-text-subtle);
+  .manager-recipe-item-needs-chip {
+    padding-right: var(--fab-space-2);
+    border-color: var(--fab-mv2-border);
+    background: var(--fab-overlay-light-06);
+    color: var(--fab-mv2-text);
   }
 
   .manager-recipe-item-preview-card {
@@ -607,6 +601,8 @@
   .manager-recipe-item-rule-sub {
     font-size: 0.6rem;
     color: var(--fab-text-subtle);
+    /* A deep dotted prerequisite path (@a.b.c.d ≥ N) must break, not overflow. */
+    overflow-wrap: anywhere;
   }
 
   .manager-recipe-item-rail-note {

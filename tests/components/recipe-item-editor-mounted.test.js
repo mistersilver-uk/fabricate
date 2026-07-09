@@ -128,37 +128,40 @@ describe('RecipeItemEditor (mounted)', () => {
     assert.match(cta.textContent, /No recipes/i);
   });
 
-  it('surfaces Required Knowledge and Learning prerequisites as read-only rail chips (issue 544)', async () => {
+  it('surfaces requirements as "Needs:" effective-rules rows AND preview-card chips (issue 544)', async () => {
     const root = await harness.mount({
       recipeItem: draft({ caps: { item: {}, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 3, prerequisiteIds: ['r1'], characterPrerequisiteIds: ['p1'] } } }),
       linkedItem: LINKED_ITEM,
       linkedRecipes: LINKED_RECIPES,
-      characterPrerequisites: [{ id: 'p1', name: 'Wizardly', icon: 'fas fa-hat-wizard', path: 'x', op: 'gte', value: 1 }],
+      characterPrerequisites: [{ id: 'p1', name: 'Wizardly', icon: 'fas fa-hat-wizard', path: 'skills.arc.rank', op: 'gte', value: 2 }],
       activeTab: 'overview',
       visibilityMode: 'knowledge'
     });
-    const requirements = root.querySelector('[data-recipe-item-requirements]');
-    assert.ok(requirements, 'the Requirements rail section renders');
+    // The separate Requirements rail section is gone.
+    assert.equal(root.querySelector('[data-recipe-item-requirements]'), null, 'no separate Requirements section');
 
-    // Required Knowledge chip resolves the recipe name and carries the scroll icon.
-    const rkChip = root.querySelector('[data-recipe-item-required-knowledge-chip="r1"]');
-    assert.ok(rkChip, 'a Required Knowledge chip renders');
-    assert.match(rkChip.textContent, /Alloy Bronze/);
-    assert.ok(rkChip.querySelector('i.fa-scroll'), 'the Required Knowledge chip has a leading scroll icon');
-    // The chip is read-only (no remove control).
-    assert.equal(rkChip.querySelector('button'), null, 'the rail chip has no remove button');
+    // Effective rules now carry one "Needs: <name>" ROW per requirement, both kinds.
+    const rules = root.querySelector('[data-recipe-item-rules]').textContent;
+    assert.match(rules, /Needs: Alloy Bronze/, 'a Required Knowledge rule row');
+    assert.match(rules, /Needs: Wizardly/, 'a Learning prerequisite rule row');
+    // The character-prereq rule sub shows the human-readable preview (@path op value).
+    assert.match(rules, /arc\.rank/, 'the prereq preview appears as the rule sub');
 
-    // Learning-prereq chip carries the prerequisite's own icon.
-    const cpChip = root.querySelector('[data-recipe-item-learning-prereq-chip="p1"]');
-    assert.ok(cpChip, 'a Learning prerequisites chip renders');
-    assert.match(cpChip.textContent, /Wizardly/);
-    assert.ok(cpChip.querySelector('i.fa-hat-wizard'), 'the Learning prerequisites chip uses the prereq’s own icon');
-
-    // The old "Needs {name}" text rule is gone from the effective-rules list.
-    assert.equal(/Needs /i.test(root.querySelector('[data-recipe-item-rules]').textContent), false, 'the legacy "Needs {name}" rule is removed');
+    // Preview card shows the read-only "Needs:" chips (both kinds) with icons.
+    const needs = root.querySelector('[data-recipe-item-preview-needs]');
+    assert.ok(needs, 'the preview card renders a Needs chip row');
+    const rkChip = needs.querySelector('[data-recipe-item-needs-chip="r1"]');
+    assert.ok(rkChip, 'a Required Knowledge Needs chip renders');
+    assert.match(rkChip.textContent, /Needs: Alloy Bronze/);
+    assert.ok(rkChip.querySelector('i.fa-scroll'), 'the Required Knowledge chip has a scroll icon');
+    assert.equal(rkChip.querySelector('button'), null, 'the preview chip is read-only (no remove)');
+    const cpChip = needs.querySelector('[data-recipe-item-needs-chip="p1"]');
+    assert.ok(cpChip, 'a Learning prerequisite Needs chip renders');
+    assert.match(cpChip.textContent, /Needs: Wizardly/);
+    assert.ok(cpChip.querySelector('i.fa-hat-wizard'), 'the prereq chip uses the prereq’s own icon');
   });
 
-  it('hides the Requirements rail section when Limited learning is off (gates toggle-gated)', async () => {
+  it('drops the "Needs:" rules and preview chips when Limited learning is off (gates toggle-gated)', async () => {
     const root = await harness.mount({
       recipeItem: draft({ caps: { item: {}, learn: { limitLearning: false, prerequisiteIds: ['r1'], characterPrerequisiteIds: ['p1'] } } }),
       linkedItem: LINKED_ITEM,
@@ -167,6 +170,7 @@ describe('RecipeItemEditor (mounted)', () => {
       activeTab: 'overview',
       visibilityMode: 'knowledge'
     });
-    assert.equal(root.querySelector('[data-recipe-item-requirements]'), null, 'no Requirements section when Limited learning is off');
+    assert.equal(root.querySelector('[data-recipe-item-preview-needs]'), null, 'no preview Needs chips when off');
+    assert.equal(/Needs:/i.test(root.querySelector('[data-recipe-item-rules]').textContent), false, 'no Needs rules when off');
   });
 });

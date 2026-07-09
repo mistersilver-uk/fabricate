@@ -376,7 +376,10 @@ The gate is enforced at **every learn entry point**, beside the Required Knowled
 - The single-learn paths (`learnRecipe`, `learnOneRecipeFromItem`, `learnRecipeFromOwnedBook`) refuse an unmet gate with the `FABRICATE.Knowledge.CharacterPrerequisiteNotMet` outcome (carrying the recipe name and the failing prerequisites' names as `reason`) and write no `learnedRecipes` entry.
 - The bulk drop-learn preview and the item-sheet picker (`previewOwnedItemLearning` / `getLearnableRecipesFromItem`) **silently filter out** recipes the actor cannot learn, so an unlearnable recipe is never offered.
 - The craft-time auto-learn (`learnRecipeOnCraft`) **silently skips** learning a recipe whose gate the crafter fails.
-- The inventory listing (`InventoryListingBuilder`) tags each book row's recipes with `learnBlocked` / `learnBlockedReason` (evaluated once per book via `_evaluateBookLearningGate`, mirroring the service Foundry-free), and the Inventory detail disables the Learn button and shows the blocking prerequisites' names.
+- The inventory listing (`InventoryListingBuilder`) evaluates BOTH gates once per book (`_evaluateBookRequirements`, mirroring the service Foundry-free) and, only when the book's `caps.learn.limitLearning` (or legacy `limitRecipes`) is on, tags each book row's recipes with `learnBlocked` / `learnBlockedReason` — where `learnBlocked` folds in Required Knowledge (any required recipe not yet learned) AND the character-prerequisite gate, and `learnBlockedReason` joins the UNMET requirements' names.
+The Inventory detail disables the Learn button on a blocked recipe and shows the blocking names; with Limited learning off, neither gate is enforced and `learnBlocked` is `false`.
+- The same `_evaluateBookRequirements` also returns a per-book `requirements` array (`[{ kind: 'knowledge' | 'character', id, name, icon, met }]`, only when Limited learning is on; dangling ids skipped fail-open) that the book detail renders as read-only "Needs: &lt;name&gt;" chips reflecting each requirement's met/unmet state (success/danger ramp).
+The GM recipe-item editor mirrors these as "Needs: &lt;name&gt;" rows in "Effective rules" and read-only chips in the "How players see it" preview card (informational, no actor).
 
 Test requirements:
 

@@ -93,6 +93,10 @@
   const bookDescription = $derived(String(item?.description ?? '').trim());
   const bookRecipes = $derived(Array.isArray(item?.recipes) ? item.recipes : []);
   const recipeTotal = $derived(bookRecipes.length);
+  // Per-book learning requirements (issue 544): read-only "Needs: <name>" chips
+  // (Required Knowledge + Learning prerequisites) with per-requirement met/unmet.
+  // Empty unless the book is learnable with Limited learning on (builder-decided).
+  const requirements = $derived(Array.isArray(item?.requirements) ? item.requirements : []);
   const usesLimit = $derived(item?.limits?.uses ?? null);
   const learningLimit = $derived(item?.limits?.learning ?? null);
   // The learn budget is spent when a finite learning cap has no remaining slots.
@@ -299,6 +303,37 @@
             <span>{accessBadge.label}</span>
           </span>
         </div>
+        {#if requirements.length > 0}
+          <div
+            class="inventory-detail-requirements"
+            data-inventory-requirements
+            role="list"
+            aria-label={localize('FABRICATE.App.Inventory.Detail.RequirementsLabel')}
+          >
+            {#each requirements as req (req.id)}
+              <span
+                class="inventory-chip inventory-detail-requirement is-{req.met ? 'met' : 'unmet'}"
+                role="listitem"
+                data-inventory-requirement={req.id}
+                data-requirement-met={req.met}
+                aria-label={localize(
+                  req.met
+                    ? 'FABRICATE.App.Inventory.Detail.RequirementMet'
+                    : 'FABRICATE.App.Inventory.Detail.RequirementUnmet',
+                  { name: req.name }
+                )}
+              >
+                <i class={req.icon} aria-hidden="true"></i>
+                <span class="inventory-detail-requirement-name">{localize('FABRICATE.App.Inventory.Detail.Needs', { name: req.name })}</span>
+                <i
+                  class={req.met ? 'fas fa-circle-check' : 'fas fa-lock'}
+                  data-requirement-status={req.met ? 'met' : 'unmet'}
+                  aria-hidden="true"
+                ></i>
+              </span>
+            {/each}
+          </div>
+        {/if}
         {#if bookDescription}
           <p class="inventory-detail-book-desc">{bookDescription}</p>
         {/if}
@@ -1004,6 +1039,42 @@
 
   .inventory-detail-blocked {
     flex: 0 0 auto;
+    border-color: var(--fab-danger-border, var(--fab-border));
+    background: var(--fab-danger-soft, var(--fab-surface-raised));
+    color: var(--fab-danger-text, var(--fab-text-muted));
+  }
+
+  /* Book-level "Needs: <name>" requirement chips (issue 544): met vs unmet is a
+     two-signal state — a success/danger ramp AND a trailing status glyph
+     (check / lock) plus a stateful aria-label — never colour alone. */
+  .inventory-detail-requirements {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  /* A long recipe/prereq name truncates instead of overflowing the narrow player
+     column; the "Needs:" text + both icons stay visible. */
+  .inventory-detail-requirement {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .inventory-detail-requirement-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .inventory-detail-requirement.is-met {
+    border-color: var(--fab-success-border, var(--fab-border));
+    background: var(--fab-success-soft, var(--fab-surface-raised));
+    color: var(--fab-success-text, var(--fab-text-muted));
+  }
+
+  .inventory-detail-requirement.is-unmet {
     border-color: var(--fab-danger-border, var(--fab-border));
     background: var(--fab-danger-soft, var(--fab-surface-raised));
     color: var(--fab-danger-text, var(--fab-text-muted));

@@ -219,6 +219,8 @@ Recipe items the player owns appear there alongside components, and the **Recipe
 
 Selecting a book shows its detail on the right.
 The book's limits appear at the top.
+If the book has learning requirements — **Required Knowledge** (recipes you must already know) or **Learning prerequisites** (character conditions) — they appear beside the access badge as **Needs: &lt;name&gt;** chips: green when you already meet the requirement, red when you don't.
+These chips only appear while the book's **Limited learning** is on; an unmet requirement also disables the recipe's **Learn** button.
 **Recipes learned** (for example "2 recipes remaining") appears when the book can be learned from and has a learn cap.
 **Crafting uses** (for example "3 uses remaining") appears when the book grants crafting access by being held and has a use cap.
 A learn-only book never shows a use limit, and an item-only book never shows a learn limit.

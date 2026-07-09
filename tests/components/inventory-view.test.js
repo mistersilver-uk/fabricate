@@ -550,4 +550,49 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
     assert.deepEqual(calls.navigate, ['r1'], 'Craft navigates to the recipe to craft it');
   });
+
+  it('renders book-level "Needs:" requirement chips with names, icons, and met/unmet tone (issue 544)', async () => {
+    const book = makeBook([{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }]);
+    book.requirements = [
+      { kind: 'knowledge', id: 'r-known', name: 'Cantrip', icon: 'fas fa-scroll', met: true },
+      { kind: 'character', id: 'p-fail', name: 'Master Only', icon: 'fas fa-hat-wizard', met: false },
+    ];
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    const row = detail.querySelector('[data-inventory-requirements]');
+    assert.ok(row, 'renders the requirement chip row');
+
+    const met = detail.querySelector('[data-inventory-requirement="r-known"]');
+    assert.ok(met, 'a met requirement chip renders');
+    assert.match(met.textContent, /Needs/, 'chip reads "Needs: <name>"');
+    assert.match(met.textContent, /Cantrip/, 'chip names the requirement');
+    assert.ok(met.querySelector('i.fa-scroll'), 'Required Knowledge chip has the scroll icon');
+    assert.ok(met.classList.contains('is-met'), 'met chip uses the success (met) tone');
+    assert.equal(met.getAttribute('data-requirement-met'), 'true');
+    assert.equal(met.querySelector('button'), null, 'requirement chips are read-only');
+    // Non-colour state signals: a trailing status glyph + a stateful accessible name.
+    assert.ok(met.querySelector('i.fa-circle-check[data-requirement-status="met"]'), 'met chip has a check status glyph');
+    assert.ok(/RequirementMet/.test(met.getAttribute('aria-label') || ''), 'met chip aria-label states it is met');
+
+    const unmet = detail.querySelector('[data-inventory-requirement="p-fail"]');
+    assert.ok(unmet, 'an unmet requirement chip renders');
+    assert.match(unmet.textContent, /Master Only/);
+    assert.ok(unmet.querySelector('i.fa-hat-wizard'), 'character prereq chip uses its own icon');
+    assert.ok(unmet.classList.contains('is-unmet'), 'unmet chip uses the danger (unmet) tone');
+    assert.equal(unmet.getAttribute('data-requirement-met'), 'false');
+    assert.ok(unmet.querySelector('i.fa-lock[data-requirement-status="unmet"]'), 'unmet chip has a lock status glyph');
+    assert.ok(/RequirementUnmet/.test(unmet.getAttribute('aria-label') || ''), 'unmet chip aria-label states it is not met');
+  });
+
+  it('renders no requirement chip row when the book has no requirements', async () => {
+    const book = makeBook([{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }]);
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assert.equal(detail.querySelector('[data-inventory-requirements]'), null, 'no requirement row without requirements');
+  });
 });

@@ -431,6 +431,10 @@ export class InventoryListingBuilder {
     // membership yet.
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
     const recipeList = Array.isArray(recipes) ? recipes : [];
+    // System-wide recipe index (by id) — used for book membership below AND to
+    // resolve Required Knowledge (`caps.learn.prerequisiteIds`) recipe names for the
+    // per-book requirement readouts (issue 544).
+    const recipeById = new Map(recipeList.map((recipe) => [stringOrNull(recipe?.id), recipe]));
     const eligible = (recipe) => {
       if (recipe?.enabled === false) return false;
       // Non-GM viewers never see an undiscovered (teaser) recipe named on a book.
@@ -441,7 +445,6 @@ export class InventoryListingBuilder {
       (def) => Array.isArray(def?.recipeIds) && def.recipeIds.length > 0
     );
     if (anyMigrated) {
-      const recipeById = new Map(recipeList.map((recipe) => [stringOrNull(recipe?.id), recipe]));
       for (const def of definitions) {
         if (!def?.id) continue;
         const members = (Array.isArray(def.recipeIds) ? def.recipeIds : [])
@@ -506,9 +509,16 @@ export class InventoryListingBuilder {
     );
     const rows = [];
     for (const [defId, { def, sources: sourceMap, item }] of owned) {
-      // The gate is per-book: every recipe a book teaches shares its character
-      // prerequisites, so evaluate once per definition.
-      const bookGate = this._evaluateBookLearningGate(def, prerequisiteById, rollData);
+      // The gate is per-book: every recipe a book teaches shares its Required
+      // Knowledge + character prerequisites, so evaluate once per definition.
+      const bookGate = this._evaluateBookRequirements(def, {
+        learnable,
+        recipeById,
+        prerequisiteById,
+        learnedMap,
+        rollData,
+        allowedRecipeIds,
+      });
       const rowSources = orderedSourceIds
         .map((id) => sourceMap.get(id))
         .filter((source) => source && source.qty > 0)
@@ -559,6 +569,11 @@ export class InventoryListingBuilder {
         producedBy: [],
         contributors: [],
         recipes: linkedRecipes,
+        // Per-book learning requirements (issue 544): read-only "Needs: <name>"
+        // chips (Required Knowledge + Learning prerequisites) with per-requirement
+        // met/unmet, surfaced in the book detail. Empty unless the book is learnable
+        // AND Limited learning is on (parity with the runtime toggle-gating).
+        requirements: bookGate.requirements,
         // Per-item access caps (issue 511) for the book-detail access badge + the
         // learn-all convenience CTA, read from the canonical per-item `def.caps` and
         // suppressed by applicability: the use cap only for a held (item) book, the
@@ -620,31 +635,101 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * Evaluate a book's character-prerequisite learning gate (issue 544) for the
-   * inventory listing, mirroring `RecipeVisibilityService._meetsCharacterPrerequisites`
-   * but Foundry-free (the builder never touches runtime globals). A prerequisite id
-   * that no longer resolves to a system definition is skipped (fail-open).
+   * Evaluate a book's learning requirements (issue 544) for the inventory listing,
+   * mirroring `RecipeVisibilityService` exactly but Foundry-free (the builder never
+   * touches runtime globals). Covers BOTH gates:
    *
-   * @param {object} def Recipe-item definition (`caps.learn.characterPrerequisiteIds`).
-   * @param {Map<string, object>} prerequisiteById System prerequisites by id.
-   * @param {object} rollData Pre-resolved actor roll data.
-   * @returns {{blocked: boolean, reason: string}}
+   *  - Required Knowledge (`caps.learn.prerequisiteIds`, folds legacy single
+   *    `prerequisite`): recipes the reader must already have learned (AND). A
+   *    prerequisite id that no longer resolves to a recipe is skipped (fail-open,
+   *    parity with `_isPrerequisiteMet`).
+   *  - Learning prerequisites (`caps.learn.characterPrerequisiteIds`): character
+   *    conditions evaluated against `rollData` (AND). A dangling id is skipped
+   *    (fail-open, parity with `_meetsCharacterPrerequisites`).
+   *
+   * Both gates are only enforced when the book is LEARNABLE **and**
+   * `caps.learn.limitLearning` (or the legacy `limitRecipes`) is on — otherwise
+   * ⇒ `blocked: false` and no requirements, matching the runtime toggle-gating (an
+   * item-mode/craft-only book never learns, so its stored learn caps are inert).
+   * `blocked` is true when any requirement is unmet, and `reason` joins the UNMET
+   * requirements' names for the lock-chip tooltip.
+   *
+   * @param {object} def Recipe-item definition.
+   * @param {object} ctx
+   * @param {boolean} ctx.learnable Whether the book can be learned from at all.
+   * @param {Map<string, object>} ctx.recipeById System recipes by id.
+   * @param {Map<string, object>} ctx.prerequisiteById System prerequisites by id.
+   * @param {object} ctx.learnedMap The reader's learned-recipes map.
+   * @param {object} ctx.rollData Pre-resolved actor roll data.
+   * @param {Set<string>|null} ctx.allowedRecipeIds Recipe ids visible to this reader
+   *   (null for a GM = all visible); used to redact undiscovered required-recipe names.
+   * @returns {{blocked: boolean, reason: string, requirements: Array<{kind: string, id: string, name: string, icon: string, met: boolean}>}}
    */
-  _evaluateBookLearningGate(def, prerequisiteById, rollData) {
-    const ids = Array.isArray(def?.caps?.learn?.characterPrerequisiteIds)
-      ? def.caps.learn.characterPrerequisiteIds
-      : [];
-    if (ids.length === 0) return { blocked: false, reason: '' };
-    const selected = ids.map((id) => prerequisiteById.get(id)).filter(Boolean);
-    if (selected.length === 0) return { blocked: false, reason: '' };
-    const { passed, failures } = evaluatePrerequisites(rollData, selected);
-    return {
-      blocked: !passed,
-      reason: failures
-        .map((failure) => failure.name || failure.preview)
-        .filter(Boolean)
-        .join(', '),
+  _evaluateBookRequirements(
+    def,
+    { learnable, recipeById, prerequisiteById, learnedMap, rollData, allowedRecipeIds = null }
+  ) {
+    const learn = def?.caps?.learn || {};
+    const limitLearning = learn.limitLearning === true || learn.limitRecipes === true;
+    // A non-learnable (item/craft-only) book never learns, so its learn caps are
+    // inert — no requirement chips and never learn-blocked. Off ⇒ same.
+    if (!learnable || !limitLearning) return { blocked: false, reason: '', requirements: [] };
+
+    const requirements = [];
+    const unmetNames = [];
+
+    // Required Knowledge — recipes the reader must already have learned (AND).
+    // Prerequisite existence is resolved against the SYSTEM-scoped `recipeById`; this
+    // is intentional — a book and its Required-Knowledge recipes share a crafting
+    // system (the same-system case `RecipeVisibilityService` also targets).
+    const prereqIds = Array.isArray(learn.prerequisiteIds)
+      ? learn.prerequisiteIds
+      : learn.prerequisite
+        ? [learn.prerequisite]
+        : [];
+    // A required recipe's NAME is disclosed only when the reader may already see it
+    // (visible in the listing, or already learned); otherwise it is redacted so a
+    // teaser/undiscovered recipe is not leaked by name. The gate decision is unaffected.
+    const nameVisible = (id) =>
+      !allowedRecipeIds || allowedRecipeIds.has(id) || Boolean(learnedMap?.[id]);
+    const hiddenLabel = () => {
+      const key = 'FABRICATE.App.Inventory.Detail.HiddenRecipe';
+      const localized = this.localize(key);
+      return localized && localized !== key ? localized : 'a hidden recipe';
     };
+    for (const rawId of prereqIds) {
+      const id = stringOrNull(rawId);
+      if (!id) continue;
+      const recipe = recipeById.get(id);
+      if (!recipe) continue; // dangling id → fail-open (skip)
+      const met = Boolean(learnedMap?.[id]);
+      const name = nameVisible(id) ? stringOrEmpty(recipe?.name) || id : hiddenLabel();
+      requirements.push({ kind: 'knowledge', id, name, icon: 'fas fa-scroll', met });
+      if (!met) unmetNames.push(name);
+    }
+
+    // Learning prerequisites — character conditions evaluated against roll data (AND).
+    const charIds = Array.isArray(learn.characterPrerequisiteIds)
+      ? learn.characterPrerequisiteIds
+      : [];
+    for (const rawId of charIds) {
+      const id = stringOrNull(rawId);
+      if (!id) continue;
+      const prereqDef = prerequisiteById.get(id);
+      if (!prereqDef) continue; // dangling id → fail-open (skip)
+      const met = evaluatePrerequisites(rollData, [prereqDef]).passed;
+      const name = stringOrEmpty(prereqDef?.name) || id;
+      requirements.push({
+        kind: 'character',
+        id,
+        name,
+        icon: prereqDef?.icon || 'fas fa-user-check',
+        met,
+      });
+      if (!met) unmetNames.push(name);
+    }
+
+    return { blocked: unmetNames.length > 0, reason: unmetNames.join(', '), requirements };
   }
 
   /**

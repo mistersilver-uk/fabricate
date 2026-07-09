@@ -411,6 +411,11 @@
           "LearnAction": "Learn",
           "LearnBlocked": "Prerequisite not met: {reason}",
           "Learned": "Learned",
+          "Needs": "Needs: {name}",
+          "HiddenRecipe": "a hidden recipe",
+          "RequirementMet": "Requirement met: {name}",
+          "RequirementUnmet": "Requirement not met: {name}",
+          "RequirementsLabel": "Learning requirements",
           "RecipeSearchPlaceholder": "Search recipes…",
           "RecipeSearchLabel": "Search recipes",
           "RecipesPerPage": "Per page",
@@ -3592,20 +3597,24 @@
             "UseAnytime": "Use anytime",
             "UseOnce": "Use once",
             "UseUpTo": "Use up to {n} times",
-            "CraftRecipes": "Craft {n} recipes"
+            "CraftRecipes": "Craft {n} recipes",
+            "Needs": "Needs: {name}",
+            "RequirementsLabel": "Learning requirements"
           },
           "Rail": {
             "EffectiveRules": "Effective rules",
             "HowPlayersSee": "How players see it",
             "Label": "Preview and effective rules",
-            "LiveHint": "This preview updates live as you change the controls on the left.",
-            "Requirements": "Requirements"
+            "LiveHint": "This preview updates live as you change the controls on the left."
           },
           "Rules": {
             "AppliesEveryRecipe": "Applies to every recipe",
             "DestroyedWhenSpent": "Destroyed when spent",
             "InertWhenSpent": "Becomes inert when spent",
             "NUsesPerCopy": "{n} uses per copy",
+            "NeedsKnowledge": "Needs: {name}",
+            "NeedsKnowledgeSub": "Must already be known",
+            "NeedsPrereqSub": "Character requirement",
             "NeverConsumed": "The item is never consumed",
             "NoCapLearning": "No cap on learning",
             "SingleUse": "Single use",
