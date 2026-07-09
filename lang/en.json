@@ -409,6 +409,7 @@
           "NoRecipeMatches": "No recipes match your search.",
           "NoRecipeDescription": "No description.",
           "LearnAction": "Learn",
+          "LearnBlocked": "Prerequisite not met: {reason}",
           "Learned": "Learned",
           "RecipeSearchPlaceholder": "Search recipes…",
           "RecipeSearchLabel": "Search recipes",
@@ -939,7 +940,8 @@
       "LearnedRecipesPartial": "{actor} learned {count} new recipes: {recipes}",
       "NoNewRecipesLearned": "{actor} already knows the matched recipe item recipes.",
       "CouldNotLearnRecipe": "Could not learn recipe",
-      "PrerequisiteNotMet": "You must learn the prerequisite recipe first."
+      "PrerequisiteNotMet": "You must learn the prerequisite recipe first.",
+      "CharacterPrerequisiteNotMet": "You do not meet the prerequisites to learn {name}: {reason}."
     },
     "Admin": {
       "Title": "Crafting Admin",
@@ -1663,6 +1665,9 @@
           "RecipeItem": "Recipe item",
           "RecipeItemDropHint": "Drag an item here to link it.",
           "RecipeItemReplaceHint": "Drop an item to replace it, or right-click to unlink.",
+          "RecipeItemLinkAnother": "Drag an item here to link another.",
+          "RecipeItemUnlinkHint": "Right-click to unlink this book.",
+          "RecipeItemLinks": "Linked recipe items",
           "OpenItem": "Open item",
           "UnlinkItem": "Unlink recipe item",
           "CopyItemUuid": "Copy item UUID",
@@ -2862,6 +2867,21 @@
           "TaskDcOverride": "DC",
           "TaskDcOverridePlaceholder": "System default"
         },
+        "CharacterPrerequisites": {
+          "Title": "Character prerequisites",
+          "Hint": "Pass/fail conditions — a property path, comparison and value — attached to a book or scroll to gate who may learn its recipes.",
+          "Empty": "No character prerequisites yet.",
+          "Add": "Add prerequisite",
+          "Delete": "Remove prerequisite",
+          "SeedPresets": "Seed presets",
+          "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
+          "Name": "Name",
+          "Condition": "Condition",
+          "Path": "Property path",
+          "Operator": "Operator",
+          "Value": "Value",
+          "Note": "Resolves against the character's roll data. Boolean comparisons (is true / is false / exists) hide the value field. Unknown paths fall back to 0 / false."
+        },
         "CurrencyUnits": {
           "Title": "Currency units",
           "Hint": "Define actor currency paths and denomination breakdowns for this crafting system.",
@@ -3506,6 +3526,9 @@
             "PartyLearns": "Party learns",
             "Prerequisite": "Prerequisite to learn",
             "PrerequisiteNone": "None",
+            "CharacterPrerequisites": "Character prerequisites to learn",
+            "CharacterPrerequisitesEmpty": "No character prerequisites defined yet — add them in System Settings first.",
+            "CharacterPrerequisitesHint": "A reader who fails any of these cannot learn this book’s recipes.",
             "Time": "time",
             "Times": "times",
             "Title": "Limits",

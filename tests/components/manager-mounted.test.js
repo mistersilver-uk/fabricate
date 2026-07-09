@@ -155,6 +155,7 @@ function compileManagerRoot() {
     );
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
@@ -235,6 +236,8 @@ function compileManagerRoot() {
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
     'src/config/flags.js',
+    // CharacterPrerequisitesCard imports the pure prerequisite engine (issue 544).
+    'src/systems/characterPrerequisites.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',

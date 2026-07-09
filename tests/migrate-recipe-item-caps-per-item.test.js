@@ -145,6 +145,7 @@ test('seeded caps survive a _normalizeSystem round-trip', async () => {
       learnScope: 'perInstance',
       learningMode: 'ntimes',
       prerequisite: null,
+      characterPrerequisiteIds: [],
       destroyWhenSpent: true,
     },
   });

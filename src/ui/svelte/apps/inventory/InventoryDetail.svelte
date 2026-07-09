@@ -173,7 +173,7 @@
   });
 
   function canLearn(recipe) {
-    return !recipe?.learned && !budgetSpent;
+    return !recipe?.learned && !recipe?.learnBlocked && !budgetSpent;
   }
   function toggleRecipe(recipeId) {
     expandedRecipeId = expandedRecipeId === recipeId ? null : recipeId;
@@ -228,6 +228,15 @@
     <span class="inventory-chip inventory-detail-learned" data-inventory-learned={recipe.id}>
       <i class="fas fa-check" aria-hidden="true"></i>
       {localize('FABRICATE.App.Inventory.Detail.Learned')}
+    </span>
+  {:else if recipe.learnBlocked}
+    <span
+      class="inventory-chip inventory-detail-blocked"
+      data-inventory-learn-blocked={recipe.id}
+      title={recipe.learnBlockedReason}
+    >
+      <i class="fas fa-lock" aria-hidden="true"></i>
+      {localize('FABRICATE.App.Inventory.Detail.LearnBlocked', { reason: recipe.learnBlockedReason })}
     </span>
   {:else}
     <button
@@ -987,6 +996,13 @@
     border-color: var(--fab-success-border, var(--fab-border));
     background: var(--fab-success-soft, var(--fab-surface-raised));
     color: var(--fab-success-text, var(--fab-text-muted));
+  }
+
+  .inventory-detail-blocked {
+    flex: 0 0 auto;
+    border-color: var(--fab-danger-border, var(--fab-border));
+    background: var(--fab-danger-soft, var(--fab-surface-raised));
+    color: var(--fab-danger-text, var(--fab-text-muted));
   }
 
   .inventory-detail-recipe-search {

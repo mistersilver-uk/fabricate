@@ -26,6 +26,8 @@ import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { getItemSourceReferences } from '../utils/sourceUuid.js';
 
+import { evaluatePrerequisites } from './characterPrerequisites.js';
+
 // Knowledge modes in which a recipe item (book) can teach a recipe. In these
 // modes owning the book surfaces a Learn affordance in the inventory; other modes
 // (item-only access, or a non-knowledge list mode) have nothing to learn, so the
@@ -493,8 +495,20 @@ export class InventoryListingBuilder {
     if (owned.size === 0) return [];
 
     const learnedMap = this._getLearnedMapFor(craftingActor);
+    // Resolve the reader's roll data + the system's prerequisite library once so
+    // each book's character-prerequisite learning gate (issue 544) can annotate
+    // its recipes with a `learnBlocked` flag the Learn affordance disables on.
+    const rollData = craftingActor?.getRollData?.() ?? {};
+    const prerequisiteById = new Map(
+      (Array.isArray(system?.characterPrerequisites) ? system.characterPrerequisites : []).map(
+        (def) => [def.id, def]
+      )
+    );
     const rows = [];
     for (const [defId, { def, sources: sourceMap, item }] of owned) {
+      // The gate is per-book: every recipe a book teaches shares its character
+      // prerequisites, so evaluate once per definition.
+      const bookGate = this._evaluateBookLearningGate(def, prerequisiteById, rollData);
       const rowSources = orderedSourceIds
         .map((id) => sourceMap.get(id))
         .filter((source) => source && source.qty > 0)
@@ -513,6 +527,8 @@ export class InventoryListingBuilder {
         description: stringOrEmpty(recipe?.description),
         img: stringOrNull(this._resolveRecipeImg(recipe)),
         learned: Boolean(learnedMap?.[recipe?.id]),
+        learnBlocked: bookGate.blocked,
+        learnBlockedReason: bookGate.reason,
       }));
 
       rows.push({
@@ -601,6 +617,34 @@ export class InventoryListingBuilder {
   _getLearnedMapFor(actor) {
     const learned = getFabricateFlag(actor, 'learnedRecipes', {});
     return learned && typeof learned === 'object' ? learned : {};
+  }
+
+  /**
+   * Evaluate a book's character-prerequisite learning gate (issue 544) for the
+   * inventory listing, mirroring `RecipeVisibilityService._meetsCharacterPrerequisites`
+   * but Foundry-free (the builder never touches runtime globals). A prerequisite id
+   * that no longer resolves to a system definition is skipped (fail-open).
+   *
+   * @param {object} def Recipe-item definition (`caps.learn.characterPrerequisiteIds`).
+   * @param {Map<string, object>} prerequisiteById System prerequisites by id.
+   * @param {object} rollData Pre-resolved actor roll data.
+   * @returns {{blocked: boolean, reason: string}}
+   */
+  _evaluateBookLearningGate(def, prerequisiteById, rollData) {
+    const ids = Array.isArray(def?.caps?.learn?.characterPrerequisiteIds)
+      ? def.caps.learn.characterPrerequisiteIds
+      : [];
+    if (ids.length === 0) return { blocked: false, reason: '' };
+    const selected = ids.map((id) => prerequisiteById.get(id)).filter(Boolean);
+    if (selected.length === 0) return { blocked: false, reason: '' };
+    const { passed, failures } = evaluatePrerequisites(rollData, selected);
+    return {
+      blocked: !passed,
+      reason: failures
+        .map((failure) => failure.name || failure.preview)
+        .filter(Boolean)
+        .join(', '),
+    };
   }
 
   /**

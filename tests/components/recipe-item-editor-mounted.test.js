@@ -11,6 +11,8 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
+    // The Limits tab's character-prerequisite picker imports the pure engine (issue 544).
+    'src/systems/characterPrerequisites.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

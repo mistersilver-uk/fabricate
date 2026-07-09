@@ -37,6 +37,9 @@
     linkedItem = null,
     linkedRecipes = [],
     availableRecipes = [],
+    // System-owned character prerequisite library (issue 544), forwarded to the
+    // Limits tab's "Character prerequisites to learn" picker.
+    characterPrerequisites = [],
     worldItems = [],
     visibilityMode = 'item',
     activeTab = 'overview',
@@ -208,6 +211,7 @@
               {visibilityMode}
               {linkedRecipes}
               {availableRecipes}
+              {characterPrerequisites}
               {onPatch}
             />
           {:else if activeTab === 'validation'}

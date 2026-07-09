@@ -169,6 +169,7 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
       learnScope: 'perInstance',
       learningMode: 'once',
       prerequisite: null,
+      characterPrerequisiteIds: [],
       destroyWhenSpent: false
     }
   });

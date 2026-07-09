@@ -26,11 +26,16 @@
   import { localize } from '../../../util/foundryBridge.js';
   import SegmentedControl from '../SegmentedControl.svelte';
 
+  import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
+
   let {
     recipeItem = null,
     visibilityMode = 'item',
     linkedRecipes = [],
     availableRecipes = [],
+    // System-owned character prerequisite library (issue 544) — the options for
+    // the "Character prerequisites to learn" multi-select.
+    characterPrerequisites = [],
     onPatch = () => {}
   } = $props();
 
@@ -130,6 +135,19 @@
   function selectPrerequisite(event) {
     const value = String(event.currentTarget.value || '');
     patchLearn({ prerequisite: value || null });
+  }
+
+  // Character prerequisites (issue 544): the ids a reader must ALL pass to learn
+  // a recipe from this book, gating on actor roll data (distinct from the single
+  // recipe `prerequisite` above, which gates on prior knowledge).
+  const characterPrerequisiteIds = $derived(
+    Array.isArray(learnCaps.characterPrerequisiteIds) ? learnCaps.characterPrerequisiteIds : []
+  );
+  function toggleCharacterPrerequisite(id) {
+    const next = characterPrerequisiteIds.includes(id)
+      ? characterPrerequisiteIds.filter((value) => value !== id)
+      : [...characterPrerequisiteIds, id];
+    patchLearn({ characterPrerequisiteIds: next });
   }
 </script>
 
@@ -269,6 +287,30 @@
             </div>
           </div>
         {/if}
+
+        <!-- Character prerequisites apply whether or not the learn COUNT is
+             limited, so this sits outside the `limitLearning` block. -->
+        <div class="manager-recipe-item-character-prereqs" data-recipe-item-character-prereqs>
+          <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisites', 'Character prerequisites to learn')}</span>
+          {#if characterPrerequisites.length === 0}
+            <p class="manager-muted" data-recipe-item-character-prereqs-empty>{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesEmpty', 'No character prerequisites defined yet — add them in System Settings first.')}</p>
+          {:else}
+            <div class="manager-recipe-item-character-prereq-list">
+              {#each characterPrerequisites as prereq (prereq.id)}
+                <label class="manager-recipe-item-character-prereq-option" data-recipe-item-character-prereq={prereq.id}>
+                  <input
+                    type="checkbox"
+                    checked={characterPrerequisiteIds.includes(prereq.id)}
+                    onchange={() => toggleCharacterPrerequisite(prereq.id)}
+                  />
+                  <span class="manager-recipe-item-character-prereq-name">{prereq.name}</span>
+                  <span class="manager-recipe-item-character-prereq-preview">{prerequisitePreview(prereq)}</span>
+                </label>
+              {/each}
+            </div>
+            <p class="manager-muted manager-recipe-item-character-prereq-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesHint', 'A reader who fails any of these cannot learn this book’s recipes.')}</p>
+          {/if}
+        </div>
       </div>
     </div>
   {/if}
@@ -279,6 +321,46 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-4);
+  }
+
+  /* Character prerequisites to learn (issue 544) */
+  .manager-recipe-item-character-prereqs {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-3);
+    padding-top: var(--fab-space-3);
+    border-top: 1px solid var(--fab-mv2-border);
+  }
+
+  .manager-recipe-item-character-prereq-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+  }
+
+  .manager-recipe-item-character-prereq-option {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    cursor: pointer;
+  }
+
+  .manager-recipe-item-character-prereq-name {
+    font-weight: 600;
+  }
+
+  .manager-recipe-item-character-prereq-preview {
+    color: var(--fab-mv2-text-muted);
+    font-family: var(--fab-font-mono, monospace);
+    font-size: 0.78rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .manager-recipe-item-character-prereq-hint {
+    font-size: 0.75rem;
   }
 
   .manager-recipe-item-limits-heading {

@@ -9,7 +9,12 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-limits-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [
+    'src/ui/svelte/util/foundryBridge.js',
+    // The Limits tab's "Character prerequisites to learn" picker imports the pure
+    // prerequisite engine (issue 544).
+    'src/systems/characterPrerequisites.js',
+  ],
   compiledModules: [
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte'
@@ -39,6 +44,32 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     const root = await harness.mount({ recipeItem: learnDraft(), visibilityMode: 'knowledge' });
     assert.ok(root.querySelector('[data-recipe-item-limits-card="knowledge"]'));
     assert.equal(root.querySelector('[data-recipe-item-limits-card="item"]'), null);
+  });
+
+  it('lists character prerequisites and toggles one into caps.learn (issue 544)', async () => {
+    const patches = [];
+    const root = await harness.mount({
+      recipeItem: learnDraft(),
+      visibilityMode: 'knowledge',
+      characterPrerequisites: [
+        { id: 'p1', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 },
+      ],
+      onPatch: (p) => patches.push(p),
+    });
+    const section = root.querySelector('[data-recipe-item-character-prereqs]');
+    assert.ok(section, 'the character-prerequisites section renders');
+    assert.match(section.textContent, /@skills\.cra\.rank ≥ 2/, 'shows the live preview');
+    root.querySelector('[data-recipe-item-character-prereq="p1"] input').click();
+    assert.deepEqual(patches, [{ caps: { learn: { characterPrerequisiteIds: ['p1'] } } }]);
+  });
+
+  it('shows an empty-state when no character prerequisites are defined', async () => {
+    const root = await harness.mount({
+      recipeItem: learnDraft(),
+      visibilityMode: 'knowledge',
+      characterPrerequisites: [],
+    });
+    assert.ok(root.querySelector('[data-recipe-item-character-prereqs-empty]'));
   });
 
   it('emits a limitUses patch and hides detail while off', async () => {

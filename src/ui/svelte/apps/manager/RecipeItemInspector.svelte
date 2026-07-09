@@ -21,6 +21,7 @@
     onSetComplexity = () => {},
     onAddRecipeItem = () => {},
     onSetRecipeItem = () => {},
+    onRemoveRecipeItem = () => {},
     onSetCategory = () => {},
     onEnterMultiStep = () => {},
     onRevertToSingleStep = () => {},
@@ -28,50 +29,68 @@
     onCopyItemUuid = () => {}
   } = $props();
 
-  // The currently linked recipe-item id is projected onto the recipe row.
-  const recipeItemId = $derived(String(recipe?.recipeItemId || ''));
+  // The recipe↔recipe-item link is many-to-many (issue 511): a recipe can be
+  // taught by several books. The row projects every containing book id as
+  // `recipeItemIds`; fall back to the legacy scalar `recipeItemId` when the
+  // projection is absent.
+  const linkedDefinitionIds = $derived(
+    Array.isArray(recipe?.recipeItemIds) && recipe.recipeItemIds.length > 0
+      ? recipe.recipeItemIds.map((id) => String(id))
+      : (recipe?.recipeItemId ? [String(recipe.recipeItemId)] : [])
+  );
 
-  // Resolve the linked recipe-item definition from the projected definitions.
-  const linkedDefinition = $derived(recipeItemId
-    ? (recipeItemDefinitions || []).find(def => def.id === recipeItemId) || null
-    : null);
-  const linkedSourceUuid = $derived(String(linkedDefinition?.sourceItemUuid || ''));
+  // Resolve each linked id to its definition, preserving projection order.
+  const linkedDefinitions = $derived(
+    linkedDefinitionIds
+      .map((id) => (recipeItemDefinitions || []).find((def) => String(def.id) === id) || null)
+      .filter(Boolean)
+  );
 
-  // Resolve the underlying item document for "open" + missing-state, mirroring
-  // EnvironmentSummaryInspector: a cancelled guard, re-resolved when the recipe
-  // id / recipeItemId changes so the thumb never goes stale.
-  let resolvedItemName = $state('');
-  let resolvedItemImg = $state('');
-  let resolvedItemMissing = $state(false);
+  // Resolve each book's underlying item document for a live thumb/name + the
+  // missing-state, keyed by definition id. Re-resolved when the recipe or its
+  // linked set changes so a row never goes stale. Mirrors the single-item
+  // resolution the inspector used before the many-to-many redesign.
+  let resolvedByDefId = $state({});
   $effect(() => {
-    const uuid = linkedSourceUuid;
-    // Re-run when the recipe changes too, even if uuid is stable.
     void recipe?.id;
-    resolvedItemName = '';
-    resolvedItemImg = '';
-    resolvedItemMissing = false;
-    if (!recipeItemId) return;
-    if (!uuid || typeof globalThis.fromUuid !== 'function') {
-      resolvedItemMissing = Boolean(recipeItemId && linkedDefinition && !uuid);
+    const defs = linkedDefinitions;
+    if (typeof globalThis.fromUuid !== 'function') {
+      const next = {};
+      for (const def of defs) {
+        const uuid = String(def?.sourceItemUuid || '');
+        if (!uuid) next[def.id] = { name: '', img: '', missing: true };
+      }
+      resolvedByDefId = next;
       return;
     }
     let cancelled = false;
-    Promise.resolve(globalThis.fromUuid(uuid)).then(doc => {
-      if (cancelled) return;
-      if (!doc) {
-        resolvedItemMissing = true;
-        return;
-      }
-      resolvedItemName = String(doc.name || '');
-      resolvedItemImg = String(doc.img || '');
-    }).catch(() => {
-      if (!cancelled) resolvedItemMissing = true;
+    Promise.all(
+      defs.map(async (def) => {
+        const uuid = String(def?.sourceItemUuid || '');
+        if (!uuid) return [def.id, { name: '', img: '', missing: true }];
+        try {
+          const doc = await Promise.resolve(globalThis.fromUuid(uuid));
+          if (!doc) return [def.id, { name: '', img: '', missing: true }];
+          return [def.id, { name: String(doc.name || ''), img: String(doc.img || ''), missing: false }];
+        } catch {
+          return [def.id, { name: '', img: '', missing: true }];
+        }
+      })
+    ).then((entries) => {
+      if (!cancelled) resolvedByDefId = Object.fromEntries(entries);
     });
     return () => { cancelled = true; };
   });
 
-  const linkedItemName = $derived(resolvedItemName || linkedDefinition?.name || linkedSourceUuid);
-  const linkedItemImg = $derived(resolvedItemImg || linkedDefinition?.img || DEFAULT_RECIPE_IMAGE);
+  function definitionName(def) {
+    return resolvedByDefId[def.id]?.name || def?.name || String(def?.sourceItemUuid || '');
+  }
+  function definitionImg(def) {
+    return resolvedByDefId[def.id]?.img || def?.img || DEFAULT_RECIPE_IMAGE;
+  }
+  function definitionMissing(def) {
+    return resolvedByDefId[def.id]?.missing === true;
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -130,53 +149,62 @@
     onSetRecipeItem(linkedId);
   }
 
-  function unlinkItem() {
-    onSetRecipeItem(null);
+  // Unlink one book from this recipe (remove the recipe from that book's
+  // membership). Many-to-many: other linked books are untouched.
+  function unlinkDefinition(def) {
+    if (def?.id) onRemoveRecipeItem(def.id);
   }
 
-  function onLinkedItemMouseDown(event) {
+  function onLinkedItemMouseDown(event, def) {
     if (event.button !== 2) return;
     event.preventDefault();
-    unlinkItem();
+    unlinkDefinition(def);
   }
 
-  function openItem() {
-    if (linkedSourceUuid) onOpenItem(linkedSourceUuid);
+  function openItem(def) {
+    const uuid = String(def?.sourceItemUuid || '');
+    if (uuid) onOpenItem(uuid);
   }
 
-  function copyItemUuid() {
-    if (linkedSourceUuid) onCopyItemUuid(linkedSourceUuid);
+  function copyItemUuid(def) {
+    const uuid = String(def?.sourceItemUuid || '');
+    if (uuid) onCopyItemUuid(uuid);
   }
 </script>
 
 <section class="manager-inspector-card" data-recipe-section="recipe-item">
   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.RecipeItem', 'Recipe item')}</h3>
-  {#if recipeItemId}
-    <!-- Drop-to-replace and right-click-to-unlink are enhancements; the visible
-         Open/Unlink buttons inside provide the accessible path. -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="manager-environment-scene-linked"
-      data-recipe-item-linked
-      role="group"
-      aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeItem', 'Recipe item')}
-      title={text('FABRICATE.Admin.Manager.Recipe.RecipeItemReplaceHint', 'Drop an item to replace it, or right-click to unlink.')}
-      use:dragDrop={{ onDrop: handleItemDrop, activeClass: 'is-drop-active' }}
-      oncontextmenu={(event) => { event.preventDefault(); unlinkItem(); }}
-      onmousedown={onLinkedItemMouseDown}
-    >
-      {#if resolvedItemMissing}
-        <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-suitcase"></i></span>
-      {:else}
-        <img class="manager-environment-scene-thumb" src={linkedItemImg} alt="" />
-      {/if}
-      {#if resolvedItemMissing}
-        <span class="manager-environment-scene-name manager-muted" data-recipe-item-missing>{text('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing', 'Recipe item unresolved')}</span>
-      {:else}
-        <button type="button" class="manager-environment-scene-name" onclick={(event) => { event.stopPropagation(); openItem(); }} title={text('FABRICATE.Admin.Manager.Recipe.OpenItem', 'Open item')}>{linkedItemName}</button>
-      {/if}
-      <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Recipe.CopyItemUuid', 'Copy item UUID')} title={text('FABRICATE.Admin.Manager.Recipe.CopyItemUuid', 'Copy item UUID')} disabled={!linkedSourceUuid} onclick={(event) => { event.stopPropagation(); copyItemUuid(); }}><i class="fas fa-copy" aria-hidden="true"></i></button>
-      <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')} title={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')} onclick={(event) => { event.stopPropagation(); unlinkItem(); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
+  {#if linkedDefinitions.length > 0}
+    <!-- Every book (recipe item) that teaches this recipe. Many-to-many: a recipe
+         can be taught by several books; each row unlinks only that book. -->
+    <ul class="manager-recipe-item-links" data-recipe-item-links aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLinks', 'Linked recipe items')}>
+      {#each linkedDefinitions as def (def.id)}
+        <!-- Right-click-to-unlink is an enhancement; the visible Unlink button
+             inside provides the accessible path. -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <li
+          class="manager-environment-scene-linked"
+          data-recipe-item-linked
+          data-recipe-item-link={def.id}
+          title={text('FABRICATE.Admin.Manager.Recipe.RecipeItemUnlinkHint', 'Right-click to unlink this book.')}
+          oncontextmenu={(event) => { event.preventDefault(); unlinkDefinition(def); }}
+          onmousedown={(event) => onLinkedItemMouseDown(event, def)}
+        >
+          {#if definitionMissing(def)}
+            <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-suitcase"></i></span>
+            <span class="manager-environment-scene-name manager-muted" data-recipe-item-missing>{text('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing', 'Recipe item unresolved')}</span>
+          {:else}
+            <img class="manager-environment-scene-thumb" src={definitionImg(def)} alt="" />
+            <button type="button" class="manager-environment-scene-name" onclick={(event) => { event.stopPropagation(); openItem(def); }} title={text('FABRICATE.Admin.Manager.Recipe.OpenItem', 'Open item')}>{definitionName(def)}</button>
+          {/if}
+          <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Recipe.CopyItemUuid', 'Copy item UUID')} title={text('FABRICATE.Admin.Manager.Recipe.CopyItemUuid', 'Copy item UUID')} disabled={!def?.sourceItemUuid} onclick={(event) => { event.stopPropagation(); copyItemUuid(def); }}><i class="fas fa-copy" aria-hidden="true"></i></button>
+          <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')} title={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')} onclick={(event) => { event.stopPropagation(); unlinkDefinition(def); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
+        </li>
+      {/each}
+    </ul>
+    <div class="manager-environment-scene-dropzone is-compact" data-recipe-item-dropzone use:dragDrop={{ onDrop: handleItemDrop, activeClass: 'is-drop-active' }}>
+      <i class="fas fa-plus" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Recipe.RecipeItemLinkAnother', 'Drag an item here to link another.')}</span>
     </div>
   {:else}
     <div class="manager-environment-scene-dropzone" data-recipe-item-dropzone use:dragDrop={{ onDrop: handleItemDrop, activeClass: 'is-drop-active' }}>

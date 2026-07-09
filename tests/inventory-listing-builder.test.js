@@ -679,6 +679,32 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     return listing.rows.find((row) => row.isRecipeItem === true) ?? null;
   }
 
+  it('flags a book’s recipes learnBlocked when the reader fails its character prerequisites (issue 544)', () => {
+    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 };
+    const system = {
+      ...bookSystem({ caps: { item: {}, learn: { characterPrerequisiteIds: ['p-expert'] } } }),
+      characterPrerequisites: [EXPERT],
+    };
+    const actorWithRollData = (rank) => ({
+      ...bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+      getRollData: () => ({ skills: { cra: { rank } } }),
+    });
+
+    const blocked = bookBuilder({ system }).buildListing({
+      craftingActor: actorWithRollData(1),
+      viewer: { isGM: false },
+    });
+    const blockedRecipes = bookRow(blocked).recipes;
+    assert.ok(blockedRecipes.every((r) => r.learnBlocked === true), 'all recipes blocked');
+    assert.equal(blockedRecipes[0].learnBlockedReason, 'Expert Crafter');
+
+    const passing = bookBuilder({ system }).buildListing({
+      craftingActor: actorWithRollData(3),
+      viewer: { isGM: false },
+    });
+    assert.ok(bookRow(passing).recipes.every((r) => r.learnBlocked === false), 'passing reader unblocked');
+  });
+
   it('classifies book learn/craft from the flat visibilityMode (item→craft, knowledge→learn, global/restricted→no rows)', () => {
     // The 1.12.0 migration stamps `visibilityMode` on every system, so the flat branch —
     // not the legacy listMode — is the primary runtime path.

@@ -705,6 +705,33 @@
     if (!selectedSystemId) return;
     await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
   }
+
+  // Character prerequisites (issue 544) — system-owned pass/fail learning gates.
+  const selectedCharacterPrerequisites = $derived(
+    Array.isArray(selectedSystem?.characterPrerequisites)
+      ? selectedSystem.characterPrerequisites
+      : []
+  );
+  const characterPrerequisitePresetsSupported = $derived(
+    ['dnd5e', 'pf2e'].includes(foundrySystemId)
+  );
+  async function onAddCharacterPrerequisite() {
+    if (!selectedSystemId) return null;
+    return await store.addCharacterPrerequisite(selectedSystemId);
+  }
+  async function onUpdateCharacterPrerequisite(prerequisiteId, patch) {
+    if (!selectedSystemId) return;
+    await store.updateCharacterPrerequisite(selectedSystemId, prerequisiteId, patch);
+  }
+  async function onDeleteCharacterPrerequisite(prerequisiteId) {
+    if (!selectedSystemId) return;
+    await store.deleteCharacterPrerequisite(selectedSystemId, prerequisiteId);
+  }
+  async function onSeedCharacterPrerequisitePresets() {
+    if (!selectedSystemId || !characterPrerequisitePresetsSupported) return;
+    await store.seedCharacterPrerequisitePresetsForSystem(selectedSystemId);
+  }
+
   async function onAddCurrencyUnit() {
     if (!selectedSystemId) return null;
     return await store.addCurrencyUnit(selectedSystemId);
@@ -2336,6 +2363,27 @@
     // The change is persisted live (book-side), so re-sync the draft's projected
     // membership on BOTH draft and baseline — keeping the recipe-item card current
     // without marking the recipe draft dirty for a book change.
+    const updated = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    if (updated) {
+      const patch = {
+        recipeItemId: updated.recipeItemId || '',
+        recipeItemIds: Array.isArray(updated.recipeItemIds) ? updated.recipeItemIds : [],
+      };
+      if (recipeDraft) recipeDraft = { ...recipeDraft, ...patch };
+      if (recipeDraftBaseline) recipeDraftBaseline = { ...recipeDraftBaseline, ...patch };
+    }
+    return true;
+  }
+
+  // Remove ONE book from this recipe's membership (issue 511 many-to-many) — used
+  // by the recipe-item inspector's per-book unlink. Other linked books are kept.
+  async function handleRemoveRecipeItem(recipeItemId) {
+    const rid = recipeDraft?.id;
+    if (!rid || !recipeItemId) return false;
+    const liveRecipe = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    const membership = new Set((liveRecipe?.recipeItemIds || []).map((id) => String(id)));
+    membership.delete(String(recipeItemId));
+    await store.setRecipeBookMembership?.(rid, [...membership]);
     const updated = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
     if (updated) {
       const patch = {
@@ -5075,6 +5123,7 @@
         linkedItem={recipeItemEditorLinkedItem}
         linkedRecipes={recipeItemEditorLinkedRecipes}
         availableRecipes={recipeItemEditorAvailableRecipes}
+        characterPrerequisites={selectedCharacterPrerequisites}
         worldItems={worldItemOptions}
         visibilityMode={craftingVisibilityMode}
         activeTab={recipeItemActiveTab}
@@ -5119,6 +5168,12 @@
         onUpdateCharacterModifier={onUpdateCharacterModifier}
         onDeleteCharacterModifier={onDeleteCharacterModifier}
         onSeedCharacterModifierPresets={onSeedCharacterModifierPresets}
+        characterPrerequisiteLibrary={selectedCharacterPrerequisites}
+        {characterPrerequisitePresetsSupported}
+        onAddCharacterPrerequisite={onAddCharacterPrerequisite}
+        onUpdateCharacterPrerequisite={onUpdateCharacterPrerequisite}
+        onDeleteCharacterPrerequisite={onDeleteCharacterPrerequisite}
+        onSeedCharacterPrerequisitePresets={onSeedCharacterPrerequisitePresets}
         currencyUnits={selectedCurrencyUnits}
         {currencyPresetsSupported}
         {currencySpendStrategy}
@@ -6788,6 +6843,7 @@
           onSetComplexity={handleSetRecipeComplexity}
           onAddRecipeItem={handleAddRecipeItem}
           onSetRecipeItem={handleSetRecipeItem}
+          onRemoveRecipeItem={handleRemoveRecipeItem}
           onSetCategory={handleSetRecipeCategory}
           onEnterMultiStep={handleEnterMultiStep}
           onRevertToSingleStep={handleRevertToSingleStep}

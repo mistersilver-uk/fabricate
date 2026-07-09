@@ -22,6 +22,7 @@ import {
   getItemIdentityReferences,
 } from '../utils/sourceUuid.js';
 
+import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -174,6 +175,16 @@ export class CraftingSystemManager {
       // interactable browser, item-drop resolution, and gathering composition —
       // reads a single source of truth. Mirrors how `components` is normalized.
       tools: Array.isArray(system.tools) ? system.tools.map((t) => this._normalizeTool(t)) : [],
+      // System-owned character prerequisite library (issue 544). Reusable
+      // pass/fail conditions (`{ id, name, icon, path, op, value }`) the GM
+      // authors in System Settings and attaches to gate learning a recipe from a
+      // book/scroll (referenced by id from a recipe item's `caps.learn`).
+      // Normalized wholesale from the incoming array; settings replace (not
+      // deep-merge), so a removed entry does not resurrect.
+      characterPrerequisites: normalizeCharacterPrerequisiteList(
+        system.characterPrerequisites,
+        () => foundry.utils.randomID()
+      ),
       // Per-system gathering realm library (geography) + realm behavior
       // settings. Realms ride along with export/import for free because the
       // exporter clones the normalized system and import funnels back through
@@ -968,6 +979,21 @@ export class CraftingSystemManager {
         ? learn.prerequisite.trim()
         : null;
 
+    // `characterPrerequisiteIds` (issue 544) — the system-owned character
+    // prerequisites (`system.characterPrerequisites[].id`) a reader must ALL pass
+    // (AND semantics) to learn a recipe from this book. Distinct from
+    // `prerequisite` (a recipe the reader must already have learned): this gates
+    // on the actor's roll data, that gates on prior knowledge.
+    const characterPrerequisiteIds = Array.isArray(learn.characterPrerequisiteIds)
+      ? [
+          ...new Set(
+            learn.characterPrerequisiteIds
+              .map((value) => String(value ?? '').trim())
+              .filter(Boolean)
+          ),
+        ]
+      : [];
+
     return {
       item: {
         limitUses: item.limitUses === true,
@@ -986,6 +1012,7 @@ export class CraftingSystemManager {
         learnScope,
         learningMode,
         prerequisite,
+        characterPrerequisiteIds,
         destroyWhenSpent: learn.destroyWhenSpent === true,
       },
     };

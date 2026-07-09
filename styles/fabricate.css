@@ -1810,6 +1810,150 @@
   font-style: italic;
 }
 
+/* Character prerequisites accordion (issue 544) */
+.fabricate-manager .manager-prerequisite-empty {
+  font-style: italic;
+}
+
+.fabricate-manager .manager-prerequisite-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-prerequisite-item {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-1);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-prerequisite-item.is-open {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager .manager-prerequisite-header {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+.fabricate-manager .manager-prerequisite-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.fabricate-manager .manager-prerequisite-chevron {
+  flex: 0 0 auto;
+  width: 12px;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-prerequisite-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-prerequisite-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-prerequisite-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  color: var(--fab-mv2-text-muted);
+  font-family: var(--fab-font-mono, monospace);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-prerequisite-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: 0 var(--fab-space-3) var(--fab-space-3);
+}
+
+.fabricate-manager .manager-prerequisite-condition-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-prerequisite-condition {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-prerequisite-path {
+  flex: 2 1 200px;
+}
+
+.fabricate-manager .manager-prerequisite-operator {
+  flex: 1 1 160px;
+}
+
+.fabricate-manager .manager-prerequisite-value {
+  flex: 0 1 110px;
+}
+
+.fabricate-manager .manager-prerequisite-path-input {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  padding-left: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 5px;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager .manager-prerequisite-path-input input {
+  border: 0;
+  background: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-prerequisite-at {
+  color: var(--fab-mv2-text-muted);
+  font-family: var(--fab-font-mono, monospace);
+}
+
+.fabricate-manager .manager-prerequisite-note {
+  font-size: 0.75rem;
+}
+
 .fabricate-manager .manager-character-modifier-list {
   list-style: none;
   margin: 0;
@@ -11034,6 +11178,22 @@
 .fabricate-manager .manager-environment-scene-dropzone.is-drop-active {
   border-color: var(--fab-mv2-accent);
   color: var(--fab-mv2-text);
+}
+
+/* Recipe-item inspector: the list of books teaching this recipe (issue 511
+   many-to-many). */
+.fabricate-manager .manager-recipe-item-links {
+  list-style: none;
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-environment-scene-dropzone.is-compact {
+  padding: var(--fab-space-2) var(--fab-space-3);
+  font-size: 0.8rem;
 }
 
 .fabricate-manager .manager-environment-scene-linked {

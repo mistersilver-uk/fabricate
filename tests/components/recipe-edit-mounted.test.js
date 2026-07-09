@@ -2998,6 +2998,36 @@ describe('RecipeItemInspector (mounted)', () => {
     inspectorHarness.remount();
   });
 
+  it('enumerates every linked book (many-to-many) and unlinks one via onRemoveRecipeItem', async () => {
+    globalThis.fromUuid = async () => null; // resolve to def name/img (missing → def fallback shown)
+    const removed = [];
+    const DEFS = [
+      { id: 'ri-a', name: 'Alpha Tome', img: 'icons/a.webp', sourceItemUuid: 'Item.a' },
+      { id: 'ri-b', name: 'Beta Scroll', img: 'icons/b.webp', sourceItemUuid: 'Item.b' },
+    ];
+    const target = await inspectorHarness.mount(
+      inspectorProps({
+        recipe: { ...RECIPE, recipeItemId: 'ri-a', recipeItemIds: ['ri-a', 'ri-b'] },
+        recipeItemDefinitions: DEFS,
+        onRemoveRecipeItem: (id) => removed.push(id),
+      })
+    );
+    await new Promise((r) => setTimeout(r, 10));
+    const rows = target.querySelectorAll('[data-recipe-item-link]');
+    assert.equal(rows.length, 2, 'both linked books are listed');
+    assert.ok(target.querySelector('[data-recipe-item-link="ri-a"]'), 'lists the first book');
+    assert.ok(target.querySelector('[data-recipe-item-link="ri-b"]'), 'lists the second book');
+    // A compact dropzone remains for linking another book.
+    assert.ok(target.querySelector('[data-recipe-item-dropzone]'), 'keeps a link-another dropzone');
+
+    // The per-row unlink removes only that book.
+    target
+      .querySelector('[data-recipe-item-link="ri-b"] .manager-icon-button.is-danger')
+      .click();
+    assert.deepEqual(removed, ['ri-b'], 'unlink calls onRemoveRecipeItem with the book id');
+    inspectorHarness.remount();
+  });
+
   it('disables the category selector and shows only General when no categories exist', async () => {
     const target = await inspectorHarness.mount(inspectorProps({ categories: [] }));
     const select = target.querySelector('[data-recipe-category-select]');
