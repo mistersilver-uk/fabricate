@@ -364,13 +364,22 @@ describe('RecipeItemLearningHook', () => {
       id,
       recipeVisibility: {
         listMode: 'knowledge',
+        // mode + dragDropEnabled stay system-wide; the learn cap is per-item (issue 511).
         knowledge: {
           mode: 'learned',
-          item: { limitUses: false },
-          learn: { consumeOnLearn: false, dragDropEnabled, limitRecipes: true, maxRecipes }
+          learn: { dragDropEnabled }
         }
       },
-      recipeItemDefinitions: [{ id: 'book', sourceItemUuid }]
+      recipeItemDefinitions: [
+        {
+          id: 'book',
+          sourceItemUuid,
+          caps: {
+            item: { limitUses: false },
+            learn: { consumeOnLearn: false, limitRecipes: true, maxRecipes }
+          }
+        }
+      ]
     };
   }
 

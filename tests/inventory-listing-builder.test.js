@@ -293,6 +293,17 @@ describe('InventoryListingBuilder — used-by index', () => {
     );
   });
 
+  it('resolves a book recipe image to the recipe’s own image, defaulting to the alchemical blueprint', () => {
+    const { builder } = makeBuilder();
+    const blueprint = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
+    assert.equal(builder._resolveRecipeImg({ img: 'icons/blade.webp' }), 'icons/blade.webp');
+    assert.equal(builder._resolveRecipeImg({ img: '' }), blueprint, 'empty img → blueprint, not a bag');
+    assert.equal(builder._resolveRecipeImg({}), blueprint);
+    // Foundry's generic item-bag default is treated as "no image" → blueprint.
+    assert.equal(builder._resolveRecipeImg({ img: 'icons/svg/item-bag.svg' }), blueprint);
+    assert.equal(builder._resolveRecipeImg({ img: '  icons/svg/item-bag.svg  ' }), blueprint);
+  });
+
   it('hides undiscovered (teaser) recipes from a non-GM viewer’s used-by list', () => {
     const systemList = [makeSystem()];
     const recipeManager = { getRecipes: () => [recipe] };
@@ -608,7 +619,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     };
   }
 
-  function bookSystem({ knowledge } = {}) {
+  function bookSystem({ knowledge, caps } = {}) {
     return {
       id: 'sys-b',
       name: 'Arcana',
@@ -621,6 +632,9 @@ describe('InventoryListingBuilder — recipe-item books', () => {
           img: 'icons/book.webp',
           description: 'A tome of spells.',
           sourceItemUuid: 'Item.book1',
+          // Per-item caps (issue 511) — the canonical source the builder reads for the
+          // book's use/learn limits + access badge.
+          caps: caps ?? { item: {}, learn: {} },
         },
       ],
       recipeVisibility: {
@@ -664,6 +678,30 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   function bookRow(listing) {
     return listing.rows.find((row) => row.isRecipeItem === true) ?? null;
   }
+
+  it('classifies book learn/craft from the flat visibilityMode (item→craft, knowledge→learn, global/restricted→no rows)', () => {
+    // The 1.12.0 migration stamps `visibilityMode` on every system, so the flat branch —
+    // not the legacy listMode — is the primary runtime path.
+    const rowFor = (visibilityMode) =>
+      bookRow(
+        bookBuilder({ system: { ...bookSystem(), visibilityMode } }).buildListing({
+          craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+          viewer: { isGM: false },
+        })
+      );
+
+    const item = rowFor('item');
+    assert.ok(item, 'item mode still projects a book row');
+    assert.equal(item.learnable, false, 'item mode is not learnable');
+    assert.equal(item.craftable, true, 'item mode grants craft-by-holding');
+
+    const knowledge = rowFor('knowledge');
+    assert.equal(knowledge.learnable, true, 'knowledge mode is learnable');
+    assert.equal(knowledge.craftable, false, 'knowledge mode learns, does not craft-by-holding');
+
+    assert.equal(rowFor('global'), null, 'global mode projects no book rows');
+    assert.equal(rowFor('restricted'), null, 'restricted mode projects no book rows');
+  });
 
   it('projects an owned book as a learnable row with its linked recipes and learned flags', () => {
     const builder = bookBuilder();
@@ -720,11 +758,8 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     // Even with a learn cap configured, an item-only book must not show a learning
     // limit — it grants access by being held, not by learning.
     const system = bookSystem({
-      knowledge: {
-        mode: 'item',
-        item: { limitUses: true, maxUses: 3 },
-        learn: { limitRecipes: true, maxRecipes: 2 },
-      },
+      knowledge: { mode: 'item' },
+      caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitRecipes: true, maxRecipes: 2 } },
     });
     const book = bookItem('Item.book1', 1, { recipeItemUsage: { timesUsed: 1 } });
     const listing = bookBuilder({ system }).buildListing({
@@ -752,11 +787,8 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   it('reports both learning and use limits for an item-or-learned book', () => {
     // Item-or-learned grants access both ways, so both limits are meaningful.
     const system = bookSystem({
-      knowledge: {
-        mode: 'itemOrLearned',
-        item: { limitUses: true, maxUses: 3 },
-        learn: { limitRecipes: true, maxRecipes: 2 },
-      },
+      knowledge: { mode: 'itemOrLearned' },
+      caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitRecipes: true, maxRecipes: 2 } },
     });
     const book = bookItem('Item.book1', 1, {
       recipeItemLearning: { learnedCount: 1 },
@@ -772,11 +804,8 @@ describe('InventoryListingBuilder — recipe-item books', () => {
 
   it('suppresses the craft-use limit for a learn-only (learned) book', () => {
     const system = bookSystem({
-      knowledge: {
-        mode: 'learned',
-        item: { limitUses: true, maxUses: 3 },
-        learn: { limitRecipes: true, maxRecipes: 2 },
-      },
+      knowledge: { mode: 'learned' },
+      caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitRecipes: true, maxRecipes: 2 } },
     });
     const book = bookItem('Item.book1', 1, {
       recipeItemLearning: { learnedCount: 1 },
@@ -792,7 +821,8 @@ describe('InventoryListingBuilder — recipe-item books', () => {
 
   it('treats an enabled-but-invalid cap as uncapped (no learning limit)', () => {
     const system = bookSystem({
-      knowledge: { mode: 'learned', item: {}, learn: { limitRecipes: true, maxRecipes: 0 } },
+      knowledge: { mode: 'learned' },
+      caps: { item: {}, learn: { limitRecipes: true, maxRecipes: 0 } },
     });
     const listing = bookBuilder({ system }).buildListing({
       craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),

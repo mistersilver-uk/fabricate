@@ -16,10 +16,12 @@ import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
+import { migrateInvertRecipeItemLink } from './migrateInvertRecipeItemLink.js';
 import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
 import { migrateMoveRoutedByIngredientsCheck } from './migrateMoveRoutedByIngredientsCheck.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
+import { migrateRecipeItemCapsPerItem } from './migrateRecipeItemCapsPerItem.js';
 import { migrateRemoveLegacyCheckSources } from './migrateRemoveLegacyCheckSources.js';
 import { migrateRemoveResultSelectionProviders } from './migrateRemoveResultSelectionProviders.js';
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
@@ -29,6 +31,7 @@ import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutio
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
+import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
 import { isFatalMigrationError } from './migrationErrors.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
@@ -258,6 +261,33 @@ const MIGRATIONS = [
       'craftingCheck.routed to the shared craftingCheck.simple slot (tier ids preserved; routed formula cleared)',
     migrate(data) {
       return migrateMoveRoutedByIngredientsCheck(data);
+    },
+  },
+  {
+    version: '1.11.0',
+    label:
+      'Move recipe-item use/learn caps from the system-wide recipeVisibility.knowledge config ' +
+      'onto each recipe item definition (per-item caps; mode + dragDropEnabled stay system-wide)',
+    migrate(data) {
+      return migrateRecipeItemCapsPerItem(data);
+    },
+  },
+  {
+    version: '1.12.0',
+    label:
+      'Seed the flat system-level visibilityMode enum (global/restricted/item/knowledge) ' +
+      'from the legacy recipeVisibility.listMode + knowledge.mode pair (recipeVisibility kept)',
+    migrate(data) {
+      return migrateVisibilityModeEnum(data);
+    },
+  },
+  {
+    version: '1.13.0',
+    label:
+      'Invert the recipe ↔ recipe-item link: move book/scroll membership onto each ' +
+      'definition as recipeIds[] (many-to-many) and strip recipe.recipeItemId / linkedRecipeItemUuid',
+    migrate(data) {
+      return migrateInvertRecipeItemLink(data);
     },
   },
   // Future migrations added here in version order

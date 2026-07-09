@@ -271,11 +271,47 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       // "restrict to specific users" allow-list under the `player` list mode.
       // GMs are excluded because they always see every recipe, so restricting
       // to a GM would be a no-op.
-      getWorldUsers: () =>
-        Array.from(game.users?.contents || [])
-          .filter(user => !user?.isGM)
-          .map(user => ({ id: user.id, name: user.name }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
+      getWorldUsers: () => {
+        const USER_ROLES = globalThis.CONST?.USER_ROLES || {
+          NONE: 0,
+          PLAYER: 1,
+          TRUSTED: 2,
+          ASSISTANT: 3,
+          GAMEMASTER: 4,
+        };
+        const loc = (key, fallback) => {
+          const translated = game?.i18n?.localize?.(key);
+          return translated && translated !== key ? translated : fallback;
+        };
+        const roleLabel = (role) => {
+          switch (role) {
+            case USER_ROLES.GAMEMASTER:
+              return loc('USER.RoleGamemaster', 'Game Master');
+            case USER_ROLES.ASSISTANT:
+              return loc('USER.RoleAssistant', 'Assistant GM');
+            case USER_ROLES.TRUSTED:
+              return loc('USER.RoleTrusted', 'Trusted Player');
+            case USER_ROLES.PLAYER:
+              return loc('USER.RolePlayer', 'Player');
+            default:
+              return loc('USER.RoleNone', 'None');
+          }
+        };
+        // Foundry `User#color` is a Color (v11+) or a plain string on older cores.
+        const colorOf = (user) => {
+          const color = user?.color;
+          if (!color) return '';
+          return typeof color === 'string' ? color : color.css || color.toString?.() || '';
+        };
+        return Array.from(game.users?.contents || [])
+          .map(user => ({
+            id: user.id,
+            name: user.name,
+            role: roleLabel(user.role),
+            color: colorOf(user),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      },
       getActorOptions: () =>
         Array.from(game.actors?.contents || [])
           .map(actor => ({
@@ -286,6 +322,29 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             type: actor.type || ''
           }))
           .filter(actor => actor.uuid && actor.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      // Player-character actors ({ id, name, img }), name-sorted, for the per-recipe
+      // "grant access to specific characters" roster under the `restricted`
+      // visibility mode. A character is a player-character per
+      // `game.fabricate.isPlayerCharacterActor` (actor.type === 'character'),
+      // with a plain type fallback so the store never touches classification logic.
+      getPlayerCharacterActors: () =>
+        Array.from(game.actors?.contents || [])
+          .filter(actor => game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character')
+          .map(actor => ({ id: actor.id, name: actor.name, img: actor.img || '' }))
+          .filter(actor => actor.id && actor.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      // Game-world Items ({ uuid, name, img, type }), name-sorted, for the
+      // ItemPickerModal (Books & Scrolls links a recipe item to a world Item).
+      getWorldItemOptions: () =>
+        Array.from(game.items?.contents || [])
+          .map(item => ({
+            uuid: item.uuid,
+            name: item.name,
+            img: item.img || '',
+            type: item.type || ''
+          }))
+          .filter(item => item.uuid && item.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       pickImagePath: async (currentPath = '') => {
         const FilePickerClass = foundry?.applications?.apps?.FilePicker?.implementation

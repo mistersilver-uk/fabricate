@@ -115,13 +115,13 @@ test('0.7.0 runs from 0.6.0 and moves config tools onto the system, bumping the 
   assert.equal('tools' in config.systems['sys-1'], false);
   // The full runner also applies the later 0.8.0 economy-toggle and 0.9.0
   // region-unification migrations, so the version advances to the latest.
-  assert.equal(settings.store.get('migrationVersion'), '1.10.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.13.0');
 });
 
 test('version gate: 0.7.0 is NOT re-applied when migrationVersion is already 0.7.0', async () => {
   const settings = makeSettings({
     migrationVersion: '0.7.0',
-    craftingSystems: [{ id: 'sys-1', tools: [] }],
+    craftingSystems: [{ id: 'sys-1', tools: [], visibilityMode: 'knowledge' }],
     gatheringConfig: { systems: { 'sys-1': { tools: [{ id: 't1', componentId: 'axe' }] } } }
   });
   const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
@@ -138,5 +138,5 @@ test('version gate: 0.7.0 is NOT re-applied when migrationVersion is already 0.7
   assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted');
   assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted (0.8.0/0.9.0 are data no-ops here)');
   assert.deepEqual(setKeys, ['migrationVersion'], 'only the version advances');
-  assert.equal(settings.store.get('migrationVersion'), '1.10.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.13.0');
 });

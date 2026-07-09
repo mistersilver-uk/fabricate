@@ -29,3 +29,4 @@ packs/*/LOG
 packs/*/LOG.old
 packs/*/LOCK
 packs/*/*.log
+design/

@@ -89,7 +89,9 @@ const playerViewer = { id: 'player-1', isGM: false };
 
 describe('Teaser visibility - existing modes unaffected', () => {
   it('global mode returns visible:true for player', () => {
-    const system = makeSystem({ recipeVisibility: { listMode: 'global' } });
+    // Under the PR-B model the flat visibilityMode is authoritative; a legacy
+    // listMode 'global' migrates to visibilityMode 'global' (issue 511).
+    const system = makeSystem({ visibilityMode: 'global', recipeVisibility: { listMode: 'global' } });
     const service = makeService(system);
     const recipe = makeRecipe({ teaser: { enabled: true } });
     const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: makeActor() });

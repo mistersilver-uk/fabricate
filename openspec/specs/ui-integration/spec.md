@@ -116,9 +116,22 @@ An empty or stale persisted selection resolves to the first available crafting s
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders.
 If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`.
-When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route.
-When the setting is enabled, `Recipes` is available as an implemented route for the selected system; `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
-When `Recipes` is the active implemented route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, redirect-when-unavailable (falling back to `system-edit` exactly as `recipes` does, since Recipes is nested under the experimental system-edit gate), breadcrumb (`Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route, and the `Crafting` nav group is not shown.
+When the setting is enabled, `Recipes` and `Books & Scrolls` are available as implemented routes for the selected system, nested inside an expandable `Crafting` nav group (see below); `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
+When `Recipes` is the active implemented route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, redirect-when-unavailable (falling back to `system-edit` exactly as `recipes` does, since Recipes is nested under the experimental system-edit gate), breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+- When `fabricate.experimentalFeatures` is enabled, the selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, and the whole group (parent and every sub-item) is shown only while the setting is enabled.
+The parent row shows an expand/collapse control and the recipe count as its badge.
+Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page, and while a Crafting child route is active the expand/collapse control is locked open — activating it keeps the submenu expanded rather than collapsing it.
+The group collapses when the active route leaves Crafting, so its submenu does not dangle open over unrelated views.
+The expanded submenu (built by `buildCraftingNavItems`) always contains `Recipes` and `Settings`, plus a **mode-conditional** entry derived from the system's `visibilityMode` (via `craftingEffect`): `Access` appears only in `restricted` mode (`showAccess`), and `Books & Scrolls` appears only in `item` and `knowledge` modes (`showBooksScrolls`); `global` mode shows neither.
+The submenu sits inside the same soft grouped container the Gathering group uses, and it carries Gathering-parity accessibility: `aria-expanded`/`aria-controls`/`aria-current`, distinct expand and collapse labels, and unique `manager-nav-crafting` / `manager-crafting-submenu` / `manager-crafting-nav-<id>` ids.
+Route exit from any Crafting child route runs through the Manager confirm-discard route-exit guard.
+- The `Crafting` group's `Settings` sub-route (`crafting-settings`, component `CraftingSettingsView`) is a real system-settings page, not a placeholder.
+It hosts the system-level crafting rules that used to live on the System Overview page: the recipe **resolution mode** card, the salvage **resolution mode** card (only when `features.salvage`), and the **Recipe Visibility** card — a single radio-card selector for the flat `visibilityMode` enum (`global` / `restricted` / `item` / `knowledge`) written through `setVisibilityMode`, paired with a `CraftingEffectPanel` that summarizes what the chosen mode enables.
+The Recipe Visibility control no longer lives on the System Overview page, and it authors the flat `visibilityMode` rather than the legacy `listMode` + `knowledge.mode` pair.
+Because the whole `Crafting` nav group is gated behind `fabricate.experimentalFeatures`, these controls are reachable only while that setting is on.
+This is an accepted consequence: with Experimental Features off, recipe resolution mode and recipe visibility are unreachable.
+Per-recipe-item use and learn caps are NOT on this page — each recipe item's caps are authored on its own Books & Scrolls item page (`books-scrolls-item`).
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count.
 Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
 Activating only the expand/collapse control toggles the submenu without navigation.
@@ -182,11 +195,13 @@ Display list + detail editor for crafting systems.
 - Recipe resolution mode (`simple`, `routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`)
 - Salvage resolution mode
 
+Recipe resolution mode and salvage resolution mode remain system fields, but their editor cards moved to the Crafting group's Settings page (`crafting-settings`), gated behind `fabricate.experimentalFeatures`.
+They are no longer edited on the System Overview page.
 Changing recipe resolution mode is destructive and must follow `007` confirmation/cleanup rules.
 
 #### Salvage Resolution Mode Card
 
-The Salvage resolution mode card renders directly beneath the recipe resolution-mode card.
+The Salvage resolution mode card renders directly beneath the recipe resolution-mode card on the Crafting group's Settings page.
 The card offers `simple` (the default), `progressive`, and `routed` (display name "Routed by check").
 Salvage has exactly one ingredient, so ingredient-set routing is meaningless and `alchemy` does not apply: neither is offered.
 `simple` returns one result group with an optional pass/fail salvage check.
@@ -269,19 +284,15 @@ If `features.gathering === false`:
 
 #### Recipe Visibility Controls
 
-The selected system's recipe visibility is authored in a standalone **Recipe Visibility** card on the System Overview Settings tab, rendered below the optional features and mirroring the self-contained Resolution Mode card.
-The card SHALL be hidden entirely when the system's crafting resolution mode is `alchemy`, because alchemy recipe visibility follows its own rules (`006`) and is not list-mode driven.
+The selected system's recipe visibility is authored on the Crafting group's **Settings** page (`crafting-settings`), in a **Recipe Visibility** section rendered below the resolution-mode card.
+It is no longer on the System Overview page, and it authors the flat `visibilityMode` enum rather than the legacy `listMode` + `knowledge.mode` pair.
 
-The card is controlled and live-applies each control: every handler sends only its own changed field to `saveVisibilityConfig`, which merges the omitted fields from the system's existing `recipeVisibility`.
-There is no separate save action for this card.
-
-- `listMode` selector with exactly three options: `global`, `player`, `knowledge`.
-Teaser mode is not a `listMode` option and is not offered by this card.
-- When `listMode === "player"`, the card shows an informational note that per-recipe restrictions are authored in each recipe's editor, and that a restricted recipe with no allowed users is hidden from all players by default.
-- `knowledge.mode` selector (only shown when `listMode === "knowledge"`)
-- `item.limitUses`, `item.maxUses`, and `item.destroyWhenExhausted` (only shown when `listMode === "knowledge"` and item mode is active)
-- `learn.consumeOnLearn` (only shown when `listMode === "knowledge"` and learned mode is active)
-- `learn.dragDropEnabled` (only shown when `listMode === "knowledge"` and learned mode is active)
+- A single radio-card selector (the shared `ResolutionModeCard` primitive) offers exactly four mutually-exclusive options: `global`, `restricted`, `item`, and `knowledge`.
+Each option carries a label and description; exactly one mode is active for the whole system.
+- Selecting an option live-applies it through `setVisibilityMode(mode)`, which persists `visibilityMode` and refreshes; the change is non-destructive (migrates no recipes) and there is no separate save action.
+- A `CraftingEffectPanel` beside the selector summarizes the active mode's effect (from the projected `craftingEffect(visibilityMode)` matrix): whether the Access tab, Books & Scrolls, limited-use, and learning-limits surfaces are shown.
+- Per-recipe-item use and learn caps are NOT authored here — each recipe item's caps live on its own Books & Scrolls item page (see Books & Scrolls Surface).
+- Legacy note: the standalone `SystemRecipeVisibilityCard` that authored `listMode` / `knowledge.mode` / `dragDropEnabled` through `saveVisibilityConfig` is retired from the rendered UI; those legacy fields are now derived and read-only fallbacks (the runtime still honours `knowledge.learn.dragDropEnabled` where present).
 
 #### Recipe Item Definition Controls
 
@@ -299,7 +310,7 @@ Recipe item definitions are distinct from components:
 - adding a recipe item definition must not add or require a component entry
 - selecting a recipe item for knowledge gating must not require importing that item into the component library
 
-When `listMode === "global"`, no per-recipe player allow-list controls are shown.
+When `visibilityMode === "global"` (or a legacy `listMode === "global"`), no per-recipe player allow-list controls are shown.
 Visibility and learning semantics are defined in `006`.
 
 ### System Overview
@@ -322,8 +333,9 @@ The rail item SHALL surface a count badge with the number of open critical-plus-
 
 #### Settings Tab
 
-The default-selected Settings tab renders the system settings form (identity, resolution modes, optional features, the Recipe Visibility card for non-alchemy systems, character modifiers, and currency configuration) unchanged.
+The default-selected Settings tab renders the system settings form (identity, optional features, character modifiers, and currency configuration) unchanged.
 It writes through the existing admin-store persistence and confirmation flows.
+Recipe resolution mode, salvage resolution mode, and the Recipe Visibility card moved to the Crafting group's Settings page (`crafting-settings`); the System Overview Settings tab no longer renders them.
 
 #### Validation Tab
 
@@ -467,6 +479,40 @@ The inspector panel that carries the recipe-item card is shown for knowledge mod
 The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
 Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
+
+### Books & Scrolls Surface
+
+`Books & Scrolls` is the `Crafting` group's recipe-item management surface, shown only while `fabricate.experimentalFeatures` is enabled.
+It is a display name only: the surface manages every recipe item in the selected system regardless of the item's Foundry item type (book, scroll, ring, wand, gem, note), and `recipe item` remains the canonical noun.
+
+The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes it contains (its canonical `recipeIds[]` membership, with a legacy `recipe.recipeItemId` fallback for un-migrated systems) as a count plus the linked recipe names, and that item's OWN use/learn caps (read from `item.caps`) as read-only chips: a use-cap chip (craft charges) and a learn-cap chip.
+Membership is authored on the item's **Contents** tab (writing the definition's `recipeIds`), not on the recipe editor.
+The caps are per recipe item, not a shared system-wide rule, so two recipe items in one system may show different chips (a one-recipe scroll beside a three-recipe tome).
+When the selected system has no recipe items, the surface shows an empty state.
+
+Opening a row navigates to a per-item caps page (`books-scrolls-item` subroute).
+That page's breadcrumb is `Crafting` then `Books & Scrolls` then the item name, and it renders a `RecipeItemCapsCard` that authors that one item's caps: the use cap (`caps.item.limitUses` / `maxUses` / `destroyWhenExhausted`), the learn cap (`caps.learn.limitRecipes` / `maxRecipes` / `destroyWhenSpent`), and `caps.learn.consumeOnLearn`.
+`consumeOnLearn` is hidden while the learn cap is enabled (the learn cap's `destroyWhenSpent` supersedes it).
+Editing is live-apply: each control passes its caps patch through `updateRecipeItemCaps(itemId, patch)`, which merges and normalizes it onto the recipe item definition, so the page stages no dirty draft and is not part of the Manager confirm-discard route-exit chain.
+The surface reads configuration only (recipe-item definitions plus the recipes referencing each item) and never reads per-item-instance runtime flags, so the admin store stays Foundry-free.
+
+### Access Surface
+
+`Access` is the `Crafting` group's per-recipe grant surface for the `restricted` visibility mode (`AccessTabView` / `GrantAccessInspector`).
+It is a Crafting nav sub-item that appears **only** while `visibilityMode === "restricted"` (`craftingEffect.showAccess`); the other modes do not list it.
+It authors the canonical `Recipe.access = { characterIds, playerIds }` grant, replacing the legacy `visibility.allowedUserIds` player list.
+
+The list (`AccessTabView`) shows the selected system's recipes with a search box, a Category filter, and an Access filter (`all` / granted / no-access); each row shows the recipe icon, name, category, and a grant chip (`N char · N player`, or a danger `No access` chip when no character or player is granted).
+Selecting a row opens the `GrantAccessInspector` for that recipe.
+
+The inspector authors the grant through **two independent rosters** — Characters and Players — each with its own search box and pager:
+
+- The **Characters** roster is the player-character actor roster (`adminStore.getPcRoster` → `services.getPlayerCharacterActors`); toggling a character grants or revokes its actor id in `access.characterIds`.
+A granted character makes the recipe visible to any viewer who **controls** that actor (assigned character or Foundry `OWNER` permission — see `006`), not to a fixed user.
+- The **Players** roster reuses the world-users projection; toggling a player grants or revokes its user id in `access.playerIds`, making the recipe visible to that user directly.
+- Each toggle persists the **full** `{ characterIds, playerIds }` snapshot via `adminStore.saveRecipeAccess` (live-apply, no dirty draft), so searching or paging never loses a grant.
+
+Grant state is read from `recipe.access`, and the surface stages no dirty draft, so it is not part of the Manager confirm-discard route-exit chain.
 
 ### Environments Tab
 

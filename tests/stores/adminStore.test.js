@@ -2708,151 +2708,44 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.alchemy.showAttemptHistoryToPlayers, false);
     });
 
-    it('saveVisibilityConfig merges with existing visibility config', async () => {
-      let updateArgs = null;
+    it('updateRecipeItemCaps delegates a caps patch to the manager for the selected system', async () => {
+      let updateCall = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.recipeVisibility = {
-          listMode: 'global',
-          knowledge: { mode: 'itemOrLearned', learn: { consumeOnLearn: true } },
-        };
-      }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
+        updateRecipeItemDefinition: async (systemId, recipeItemId, patch) => {
+          updateCall = { systemId, recipeItemId, patch };
+          return { item: { id: recipeItemId } };
         },
       });
+
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveVisibilityConfig('knowledge', 'learned', false);
-      assert.ok(updateArgs !== null);
-      const rv = updateArgs.updates.recipeVisibility;
-      assert.equal(rv.listMode, 'knowledge');
-      assert.equal(rv.knowledge.mode, 'learned');
-      assert.equal(rv.knowledge.learn.consumeOnLearn, false);
+      await store.updateRecipeItemCaps('book-1', { learn: { limitRecipes: true, maxRecipes: 4 } });
+
+      assert.ok(updateCall !== null);
+      assert.equal(updateCall.systemId, 'sys1');
+      assert.equal(updateCall.recipeItemId, 'book-1');
+      assert.deepEqual(updateCall.patch, { caps: { learn: { limitRecipes: true, maxRecipes: 4 } } });
     });
 
-    it('saveVisibilityConfig accepts canonical knowledge item and learn fields', async () => {
-      let updateArgs = null;
+    it('updateRecipeItemCaps is a no-op without a recipe item id', async () => {
+      let called = false;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.recipeVisibility = {
-          listMode: 'knowledge',
-          knowledge: {
-            mode: 'itemOrLearned',
-            item: { limitUses: false, destroyWhenExhausted: false },
-            learn: { consumeOnLearn: true, dragDropEnabled: true },
-          },
-        };
-      }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
+        updateRecipeItemDefinition: async () => {
+          called = true;
         },
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveVisibilityConfig({
-        listMode: 'knowledge',
-        knowledgeMode: 'itemOrLearned',
-        consumeOnLearn: false,
-        limitUses: true,
-        maxUses: 3,
-        destroyWhenExhausted: true,
-        dragDropEnabled: false,
-      });
+      await store.updateRecipeItemCaps('', { item: { limitUses: true } });
 
-      const rv = updateArgs.updates.recipeVisibility;
-      assert.equal(rv.listMode, 'knowledge');
-      assert.equal(rv.knowledge.item.limitUses, true);
-      assert.equal(rv.knowledge.item.maxUses, 3);
-      assert.equal(rv.knowledge.item.destroyWhenExhausted, true);
-      assert.equal(rv.knowledge.learn.consumeOnLearn, false);
-      assert.equal(rv.knowledge.learn.dragDropEnabled, false);
-    });
-
-    it('saveVisibilityConfig threads the recipe-item learn-cap fields (issue 511)', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.recipeVisibility = {
-          listMode: 'knowledge',
-          knowledge: {
-            mode: 'learned',
-            item: { limitUses: false },
-            learn: { consumeOnLearn: true, dragDropEnabled: true },
-          },
-        };
-      }
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        },
-      });
-
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.saveVisibilityConfig({ limitRecipes: true, maxRecipes: 5, destroyWhenSpent: true });
-
-      const rv = updateArgs.updates.recipeVisibility;
-      assert.equal(rv.knowledge.learn.limitRecipes, true);
-      assert.equal(rv.knowledge.learn.maxRecipes, 5);
-      assert.equal(rv.knowledge.learn.destroyWhenSpent, true);
-    });
-
-    it('saveVisibilityConfig clears the learn cap and preserves consumeOnLearn when limitRecipes turns off', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.recipeVisibility = {
-          listMode: 'knowledge',
-          knowledge: {
-            mode: 'learned',
-            item: { limitUses: false },
-            // A GM who had consumeOnLearn:false before enabling the cap must keep
-            // that choice when the cap is toggled back off (UN4).
-            learn: {
-              consumeOnLearn: false,
-              dragDropEnabled: true,
-              limitRecipes: true,
-              maxRecipes: 3,
-              destroyWhenSpent: true,
-            },
-          },
-        };
-      }
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        },
-      });
-
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.saveVisibilityConfig({ limitRecipes: false });
-
-      const rv = updateArgs.updates.recipeVisibility;
-      assert.equal(rv.knowledge.learn.limitRecipes, false);
-      assert.equal(rv.knowledge.learn.maxRecipes, undefined);
-      assert.equal(rv.knowledge.learn.destroyWhenSpent, false);
-      assert.equal(rv.knowledge.learn.consumeOnLearn, false);
+      assert.equal(called, false);
     });
   });
 
@@ -2956,7 +2849,6 @@ describe('createAdminStore', () => {
         'setCurrencyMacro',
         'clearCurrencyMacro',
         'seedCurrencyUnitPresets',
-        'saveVisibilityConfig',
         'saveTeaserConfig',
         'deleteRecipe',
         'duplicateRecipe',

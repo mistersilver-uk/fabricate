@@ -22,6 +22,7 @@
  */
 
 import { getFabricateFlag } from '../config/flags.js';
+import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { getItemSourceReferences } from '../utils/sourceUuid.js';
 
@@ -34,6 +35,10 @@ const LEARN_CAPABLE_MODES = new Set(['learned', 'itemOrLearned']);
 // Knowledge modes in which the book grants crafting access by being held — the
 // only modes where its craft-use ("Crafting uses") limit is meaningful.
 const ITEM_ACCESS_MODES = new Set(['item', 'itemOrLearned']);
+
+// Foundry's generic default Item image — treated as "no image" for a recipe so it
+// falls back to the recipe blueprint rather than showing the bag SVG.
+const GENERIC_ITEM_IMAGE = 'icons/svg/item-bag.svg';
 
 function stringOrEmpty(value) {
   return typeof value === 'string' ? value : value == null ? '' : String(value);
@@ -398,39 +403,66 @@ export class InventoryListingBuilder {
 
     const visibility = system?.recipeVisibility ?? {};
     const knowledge = visibility?.knowledge ?? {};
-    // A recipe item is an inventory row in any knowledge list mode — it is a book
-    // the player owns regardless of how it grants access. `learnable` gates the
-    // Learn affordance: only `learned` / `itemOrLearned` modes teach from it; an
-    // item-only mode book grants craft access by being held, so it lists its
-    // recipes and craft-use limit but offers no Learn button.
-    if (visibility?.listMode !== 'knowledge') return [];
-    const mode = knowledge?.mode || 'itemOrLearned';
+    // Resolve the effective book access mode from the flat `visibilityMode` enum when
+    // present (issue 511) — `item` → item-access, `knowledge` → item + learning —
+    // falling back to the legacy `recipeVisibility.listMode`/`knowledge.mode` pair.
+    // `learnable` gates the Learn affordance (learned / itemOrLearned); `grantsByItem`
+    // gates the held-book craft affordance + its craft-use limit. A flat `item` book
+    // therefore lists Craft controls, never Learn.
+    const flat = system?.visibilityMode;
+    let mode;
+    if (flat === 'item') mode = 'item';
+    else if (flat === 'knowledge') mode = 'itemOrLearned';
+    else if (['global', 'restricted'].includes(flat)) return [];
+    else if (visibility?.listMode === 'knowledge') mode = knowledge?.mode || 'itemOrLearned';
+    else return [];
     const learnable = LEARN_CAPABLE_MODES.has(mode);
     const grantsByItem = ITEM_ACCESS_MODES.has(mode);
 
     const systemId = stringOrNull(system?.id);
     const systemName = stringOrEmpty(system?.name);
 
-    // Group the system's recipes by the definition they link (recipe.recipeItemId
-    // → definition id, or recipe.linkedRecipeItemUuid → definition sourceItemUuid).
-    const defBySourceUuid = new Map(
-      definitions.filter((def) => def?.sourceItemUuid).map((def) => [def.sourceItemUuid, def.id])
-    );
-    const recipesByDef = new Map();
+    // Group the system's recipes by the book that contains them. Canonical read is
+    // each definition's `recipeIds[]` (many-to-many — a recipe may appear under several
+    // books). Falls back to the legacy reverse ref (`recipe.recipeItemId`, or
+    // `linkedRecipeItemUuid → definition sourceItemUuid`) only when no book carries
+    // membership yet.
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
-    for (const recipe of Array.isArray(recipes) ? recipes : []) {
-      if (recipe?.enabled === false) continue;
+    const recipeList = Array.isArray(recipes) ? recipes : [];
+    const eligible = (recipe) => {
+      if (recipe?.enabled === false) return false;
       // Non-GM viewers never see an undiscovered (teaser) recipe named on a book.
-      if (allowedRecipeIds && !allowedRecipeIds.has(recipe?.id)) continue;
-      const defId =
-        stringOrNull(recipe?.recipeItemId) ??
-        (recipe?.linkedRecipeItemUuid
-          ? (defBySourceUuid.get(recipe.linkedRecipeItemUuid) ?? null)
-          : null);
-      if (!defId) continue;
-      const list = recipesByDef.get(defId) ?? [];
-      list.push(recipe);
-      recipesByDef.set(defId, list);
+      return !(allowedRecipeIds && !allowedRecipeIds.has(recipe?.id));
+    };
+    const recipesByDef = new Map();
+    const anyMigrated = definitions.some(
+      (def) => Array.isArray(def?.recipeIds) && def.recipeIds.length > 0
+    );
+    if (anyMigrated) {
+      const recipeById = new Map(recipeList.map((recipe) => [stringOrNull(recipe?.id), recipe]));
+      for (const def of definitions) {
+        if (!def?.id) continue;
+        const members = (Array.isArray(def.recipeIds) ? def.recipeIds : [])
+          .map((id) => recipeById.get(stringOrNull(id)))
+          .filter((recipe) => recipe && eligible(recipe));
+        if (members.length > 0) recipesByDef.set(def.id, members);
+      }
+    } else {
+      const defBySourceUuid = new Map(
+        definitions.filter((def) => def?.sourceItemUuid).map((def) => [def.sourceItemUuid, def.id])
+      );
+      for (const recipe of recipeList) {
+        if (!eligible(recipe)) continue;
+        const defId =
+          stringOrNull(recipe?.recipeItemId) ??
+          (recipe?.linkedRecipeItemUuid
+            ? (defBySourceUuid.get(recipe.linkedRecipeItemUuid) ?? null)
+            : null);
+        if (!defId) continue;
+        const list = recipesByDef.get(defId) ?? [];
+        list.push(recipe);
+        recipesByDef.set(defId, list);
+      }
     }
 
     // Owned books: defId → { def, sources: Map<actorId,{...,qty}>, item }, where
@@ -479,7 +511,7 @@ export class InventoryListingBuilder {
         id: stringOrNull(recipe?.id),
         name: stringOrEmpty(recipe?.name),
         description: stringOrEmpty(recipe?.description),
-        img: stringOrNull(this._resolveRecipeImg(system, recipe)),
+        img: stringOrNull(this._resolveRecipeImg(recipe)),
         learned: Boolean(learnedMap?.[recipe?.id]),
       }));
 
@@ -499,6 +531,10 @@ export class InventoryListingBuilder {
         isTool: false,
         isRecipeItem: true,
         learnable,
+        // Item-mode books grant crafting by being held (not learning): the player
+        // crafts their recipes directly. Exclusive with `learnable` so the UI shows
+        // one affordance — Learn (knowledge) or Craft (item).
+        craftable: grantsByItem && !learnable,
         totalQuantity,
         sources: rowSources,
         essences: [],
@@ -507,7 +543,28 @@ export class InventoryListingBuilder {
         producedBy: [],
         contributors: [],
         recipes: linkedRecipes,
-        limits: this._recipeItemLimits(knowledge, item, { learnable, grantsByItem }),
+        // Per-item access caps (issue 511) for the book-detail access badge + the
+        // learn-all convenience CTA, read from the canonical per-item `def.caps` and
+        // suppressed by applicability: the use cap only for a held (item) book, the
+        // learn cap only for a teachable book.
+        caps: {
+          item: grantsByItem
+            ? { limitUses: def?.caps?.item?.limitUses === true, maxUses: def?.caps?.item?.maxUses }
+            : { limitUses: false },
+          learn: learnable
+            ? {
+                limitLearning:
+                  def?.caps?.learn?.limitLearning === true ||
+                  def?.caps?.learn?.limitRecipes === true,
+                learnsAllowed: def?.caps?.learn?.learnsAllowed ?? def?.caps?.learn?.maxRecipes,
+                learnScope: def?.caps?.learn?.learnScope,
+                learningMode: def?.caps?.learn?.learningMode,
+              }
+            : { limitLearning: false },
+        },
+        // Runtime remaining budgets (per owned document) — greys out a spent Learn
+        // control. `caps` above drives the access badge + the learn-all convenience.
+        limits: this._recipeItemLimits(def, item, { learnable, grantsByItem }),
       });
     }
 
@@ -547,38 +604,37 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * The book's use / learn limit readouts from the system knowledge config and a
-   * representative owned document's counters. Each is null unless its cap is
-   * enabled with a finite positive maximum, mirroring how the runtime treats an
-   * invalid cap as uncapped.
+   * The book's use / learn limit readouts from its canonical per-item `def.caps` and a
+   * representative owned document's runtime counters. Each is null unless its cap is
+   * enabled with a finite positive maximum (an invalid cap is treated as uncapped), and
+   * is suppressed when the mode does not apply (use only for a held book, learn only for
+   * a teachable book). The `remaining` is per-document; a `total`-scope learn budget is
+   * enforced against the shared world pool at learn time, so this remaining is a lower
+   * bound used only to grey out the Learn control.
    * @private
    */
-  _recipeItemLimits(knowledge, item, { learnable = false, grantsByItem = false } = {}) {
+  _recipeItemLimits(def, item, { learnable = false, grantsByItem = false } = {}) {
+    const itemCaps = def?.caps?.item || {};
+    const learnCaps = def?.caps?.learn || {};
     const finitePositive = (value) => {
       const num = Number(value);
       return Number.isFinite(num) && num > 0 ? num : null;
     };
 
-    // The craft-use limit only applies when the book grants access by being held
-    // (item / itemOrLearned) — a learn-only book is never "used" to craft, so its
-    // use limit is suppressed, mirroring the learn-limit suppression below.
     let uses = null;
     const maxUses =
-      grantsByItem && knowledge?.item?.limitUses === true
-        ? finitePositive(knowledge?.item?.maxUses)
-        : null;
+      grantsByItem && itemCaps.limitUses === true ? finitePositive(itemCaps.maxUses) : null;
     if (maxUses != null) {
       const used = Number(getFabricateFlag(item, 'recipeItemUsage', {})?.timesUsed || 0);
       uses = { max: maxUses, used, remaining: Math.max(0, maxUses - used) };
     }
 
-    // The learn budget only applies when the book can teach — an item-only book is
-    // never "learned from", so its learning limit is suppressed.
     let learning = null;
-    const maxRecipes =
-      learnable && knowledge?.learn?.limitRecipes === true
-        ? finitePositive(knowledge?.learn?.maxRecipes)
-        : null;
+    const learnLimited =
+      learnable && (learnCaps.limitLearning === true || learnCaps.limitRecipes === true);
+    const maxRecipes = learnLimited
+      ? finitePositive(learnCaps.learnsAllowed ?? learnCaps.maxRecipes)
+      : null;
     if (maxRecipes != null) {
       const learned = Number(getFabricateFlag(item, 'recipeItemLearning', {})?.learnedCount || 0);
       learning = { max: maxRecipes, learned, remaining: Math.max(0, maxRecipes - learned) };
@@ -592,12 +648,13 @@ export class InventoryListingBuilder {
    * the linked recipe-item image when present, else the recipe's own image.
    * @private
    */
-  _resolveRecipeImg(system, recipe) {
-    const recipeItemImg = recipe?.recipeItemId
-      ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)
-          ?.img || ''
-      : '';
-    return recipeItemImg || recipe?.img || '';
+  _resolveRecipeImg(recipe) {
+    // A book's recipes show their OWN image, defaulting to the alchemical blueprint
+    // (matching the GM app). Foundry's generic item-bag default is treated as "no
+    // image" so an imported recipe that never had a real icon falls back to the
+    // blueprint too, never the bag SVG.
+    const img = typeof recipe?.img === 'string' ? recipe.img.trim() : '';
+    return !img || img === GENERIC_ITEM_IMAGE ? DEFAULT_RECIPE_IMAGE : img;
   }
 
   /**

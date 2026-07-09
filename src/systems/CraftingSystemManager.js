@@ -127,6 +127,10 @@ export class CraftingSystemManager {
       // New spec-first shape
       features,
       itemTags: this._normalizeStringList(system.itemTags ?? system.tags),
+      // Flat system-level visibility strategy (issue 511, PR-B): the single enum
+      // that gates the whole Crafting authoring surface. `recipeVisibility` is
+      // kept alongside it for its residual `knowledge.learn.dragDropEnabled`.
+      visibilityMode: this._normalizeVisibilityMode(system.visibilityMode),
       recipeVisibility: this._normalizeRecipeVisibility(system.recipeVisibility),
       requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
@@ -715,6 +719,23 @@ export class CraftingSystemManager {
     };
   }
 
+  // System-wide recipe visibility STRATEGY only (issue 511). The recipe-item
+  // use/learn caps that used to live under `knowledge.item` / `knowledge.learn`
+  // are now per-recipe-item (`recipeItemDefinition.caps`, see
+  // `_normalizeRecipeItemCaps`); only `mode` and `learn.dragDropEnabled` — the
+  // system-level knobs that gate whether the knowledge/learning machinery runs —
+  // remain here. Legacy caps in stored data are dropped by this normalizer and
+  // carried onto each definition by the 1.11.0 migration.
+  // Flat system-level visibility strategy enum (issue 511, PR-B). One knob —
+  // `visibilityMode` ∈ {global, restricted, item, knowledge} — gates the whole
+  // Crafting authoring surface (see craftingVisibility.js). Unknown/missing →
+  // `knowledge` (the default), mirroring the inline resolutionMode defaulter.
+  // The legacy `recipeVisibility` block is normalized separately and preserved
+  // for its residual `knowledge.learn.dragDropEnabled`.
+  _normalizeVisibilityMode(value) {
+    return ['global', 'restricted', 'item', 'knowledge'].includes(value) ? value : 'knowledge';
+  }
+
   _normalizeRecipeVisibility(recipeVisibility = {}) {
     const listMode = ['global', 'player', 'knowledge', 'teaser'].includes(
       recipeVisibility?.listMode
@@ -728,28 +749,8 @@ export class CraftingSystemManager {
         mode: ['item', 'learned', 'itemOrLearned'].includes(knowledge?.mode)
           ? knowledge.mode
           : 'itemOrLearned',
-        item: {
-          limitUses: knowledge?.item?.limitUses === true,
-          maxUses: Number.isFinite(Number(knowledge?.item?.maxUses))
-            ? Number(knowledge.item.maxUses)
-            : undefined,
-          destroyWhenExhausted: knowledge?.item?.destroyWhenExhausted === true,
-        },
         learn: {
-          consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false,
           dragDropEnabled: knowledge?.learn?.dragDropEnabled !== false,
-          // Recipe-item learn cap (issue 511). Mirrors the sibling item cap
-          // (limitUses / maxUses / destroyWhenExhausted). `destroyWhenSpent`
-          // (learn) is deliberately named distinctly from `destroyWhenExhausted`
-          // (item/craft-charges) — do not normalize them to one name.
-          limitRecipes: knowledge?.learn?.limitRecipes === true,
-          maxRecipes:
-            knowledge?.learn?.limitRecipes === true &&
-            Number.isFinite(Number(knowledge?.learn?.maxRecipes)) &&
-            Number(knowledge.learn.maxRecipes) > 0
-              ? Number(knowledge.learn.maxRecipes)
-              : undefined,
-          destroyWhenSpent: knowledge?.learn?.destroyWhenSpent === true,
         },
       },
     };
@@ -902,6 +903,94 @@ export class CraftingSystemManager {
     return normalized;
   }
 
+  // Per-recipe-item use/learn caps (issue 511). Each recipe item definition owns
+  // its own caps rather than sharing one system-wide config, so a cookbook and a
+  // scroll can differ. The `item` (craft-charge) and `learn` sub-shapes mirror the
+  // legacy system-wide `recipeVisibility.knowledge.item` / `.learn` normalization
+  // exactly, so a migrated system round-trips its old values unchanged. `learn`
+  // deliberately omits `dragDropEnabled` — that stays a system-level knowledge
+  // setting. Absent caps normalize to uncapped (the safe default for new items).
+  // Reconcile the legacy boolean `destroyWhenExhausted` with the new enum
+  // `whenSpent` ('destroyed' | 'inert'), keeping BOTH persisted and in sync (issue
+  // 511, PR-B). The enum wins when authored; otherwise the boolean seeds it; when
+  // neither is present a spent charge defaults to 'destroyed'.
+  _reconcileWhenSpent(item = {}) {
+    const authored = item.whenSpent === 'destroyed' || item.whenSpent === 'inert';
+    if (authored) {
+      return { whenSpent: item.whenSpent, destroyWhenExhausted: item.whenSpent === 'destroyed' };
+    }
+    if (Object.prototype.hasOwnProperty.call(item, 'destroyWhenExhausted')) {
+      const destroyWhenExhausted = item.destroyWhenExhausted === true;
+      return { whenSpent: destroyWhenExhausted ? 'destroyed' : 'inert', destroyWhenExhausted };
+    }
+    return { whenSpent: 'destroyed', destroyWhenExhausted: true };
+  }
+
+  _normalizeRecipeItemCaps(caps = {}) {
+    const item = caps?.item || {};
+    const learn = caps?.learn || {};
+
+    const { whenSpent, destroyWhenExhausted } = this._reconcileWhenSpent(item);
+
+    // `limitLearning` (new) mirrors legacy `limitRecipes`; the new field wins when
+    // authored, otherwise the legacy boolean seeds it. Both are always persisted.
+    const limitLearning = Object.prototype.hasOwnProperty.call(learn, 'limitLearning')
+      ? learn.limitLearning === true
+      : learn.limitRecipes === true;
+
+    // `learnsAllowed` (new) mirrors legacy `maxRecipes` — a finite positive count kept
+    // only while the limit is on. The new field wins when authored.
+    const rawLearns = Object.prototype.hasOwnProperty.call(learn, 'learnsAllowed')
+      ? learn.learnsAllowed
+      : learn.maxRecipes;
+    const learnsAllowed =
+      limitLearning && Number.isFinite(Number(rawLearns)) && Number(rawLearns) > 0
+        ? Number(rawLearns)
+        : undefined;
+
+    // `learnScope` ('perInstance' | 'total') is the canonical cap scope: `perInstance`
+    // limits how many recipes may be learned from a SINGLE copy of the item in a
+    // character's inventory; `total` limits how many may be learned across EVERY copy
+    // of the source recipe item (a shared world pool). Prefer an authored `learnScope`,
+    // otherwise derive it from the legacy `learningMode` ('party' → total, else
+    // perInstance). `learningMode` is kept as a synced legacy mirror
+    // (total → 'party'; perInstance → 'ntimes' when N>1, else 'once').
+    const learnScope = ['perInstance', 'total'].includes(learn.learnScope)
+      ? learn.learnScope
+      : learn.learningMode === 'party'
+        ? 'total'
+        : 'perInstance';
+    const learningMode =
+      learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
+
+    const prerequisite =
+      typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
+        ? learn.prerequisite.trim()
+        : null;
+
+    return {
+      item: {
+        limitUses: item.limitUses === true,
+        maxUses: Number.isFinite(Number(item.maxUses)) ? Number(item.maxUses) : undefined,
+        destroyWhenExhausted,
+        whenSpent,
+      },
+      learn: {
+        consumeOnLearn: learn.consumeOnLearn !== false,
+        // `destroyWhenSpent` (learn) is deliberately named distinctly from
+        // `destroyWhenExhausted` (item/craft-charges) — do not normalize to one name.
+        limitRecipes: limitLearning,
+        limitLearning,
+        maxRecipes: learnsAllowed,
+        learnsAllowed,
+        learnScope,
+        learningMode,
+        prerequisite,
+        destroyWhenSpent: learn.destroyWhenSpent === true,
+      },
+    };
+  }
+
   _normalizeRecipeItemDefinition(entry, usedIds = new Set()) {
     if (!entry || typeof entry !== 'object') return null;
 
@@ -918,6 +1007,20 @@ export class CraftingSystemManager {
       description: this._normalizeComponentDescription(entry.description),
       img: String(entry.img || '').trim() || 'icons/svg/item-bag.svg',
       sourceItemUuid,
+      // Per-recipe-item enable toggle (issue 511, PR-B). Defaults on; a disabled
+      // definition still round-trips but the library UI can hide/skip it.
+      enabled: entry.enabled !== false,
+      // Book membership (issue 511): the recipe ids this book/scroll contains — the
+      // canonical, many-to-many link (a recipe may belong to several books). Distinct
+      // from the visibility-teaser `recipeIds` fragment elsewhere. Deduped id list.
+      recipeIds: [
+        ...new Set(
+          (Array.isArray(entry.recipeIds) ? entry.recipeIds : [])
+            .map((rid) => String(rid || '').trim())
+            .filter(Boolean)
+        ),
+      ],
+      caps: this._normalizeRecipeItemCaps(entry.caps),
     };
   }
 
@@ -1555,6 +1658,70 @@ export class CraftingSystemManager {
     };
   }
 
+  // Update a recipe item definition's per-item caps and enable state (issue 511).
+  // A definition's identity (name/img/sourceItemUuid) is managed by the recipe-item
+  // linking flow and is not editable here. The patch's `item`/`learn` partials merge
+  // over the current caps, then the whole block is re-normalized (uncapped defaults,
+  // finite/positive clamps, legacy/new field sync) via `_normalizeRecipeItemCaps`.
+  // An `enabled` patch toggles the definition's enable flag.
+  async updateRecipeItemDefinition(systemId, recipeItemId, patch = {}) {
+    this._assertGM('update recipe item');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const definition = this.getRecipeItemDefinition(systemId, recipeItemId);
+    if (!definition) throw new Error(`Recipe item definition not found: ${recipeItemId}`);
+
+    if (Object.prototype.hasOwnProperty.call(patch, 'enabled')) {
+      definition.enabled = patch.enabled !== false;
+    }
+
+    // Book membership (issue 511 many-to-many): replace the contained-recipe id set.
+    if (Object.prototype.hasOwnProperty.call(patch, 'recipeIds')) {
+      definition.recipeIds = [
+        ...new Set(
+          (Array.isArray(patch.recipeIds) ? patch.recipeIds : [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean)
+        ),
+      ];
+    }
+
+    const capsPatch = patch?.caps || {};
+    definition.caps = this._normalizeRecipeItemCaps({
+      item: this._mergeCapsSection(definition.caps?.item, capsPatch.item, [
+        ['whenSpent', 'destroyWhenExhausted'],
+      ]),
+      learn: this._mergeCapsSection(definition.caps?.learn, capsPatch.learn, [
+        ['limitLearning', 'limitRecipes'],
+        ['learnsAllowed', 'maxRecipes'],
+      ]),
+    });
+
+    await this.save();
+    return { item: { ...definition } };
+  }
+
+  // Merge a caps patch over the stored caps sub-block while keeping the legacy/new
+  // mirror pairs consistent (issue 511, PR-B). When a patch sets ONE member of a
+  // mirror pair (e.g. legacy `limitRecipes` from the old UI, or new `limitLearning`
+  // from the redesigned UI), the stored sibling would otherwise win in the
+  // normalizer and revert the change, so drop the un-patched sibling here and let
+  // `_normalizeRecipeItemCaps` re-derive it from the patched value.
+  _mergeCapsSection(base = {}, patch = {}, mirrorPairs = []) {
+    const merged = { ...base, ...patch };
+    for (const pair of mirrorPairs) {
+      const patchedMembers = pair.filter((field) =>
+        Object.prototype.hasOwnProperty.call(patch, field)
+      );
+      if (patchedMembers.length === 0) continue;
+      for (const field of pair) {
+        if (!patchedMembers.includes(field)) delete merged[field];
+      }
+    }
+    return merged;
+  }
+
   async updateSystem(systemId, updates = {}) {
     this._assertGM('update crafting system');
     const current = this.getSystem(systemId);
@@ -2116,18 +2283,74 @@ export class CraftingSystemManager {
     );
   }
 
+  // The recipes a book/scroll contains. Canonical source is the definition's
+  // `recipeIds[]` (issue 511 many-to-many). Falls back to the legacy reverse ref
+  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → sourceItemUuid`) only for
+  // un-migrated definitions that carry no `recipeIds` yet.
   _getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition) {
     if (!definition || !this.recipeManager?.getRecipes) return [];
+    const recipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
+
+    const recipeIds = Array.isArray(definition.recipeIds) ? definition.recipeIds : [];
+    if (recipeIds.length > 0) {
+      const idSet = new Set(recipeIds.map(String));
+      return recipes.filter((recipe) => idSet.has(String(recipe?.id)));
+    }
+
+    // This definition carries no membership. Only reach for the legacy reverse ref when
+    // the WHOLE system is un-migrated; in a migrated system an empty `recipeIds` means an
+    // empty book, and a recipe's stale `recipeItemId`/`linkedRecipeItemUuid` must not
+    // resurrect a phantom membership (mirrors getRecipeItemDefinitionsContaining).
+    const definitions = Array.isArray(this.getSystem(systemId)?.recipeItemDefinitions)
+      ? this.getSystem(systemId).recipeItemDefinitions
+      : [];
+    const anyMigrated = definitions.some(
+      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
+    );
+    if (anyMigrated) return [];
+
     const definitionId = String(definition.id || '').trim();
     const sourceItemUuid = String(definition.sourceItemUuid || '').trim();
-
-    return this.recipeManager.getRecipes({ craftingSystemId: systemId }).filter((recipe) => {
+    return recipes.filter((recipe) => {
       const recipeItemId = String(recipe?.recipeItemId || '').trim();
       const linkedRecipeItemUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
       return (
         recipeItemId === definitionId ||
         (!recipeItemId && !!sourceItemUuid && linkedRecipeItemUuid === sourceItemUuid)
       );
+    });
+  }
+
+  // Forward membership query (issue 511 many-to-many): the definitions of `systemId`
+  // that contain `recipeId`. Canonical read is each definition's `recipeIds[]`; when a
+  // system carries no membership yet (fully un-migrated) it falls back to resolving the
+  // recipe's legacy reverse ref (`recipeItemId` / `linkedRecipeItemUuid`) to its book.
+  getRecipeItemDefinitionsContaining(systemId, recipeId) {
+    const system = this.getSystem(systemId);
+    if (!system || !recipeId) return [];
+    const rid = String(recipeId);
+    const definitions = Array.isArray(system.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+
+    const byMembership = definitions.filter((def) =>
+      (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
+    );
+    if (byMembership.length > 0) return byMembership;
+
+    // Only fall back for a system that has no membership authored anywhere.
+    const anyMigrated = definitions.some(
+      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
+    );
+    if (anyMigrated) return [];
+
+    const recipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!recipe) return [];
+    const recipeItemId = String(recipe.recipeItemId || '').trim();
+    const legacyUuid = String(recipe.linkedRecipeItemUuid || '').trim();
+    return definitions.filter((def) => {
+      if (recipeItemId) return String(def.id) === recipeItemId;
+      return !!legacyUuid && String(def.sourceItemUuid || '') === legacyUuid;
     });
   }
 

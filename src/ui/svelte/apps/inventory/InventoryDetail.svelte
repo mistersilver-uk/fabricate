@@ -10,9 +10,16 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { recipeItemAccessBadge } from '../../util/recipeItemAccessBadge.js';
   import CraftingThumb from '../crafting/CraftingThumb.svelte';
 
-  let { item = null, onOpenRecipe = null, onLearn = null, learningRecipeId = null } = $props();
+  let {
+    item = null,
+    onOpenRecipe = null,
+    onLearn = null,
+    onLearnAll = null,
+    learningRecipeId = null
+  } = $props();
 
   // Each detail list (sources, used-by, required-for, produced-by, contributors)
   // paginates independently at this many rows.
@@ -76,18 +83,61 @@
     if (recipeId) onOpenRecipe?.(recipeId);
   }
 
-  // --- Recipe-item "book" learning state -------------------------------------
+  // --- Recipe-item "book" learning / crafting state --------------------------
   const isRecipeItem = $derived(item?.isRecipeItem === true);
-  // Learn controls appear only when the book's system can teach (learned /
-  // itemOrLearned). An item-only book still lists its recipes + craft-use limit,
-  // but grants access by being held, so it offers no Learn affordance.
+  // Exclusive affordances: a knowledge book is LEARNABLE (per-recipe Learn), an item
+  // book is CRAFTABLE by being held (per-recipe Craft → navigate to the recipe).
   const learnable = $derived(item?.learnable === true);
+  const craftable = $derived(item?.craftable === true);
+  const bookMode = $derived(craftable ? 'item' : 'knowledge');
   const bookDescription = $derived(String(item?.description ?? '').trim());
   const bookRecipes = $derived(Array.isArray(item?.recipes) ? item.recipes : []);
+  const recipeTotal = $derived(bookRecipes.length);
   const usesLimit = $derived(item?.limits?.uses ?? null);
   const learningLimit = $derived(item?.limits?.learning ?? null);
   // The learn budget is spent when a finite learning cap has no remaining slots.
   const budgetSpent = $derived(Boolean(learningLimit) && Number(learningLimit.remaining ?? 0) <= 0);
+
+  // The access badge mirrors the GM "How players see it" preview EXACTLY (shared helper):
+  // "Learn freely" / "Learn up to N …" for knowledge books; "Reread anytime" / "N uses"
+  // for item books.
+  const badgeText = (key, fallback, data) => {
+    const translated = localize(key, data);
+    return translated && translated !== key
+      ? translated
+      : fallback.replace('{n}', String(data?.n ?? ''));
+  };
+  const accessBadge = $derived(
+    recipeItemAccessBadge(
+      { mode: bookMode, item: item?.caps?.item, learn: item?.caps?.learn },
+      badgeText
+    )
+  );
+
+  // Knowledge-mode "Read & learn all N recipes" convenience: shown ONLY when the reader
+  // can actually learn everything — no learn limit, or a limit that meets/exceeds the
+  // book size — and there is at least one unlearned recipe.
+  const learnLimited = $derived(item?.caps?.learn?.limitLearning === true);
+  const learnCap = $derived(
+    Number.isFinite(item?.caps?.learn?.learnsAllowed) && item.caps.learn.learnsAllowed > 0
+      ? item.caps.learn.learnsAllowed
+      : null
+  );
+  const unlearnedRecipeIds = $derived(
+    bookRecipes.filter((recipe) => !recipe?.learned).map((recipe) => recipe.id)
+  );
+  const canLearnAll = $derived(
+    learnable &&
+      !budgetSpent &&
+      unlearnedRecipeIds.length > 0 &&
+      (!learnLimited || (learnCap != null && learnCap >= recipeTotal))
+  );
+  function learnAll() {
+    if (learningRecipeId == null && unlearnedRecipeIds.length > 0) onLearnAll?.(unlearnedRecipeIds);
+  }
+  function craftRecipe(recipeId) {
+    if (recipeId) onOpenRecipe?.(recipeId);
+  }
 
   // Search appears only once a book teaches more than a page's worth of recipes.
   const RECIPE_PAGE_SIZES = [6, 9, 12];
@@ -122,12 +172,6 @@
     return filteredRecipes.slice(clamped * size, clamped * size + size);
   });
 
-  // "N unit remaining", singular only at exactly one (0 and >1 use the plural).
-  function remainingText(remaining, oneKey, manyKey) {
-    const value = Number(remaining ?? 0);
-    const key = value === 1 ? oneKey : manyKey;
-    return localize(`FABRICATE.App.Inventory.Detail.${key}`, { remaining: value });
-  }
   function canLearn(recipe) {
     return !recipe?.learned && !budgetSpent;
   }
@@ -206,6 +250,18 @@
   {/if}
 {/snippet}
 
+{#snippet craftControl(recipe)}
+  <button
+    type="button"
+    class="inventory-detail-craft-btn"
+    data-inventory-craft={recipe.id}
+    onclick={() => craftRecipe(recipe.id)}
+  >
+    <i class="fas fa-hammer" aria-hidden="true"></i>
+    <span>{localize('FABRICATE.App.Inventory.Detail.CraftAction')}</span>
+  </button>
+{/snippet}
+
 {#if !item}
   <div class="inventory-detail-empty" data-inventory-detail-empty>
     <i class="fas fa-boxes-stacked" aria-hidden="true"></i>
@@ -221,7 +277,14 @@
           {localize('FABRICATE.App.Inventory.Detail.Total', { count: Number(item.totalQuantity ?? 0) })}
         </p>
         <div class="inventory-detail-chips">
-          <span class="inventory-chip inventory-chip-type">{localize('FABRICATE.App.Inventory.Detail.TypeRecipeItem')}</span>
+          <span
+            class="inventory-chip inventory-detail-access-badge is-{accessBadge.tone}"
+            data-inventory-access-badge
+            data-badge-tone={accessBadge.tone}
+          >
+            <i class={accessBadge.icon} aria-hidden="true"></i>
+            <span>{accessBadge.label}</span>
+          </span>
         </div>
         {#if bookDescription}
           <p class="inventory-detail-book-desc">{bookDescription}</p>
@@ -229,28 +292,17 @@
       </div>
     </header>
 
-    {#if learningLimit || usesLimit}
-      <section class="inventory-detail-section" data-inventory-section="limits">
-        <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.LimitsTitle')}</p>
-        <div class="inventory-detail-limits">
-          {#if learningLimit}
-            <div class="inventory-detail-limit" data-inventory-limit="learning">
-              <span class="inventory-detail-limit-label">{localize('FABRICATE.App.Inventory.Detail.LearningLimitLabel')}</span>
-              <span class="inventory-detail-limit-value" data-inventory-learning-budget>
-                {remainingText(learningLimit.remaining, 'LearningRemainingOne', 'LearningRemainingMany')}
-              </span>
-            </div>
-          {/if}
-          {#if usesLimit}
-            <div class="inventory-detail-limit" data-inventory-limit="uses">
-              <span class="inventory-detail-limit-label">{localize('FABRICATE.App.Inventory.Detail.UsesLimitLabel')}</span>
-              <span class="inventory-detail-limit-value" data-inventory-uses-budget>
-                {remainingText(usesLimit.remaining, 'UsesRemainingOne', 'UsesRemainingMany')}
-              </span>
-            </div>
-          {/if}
-        </div>
-      </section>
+    {#if canLearnAll}
+      <button
+        type="button"
+        class="inventory-detail-read-learn"
+        data-inventory-learn-all
+        disabled={learningRecipeId != null}
+        onclick={learnAll}
+      >
+        <i class="fas fa-graduation-cap" aria-hidden="true"></i>
+        <span>{localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', { total: recipeTotal })}</span>
+      </button>
     {/if}
 
     <section class="inventory-detail-section" data-inventory-section="learn">
@@ -265,7 +317,7 @@
               <CraftingThumb src={recipe.img ?? ''} alt="" size={40} />
               <span class="inventory-detail-row-name">{recipe.name}</span>
             </span>
-            {#if learnable}{@render learnControl(recipe)}{/if}
+            {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(recipe)}{/if}
           </div>
           {#if recipe.description}
             <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
@@ -310,7 +362,7 @@
                       aria-hidden="true"
                     ></i>
                   </button>
-                  {#if learnable}{@render learnControl(recipe)}{/if}
+                  {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(recipe)}{/if}
                 </div>
                 {#if expanded}
                   <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
@@ -808,35 +860,70 @@
     font-size: 12px;
     line-height: 1.4;
     color: var(--fab-text-muted);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
   }
 
-  .inventory-detail-limits {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .inventory-detail-limit {
+  /* The "Read & learn" (knowledge) / "Use" (item) call-to-action that expands the
+     recipe list — mirrors the GM "How players see it" preview CTA: a large, centered,
+     solid-accent button. */
+  .inventory-detail-read-learn {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 12px;
-    border: 1px solid var(--fab-border);
+    justify-content: center;
+    gap: var(--fab-space-2);
+    width: 100%;
+    box-sizing: border-box;
+    padding: 13px 16px;
+    min-height: 48px;
+    border: 1px solid var(--fab-accent-border);
     border-radius: 8px;
-    background: var(--fab-surface-soft);
+    background: var(--fab-accent);
+    color: var(--fab-on-accent);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
   }
 
-  .inventory-detail-limit-label {
-    font-size: 12px;
-    color: var(--fab-text-muted);
+  .inventory-detail-read-learn:hover {
+    filter: brightness(1.08);
   }
 
-  .inventory-detail-limit-value {
-    font-size: 12px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    color: var(--fab-text);
+  .inventory-detail-read-learn:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .inventory-detail-read-learn:disabled {
+    opacity: 0.5;
+    cursor: default;
+    filter: none;
+  }
+
+  /* Access badge under the book name — the SAME learn/use badge as the GM preview. */
+  .inventory-detail-access-badge {
+    gap: 5px;
+  }
+
+  .inventory-detail-access-badge.is-warning {
+    border-color: var(--fab-warning-border);
+    background: var(--fab-warning-soft);
+    color: var(--fab-warning-text);
+  }
+
+  .inventory-detail-access-badge.is-info {
+    border-color: var(--fab-info-border);
+    background: var(--fab-info-soft);
+    color: var(--fab-info-text);
+  }
+
+  .inventory-detail-access-badge.is-success {
+    border-color: var(--fab-success-border);
+    background: var(--fab-success-soft);
+    color: var(--fab-success-text);
   }
 
   /* The static (non-toggle) headline for a single-recipe book, mirroring the
@@ -857,7 +944,8 @@
   }
 
   /* The Learn button + the Learned chip share the trailing slot in a recipe row. */
-  .inventory-detail-learn-btn {
+  .inventory-detail-learn-btn,
+  .inventory-detail-craft-btn {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -873,12 +961,14 @@
     white-space: nowrap;
   }
 
-  .inventory-detail-learn-btn:hover:not(:disabled) {
+  .inventory-detail-learn-btn:hover:not(:disabled),
+  .inventory-detail-craft-btn:hover:not(:disabled) {
     background: var(--fab-accent);
     color: var(--fab-on-accent);
   }
 
-  .inventory-detail-learn-btn:focus-visible {
+  .inventory-detail-learn-btn:focus-visible,
+  .inventory-detail-craft-btn:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
@@ -886,6 +976,10 @@
   .inventory-detail-learn-btn:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  .inventory-chip-uses i {
+    font-size: 10px;
   }
 
   .inventory-detail-learned {
@@ -956,6 +1050,10 @@
     align-items: center;
     gap: var(--fab-space-3);
     padding: 0;
+    /* Defuse Foundry's fixed global button height so the 40px thumb isn't clamped/misaligned
+       (matches the min-height the sibling recipe/read-learn buttons pin). */
+    height: auto;
+    min-height: 40px;
     border: none;
     background: none;
     color: var(--fab-text);

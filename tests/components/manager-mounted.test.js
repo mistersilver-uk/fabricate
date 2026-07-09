@@ -30,7 +30,7 @@ let ToolsBrowserViewComponent;
 let ChecksViewComponent;
 let RecipeOverviewTabComponent;
 let SystemEditViewComponent;
-let SystemRecipeVisibilityCardComponent;
+let CraftingSettingsViewComponent;
 let mounted;
 let target;
 
@@ -81,6 +81,35 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingEffectPanel.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/SegmentedControl.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RosterRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPickerModal.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/AccessTabView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GrantAccessInspector.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPageInspector.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemEditor.svelte');
+  for (const recipeItemComponent of [
+    'RecipeItemEditorTabs',
+    'RecipeItemOverviewTab',
+    'RecipeItemContentsTab',
+    'RecipeItemLimitsTab',
+    'RecipeItemValidationTab',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe-item/${recipeItemComponent}.svelte`);
+  }
+  // Plain crafting modules imported by the nav model + Settings/nav wiring — copied
+  // raw (NOT compiled), the same way recipe/recipeReadiness.js is.
+  for (const craftingModule of ['craftingVisibility.js', 'craftingNav.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/crafting/${craftingModule}`);
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/crafting/${craftingModule}`), 'utf8')
+    );
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
@@ -103,7 +132,6 @@ function compileManagerRoot() {
     'RecipeRoutingAssignment',
     'RecipeResultItemRow',
     'RecipeToolsSection',
-    'SystemRecipeVisibilityCard',
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);
   }
@@ -116,6 +144,16 @@ function compileManagerRoot() {
     );
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
+  // Plain module imported by CraftingSettingsView — copied raw (NOT compiled), the
+  // same way recipe/recipeReadiness.js is, so the mounted import resolves.
+  {
+    const moduleDestination = join(tempRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js');
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js'), 'utf8')
+    );
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
@@ -159,6 +197,7 @@ function compileManagerRoot() {
 
   for (const utilPath of [
     'foundryBridge.js',
+    'recipeItemAccessBadge.js',
     'essenceIcons.js',
     'fontAwesomeFreeClassicIcons.js',
     'iconPickerPopover.js',
@@ -171,6 +210,7 @@ function compileManagerRoot() {
     'recipeDuration.js',
     'recipeCurrency.js',
     'systemDisambiguation.js',
+    'craftingImageDefaults.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
@@ -234,6 +274,19 @@ function gatheringToggle() {
   return target.querySelector('.manager-nav-toggle');
 }
 
+// The gated Crafting nav group (issue 511) nests Recipes as a sub-route. Clicking
+// the "Crafting" parent from a non-crafting route routes straight to Recipes and
+// expands the group; the parent also carries the recipes count badge.
+function craftingParent() {
+  return navButton('Crafting');
+}
+
+function craftingSubitem(labelText) {
+  return Array.from(target.querySelectorAll('#manager-crafting-submenu .manager-nav-subitem')).find(
+    (button) => button.textContent.includes(labelText)
+  );
+}
+
 // Mount the manager, route to Recipes, and open the recipe-edit route for r1.
 // Assigns the module-level `mounted`/`target` (so afterEach can clean up) and
 // returns the mounted target for the caller to query.
@@ -248,7 +301,7 @@ async function openRecipeEditor(calls, storeOptions = {}) {
     },
   });
   flushSync();
-  navButton('Recipes').click();
+  craftingParent().click();
   await tick();
   flushSync();
   target.querySelector('[data-recipe-id="r1"] .manager-icon-button').click();
@@ -353,6 +406,27 @@ function createStore(calls = [], options = {}) {
       gatheringCraftingCheck: options.gatheringCraftingCheck,
       features: selectedFeatures,
       managedItemOptions: alchemyManagedItemOptions,
+      // System-level recipe visibility config (issue 511). The Books & Scrolls
+      // surface reads the shared use/learn caps from here; left undefined unless a
+      // test supplies one (the visibility card then falls back to its defaults).
+      recipeVisibility: options.recipeVisibility,
+      // Recipe items (cook books / scrolls) surfaced by the Books & Scrolls
+      // management surface (issue 511). r1 links to the first book, so the
+      // surface can show a linked-recipe count and the shared cap chips.
+      recipeItemDefinitions: options.recipeItemDefinitions ?? [
+        {
+          id: 'ri1',
+          name: 'Alchemist Cook Book',
+          img: 'icons/sundries/books/book-worn-brown.webp',
+          description: 'A well-thumbed book of potion recipes.',
+        },
+        {
+          id: 'ri2',
+          name: 'Scroll of Elixirs',
+          img: 'icons/sundries/scrolls/scroll-bound-brown.webp',
+          description: '',
+        },
+      ],
       // Tools are system-owned: the manager reads the library from
       // selectedSystem.tools (not gatheringConfig). Mirror the option here so the
       // Tools browser + the gathering task editor's tool picker see them.
@@ -641,7 +715,14 @@ function createStore(calls = [], options = {}) {
   applySelectedCurrency(systemDetails, options.selectedCurrency);
   const baseSelectedSystem =
     options.noSystems || options.selected === false ? null : systemDetails.alchemy;
-  const selectedSystem = applyRecipeKnowledgeMode(baseSelectedSystem, options.recipeKnowledgeMode);
+  const selectedSystemWithMode = applyRecipeKnowledgeMode(
+    baseSelectedSystem,
+    options.recipeKnowledgeMode
+  );
+  // Flat visibilityMode (issue 511, PR-B) + any other per-test system overrides.
+  const selectedSystem = selectedSystemWithMode
+    ? { ...selectedSystemWithMode, ...(options.selectedSystemOverrides || {}) }
+    : selectedSystemWithMode;
   const essenceCardsBySystem = {
     alchemy: [
       {
@@ -725,6 +806,7 @@ function createStore(calls = [], options = {}) {
             img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
             description: 'Restores a small amount of health.',
             category: 'potions',
+            recipeItemId: 'ri1',
             enabled: true,
             locked: false,
             isSimple: true,
@@ -1015,6 +1097,38 @@ function createStore(calls = [], options = {}) {
       applySystemEnabled(id, enabled);
     },
     saveSystemDetails: (name, description) => calls.push(['saveSystemDetails', name, description]),
+    updateRecipeItemCaps: (recipeItemId, patch) => {
+      calls.push(['updateRecipeItemCaps', recipeItemId, patch]);
+      return options.updateRecipeItemCapsResult ?? true;
+    },
+    setVisibilityMode: (mode) => {
+      calls.push(['setVisibilityMode', mode]);
+      return options.setVisibilityModeResult ?? true;
+    },
+    setRecipeItemEnabled: (recipeItemId, enabled) => {
+      calls.push(['setRecipeItemEnabled', recipeItemId, enabled]);
+      return options.setRecipeItemEnabledResult ?? true;
+    },
+    saveRecipeItem: (recipeItemId, patch) => {
+      calls.push(['saveRecipeItem', recipeItemId, patch]);
+      return options.saveRecipeItemResult ?? true;
+    },
+    deleteRecipeItemDefinition: (recipeItemId) => {
+      calls.push(['deleteRecipeItemDefinition', recipeItemId]);
+      return options.deleteRecipeItemDefinitionResult ?? true;
+    },
+    confirmDiscardDirtyRecipeItemDraft: () => {
+      calls.push(['confirmDiscardDirtyRecipeItemDraft']);
+      return options.confirmDiscardRecipeItemResult ?? 'discard';
+    },
+    getPcRoster: () => {
+      calls.push(['getPcRoster']);
+      return options.pcRoster ?? [];
+    },
+    saveRecipeAccess: (recipeId, grant) => {
+      calls.push(['saveRecipeAccess', recipeId, grant]);
+      return options.saveRecipeAccessResult ?? true;
+    },
     setResolutionMode: async (mode) => {
       calls.push(['setResolutionMode', mode]);
       return options.resolutionModeResult ?? true;
@@ -1487,11 +1601,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte.js'))
       )
     ).default;
-    SystemRecipeVisibilityCardComponent = (
+    CraftingSettingsViewComponent = (
       await import(
-        pathToFileURL(
-          join(tempRoot, 'src/ui/svelte/apps/manager/recipe/SystemRecipeVisibilityCard.svelte.js')
-        )
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte.js'))
       )
     ).default;
     ToolsBrowserViewComponent = (
@@ -3234,10 +3346,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  function mountRecipeVisibilityCard(props) {
+  function mountCraftingSettingsView(props) {
     target = document.createElement('div');
     document.body.appendChild(target);
-    mounted = mount(SystemRecipeVisibilityCardComponent, { target, props });
+    mounted = mount(CraftingSettingsViewComponent, { target, props });
     flushSync();
     return target;
   }
@@ -3250,254 +3362,45 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  it('SystemEditView renders the recipe visibility card for a non-alchemy system and hides it for alchemy', () => {
+  it('CraftingSettingsView renders the recipe resolution and flat visibility-mode cards', () => {
+    // The recipe resolution + flat visibility-mode controls live on the gated
+    // Crafting > Settings page (issue 511, PR-B). Visibility is now a single flat
+    // enum (global/restricted/item/knowledge), not the old listMode card.
     const baseSystem = {
       id: 'sys1',
       name: 'System One',
       resolutionMode: 'simple',
+      visibilityMode: 'knowledge',
       features: {},
-      recipeVisibility: { listMode: 'global' },
-      showRecipeVisibilityKnowledgeOptions: false,
+      craftingEffect: {
+        showAccess: false,
+        showBooksScrolls: true,
+        showLimitedUse: false,
+        showLearningLimits: true,
+        summaryKey: 'FABRICATE.Admin.Manager.Crafting.Effect.SummaryKnowledge',
+      },
     };
-    mountSystemEditView({ selectedSystem: baseSystem });
+    mountCraftingSettingsView({ selectedSystem: baseSystem });
     assert.ok(
-      target.querySelector('[data-system-recipe-visibility]'),
-      'the card renders for a non-alchemy system'
-    );
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-
-    mountSystemEditView({ selectedSystem: { ...baseSystem, resolutionMode: 'alchemy' } });
-    assert.equal(
-      target.querySelector('[data-system-recipe-visibility]'),
-      null,
-      'the card is hidden for an alchemy system'
-    );
-  });
-
-  it('recipe visibility card list-mode select emits a listMode-only save patch', () => {
-    const emitted = [];
-    mountRecipeVisibilityCard({
-      recipeVisibility: { listMode: 'global' },
-      showKnowledgeOptions: false,
-      onSave: (patch) => emitted.push(patch),
-    });
-    const select = target.querySelector('[data-recipe-visibility-list-mode]');
-    assert.ok(select, 'the list-mode select renders');
-    assert.equal(select.value, 'global', 'reflects the current list mode');
-
-    select.value = 'knowledge';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    assert.deepEqual(emitted.at(-1), { listMode: 'knowledge' });
-  });
-
-  it('recipe visibility card shows knowledge sub-rows only in knowledge mode', () => {
-    mountRecipeVisibilityCard({
-      recipeVisibility: { listMode: 'global' },
-      showKnowledgeOptions: false,
-      onSave: () => {},
-    });
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-knowledge]'),
-      null,
-      'no knowledge sub-rows outside knowledge mode'
-    );
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-
-    const emitted = [];
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: true, maxUses: 3, destroyWhenExhausted: false },
-          learn: { consumeOnLearn: true, dragDropEnabled: true },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: (patch) => emitted.push(patch),
-    });
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-knowledge-mode]'),
-      'the knowledge-mode select renders in knowledge mode'
+      target.querySelector('[data-crafting-resolution-mode]'),
+      'the resolution-mode card renders on Crafting Settings'
     );
     assert.ok(
-      target.querySelector('[data-recipe-visibility-limit-uses]'),
-      'the item limit-uses toggle renders for itemOrLearned'
+      target.querySelector('[data-crafting-visibility-section]'),
+      'the flat visibility-mode section renders'
     );
+    // All four visibility modes are offered.
+    const visibilityOptions = Array.from(
+      target.querySelectorAll('[data-crafting-visibility-mode-option]')
+    ).map((option) => option.getAttribute('data-crafting-visibility-mode-option'));
+    for (const mode of ['global', 'restricted', 'item', 'knowledge']) {
+      assert.ok(visibilityOptions.includes(mode), `visibility option "${mode}" is offered`);
+    }
+    // The effect panel reflects the active mode's conditional surface.
     assert.ok(
-      target.querySelector('[data-recipe-visibility-max-uses]'),
-      'the max-uses stepper renders when limitUses is on'
+      target.querySelector('[data-crafting-settings-context] [data-crafting-effect]'),
+      'the effect panel renders alongside the cards'
     );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
-      'the consume-on-learn toggle renders for itemOrLearned'
-    );
-
-    // Turning the limit-uses toggle OFF passes only that field; the store
-    // cascade clears the cap.
-    target.querySelector('[data-recipe-visibility-limit-uses]').click();
-    assert.deepEqual(emitted.at(-1), { limitUses: false });
-  });
-
-  it('recipe visibility card commits a concrete cap when enabling limited uses', () => {
-    // Enabling limited uses without a stored maxUses must persist a real cap
-    // (>= 1); otherwise the runtime treats the undefined cap as unlimited while
-    // the card displays "1".
-    const emitted = [];
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: false },
-          learn: { consumeOnLearn: true, dragDropEnabled: true },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: (patch) => emitted.push(patch),
-    });
-
-    // The stepper stays visible but disabled until limited uses is on (faded,
-    // non-interactive) rather than appearing/disappearing.
-    const stepper = target.querySelector('[data-recipe-visibility-max-uses]');
-    assert.ok(stepper, 'the max-uses stepper is present even when limitUses is off');
-    assert.equal(
-      stepper.querySelector('input').disabled,
-      true,
-      'the max-uses input is disabled when limitUses is off'
-    );
-
-    target.querySelector('[data-recipe-visibility-limit-uses]').click();
-    assert.deepEqual(emitted.at(-1), { limitUses: true, maxUses: 1 });
-  });
-
-  it('recipe visibility card shows a per-mode note under the list-mode select', () => {
-    // The note now lives inside the List mode card (under the select) and has an
-    // equivalent for every mode, so the option labels can stay terse.
-    mountRecipeVisibilityCard({
-      recipeVisibility: { listMode: 'global' },
-      showKnowledgeOptions: false,
-      onSave: () => {},
-    });
-    const globalNote = target.querySelector('[data-recipe-visibility-list-mode-note]');
-    assert.ok(globalNote, 'a mode note renders in global mode');
-    assert.match(globalNote.textContent, /visible to all players/i);
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-
-    mountRecipeVisibilityCard({
-      recipeVisibility: { listMode: 'player' },
-      showKnowledgeOptions: false,
-      onSave: () => {},
-    });
-    const playerNote = target.querySelector('[data-recipe-visibility-list-mode-note]');
-    assert.ok(playerNote, 'a mode note renders in player mode');
-    assert.match(playerNote.textContent, /per-recipe/i);
-  });
-
-  it('recipe visibility card renders the learn-cap card and hides consume-on-learn when the cap is on (issue 511)', () => {
-    // Cap OFF: consume-on-learn tile present; learn-cap nested inputs disabled.
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: false },
-          learn: { consumeOnLearn: true, dragDropEnabled: true, limitRecipes: false },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: () => {},
-    });
-
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-limit-recipes]'),
-      'the learn-cap Enabled toggle renders'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-max-recipes]'),
-      'the max-recipes stepper renders even when the cap is off'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-destroy-spent]'),
-      'the destroy-when-spent toggle renders'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-max-recipes] input').disabled,
-      true,
-      'the max-recipes input is disabled while the cap is off'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
-      'consume-on-learn shows while the cap is off'
-    );
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-
-    // Cap ON: consume-on-learn tile hidden; stepper enabled.
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'itemOrLearned',
-          item: { limitUses: false },
-          learn: {
-            consumeOnLearn: true,
-            dragDropEnabled: true,
-            limitRecipes: true,
-            maxRecipes: 3,
-          },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: () => {},
-    });
-
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-consume-on-learn]'),
-      null,
-      'consume-on-learn is hidden while the cap is on'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-limit-recipes]'),
-      'the learn-cap card still renders while the cap is on'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-visibility-max-recipes] input').disabled,
-      false,
-      'the max-recipes input is enabled while the cap is on'
-    );
-    // The drag-drop tile is unaffected by the cap.
-    assert.ok(target.querySelector('[data-recipe-visibility-drag-drop]'));
-  });
-
-  it('recipe visibility card commits a concrete cap when enabling the learn limit (issue 511)', () => {
-    const emitted = [];
-    mountRecipeVisibilityCard({
-      recipeVisibility: {
-        listMode: 'knowledge',
-        knowledge: {
-          mode: 'learned',
-          item: { limitUses: false },
-          learn: { consumeOnLearn: false, dragDropEnabled: true, limitRecipes: false },
-        },
-      },
-      showKnowledgeOptions: true,
-      onSave: (patch) => emitted.push(patch),
-    });
-
-    target.querySelector('[data-recipe-visibility-limit-recipes]').click();
-    assert.deepEqual(emitted.at(-1), { limitRecipes: true, maxRecipes: 1 });
   });
 
   it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
@@ -3837,7 +3740,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    const recipesNav = navButton('Recipes');
+    const recipesNav = craftingParent();
     assert.equal(recipesNav.disabled, false);
     assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '2');
     for (const label of ['Graph']) {
@@ -3846,7 +3749,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
     }
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
@@ -3910,7 +3813,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         'System Overview',
-        'Recipes',
+        'Crafting',
         'Components',
         'Tags & Categories',
         'Essences',
@@ -3938,7 +3841,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -4142,7 +4045,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -4183,7 +4086,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -5704,7 +5607,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -5742,7 +5645,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     for (let i = 0; i < 6; i++) await Promise.resolve();
     await tick();
     flushSync();
@@ -5787,7 +5690,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await Promise.resolve();
     await Promise.resolve();
     await tick();
@@ -5903,6 +5806,401 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Air');
     assert.ok(target.textContent.includes('Save failed.'));
+  });
+
+  it('renders the gated Crafting nav group only when experimental features are on', async () => {
+    // Experimental OFF: no Crafting group; Recipes shows as a disabled placeholder.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { experimentalFeaturesEnabled: false }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    assert.equal(target.querySelector('#manager-nav-crafting'), null, 'Crafting group hidden when experimental off');
+    assert.equal(Boolean(craftingParent()), false, 'no Crafting parent button when experimental off');
+  });
+
+  it('exposes the Crafting group with Gathering-parity a11y and nested Settings + Recipes', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    // Collapsed by default: parent present, submenu absent.
+    const parent = target.querySelector('#manager-nav-crafting');
+    assert.ok(parent, 'Crafting parent renders when experimental on');
+    assert.equal(parent.getAttribute('aria-expanded'), 'false');
+    assert.equal(parent.querySelector('.manager-nav-count').textContent.trim(), '2');
+    const toggle = target.querySelector('#manager-nav-crafting + .manager-nav-toggle');
+    assert.equal(toggle.getAttribute('aria-controls'), 'manager-crafting-submenu');
+    assert.equal(toggle.getAttribute('aria-label'), 'Expand crafting menu');
+    assert.equal(target.querySelector('#manager-crafting-submenu'), null);
+
+    // Clicking the parent routes to Recipes and expands the submenu.
+    parent.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.equal(parent.getAttribute('aria-expanded'), 'true');
+    const submenu = target.querySelector('#manager-crafting-submenu');
+    assert.ok(submenu, 'crafting submenu renders when expanded');
+    assert.equal(
+      target.querySelector('#manager-nav-crafting + .manager-nav-toggle').getAttribute('aria-label'),
+      'Collapse crafting menu'
+    );
+    // The Crafting sub-tabs are a conditional set keyed on the system's
+    // visibilityMode (issue 511, PR-B). The default fixture has no visibilityMode
+    // (→ 'knowledge'), so Access is hidden and Books & Scrolls is shown; order is
+    // Recipes · Books & Scrolls · Settings.
+    const craftingItems = Array.from(submenu.querySelectorAll('.manager-nav-subitem'));
+    assert.deepEqual(
+      craftingItems.map((item) => item.querySelector('.manager-nav-label')?.textContent.trim()),
+      ['Recipes', 'Books & Scrolls', 'Settings']
+    );
+    assert.deepEqual(
+      craftingItems.map((item) => item.id),
+      ['manager-crafting-nav-recipes', 'manager-crafting-nav-books-scrolls', 'manager-crafting-nav-settings']
+    );
+    assert.equal(craftingSubitem('Recipes').getAttribute('aria-current'), 'page');
+    assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), true);
+    assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), null);
+
+    // Settings routes to the real crafting-rules page (resolution mode + visibility).
+    craftingSubitem('Settings').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'crafting-settings');
+    assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-crafting-settings]'), 'crafting settings page renders');
+    assert.ok(
+      target.querySelector('[data-crafting-resolution-mode]'),
+      'the recipe resolution-mode card renders on Crafting Settings'
+    );
+    // The inspector aside is suppressed on the crafting-settings route.
+    assert.equal(target.querySelector('.manager-inspector'), null);
+
+    // Recipes sub-item routes back to the recipes browser.
+    craftingSubitem('Recipes').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
+  });
+
+  it('does not mark a Crafting subitem active while the group is expanded over a non-crafting route', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    // On Components (a non-crafting route), manually expand the collapsed Crafting
+    // group via its toggle.
+    navButton('Components').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
+    target.querySelector('#manager-nav-crafting + .manager-nav-toggle').click();
+    await tick();
+    flushSync();
+
+    // The submenu is shown, but no subitem falsely reports the active/current page
+    // (the state is guarded by isCraftingRoute, mirroring the Gathering group).
+    assert.ok(target.querySelector('#manager-crafting-submenu'), 'submenu expands from a non-crafting route');
+    assert.equal(craftingSubitem('Recipes').getAttribute('aria-current'), null);
+    assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), false);
+    assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), null);
+    assert.equal(craftingSubitem('Books & Scrolls').getAttribute('aria-current'), null);
+  });
+
+  // Navigate the mounted manager to the Books & Scrolls surface via the Crafting
+  // group and return the surface root for querying.
+  async function openBooksScrolls(calls, storeOptions = {}) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    craftingParent().click();
+    await tick();
+    flushSync();
+    craftingSubitem('Books & Scrolls').click();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  // Projected recipe-item fixtures (issue 511, PR-B). The router forwards
+  // `selectedSystem.recipeItemDefinitions` straight to BooksScrollsView, so these
+  // carry the enriched projection fields the surface reads (resolvedName,
+  // derivedType, recipes[], caps).
+  const booksScrollsFixtures = [
+    {
+      id: 'ri1',
+      name: 'Alchemist Cook Book',
+      resolvedName: 'Alchemist Cook Book',
+      resolvedImg: 'icons/sundries/books/book-worn-brown.webp',
+      derivedType: 'Book',
+      sourceItemUuid: 'Compendium.fabricate.items.cook-book',
+      enabled: true,
+      description: 'A well-thumbed book of potion recipes.',
+      recipes: [{ id: 'r1', name: 'Healing Draught', category: 'potions' }],
+      learnedByCount: 2,
+      linkMissing: false,
+      caps: { learn: { limitLearning: true, learningMode: 'once' } },
+    },
+    {
+      id: 'ri2',
+      name: 'Scroll of Elixirs',
+      resolvedName: 'Scroll of Elixirs',
+      resolvedImg: 'icons/sundries/scrolls/scroll-bound-brown.webp',
+      derivedType: 'Scroll',
+      sourceItemUuid: '',
+      enabled: true,
+      description: '',
+      recipes: [],
+      learnedByCount: 0,
+      linkMissing: false,
+      caps: { learn: { limitLearning: false } },
+    },
+  ];
+
+  it('lists recipe items with recipe-count and cap chips and surfaces the item inspector on select', async () => {
+    const calls = [];
+    await openBooksScrolls(calls, { recipeItemDefinitions: booksScrollsFixtures });
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+    assert.ok(target.querySelector('[data-books-scrolls]'), 'Books & Scrolls surface renders');
+    // The parent nav count reflects the recipes count (2 recipes in the fixture).
+    assert.equal(craftingParent().querySelector('.manager-nav-count').textContent.trim(), '2');
+
+    // Both recipe items are listed with their own recipe-count + learning chips.
+    const cards = Array.from(target.querySelectorAll('[data-books-scrolls-item]'));
+    assert.equal(cards.length, 2);
+    assert.equal(
+      target.querySelector('[data-books-scrolls-recipe-count="ri1"]').textContent.trim(),
+      '1 recipe'
+    );
+    assert.equal(
+      target.querySelector('[data-books-scrolls-recipe-count="ri2"]').textContent.trim(),
+      'No recipes'
+    );
+    // Knowledge mode (default): the cap chip shows the learning limit.
+    assert.equal(
+      target.querySelector('[data-books-scrolls-cap-chip="ri1"]').getAttribute('data-books-scrolls-cap-limited'),
+      'true'
+    );
+    assert.equal(
+      target.querySelector('[data-books-scrolls-cap-chip="ri2"]').getAttribute('data-books-scrolls-cap-limited'),
+      'false'
+    );
+
+    // Toggling a row's enabled flag routes through setRecipeItemEnabled (no draft).
+    target.querySelector('[data-books-scrolls-toggle="ri1"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some((call) => call[0] === 'setRecipeItemEnabled' && call[1] === 'ri1' && call[2] === false),
+      'toggling a row calls setRecipeItemEnabled'
+    );
+
+    // Selecting a row surfaces the ItemPageInspector aside for that item.
+    target.querySelector('[data-books-scrolls-select="ri2"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-item-page-inspector]'), 'the item inspector renders on select');
+    assert.equal(
+      target.querySelector('[data-item-page-name]').textContent.trim(),
+      'Scroll of Elixirs'
+    );
+    assert.equal(target.querySelector('[data-item-page-recipe-count]').textContent.trim(), '0');
+  });
+
+  it('opens the recipe-item editor from a Books & Scrolls row and saves the staged draft', async () => {
+    const calls = [];
+    await openBooksScrolls(calls, { recipeItemDefinitions: booksScrollsFixtures });
+
+    // The pen action opens the full-window recipe-item editor route.
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assert.ok(target.querySelector('[data-recipe-item-editor]'), 'the recipe-item editor body renders');
+    // The router owns the header + footer actions.
+    assert.ok(target.querySelector('[data-recipe-item-back]'), 'Back action renders');
+    assert.ok(target.querySelector('[data-recipe-item-delete]'), 'Delete action renders');
+    const save = target.querySelector('[data-recipe-item-save]');
+    assert.ok(save, 'Save action renders');
+    assert.equal(save.disabled, true, 'Save is disabled until the draft is dirty');
+    // The editor is fed the persisted linked recipe (r1) for ri1.
+    assert.ok(target.textContent.includes('Alchemist Cook Book'), 'the linked item name shows in the editor');
+
+    // Flipping the Overview Enabled toggle stages a draft change → dirty.
+    target.querySelector('[data-recipe-item-enabled]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-recipe-item-dirty]'), 'the Unsaved chip appears when dirty');
+    assert.equal(target.querySelector('[data-recipe-item-save]').disabled, false, 'Save enables when dirty');
+
+    // Saving commits the whole draft in one saveRecipeItem call, then returns to
+    // the Books & Scrolls surface.
+    target.querySelector('[data-recipe-item-save]').click();
+    await tick();
+    flushSync();
+    const saveCall = calls.find((call) => call[0] === 'saveRecipeItem' && call[1] === 'ri1');
+    assert.ok(saveCall, 'Save routes through saveRecipeItem for ri1');
+    assert.equal(saveCall[2].enabled, false, 'the staged enabled change is persisted');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+  });
+
+  it('guards a dirty recipe-item editor exit through the confirm-discard chain', async () => {
+    const calls = [];
+    await openBooksScrolls(calls, {
+      recipeItemDefinitions: booksScrollsFixtures,
+      // Cancel the discard so navigation is blocked and the editor stays open.
+      confirmDiscardRecipeItemResult: 'cancel',
+    });
+
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+
+    // Make the draft dirty.
+    target.querySelector('[data-recipe-item-enabled]').click();
+    await tick();
+    flushSync();
+
+    // Attempting to leave via Back consults the confirm-discard guard; cancelling
+    // keeps us on the editor route.
+    target.querySelector('[data-recipe-item-back]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeItemDraft'),
+      'a dirty exit enters the recipe-item confirm-discard chain'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit',
+      'cancelling the discard keeps the editor open'
+    );
+  });
+
+  it('opens the item picker to create a recipe item and then opens its editor', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          experimentalFeaturesEnabled: true,
+          recipeItemDefinitions: booksScrollsFixtures,
+        }),
+        services: {
+          openCurrentAdmin: () => {},
+          getWorldItemOptions: () => [
+            { uuid: 'Compendium.world.items.tome', name: 'Tome of Wonders', img: '', type: 'book' },
+          ],
+        },
+      },
+    });
+    flushSync();
+    craftingParent().click();
+    await tick();
+    flushSync();
+    craftingSubitem('Books & Scrolls').click();
+    await tick();
+    flushSync();
+
+    // Create opens the router-owned item picker modal.
+    target.querySelector('[data-books-scrolls-create]').click();
+    await tick();
+    flushSync();
+    const pickerRow = document.querySelector('[data-item-picker-row]');
+    assert.ok(pickerRow, 'the item picker lists world items');
+
+    // Picking an item adds the definition and opens its editor.
+    pickerRow.click();
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some((call) => call[0] === 'addRecipeItemFromUuid' && call[2] === 'Compendium.world.items.tome'),
+      'picking an item adds it via addRecipeItemFromUuid'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+  });
+
+  it('exposes the Access sub-tab under restricted visibility and grants a recipe', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          experimentalFeaturesEnabled: true,
+          selectedSystemOverrides: { visibilityMode: 'restricted' },
+          pcRoster: [{ id: 'char1', name: 'Aria', img: '' }],
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    // Restricted visibility surfaces the Access sub-tab (and hides Books & Scrolls).
+    craftingParent().click();
+    await tick();
+    flushSync();
+    assert.ok(craftingSubitem('Access'), 'the Access sub-tab is shown under restricted visibility');
+    assert.equal(craftingSubitem('Books & Scrolls'), undefined, 'Books & Scrolls is hidden under restricted');
+
+    craftingSubitem('Access').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'access');
+    assert.ok(target.querySelector('[data-access-search]'), 'the access list renders');
+    assert.ok(target.querySelectorAll('[data-access-row]').length >= 1, 'recipes are listed');
+
+    // Selecting a recipe surfaces the GrantAccessInspector.
+    target.querySelector('[data-access-row="r1"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-access-roster]'), 'the grant-access inspector renders on select');
+  });
+
+  it('shows the Books & Scrolls empty state when the system has no recipe items', async () => {
+    const calls = [];
+    await openBooksScrolls(calls, { recipeItemDefinitions: [] });
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+    assert.ok(target.querySelector('[data-books-scrolls-empty]'), 'empty state renders');
+    assert.equal(target.querySelectorAll('[data-books-scrolls-item]').length, 0);
+    assert.ok(target.textContent.includes('No recipe items yet'));
   });
 
   it('routes to the environments browser and opens the forced v2 editor route', async () => {
@@ -9027,7 +9325,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    const recipesNav = navButton('Recipes');
+    const recipesNav = craftingParent();
     assert.equal(recipesNav.disabled, false);
     assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
     for (const label of ['Graph']) {
@@ -9036,7 +9334,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
     }
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -9079,7 +9377,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Recipes').click();
+    craftingParent().click();
     await tick();
     flushSync();
 
@@ -10387,50 +10685,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       .querySelector('.manager-system-edit-form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-    // The resolution-mode card IS the selector: one radio row per mode, all four in order,
-    // each with a non-empty description, and the active row matching the system's mode.
-    const modeCard = target.querySelector('#manager-system-resolution-mode');
-    assert.ok(modeCard, 'resolution-mode radiogroup card should render');
-    const activeMode = (card) =>
-      card.querySelector('.manager-resolution-option.is-active')?.dataset
-        .systemResolutionModeOption;
-    const modeRows = [...modeCard.querySelectorAll('[data-system-resolution-mode-option]')];
-    assert.deepEqual(
-      modeRows.map((row) => row.dataset.systemResolutionModeOption),
-      ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'],
-      'the card lists all five modes in order'
-    );
-    assert.ok(
-      modeRows.every(
-        (row) => row.querySelector('.manager-resolution-option-desc')?.textContent.trim().length > 0
-      ),
-      'each mode row has a non-empty description'
-    );
-    assert.ok(
-      modeRows.every((row) =>
-        row.querySelector('input[type="radio"][name="manager-system-resolution-mode"]')
-      ),
-      'each mode row wraps a real radio input'
-    );
+    // Resolution mode moved to the gated Crafting > Settings page (issue 511), so
+    // System Overview no longer carries the resolution-mode card. Identity save and
+    // the optional-feature toggles still live here.
     assert.equal(
-      activeMode(modeCard),
-      'alchemy',
-      'the active row matches the system resolution mode'
-    );
-
-    const routedRadio = modeCard.querySelector(
-      '[data-system-resolution-mode-option="routedByCheck"] input[type="radio"]'
-    );
-    routedRadio.checked = true;
-    routedRadio.dispatchEvent(new Event('change', { bubbles: true }));
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(
-      activeMode(modeCard),
-      'routedByCheck',
-      'selecting the routed-by-check radio moves the active highlight'
+      target.querySelector('#manager-system-resolution-mode'),
+      null,
+      'the resolution-mode card is no longer on System Overview'
     );
 
     target.querySelector('[data-feature-key="gathering"] .manager-status-toggle').click();
@@ -10443,7 +10704,6 @@ describe('CraftingSystemManager mounted behavior', () => {
           call[2] === 'Updated potion work'
       )
     );
-    assert.ok(calls.some((call) => call[0] === 'setResolutionMode' && call[1] === 'routedByCheck'));
     assert.ok(
       calls.some(
         (call) => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false
@@ -10577,31 +10837,45 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('renders the salvage resolution-mode card (simple/progressive/routed) and routes its change', async () => {
-    // Alchemy has no salvageResolutionMode (absent ⇒ simple, the default).
-    const { calls } = await mountCurrencyEditor();
+    // The resolution cards live on the gated Crafting > Settings page now (issue 511).
+    const calls = [];
+    mountCraftingSettingsView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'Alchemy',
+        resolutionMode: 'alchemy',
+        features: { salvage: true },
+        recipeVisibility: { listMode: 'global' },
+        showRecipeVisibilityKnowledgeOptions: false,
+      },
+      onSetSalvageResolutionMode: (mode) => {
+        calls.push(['setSalvageResolutionMode', mode]);
+        return true;
+      },
+    });
 
-    const salvageCard = target.querySelector('[data-system-salvage-resolution-mode]');
+    const salvageCard = target.querySelector('[data-crafting-salvage-resolution-mode]');
     const rows = assertResolutionCard(salvageCard, {
-      optionAttr: 'data-system-salvage-resolution-mode-option',
-      groupName: 'manager-system-salvage-resolution-mode',
+      optionAttr: 'data-crafting-salvage-resolution-mode-option',
+      groupName: 'manager-crafting-salvage-resolution-mode',
       expectedValues: ['simple', 'progressive', 'routed'],
     });
     assert.equal(rows.length, 3, 'salvage card offers exactly three options');
 
     // Simple is the default, so it is the checked radio for a simple/absent system.
     const checked = salvageCard.querySelector(
-      'input[type="radio"][name="manager-system-salvage-resolution-mode"]:checked'
+      'input[type="radio"][name="manager-crafting-salvage-resolution-mode"]:checked'
     );
     assert.ok(checked, 'a salvage radio is checked for a simple/absent system');
     assert.equal(
-      checked.closest('[data-system-salvage-resolution-mode-option]').dataset
-        .systemSalvageResolutionModeOption,
+      checked.closest('[data-crafting-salvage-resolution-mode-option]').dataset
+        .craftingSalvageResolutionModeOption,
       'simple',
       'simple is the default selected salvage mode'
     );
 
     const routedRadio = salvageCard.querySelector(
-      '[data-system-salvage-resolution-mode-option="routed"] input[type="radio"]'
+      '[data-crafting-salvage-resolution-mode-option="routed"] input[type="radio"]'
     );
     routedRadio.checked = true;
     routedRadio.dispatchEvent(new Event('change', { bubbles: true }));
@@ -11148,28 +11422,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-feature-key="craftingChecks"]'), null);
     assert.equal(target.querySelector('[data-feature-key="outcomeRouting"]'), null);
 
-    const modeCard = target.querySelector('#manager-system-resolution-mode');
-    const activeMode = () =>
-      modeCard.querySelector('.manager-resolution-option.is-active')?.dataset
-        .systemResolutionModeOption;
-    assert.equal(activeMode(), 'alchemy');
-    const progressiveRadio = modeCard.querySelector(
-      '[data-system-resolution-mode-option="progressive"] input[type="radio"]'
-    );
-    progressiveRadio.checked = true;
-    progressiveRadio.dispatchEvent(new Event('change', { bubbles: true }));
-    await Promise.resolve();
-    await tick();
-    flushSync();
-    // A rejected change reverts the selection: the active row and checked radio return to the system's mode.
-    assert.equal(activeMode(), 'alchemy');
-    assert.equal(
-      modeCard.querySelector('input[type="radio"][name="manager-system-resolution-mode"]:checked')
-        ?.value,
-      'alchemy',
-      'the rejected change re-checks the previously-selected radio'
-    );
-
+    // Resolution-mode rollback moved to the Crafting Settings page (issue 511); the
+    // optional-feature toggle rollback still lives on System Overview.
     const gathering = target.querySelector('[data-feature-key="gathering"] .manager-status-toggle');
     assert.equal(gathering.getAttribute('aria-pressed'), 'true');
     gathering.click();
@@ -11178,11 +11432,49 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(gathering.getAttribute('aria-pressed'), 'true');
 
-    assert.ok(calls.some((call) => call[0] === 'setResolutionMode' && call[1] === 'progressive'));
     assert.ok(
       calls.some(
         (call) => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false
       )
+    );
+  });
+
+  it('CraftingSettingsView rolls back the resolution radio when the store rejects the change', async () => {
+    // The resolution-mode confirm-then-migrate flow can be cancelled (store returns
+    // false); the card must revert to the system's mode (issue 511).
+    mountCraftingSettingsView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'Alchemy',
+        resolutionMode: 'alchemy',
+        features: {},
+        recipeVisibility: { listMode: 'global' },
+        showRecipeVisibilityKnowledgeOptions: false,
+      },
+      onSetResolutionMode: async () => false,
+    });
+
+    const modeCard = target.querySelector('#manager-crafting-resolution-mode');
+    const activeMode = () =>
+      modeCard.querySelector('.manager-resolution-option.is-active')?.dataset
+        .craftingResolutionModeOption;
+    assert.equal(activeMode(), 'alchemy');
+
+    const progressiveRadio = modeCard.querySelector(
+      '[data-crafting-resolution-mode-option="progressive"] input[type="radio"]'
+    );
+    progressiveRadio.checked = true;
+    progressiveRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(activeMode(), 'alchemy', 'a rejected change reverts to the system mode');
+    assert.equal(
+      modeCard.querySelector('input[type="radio"][name="manager-crafting-resolution-mode"]:checked')
+        ?.value,
+      'alchemy',
+      'the rejected change re-checks the previously-selected radio'
     );
   });
 

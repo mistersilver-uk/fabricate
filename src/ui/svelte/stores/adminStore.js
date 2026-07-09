@@ -67,6 +67,7 @@ import { classifyModeChange } from '../../../migration/migrateRecipeForModeChang
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
+import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1448,10 +1449,15 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
 
   const prepared = recipes.map((recipe) => {
     const display = _buildRecipeBrowserDisplay(recipe);
-    const recipeItemId = recipe.recipeItemId || '';
-    const recipeItemDefinition = recipeItemId
-      ? systemManager.getRecipeItemDefinition?.(selectedSystem.id, recipeItemId) || null
-      : null;
+    // Book membership (many-to-many): the books that contain this recipe. The
+    // legacy scalar `recipeItemId`/name/img reflect the FIRST containing book.
+    const containingDefinitions = _recipeItemDefinitionsContaining(
+      selectedSystem.recipeItemDefinitions,
+      recipe
+    );
+    const recipeItemIds = containingDefinitions.map((def) => String(def.id));
+    const recipeItemDefinition = containingDefinitions[0] || null;
+    const recipeItemId = recipeItemDefinition ? String(recipeItemDefinition.id) : '';
     // Plain authoring data for the recipe editor's step-mode UI. Sourced from
     // toJSON() so step / top-level shapes match Recipe._normalizeStep exactly.
     // The multi-step editor reads `steps` (and migrates the top-level fields into
@@ -1482,12 +1488,26 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       // the per-recipe restriction editor can seed, stage, and save an edit. Without
       // it `recipeDraft.visibility` is undefined and edits cannot be persisted.
       visibility: raw.visibility || null,
+      // Per-recipe access grants (restricted visibility mode): the normalized
+      // `{ characterIds, playerIds }` snapshot the Access tab seeds and saves, plus
+      // a `{ characterCount, playerCount }` summary the recipe rows render as the
+      // "N char · N player" grant chip (or "No access" when both are 0).
+      access: {
+        characterIds: Array.isArray(raw.access?.characterIds) ? raw.access.characterIds : [],
+        playerIds: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds : [],
+      },
+      accessSummary: {
+        characterCount: Array.isArray(raw.access?.characterIds) ? raw.access.characterIds.length : 0,
+        playerCount: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds.length : 0,
+      },
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
       // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
       incomplete: _isRecipeIncomplete(recipe),
-      // Canonical recipe-item linkage (never the legacy uuid alias).
+      // Book membership: all books containing this recipe (many-to-many), plus the
+      // first book's id/name/img/source for legacy single-link consumers.
+      recipeItemIds,
       recipeItemId,
       recipeItemName: recipeItemDefinition?.name || '',
       recipeItemImg: recipeItemDefinition?.img || '',
@@ -1554,6 +1574,169 @@ async function _sourceMissingForUuid(uuid) {
   } catch (_) {
     return true;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Books & Scrolls recipe-item projection (issue 511)
+//
+// The library surface reads each recipe item enriched with its resolved
+// game-world item (name/img/type), its linked recipes (reverse ref via
+// `recipe.recipeItemId`), and how many world actors have learned any of those
+// recipes. Resolution touches `fromUuid`, so it is done ONCE per refresh and
+// batched with `Promise.all` (never inside a Svelte `$derived`/`$effect`).
+// ---------------------------------------------------------------------------
+
+// Human label for a recipe item whose linked game-world item has not resolved
+// yet (or was deleted) — the trailing UUID segment, matching the manager's own
+// `_labelFromUuid`.
+function _recipeItemLabelFromUuid(uuid) {
+  if (!uuid) return '';
+  const parts = String(uuid).split('.');
+  return parts.at(-1) || '';
+}
+
+// Best-effort Book / Scroll / Tome label inferred from the linked item's type
+// and name. Defaults to 'Book' when nothing more specific is detectable.
+// Recipe-item "type" is derived purely from how many recipes it grants, so the
+// Books & Scrolls Type pill/filter is diagnostic: a multi-recipe tome is a "Book",
+// a single-recipe item is a "Scroll", and an item with no recipes linked yet is
+// "Incomplete" (distinct from the `linkMissing` broken-link state). Display strings
+// mirror the existing un-localised `derivedType`.
+function _recipeItemTypeFromRecipeCount(count) {
+  const n = Number(count) || 0;
+  if (n >= 2) return 'Book';
+  if (n === 1) return 'Scroll';
+  return 'Incomplete';
+}
+
+// The recipe-item definitions of a system that CONTAIN a recipe (issue 511
+// many-to-many). Canonical read is each definition's `recipeIds[]`; only a system
+// with no membership authored yet falls back to the recipe's book-only `recipeItemId`.
+function _recipeItemDefinitionsContaining(definitions, recipe) {
+  const defs = Array.isArray(definitions) ? definitions : [];
+  const rid = String(recipe?.id || '');
+  const byMembership = defs.filter((def) =>
+    (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
+  );
+  if (byMembership.length > 0) return byMembership;
+  const anyMigrated = defs.some((def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0);
+  if (anyMigrated) return [];
+  const recipeItemId = String(recipe?.recipeItemId || '').trim();
+  return recipeItemId ? defs.filter((def) => String(def.id) === recipeItemId) : [];
+}
+
+// Synchronous fallback projection painted immediately in refresh phase 1. The
+// resolved name/img/type, linked `recipes[]`, and `learnedByCount` are filled in
+// asynchronously by `_enrichRecipeItemLibrary` before the phase-2 publish.
+function _projectRecipeItemDefinitionSync(def) {
+  const sourceItemUuid = def?.sourceItemUuid || '';
+  return {
+    id: def?.id || '',
+    sourceItemUuid,
+    img: def?.img || '',
+    description: def?.description || '',
+    enabled: def?.enabled !== false,
+    // Book membership (issue 511 many-to-many) — the recipe ids this book contains.
+    recipeIds: Array.isArray(def?.recipeIds) ? def.recipeIds.map((id) => String(id)) : [],
+    caps: _clonePlain(def?.caps || {}),
+    resolvedName: def?.name || _recipeItemLabelFromUuid(sourceItemUuid) || 'Recipe item',
+    resolvedImg: def?.img || 'icons/svg/item-bag.svg',
+    derivedType: _recipeItemTypeFromRecipeCount(0),
+    linkMissing: false,
+    recipes: [],
+    learnedByCount: 0,
+  };
+}
+
+// Resolve one linked game-world item. Returns `{ doc, missing }`; `missing` is
+// true only when a uuid is present but cannot be resolved (deleted/broken link).
+async function _resolveRecipeItemSource(uuid) {
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return { doc: null, missing: false };
+  try {
+    const doc = await globalThis.fromUuid(uuid);
+    return { doc: doc || null, missing: !doc };
+  } catch (_) {
+    return { doc: null, missing: true };
+  }
+}
+
+// Build a `recipeId -> Set(actorId)` index of learned recipes across every world
+// actor (best-effort; `game.*` may be unavailable in headless contexts → empty).
+function _buildLearnedRecipeActorIndex() {
+  const index = new Map();
+  const raw = globalThis.game?.actors;
+  const actors = Array.isArray(raw?.contents)
+    ? raw.contents
+    : Array.isArray(raw)
+      ? raw
+      : typeof raw?.[Symbol.iterator] === 'function'
+        ? [...raw]
+        : [];
+  for (const actor of actors) {
+    const learned = actor?.flags?.fabricate?.learnedRecipes;
+    if (!learned || typeof learned !== 'object') continue;
+    const actorId = actor.id || actor._id || '';
+    for (const recipeId of Object.keys(learned)) {
+      if (!index.has(recipeId)) index.set(recipeId, new Set());
+      index.get(recipeId).add(actorId);
+    }
+  }
+  return index;
+}
+
+// Enrich the synchronously-projected recipe items with async-resolved
+// name/img/type plus their derived `recipes[]` and `learnedByCount`. Called once
+// per refresh from the async phase; `fromUuid` resolution is batched.
+async function _enrichRecipeItemLibrary(projectedItems, recipes) {
+  const items = Array.isArray(projectedItems) ? projectedItems : [];
+  if (items.length === 0) return [];
+
+  const recipeList = Array.isArray(recipes) ? recipes : [];
+  const recipeById = new Map();
+  // Legacy reverse-ref index — fallback for definitions with no `recipeIds` yet.
+  const recipesByItemId = new Map();
+  for (const recipe of recipeList) {
+    recipeById.set(String(recipe?.id), recipe);
+    const key = String(recipe?.recipeItemId || '');
+    if (!key) continue;
+    if (!recipesByItemId.has(key)) recipesByItemId.set(key, []);
+    recipesByItemId.get(key).push(recipe);
+  }
+  const toRecipeRef = (recipe) => ({
+    id: recipe.id,
+    name: recipe.name,
+    category: recipe.category || '',
+  });
+
+  const actorIndex = _buildLearnedRecipeActorIndex();
+  const resolved = await Promise.all(
+    items.map((item) => _resolveRecipeItemSource(item.sourceItemUuid))
+  );
+
+  return items.map((item, index) => {
+    const { doc, missing } = resolved[index];
+    // Canonical membership: the book's `recipeIds`. Fall back to the legacy reverse
+    // ref only for a definition that carries none yet (un-migrated).
+    const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
+    const linkedRecipes =
+      memberIds.length > 0
+        ? memberIds.map((id) => recipeById.get(String(id))).filter(Boolean).map(toRecipeRef)
+        : (recipesByItemId.get(String(item.id)) || []).map(toRecipeRef);
+    const learnedActors = new Set();
+    for (const recipe of linkedRecipes) {
+      const actorsForRecipe = actorIndex.get(recipe.id);
+      if (actorsForRecipe) for (const actorId of actorsForRecipe) learnedActors.add(actorId);
+    }
+    return {
+      ...item,
+      resolvedName: doc?.name || item.resolvedName,
+      resolvedImg: doc?.img || item.resolvedImg,
+      derivedType: _recipeItemTypeFromRecipeCount(linkedRecipes.length),
+      linkMissing: missing,
+      recipes: linkedRecipes,
+      learnedByCount: learnedActors.size,
+    };
+  });
 }
 
 async function _buildItemCards(
@@ -1787,12 +1970,19 @@ function _buildSelectedSystemViewData(
   const showRecipeVisibilityKnowledgeOptions = listMode === 'knowledge';
   const showRecipeVisibilityPlayerNote = listMode === 'player';
 
+  // Flat system-level visibility strategy (issue 511, PR-B). `visibilityMode`
+  // gates the whole Crafting surface; `craftingEffect` is the matrix contract
+  // consumed by the Settings effect panel and nav gating alike.
+  const visibilityMode = selectedSystem.visibilityMode || 'knowledge';
+
   return {
     id: selectedSystem.id,
     name: selectedSystem.name,
     description: selectedSystem.description,
     enabled: selectedSystem.enabled !== false,
     resolutionMode: selectedSystem.resolutionMode || 'simple',
+    visibilityMode,
+    craftingEffect: craftingEffect(visibilityMode),
 
     features: {
       recipeCategories: true,
@@ -1898,8 +2088,12 @@ function _buildSelectedSystemViewData(
         : null,
 
     recipeVisibility: selectedSystem.recipeVisibility || {},
+    // Books & Scrolls library projection (issue 511). Painted synchronously with
+    // stored name/img fallbacks; refresh() overwrites this with the async-enriched
+    // shape (resolved name/img/type, derived recipes[], learnedByCount) before the
+    // phase-2 publish. Never resolve `fromUuid` here — this runs synchronously.
     recipeItemDefinitions: Array.isArray(selectedSystem.recipeItemDefinitions)
-      ? selectedSystem.recipeItemDefinitions
+      ? selectedSystem.recipeItemDefinitions.map(_projectRecipeItemDefinitionSync)
       : [],
     teaserConfig: selectedSystem.teaserConfig || {
       enabled: false,
@@ -4265,6 +4459,26 @@ export function createAdminStore(services) {
 
     const environmentState = await _buildEnvironmentState(selectedSystem);
 
+    // Books & Scrolls library (issue 511): batch-resolve each recipe item's linked
+    // game-world item and derive its recipes[]/learnedByCount now that the recipe
+    // list is built. Overwrites the phase-1 synchronous fallback in place so the
+    // phase-2 publish carries the fully enriched projection.
+    if (selectedSystemData) {
+      // Build a NEW selectedSystemData for the phase-2 publish rather than mutating
+      // the phase-1 object in place. The two publishes must be DIFFERENT references:
+      // Svelte's `selectedSystem` `$derived` only re-propagates the enriched
+      // recipeItemDefinitions to the UI when the parent object's reference changes,
+      // so an in-place mutation left the Books & Scrolls counts stuck on the phase-1
+      // empty projection after any refresh (e.g. switching visibility mode).
+      selectedSystemData = {
+        ...selectedSystemData,
+        recipeItemDefinitions: await _enrichRecipeItemLibrary(
+          selectedSystemData.recipeItemDefinitions,
+          recipeListData.recipes
+        ),
+      };
+    }
+
     // The derived system-validation report. Reads the system's recipes /
     // components and the environments just listed (each annotated with its
     // composition view-model). Computed once per refresh for the GM overview.
@@ -4433,6 +4647,18 @@ export function createAdminStore(services) {
     await systemManager.updateSystem(sysId, { resolutionMode: nextMode });
     await refresh();
     return true;
+  }
+
+  // Flat system-level visibility strategy (issue 511, PR-B). Non-destructive:
+  // unlike setResolutionMode, switching visibilityMode migrates no recipes and
+  // needs no confirm — it only re-gates the Crafting authoring surface. Just
+  // persist the new enum and refresh so the projection's craftingEffect updates.
+  async function setVisibilityMode(mode) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    await systemManager.updateSystem(sysId, { visibilityMode: mode });
+    await refresh();
   }
 
   // Salvage resolution mode is non-destructive: updateSystem runs only the inline
@@ -6759,103 +6985,104 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  async function saveVisibilityConfig(
-    configOrListMode,
-    knowledgeMode,
-    consumeOnLearn,
-    extras = {}
-  ) {
+  // Live-apply a per-recipe-item caps patch (issue 511). The Books & Scrolls
+  // per-item page calls this with single-field patches (e.g. `{ item: { limitUses } }`
+  // or `{ learn: { maxRecipes } }`); the manager merges the rest from the persisted
+  // definition, so the surface stages no dirty draft.
+  async function updateRecipeItemCaps(recipeItemId, capsPatch = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
-    if (!sysId) return;
-    const system = systemManager.getSystem(sysId);
-    if (!system) return;
-
-    const existing = system.recipeVisibility || {};
-    const currentKnowledge = existing.knowledge || {};
-    const currentItem = currentKnowledge.item || {};
-    const currentLearn = currentKnowledge.learn || {};
-    const normalizedConfig =
-      typeof configOrListMode === 'object' && configOrListMode !== null
-        ? configOrListMode
-        : {
-            listMode: configOrListMode,
-            knowledgeMode,
-            consumeOnLearn,
-            ...extras,
-          };
-    const nextListMode = normalizedConfig.listMode || existing.listMode || 'global';
-    const nextKnowledgeMode =
-      normalizedConfig.knowledgeMode || currentKnowledge.mode || 'itemOrLearned';
-    const nextLimitUses =
-      normalizedConfig.limitUses !== undefined
-        ? normalizedConfig.limitUses === true
-        : currentItem.limitUses === true;
-    const rawMaxUses =
-      normalizedConfig.maxUses !== undefined ? normalizedConfig.maxUses : currentItem.maxUses;
-    const nextMaxUses =
-      nextLimitUses && Number.isFinite(Number(rawMaxUses)) && Number(rawMaxUses) > 0
-        ? Number(rawMaxUses)
-        : undefined;
-    const nextDestroyWhenExhausted = nextLimitUses
-      ? normalizedConfig.destroyWhenExhausted !== undefined
-        ? normalizedConfig.destroyWhenExhausted === true
-        : currentItem.destroyWhenExhausted === true
-      : false;
-    // `consumeOnLearn` is always merged from the patch or the persisted value —
-    // never zeroed while the learn cap is on — so toggling `limitRecipes` off
-    // again preserves the GM's prior consume-on-learn choice (issue 511, UN4).
-    const nextConsumeOnLearn =
-      normalizedConfig.consumeOnLearn !== undefined
-        ? normalizedConfig.consumeOnLearn !== false
-        : currentLearn.consumeOnLearn !== false;
-    const nextDragDropEnabled =
-      normalizedConfig.dragDropEnabled !== undefined
-        ? normalizedConfig.dragDropEnabled !== false
-        : currentLearn.dragDropEnabled !== false;
-    // Recipe-item learn cap (issue 511), mirroring the item-cap cascade above.
-    const nextLimitRecipes =
-      normalizedConfig.limitRecipes !== undefined
-        ? normalizedConfig.limitRecipes === true
-        : currentLearn.limitRecipes === true;
-    const rawMaxRecipes =
-      normalizedConfig.maxRecipes !== undefined
-        ? normalizedConfig.maxRecipes
-        : currentLearn.maxRecipes;
-    const nextMaxRecipes =
-      nextLimitRecipes && Number.isFinite(Number(rawMaxRecipes)) && Number(rawMaxRecipes) > 0
-        ? Number(rawMaxRecipes)
-        : undefined;
-    const nextDestroyWhenSpent = nextLimitRecipes
-      ? normalizedConfig.destroyWhenSpent !== undefined
-        ? normalizedConfig.destroyWhenSpent === true
-        : currentLearn.destroyWhenSpent === true
-      : false;
-    const recipeVisibility = {
-      ...existing,
-      listMode: nextListMode,
-      knowledge: {
-        ...currentKnowledge,
-        mode: nextKnowledgeMode,
-        item: {
-          ...currentItem,
-          limitUses: nextLimitUses,
-          maxUses: nextMaxUses,
-          destroyWhenExhausted: nextDestroyWhenExhausted,
-        },
-        learn: {
-          ...currentLearn,
-          consumeOnLearn: nextConsumeOnLearn,
-          dragDropEnabled: nextDragDropEnabled,
-          limitRecipes: nextLimitRecipes,
-          maxRecipes: nextMaxRecipes,
-          destroyWhenSpent: nextDestroyWhenSpent,
-        },
-      },
-    };
-
-    await systemManager.updateSystem(sysId, { recipeVisibility });
+    if (!sysId || !recipeItemId) return;
+    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, { caps: capsPatch });
     await refresh();
+  }
+
+  // Set which books/scrolls a recipe belongs to from the recipe side (issue 511
+  // many-to-many). Reconciles each definition's `recipeIds` so the recipe is a member
+  // of exactly `bookIds`. Writes only the definitions that actually change (via
+  // updateRecipeItemDefinition — no "Recipe updated" toast), then refreshes.
+  async function setRecipeBookMembership(recipeId, bookIds = []) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeId) return;
+    const rid = String(recipeId);
+    const wanted = new Set((Array.isArray(bookIds) ? bookIds : []).map((id) => String(id)));
+    const system = systemManager.getSystem?.(sysId);
+    const definitions = Array.isArray(system?.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+    let changed = false;
+    for (const def of definitions) {
+      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) => String(id));
+      const has = currentIds.includes(rid);
+      const want = wanted.has(String(def.id));
+      if (has === want) continue;
+      const next = want ? [...new Set([...currentIds, rid])] : currentIds.filter((id) => id !== rid);
+      await systemManager.updateRecipeItemDefinition(sysId, def.id, { recipeIds: next });
+      changed = true;
+    }
+    if (changed) await refresh();
+  }
+
+  // Enable / disable a single recipe item from the Books & Scrolls library row or
+  // item-page toggle (issue 511). Persists only the `enabled` flag and refreshes;
+  // navigation to the per-item editor is the router's concern, not the store's.
+  async function setRecipeItemEnabled(recipeItemId, enabled) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeItemId) return;
+    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, { enabled: enabled !== false });
+    await refresh();
+  }
+
+  // Persist the full recipe-item editor draft in a single call (issue 511, PR-B).
+  // The router owns the draft and passes the complete `{ enabled, sourceItemUuid,
+  // caps }` snapshot; the manager patch accepts these fields. Refreshes projections
+  // (resolved name/img/type + derived recipes[]) on success.
+  async function saveRecipeItem(recipeItemId, patch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeItemId) return false;
+    try {
+      await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, patch);
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to save recipe item:', err);
+      services.notify?.error?.(err?.message || 'Failed to save recipe item');
+      return false;
+    }
+  }
+
+  // Delete a recipe-item definition after a confirm (issue 511, PR-B). Returns
+  // false when cancelled or on error so the editor route can stay open.
+  async function deleteRecipeItemDefinition(recipeItemId) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId || !recipeItemId) return false;
+    const confirmed = await services.confirmDialog?.({
+      title: services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') || 'Delete recipe item?',
+      content: `<p>${services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteContent') || 'Delete this recipe item? Recipes linked to it will be unlinked.'}</p>`,
+      yes: () => true,
+      no: () => false,
+    });
+    if (!confirmed) return false;
+    try {
+      await systemManager.deleteRecipeItemDefinition(sysId, recipeItemId);
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to delete recipe item:', err);
+      services.notify?.error?.(err?.message || 'Failed to delete recipe item');
+      return false;
+    }
+  }
+
+  function confirmDiscardDirtyRecipeItemDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.RecipeItem.DiscardDirtyContent',
+      'The current recipe item has unsaved changes. Discard them and continue?'
+    );
   }
 
   async function saveTeaserConfig(teaserConfig) {
@@ -6944,6 +7171,47 @@ export function createAdminStore(services) {
     } catch (err) {
       console.error('Fabricate | Failed to toggle recipe enabled state:', err);
       services.notify?.error?.(err?.message || 'Failed to update recipe');
+      return false;
+    }
+  }
+
+  /**
+   * The player-character roster for the Access tab's Characters list. Sourced
+   * through the injected service so the store never touches `game.*`. Returns
+   * `[{ id, name, img }]` (name-sorted) or `[]` when the service is absent.
+   * The Players roster reuses the existing `worldUsers` projection.
+   * @returns {Array<{id: string, name: string, img: string}>}
+   */
+  function getPcRoster() {
+    return services.getPlayerCharacterActors?.() || [];
+  }
+
+  /**
+   * Persist a recipe's full access grant. The whole `access` object is replaced
+   * (updateRecipe does a shallow top-level merge), so callers must always pass the
+   * complete `{ characterIds, playerIds }` snapshot — never a partial patch.
+   * Mirrors toggleRecipeEnabled: allowIncomplete so an authoring shell's grant can
+   * be edited before it is craftable, then refreshes projections.
+   * @param {string} recipeId
+   * @param {{characterIds?: string[], playerIds?: string[]}} access
+   * @returns {Promise<boolean>}
+   */
+  async function saveRecipeAccess(recipeId, access = {}) {
+    const recipeManager = services.getRecipeManager();
+    const characterIds = Array.isArray(access.characterIds) ? access.characterIds : [];
+    const playerIds = Array.isArray(access.playerIds) ? access.playerIds : [];
+
+    try {
+      await recipeManager.updateRecipe(
+        recipeId,
+        { access: { characterIds, playerIds } },
+        { allowIncomplete: true }
+      );
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to save recipe access:', err);
+      services.notify?.error?.(err?.message || 'Failed to update recipe access');
       return false;
     }
   }
@@ -7161,6 +7429,7 @@ export function createAdminStore(services) {
     deleteSystem,
     saveSystemDetails,
     setResolutionMode,
+    setVisibilityMode,
     setSalvageResolutionMode,
     setTab,
     selectEnvironment,
@@ -7273,14 +7542,21 @@ export function createAdminStore(services) {
     clearCurrencyMacro,
     seedCurrencyUnitPresets,
     saveAlchemyConfig,
-    saveVisibilityConfig,
     saveTeaserConfig,
     createRecipe,
     deleteRecipe,
     duplicateRecipe,
     toggleRecipeEnabled,
     updateRecipe,
+    getPcRoster,
+    saveRecipeAccess,
     addRecipeItemFromUuid,
+    updateRecipeItemCaps,
+    setRecipeBookMembership,
+    setRecipeItemEnabled,
+    saveRecipeItem,
+    deleteRecipeItemDefinition,
+    confirmDiscardDirtyRecipeItemDraft,
     importRecipes,
     exportRecipes,
     exportSystem,

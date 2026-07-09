@@ -193,25 +193,33 @@ CraftingSystem = {
   //     // duplicate `NdS` groups (1d20 + 1d20) are disambiguated 0/1. Per-die aggregates
   //     // read the active-only raw faces; with no per-die data they fail open (no break).
 
+  // Canonical, flat recipe-visibility strategy (issue 511, PR-B). One enum that
+  // supersedes the compound recipeVisibility.listMode + knowledge.mode pair and is
+  // the single knob gating the whole Crafting authoring surface and the player book
+  // affordances. Seeded from the legacy recipeVisibility block by the 1.12.0
+  // migration; when absent the runtime derives the same fallback. Switching it is
+  // non-destructive (migrates no recipes).
+  //   global     — every recipe visible to all players
+  //   restricted — per-recipe/character grants (the legacy "player" list mode)
+  //   item       — craft only while holding the linked book; use cap applies, no Learn
+  //   knowledge  — learn the recipe from the book; learn cap applies
+  visibilityMode: "global" | "restricted" | "item" | "knowledge", // default "knowledge"
+
+  // LEGACY recipe-visibility strategy, superseded by visibilityMode above. It is no
+  // longer UI-authored (the crafting Settings page writes visibilityMode); it is
+  // retained on read as the derivation source when visibilityMode is absent, and its
+  // residual knowledge.learn.dragDropEnabled is still normalized.
   recipeVisibility: {
     listMode: "global" | "player" | "knowledge",  // default "global"
 
-    // Required only when listMode === "knowledge"; ignored in "global" and "player" modes.
+    // Recipe visibility STRATEGY only. Required only when listMode === "knowledge";
+    // ignored in "global" and "player" modes. The recipe-item use/learn caps are no
+    // longer here — each recipe item owns them (RecipeItemDefinition.caps); see below.
     knowledge?: {
       mode: "item" | "learned" | "itemOrLearned",
 
-      item?: {
-        limitUses: boolean,
-        maxUses?: number,
-        destroyWhenExhausted?: boolean,
-      },
-
       learn?: {
-        consumeOnLearn: boolean, // default true
         dragDropEnabled: boolean, // default true; controls actor-drop auto-learn behaviour
-        limitRecipes: boolean,       // default false; enables the per-recipe-item learn cap
-        maxRecipes?: number,         // finite integer > 0; meaningful only when limitRecipes is true
-        destroyWhenSpent?: boolean,  // default false; destroy the recipe item once its learn budget is spent
       },
     },
   },
@@ -445,17 +453,25 @@ Additionally, the config-level `canAfford` and `decrement` macros must be set (t
 
 ### Recipe Visibility Requirements
 
-1. `listMode` must be one of `"global"`, `"player"`, or `"knowledge"`.
+0. `visibilityMode` is the **canonical** recipe-visibility strategy and must be one of `"global"`, `"restricted"`, `"item"`, or `"knowledge"`; unknown, missing, or invalid values normalize to `"knowledge"`.
+It supersedes the legacy `recipeVisibility.listMode` + `knowledge.mode` pair (which requirements 1–8 below describe) and gates the whole Crafting authoring surface (nav group, Settings effect panel, Books & Scrolls, limited-use, learning limits) plus the player book affordances.
+The `1.12.0` migration seeds it from the legacy block (`global`→`global`, `player`→`restricted`, `knowledge`+`item`→`item`, `knowledge`+`learned`/`itemOrLearned`→`knowledge`, `teaser`→`global` with `teaserConfig` preserved, absent/invalid→`knowledge`).
+A stored value is normalized on read to one of the four (unknown/absent→`knowledge`); the visibility runtime instead derives from the legacy pair only for a raw/un-normalized system that carries no `visibilityMode` (`player`→`restricted`, `knowledge`+`item`→`item`, `knowledge`+learning→`knowledge`, else `global`).
+Switching `visibilityMode` migrates no recipes and needs no confirmation.
+The legacy `recipeVisibility` block is retained on read as the derivation source and for its residual `knowledge.learn.dragDropEnabled`.
+1. `listMode` (legacy) must be one of `"global"`, `"player"`, or `"knowledge"`.
 Invalid or missing values default to `"global"`.
 2. The `knowledge` sub-object is only meaningful when `listMode === "knowledge"`.
 3. When `listMode === "global"`, all enabled recipes are visible to all users without restriction or knowledge filtering.
 4. `knowledge.learn.dragDropEnabled` controls automatic learning from actor item drops when knowledge learning is enabled; default is `true`.
 5. If `knowledge.learn.dragDropEnabled` is `false`, automatic actor-drop learning is disabled and manual learn UI affordances must be used.
-6. `knowledge.learn.limitRecipes` enables the per-recipe-item learn cap; default is `false`.
-`knowledge.learn.maxRecipes` is normalized to a finite integer `> 0` and is retained only when `limitRecipes === true`, mirroring how `knowledge.item.maxUses` is retained only when `knowledge.item.limitUses === true`.
-A `limitRecipes === true` system with a missing or invalid `maxRecipes` is treated as uncapped at runtime (fails closed to the unlimited learn path), not as a zero budget.
-7. `knowledge.learn.destroyWhenSpent` removes the recipe item once its learn budget is spent; default is `false`.
-It is deliberately distinct from the item craft-charge flag `knowledge.item.destroyWhenExhausted` and must not be normalized to a shared name.
+6. The per-recipe-item use and learn caps are NOT on `recipeVisibility.knowledge`.
+They live on each recipe item definition (`RecipeItemDefinition.caps`, see that model), so two recipe items in one system may carry different caps.
+`caps.learn.limitRecipes` enables that item's learn cap; `caps.learn.maxRecipes` is normalized to a finite integer `> 0` and is retained only when `limitRecipes === true`, mirroring how `caps.item.maxUses` is retained only when `caps.item.limitUses === true`.
+A `limitRecipes === true` item with a missing or invalid `maxRecipes` is treated as uncapped at runtime (fails closed to the unlimited learn path), not as a zero budget.
+7. `caps.learn.destroyWhenSpent` removes the recipe item once its learn budget is spent; default is `false`.
+It is deliberately distinct from the item craft-charge flag `caps.item.destroyWhenExhausted` and must not be normalized to a shared name.
+8. The `1.11.0` migration seeds every existing recipe item's `caps` from the system's old `knowledge.item` / `knowledge.learn` values and strips those fields from `recipeVisibility.knowledge`, so existing worlds keep their behaviour while new recipe items default uncapped.
 
 ## EssenceDefinition
 
@@ -499,6 +515,45 @@ RecipeItemDefinition = {
   img: string,
   description?: string,
   sourceItemUuid: string,
+
+  // Canonical recipe↔book membership (issue 511, PR-B). Many-to-many: a recipe may
+  // belong to several books, and a book may contain several recipes. This inverts the
+  // former scalar recipe.recipeItemId reverse ref (removed by the 1.13.0 migration).
+  // Authored on the Books & Scrolls item Contents tab.
+  recipeIds: string[],               // default []
+
+  // Per-recipe-item use/learn caps (issue 511). Each recipe item owns its own caps
+  // rather than sharing one system-wide config, so a one-recipe scroll and a
+  // three-recipe tome in the same system can differ. Absent caps normalize to
+  // uncapped (the default for a new recipe item). The PR-B redesign renamed several
+  // cap fields; the NEW names are canonical for new writes, and each legacy name is
+  // kept persisted and in sync so an un-migrated raw cap still loads.
+  caps: {
+    item: {
+      limitUses: boolean,            // default false; enables the craft-charge cap
+      maxUses?: number,              // times the item grants crafting access
+      whenSpent?: "destroyed" | "inert", // canonical; what happens when uses run out —
+                                     // "destroyed" removes the item, "inert" keeps it but
+                                     // stops granting craftability. Derives from / mirrors
+                                     // the legacy destroyWhenExhausted boolean.
+      destroyWhenExhausted?: boolean, // legacy mirror of whenSpent === "destroyed"
+    },
+    learn: {
+      consumeOnLearn: boolean,       // default true; consume on drag-drop auto-learn
+      limitLearning: boolean,        // canonical; enables the learn cap (legacy: limitRecipes)
+      learnsAllowed?: number,        // canonical; finite integer > 0 (legacy: maxRecipes)
+      learnScope?: "perInstance" | "total", // canonical; "perInstance" (default) counts per
+                                     // physical item document, "total" draws all actors from
+                                     // one shared world pool keyed system::defId
+                                     // (legacy mirror: learningMode "party" ⇔ "total")
+      prerequisite?: string | null,  // recipeId a reader must already have learned first
+      destroyWhenSpent?: boolean,    // default false; destroy the item once its learn budget is spent
+      // Legacy mirrors kept in sync with the canonical fields above:
+      limitRecipes?: boolean,        // legacy mirror of limitLearning
+      maxRecipes?: number,           // legacy mirror of learnsAllowed
+      learningMode?: "once" | "ntimes" | "party", // legacy mirror derived from learnScope/learnsAllowed
+    },
+  },
 }
 ```
 
@@ -507,8 +562,16 @@ RecipeItemDefinition = {
 1. `sourceItemUuid` points to the canonical world or compendium item template used for recipe-item matching.
 2. New recipe item definitions are created from dropped or selected Foundry items; manual UUID entry is not part of the canonical UI flow.
 3. If the source template later becomes unresolved, the stored `sourceItemUuid` is retained and the definition becomes stale-but-readable.
-4. Multiple recipes may reference the same recipe item definition.
+4. `recipeIds[]` is the **canonical** recipe↔book membership (issue 511, PR-B): it is many-to-many, so a book may contain several recipes and a recipe may belong to several books.
 This is the canonical way to model shared formulas, books, schematics, or recipe scrolls.
+The scalar reverse ref `recipe.recipeItemId` (and the legacy `recipe.linkedRecipeItemUuid` book alias) is removed by the `1.13.0` migration, which inverts it onto `recipeIds`; membership is authored book-side on the Contents tab, and the runtime falls back to the legacy reverse ref only for a fully un-migrated system (no book carries `recipeIds` yet).
+5. `caps` holds this recipe item's own use and learn caps.
+The use cap (`caps.item.limitUses` / `maxUses` / `whenSpent`) governs how many times holding the item grants crafting access; the learn cap (`caps.learn.limitLearning` / `learnsAllowed` / `learnScope` / `destroyWhenSpent`) governs how many of the item's linked recipes may be learned from it.
+The PR-B redesign renamed the cap fields; the new names are canonical and each legacy name (`destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) is persisted and kept in sync so an un-migrated raw cap still loads.
+`caps.learn.destroyWhenSpent` is deliberately distinct from `caps.item.whenSpent === "destroyed"` (`destroyWhenExhausted`) and must not be normalized to a shared name.
+6. `caps.learn.learnScope` selects the learn-cap counter scope: `"perInstance"` (default) counts against each physical item document (`recipeItemLearning.learnedCount`), while `"total"` draws every actor's learns from one GM-authoritative shared world pool keyed `system::defId`.
+7. The `1.11.0` migration seeds `caps` on every existing recipe item from the system's former `recipeVisibility.knowledge.item` / `.learn` values, then strips those fields from the system config.
+Recipe items created after the migration default to uncapped.
 
 ## Component
 
@@ -600,12 +663,27 @@ Recipe = {
   // otherwise. Semantics in 004.
   minSuccessOutcomeId?: string | null,
 
+  // Per-recipe access grants for the `restricted` visibility mode (issue 511, PR-B).
+  // Which specific player-characters and players may see/read this recipe. Each is a
+  // deduped list of non-empty id strings. Read-forward: when both lists are empty, the
+  // player grants are seeded once from the legacy visibility.allowedUserIds.
+  access: {
+    characterIds: string[], // Actor ids of granted player-characters (visible to a viewer who controls the actor)
+    playerIds: string[],    // User ids of granted players (visible to that user directly)
+  },
+
+  // LEGACY player-list visibility. Superseded by `access` above (read-forward source
+  // for its player grants). Retained on read as the un-migrated restricted-mode fallback.
   visibility?: {
     restricted: boolean,
     allowedUserIds?: string[],  // Required when restricted is true. Empty array = hidden from all non-GM users.
   },
 
-  // Canonical recipe-item definition reference inside the owning crafting system
+  // LEGACY scalar recipe→book reverse ref. Membership was inverted to the many-to-many
+  // RecipeItemDefinition.recipeIds[] (issue 511, PR-B); the 1.13.0 migration removes
+  // this field. It survives only as an un-migrated read fallback. (recipe.linkedRecipeItemUuid
+  // — not shown here — is a separate legacy alias the same migration strips only when it
+  // resolved a book, preserving a standalone alchemy formula-item link.)
   recipeItemId?: string,
 
   locked: boolean,
@@ -640,11 +718,16 @@ Recipe = {
 7. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
 8. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
-9. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array.
-An empty array is valid and means no non-GM user may see the recipe.
-10. If knowledge mode includes item matching or learning, `recipeItemId` should be configured for player craftability.
-11. If `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
-12. If `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
+9. `access` is the canonical per-recipe grant for `restricted` visibility mode (issue 511, PR-B): `access.characterIds` grants named player-characters and `access.playerIds` grants named players.
+Each normalizes to a deduped list of non-empty id strings (non-string entries are dropped).
+When both lists are empty, the player grants are read-forward once from the legacy `visibility.allowedUserIds`, so a pre-`access` recipe keeps showing to the same players after the runtime switches to reading `access`.
+An `access` grant with both lists empty means no non-GM user may see the recipe (the GM always can).
+9a.
+The legacy `visibility` block is retained on read as the `access` read-forward source and the un-migrated fallback: if `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array; an empty array is valid and means no non-GM user may see the recipe.
+10. If `visibilityMode` is `item` or `knowledge`, the recipe should be a member of at least one recipe item definition (`RecipeItemDefinition.recipeIds`, the canonical membership since issue 511 PR-B) for player craftability.
+The legacy scalar `recipeItemId` requirements below still hold for un-migrated systems that resolve membership through the reverse-ref fallback.
+11. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
+12. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
 13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `004`); it defaults to `null`.
 It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
 An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
@@ -669,7 +752,8 @@ Define matching between a recipe's system-managed recipe item definition and own
 
 ### Canonical Link
 
-- `Recipe.recipeItemId` stores the reference to a `CraftingSystem.recipeItemDefinitions[].id` entry.
+- `RecipeItemDefinition.recipeIds[]` stores the canonical recipe↔book membership (issue 511, PR-B, many-to-many): each definition lists the recipe ids it contains, so a recipe may belong to several books.
+- The legacy scalar `Recipe.recipeItemId` (removed by the `1.13.0` migration) stored a single reference to a `CraftingSystem.recipeItemDefinitions[].id` entry; it survives only as an un-migrated read fallback.
 - `RecipeItemDefinition.sourceItemUuid` stores the canonical template reference to the recipe item.
 - The template may point to a world item or a compendium item.
 
@@ -1328,9 +1412,9 @@ Requirements:
 
 1. `timesUsed` must be a non-negative integer.
 2. Usage is tracked per owned item instance.
-3. Maximum uses is configured in `CraftingSystem.recipeVisibility.knowledge.item.maxUses`.
+3. Maximum uses is configured per recipe item in `RecipeItemDefinition.caps.item.maxUses` (enabled by `caps.item.limitUses`), resolved from the recipe's linked definition.
 4. When `timesUsed >= maxUses`, the item is exhausted.
-5. If `destroyWhenExhausted` is true, the item is destroyed when exhausted.
+5. If `caps.item.destroyWhenExhausted` is true, the item is destroyed when exhausted.
 
 ### Recipe Item Learning Flag
 
@@ -1346,12 +1430,13 @@ Item.flags.fabricate.recipeItemLearning = {
 Requirements:
 
 1. `learnedCount` must be a non-negative integer.
-2. The count is tracked per owned item **document** instance, so a stacked `qty > 1` document shares one count.
+2. This document-instance counter backs the `caps.learn.learnScope === "perInstance"` (default) scope; the count is tracked per owned item **document** instance, so a stacked `qty > 1` document shares one count.
 3. It accumulates across every actor that holds the document and is **not** reset on transfer or ownership change.
-4. The learn cap is configured in `CraftingSystem.recipeVisibility.knowledge.learn.maxRecipes` (enabled by `limitRecipes`).
-5. When `learnedCount >= maxRecipes`, the learn budget is spent and no further recipe may be learned from the item.
-6. If `knowledge.learn.destroyWhenSpent` is true, the recipe item is destroyed when its budget is spent.
+4. The learn cap is configured per recipe item in `RecipeItemDefinition.caps.learn.learnsAllowed` (enabled by `caps.learn.limitLearning`; legacy mirrors `maxRecipes`/`limitRecipes`), resolved from the recipe's member book definition.
+5. When `learnedCount >= learnsAllowed`, the learn budget is spent and no further recipe may be learned from the item.
+6. If `caps.learn.destroyWhenSpent` is true, the recipe item is destroyed when its budget is spent.
 7. This counter is independent of `recipeItemUsage.timesUsed` (craft-charges); the two are never conflated.
+8. When `caps.learn.learnScope === "total"`, the learn budget is NOT this per-document counter but a single GM-authoritative shared world pool keyed `system::defId` (the recipe-item party learn pool); every actor's learns draw from that one budget.
 
 ### Tool Item Usage Flag
 
@@ -1636,17 +1721,21 @@ The following canonical field names must be used in all new writes:
 | Result | `componentId` | Produced item component reference |
 | CraftingSystem | `components` | Array of managed item entries |
 | CraftingSystem | `recipeItemDefinitions` | Array of managed recipe-item entries |
+| CraftingSystem | `visibilityMode` | Canonical flat recipe-visibility strategy (`global`/`restricted`/`item`/`knowledge`); supersedes legacy `recipeVisibility.listMode` + `knowledge.mode` |
 | IngredientSet | `ingredientGroups` | Array of ingredient group objects |
 | Recipe | `resultGroups` | Array of result group objects |
-| Recipe | `recipeItemId` | Recipe item definition reference |
+| Recipe | `access` | Per-recipe restricted-mode grants (`{ characterIds, playerIds }`); read-forward from legacy `visibility.allowedUserIds` |
+| ~~Recipe~~ `recipeItemId` | *(legacy)* | Removed by the 1.13.0 migration; membership inverted to `RecipeItemDefinition.recipeIds` |
 | EssenceDefinition | `sourceComponentId` | Managed component source reference |
 | EssenceDefinition | `sourceItemUuid` | Resolved or legacy template item evidence for effect transfer |
 | Component | `sourceItemUuid` | Template item reference |
 | RecipeItemDefinition | `sourceItemUuid` | Template item reference |
+| RecipeItemDefinition | `recipeIds` | Canonical recipe↔book membership (many-to-many); inverts the removed `Recipe.recipeItemId` |
+| RecipeItemDefinition | `caps` | Per-recipe-item use/learn caps (`caps.item`, `caps.learn`); canonical cap fields `whenSpent`, `limitLearning`, `learnsAllowed`, `learnScope` (legacy mirrors `destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) |
 | CraftingSystem | `itemTags` | Array of tag strings |
 | Item flag | `toolUsage.timesUsed` | Tool usage tracking (legacy `catalystItemUsage.timesUsed` read as fallback) |
-| Item flag | `recipeItemUsage.timesUsed` | Recipe-item craft-charge tracking (`knowledge.item` cap) |
-| Item flag | `recipeItemLearning.learnedCount` | Recipe-item learn-cap tracking (`knowledge.learn` cap), per document instance |
+| Item flag | `recipeItemUsage.timesUsed` | Recipe-item craft-charge tracking (`RecipeItemDefinition.caps.item` cap) |
+| Item flag | `recipeItemLearning.learnedCount` | Recipe-item learn-cap tracking (`RecipeItemDefinition.caps.learn` cap), per document instance |
 
 ### Legacy Read Aliases
 

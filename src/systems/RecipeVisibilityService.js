@@ -1,6 +1,8 @@
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { getItemSourceReferences } from '../utils/sourceUuid.js';
 
+import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
+
 const LEARN_RECIPE_MESSAGES = {
   systemNotFound: 'FABRICATE.Knowledge.SystemNotFound',
   learningDisabled: 'FABRICATE.Knowledge.LearningDisabled',
@@ -8,19 +10,27 @@ const LEARN_RECIPE_MESSAGES = {
   alreadyLearned: 'FABRICATE.Knowledge.AlreadyLearned',
   noMatchingItem: 'FABRICATE.Knowledge.NoMatchingItem',
   learnBudgetSpent: 'FABRICATE.Knowledge.LearnBudgetSpent',
+  prerequisiteNotMet: 'FABRICATE.Knowledge.PrerequisiteNotMet',
   learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe',
   learnedRecipes: 'FABRICATE.Knowledge.LearnedRecipes',
   learnedRecipesPartial: 'FABRICATE.Knowledge.LearnedRecipesPartial',
   noNewRecipesLearned: 'FABRICATE.Knowledge.NoNewRecipesLearned',
 };
 
+const VISIBILITY_MODES = ['global', 'restricted', 'item', 'knowledge'];
+
 /**
  * Visibility, knowledge access, and learn-state service.
  */
 export class RecipeVisibilityService {
-  constructor(recipeManager, craftingSystemManager) {
+  constructor(
+    recipeManager,
+    craftingSystemManager,
+    partyLearnPool = createDefaultPartyLearnPool()
+  ) {
     this.recipeManager = recipeManager;
     this.craftingSystemManager = craftingSystemManager;
+    this._partyLearnPool = partyLearnPool;
   }
 
   _getCraftingSystem(recipe) {
@@ -28,8 +38,57 @@ export class RecipeVisibilityService {
     return this.craftingSystemManager?.getSystem(recipe.craftingSystemId) || null;
   }
 
-  _isRecipeVisibleByPlayerListMode(recipe, viewer) {
+  // Resolve the flat system-level visibility mode (issue 511, PR-B). Prefers the new
+  // `system.visibilityMode` enum; when absent (legacy world, or a raw fixture) it
+  // derives one from the old `recipeVisibility.listMode` + `knowledge.mode`:
+  //   global → global · player → restricted · knowledge+item → item ·
+  //   knowledge+(learned|itemOrLearned) → knowledge · teaser → teaser (handled
+  //   separately) · missing/unknown → global (the legacy default).
+  _getVisibilityMode(system) {
+    // Legacy teaser is not representable in the flat enum and keeps its own
+    // teaserConfig-driven runtime, so a system still flagged `listMode: 'teaser'`
+    // resolves to teaser regardless of the (possibly-defaulted) `visibilityMode`.
+    // (The migration maps teaser → global for the authoring enum but preserves
+    // teaserConfig — teaser retirement is a flagged product decision.)
+    if (system?.recipeVisibility?.listMode === 'teaser') return 'teaser';
+
+    const mode = system?.visibilityMode;
+    if (VISIBILITY_MODES.includes(mode)) return mode;
+
+    const listMode = system?.recipeVisibility?.listMode;
+    if (listMode === 'player') return 'restricted';
+    if (listMode === 'knowledge') {
+      const knowledgeMode = system?.recipeVisibility?.knowledge?.mode || 'itemOrLearned';
+      return knowledgeMode === 'item' ? 'item' : 'knowledge';
+    }
+    return 'global';
+  }
+
+  // Whether the system carries an authored flat `visibilityMode`. When it does, the
+  // item/knowledge modes drive the knowledge sub-mode (item → 'item', knowledge →
+  // 'itemOrLearned'); when it does not, the legacy `knowledge.mode` is honored as-is
+  // so migrated 'learned' systems keep their learned-only semantics.
+  _usesFlatVisibilityMode(system) {
+    return VISIBILITY_MODES.includes(system?.visibilityMode);
+  }
+
+  // Whether a viewer may see a `restricted`-mode recipe. GM always; otherwise the
+  // per-recipe `access` grant governs (a player id, or a character the viewer
+  // controls). When `access` is absent (legacy recipe) fall back to the old
+  // `visibility.restricted` / `allowedUserIds` player-list gate.
+  _isRecipeVisibleByAccessGrant(recipe, viewer) {
     if (viewer?.isGM) return true;
+
+    const access = recipe?.access;
+    const hasAccess =
+      access && (Array.isArray(access.playerIds) || Array.isArray(access.characterIds));
+    if (hasAccess) {
+      const playerIds = Array.isArray(access.playerIds) ? access.playerIds : [];
+      if (playerIds.includes(viewer?.id)) return true;
+      const characterIds = Array.isArray(access.characterIds) ? access.characterIds : [];
+      return characterIds.some((actorId) => this._viewerControlsCharacter(viewer, actorId));
+    }
+
     const visibility = recipe?.visibility || {};
     if (visibility.restricted !== true) return true;
     return (
@@ -37,14 +96,66 @@ export class RecipeVisibilityService {
     );
   }
 
-  _getRecipeItemDefinition(recipe) {
+  // Whether `viewer` controls the actor `actorId` — either it is their assigned
+  // character, or they hold OWNER permission on it.
+  _viewerControlsCharacter(viewer, actorId) {
+    if (!viewer || !actorId) return false;
+    if (viewer.character?.id === actorId) return true;
+    const actor = globalThis.game?.actors?.get?.(actorId);
+    return actor?.testUserPermission?.(viewer, 'OWNER') === true;
+  }
+
+  // The book/scroll definitions a recipe belongs to (issue 511 many-to-many). Canonical
+  // read is each definition's `recipeIds[]`; a system with no membership authored yet
+  // (fully un-migrated) falls back to the recipe's legacy single reverse ref. Returns a
+  // SET — a recipe may live in several books, each with its own caps.
+  _getRecipeItemDefinitions(recipe) {
     const system = this._getCraftingSystem(recipe);
-    if (!system || !recipe?.recipeItemId) return null;
-    return (
-      this.craftingSystemManager?.getRecipeItemDefinition?.(system.id, recipe.recipeItemId) ||
-      (system.recipeItemDefinitions || []).find((def) => def.id === recipe.recipeItemId) ||
-      null
+    if (!system) return [];
+    const definitions = system.recipeItemDefinitions || [];
+    const rid = String(recipe?.id || '');
+
+    const byMembership = definitions.filter((def) =>
+      (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
     );
+    if (byMembership.length > 0) return byMembership;
+
+    // Only fall back when NO book in the system carries membership yet.
+    const anyMigrated = definitions.some(
+      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
+    );
+    if (anyMigrated) return [];
+
+    const recipeItemId = String(recipe?.recipeItemId || '').trim();
+    if (recipeItemId) {
+      const def = definitions.find((d) => String(d.id) === recipeItemId);
+      return def ? [def] : [];
+    }
+    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+    if (legacyUuid) {
+      const def = definitions.find((d) => String(d.sourceItemUuid || '') === legacyUuid);
+      return def ? [def] : [];
+    }
+    return [];
+  }
+
+  // A single representative definition (the recipe's first member book) — used for
+  // system-wide defaults/previews. Learn/use paths anchor caps on the SELECTED book via
+  // `_matchDefinitionForItem`, not this.
+  _getRecipeItemDefinition(recipe) {
+    return this._getRecipeItemDefinitions(recipe)[0] || null;
+  }
+
+  // Every source uuid that identifies one of the recipe's member books.
+  _getRecipeItemSourceUuids(recipe) {
+    const uuids = new Set();
+    for (const def of this._getRecipeItemDefinitions(recipe)) {
+      const src = String(def?.sourceItemUuid || '').trim();
+      if (src) uuids.add(src);
+    }
+    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+    if (legacyUuid) uuids.add(legacyUuid);
+    return uuids;
   }
 
   _getRecipeItemSourceUuid(recipe) {
@@ -54,17 +165,34 @@ export class RecipeVisibilityService {
   }
 
   _hasRecipeItemReference(recipe) {
-    return Boolean(recipe?.recipeItemId || recipe?.linkedRecipeItemUuid);
+    return (
+      this._getRecipeItemDefinitions(recipe).length > 0 ||
+      Boolean(recipe?.recipeItemId) ||
+      Boolean(recipe?.linkedRecipeItemUuid)
+    );
   }
 
   _isMatchingRecipeItem(recipe, item) {
-    const linked = this._getRecipeItemSourceUuid(recipe);
-    if (!linked || !item) return false;
+    if (!item) return false;
+    const uuids = this._getRecipeItemSourceUuids(recipe);
+    if (uuids.size === 0) return false;
     // Match against the item's full source-reference set — live uuid, compendium
     // source AND `_stats.duplicateSource` — so a book duplicated (dragged) from a
-    // world template still resolves. Source-uuid-only matching loses the link for
-    // world-duplicated copies (the same trap components avoid).
-    return getItemSourceReferences(item).includes(linked);
+    // world template still resolves. A recipe matches if the item is ANY of its books.
+    const refs = getItemSourceReferences(item);
+    return refs.some((ref) => uuids.has(ref));
+  }
+
+  // The member book definition that a specific owned item IS (by source ref), so the
+  // learn/use paths read caps from the book actually being read. Falls back to the
+  // recipe's first member book.
+  _matchDefinitionForItem(recipe, item) {
+    const defs = this._getRecipeItemDefinitions(recipe);
+    if (!item) return defs[0] || null;
+    const refs = getItemSourceReferences(item);
+    return (
+      defs.find((def) => refs.includes(String(def?.sourceItemUuid || '').trim())) || defs[0] || null
+    );
   }
 
   _isActorOwnedItem(ownedItem, actor) {
@@ -97,6 +225,46 @@ export class RecipeVisibilityService {
     });
   }
 
+  // Mark a spent item-charge document 'inert' (issue 511, PR-B `whenSpent: 'inert'`):
+  // keep the item but record its exhaustion so it stops granting craftability. The
+  // usage count is written alongside the flag so `_filterNonExhausted` still excludes
+  // it via `timesUsed >= maxUses`.
+  async _markRecipeItemInert(item, timesUsed) {
+    await setFabricateFlag(item, 'recipeItemUsage', {
+      timesUsed: Math.max(0, Math.floor(timesUsed)),
+      inert: true,
+    });
+  }
+
+  // The learning-limit SCOPE for a recipe's linked recipe item: 'perInstance' (the
+  // cap applies to each physical copy of the item) or 'total' (one shared world pool
+  // across every copy of the source item).
+  _getRecipeItemLearnScope(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    return this._getRecipeItemCaps(recipe, definition).learn.learnScope || 'perInstance';
+  }
+
+  // The recipeId a reader must already have learned before this recipe (or null).
+  _getRecipeItemPrerequisite(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    return this._getRecipeItemCaps(recipe, definition).learn.prerequisite || null;
+  }
+
+  // A reader satisfies a recipe's prerequisite when it is unset, or the actor has
+  // already learned the prerequisite recipe.
+  _isPrerequisiteMet(recipe, actor, definition = this._getRecipeItemDefinition(recipe)) {
+    const prerequisiteId = this._getRecipeItemPrerequisite(recipe, definition);
+    if (!prerequisiteId) return true;
+    return !!this._getLearnedMap(actor)?.[prerequisiteId];
+  }
+
+  // The shared-pool key for a `total`-scope recipe item — system + book-definition
+  // scoped, so distinct books (and distinct systems) keep independent shared budgets.
+  _partyLearnPoolKey(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    const system = this._getCraftingSystem(recipe);
+    const itemKey =
+      definition?.id || recipe?.recipeItemId || recipe?.linkedRecipeItemUuid || 'unknown';
+    return `${system?.id || 'unknown'}::${itemKey}`;
+  }
+
   // Per item-DOCUMENT-instance learn count for the recipe-item learn cap (issue
   // 511). Mirrors `recipeItemUsage.timesUsed` (`_getRecipeItemUsage` /
   // `_setRecipeItemUsage`): the count lives on the physical item document, so a
@@ -118,10 +286,74 @@ export class RecipeVisibilityService {
     return (
       system?.recipeVisibility?.knowledge || {
         mode: 'itemOrLearned',
-        item: { limitUses: false },
-        learn: { consumeOnLearn: true },
+        learn: { dragDropEnabled: true },
       }
     );
+  }
+
+  // Per-recipe-item use/learn caps (issue 511). Caps live on the recipe's linked
+  // recipe item definition (`definition.caps`) rather than one system-wide config,
+  // so two books in the same system can differ. Resolves via the recipe's
+  // `recipeItemId`; a recipe with no resolvable definition FAILS CLOSED to uncapped
+  // (the same permissive default `_getKnowledgeConfig` fell back to, and consistent
+  // with the invalid-cap → unlimited convention). `mode` and `dragDropEnabled` stay
+  // system-wide and are read from `_getKnowledgeConfig`, never from here.
+  _getRecipeItemCaps(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    const caps = definition?.caps;
+    const item = caps?.item || {};
+    const learn = caps?.learn || {};
+
+    // whenSpent (new) — prefer the authored enum; otherwise derive from the legacy
+    // `destroyWhenExhausted` boolean (true → 'destroyed', absent/false → 'inert')
+    // so an un-migrated raw cap keeps its old runtime behaviour (no delete).
+    const whenSpent =
+      item.whenSpent === 'destroyed' || item.whenSpent === 'inert'
+        ? item.whenSpent
+        : item.destroyWhenExhausted === true
+          ? 'destroyed'
+          : 'inert';
+
+    // limitLearning / learnsAllowed / learningMode / prerequisite (new) — prefer the
+    // new fields, else derive from the legacy limitRecipes/maxRecipes pair.
+    const limitLearning =
+      learn.limitLearning === true ||
+      (learn.limitLearning === undefined && learn.limitRecipes === true);
+    const rawLearns = learn.learnsAllowed === undefined ? learn.maxRecipes : learn.learnsAllowed;
+    const learnsAllowed = Number.isFinite(Number(rawLearns)) ? Number(rawLearns) : undefined;
+    // `learnScope` ('perInstance' | 'total') — prefer the new field, else derive from
+    // the legacy `learningMode` ('party' → total shared world pool, else per-copy).
+    const learnScope = ['perInstance', 'total'].includes(learn.learnScope)
+      ? learn.learnScope
+      : learn.learningMode === 'party'
+        ? 'total'
+        : 'perInstance';
+    const learningMode =
+      learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
+    const prerequisite =
+      typeof learn.prerequisite === 'string' && learn.prerequisite ? learn.prerequisite : null;
+
+    return {
+      item: {
+        limitUses: item.limitUses === true,
+        maxUses: item.maxUses,
+        destroyWhenExhausted: item.destroyWhenExhausted === true,
+        whenSpent,
+      },
+      learn: {
+        consumeOnLearn: learn.consumeOnLearn !== false,
+        // Legacy cap fields kept in sync with the new ones so the existing learn-cap
+        // helpers (`_getLearnCapForRecipe`, `_isRecipeItemLearnCapped`) transparently
+        // honor a book authored with only the new `limitLearning`/`learnsAllowed`.
+        limitRecipes: limitLearning,
+        maxRecipes: learnsAllowed,
+        destroyWhenSpent: learn.destroyWhenSpent === true,
+        limitLearning,
+        learnsAllowed,
+        learnScope,
+        learningMode,
+        prerequisite,
+      },
+    };
   }
 
   _collectCandidateItems(recipe, craftingActor, componentSourceActors = []) {
@@ -182,7 +414,13 @@ export class RecipeVisibilityService {
    * collect candidate items directly via `_collectCandidateItems` /
    * `_filterNonExhausted` so they react to what the actor really owns.
    */
-  evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors = [] }) {
+  evaluateKnowledgeAccess({
+    recipe,
+    viewer,
+    craftingActor,
+    componentSourceActors = [],
+    knowledgeMode = null,
+  }) {
     const system = this._getCraftingSystem(recipe);
     const knowledge = this._getKnowledgeConfig(system);
     if (viewer?.isGM) {
@@ -195,13 +433,16 @@ export class RecipeVisibilityService {
       };
     }
 
+    const caps = this._getRecipeItemCaps(recipe);
     const learnedMap = this._getLearnedMap(craftingActor);
     const hasLearned = !!learnedMap?.[recipe.id];
     const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
-    const matchedItems = this._filterNonExhausted(allMatches, knowledge?.item || {});
+    const matchedItems = this._filterNonExhausted(allMatches, caps.item);
     const hasMatchedItem = matchedItems.length > 0;
 
-    const mode = knowledge?.mode || 'itemOrLearned';
+    // A caller may force the knowledge sub-mode (the flat `item`/`knowledge`
+    // visibility modes do this); otherwise honor the system's legacy `knowledge.mode`.
+    const mode = knowledgeMode || knowledge?.mode || 'itemOrLearned';
     let granted = false;
     if (mode === 'item') granted = hasMatchedItem;
     if (mode === 'learned') granted = hasLearned;
@@ -234,12 +475,11 @@ export class RecipeVisibilityService {
    * @returns {boolean}
    */
   isKnowledgeItemExhausted({ recipe, craftingActor, componentSourceActors = [] }) {
-    const system = this._getCraftingSystem(recipe);
-    const knowledge = this._getKnowledgeConfig(system);
-    if (!knowledge?.item?.limitUses) return false;
+    const caps = this._getRecipeItemCaps(recipe);
+    if (!caps.item.limitUses) return false;
     const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
     if (allMatches.length === 0) return false;
-    const nonExhausted = this._filterNonExhausted(allMatches, knowledge.item);
+    const nonExhausted = this._filterNonExhausted(allMatches, caps.item);
     return nonExhausted.length === 0;
   }
 
@@ -424,30 +664,50 @@ export class RecipeVisibilityService {
       return { visible: false, craftable: false, reason: 'alchemy-not-learned', knowledge: null };
     }
 
-    const listMode = system?.recipeVisibility?.listMode || 'global';
+    const mode = this._getVisibilityMode(system);
     let visible;
     let knowledge = null;
 
-    // Teaser mode: handled separately
-    if (listMode === 'teaser') {
+    // Teaser mode: handled separately (legacy `recipeVisibility.listMode === 'teaser'`).
+    if (mode === 'teaser') {
       return this._evaluateTeaserAccess({ recipe, viewer, craftingActor, system });
     }
 
+    // A GM sees every non-teaser recipe; otherwise gate on the resolved mode.
     if (viewer?.isGM) {
       visible = true;
-    } else if (listMode === 'knowledge') {
-      knowledge = this.evaluateKnowledgeAccess({
-        recipe,
-        viewer,
-        craftingActor,
-        componentSourceActors,
-      });
-      visible = knowledge.granted || knowledge.hasMatchedItem;
-    } else if (listMode === 'player') {
-      visible = this._isRecipeVisibleByPlayerListMode(recipe, viewer);
     } else {
-      // Global mode: all enabled recipes are visible to all players.
-      visible = true;
+      switch (mode) {
+        case 'restricted': {
+          visible = this._isRecipeVisibleByAccessGrant(recipe, viewer);
+          break;
+        }
+        case 'item':
+        case 'knowledge': {
+          // `item` → item-only knowledge access; `knowledge` → item-or-learned.
+          // Only force the sub-mode when the flat `visibilityMode` is authored;
+          // legacy systems keep their own `knowledge.mode` (so 'learned' stays
+          // learned-only).
+          const knowledgeMode = this._usesFlatVisibilityMode(system)
+            ? mode === 'item'
+              ? 'item'
+              : 'itemOrLearned'
+            : null;
+          knowledge = this.evaluateKnowledgeAccess({
+            recipe,
+            viewer,
+            craftingActor,
+            componentSourceActors,
+            knowledgeMode,
+          });
+          visible = knowledge.granted || knowledge.hasMatchedItem;
+          break;
+        }
+        default: {
+          // `global` (and any unknown mode) → visible to all players.
+          visible = true;
+        }
+      }
     }
 
     if (!visible) {
@@ -506,14 +766,19 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
     }
 
+    if (!this._isPrerequisiteMet(recipe, craftingActor)) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.prerequisiteNotMet };
+    }
+
     // Learning consumes/anchors a real owned recipe item, so we must evaluate
     // the actor's actual inventory directly rather than trusting
     // `evaluateKnowledgeAccess().matchedItems` — that array is empty on the GM
     // bypass path, which would make a GM who genuinely owns a matching item fail
     // with `noMatchingItem`. Collecting candidates here means a GM (or player)
     // who owns a match can learn, while one who owns none still cannot.
+    const caps = this._getRecipeItemCaps(recipe);
     const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
-    const matchedItems = this._filterNonExhausted(allMatches, knowledge?.item || {});
+    const matchedItems = this._filterNonExhausted(allMatches, caps.item);
     const selected = this._selectDeterministic(matchedItems);
     if (!selected) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
@@ -528,7 +793,7 @@ export class RecipeVisibilityService {
     };
     await this._setLearnedMap(craftingActor, next);
 
-    if (knowledge?.learn?.consumeOnLearn === true) {
+    if (caps.learn.consumeOnLearn === true) {
       await selected.item.delete();
     }
 
@@ -545,16 +810,15 @@ export class RecipeVisibilityService {
   // NOT treated as capped — it fails closed to the uncapped/unlimited learn path
   // (mirroring how `_filterNonExhausted` treats an invalid `maxUses` as
   // unlimited) rather than bricking its linked recipes with a zero budget.
-  _isRecipeItemLearnCapped(recipe) {
-    return Number.isFinite(this._getLearnCapForRecipe(recipe));
+  _isRecipeItemLearnCapped(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    return Number.isFinite(this._getLearnCapForRecipe(recipe, definition));
   }
 
   // The finite positive learn cap for a capped recipe, or undefined.
-  _getLearnCapForRecipe(recipe) {
-    const system = this._getCraftingSystem(recipe);
-    const knowledge = this._getKnowledgeConfig(system);
-    if (knowledge?.learn?.limitRecipes !== true) return;
-    const max = Number(knowledge?.learn?.maxRecipes);
+  _getLearnCapForRecipe(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    const caps = this._getRecipeItemCaps(recipe, definition);
+    if (caps.learn.limitRecipes !== true) return;
+    const max = Number(caps.learn.maxRecipes);
     return Number.isFinite(max) && max > 0 ? max : undefined;
   }
 
@@ -569,7 +833,10 @@ export class RecipeVisibilityService {
 
     const system = this._getCraftingSystem(recipe);
     if (!system) return false;
-    if ((system?.recipeVisibility?.listMode || 'global') !== 'knowledge') return false;
+    // Learning only applies to the knowledge visibility mode (item-only and the
+    // non-knowledge modes never learn). Routed through `_getVisibilityMode` so both
+    // the flat enum and the legacy `listMode`/`knowledge.mode` pair resolve here.
+    if (this._getVisibilityMode(system) !== 'knowledge') return false;
 
     const knowledge = this._getKnowledgeConfig(system);
     if (!['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned')) return false;
@@ -787,20 +1054,34 @@ export class RecipeVisibilityService {
     if (!ownedItem || !actor) return empty;
     if (!this._isActorOwnedItem(ownedItem, actor)) return empty;
 
+    // Caps are read from THIS owned book (the one being read) per recipe — a recipe may
+    // live in several books, and several systems can share one physical item, so each
+    // recipe's cap resolves against the book that IS this item (many-to-many).
     const cappedCandidates = this._getOwnedItemLearningCandidates({
       ownedItem,
       mode: 'manual',
-    }).filter((recipe) => this._isRecipeItemLearnCapped(recipe));
+    }).filter((recipe) =>
+      this._isRecipeItemLearnCapped(recipe, this._matchDefinitionForItem(recipe, ownedItem))
+    );
     if (cappedCandidates.length === 0) return empty;
 
-    // The budget is per item-document instance (mirrors recipeItemUsage). When
-    // several capped systems link the same physical item, use the most permissive
-    // cap; in practice one book links to one system's recipes.
+    // When several capped systems link the same physical item, use the most
+    // permissive cap; in practice one book links to one system's recipes.
     const caps = cappedCandidates
-      .map((recipe) => this._getLearnCapForRecipe(recipe))
+      .map((recipe) =>
+        this._getLearnCapForRecipe(recipe, this._matchDefinitionForItem(recipe, ownedItem))
+      )
       .filter((value) => Number.isFinite(value));
     const maxRecipes = caps.length > 0 ? Math.max(...caps) : undefined;
-    const count = this._getRecipeItemLearnCount(ownedItem);
+    // The spent count is scope-aware: `perInstance` reads the per-copy document
+    // count; `total` reads the shared world pool (which the per-copy count never
+    // reflects), so the reader sees the real remaining budget for either scope.
+    const primary = cappedCandidates[0];
+    const primaryDefinition = this._matchDefinitionForItem(primary, ownedItem);
+    const count =
+      this._getRecipeItemLearnScope(primary, primaryDefinition) === 'total'
+        ? this._partyLearnPool.get(this._partyLearnPoolKey(primary, primaryDefinition))
+        : this._getRecipeItemLearnCount(ownedItem);
     const remainingBudget = Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - count) : 0;
 
     const learnedMap = this._getLearnedMap(actor);
@@ -842,7 +1123,10 @@ export class RecipeVisibilityService {
     ) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
     }
-    if (!this._isRecipeItemLearnCapped(recipe)) {
+    // Caps/scope/prerequisite come from the SPECIFIC owned book being read — a recipe
+    // may belong to several books, each with its own economy (many-to-many).
+    const definition = this._matchDefinitionForItem(recipe, ownedItem);
+    if (!this._isRecipeItemLearnCapped(recipe, definition)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.linkedItemRequired };
     }
 
@@ -851,7 +1135,26 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
     }
 
-    const maxRecipes = this._getLearnCapForRecipe(recipe);
+    if (!this._isPrerequisiteMet(recipe, actor, definition)) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.prerequisiteNotMet };
+    }
+
+    const maxRecipes = this._getLearnCapForRecipe(recipe, definition);
+
+    // `total` scope draws from ONE shared world pool (across every copy of the source
+    // item) instead of the per-copy document count, so every actor spends the same
+    // budget.
+    if (this._getRecipeItemLearnScope(recipe, definition) === 'total') {
+      return this._learnOnePartyRecipe({
+        recipe,
+        ownedItem,
+        actor,
+        learnedMap,
+        maxRecipes,
+        definition,
+      });
+    }
+
     const count = this._getRecipeItemLearnCount(ownedItem);
     const remainingBudget = Number.isFinite(maxRecipes) ? maxRecipes - count : 0;
     if (remainingBudget <= 0) {
@@ -870,11 +1173,64 @@ export class RecipeVisibilityService {
     const nextCount = count + 1;
     await this._setRecipeItemLearnCount(ownedItem, nextCount);
 
-    const knowledge = this._getKnowledgeConfig(this._getCraftingSystem(recipe));
+    const caps = this._getRecipeItemCaps(recipe, definition);
     const spent = Number.isFinite(maxRecipes) && nextCount >= maxRecipes;
     let destroyed = false;
-    if (spent && knowledge?.learn?.destroyWhenSpent === true) {
+    if (spent && caps.learn.destroyWhenSpent === true) {
       await ownedItem.delete?.();
+      destroyed = true;
+    }
+
+    return {
+      success: true,
+      message: LEARN_RECIPE_MESSAGES.learnedRecipe,
+      messageData: { name: recipe.name },
+      destroyed,
+      remainingBudget: Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - nextCount) : 0,
+    };
+  }
+
+  // Learn one recipe from a `party`-mode book against the SHARED world pool. The
+  // shared slot is reserved via the GM-authoritative pool BEFORE the learn is
+  // recorded, so a non-GM (or otherwise failed) increment fails closed — the actor
+  // does not learn and the shared budget is not forked.
+  async _learnOnePartyRecipe({
+    recipe,
+    ownedItem,
+    actor,
+    learnedMap,
+    maxRecipes,
+    definition = this._matchDefinitionForItem(recipe, ownedItem),
+  }) {
+    const key = this._partyLearnPoolKey(recipe, definition);
+    const count = this._partyLearnPool.get(key);
+    const remainingBudget = Number.isFinite(maxRecipes) ? maxRecipes - count : 0;
+    if (remainingBudget <= 0) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.learnBudgetSpent };
+    }
+
+    const reserved = await this._partyLearnPool.increment(key);
+    if (!reserved) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.learnBudgetSpent };
+    }
+
+    const next = {
+      ...learnedMap,
+      [recipe.id]: {
+        learnedAt: Date.now(),
+        sourceItemUuid: ownedItem?.uuid || null,
+      },
+    };
+    await this._setLearnedMap(actor, next);
+
+    const nextCount = count + 1;
+    // Read caps from the SPECIFIC owned book being learned from (per-book), not the
+    // recipe's first member book — the destroy-when-spent decision applies to THIS item.
+    const caps = this._getRecipeItemCaps(recipe, definition);
+    const spent = Number.isFinite(maxRecipes) && nextCount >= maxRecipes;
+    let destroyed = false;
+    if (spent && caps.learn.destroyWhenSpent === true) {
+      await ownedItem?.delete?.();
       destroyed = true;
     }
 
@@ -925,17 +1281,23 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
     }
 
+    if (!this._isPrerequisiteMet(recipe, craftingActor)) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.prerequisiteNotMet };
+    }
+
     // Resolve the owned book document (crafting actor first) the same way the craft
     // and drop paths do — never trust the GM-bypass matchedItems array.
     const matches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
     const selected = this._selectDeterministic(matches);
     if (!selected) return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
 
-    // An EFFECTIVE cap (enabled + finite positive max) routes through the
-    // budget-enforcing capped path; an invalid cap falls through to uncapped.
+    // An EFFECTIVE cap (enabled + finite positive max) on the SELECTED book routes
+    // through the budget-enforcing capped path; an invalid cap falls through to
+    // uncapped.
+    const selectedDefinition = this._matchDefinitionForItem(recipe, selected.item);
     if (
-      this._isRecipeItemLearnCapped(recipe) &&
-      Number.isFinite(this._getLearnCapForRecipe(recipe))
+      this._isRecipeItemLearnCapped(recipe, selectedDefinition) &&
+      Number.isFinite(this._getLearnCapForRecipe(recipe, selectedDefinition))
     ) {
       return this.learnOneRecipeFromItem({
         recipe,
@@ -959,25 +1321,43 @@ export class RecipeVisibilityService {
   async applyRecipeItemUseOnCraft({ recipe, craftingActor, componentSourceActors = [] }) {
     const system = this._getCraftingSystem(recipe);
     if (!system) return;
-    const listMode = system?.recipeVisibility?.listMode || 'player';
-    if (listMode !== 'knowledge') return;
+    // Use-tracking applies to the item-charge modes only (flat `item`/`knowledge`,
+    // or their legacy `listMode: 'knowledge'` equivalents).
+    const visibilityMode = this._getVisibilityMode(system);
+    if (visibilityMode !== 'item' && visibilityMode !== 'knowledge') return;
 
     const knowledge = this._getKnowledgeConfig(system);
     const mode = knowledge?.mode || 'itemOrLearned';
     if (!['item', 'itemOrLearned'].includes(mode)) return;
-    if (!knowledge?.item?.limitUses) return;
+    const caps = this._getRecipeItemCaps(recipe);
+    if (!caps.item.limitUses) return;
 
     const matches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
-    const nonExhausted = this._filterNonExhausted(matches, knowledge.item);
+    const nonExhausted = this._filterNonExhausted(matches, caps.item);
     const selected = this._selectDeterministic(nonExhausted);
     if (!selected) return;
 
+    // Re-anchor caps to the SPECIFIC book the selected item is (per-book use caps): a
+    // recipe in two item-mode books with differing maxUses/whenSpent must exhaust and
+    // spend the actually-consumed item by ITS book's rules, not the first book's.
+    const selectedCaps = this._getRecipeItemCaps(
+      recipe,
+      this._matchDefinitionForItem(recipe, selected.item)
+    );
     const nextUses = Number(selected.timesUsed || 0) + 1;
-    await this._setRecipeItemUsage(selected.item, nextUses);
-
-    const maxUses = Number(knowledge?.item?.maxUses);
+    const maxUses = Number(selectedCaps.item.maxUses);
     const exhausted = Number.isFinite(maxUses) && maxUses > 0 && nextUses >= maxUses;
-    if (exhausted && knowledge?.item?.destroyWhenExhausted === true) {
+
+    // On exhaustion: 'destroyed' deletes the item; 'inert' keeps it but flags it so
+    // it no longer grants craftability (it is already excluded by `_filterNonExhausted`
+    // once `timesUsed >= maxUses`, so no further gating is needed).
+    if (exhausted && selectedCaps.item.whenSpent === 'inert') {
+      await this._markRecipeItemInert(selected.item, nextUses);
+      return;
+    }
+
+    await this._setRecipeItemUsage(selected.item, nextUses);
+    if (exhausted && selectedCaps.item.whenSpent === 'destroyed') {
       await selected.item.delete();
     }
   }
