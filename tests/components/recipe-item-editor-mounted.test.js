@@ -127,4 +127,46 @@ describe('RecipeItemEditor (mounted)', () => {
     assert.ok(cta.classList.contains('is-disabled'), 'the no-recipes CTA is visually disabled');
     assert.match(cta.textContent, /No recipes/i);
   });
+
+  it('surfaces Required Knowledge and Learning prerequisites as read-only rail chips (issue 544)', async () => {
+    const root = await harness.mount({
+      recipeItem: draft({ caps: { item: {}, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 3, prerequisiteIds: ['r1'], characterPrerequisiteIds: ['p1'] } } }),
+      linkedItem: LINKED_ITEM,
+      linkedRecipes: LINKED_RECIPES,
+      characterPrerequisites: [{ id: 'p1', name: 'Wizardly', icon: 'fas fa-hat-wizard', path: 'x', op: 'gte', value: 1 }],
+      activeTab: 'overview',
+      visibilityMode: 'knowledge'
+    });
+    const requirements = root.querySelector('[data-recipe-item-requirements]');
+    assert.ok(requirements, 'the Requirements rail section renders');
+
+    // Required Knowledge chip resolves the recipe name and carries the scroll icon.
+    const rkChip = root.querySelector('[data-recipe-item-required-knowledge-chip="r1"]');
+    assert.ok(rkChip, 'a Required Knowledge chip renders');
+    assert.match(rkChip.textContent, /Alloy Bronze/);
+    assert.ok(rkChip.querySelector('i.fa-scroll'), 'the Required Knowledge chip has a leading scroll icon');
+    // The chip is read-only (no remove control).
+    assert.equal(rkChip.querySelector('button'), null, 'the rail chip has no remove button');
+
+    // Learning-prereq chip carries the prerequisite's own icon.
+    const cpChip = root.querySelector('[data-recipe-item-learning-prereq-chip="p1"]');
+    assert.ok(cpChip, 'a Learning prerequisites chip renders');
+    assert.match(cpChip.textContent, /Wizardly/);
+    assert.ok(cpChip.querySelector('i.fa-hat-wizard'), 'the Learning prerequisites chip uses the prereq’s own icon');
+
+    // The old "Needs {name}" text rule is gone from the effective-rules list.
+    assert.equal(/Needs /i.test(root.querySelector('[data-recipe-item-rules]').textContent), false, 'the legacy "Needs {name}" rule is removed');
+  });
+
+  it('hides the Requirements rail section when Limited learning is off (gates toggle-gated)', async () => {
+    const root = await harness.mount({
+      recipeItem: draft({ caps: { item: {}, learn: { limitLearning: false, prerequisiteIds: ['r1'], characterPrerequisiteIds: ['p1'] } } }),
+      linkedItem: LINKED_ITEM,
+      linkedRecipes: LINKED_RECIPES,
+      characterPrerequisites: [{ id: 'p1', name: 'Wizardly', icon: 'fas fa-hat-wizard', path: 'x', op: 'gte', value: 1 }],
+      activeTab: 'overview',
+      visibilityMode: 'knowledge'
+    });
+    assert.equal(root.querySelector('[data-recipe-item-requirements]'), null, 'no Requirements section when Limited learning is off');
+  });
 });

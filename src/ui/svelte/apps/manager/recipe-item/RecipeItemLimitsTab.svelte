@@ -371,6 +371,7 @@
                   <div class="manager-selected-tag-row" role="list">
                     {#each selectedRequiredKnowledge as option (option.id)}
                       <span class="manager-chip manager-selected-tag-pill" role="listitem" data-recipe-item-required-knowledge={option.id}>
+                        <i class="fas fa-scroll" aria-hidden="true"></i>
                         <span>{option.name}</span>
                         <button
                           type="button"
@@ -409,7 +410,7 @@
                       <div id="recipe-item-character-prereq-suggestions" class="manager-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites', 'Learning prerequisites')}>
                         {#each characterPrereqSuggestions as prereq (prereq.id)}
                           <button type="button" role="option" aria-selected="false" class="manager-tag-suggestion" data-recipe-item-character-prereq-option={prereq.id} onclick={() => addCharacterPrerequisite(prereq.id)}>
-                            <i class="fas fa-user-check" aria-hidden="true"></i>
+                            <i class={prereq.icon || 'fas fa-user-check'} aria-hidden="true"></i>
                             <span>{prereq.name}</span>
                           </button>
                         {/each}
@@ -421,6 +422,7 @@
                   <div class="manager-selected-tag-row" data-recipe-item-character-prereq-chips role="list">
                     {#each selectedCharacterPrerequisites as prereq (prereq.id)}
                       <span class="manager-chip manager-selected-tag-pill" role="listitem" data-recipe-item-character-prereq={prereq.id} title={prerequisitePreview(prereq)}>
+                        <i class={prereq.icon || 'fas fa-user-check'} aria-hidden="true"></i>
                         <span>{prereq.name}</span>
                         <button
                           type="button"
@@ -454,10 +456,13 @@
     gap: var(--fab-space-4);
   }
 
-  /* Required Knowledge + Learning prerequisites — two equal columns (issue 544). */
+  /* Required Knowledge + Learning prerequisites — two equal columns (issue 544).
+     `align-items: start` keeps each column at its content height so a column with
+     more chips doesn't stretch the other. */
   .manager-recipe-item-prereq-columns {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
     gap: var(--fab-space-4);
   }
 
@@ -485,9 +490,13 @@
     line-height: 1.4;
   }
 
-  /* The typeahead search stretches to fill its column (overrides the global
-     toolbar-oriented max-width and min-width so a narrow column can't overflow). */
+  /* The typeahead search stretches to fill its column width (overrides the global
+     toolbar-oriented max-width/min-width so a narrow column can't overflow), but
+     `flex: 0 0 auto` stops the global `flex: 1 1 210px` from growing the search box
+     vertically inside the column — otherwise it would push the pill row to the
+     bottom instead of sitting directly under the input. */
   .manager-recipe-item-prereq-column :global(.manager-tag-search) {
+    flex: 0 0 auto;
     max-width: none;
     min-width: 0;
     width: 100%;

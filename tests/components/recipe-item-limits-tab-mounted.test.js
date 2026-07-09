@@ -146,6 +146,36 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     assert.ok(root.querySelector('[data-recipe-item-required-knowledge="r2"]'), 'the legacy single prerequisite renders as a pill');
   });
 
+  it('renders a leading icon on selected chips in both columns; character-prereq chips use the prereq’s own icon', async () => {
+    const root = await harness.mount({
+      recipeItem: learnDraft({ limitLearning: true, prerequisiteIds: ['r1'], characterPrerequisiteIds: ['p1'] }),
+      visibilityMode: 'knowledge',
+      linkedRecipes: [{ id: 'r1', name: 'Alloy Bronze' }],
+      characterPrerequisites: [{ id: 'p1', name: 'Wizardly', icon: 'fas fa-hat-wizard', path: 'x', op: 'gte', value: 1 }],
+    });
+    // Required Knowledge chip carries the generic scroll icon (matching its suggestion).
+    const rkChip = root.querySelector('[data-recipe-item-required-knowledge="r1"]');
+    assert.ok(rkChip.querySelector('i.fa-scroll'), 'the Required Knowledge chip has a leading scroll icon');
+    // Character-prereq chip carries the prerequisite's OWN icon, not the generic one.
+    const cpChip = root.querySelector('[data-recipe-item-character-prereq="p1"]');
+    assert.ok(cpChip.querySelector('i.fa-hat-wizard'), 'the character-prereq chip uses the prereq’s own icon');
+    assert.equal(cpChip.querySelector('i.fa-user-check'), null, 'no generic fallback icon when the prereq has its own');
+  });
+
+  it('renders the prereq’s own icon on the character-prerequisite suggestion', async () => {
+    const root = await harness.mount({
+      recipeItem: learnDraft({ limitLearning: true }),
+      visibilityMode: 'knowledge',
+      characterPrerequisites: [{ id: 'p1', name: 'Wizardly', icon: 'fas fa-hat-wizard', path: 'x', op: 'gte', value: 1 }],
+    });
+    const search = root.querySelector('[data-recipe-item-character-prereq-search]');
+    search.value = 'wiz';
+    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    flushSync();
+    const option = root.querySelector('[data-recipe-item-character-prereq-option="p1"]');
+    assert.ok(option.querySelector('i.fa-hat-wizard'), 'the suggestion uses the prereq’s own icon');
+  });
+
   it('shows an inline empty note (not a search input) for Required Knowledge when there are no recipe options', async () => {
     const root = await harness.mount({
       recipeItem: learnDraft({ limitLearning: true }),

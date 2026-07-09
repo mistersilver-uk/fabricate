@@ -3598,17 +3598,16 @@
             "EffectiveRules": "Effective rules",
             "HowPlayersSee": "How players see it",
             "Label": "Preview and effective rules",
-            "LiveHint": "This preview updates live as you change the controls on the left."
+            "LiveHint": "This preview updates live as you change the controls on the left.",
+            "Requirements": "Requirements"
           },
           "Rules": {
             "AppliesEveryRecipe": "Applies to every recipe",
             "DestroyedWhenSpent": "Destroyed when spent",
             "InertWhenSpent": "Becomes inert when spent",
             "NUsesPerCopy": "{n} uses per copy",
-            "NeedsPrereq": "Needs {name}",
             "NeverConsumed": "The item is never consumed",
             "NoCapLearning": "No cap on learning",
-            "OthersCantLearn": "Others can’t learn from it",
             "SingleUse": "Single use",
             "UnlimitedUses": "Unlimited uses"
           },
