@@ -137,17 +137,31 @@
     patchLearn({ prerequisite: value || null });
   }
 
-  // Character prerequisites (issue 544): the ids a reader must ALL pass to learn
-  // a recipe from this book, gating on actor roll data (distinct from the single
-  // recipe `prerequisite` above, which gates on prior knowledge).
+  // Character prerequisites (issue 544): the ids a reader must ALL pass (AND) to
+  // learn a recipe from this book, gating on actor roll data — distinct from the
+  // single recipe `prerequisite` above, which gates on prior knowledge. Authored
+  // as a multi-select: an "add" dropdown of the unselected prerequisites plus a
+  // row of removable chips for the selected ones.
   const characterPrerequisiteIds = $derived(
     Array.isArray(learnCaps.characterPrerequisiteIds) ? learnCaps.characterPrerequisiteIds : []
   );
-  function toggleCharacterPrerequisite(id) {
-    const next = characterPrerequisiteIds.includes(id)
-      ? characterPrerequisiteIds.filter((value) => value !== id)
-      : [...characterPrerequisiteIds, id];
-    patchLearn({ characterPrerequisiteIds: next });
+  // The selected prerequisites resolved to their definitions (order = selection).
+  const selectedCharacterPrerequisites = $derived.by(() => {
+    const byId = new Map((characterPrerequisites || []).map((p) => [String(p.id), p]));
+    return characterPrerequisiteIds.map((id) => byId.get(String(id))).filter(Boolean);
+  });
+  // The prerequisites still available to add (not already selected).
+  const availableCharacterPrerequisites = $derived(
+    (characterPrerequisites || []).filter((p) => !characterPrerequisiteIds.includes(p.id))
+  );
+  function addCharacterPrerequisite(event) {
+    const id = String(event.currentTarget.value || '');
+    if (!id || characterPrerequisiteIds.includes(id)) return;
+    patchLearn({ characterPrerequisiteIds: [...characterPrerequisiteIds, id] });
+    event.currentTarget.value = ''; // reset the add-select back to its placeholder
+  }
+  function removeCharacterPrerequisite(id) {
+    patchLearn({ characterPrerequisiteIds: characterPrerequisiteIds.filter((value) => value !== id) });
   }
 </script>
 
@@ -289,25 +303,47 @@
         {/if}
 
         <!-- Character prerequisites apply whether or not the learn COUNT is
-             limited, so this sits outside the `limitLearning` block. -->
+             limited, so this sits outside the `limitLearning` block. A multi-select
+             (add-dropdown + removable chips): a reader must pass ALL selected. -->
         <div class="manager-recipe-item-character-prereqs" data-recipe-item-character-prereqs>
           <span id="recipe-item-character-prereqs-label" class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisites', 'Character prerequisites to learn')}</span>
-          {#if characterPrerequisites.length === 0}
-            <p class="manager-muted" data-recipe-item-character-prereqs-empty>{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesEmpty', 'No character prerequisites defined yet — add them in System Settings first.')}</p>
-          {:else}
-            <div class="manager-recipe-item-character-prereq-list" role="group" aria-labelledby="recipe-item-character-prereqs-label">
-              {#each characterPrerequisites as prereq (prereq.id)}
-                <label class="manager-recipe-item-character-prereq-option" data-recipe-item-character-prereq={prereq.id}>
-                  <input
-                    type="checkbox"
-                    checked={characterPrerequisiteIds.includes(prereq.id)}
-                    onchange={() => toggleCharacterPrerequisite(prereq.id)}
-                  />
-                  <span class="manager-recipe-item-character-prereq-name">{prereq.name}</span>
-                  <span class="manager-recipe-item-character-prereq-preview">{prerequisitePreview(prereq)}</span>
-                </label>
+          {#if selectedCharacterPrerequisites.length > 0}
+            <div class="manager-recipe-item-character-prereq-chips" data-recipe-item-character-prereq-chips role="list">
+              {#each selectedCharacterPrerequisites as prereq (prereq.id)}
+                <span class="manager-recipe-item-character-prereq-chip" data-recipe-item-character-prereq={prereq.id} role="listitem" title={prerequisitePreview(prereq)}>
+                  <span class="manager-recipe-item-character-prereq-chip-name">{prereq.name}</span>
+                  <button
+                    type="button"
+                    class="manager-recipe-item-character-prereq-remove"
+                    data-recipe-item-character-prereq-remove={prereq.id}
+                    aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove', 'Remove')}
+                    title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove', 'Remove')}
+                    onclick={() => removeCharacterPrerequisite(prereq.id)}
+                  ><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                </span>
               {/each}
             </div>
+          {/if}
+          <label class="manager-field manager-recipe-item-character-prereq-add">
+            <span class="sr-only">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesAdd', 'Add a character prerequisite…')}</span>
+            <select
+              data-recipe-item-character-prereq-add
+              value=""
+              disabled={characterPrerequisites.length === 0}
+              aria-labelledby="recipe-item-character-prereqs-label"
+              onchange={addCharacterPrerequisite}
+            >
+              {#if characterPrerequisites.length === 0}
+                <option value="">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone', 'No character prerequisites — add them in System Settings')}</option>
+              {:else}
+                <option value="">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesAdd', 'Add a character prerequisite…')}</option>
+                {#each availableCharacterPrerequisites as prereq (prereq.id)}
+                  <option value={prereq.id}>{prereq.name}</option>
+                {/each}
+              {/if}
+            </select>
+          </label>
+          {#if selectedCharacterPrerequisites.length > 0}
             <p class="manager-muted manager-recipe-item-character-prereq-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesHint', 'A reader who fails any of these cannot learn this book’s recipes.')}</p>
           {/if}
         </div>
@@ -333,32 +369,47 @@
     border-top: 1px solid var(--fab-mv2-border);
   }
 
-  .manager-recipe-item-character-prereq-list {
+  .manager-recipe-item-character-prereq-chips {
     display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-1);
+    flex-flow: row wrap;
+    gap: var(--fab-space-chip);
   }
 
-  .manager-recipe-item-character-prereq-option {
-    display: flex;
+  .manager-recipe-item-character-prereq-chip {
+    display: inline-flex;
     align-items: center;
-    gap: var(--fab-space-2);
-    cursor: pointer;
+    gap: var(--fab-space-1);
+    padding: 2px 4px 2px 10px;
+    border: 1px solid var(--fab-mv2-border-strong);
+    border-radius: 999px;
+    background: var(--fab-mv2-surface-2);
+    font-size: 0.8rem;
   }
 
-  .manager-recipe-item-character-prereq-name {
+  .manager-recipe-item-character-prereq-chip-name {
     font-weight: 600;
   }
 
-  .manager-recipe-item-character-prereq-preview {
-    flex: 0 1 auto;
-    min-width: 0;
+  .manager-recipe-item-character-prereq-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
     color: var(--fab-mv2-text-muted);
-    font-family: var(--fab-font-mono, monospace);
-    font-size: 0.78rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    cursor: pointer;
+    font-size: 0.75rem;
+  }
+
+  .manager-recipe-item-character-prereq-remove:hover {
+    color: var(--fab-mv2-text);
+  }
+
+  .manager-recipe-item-character-prereq-add {
+    max-width: 320px;
   }
 
   .manager-recipe-item-character-prereq-hint {

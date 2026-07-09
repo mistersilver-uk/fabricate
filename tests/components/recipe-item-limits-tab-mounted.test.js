@@ -46,24 +46,39 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     assert.equal(root.querySelector('[data-recipe-item-limits-card="item"]'), null);
   });
 
-  it('lists character prerequisites and toggles one into caps.learn (issue 544)', async () => {
+  it('adds a character prerequisite via the dropdown, then appends a second (issue 544)', async () => {
     const patches = [];
-    const root = await harness.mount({
+    const props = {
       recipeItem: learnDraft(),
       visibilityMode: 'knowledge',
       characterPrerequisites: [
         { id: 'p1', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 },
+        { id: 'p2', name: 'Journeyman', path: 'abilities.int.mod', op: 'gte', value: 2 },
       ],
       onPatch: (p) => patches.push(p),
-    });
-    const section = root.querySelector('[data-recipe-item-character-prereqs]');
-    assert.ok(section, 'the character-prerequisites section renders');
-    assert.match(section.textContent, /@skills\.cra\.rank ≥ 2/, 'shows the live preview');
-    root.querySelector('[data-recipe-item-character-prereq="p1"] input').click();
-    assert.deepEqual(patches, [{ caps: { learn: { characterPrerequisiteIds: ['p1'] } } }]);
+    };
+    let root = await harness.mount(props);
+    const add = root.querySelector('[data-recipe-item-character-prereq-add]');
+    assert.ok(add && !add.disabled, 'the add dropdown renders and is enabled');
+    // Both prerequisites are offered when none are selected yet.
+    assert.equal(add.querySelectorAll('option[value="p1"], option[value="p2"]').length, 2);
+    add.value = 'p1';
+    add.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    assert.deepEqual(patches.at(-1), { caps: { learn: { characterPrerequisiteIds: ['p1'] } } });
+
+    // Re-mount with p1 already selected: it shows as a chip, and the dropdown only
+    // offers the remaining prerequisite; selecting it appends.
+    harness.remount();
+    root = await harness.mount({ ...props, recipeItem: learnDraft({ characterPrerequisiteIds: ['p1'] }) });
+    assert.ok(root.querySelector('[data-recipe-item-character-prereq="p1"]'), 'the selected prereq shows as a chip');
+    const add2 = root.querySelector('[data-recipe-item-character-prereq-add]');
+    assert.equal(add2.querySelector('option[value="p1"]'), null, 'an already-selected prereq is not offered again');
+    add2.value = 'p2';
+    add2.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    assert.deepEqual(patches.at(-1), { caps: { learn: { characterPrerequisiteIds: ['p1', 'p2'] } } });
   });
 
-  it('toggles a character prerequisite OFF, emitting an empty caps.learn array', async () => {
+  it('removes a selected character prerequisite via its chip ×', async () => {
     const patches = [];
     const root = await harness.mount({
       recipeItem: learnDraft({ characterPrerequisiteIds: ['p1'] }),
@@ -71,19 +86,21 @@ describe('RecipeItemLimitsTab (mounted)', () => {
       characterPrerequisites: [{ id: 'p1', name: 'Expert', path: 'x', op: 'gte', value: 1 }],
       onPatch: (p) => patches.push(p),
     });
-    const box = root.querySelector('[data-recipe-item-character-prereq="p1"] input');
-    assert.equal(box.checked, true, 'starts checked');
-    box.click();
+    const remove = root.querySelector('[data-recipe-item-character-prereq-remove="p1"]');
+    assert.ok(remove, 'the chip renders a remove control');
+    remove.click();
     assert.deepEqual(patches, [{ caps: { learn: { characterPrerequisiteIds: [] } } }]);
   });
 
-  it('shows an empty-state when no character prerequisites are defined', async () => {
+  it('disables the add dropdown (no detached empty block) when no prerequisites are defined', async () => {
     const root = await harness.mount({
       recipeItem: learnDraft(),
       visibilityMode: 'knowledge',
       characterPrerequisites: [],
     });
-    assert.ok(root.querySelector('[data-recipe-item-character-prereqs-empty]'));
+    const add = root.querySelector('[data-recipe-item-character-prereq-add]');
+    assert.ok(add && add.disabled, 'the add dropdown is disabled when the library is empty');
+    assert.equal(root.querySelector('[data-recipe-item-character-prereq-chips]'), null, 'no chips when nothing selected');
   });
 
   it('emits a limitUses patch and hides detail while off', async () => {
