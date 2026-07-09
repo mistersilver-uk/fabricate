@@ -117,11 +117,28 @@
     return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnUpToPerCopy', 'Learn up to {n} per copy').replace('{n}', String(learnsAllowed));
   }
 
+  // Required Knowledge preview (issue 544): resolve every required recipe id to its
+  // name and join them for the badge. Defensive over the array-or-legacy-single shape.
   const prereqName = $derived.by(() => {
-    const id = learnCaps.prerequisite ? String(learnCaps.prerequisite) : '';
-    if (!id) return '';
-    const match = [...(linkedRecipes || []), ...(availableRecipes || [])].find(recipe => String(recipe?.id) === id);
-    return match ? String(match.name || id) : id;
+    const ids = Array.isArray(learnCaps.prerequisiteIds)
+      ? learnCaps.prerequisiteIds
+      : learnCaps.prerequisite
+        ? [learnCaps.prerequisite]
+        : [];
+    if (ids.length === 0) return '';
+    const byId = new Map(
+      [...(linkedRecipes || []), ...(availableRecipes || [])].map((recipe) => [
+        String(recipe?.id),
+        recipe,
+      ])
+    );
+    return ids
+      .map((id) => {
+        const key = String(id);
+        const match = byId.get(key);
+        return match ? String(match.name || key) : key;
+      })
+      .join(', ');
   });
 
   // Preview badge via the shared helper so the GM "How players see it" preview and the

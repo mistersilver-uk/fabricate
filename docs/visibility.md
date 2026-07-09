@@ -167,9 +167,10 @@ Learning happens from an owned recipe item.
 A recipe can be learned when it has a linked recipe item, the player owns a matching item, and the recipe has not already been learned.
 When a recipe is learned, Fabricate records it on the actor along with when it was learned and which item taught it.
 
-A book can also require a prerequisite.
-When you set a **Prerequisite to learn** on a book, a player must have already learned that recipe before they can learn from the book.
-A player who has not is refused with a message telling them to learn the prerequisite first.
+A book can also require prior knowledge.
+When you add **Required Knowledge** to a book, a player must have already learned all of those recipes before they can learn from the book.
+A player who has not is refused with a message telling them to learn the required recipes first.
+This only applies while the book's **Limited learning** is on.
 See [Limiting Recipes Learned Per Book](#limiting-recipes-learned-per-book).
 
 Players learn from the **Inventory** tab of the Fabricate window.
@@ -206,9 +207,10 @@ Turn on **Limited learning**, then set **Recipes allowed** to the number of reci
 Once a book's budget is spent, no further recipe can be learned from it.
 A per-copy budget follows its copy, and a shared budget is not reset when a copy changes hands or owners.
 
-**Requiring a prerequisite.** The learning limits also include a **Prerequisite to learn** selector.
-Pick a recipe that a player must have already learned before they may learn from this book, or leave it **None**.
-A player who has not learned the prerequisite is refused with a message telling them to learn it first.
+**Requiring prior knowledge.** With **Limited learning** on, the detail block also shows a **Required Knowledge** field.
+Search for and add any recipes a player must have already learned before they may learn from this book; each shows as a removable pill.
+A player who has not learned all of them is refused with a message telling them to learn the required recipes first.
+Turning **Limited learning** off removes this requirement (and the character **Learning prerequisites** beside it) entirely — the book then teaches freely.
 
 ### Learning From the Inventory Tab
 
@@ -332,7 +334,7 @@ The breadcrumb reads **Crafting** then **Books & Scrolls** then the item's name,
 The Limits tab depends on the system's visibility mode.
 
 - In **Item** mode it shows a **Uses** card: turn on **Limited use**, set **Uses per copy**, and choose what happens **When the last use is spent** (**Destroyed** or **Becomes inert**).
-- In **Knowledge** mode it shows a **Learning** card: turn on **Limited learning**, choose whether the limit applies **Per copy** or **Across all copies**, set **Recipes allowed**, and optionally pick a **Prerequisite to learn**.
+- In **Knowledge** mode it shows a **Learning** card: turn on **Limited learning**, choose whether the limit applies **Per copy** or **Across all copies**, set **Recipes allowed**, and optionally add **Required Knowledge** (recipes the reader must already know) and **Learning prerequisites** (character conditions) — both hidden, and not enforced, while Limited learning is off.
 
 The same page has a **Contents** tab where you link and remove the recipes the book teaches.
 Every change applies immediately, so there is no separate save step.

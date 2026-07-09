@@ -501,10 +501,10 @@ That page's breadcrumb is `Crafting` then `Books & Scrolls` then the item name, 
 Editing is live-apply: each control passes its caps patch through `updateRecipeItemCaps(itemId, patch)`, which merges and normalizes it onto the recipe item definition, so the page stages no dirty draft and is not part of the Manager confirm-discard route-exit chain.
 The surface reads configuration only (recipe-item definitions plus the recipes referencing each item) and never reads per-item-instance runtime flags, so the admin store stays Foundry-free.
 
-The item's Limits authoring surface (`RecipeItemLimitsTab`) also renders a **Character prerequisites to learn** picker (issue 544) that authors `caps.learn.characterPrerequisiteIds`.
-It is a multi-select checkbox list of the system's `characterPrerequisites` library (name plus a muted `@path op value` preview per option); toggling an option adds or removes that prerequisite id, and a hint notes that a reader who fails any selected prerequisite cannot learn the book's recipes.
-The picker sits **outside** the learn-count `limitLearning` block, because the character-prerequisite gate applies whether or not the learn count is limited.
-When the system defines no prerequisites yet, the picker shows an empty state steering the GM to add them in System Settings first.
+The item's Limits authoring surface (`RecipeItemLimitsTab`), in knowledge mode inside the `limitLearning` detail block, renders (issue 544) a **Limit applies** control and **Recipes allowed** stepper on one line, then a two-column line of searchable typeahead pickers: **Required Knowledge** (left, authoring `caps.learn.prerequisiteIds` — recipes the reader must already know) and **Learning prerequisites** (right, authoring `caps.learn.characterPrerequisiteIds`).
+Each column is an uppercase label, a hint, a search input (typeahead) that filters the candidate options by name, and a wrap row of removable pills below it for the selected entries; the Learning prerequisites pill carries the option's `@path op value` preview as its title.
+Both pickers sit **inside** the `limitLearning` block, so they hide when Limited learning is off — matching the runtime rule that neither gate is enforced when the toggle is off.
+When there are no options (no candidate recipes / no `characterPrerequisites` library yet), the column's search input is disabled with an inline empty-state hint (Learning prerequisites steers the GM to add them in System Settings first) rather than a detached paragraph.
 
 ### Access Surface
 

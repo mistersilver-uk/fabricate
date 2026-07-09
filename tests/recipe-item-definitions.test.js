@@ -168,7 +168,7 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
       learnsAllowed: undefined,
       learnScope: 'perInstance',
       learningMode: 'once',
-      prerequisite: null,
+      prerequisiteIds: [],
       characterPrerequisiteIds: [],
       destroyWhenSpent: false
     }
@@ -246,18 +246,36 @@ test('_normalizeRecipeItemCaps mirrors limitRecipes/maxRecipes to limitLearning/
   assert.equal(modern.learn.learningMode, 'party');
 });
 
-test('_normalizeRecipeItemCaps defaults learningMode once, prerequisite null, and clamps enum', () => {
+test('_normalizeRecipeItemCaps defaults learningMode once, prerequisiteIds empty, and clamps enum', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
   const bare = manager._normalizeRecipeItemCaps({});
   assert.equal(bare.learn.learningMode, 'once');
-  assert.equal(bare.learn.prerequisite, null);
+  assert.deepEqual(bare.learn.prerequisiteIds, []);
+  assert.equal(bare.learn.prerequisite, undefined, 'the legacy singular is not re-emitted');
 
   const bad = manager._normalizeRecipeItemCaps({ learn: { learningMode: 'nonsense' } });
   assert.equal(bad.learn.learningMode, 'once');
+});
 
-  const prereq = manager._normalizeRecipeItemCaps({ learn: { prerequisite: '  recipe-42  ' } });
-  assert.equal(prereq.learn.prerequisite, 'recipe-42');
+test('_normalizeRecipeItemCaps trims/dedupes prerequisiteIds and folds a legacy single prerequisite (issue 544)', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  // An array is trimmed, String-coerced, de-duplicated, and empties dropped.
+  const many = manager._normalizeRecipeItemCaps({
+    learn: { prerequisiteIds: ['  recipe-42  ', 'recipe-42', '', 'recipe-7'] },
+  });
+  assert.deepEqual(many.learn.prerequisiteIds, ['recipe-42', 'recipe-7']);
+
+  // A legacy single `prerequisite` string is folded into the array (back-compat).
+  const legacy = manager._normalizeRecipeItemCaps({ learn: { prerequisite: '  recipe-42  ' } });
+  assert.deepEqual(legacy.learn.prerequisiteIds, ['recipe-42']);
+
+  // The array wins when both the array and the legacy single are present.
+  const both = manager._normalizeRecipeItemCaps({
+    learn: { prerequisiteIds: ['recipe-9'], prerequisite: 'recipe-42' },
+  });
+  assert.deepEqual(both.learn.prerequisiteIds, ['recipe-9']);
 });
 
 test('_normalizeRecipeItemCaps derives learnScope (per-copy vs total) with legacy mode fallback', () => {

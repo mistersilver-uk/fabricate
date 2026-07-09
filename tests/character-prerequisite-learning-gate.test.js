@@ -69,7 +69,14 @@ class FakeActor extends FakeDoc {
 
 const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 };
 
-function buildSystem({ characterPrerequisiteIds = ['p-expert'], capped = false, characterPrerequisites = [EXPERT] } = {}) {
+// `limitLearning` defaults ON: the character-prerequisite gate is only enforced when
+// Limited learning is on (issue 544). `capped` additionally sets a finite learn count.
+function buildSystem({
+  characterPrerequisiteIds = ['p-expert'],
+  capped = false,
+  limitLearning = true,
+  characterPrerequisites = [EXPERT],
+} = {}) {
   return {
     id: 'system-1',
     resolutionMode: capped ? 'simple' : 'alchemy',
@@ -88,7 +95,7 @@ function buildSystem({ characterPrerequisiteIds = ['p-expert'], capped = false, 
           item: { limitUses: false },
           learn: {
             consumeOnLearn: false,
-            limitLearning: capped,
+            limitLearning,
             learnsAllowed: capped ? 3 : undefined,
             characterPrerequisiteIds,
           },
@@ -141,6 +148,15 @@ test('learnRecipe: gate blocks a failing actor with a reason', async () => {
   assert.equal(result.success, false);
   assert.equal(result.message, 'FABRICATE.Knowledge.CharacterPrerequisiteNotMet');
   assert.equal(result.messageData.reason, 'Expert Crafter');
+});
+
+test('learnRecipe: the gate is NOT enforced when Limited learning is off (issue 544)', async () => {
+  // A failing actor learns freely because the toggle governs both gates now.
+  const system = buildSystem({ limitLearning: false });
+  const recipe = buildRecipe();
+  const actor = new FakeActor({ items: [new FakeItem()], rollData: { skills: { cra: { rank: 0 } } } });
+  const result = await buildService(system, [recipe]).learnRecipe({ recipe, craftingActor: actor });
+  assert.equal(result.success, true);
 });
 
 test('learnRecipe: a dangling prerequisite id fails open (no definition ⇒ ungated)', async () => {
@@ -228,13 +244,13 @@ test('learnRecipeFromOwnedBook: gates on the OWNED book, not the recipe’s firs
         id: 'book-b',
         sourceItemUuid: 'Compendium.world.items.book-b',
         recipeIds: ['recipe-1'],
-        caps: { item: {}, learn: { characterPrerequisiteIds: ['p-expert'] } },
+        caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: ['p-expert'] } },
       },
       {
         id: 'book-a',
         sourceItemUuid: 'Compendium.world.items.book-a',
         recipeIds: ['recipe-1'],
-        caps: { item: {}, learn: { characterPrerequisiteIds: [] } },
+        caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: [] } },
       },
     ],
   };

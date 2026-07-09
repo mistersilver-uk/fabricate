@@ -554,11 +554,15 @@ RecipeItemDefinition = {
                                      // physical item document, "total" draws all actors from
                                      // one shared world pool keyed system::defId
                                      // (legacy mirror: learningMode "party" ⇔ "total")
-      prerequisite?: string | null,  // recipeId a reader must already have learned first (prior-knowledge gate)
+      prerequisiteIds: string[],     // default []; recipeIds a reader must ALL already have learned
+                                     // first (AND — "Required Knowledge"; prior-knowledge gate). Folds
+                                     // a legacy single `prerequisite` string on normalize (issue 544).
+                                     // Only enforced when limitLearning is true.
       characterPrerequisiteIds: string[], // default []; ids into CraftingSystem.characterPrerequisites
                                      // that a reader must ALL pass (AND) to learn this book's recipes,
                                      // evaluated against actor roll data (issue 544). A per-book
-                                     // actor-stat gate, distinct from `prerequisite` (prior knowledge).
+                                     // actor-stat gate, distinct from `prerequisiteIds` (prior knowledge).
+                                     // Only enforced when limitLearning is true.
       destroyWhenSpent?: boolean,    // default false; destroy the item once its learn budget is spent
       // Legacy mirrors kept in sync with the canonical fields above:
       limitRecipes?: boolean,        // legacy mirror of limitLearning
@@ -582,10 +586,11 @@ The use cap (`caps.item.limitUses` / `maxUses` / `whenSpent`) governs how many t
 The PR-B redesign renamed the cap fields; the new names are canonical and each legacy name (`destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) is persisted and kept in sync so an un-migrated raw cap still loads.
 `caps.learn.destroyWhenSpent` is deliberately distinct from `caps.item.whenSpent === "destroyed"` (`destroyWhenExhausted`) and must not be normalized to a shared name.
 6. `caps.learn.learnScope` selects the learn-cap counter scope: `"perInstance"` (default) counts against each physical item document (`recipeItemLearning.learnedCount`), while `"total"` draws every actor's learns from one GM-authoritative shared world pool keyed `system::defId`.
-6a. `caps.learn.characterPrerequisiteIds` (issue 544) is a deduped, trimmed, non-empty string list (default `[]`) of references into `CraftingSystem.characterPrerequisites[].id`.
-It is a per-book **character-prerequisite learning gate**: a reader must pass **ALL** of the referenced prerequisites (AND semantics) against the acting actor's roll data before learning any of the book's recipes (see `recipe-visibility`).
-It is normalized beside the single-recipe `caps.learn.prerequisite` in `CraftingSystemManager._normalizeRecipeItemCaps` but is a distinct gate: `prerequisite` gates on prior recipe knowledge, `characterPrerequisiteIds` gates on actor stats/flags.
-An id that no longer resolves to a system definition is skipped at runtime (fail-open), so deleting a prerequisite removes its gate rather than bricking the book.
+6a. `caps.learn.prerequisiteIds` and `caps.learn.characterPrerequisiteIds` (issue 544) are each a deduped, trimmed, non-empty string list (default `[]`), normalized with the same shape in `CraftingSystemManager._normalizeRecipeItemCaps`.
+`prerequisiteIds` (**Required Knowledge**) is a list of recipeIds the reader must ALL already have learned; it folds a legacy single `caps.learn.prerequisite` string on normalize (back-compat, no stored data to migrate) and the singular is no longer emitted.
+`characterPrerequisiteIds` references into `CraftingSystem.characterPrerequisites[].id`: a per-book **character-prerequisite learning gate** where a reader must pass **ALL** referenced prerequisites (AND semantics) against the acting actor's roll data.
+The two gates are distinct — `prerequisiteIds` gates on prior recipe knowledge, `characterPrerequisiteIds` gates on actor stats/flags — but both are only enforced when `caps.learn.limitLearning` is `true` (Limited learning off ⇒ learn freely, neither gate applies).
+An id that no longer resolves is skipped at runtime (fail-open for character prerequisites), so deleting a prerequisite removes its gate rather than bricking the book.
 7. The `1.11.0` migration seeds `caps` on every existing recipe item from the system's former `recipeVisibility.knowledge.item` / `.learn` values, then strips those fields from the system config.
 Recipe items created after the migration default to uncapped.
 

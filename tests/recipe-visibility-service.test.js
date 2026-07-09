@@ -2327,7 +2327,7 @@ function makeFakePartyPool() {
   };
 }
 
-function buildLearnModeSystem({ learningMode, learnScope, learnsAllowed, prerequisite = null } = {}) {
+function buildLearnModeSystem({ learningMode, learnScope, learnsAllowed, prerequisiteIds = [] } = {}) {
   return buildMockSystem({
     id: 'system-1',
     recipeVisibility: {
@@ -2340,7 +2340,7 @@ function buildLearnModeSystem({ learningMode, learnScope, learnsAllowed, prerequ
         sourceItemUuid: 'Compendium.world.items.book',
         caps: {
           item: { limitUses: false },
-          learn: { limitLearning: true, learnsAllowed, learnScope, learningMode, prerequisite }
+          learn: { limitLearning: true, learnsAllowed, learnScope, learningMode, prerequisiteIds }
         }
       }
     ]
@@ -2574,7 +2574,85 @@ test('LEARN.party - a non-GM (failed) shared-counter write fails closed without 
   assert.ok(!learned || !learned['r-a'], 'the recipe is not learned when the shared write fails');
 });
 
-test('PREREQ - learning is refused until the prerequisite recipe is learned', async () => {
+test('PREREQ - learning is refused until ALL required-knowledge recipes are learned (AND)', async () => {
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } }
+    },
+    recipeItemDefinitions: [
+      { id: 'basic', sourceItemUuid: 'src-basic', caps: { item: { limitUses: false }, learn: {} } },
+      { id: 'basic2', sourceItemUuid: 'src-basic2', caps: { item: { limitUses: false }, learn: {} } },
+      {
+        id: 'advanced',
+        sourceItemUuid: 'src-adv',
+        caps: {
+          item: { limitUses: false },
+          learn: { limitLearning: true, prerequisiteIds: ['r-a', 'r-c'] }
+        }
+      }
+    ]
+  });
+  const basicRecipe = buildMockRecipe({ id: 'r-a', recipeItemId: 'basic', linkedRecipeItemUuid: null });
+  const basic2Recipe = buildMockRecipe({ id: 'r-c', recipeItemId: 'basic2', linkedRecipeItemUuid: null });
+  const advancedRecipe = buildMockRecipe({ id: 'r-b', recipeItemId: 'advanced', linkedRecipeItemUuid: null });
+  const basicBook = new FakeItem({ uuid: 'Actor.a1.Item.basic', sourceId: 'src-basic' });
+  const basic2Book = new FakeItem({ uuid: 'Actor.a1.Item.basic2', sourceId: 'src-basic2' });
+  const advancedBook = new FakeItem({ uuid: 'Actor.a1.Item.adv', sourceId: 'src-adv' });
+  const actor = new FakeActor({ id: 'a1', items: [basicBook, basic2Book, advancedBook] });
+  const service = buildService({ system, recipes: [basicRecipe, basic2Recipe, advancedRecipe] });
+
+  // Neither prerequisite learned → r-b is refused.
+  const blocked = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
+  assert.equal(blocked.success, false);
+  assert.equal(blocked.message, 'FABRICATE.Knowledge.PrerequisiteNotMet');
+
+  // Learning only ONE prerequisite still leaves it refused (AND semantics).
+  assert.equal((await service.learnRecipeFromOwnedBook({ recipe: basicRecipe, craftingActor: actor })).success, true);
+  const stillBlocked = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
+  assert.equal(stillBlocked.success, false);
+  assert.equal(stillBlocked.message, 'FABRICATE.Knowledge.PrerequisiteNotMet');
+
+  // Learn the second prerequisite, then r-b succeeds.
+  assert.equal((await service.learnRecipeFromOwnedBook({ recipe: basic2Recipe, craftingActor: actor })).success, true);
+  const unblocked = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
+  assert.equal(unblocked.success, true);
+});
+
+test('PREREQ - with Limited learning OFF, neither Required Knowledge nor character prerequisites gate learning (issue 544)', async () => {
+  const system = buildMockSystem({
+    id: 'system-1',
+    characterPrerequisites: [
+      { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 5 }
+    ],
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } }
+    },
+    recipeItemDefinitions: [
+      {
+        id: 'advanced',
+        sourceItemUuid: 'src-adv',
+        caps: {
+          item: { limitUses: false },
+          // Both gates configured, but Limited learning is OFF → neither is enforced.
+          learn: { limitLearning: false, prerequisiteIds: ['r-a'], characterPrerequisiteIds: ['p-expert'] }
+        }
+      }
+    ]
+  });
+  const advancedRecipe = buildMockRecipe({ id: 'r-b', recipeItemId: 'advanced', linkedRecipeItemUuid: null });
+  const advancedBook = new FakeItem({ uuid: 'Actor.a1.Item.adv', sourceId: 'src-adv' });
+  // The actor has NOT learned r-a and FAILS the character prerequisite (rank 0 < 5).
+  const actor = new FakeActor({ id: 'a1', items: [advancedBook], rollData: { skills: { cra: { rank: 0 } } } });
+  const service = buildService({ system, recipes: [advancedRecipe] });
+
+  const result = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
+  assert.equal(result.success, true, 'learning is free when Limited learning is off');
+});
+
+test('PREREQ - Required Knowledge blocks the drag-drop bulk learn path (issue 544)', () => {
   const system = buildMockSystem({
     id: 'system-1',
     recipeVisibility: {
@@ -2586,24 +2664,89 @@ test('PREREQ - learning is refused until the prerequisite recipe is learned', as
       {
         id: 'advanced',
         sourceItemUuid: 'src-adv',
-        caps: { item: { limitUses: false }, learn: { prerequisite: 'r-a' } }
+        // limitLearning on but no learnsAllowed → uncapped, so it bulk-learns on drop.
+        caps: { item: { limitUses: false }, learn: { limitLearning: true, prerequisiteIds: ['r-a'] } }
       }
     ]
   });
   const basicRecipe = buildMockRecipe({ id: 'r-a', recipeItemId: 'basic', linkedRecipeItemUuid: null });
   const advancedRecipe = buildMockRecipe({ id: 'r-b', recipeItemId: 'advanced', linkedRecipeItemUuid: null });
-  const basicBook = new FakeItem({ uuid: 'Actor.a1.Item.basic', sourceId: 'src-basic' });
-  const advancedBook = new FakeItem({ uuid: 'Actor.a1.Item.adv', sourceId: 'src-adv' });
-  const actor = new FakeActor({ id: 'a1', items: [basicBook, advancedBook] });
   const service = buildService({ system, recipes: [basicRecipe, advancedRecipe] });
 
-  // Prerequisite (r-a) not yet learned → r-b is refused.
-  const blocked = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
-  assert.equal(blocked.success, false);
-  assert.equal(blocked.message, 'FABRICATE.Knowledge.PrerequisiteNotMet');
+  // Required Knowledge (r-a) not learned → the bulk preview does NOT offer r-b.
+  const blockedBook = new FakeItem({ uuid: 'Actor.a1.Item.adv', sourceId: 'src-adv' });
+  const blockedActor = new FakeActor({ id: 'a1', items: [blockedBook] });
+  const blocked = service.previewOwnedItemLearning({ ownedItem: blockedBook, actor: blockedActor, mode: 'auto' });
+  assert.equal(blocked.learnedRecipes.some((r) => r.id === 'r-b'), false, 'Required Knowledge unmet ⇒ r-b not bulk-learnable');
 
-  // Learn the prerequisite, then r-b succeeds.
-  assert.equal((await service.learnRecipeFromOwnedBook({ recipe: basicRecipe, craftingActor: actor })).success, true);
-  const unblocked = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
-  assert.equal(unblocked.success, true);
+  // r-a learned → r-b is offered.
+  const okBook = new FakeItem({ uuid: 'Actor.a2.Item.adv', sourceId: 'src-adv' });
+  const okActor = new FakeActor({
+    id: 'a2',
+    items: [okBook],
+    flagsArg: { fabricate: { learnedRecipes: { 'r-a': { learnedAt: 1 } } } }
+  });
+  const ok = service.previewOwnedItemLearning({ ownedItem: okBook, actor: okActor, mode: 'auto' });
+  assert.equal(ok.learnedRecipes.some((r) => r.id === 'r-b'), true, 'Required Knowledge met ⇒ r-b bulk-learnable');
+});
+
+test('PREREQ - Required Knowledge blocks the craft-time auto-learn (issue 544)', async () => {
+  const system = buildMockSystem({
+    id: 'system-1',
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: true },
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } }
+    },
+    recipeItemDefinitions: [
+      {
+        id: 'advanced',
+        sourceItemUuid: 'src-adv',
+        caps: { item: { limitUses: false }, learn: { limitLearning: true, prerequisiteIds: ['r-a'] } }
+      }
+    ]
+  });
+  const basicRecipe = buildMockRecipe({ id: 'r-a', recipeItemId: 'basic', linkedRecipeItemUuid: null });
+  const advancedRecipe = buildMockRecipe({ id: 'r-b', recipeItemId: 'advanced', linkedRecipeItemUuid: null });
+  const service = buildService({ system, recipes: [basicRecipe, advancedRecipe] });
+
+  // Required Knowledge (r-a) not learned → crafting r-b does not auto-learn it.
+  const blockedActor = new FakeActor({ id: 'a1' });
+  await service.learnRecipeOnCraft(advancedRecipe, blockedActor);
+  assert.ok(!service._getLearnedMap(blockedActor)?.['r-b'], 'Required Knowledge unmet ⇒ no craft auto-learn');
+
+  // r-a learned → crafting r-b auto-learns it.
+  const okActor = new FakeActor({
+    id: 'a2',
+    flagsArg: { fabricate: { learnedRecipes: { 'r-a': { learnedAt: 1 } } } }
+  });
+  await service.learnRecipeOnCraft(advancedRecipe, okActor);
+  assert.ok(service._getLearnedMap(okActor)?.['r-b'], 'Required Knowledge met ⇒ craft auto-learns');
+});
+
+test('PREREQ - a dangling Required Knowledge id (deleted recipe) fails open (issue 544)', async () => {
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } }
+    },
+    recipeItemDefinitions: [
+      {
+        id: 'advanced',
+        sourceItemUuid: 'src-adv',
+        // 'ghost' resolves to no existing recipe.
+        caps: { item: { limitUses: false }, learn: { limitLearning: true, prerequisiteIds: ['ghost'] } }
+      }
+    ]
+  });
+  const advancedRecipe = buildMockRecipe({ id: 'r-b', recipeItemId: 'advanced', linkedRecipeItemUuid: null });
+  const advancedBook = new FakeItem({ uuid: 'Actor.a1.Item.adv', sourceId: 'src-adv' });
+  const actor = new FakeActor({ id: 'a1', items: [advancedBook] });
+  const service = buildService({ system, recipes: [advancedRecipe] });
+
+  // The deleted prerequisite is skipped rather than permanently bricking the book.
+  const result = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
+  assert.equal(result.success, true, 'a deleted prerequisite recipe does not brick the book');
 });

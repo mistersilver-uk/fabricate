@@ -974,10 +974,20 @@ export class CraftingSystemManager {
     const learningMode =
       learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
 
-    const prerequisite =
-      typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
-        ? learn.prerequisite.trim()
-        : null;
+    // `prerequisiteIds` (issue 544) — the recipe ids a reader must ALREADY have
+    // learned (AND semantics) before learning from this book or scroll. Replaces the
+    // legacy single `prerequisite` string, which is folded in here so an un-migrated
+    // draft still reads correctly (there is no stored data to migrate — the field
+    // defaulted to null/absent). Trims/dedupes with the same shape as
+    // `characterPrerequisiteIds` below.
+    const rawPrerequisiteIds = Array.isArray(learn.prerequisiteIds)
+      ? learn.prerequisiteIds
+      : typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
+        ? [learn.prerequisite]
+        : [];
+    const prerequisiteIds = [
+      ...new Set(rawPrerequisiteIds.map((value) => String(value ?? '').trim()).filter(Boolean)),
+    ];
 
     // `characterPrerequisiteIds` (issue 544) — the system-owned character
     // prerequisites (`system.characterPrerequisites[].id`) a reader must ALL pass
@@ -1011,7 +1021,7 @@ export class CraftingSystemManager {
         learnsAllowed,
         learnScope,
         learningMode,
-        prerequisite,
+        prerequisiteIds,
         characterPrerequisiteIds,
         destroyWhenSpent: learn.destroyWhenSpent === true,
       },

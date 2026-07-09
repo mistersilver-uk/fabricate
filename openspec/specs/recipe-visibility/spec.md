@@ -23,7 +23,7 @@ From `002-data-models.md`:
 - `CraftingSystem.recipeVisibility` (legacy strategy, superseded by `visibilityMode`; read as a derivation fallback: `listMode`, `knowledge.mode`, `knowledge.learn.dragDropEnabled`)
 - `CraftingSystem.recipeItemDefinitions`
 - `RecipeItemDefinition.recipeIds` (canonical recipe↔book membership, many-to-many)
-- `RecipeItemDefinition.caps` (per-recipe-item use/learn caps, including `caps.learn.prerequisite` and `caps.learn.characterPrerequisiteIds`)
+- `RecipeItemDefinition.caps` (per-recipe-item use/learn caps, including `caps.learn.prerequisiteIds` and `caps.learn.characterPrerequisiteIds`)
 - `CraftingSystem.characterPrerequisites` (system-owned character-prerequisite library referenced by `caps.learn.characterPrerequisiteIds`)
 - `Recipe.access` (canonical restricted-mode grants: `characterIds`, `playerIds`)
 - `Recipe.visibility` (legacy restricted-mode player list; `access` read-forward source)
@@ -328,8 +328,10 @@ When a single matched instance must be mutated (increment or consume), choose:
 - The member recipe item definition exists.
 - Recipe is not yet learned for the selected crafting actor.
 - At least one matched, owned recipe item exists.
-- The recipe's learn **prerequisite** is satisfied (see Learn Prerequisite below).
+- The recipe's **Required Knowledge** is satisfied (see Learn Prerequisite below).
 - The book's **character-prerequisite learning gate** is satisfied (see Character Prerequisite Learning Gate below).
+
+Both learning gates are only enforced when the book's `caps.learn.limitLearning` is `true`; with Limited learning off, neither gate applies and the book's recipes learn freely (issue 544).
 
 The "at least one matched, owned recipe item exists" precondition is evaluated against the crafting actor's actual inventory for every viewer, including a GM.
 The learn operation must collect and filter candidate items directly rather than reusing the GM access-grant's matched-items output (which is empty — see GM Access-Grant Semantics).
@@ -352,22 +354,24 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 
 ### Learn Prerequisite
 
-A recipe item's learn cap may name a **prerequisite** recipe (`caps.learn.prerequisite`, a recipe id, resolved per Recipe-Item Cap Resolution).
-When set, a reader may only learn the recipe once the crafting actor has **already learned** the prerequisite recipe (`RecipeVisibilityService._isPrerequisiteMet` checks `Actor.flags.fabricate.learnedRecipes[prerequisite]`).
-An unset/empty prerequisite is always satisfied.
-Every learn path enforces this gate (drag-and-drop learn, the Inventory-tab learn, and the craft-time learn): a learn attempt against an unmet prerequisite is refused with the `FABRICATE.Knowledge.PrerequisiteNotMet` outcome and writes no `learnedRecipes` entry.
+A recipe item's learn cap may name **Required Knowledge** (`caps.learn.prerequisiteIds`, a list of recipe ids, resolved per Recipe-Item Cap Resolution; folds a legacy single `caps.learn.prerequisite` string on normalize).
+When Limited learning is on and the list is non-empty, a reader may only learn the recipe once the crafting actor has **already learned ALL** of the required recipes (**AND** semantics; `RecipeVisibilityService._isPrerequisiteMet` checks `Actor.flags.fabricate.learnedRecipes[id]` for every id).
+An empty list is always satisfied, and when `caps.learn.limitLearning` is not `true` the gate is not enforced at all (`_isPrerequisiteMet` returns `true` immediately).
+A `prerequisiteIds` id that no longer resolves to an existing recipe is **skipped (fail-open)**, mirroring the character-prerequisite gate: a deleted required recipe removes its part of the gate rather than permanently bricking the book (the learned map is pruned of deleted recipes, so an unresolvable required id could otherwise never be satisfied).
+Every learn path enforces this gate on the same entry points as the character gate — the single-learn paths (`learnRecipe`, `learnOneRecipeFromItem`, `learnRecipeFromOwnedBook`) refuse with the `FABRICATE.Knowledge.PrerequisiteNotMet` outcome and write no `learnedRecipes` entry, while the drag-and-drop bulk preview (`previewOwnedItemLearning`), the item-sheet picker (`getLearnableRecipesFromItem`), and the craft-time auto-learn (`learnRecipeOnCraft`) silently omit a recipe whose Required Knowledge is unmet.
 
 ### Character Prerequisite Learning Gate
 
 A book/scroll may carry a **character-prerequisite learning gate** (issue 544): the recipe item definition's `caps.learn.characterPrerequisiteIds`, a list of ids into the system's `characterPrerequisites` library.
-This is **distinct** from the recipe `prerequisite` above: `prerequisite` gates on **prior recipe knowledge** (has the reader already learned recipe X), while the character-prerequisite gate gates on the acting **actor's roll data** (a stat, level, proficiency, or flag comparison).
+This is **distinct** from Required Knowledge above: `prerequisiteIds` gates on **prior recipe knowledge** (has the reader already learned recipe X), while the character-prerequisite gate gates on the acting **actor's roll data** (a stat, level, proficiency, or flag comparison).
 The gate is **per-book**: every recipe a book teaches shares that book's `characterPrerequisiteIds`, so the gate is evaluated once per definition, not per recipe.
+Like Required Knowledge, it is only enforced when `caps.learn.limitLearning` is `true` (`_meetsCharacterPrerequisites` returns `{ met: true }` immediately when Limited learning is off).
 
-When set, a reader may learn the book's recipes only when the acting actor passes **ALL** of the referenced prerequisites (**AND** semantics), evaluated against `actor.getRollData()` by the pure `evaluatePrerequisites` resolver (`RecipeVisibilityService._meetsCharacterPrerequisites` → `{ met, reason }`).
+When enforced, a reader may learn the book's recipes only when the acting actor passes **ALL** of the referenced prerequisites (**AND** semantics), evaluated against `actor.getRollData()` by the pure `evaluatePrerequisites` resolver (`RecipeVisibilityService._meetsCharacterPrerequisites` → `{ met, reason }`).
 A `characterPrerequisiteIds` entry that no longer resolves to a system definition is **skipped (fail-open)**: a deleted prerequisite removes its gate rather than bricking the book.
 An unknown or missing roll-data `path` degrades to `0`/`false` (never throws) and fails its condition.
 
-The gate is enforced at **every learn entry point**, beside the `prerequisite` check:
+The gate is enforced at **every learn entry point**, beside the Required Knowledge check:
 
 - The single-learn paths (`learnRecipe`, `learnOneRecipeFromItem`, `learnRecipeFromOwnedBook`) refuse an unmet gate with the `FABRICATE.Knowledge.CharacterPrerequisiteNotMet` outcome (carrying the recipe name and the failing prerequisites' names as `reason`) and write no `learnedRecipes` entry.
 - The bulk drop-learn preview and the item-sheet picker (`previewOwnedItemLearning` / `getLearnableRecipesFromItem`) **silently filter out** recipes the actor cannot learn, so an unlearnable recipe is never offered.
