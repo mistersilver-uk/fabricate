@@ -1986,19 +1986,11 @@ async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('.fabricate-manager #manager-system-name').first().fill('The Herbalist');
   await page.locator('.fabricate-manager #manager-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
-  // The fixture system is `routedByCheck`; click a DIFFERENT mode so the
-  // change-mode confirm dialog fires (then cancelled below). The crafting enum now
-  // carries `routedByIngredients` / `routedByCheck` (the legacy `routed` option is
-  // gone — see SystemEditView.resolutionModeOptions).
-  await page.locator('.fabricate-manager [data-system-resolution-mode-option="routedByIngredients"]').first().click();
-  // Changing resolution mode may raise a confirm dialog; its buttons differ
-  // across manager revisions. Dismiss it resiliently and never leave a modal open.
-  const cancelDialog = page.locator('.dialog button:has-text("No"), .dialog button:has-text("Cancel"), .dialog button:has-text("Keep")').first();
-  if (await cancelDialog.count() > 0) {
-    await cancelDialog.click().catch(() => {});
-  } else {
-    await page.keyboard.press('Escape').catch(() => {});
-  }
+  // NOTE: the recipe-resolution-mode control moved off the system-edit view into
+  // the dedicated Crafting Settings section (`data-crafting-resolution-mode-option`
+  // in CraftingSettingsView) with the issue-511 Books & Scrolls refactor, so the
+  // old `data-system-resolution-mode-option` interaction that lived here is gone.
+  // The mode-change confirm flow is exercised where the control now lives.
   await softClick(page.locator('.fabricate-manager [data-edit-control="advanced-options"] input'), { trial: true });
   await softClick(page.locator('.fabricate-manager [data-feature-key="gathering"] input'), { trial: true });
   await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to systems")'), { trial: true });
