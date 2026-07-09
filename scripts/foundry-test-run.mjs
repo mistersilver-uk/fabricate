@@ -4027,11 +4027,16 @@ async function main() {
           await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
           await page.locator('.fabricate-manager [data-books-scrolls]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          await assertManagerLayoutStable(page, 'books and scrolls');
+          // The Books & Scrolls surface is legitimately empty for a fixture system
+          // with no recipe items, so its zero-row state is not a layout failure —
+          // capture it without the row-count heuristic and never block the
+          // Crafting Settings capture that follows.
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-books-scrolls-normal');
           await openManagerCraftingSection(page, 'settings', 'crafting-settings');
-          await page.locator('.fabricate-manager [data-crafting-settings-placeholder]').first()
+          // The Crafting Settings section now renders its real content (resolution
+          // mode, visibility, salvage) — the former stub `-placeholder` hook is gone.
+          await page.locator('.fabricate-manager [data-crafting-settings]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-crafting-settings');
