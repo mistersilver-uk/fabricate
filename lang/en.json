@@ -3605,7 +3605,7 @@
             "EffectiveRules": "Effective rules",
             "HowPlayersSee": "How players see it",
             "Label": "Preview and effective rules",
-            "LiveHint": "This preview updates live as you change the settings on the left, and the controls above."
+            "LiveHint": "This preview updates live as you change the controls on the left."
           },
           "Rules": {
             "AppliesEveryRecipe": "Applies to every recipe",
