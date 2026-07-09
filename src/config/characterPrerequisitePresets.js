@@ -58,9 +58,12 @@ function buildPresetBundle(conditions) {
  * @type {ReadonlyArray<object>}
  */
 export const DND5E_CHARACTER_PREREQUISITE_PRESETS = buildPresetBundle({
-  smithsTools: { path: 'tools.smith.prof.multiplier', op: 'gte', value: 1 },
-  // dnd5e skill proficiency is a 0/0.5/1/2 multiplier; proficient (or better) is ≥ 1.
-  proficientArcana: { path: 'skills.arc.prof.multiplier', op: 'gte', value: 1 },
+  // dnd5e skill/tool proficiency lives on `<skill|tool>.value` as a 0/0.5/1/2
+  // multiplier (0 = not proficient, 0.5 = half, 1 = proficient, 2 = expertise);
+  // proficient-or-better is ≥ 1. Ability presets read the ability score
+  // (`abilities.<key>.value`).
+  smithsTools: { path: 'tools.smith.value', op: 'gte', value: 1 },
+  proficientArcana: { path: 'skills.arc.value', op: 'gte', value: 1 },
   expertCrafter: { path: 'abilities.int.value', op: 'gte', value: 13 },
   strongEnough: { path: 'abilities.str.value', op: 'gte', value: 15 },
 });
