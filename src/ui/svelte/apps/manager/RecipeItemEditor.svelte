@@ -25,8 +25,12 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { recipeItemAccessBadge } from '../../util/recipeItemAccessBadge.js';
   import { prerequisitePreview } from '../../../../systems/characterPrerequisites.js';
+  import { buildRecipeItemPreviewRow } from '../../util/recipeItemPreviewRow.js';
+  // The "How players see it" rail renders the REAL player book detail (fed a synthetic
+  // row) so it can never drift from what players actually see. InventoryDetail pulls in
+  // its own `recipeItemAccessBadge`, keeping the access badge in lockstep by construction.
+  import InventoryDetail from '../inventory/InventoryDetail.svelte';
   import RecipeItemEditorTabs from './recipe-item/RecipeItemEditorTabs.svelte';
   import RecipeItemOverviewTab from './recipe-item/RecipeItemOverviewTab.svelte';
   import RecipeItemContentsTab from './recipe-item/RecipeItemContentsTab.svelte';
@@ -82,7 +86,6 @@
   const hasItem = $derived(Boolean(linkedItem?.uuid || recipeItem?.sourceItemUuid));
 
   const itemName = $derived(String(linkedItem?.name || '') || text('FABRICATE.Admin.Manager.RecipeItem.Overview.NamePlaceholder', 'Untitled recipe item'));
-  const itemType = $derived(String(linkedItem?.type || ''));
 
   // ---- Validation (shared shape with the Validation tab) --------------------
   const computedChecks = $derived.by(() => {
@@ -167,42 +170,54 @@
       }));
   });
 
-  // Combined read-only chip list for the preview card ("Needs: <name>").
-  const requirementChips = $derived([...requiredKnowledgeChips, ...learningPrerequisiteChips]);
+  // "Satisfied?" experiment toggle (issue 544): a GM-only, NON-persisted map of
+  // requirementId → boolean driving the embedded preview's synthetic met/unmet state.
+  // Unset defaults to `true` (satisfied), so the preview opens on the normal/unlocked
+  // player view; the GM flips a requirement off to preview its gated state.
+  let satisfiedById = $state({});
+  const satisfied = (id) => satisfiedById[id] !== false;
+  function toggleSatisfied(id) {
+    satisfiedById = { ...satisfiedById, [id]: !satisfied(id) };
+  }
 
-  // Preview badge via the shared helper so the GM "How players see it" preview and the
-  // player Inventory book detail render IDENTICAL badges under every mode/cap combo.
-  const gmBadgeText = (key, fallback, data) =>
-    text(key, fallback).replace('{n}', String(data?.n ?? ''));
-  const previewBadge = $derived(
-    recipeItemAccessBadge(
-      { mode: modeItem ? 'item' : 'knowledge', item: itemCaps, learn: learnCaps },
-      gmBadgeText
-    )
+  // ONE requirement source, reusing the already-resolved (and limitLearning-gated)
+  // chip deriveds, stamped with the current toggle state.
+  const previewRequirements = $derived([
+    ...requiredKnowledgeChips.map((chip) => ({
+      id: chip.id,
+      kind: 'knowledge',
+      name: chip.name,
+      icon: chip.icon,
+      met: satisfied(chip.id),
+    })),
+    ...learningPrerequisiteChips.map((chip) => ({
+      id: chip.id,
+      kind: 'character',
+      name: chip.name,
+      icon: chip.icon,
+      met: satisfied(chip.id),
+    })),
+  ]);
+
+  // The synthetic book row fed to the REAL player `InventoryDetail` component so the
+  // "How players see it" preview can never drift from the actual player UI.
+  const previewRow = $derived(
+    buildRecipeItemPreviewRow({
+      key: `recipeitem:preview:${recipeItem?.id ?? 'draft'}`,
+      name: itemName,
+      img: linkedItem?.img,
+      description: linkedItem?.description,
+      mode: visibilityMode,
+      caps: recipeItem?.caps,
+      recipes: (linkedRecipes || []).map((recipe) => ({
+        id: recipe?.id,
+        name: recipe?.name,
+        description: '',
+        img: recipe?.img,
+      })),
+      requirements: previewRequirements,
+    })
   );
-
-  const readLabel = $derived.by(() => {
-    if (recipeCount === 0) {
-      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.NoRecipes', 'No recipes to learn');
-    }
-    // Item mode: the held book grants CRAFTING access, so the CTA is craft-based, not
-    // learn-based. The use cap is shown separately as the badge under the name.
-    if (modeItem) {
-      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.CraftRecipes', 'Craft {n} recipes').replace('{n}', String(recipeCount));
-    }
-    // When a learning cap actually restricts (below the total), the reader picks up to
-    // the cap; otherwise they can read & learn everything.
-    if (limitLearning && learnsAllowed < recipeCount) {
-      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.ReadLearnUpTo', 'Read & learn up to {n} of {total}')
-        .replace('{n}', String(learnsAllowed))
-        .replace('{total}', String(recipeCount));
-    }
-    return text('FABRICATE.Admin.Manager.RecipeItem.Preview.ReadLearn', 'Read & learn {n} {noun}')
-      .replace('{n}', String(recipeCount))
-      .replace('{noun}', recipeCount === 1
-        ? text('FABRICATE.Admin.Manager.RecipeItem.Preview.RecipeSingular', 'recipe')
-        : text('FABRICATE.Admin.Manager.RecipeItem.Preview.RecipePlural', 'recipes'));
-  });
 
   const effectiveRules = $derived.by(() => {
     const rules = [];
@@ -217,12 +232,15 @@
         : { icon: 'fas fa-book', tone: 'success', title: text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely'), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NoCapLearning', 'No cap on learning') });
       // Required Knowledge / Learning prerequisites become one "Needs: <name>" row each
       // (only when Limited learning is on — matching runtime toggle-gating).
+      // Each "Needs: <name>" row carries the requirement `id`/`kind` so the markup can
+      // render a GM-only "Satisfied?" toggle that drives the embedded preview. The
+      // use/learn-cap rows above carry no `id` and get no toggle.
       const needsTitle = (name) => text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledge', 'Needs: {name}').replace('{name}', name);
       for (const chip of requiredKnowledgeChips) {
-        rules.push({ icon: 'fas fa-scroll', tone: 'muted', title: needsTitle(chip.name), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledgeSub', 'Must already be known') });
+        rules.push({ id: chip.id, kind: 'knowledge', icon: 'fas fa-scroll', tone: 'muted', title: needsTitle(chip.name), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledgeSub', 'Must already be known') });
       }
       for (const chip of learningPrerequisiteChips) {
-        rules.push({ icon: chip.icon, tone: 'muted', title: needsTitle(chip.name), sub: chip.preview || text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsPrereqSub', 'Character requirement') });
+        rules.push({ id: chip.id, kind: 'character', icon: chip.icon, tone: 'muted', title: needsTitle(chip.name), sub: chip.preview || text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsPrereqSub', 'Character requirement') });
       }
     }
     return rules;
@@ -280,41 +298,10 @@
       <aside class="manager-recipe-item-editor-rail" data-recipe-item-rail aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Rail.Label', 'Preview and effective rules')}>
         <div class="manager-recipe-item-rail-section">
           <span class="manager-recipe-item-rail-title">{text('FABRICATE.Admin.Manager.RecipeItem.Rail.HowPlayersSee', 'How players see it')}</span>
-          <div class="manager-recipe-item-preview-card" data-recipe-item-preview>
-            <div class="manager-recipe-item-preview-head">
-              <span class="manager-recipe-item-preview-thumb" aria-hidden="true">
-                {#if linkedItem?.img}<img src={linkedItem.img} alt="" />{:else}<i class="fas fa-book"></i>{/if}
-              </span>
-              <div class="manager-recipe-item-preview-copy">
-                <span class="manager-recipe-item-preview-name" data-recipe-item-preview-name>{itemName}</span>
-                <span class="manager-recipe-item-preview-meta">{itemType
-                  ? text('FABRICATE.Admin.Manager.RecipeItem.Preview.MetaInPack', '{type} · in your pack').replace('{type}', itemType)
-                  : text('FABRICATE.Admin.Manager.RecipeItem.Preview.MetaInPackNoType', 'In your pack')}</span>
-              </div>
-            </div>
-            <div class="manager-recipe-item-preview-badges">
-              <span class={`manager-recipe-item-preview-badge is-${previewBadge.tone}`} data-recipe-item-preview-badge data-badge-tone={previewBadge.tone}>
-                <i class={previewBadge.icon} aria-hidden="true"></i>
-                <span>{previewBadge.label}</span>
-              </span>
-            </div>
-            <!-- Presentational only: a preview of the player's CTA, not an action here.
-                 Rendered as a non-interactive element so it isn't a focusable dead button. -->
-            <div class="manager-recipe-item-preview-cta" class:is-disabled={recipeCount === 0} data-recipe-item-preview-cta>
-              <i class="fas fa-book-open" aria-hidden="true"></i>
-              <span>{readLabel}</span>
-            </div>
-            {#if requirementChips.length > 0}
-              <div class="manager-recipe-item-preview-needs" data-recipe-item-preview-needs role="list" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Preview.RequirementsLabel', 'Learning requirements')}>
-                {#each requirementChips as chip (chip.id)}
-                  <span class="manager-chip manager-selected-tag-pill manager-recipe-item-needs-chip" role="listitem" data-recipe-item-needs-chip={chip.id}>
-                    <i class={chip.icon} aria-hidden="true"></i>
-                    <span class="manager-recipe-item-needs-chip-name">{text('FABRICATE.Admin.Manager.RecipeItem.Preview.Needs', 'Needs: {name}').replace('{name}', chip.name)}</span>
-                    <i class="fas fa-lock" aria-hidden="true"></i>
-                  </span>
-                {/each}
-              </div>
-            {/if}
+          <!-- The REAL player book detail, fed a synthetic row — so it can never drift.
+               No callbacks are passed, so it's a read-only preview. -->
+          <div class="manager-recipe-item-live-preview" data-recipe-item-preview>
+            <InventoryDetail item={previewRow} learningRecipeId={null} />
           </div>
         </div>
 
@@ -328,6 +315,22 @@
                   <span class="manager-recipe-item-rule-title">{rule.title}</span>
                   <span class="manager-recipe-item-rule-sub">{rule.sub}</span>
                 </div>
+                {#if rule.id}
+                  <button
+                    type="button"
+                    class={`manager-status-toggle manager-recipe-item-satisfied-toggle ${satisfied(rule.id) ? 'is-on' : 'is-off'}`}
+                    data-recipe-item-satisfied-toggle={rule.id}
+                    aria-pressed={satisfied(rule.id)}
+                    aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Rules.Satisfied', 'Satisfied?')}
+                    title={text('FABRICATE.Admin.Manager.RecipeItem.Rules.Satisfied', 'Satisfied?')}
+                    onclick={() => toggleSatisfied(rule.id)}
+                  >
+                    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                    <span class="manager-status-toggle-label">{satisfied(rule.id)
+                      ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                      : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+                  </button>
+                {/if}
               </div>
             {/each}
           </div>
@@ -414,147 +417,17 @@
     color: var(--fab-text-subtle);
   }
 
-  /* "Needs: <name>" requirement chips inside the "How players see it" preview card
-     (issue 544): these MIRROR the player's requirement chip (leading type icon +
-     "Needs: {name}" + trailing lock glyph). The GM preview has no actor, so it shows
-     the chips in the player's UNMET/locked appearance (danger ramp) — i.e. what a
-     not-yet-qualified player would see. Reuse the `.manager-selected-tag-pill` SHAPE
-     but override its success ramp; restore symmetric right padding (the pill trims it
-     for a remove button these read-only chips don't carry). */
-  .manager-recipe-item-preview-needs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-1);
-  }
-
-  .manager-recipe-item-needs-chip {
-    max-width: 100%;
-    min-width: 0;
-    padding-right: var(--fab-space-2);
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-    color: var(--fab-danger-text);
-  }
-
-  /* Long names ellipsize so a chip can't blow out the ~280px preview card. */
-  .manager-recipe-item-needs-chip-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-  }
-
-  .manager-recipe-item-preview-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-3);
+  /* The "How players see it" rail embeds the REAL player `InventoryDetail` component
+     (issue 544), which sets `height: 100%`; bound it and let it scroll so the full
+     player UI (badge, description, "Needs:" chips, recipe list + search + pager)
+     renders inside the ~320px rail instead of collapsing. */
+  .manager-recipe-item-live-preview {
+    max-height: 460px;
+    overflow: auto;
     border: 1px solid var(--fab-border);
     border-radius: 11px;
     background: var(--fab-bg-1);
   }
-
-  .manager-recipe-item-preview-head {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-  }
-
-  .manager-recipe-item-preview-thumb {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
-    border-radius: 9px;
-    background: var(--fab-bg-3);
-    color: var(--fab-text-secondary);
-    overflow: hidden;
-  }
-
-  .manager-recipe-item-preview-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .manager-recipe-item-preview-copy {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-    min-width: 0;
-  }
-
-  .manager-recipe-item-preview-name {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--fab-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .manager-recipe-item-preview-meta {
-    font-size: 0.62rem;
-    color: var(--fab-text-subtle);
-  }
-
-  .manager-recipe-item-preview-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-recipe-item-preview-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--fab-space-1);
-    padding: var(--fab-space-2xs) var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    font-size: 0.62rem;
-    font-weight: 600;
-  }
-
-  .manager-recipe-item-preview-badge.is-warning {
-    border-color: var(--fab-warning-border);
-    background: var(--fab-warning-soft);
-    color: var(--fab-warning-text);
-  }
-
-  .manager-recipe-item-preview-badge.is-info {
-    border-color: var(--fab-info-border);
-    background: var(--fab-info-soft);
-    color: var(--fab-info-text);
-  }
-
-  .manager-recipe-item-preview-badge.is-success {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-    color: var(--fab-success-text);
-  }
-
-  .manager-recipe-item-preview-cta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fab-space-2);
-    width: 100%;
-    height: 36px;
-    border: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font-weight: 700;
-    font-size: 0.75rem;
-    cursor: default;
-  }
-
-  .manager-recipe-item-preview-cta.is-disabled {
-    opacity: 0.6;
-  }
-
 
   .manager-recipe-item-rules-list {
     display: flex;
@@ -615,6 +488,12 @@
     color: var(--fab-text-subtle);
     /* A deep dotted prerequisite path (@a.b.c.d ≥ N) must break, not overflow. */
     overflow-wrap: anywhere;
+  }
+
+  /* GM-only "Satisfied?" experiment toggle, right-aligned in a "Needs:" rule row. */
+  .manager-recipe-item-satisfied-toggle {
+    flex: 0 0 auto;
+    margin-left: auto;
   }
 
   .manager-recipe-item-rail-note {

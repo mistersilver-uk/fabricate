@@ -91,6 +91,12 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GrantAccessInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPageInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemEditor.svelte');
+  // The RecipeItemEditor's "How players see it" rail embeds the REAL player
+  // InventoryDetail (which pulls in CraftingThumb → craftingImageDefaults) fed a
+  // synthetic row from recipeItemPreviewRow.js (issue 544). Compile/copy them here too
+  // or mounting the manager tree that renders the editor HANGS (# cancelled).
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryDetail.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/crafting/CraftingThumb.svelte');
   for (const recipeItemComponent of [
     'RecipeItemEditorTabs',
     'RecipeItemOverviewTab',
@@ -212,6 +218,7 @@ function compileManagerRoot() {
     'recipeCurrency.js',
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
+    'recipeItemPreviewRow.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });

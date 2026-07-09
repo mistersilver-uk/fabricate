@@ -3617,6 +3617,7 @@
             "NeedsPrereqSub": "Character requirement",
             "NeverConsumed": "The item is never consumed",
             "NoCapLearning": "No cap on learning",
+            "Satisfied": "Satisfied?",
             "SingleUse": "Single use",
             "UnlimitedUses": "Unlimited uses"
           },
