@@ -2876,6 +2876,8 @@
           "SeedPresets": "Seed presets",
           "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
           "Name": "Name",
+          "Icon": "Icon",
+          "ChangeIcon": "Change icon",
           "Condition": "Condition",
           "Path": "Property path",
           "Operator": "Operator",

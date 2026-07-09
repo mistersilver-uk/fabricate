@@ -3406,6 +3406,34 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('SystemEditView character-prerequisites accordion renders an icon picker left of the name input (issue 544)', () => {
+    mountSystemEditView({
+      selectedSystem: { id: 'sys1', name: 'System One', resolutionMode: 'simple', features: {} },
+      characterPrerequisiteLibrary: [
+        { id: 'p1', name: 'Proficient in Arcana', icon: 'fa-solid fa-hat-wizard', path: 'skills.arc.prof.multiplier', op: 'gte', value: 1 },
+      ],
+    });
+    const card = target.querySelector('[data-system-character-prerequisites]');
+    assert.ok(card, 'the prerequisites card renders');
+    // Expand the item, then the name row exposes the icon field (with the searchable
+    // IconPicker trigger) before the name input.
+    card.querySelector('[data-toggle-prerequisite]').click();
+    flushSync();
+    const iconField = target.querySelector('[data-prerequisite-icon-field]');
+    assert.ok(iconField, 'the icon field renders in the expanded editor');
+    assert.ok(
+      iconField.querySelector('.manager-prerequisite-icon-trigger'),
+      'the icon field renders the searchable IconPicker trigger'
+    );
+    // Icon field precedes the name input within the name row (icon is to the left).
+    const row = target.querySelector('.manager-prerequisite-name-row');
+    const nameInput = row.querySelector('[data-prerequisite-name]');
+    assert.ok(
+      iconField.compareDocumentPosition(nameInput) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the icon field comes before the name input'
+    );
+  });
+
   it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
     // Not in player mode ⇒ no visibility section.
     mountRecipeOverview({

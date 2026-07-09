@@ -1901,6 +1901,22 @@
   padding: 0 var(--fab-space-3) var(--fab-space-3);
 }
 
+/* Name row: icon picker (issue 544) to the left of the name input */
+.fabricate-manager .manager-prerequisite-name-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-prerequisite-icon-field {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-prerequisite-name-row .manager-prerequisite-name-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .fabricate-manager .manager-prerequisite-condition-label {
   font-size: 0.7rem;
   font-weight: 600;

@@ -9,6 +9,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import IconPicker from '../../../components/IconPicker.svelte';
   import {
     PREREQUISITE_OPERATORS,
     DEFAULT_PREREQUISITE_ICON,
@@ -132,15 +133,26 @@
 
           {#if open}
             <div class="manager-prerequisite-body" id={`prerequisite-body-${entry.id}`}>
-              <label class="manager-field manager-prerequisite-name-field">
-                <span>{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Name', 'Name')}</span>
-                <input
-                  type="text"
-                  value={entry.name}
-                  data-prerequisite-name
-                  oninput={(event) => onUpdate(entry.id, { name: event.currentTarget.value })}
-                />
-              </label>
+              <div class="manager-prerequisite-name-row">
+                <div class="manager-field manager-prerequisite-icon-field" data-prerequisite-icon-field>
+                  <span>{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Icon', 'Icon')}</span>
+                  <IconPicker
+                    value={entry.icon || DEFAULT_PREREQUISITE_ICON}
+                    buttonTitle={text('FABRICATE.Admin.Manager.CharacterPrerequisites.ChangeIcon', 'Change icon')}
+                    triggerClass="manager-prerequisite-icon-trigger"
+                    onChange={(iconClass) => onUpdate(entry.id, { icon: iconClass })}
+                  />
+                </div>
+                <label class="manager-field manager-prerequisite-name-field">
+                  <span>{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Name', 'Name')}</span>
+                  <input
+                    type="text"
+                    value={entry.name}
+                    data-prerequisite-name
+                    oninput={(event) => onUpdate(entry.id, { name: event.currentTarget.value })}
+                  />
+                </label>
+              </div>
 
               <span class="manager-prerequisite-condition-label">
                 {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Condition', 'Condition')}
