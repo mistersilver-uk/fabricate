@@ -3643,7 +3643,7 @@ async function main() {
       let previousExperimentalFeatures = false;
       try {
         previousExperimentalFeatures = await page.evaluate(async (sysId) => {
-          const previousExperimentalFeatures = game.settings.get('fabricate', 'experimentalFeatures') === true;
+          const previousExperimentalFeatures = Boolean(game.settings.get('fabricate', 'experimentalFeatures'));
           await game.settings.set('fabricate', 'experimentalFeatures', true);
           await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
           const csm = game.fabricate.getCraftingSystemManager();
