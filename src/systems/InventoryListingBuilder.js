@@ -703,7 +703,9 @@ export class InventoryListingBuilder {
       if (!recipe) continue; // dangling id → fail-open (skip)
       const met = Boolean(learnedMap?.[id]);
       const name = nameVisible(id) ? stringOrEmpty(recipe?.name) || id : hiddenLabel();
-      requirements.push({ kind: 'knowledge', id, name, icon: 'fas fa-scroll', met });
+      // The learning/knowledge glyph (matches the Limits "Learning" card heading);
+      // kept in lockstep with RecipeItemEditor's requiredKnowledgeChips icon.
+      requirements.push({ kind: 'knowledge', id, name, icon: 'fas fa-graduation-cap', met });
       if (!met) unmetNames.push(name);
     }
 

@@ -509,14 +509,14 @@ describe('recipe default image is the blueprint, sourced from one canonical lite
 });
 
 describe('recipe image helpers prefer the linked recipe-item image', () => {
-  it('RecipesBrowserView row thumbnail prefers recipeItemImg, then img, then the default', () => {
+  it('RecipesBrowserView row thumbnail prefers recipeItemImg, then the shared resolver', () => {
     assert.ok(
-      browserSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
-      'browser imports the constant'
+      browserSource.includes("import { resolveRecipeImage } from '../../util/craftingImageDefaults.js'"),
+      'browser imports the shared resolver'
     );
     assert.ok(
-      browserSource.includes('recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE'),
-      'row image prefers the linked item image'
+      browserSource.includes('recipe?.recipeItemImg || resolveRecipeImage(recipe)'),
+      'row image prefers the linked item image, then the shared resolver'
     );
     assert.equal(browserSource.includes("recipe?.img || 'icons/svg/item-bag.svg'"), false, 'no bag-SVG row fallback');
   });

@@ -742,7 +742,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     const known = reqs.find((r) => r.id === 'r-known');
     assert.deepEqual(
       { kind: known.kind, name: known.name, icon: known.icon, met: known.met },
-      { kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-scroll', met: true }
+      { kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-graduation-cap', met: true }
     );
     const unknown = reqs.find((r) => r.id === 'r-unknown');
     assert.equal(unknown.met, false, 'an unlearned required recipe is unmet');

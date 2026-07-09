@@ -47,7 +47,7 @@ function knowledgeRow(overrides = {}) {
     caps: { item: {}, learn: { limitLearning: true, learnsAllowed: 3, learnScope: 'perInstance' } },
     recipes: [{ id: 'r1', name: 'Fireball', img: 'icons/fb.webp' }],
     requirements: [
-      { id: 'r-known', kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-scroll', met: true },
+      { id: 'r-known', kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-graduation-cap', met: true },
       { id: 'p1', kind: 'character', name: 'Expert', icon: 'fas fa-hat-wizard', met: true },
     ],
     ...overrides,
@@ -81,7 +81,7 @@ test('item mode ⇒ craftable, caps.item applicable, no requirements even with p
     caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitLearning: true } },
     recipes: [{ id: 'r1', name: 'Forge' }],
     requirements: [
-      { id: 'r-known', kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-scroll', met: false },
+      { id: 'r-known', kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-graduation-cap', met: false },
     ],
   });
   assert.equal(row.learnable, false);
@@ -99,7 +99,7 @@ test('limitLearning off ⇒ requirements dropped and not blocked', () => {
   const row = knowledgeRow({
     caps: { item: {}, learn: { limitLearning: false } },
     requirements: [
-      { id: 'r-known', kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-scroll', met: false },
+      { id: 'r-known', kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-graduation-cap', met: false },
     ],
   });
   assert.deepEqual(row.requirements, []);
@@ -130,8 +130,8 @@ test('all requirements met ⇒ not blocked; recipes carry the requirement shape'
 test('an unmet requirement ⇒ blocked with reason listing ONLY the unmet names', () => {
   const row = knowledgeRow({
     requirements: [
-      { id: 'r-known', kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-scroll', met: true },
-      { id: 'r-missing', kind: 'knowledge', name: 'Ritual', icon: 'fas fa-scroll', met: false },
+      { id: 'r-known', kind: 'knowledge', name: 'Cantrip', icon: 'fas fa-graduation-cap', met: true },
+      { id: 'r-missing', kind: 'knowledge', name: 'Ritual', icon: 'fas fa-graduation-cap', met: false },
       {
         id: 'p-fail',
         kind: 'character',

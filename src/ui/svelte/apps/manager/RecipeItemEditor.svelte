@@ -145,7 +145,9 @@
     return ids.map((id) => {
       const key = String(id);
       const match = byId.get(key);
-      return { id: key, name: match ? String(match.name || key) : key, icon: 'fas fa-scroll' };
+      // The learning/knowledge glyph, kept in lockstep with the player builder's
+      // knowledge requirement icon (InventoryListingBuilder._evaluateBookRequirements).
+      return { id: key, name: match ? String(match.name || key) : key, icon: 'fas fa-graduation-cap' };
     });
   });
 
@@ -237,7 +239,7 @@
       // use/learn-cap rows above carry no `id` and get no toggle.
       const needsTitle = (name) => text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledge', 'Needs: {name}').replace('{name}', name);
       for (const chip of requiredKnowledgeChips) {
-        rules.push({ id: chip.id, kind: 'knowledge', icon: 'fas fa-scroll', tone: 'muted', title: needsTitle(chip.name), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledgeSub', 'Must already be known') });
+        rules.push({ id: chip.id, kind: 'knowledge', icon: chip.icon, tone: 'muted', title: needsTitle(chip.name), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledgeSub', 'Must already be known') });
       }
       for (const chip of learningPrerequisiteChips) {
         rules.push({ id: chip.id, kind: 'character', icon: chip.icon, tone: 'muted', title: needsTitle(chip.name), sub: chip.preview || text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsPrereqSub', 'Character requirement') });

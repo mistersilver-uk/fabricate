@@ -571,7 +571,7 @@ describe('InventoryView (mounted) — recipe-item books', () => {
   it('renders book-level "Needs:" requirement chips with names, icons, and met/unmet tone (issue 544)', async () => {
     const book = makeBook([{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }]);
     book.requirements = [
-      { kind: 'knowledge', id: 'r-known', name: 'Cantrip', icon: 'fas fa-scroll', met: true },
+      { kind: 'knowledge', id: 'r-known', name: 'Cantrip', icon: 'fas fa-graduation-cap', met: true },
       { kind: 'character', id: 'p-fail', name: 'Master Only', icon: 'fas fa-hat-wizard', met: false },
     ];
     const { services } = makeBookServices(book);
@@ -586,7 +586,7 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.ok(met, 'a met requirement chip renders');
     assert.match(met.textContent, /Needs/, 'chip reads "Needs: <name>"');
     assert.match(met.textContent, /Cantrip/, 'chip names the requirement');
-    assert.ok(met.querySelector('i.fa-scroll'), 'Required Knowledge chip has the scroll icon');
+    assert.ok(met.querySelector('i.fa-graduation-cap'), 'Required Knowledge chip has the graduation-cap icon');
     assert.ok(met.classList.contains('is-met'), 'met chip uses the success (met) tone');
     assert.equal(met.getAttribute('data-requirement-met'), 'true');
     assert.equal(met.querySelector('button'), null, 'requirement chips are read-only');

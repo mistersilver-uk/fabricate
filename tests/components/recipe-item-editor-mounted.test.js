@@ -296,6 +296,7 @@ describe('RecipeItemEditor (mounted)', () => {
     const preview = root.querySelector('[data-recipe-item-preview]');
     const rk = preview.querySelector('[data-inventory-requirement="r1"]');
     assert.ok(rk, 'the embedded preview renders the Required Knowledge chip');
+    assert.ok(rk.querySelector('i.fa-graduation-cap'), 'the Required Knowledge chip uses the graduation-cap icon');
     assert.equal(rk.getAttribute('data-requirement-met'), 'true', 'default is satisfied/met');
     assert.ok(
       preview.querySelector('[data-inventory-requirement="p1"]'),
