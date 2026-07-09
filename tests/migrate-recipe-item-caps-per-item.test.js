@@ -144,7 +144,8 @@ test('seeded caps survive a _normalizeSystem round-trip', async () => {
       // the legacy 'ntimes' learning-mode mirror.
       learnScope: 'perInstance',
       learningMode: 'ntimes',
-      prerequisite: null,
+      prerequisiteIds: [],
+      characterPrerequisiteIds: [],
       destroyWhenSpent: true,
     },
   });

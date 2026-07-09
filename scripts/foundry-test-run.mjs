@@ -1986,19 +1986,11 @@ async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('.fabricate-manager #manager-system-name').first().fill('The Herbalist');
   await page.locator('.fabricate-manager #manager-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
-  // The fixture system is `routedByCheck`; click a DIFFERENT mode so the
-  // change-mode confirm dialog fires (then cancelled below). The crafting enum now
-  // carries `routedByIngredients` / `routedByCheck` (the legacy `routed` option is
-  // gone — see SystemEditView.resolutionModeOptions).
-  await page.locator('.fabricate-manager [data-system-resolution-mode-option="routedByIngredients"]').first().click();
-  // Changing resolution mode may raise a confirm dialog; its buttons differ
-  // across manager revisions. Dismiss it resiliently and never leave a modal open.
-  const cancelDialog = page.locator('.dialog button:has-text("No"), .dialog button:has-text("Cancel"), .dialog button:has-text("Keep")').first();
-  if (await cancelDialog.count() > 0) {
-    await cancelDialog.click().catch(() => {});
-  } else {
-    await page.keyboard.press('Escape').catch(() => {});
-  }
+  // NOTE: the recipe-resolution-mode control moved off the system-edit view into
+  // the dedicated Crafting Settings section (`data-crafting-resolution-mode-option`
+  // in CraftingSettingsView) with the issue-511 Books & Scrolls refactor, so the
+  // old `data-system-resolution-mode-option` interaction that lived here is gone.
+  // The mode-change confirm flow is exercised where the control now lives.
   await softClick(page.locator('.fabricate-manager [data-edit-control="advanced-options"] input'), { trial: true });
   await softClick(page.locator('.fabricate-manager [data-feature-key="gathering"] input'), { trial: true });
   await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to systems")'), { trial: true });
@@ -3651,7 +3643,7 @@ async function main() {
       let previousExperimentalFeatures = false;
       try {
         previousExperimentalFeatures = await page.evaluate(async (sysId) => {
-          const previousExperimentalFeatures = game.settings.get('fabricate', 'experimentalFeatures') === true;
+          const previousExperimentalFeatures = Boolean(game.settings.get('fabricate', 'experimentalFeatures'));
           await game.settings.set('fabricate', 'experimentalFeatures', true);
           await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
           const csm = game.fabricate.getCraftingSystemManager();
@@ -3944,7 +3936,8 @@ async function main() {
         for (const selector of [
           '#manager-system-name',
           '#manager-system-description',
-          '#manager-system-resolution-mode',
+          // Recipe-resolution mode moved to the Crafting Settings section
+          // (#511 Books & Scrolls); it is no longer a system-edit control.
           '[data-edit-control="advanced-options"]',
           '[data-feature-key="gathering"]'
         ]) {
@@ -4034,11 +4027,16 @@ async function main() {
           await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
           await page.locator('.fabricate-manager [data-books-scrolls]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          await assertManagerLayoutStable(page, 'books and scrolls');
+          // The Books & Scrolls surface is legitimately empty for a fixture system
+          // with no recipe items, so its zero-row state is not a layout failure —
+          // capture it without the row-count heuristic and never block the
+          // Crafting Settings capture that follows.
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-books-scrolls-normal');
           await openManagerCraftingSection(page, 'settings', 'crafting-settings');
-          await page.locator('.fabricate-manager [data-crafting-settings-placeholder]').first()
+          // The Crafting Settings section now renders its real content (resolution
+          // mode, visibility, salvage) — the former stub `-placeholder` hook is gone.
+          await page.locator('.fabricate-manager [data-crafting-settings]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-crafting-settings');

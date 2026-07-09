@@ -409,7 +409,13 @@
           "NoRecipeMatches": "No recipes match your search.",
           "NoRecipeDescription": "No description.",
           "LearnAction": "Learn",
+          "LearnBlockedShort": "Requirements not met",
           "Learned": "Learned",
+          "Needs": "Needs: {name}",
+          "HiddenRecipe": "a hidden recipe",
+          "RequirementMet": "Requirement met: {name}",
+          "RequirementUnmet": "Requirement not met: {name}",
+          "RequirementsLabel": "Learning requirements",
           "RecipeSearchPlaceholder": "Search recipes…",
           "RecipeSearchLabel": "Search recipes",
           "RecipesPerPage": "Per page",
@@ -442,7 +448,8 @@
           "UseSpent": "No uses left",
           "CraftRecipes": "Craft {total} recipes",
           "CraftAction": "Craft",
-          "ReadLearnAllRecipes": "Read & learn all {total} recipes"
+          "ReadLearnAllRecipes": "Read & learn all {total} recipes",
+          "ReadLearnAllRecipeSingular": "Read & learn"
         }
       },
       "ActorBar": {
@@ -939,7 +946,8 @@
       "LearnedRecipesPartial": "{actor} learned {count} new recipes: {recipes}",
       "NoNewRecipesLearned": "{actor} already knows the matched recipe item recipes.",
       "CouldNotLearnRecipe": "Could not learn recipe",
-      "PrerequisiteNotMet": "You must learn the prerequisite recipe first."
+      "PrerequisiteNotMet": "You must learn the required recipes first.",
+      "CharacterPrerequisiteNotMet": "You do not meet the prerequisites to learn {name}: {reason}."
     },
     "Admin": {
       "Title": "Crafting Admin",
@@ -1663,6 +1671,9 @@
           "RecipeItem": "Recipe item",
           "RecipeItemDropHint": "Drag an item here to link it.",
           "RecipeItemReplaceHint": "Drop an item to replace it, or right-click to unlink.",
+          "RecipeItemLinkAnother": "Drag an item here to link another.",
+          "RecipeItemUnlinkHint": "Right-click to unlink this book.",
+          "RecipeItemLinks": "Linked recipe items",
           "OpenItem": "Open item",
           "UnlinkItem": "Unlink recipe item",
           "CopyItemUuid": "Copy item UUID",
@@ -2862,6 +2873,23 @@
           "TaskDcOverride": "DC",
           "TaskDcOverridePlaceholder": "System default"
         },
+        "CharacterPrerequisites": {
+          "Title": "Character prerequisites",
+          "Hint": "Pass/fail conditions — a property path, comparison and value — attached to a book or scroll to gate who may learn its recipes.",
+          "Empty": "No character prerequisites yet.",
+          "Add": "Add prerequisite",
+          "Delete": "Remove prerequisite",
+          "SeedPresets": "Seed presets",
+          "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
+          "Name": "Name",
+          "Icon": "Icon",
+          "ChangeIcon": "Change icon",
+          "Condition": "Condition",
+          "Path": "Property path",
+          "Operator": "Operator",
+          "Value": "Value",
+          "Note": "Resolves against the character's roll data. Boolean comparisons (is true / is false / exists) hide the value field. Unknown paths fall back to 0 / false."
+        },
         "CurrencyUnits": {
           "Title": "Currency units",
           "Hint": "Define actor currency paths and denomination breakdowns for this crafting system.",
@@ -3504,8 +3532,16 @@
             "ModeOnce": "Once per reader",
             "ModeParty": "Party-wide",
             "PartyLearns": "Party learns",
-            "Prerequisite": "Prerequisite to learn",
-            "PrerequisiteNone": "None",
+            "RequiredKnowledge": "Required Knowledge",
+            "RequiredKnowledgeHint": "The character must already know these recipes to learn from this book or scroll.",
+            "RequiredKnowledgeSearch": "Search recipes…",
+            "RequiredKnowledgeEmpty": "No recipes to require yet",
+            "RequiredKnowledgeRemove": "Remove",
+            "LearningPrerequisites": "Learning prerequisites",
+            "LearningPrerequisitesHint": "The character must have these attributes to learn from this book or scroll.",
+            "LearningPrerequisitesSearch": "Search prerequisites…",
+            "CharacterPrerequisitesNone": "No prerequisites yet — add them in System Settings.",
+            "CharacterPrerequisitesRemove": "Remove",
             "Time": "time",
             "Times": "times",
             "Title": "Limits",
@@ -3562,23 +3598,27 @@
             "UseAnytime": "Use anytime",
             "UseOnce": "Use once",
             "UseUpTo": "Use up to {n} times",
-            "CraftRecipes": "Craft {n} recipes"
+            "CraftRecipes": "Craft {n} recipes",
+            "Needs": "Needs: {name}",
+            "RequirementsLabel": "Learning requirements"
           },
           "Rail": {
             "EffectiveRules": "Effective rules",
             "HowPlayersSee": "How players see it",
             "Label": "Preview and effective rules",
-            "LiveHint": "This preview updates live as you change the controls on the left."
+            "LiveHint": "This preview updates live as you change the settings on the left, and the controls above."
           },
           "Rules": {
             "AppliesEveryRecipe": "Applies to every recipe",
             "DestroyedWhenSpent": "Destroyed when spent",
             "InertWhenSpent": "Becomes inert when spent",
             "NUsesPerCopy": "{n} uses per copy",
-            "NeedsPrereq": "Needs {name}",
+            "NeedsKnowledge": "Needs: {name}",
+            "NeedsKnowledgeSub": "Must already be known",
+            "NeedsPrereqSub": "Character requirement",
             "NeverConsumed": "The item is never consumed",
             "NoCapLearning": "No cap on learning",
-            "OthersCantLearn": "Others can’t learn from it",
+            "Satisfied": "Satisfied?",
             "SingleUse": "Single use",
             "UnlimitedUses": "Unlimited uses"
           },

@@ -91,6 +91,12 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GrantAccessInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPageInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemEditor.svelte');
+  // The RecipeItemEditor's "How players see it" rail embeds the REAL player
+  // InventoryDetail (which pulls in CraftingThumb → craftingImageDefaults) fed a
+  // synthetic row from recipeItemPreviewRow.js (issue 544). Compile/copy them here too
+  // or mounting the manager tree that renders the editor HANGS (# cancelled).
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryDetail.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/crafting/CraftingThumb.svelte');
   for (const recipeItemComponent of [
     'RecipeItemEditorTabs',
     'RecipeItemOverviewTab',
@@ -155,6 +161,7 @@ function compileManagerRoot() {
     );
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
@@ -211,6 +218,7 @@ function compileManagerRoot() {
     'recipeCurrency.js',
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
+    'recipeItemPreviewRow.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
@@ -235,6 +243,8 @@ function compileManagerRoot() {
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
     'src/config/flags.js',
+    // CharacterPrerequisitesCard imports the pure prerequisite engine (issue 544).
+    'src/systems/characterPrerequisites.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',
@@ -3400,6 +3410,34 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target.querySelector('[data-crafting-settings-context] [data-crafting-effect]'),
       'the effect panel renders alongside the cards'
+    );
+  });
+
+  it('SystemEditView character-prerequisites accordion renders an icon picker left of the name input (issue 544)', () => {
+    mountSystemEditView({
+      selectedSystem: { id: 'sys1', name: 'System One', resolutionMode: 'simple', features: {} },
+      characterPrerequisiteLibrary: [
+        { id: 'p1', name: 'Proficient in Arcana', icon: 'fa-solid fa-hat-wizard', path: 'skills.arc.prof.multiplier', op: 'gte', value: 1 },
+      ],
+    });
+    const card = target.querySelector('[data-system-character-prerequisites]');
+    assert.ok(card, 'the prerequisites card renders');
+    // Expand the item, then the name row exposes the icon field (with the searchable
+    // IconPicker trigger) before the name input.
+    card.querySelector('[data-toggle-prerequisite]').click();
+    flushSync();
+    const iconField = target.querySelector('[data-prerequisite-icon-field]');
+    assert.ok(iconField, 'the icon field renders in the expanded editor');
+    assert.ok(
+      iconField.querySelector('.manager-prerequisite-icon-trigger'),
+      'the icon field renders the searchable IconPicker trigger'
+    );
+    // Icon field precedes the name input within the name row (icon is to the left).
+    const row = target.querySelector('.manager-prerequisite-name-row');
+    const nameInput = row.querySelector('[data-prerequisite-name]');
+    assert.ok(
+      iconField.compareDocumentPosition(nameInput) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the icon field comes before the name input'
     );
   });
 

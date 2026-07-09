@@ -141,8 +141,10 @@ describe('RecipeItemInspector recipe-item link card', () => {
   });
 
   it('carries the EnvironmentSummaryInspector a11y contract', () => {
-    assert.ok(inspectorSource.includes('role="group"'), 'linked container is a group');
-    assert.ok(inspectorSource.includes('aria-label='), 'linked container has an aria-label');
+    // The recipe-item card now lists every linked book (many-to-many), so the a11y
+    // contract is a labelled list rather than a single group container.
+    assert.ok(inspectorSource.includes('data-recipe-item-links'), 'renders the linked-items list');
+    assert.ok(inspectorSource.includes('aria-label='), 'the list has an aria-label');
     assert.ok(inspectorSource.includes('svelte-ignore a11y_no_noninteractive_element_interactions'), 'carries the ignore comment');
     assert.ok(inspectorSource.includes('manager-icon-button is-danger'), 'visible danger unlink button');
   });
@@ -507,14 +509,14 @@ describe('recipe default image is the blueprint, sourced from one canonical lite
 });
 
 describe('recipe image helpers prefer the linked recipe-item image', () => {
-  it('RecipesBrowserView row thumbnail prefers recipeItemImg, then img, then the default', () => {
+  it('RecipesBrowserView row thumbnail prefers recipeItemImg, then the shared resolver', () => {
     assert.ok(
-      browserSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
-      'browser imports the constant'
+      browserSource.includes("import { resolveRecipeImage } from '../../util/craftingImageDefaults.js'"),
+      'browser imports the shared resolver'
     );
     assert.ok(
-      browserSource.includes('recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE'),
-      'row image prefers the linked item image'
+      browserSource.includes('recipe?.recipeItemImg || resolveRecipeImage(recipe)'),
+      'row image prefers the linked item image, then the shared resolver'
     );
     assert.equal(browserSource.includes("recipe?.img || 'icons/svg/item-bag.svg'"), false, 'no bag-SVG row fallback');
   });

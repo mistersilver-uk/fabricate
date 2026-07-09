@@ -337,6 +337,11 @@ The default-selected Settings tab renders the system settings form (identity, op
 It writes through the existing admin-store persistence and confirmation flows.
 Recipe resolution mode, salvage resolution mode, and the Recipe Visibility card moved to the Crafting group's Settings page (`crafting-settings`); the System Overview Settings tab no longer renders them.
 
+The Settings tab additionally renders a **Character prerequisites** card (`CharacterPrerequisitesCard`, issue 544) — a system-owned library of reusable pass/fail conditions the GM attaches to a book/scroll to gate who may learn its recipes (behaviour in `recipe-visibility`).
+It is an accordion list (one entry expanded at a time): each collapsed row shows the entry name and a live `@path op value` preview, and the expanded body edits the name, then the property `path` (rendered with a leading `@` affordance), an operator dropdown (the nine `CharacterPrerequisite.op` tokens), and a `value` field that is hidden for the valueless operators (`is true` / `is false` / `exists`).
+Add, delete, and an opt-in **Seed presets** action (enabled only for `dnd5e` / `pf2e` worlds, disabled with an explanatory tooltip otherwise) mirror the gathering character-modifier card's affordances.
+Each control live-applies through the admin store (`addCharacterPrerequisite` / `updateCharacterPrerequisite` / `deleteCharacterPrerequisite` / `seedCharacterPrerequisitePresetsForSystem`), staging no dirty draft.
+
 #### Validation Tab
 
 The Validation tab renders the derived system-validation report
@@ -495,6 +500,18 @@ That page's breadcrumb is `Crafting` then `Books & Scrolls` then the item name, 
 `consumeOnLearn` is hidden while the learn cap is enabled (the learn cap's `destroyWhenSpent` supersedes it).
 Editing is live-apply: each control passes its caps patch through `updateRecipeItemCaps(itemId, patch)`, which merges and normalizes it onto the recipe item definition, so the page stages no dirty draft and is not part of the Manager confirm-discard route-exit chain.
 The surface reads configuration only (recipe-item definitions plus the recipes referencing each item) and never reads per-item-instance runtime flags, so the admin store stays Foundry-free.
+
+The item's Limits authoring surface (`RecipeItemLimitsTab`), in knowledge mode inside the `limitLearning` detail block, renders (issue 544) a **Limit applies** control and **Recipes allowed** stepper on one line, then a two-column line of searchable typeahead pickers: **Required Knowledge** (left, authoring `caps.learn.prerequisiteIds` — recipes the reader must already know) and **Learning prerequisites** (right, authoring `caps.learn.characterPrerequisiteIds`).
+Each column is an uppercase label, a hint, a search input (typeahead) that filters the candidate options by name, and a wrap row of removable pills below it for the selected entries; the Learning prerequisites pill carries the option's `@path op value` preview as its title.
+Both pickers sit **inside** the `limitLearning` block, so they hide when Limited learning is off — matching the runtime rule that neither gate is enforced when the toggle is off.
+When there are no options (no candidate recipes / no `characterPrerequisites` library yet), the column shows an inline muted empty note in place of the search input (Learning prerequisites steers the GM to add them in System Settings first) rather than a detached paragraph.
+
+The recipe-item editor's right rail's **"How players see it"** section renders the ACTUAL player book detail component (`InventoryDetail`) fed a synthetic row built by the pure, import-free `buildRecipeItemPreviewRow` helper (issue 544) — rather than a bespoke re-implementation — so the preview can never drift from what players see (mirroring the shared-`recipeItemAccessBadge` no-drift precedent).
+The synthetic row mirrors the exact shape `InventoryListingBuilder._buildRecipeItemRows` emits (mode → `learnable`/`craftable`, applicability-suppressed caps, `requirements` kept only when learnable + Limited learning, `blocked`/`reason` folded onto each recipe), so the embedded detail renders the real access badge, description, "Needs: &lt;name&gt;" requirement chips (with met/unmet state), and per-recipe Learn/Craft affordances.
+Because the GM preview has no actor, the **"Effective rules"** list's "Needs: &lt;name&gt;" rows (one per requirement, only when Limited learning is on; the character-prerequisite row's sub is the `@path op value` preview) each carry a GM-only **"Satisfied?"** toggle (`manager-status-toggle`, defaulting to satisfied so the preview opens unlocked).
+Flipping a requirement's toggle drives that requirement's synthetic `met` state, which flows to the embedded `InventoryDetail` live — its requirement chip flips met/unmet and its Learn buttons enable/disable — letting the GM preview exactly what a player in any qualification state would see.
+The toggle is an authoring experiment control only; it is never persisted.
+In the player app, the **book detail** (`InventoryDetail`) renders the "Needs: &lt;name&gt;" chip row full-width below the header from the row's `requirements` array (surfaced by `InventoryListingBuilder`), reflecting the acting actor's met/unmet state per requirement (success ramp + check glyph when met, danger ramp + lock glyph when unmet); a blocked recipe's Learn button is disabled (the enumeration is not repeated per recipe).
 
 ### Access Surface
 
@@ -731,15 +748,18 @@ This is a valid configuration and saves without error.
 
 If knowledge mode includes item matching or learning:
 
-- Recipe item selector / drop zone bound to `recipeItemId`
-- Preview of the selected system recipe item definition (name, image, and source status)
-- Clear action for removing the current recipe item reference
-- Helper text: owned copies match by UUID or resolved source UUID of the selected recipe item definition
+- Recipe item selector / drop zone
+- Preview of each linked recipe item definition (name, image, and source status)
+- Per-book unlink action
+- Helper text: owned copies match by UUID or resolved source UUID of the linked recipe item definition
 
-The recipe item selector is **partially implemented** by a recipe-item link card rendered in the GM manager's right-hand context inspector panel (the global `manager-inspector` aside), not a view-internal column: a drop zone bound to `recipeItemId`, a preview of the linked definition's name/image/source status, a clear (unlink) action, and the drag/drop-first interaction with no manual UUID entry.
+The recipe item selector is **partially implemented** by a recipe-item link card (`RecipeItemInspector`) rendered in the GM manager's right-hand context inspector panel (the global `manager-inspector` aside), not a view-internal column.
+Because recipe↔book membership is **many-to-many** (issue 511: `RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`), the card enumerates **every** book/scroll that teaches this recipe as a **list** rather than showing a single scalar link.
+Each list row previews that book's name/image/source status and offers Open item, Copy item UUID, and a per-book Unlink (also right-click) — Unlink removes the recipe from **that** book's membership only, leaving the recipe's other books intact.
+Below the list a compact drop zone links another book: dropping a Foundry Item links it via `addRecipeItemFromUuid` (which synthesizes or dedups a `RecipeItemDefinition`) and adds the recipe to its membership.
+Each row falls back to the legacy scalar `recipe.recipeItemId` only for a fully un-migrated system, and a row whose definition's `sourceItemUuid` no longer resolves shows a missing/stale state and retains the link.
 The central `manager-main` holds the recipe identity card; the recipe-item card sits beside it in the shared inspector panel.
-Linking or unlinking applies immediately and is independent of the identity Save draft.
-Dropping a Foundry Item links it via `addRecipeItemFromUuid` (which synthesizes or dedups a `RecipeItemDefinition`) and sets `recipe.recipeItemId`; unlinking nulls `recipe.recipeItemId` and does **not** delete the shared definition; and when the linked definition's `sourceItemUuid` no longer resolves the card shows a missing/stale state and retains the link.
+Linking or unlinking applies immediately (through `setRecipeBookMembership`) and is independent of the identity Save draft, and unlinking does **not** delete the shared definition.
 The inspector panel is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and suppressed (full-width main) for `learned`.
 The player-mode restricted-visibility toggle and allowed-users allow-list are implemented on the Overview tab as described above.
 

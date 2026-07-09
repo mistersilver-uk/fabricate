@@ -2,7 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
 
   let {
@@ -56,7 +56,9 @@
   }
 
   function recipeImage(recipe) {
-    return recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
+    // The linked-book image wins; otherwise the shared resolver maps an empty OR
+    // generic item-bag image → the recipe blueprint (never the bag SVG).
+    return recipe?.recipeItemImg || resolveRecipeImage(recipe);
   }
 
   // Render the recipe's category in sentence case: the reserved fallback resolves

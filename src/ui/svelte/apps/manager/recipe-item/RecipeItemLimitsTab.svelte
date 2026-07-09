@@ -7,11 +7,15 @@
                  "Uses per copy" stepper (caps.item.maxUses, min 1) and a "When the
                  last use is spent" SegmentedControl (caps.item.whenSpent).
    - knowledge → Learning card. A "Limited learning" toggle (caps.learn.limitLearning);
-                 when on, a "Limit applies" SegmentedControl (caps.learn.learnScope:
-                 perInstance = per copy / total = across all copies), a "Recipes allowed"
-                 stepper (caps.learn.learnsAllowed, min 1), a "Prerequisite to learn"
-                 selector (a recipe id from linkedRecipes/availableRecipes, or None),
-                 and a live plain-English explanation.
+                 when on, a detail block with "Limit applies" (caps.learn.learnScope:
+                 perInstance = per copy / total = across all copies) + "Recipes allowed"
+                 stepper (caps.learn.learnsAllowed, min 1) on one line, then two columns:
+                 "Required Knowledge" (caps.learn.prerequisiteIds — recipes the reader
+                 must already know, AND) and "Learning prerequisites"
+                 (caps.learn.characterPrerequisiteIds — character prerequisites the reader
+                 must pass, AND), each a searchable typeahead + removable pills, then a
+                 live plain-English explanation. When the toggle is off, none of this
+                 shows and neither gate is enforced at runtime.
 
   CONTROLLED: every change emits a nested partial patch via `onPatch`; the router
   deep-merges it into the draft.
@@ -26,11 +30,16 @@
   import { localize } from '../../../util/foundryBridge.js';
   import SegmentedControl from '../SegmentedControl.svelte';
 
+  import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
+
   let {
     recipeItem = null,
     visibilityMode = 'item',
     linkedRecipes = [],
     availableRecipes = [],
+    // System-owned character prerequisite library (issue 544) — the options for
+    // the "Character prerequisites to learn" multi-select.
+    characterPrerequisites = [],
     onPatch = () => {}
   } = $props();
 
@@ -63,7 +72,6 @@
   const learnsAllowed = $derived(
     Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0 ? learnCaps.learnsAllowed : 1
   );
-  const prerequisite = $derived(learnCaps.prerequisite ? String(learnCaps.prerequisite) : '');
 
   const WHEN_SPENT_OPTIONS = [
     { value: 'destroyed', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Destroyed', fallback: 'Destroyed' },
@@ -118,7 +126,15 @@
   }
 
   function toggleLimitLearning() {
-    patchLearn({ limitLearning: !limitLearning });
+    const next = !limitLearning;
+    const patch = { limitLearning: next };
+    // Turning ON must seed a real `learnsAllowed` in the SAME patch: the stepper only
+    // DISPLAYS the derived default (1) when unset, so without this the saved/preview
+    // cap stays `undefined` and the player learn-all CTA is wrongly hidden (issue 544).
+    if (next && !(Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0)) {
+      patch.learnsAllowed = learnsAllowed;
+    }
+    patchLearn(patch);
   }
   function selectLearnScope(value) {
     patchLearn({ learnScope: value });
@@ -127,9 +143,83 @@
     const next = Math.max(1, learnsAllowed + delta);
     if (next !== learnsAllowed) patchLearn({ learnsAllowed: next });
   }
-  function selectPrerequisite(event) {
-    const value = String(event.currentTarget.value || '');
-    patchLearn({ prerequisite: value || null });
+
+  // Required Knowledge (issue 544): the recipe ids a reader must ALREADY have
+  // learned (AND semantics — must know ALL of them) before learning from this book
+  // or scroll. Authored as a searchable typeahead + removable pills (mirrors the
+  // tag picker in ComponentsBrowserView). Folds the legacy single `prerequisite`
+  // string into the array so un-normalized drafts still read correctly.
+  const prerequisiteIds = $derived(
+    Array.isArray(learnCaps.prerequisiteIds)
+      ? learnCaps.prerequisiteIds
+      : learnCaps.prerequisite
+        ? [String(learnCaps.prerequisite)]
+        : []
+  );
+  // The selected required-knowledge recipes resolved to `{ id, name }` (order = selection).
+  const selectedRequiredKnowledge = $derived.by(() => {
+    const byId = new Map(prerequisiteOptions.map((option) => [String(option.id), option]));
+    return prerequisiteIds.map((id) => byId.get(String(id))).filter(Boolean);
+  });
+  let requiredKnowledgeSearch = $state('');
+  const normalizedRequiredKnowledgeSearch = $derived(
+    (requiredKnowledgeSearch || '').trim().toLowerCase()
+  );
+  // Options not already selected whose name matches the (non-empty) search term.
+  const requiredKnowledgeSuggestions = $derived(
+    normalizedRequiredKnowledgeSearch
+      ? prerequisiteOptions.filter(
+          (option) =>
+            !prerequisiteIds.includes(option.id) &&
+            option.name.toLowerCase().includes(normalizedRequiredKnowledgeSearch)
+        )
+      : []
+  );
+  function addRequiredKnowledge(id) {
+    const value = String(id || '');
+    if (!value || prerequisiteIds.includes(value)) return;
+    patchLearn({ prerequisiteIds: [...prerequisiteIds, value] });
+    requiredKnowledgeSearch = '';
+  }
+  function removeRequiredKnowledge(id) {
+    patchLearn({ prerequisiteIds: prerequisiteIds.filter((value) => value !== id) });
+  }
+
+  // Learning prerequisites (issue 544): the system-owned character-prerequisite ids
+  // a reader must ALL pass (AND) to learn from this book, gating on actor roll data
+  // — distinct from Required Knowledge above, which gates on prior recipe knowledge.
+  // Authored with the same searchable typeahead + removable pills.
+  const characterPrerequisiteIds = $derived(
+    Array.isArray(learnCaps.characterPrerequisiteIds) ? learnCaps.characterPrerequisiteIds : []
+  );
+  // The selected prerequisites resolved to their definitions (order = selection).
+  const selectedCharacterPrerequisites = $derived.by(() => {
+    const byId = new Map((characterPrerequisites || []).map((p) => [String(p.id), p]));
+    return characterPrerequisiteIds.map((id) => byId.get(String(id))).filter(Boolean);
+  });
+  // The prerequisites still available to add (not already selected).
+  const availableCharacterPrerequisites = $derived(
+    (characterPrerequisites || []).filter((p) => !characterPrerequisiteIds.includes(p.id))
+  );
+  let characterPrereqSearch = $state('');
+  const normalizedCharacterPrereqSearch = $derived(
+    (characterPrereqSearch || '').trim().toLowerCase()
+  );
+  const characterPrereqSuggestions = $derived(
+    normalizedCharacterPrereqSearch
+      ? availableCharacterPrerequisites.filter((p) =>
+          String(p.name || '').toLowerCase().includes(normalizedCharacterPrereqSearch)
+        )
+      : []
+  );
+  function addCharacterPrerequisite(id) {
+    const value = String(id || '');
+    if (!value || characterPrerequisiteIds.includes(value)) return;
+    patchLearn({ characterPrerequisiteIds: [...characterPrerequisiteIds, value] });
+    characterPrereqSearch = '';
+  }
+  function removeCharacterPrerequisite(id) {
+    patchLearn({ characterPrerequisiteIds: characterPrerequisiteIds.filter((value) => value !== id) });
   }
 </script>
 
@@ -223,20 +313,21 @@
 
         {#if limitLearning}
           <div class="manager-recipe-item-limits-detail is-column">
-            <div class="manager-recipe-item-learning-limit">
-              <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo', 'Limit applies')}</span>
-              <SegmentedControl
-                options={LEARN_SCOPE_OPTIONS}
-                value={learnScope}
-                onChange={selectLearnScope}
-                groupName="recipe-item-learn-scope"
-                ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo', 'Limit applies')}
-                dataAttr="data-recipe-item-learn-scope"
-                optionDataAttr="data-recipe-item-learn-scope-option"
-              />
-            </div>
-
+            <!-- Line 1: Limit applies · divider · Recipes allowed. -->
             <div class="manager-recipe-item-learning-row">
+              <div class="manager-recipe-item-learning-limit">
+                <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo', 'Limit applies')}</span>
+                <SegmentedControl
+                  options={LEARN_SCOPE_OPTIONS}
+                  value={learnScope}
+                  onChange={selectLearnScope}
+                  groupName="recipe-item-learn-scope"
+                  ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo', 'Limit applies')}
+                  dataAttr="data-recipe-item-learn-scope"
+                  optionDataAttr="data-recipe-item-learn-scope-option"
+                />
+              </div>
+              <div class="manager-recipe-item-limits-divider is-vertical" aria-hidden="true"></div>
               <div class="manager-recipe-item-stepper-group">
                 <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RecipesAllowed', 'Recipes allowed')}</span>
                 <div class="manager-recipe-item-stepper" data-recipe-item-learns-stepper>
@@ -248,18 +339,110 @@
                     : text('FABRICATE.Admin.Manager.RecipeItem.Limits.UnitPerCopy', 'per copy')}</span>
                 </div>
               </div>
-              <div class="manager-recipe-item-limits-divider is-vertical" aria-hidden="true"></div>
-              <div class="manager-recipe-item-prereq">
-                <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.Prerequisite', 'Prerequisite to learn')}</span>
-                <label class="manager-field">
-                  <span class="sr-only">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.Prerequisite', 'Prerequisite to learn')}</span>
-                  <select data-recipe-item-prerequisite value={prerequisite} onchange={selectPrerequisite}>
-                    <option value="">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.PrerequisiteNone', 'None')}</option>
-                    {#each prerequisiteOptions as option (option.id)}
-                      <option value={option.id}>{option.name}</option>
+            </div>
+
+            <!-- Line 2: two equal columns — Required Knowledge · Learning prerequisites. -->
+            <div class="manager-recipe-item-prereq-columns">
+              <!-- Required Knowledge (recipes the reader must already have learned). -->
+              <div class="manager-recipe-item-prereq-column" data-recipe-item-required-knowledge-column>
+                <span id="recipe-item-required-knowledge-label" class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge', 'Required Knowledge')}</span>
+                <p class="manager-muted manager-recipe-item-prereq-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeHint', 'The character must already know these recipes to learn from this book or scroll.')}</p>
+                {#if prerequisiteOptions.length === 0}
+                  <p class="manager-muted manager-recipe-item-prereq-empty" data-recipe-item-required-knowledge-empty>{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeEmpty', 'No recipes to require yet')}</p>
+                {:else}
+                  <div class="manager-tag-search">
+                    <input
+                      type="search"
+                      class="manager-recipe-item-prereq-search"
+                      data-recipe-item-required-knowledge-search
+                      role="combobox"
+                      aria-expanded={requiredKnowledgeSuggestions.length > 0}
+                      aria-controls="recipe-item-required-knowledge-suggestions"
+                      value={requiredKnowledgeSearch}
+                      placeholder={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeSearch', 'Search recipes…')}
+                      aria-labelledby="recipe-item-required-knowledge-label"
+                      oninput={(event) => (requiredKnowledgeSearch = event.currentTarget.value)}
+                    />
+                    {#if requiredKnowledgeSuggestions.length > 0}
+                      <div id="recipe-item-required-knowledge-suggestions" class="manager-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge', 'Required Knowledge')}>
+                        {#each requiredKnowledgeSuggestions as option (option.id)}
+                          <button type="button" role="option" aria-selected="false" class="manager-tag-suggestion" data-recipe-item-required-knowledge-option={option.id} onclick={() => addRequiredKnowledge(option.id)}>
+                            <i class="fas fa-scroll" aria-hidden="true"></i>
+                            <span>{option.name}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
+                {#if selectedRequiredKnowledge.length > 0}
+                  <div class="manager-selected-tag-row" role="list">
+                    {#each selectedRequiredKnowledge as option (option.id)}
+                      <span class="manager-chip manager-selected-tag-pill" role="listitem" data-recipe-item-required-knowledge={option.id}>
+                        <i class="fas fa-scroll" aria-hidden="true"></i>
+                        <span>{option.name}</span>
+                        <button
+                          type="button"
+                          data-recipe-item-required-knowledge-remove={option.id}
+                          aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeRemove', 'Remove')}
+                          title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeRemove', 'Remove')}
+                          onclick={() => removeRequiredKnowledge(option.id)}
+                        ><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                      </span>
                     {/each}
-                  </select>
-                </label>
+                  </div>
+                {/if}
+              </div>
+
+              <!-- Learning prerequisites (character prerequisites the reader must pass). -->
+              <div class="manager-recipe-item-prereq-column" data-recipe-item-character-prereqs>
+                <span id="recipe-item-character-prereqs-label" class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites', 'Learning prerequisites')}</span>
+                <p class="manager-muted manager-recipe-item-prereq-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesHint', 'The character must have these attributes to learn.')}</p>
+                {#if characterPrerequisites.length === 0}
+                  <p class="manager-muted manager-recipe-item-prereq-empty" data-recipe-item-character-prereq-empty>{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone', 'No prerequisites yet — add them in System Settings.')}</p>
+                {:else}
+                  <div class="manager-tag-search">
+                    <input
+                      type="search"
+                      class="manager-recipe-item-prereq-search"
+                      data-recipe-item-character-prereq-search
+                      role="combobox"
+                      aria-expanded={characterPrereqSuggestions.length > 0}
+                      aria-controls="recipe-item-character-prereq-suggestions"
+                      value={characterPrereqSearch}
+                      placeholder={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesSearch', 'Search prerequisites…')}
+                      aria-labelledby="recipe-item-character-prereqs-label"
+                      oninput={(event) => (characterPrereqSearch = event.currentTarget.value)}
+                    />
+                    {#if characterPrereqSuggestions.length > 0}
+                      <div id="recipe-item-character-prereq-suggestions" class="manager-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites', 'Learning prerequisites')}>
+                        {#each characterPrereqSuggestions as prereq (prereq.id)}
+                          <button type="button" role="option" aria-selected="false" class="manager-tag-suggestion" data-recipe-item-character-prereq-option={prereq.id} onclick={() => addCharacterPrerequisite(prereq.id)}>
+                            <i class={prereq.icon || 'fas fa-user-check'} aria-hidden="true"></i>
+                            <span>{prereq.name}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
+                {#if selectedCharacterPrerequisites.length > 0}
+                  <div class="manager-selected-tag-row" data-recipe-item-character-prereq-chips role="list">
+                    {#each selectedCharacterPrerequisites as prereq (prereq.id)}
+                      <span class="manager-chip manager-selected-tag-pill" role="listitem" data-recipe-item-character-prereq={prereq.id} title={prerequisitePreview(prereq)}>
+                        <i class={prereq.icon || 'fas fa-user-check'} aria-hidden="true"></i>
+                        <span>{prereq.name}</span>
+                        <button
+                          type="button"
+                          data-recipe-item-character-prereq-remove={prereq.id}
+                          aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove', 'Remove')}
+                          title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove', 'Remove')}
+                          onclick={() => removeCharacterPrerequisite(prereq.id)}
+                        ><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                      </span>
+                    {/each}
+                  </div>
+                {/if}
               </div>
             </div>
 
@@ -281,6 +464,61 @@
     gap: var(--fab-space-4);
   }
 
+  /* Required Knowledge + Learning prerequisites — two equal columns (issue 544).
+     `align-items: start` keeps each column at its content height so a column with
+     more chips doesn't stretch the other. */
+  .manager-recipe-item-prereq-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--fab-space-4);
+  }
+
+  .manager-recipe-item-prereq-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  .manager-recipe-item-prereq-hint {
+    margin: 0;
+    font-size: 0.66rem;
+    line-height: 1.4;
+  }
+
+  /* Inline empty state shown instead of the search input when a column has no
+     options — a real, readable text node (not a disabled-input placeholder). */
+  .manager-recipe-item-prereq-empty {
+    margin: 0;
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border: 1px dashed var(--fab-border);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    line-height: 1.4;
+  }
+
+  /* The typeahead search stretches to fill its column width (overrides the global
+     toolbar-oriented max-width/min-width so a narrow column can't overflow), but
+     `flex: 0 0 auto` stops the global `flex: 1 1 210px` from growing the search box
+     vertically inside the column — otherwise it would push the pill row to the
+     bottom instead of sitting directly under the input. */
+  .manager-recipe-item-prereq-column :global(.manager-tag-search) {
+    flex: 0 0 auto;
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Stack the two columns when the editor body itself is narrow. Keyed to the
+     detail block's own inline size (~600px content width) rather than the whole
+     manager shell, so the flip tracks the real column width. */
+  @container recipe-item-limits-detail (max-width: 600px) {
+    .manager-recipe-item-prereq-columns {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .manager-recipe-item-limits-heading {
     display: flex;
     align-items: center;
@@ -300,7 +538,11 @@
     border: 1px solid var(--fab-accent-border);
     border-radius: 11px;
     background: var(--fab-surface-soft);
-    overflow: hidden;
+    /* Not `overflow: hidden`: the typeahead suggestions dropdown is absolutely
+       positioned near the panel's bottom edge and must be allowed to escape it
+       (a clip can't be beaten by z-index). Children have transparent backgrounds,
+       so the rounded corners still read cleanly. */
+    overflow: visible;
   }
 
   .manager-recipe-item-limits-toggle-row {
@@ -341,6 +583,10 @@
     flex-direction: column;
     align-items: stretch;
     gap: var(--fab-space-4);
+    /* Query container for the two-column prereq grid below — measures the detail
+       block's own inline size (the true column area), not the whole shell. */
+    container-type: inline-size;
+    container-name: recipe-item-limits-detail;
   }
 
   .manager-recipe-item-learning-row {
@@ -351,15 +597,10 @@
 
   .manager-recipe-item-stepper-group,
   .manager-recipe-item-when-spent,
-  .manager-recipe-item-learning-limit,
-  .manager-recipe-item-prereq {
+  .manager-recipe-item-learning-limit {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
-  }
-
-  .manager-recipe-item-prereq {
-    flex: 1.4;
   }
 
   .manager-recipe-item-stepper-label {

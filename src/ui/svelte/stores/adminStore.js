@@ -46,6 +46,14 @@ import {
   seedCharacterModifierPresets,
 } from '../../../config/gatheringCharacterModifierPresets.js';
 import {
+  getCharacterPrerequisitePresetsForFoundrySystem,
+  seedCharacterPrerequisitePresets,
+} from '../../../config/characterPrerequisitePresets.js';
+import {
+  normalizeCharacterPrerequisite,
+  normalizeCharacterPrerequisiteList,
+} from '../../../systems/characterPrerequisites.js';
+import {
   getCurrencyPresetsForFoundrySystem,
   seedCurrencyPresets,
 } from '../../../config/currencyPresets.js';
@@ -2012,6 +2020,11 @@ function _buildSelectedSystemViewData(
       ? selectedSystem.tools.map((tool) => _normalizeGatheringLibraryTool(tool))
       : [],
 
+    // System-owned character prerequisite library (issue 544). Surfaced through
+    // the allowlist projection (like `tools`) so the System Settings accordion
+    // and the recipe-item learning-gate picker read them.
+    characterPrerequisites: normalizeCharacterPrerequisiteList(selectedSystem.characterPrerequisites),
+
     requirements: selectedSystem.requirements || {
       time: { enabled: false },
       currency: { enabled: false, units: [] },
@@ -3391,6 +3404,95 @@ export function createAdminStore(services) {
     );
     const updated = await systemManager.updateSystem(id, { tools: normalized });
     return Array.isArray(updated?.tools) ? updated.tools : normalized;
+  }
+
+  // --- Character prerequisites (issue 544) — system-owned pass/fail gates ------
+
+  function _systemCharacterPrerequisites(systemId) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return [];
+    const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
+    return normalizeCharacterPrerequisiteList(system?.characterPrerequisites, _randomID);
+  }
+
+  async function _persistSystemCharacterPrerequisites(systemId, prerequisites) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return null;
+    const systemManager = services.getCraftingSystemManager?.();
+    if (!systemManager?.updateSystem) return null;
+    const normalized = normalizeCharacterPrerequisiteList(prerequisites, _randomID);
+    const updated = await systemManager.updateSystem(id, { characterPrerequisites: normalized });
+    return Array.isArray(updated?.characterPrerequisites)
+      ? updated.characterPrerequisites
+      : normalized;
+  }
+
+  async function addCharacterPrerequisite(systemId = get(selectedSystemId), partial = {}) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return null;
+    const entry = normalizeCharacterPrerequisite({ id: _randomID(), ...partial }, _randomID);
+    if (!entry) return null;
+    const persisted = await _persistSystemCharacterPrerequisites(id, [
+      ..._systemCharacterPrerequisites(id),
+      entry,
+    ]);
+    if (persisted === null) return null;
+    await refresh();
+    return entry;
+  }
+
+  async function updateCharacterPrerequisite(
+    systemId = get(selectedSystemId),
+    prerequisiteId,
+    updates = {}
+  ) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id || !prerequisiteId) return false;
+    let changed = false;
+    const next = _systemCharacterPrerequisites(id).map((entry) => {
+      if (entry.id !== prerequisiteId) return entry;
+      changed = true;
+      return normalizeCharacterPrerequisite({ ...entry, ...updates, id: entry.id }, _randomID);
+    });
+    if (!changed) return false;
+    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    if (persisted === null) return false;
+    await refresh();
+    return true;
+  }
+
+  async function deleteCharacterPrerequisite(systemId = get(selectedSystemId), prerequisiteId) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id || !prerequisiteId) return false;
+    const current = _systemCharacterPrerequisites(id);
+    const next = current.filter((entry) => entry.id !== prerequisiteId);
+    if (next.length === current.length) return false; // unknown id — nothing removed
+    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    if (persisted === null) return false;
+    await refresh();
+    return true;
+  }
+
+  async function seedCharacterPrerequisitePresetsForSystem(systemId = get(selectedSystemId)) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return { added: 0, skipped: 0, unsupported: true, foundrySystemId: '' };
+    const foundrySystemId = String(services.getFoundrySystemId?.() || '');
+    const presets = getCharacterPrerequisitePresetsForFoundrySystem(foundrySystemId);
+    if (!presets.length) {
+      return { added: 0, skipped: 0, unsupported: true, foundrySystemId };
+    }
+    const { added, skipped, next } = seedCharacterPrerequisitePresets({
+      presets,
+      currentLibrary: _systemCharacterPrerequisites(id),
+    });
+    if (added.length > 0) {
+      const persisted = await _persistSystemCharacterPrerequisites(id, next);
+      if (persisted === null) {
+        return { added: 0, skipped: skipped.length, unsupported: false, foundrySystemId };
+      }
+      await refresh();
+    }
+    return { added: added.length, skipped: skipped.length, unsupported: false, foundrySystemId };
   }
 
   function _environmentList() {
@@ -7513,6 +7615,10 @@ export function createAdminStore(services) {
     updateGatheringCharacterModifier,
     deleteGatheringCharacterModifier,
     seedGatheringCharacterModifierPresets,
+    addCharacterPrerequisite,
+    updateCharacterPrerequisite,
+    deleteCharacterPrerequisite,
+    seedCharacterPrerequisitePresetsForSystem,
     addGatheringDropRowCharacterModifier,
     updateGatheringDropRowCharacterModifier,
     deleteGatheringDropRowCharacterModifier,

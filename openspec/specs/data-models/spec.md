@@ -57,6 +57,14 @@ CraftingSystem = {
   components: Component[],
   recipeItemDefinitions: RecipeItemDefinition[],
 
+  // System-owned character-prerequisite library (issue 544). Reusable pass/fail
+  // conditions the GM authors in System Settings and attaches, by id, to a book/
+  // scroll's caps.learn to gate WHO may learn its recipes against the acting
+  // actor's roll data. Normalized wholesale (settings replace, not deep-merge) by
+  // normalizeCharacterPrerequisiteList, so a removed entry does not resurrect.
+  // Shape defined under ## CharacterPrerequisite below.
+  characterPrerequisites: CharacterPrerequisite[], // default []
+
   // Present only when features.salvage is true.
   salvageResolutionMode: "simple" | "routed" | "progressive",
 
@@ -546,7 +554,15 @@ RecipeItemDefinition = {
                                      // physical item document, "total" draws all actors from
                                      // one shared world pool keyed system::defId
                                      // (legacy mirror: learningMode "party" ⇔ "total")
-      prerequisite?: string | null,  // recipeId a reader must already have learned first
+      prerequisiteIds: string[],     // default []; recipeIds a reader must ALL already have learned
+                                     // first (AND — "Required Knowledge"; prior-knowledge gate). Folds
+                                     // a legacy single `prerequisite` string on normalize (issue 544).
+                                     // Only enforced when limitLearning is true.
+      characterPrerequisiteIds: string[], // default []; ids into CraftingSystem.characterPrerequisites
+                                     // that a reader must ALL pass (AND) to learn this book's recipes,
+                                     // evaluated against actor roll data (issue 544). A per-book
+                                     // actor-stat gate, distinct from `prerequisiteIds` (prior knowledge).
+                                     // Only enforced when limitLearning is true.
       destroyWhenSpent?: boolean,    // default false; destroy the item once its learn budget is spent
       // Legacy mirrors kept in sync with the canonical fields above:
       limitRecipes?: boolean,        // legacy mirror of limitLearning
@@ -570,8 +586,47 @@ The use cap (`caps.item.limitUses` / `maxUses` / `whenSpent`) governs how many t
 The PR-B redesign renamed the cap fields; the new names are canonical and each legacy name (`destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) is persisted and kept in sync so an un-migrated raw cap still loads.
 `caps.learn.destroyWhenSpent` is deliberately distinct from `caps.item.whenSpent === "destroyed"` (`destroyWhenExhausted`) and must not be normalized to a shared name.
 6. `caps.learn.learnScope` selects the learn-cap counter scope: `"perInstance"` (default) counts against each physical item document (`recipeItemLearning.learnedCount`), while `"total"` draws every actor's learns from one GM-authoritative shared world pool keyed `system::defId`.
+6a. `caps.learn.prerequisiteIds` and `caps.learn.characterPrerequisiteIds` (issue 544) are each a deduped, trimmed, non-empty string list (default `[]`), normalized with the same shape in `CraftingSystemManager._normalizeRecipeItemCaps`.
+`prerequisiteIds` (**Required Knowledge**) is a list of recipeIds the reader must ALL already have learned; it folds a legacy single `caps.learn.prerequisite` string on normalize (back-compat, no stored data to migrate) and the singular is no longer emitted.
+`characterPrerequisiteIds` references into `CraftingSystem.characterPrerequisites[].id`: a per-book **character-prerequisite learning gate** where a reader must pass **ALL** referenced prerequisites (AND semantics) against the acting actor's roll data.
+The two gates are distinct — `prerequisiteIds` gates on prior recipe knowledge, `characterPrerequisiteIds` gates on actor stats/flags — but both are only enforced when `caps.learn.limitLearning` is `true` (Limited learning off ⇒ learn freely, neither gate applies).
+An id that no longer resolves is skipped at runtime (fail-open for character prerequisites), so deleting a prerequisite removes its gate rather than bricking the book.
 7. The `1.11.0` migration seeds `caps` on every existing recipe item from the system's former `recipeVisibility.knowledge.item` / `.learn` values, then strips those fields from the system config.
 Recipe items created after the migration default to uncapped.
+
+## CharacterPrerequisite
+
+### Purpose
+
+Define one system-owned, reusable pass/fail condition (issue 544) evaluated against the acting actor's prepared roll data.
+The GM authors a library of them on the System Settings page; a book/scroll references a subset by id from `RecipeItemDefinition.caps.learn.characterPrerequisiteIds` to gate who may learn its recipes (behaviour in `recipe-visibility`).
+
+### Properties
+
+```js
+CharacterPrerequisite = {
+  id: string,     // stable reference stored by caps.learn.characterPrerequisiteIds
+  name: string,   // GM label; defaults to "Prerequisite"
+  icon: string,   // Font Awesome glyph; defaults to "fa-solid fa-user-shield"
+  path: string,   // dotted key into actor.getRollData(), stored WITHOUT a leading @ (e.g. "skills.cra.rank")
+  op: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "isTrue" | "isFalse" | "exists", // default "gte"
+  value: * | null, // comparand; forced to null for the valueless operators (isTrue/isFalse/exists)
+}
+```
+
+### Requirements
+
+1. `characterPrerequisites` normalizes wholesale from the incoming array (`normalizeCharacterPrerequisiteList`); settings replace rather than deep-merge, so a removed entry does not resurrect.
+An entry with no assignable `id` is dropped.
+2. `op` is one of the nine word tokens above; an unknown or missing token normalizes to `"gte"`.
+The three **valueless** operators — `isTrue`, `isFalse`, `exists` — force `value` to `null` and hide the editor's value field; the six numeric operators keep a comparand (an empty-string value normalizes to `null`).
+3. `path` is stored WITHOUT a leading `@` (the `@` is a display/authoring affordance only); a leading `@` on input is stripped on normalization.
+It is resolved at runtime as a dotted traversal of `actor.getRollData()`, which Foundry has already flattened (`skills.cra.rank` in pf2e, `skills.arc.value` in dnd5e).
+4. Evaluation is pure and Foundry-free (`evaluatePrerequisite` / `evaluatePrerequisites`).
+An unknown or missing `path` degrades to `0` (numeric operators) or `false` (boolean/existence operators) and logs a single `console.warn`; it never throws.
+`evaluatePrerequisites` applies **AND** semantics and returns `{ passed, failures }`, where each failure carries a `prerequisitePreview` string (`@path op value`, or `@path op` for valueless) for player messaging.
+5. `op` is a deliberate **word-token** vocabulary that parallels the symbolic `CheckBreakageCondition` operators (`==` / `<=` / `>=` / `<` / `>`, defined under **CraftingSystem**).
+The two are the same comparison intent on different surfaces (a stat gate versus a dice-matching trigger) and are intentionally not unified.
 
 ## Component
 

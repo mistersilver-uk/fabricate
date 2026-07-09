@@ -151,7 +151,10 @@ describe('InventoryView (mounted)', () => {
     assert.match(detail.textContent, /Distil Gland/, 'detail lists a producing recipe');
     assert.match(detail.textContent, /Harvest Beast/, 'detail lists a producing gathering task');
     // Required For section (the item is a tool) lists the tool recipe.
-    assert.ok(detail.querySelector('[data-inventory-section="required"]'), 'shows Required for for a tool');
+    assert.ok(
+      detail.querySelector('[data-inventory-section="required"]'),
+      'shows Required for for a tool'
+    );
     assert.ok(
       detail.querySelector('[data-inventory-required-for="r3"]'),
       'renders the required-for recipe'
@@ -377,7 +380,13 @@ describe('InventoryView (mounted) — recipe-item books', () => {
 
   it('renders a single-recipe book inline with its description and a Learn button', async () => {
     const book = makeBook([
-      { id: 'r1', name: 'Forge Breastplate', description: 'A sturdy cuirass.', img: null, learned: false },
+      {
+        id: 'r1',
+        name: 'Forge Breastplate',
+        description: 'A sturdy cuirass.',
+        img: null,
+        learned: false,
+      },
     ]);
     const { services, calls } = makeBookServices(book);
     const target = await harness.mount({ services });
@@ -385,11 +394,19 @@ describe('InventoryView (mounted) — recipe-item books', () => {
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
     assert.ok(detail, 'renders the book detail');
-    assert.match(detail.textContent, /A worn manual of forge techniques\./, 'shows the book description');
+    assert.match(
+      detail.textContent,
+      /A worn manual of forge techniques\./,
+      'shows the book description'
+    );
     assert.match(detail.textContent, /Forge Breastplate/, 'shows the single recipe name');
     assert.match(detail.textContent, /A sturdy cuirass\./, 'shows the recipe description inline');
     // No accordion for a single recipe.
-    assert.equal(detail.querySelector('[data-inventory-recipe-accordion]'), null, 'no accordion for one recipe');
+    assert.equal(
+      detail.querySelector('[data-inventory-recipe-accordion]'),
+      null,
+      'no accordion for one recipe'
+    );
 
     const learn = detail.querySelector('[data-inventory-learn="r1"]');
     assert.ok(learn, 'renders a Learn button');
@@ -409,14 +426,60 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     const detail = target.querySelector('[data-inventory-recipe-item]');
     // No reveal CTA — the recipe list is shown immediately with per-recipe Learn.
     assert.equal(detail.querySelector('[data-inventory-read-learn]'), null, 'no reveal CTA');
-    assert.ok(detail.querySelector('[data-inventory-learn-recipe="r1"]'), 'the recipe list is shown');
+    assert.ok(
+      detail.querySelector('[data-inventory-learn-recipe="r1"]'),
+      'the recipe list is shown'
+    );
     assert.ok(detail.querySelector('[data-inventory-learn="r1"]'), 'per-recipe Learn is shown');
     // An unlimited learnable book offers the "Read & learn all N" convenience.
     const learnAll = detail.querySelector('[data-inventory-learn-all]');
     assert.ok(learnAll, 'shows the learn-all convenience');
+    // A single-recipe book reads the singular "Read & learn", not "...all 1 recipes".
+    assert.match(
+      learnAll.textContent,
+      /ReadLearnAllRecipeSingular/,
+      'single recipe ⇒ singular CTA'
+    );
+    assert.ok(
+      !/ReadLearnAllRecipes/.test(learnAll.textContent),
+      'not the plural "...all {n} recipes"'
+    );
     learnAll.click();
     await settle();
     assert.deepEqual(calls.learnAll, [['r1']], 'learn-all passes the unlearned recipe ids');
+  });
+
+  it('uses the plural learn-all CTA for a multi-recipe book', async () => {
+    const book = makeBook([
+      { id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false },
+      { id: 'r2', name: 'Forge Gauntlets', description: '', img: null, learned: false },
+    ]);
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+    const learnAll = target.querySelector(
+      '[data-inventory-recipe-item] [data-inventory-learn-all]'
+    );
+    assert.ok(learnAll, 'shows the learn-all convenience');
+    assert.match(learnAll.textContent, /ReadLearnAllRecipes/, 'multi-recipe ⇒ plural CTA');
+  });
+
+  it('keeps the learn-all CTA for a Limited-learning book with Recipes-allowed 1 and a single unlearned recipe (issue 544)', async () => {
+    const book = makeBook(
+      [{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false }],
+      { uses: null, learning: { max: 1, learned: 0, remaining: 1 } },
+      true,
+      false,
+      { item: { limitUses: false }, learn: { limitLearning: true, learnsAllowed: 1 } }
+    );
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assert.ok(
+      detail.querySelector('[data-inventory-learn-all]'),
+      'the learn-all CTA is NOT hidden when the cap (1) covers the single recipe'
+    );
   });
 
   it('always shows the list, hides learn-all, and disables Learn when the budget is spent', async () => {
@@ -432,7 +495,10 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
-    assert.ok(detail.querySelector('[data-inventory-learn-recipe="r1"]'), 'the recipe list is shown');
+    assert.ok(
+      detail.querySelector('[data-inventory-learn-recipe="r1"]'),
+      'the recipe list is shown'
+    );
     assert.equal(
       detail.querySelector('[data-inventory-learn="r1"]').disabled,
       true,
@@ -445,15 +511,53 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     );
   });
 
+  it('renders a DISABLED Learn button (not an enumeration chip) for a requirement-blocked recipe (issue 544)', async () => {
+    const book = makeBook([
+      {
+        id: 'r1',
+        name: 'Forge Breastplate',
+        description: '',
+        img: null,
+        learned: false,
+        learnBlocked: true,
+        learnBlockedReason: 'Forge a Club',
+      },
+    ]);
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    const learn = detail.querySelector('[data-inventory-learn="r1"]');
+    assert.ok(learn, 'a blocked recipe still shows the Learn button');
+    assert.equal(learn.disabled, true, 'the Learn button is disabled when the recipe is blocked');
+    assert.ok(
+      /LearnBlockedShort/.test(learn.getAttribute('title') || ''),
+      'the disabled button explains itself'
+    );
+    // The per-recipe enumeration chip is gone — requirements live in the book-level chips.
+    assert.equal(
+      detail.querySelector('[data-inventory-learn-blocked="r1"]'),
+      null,
+      'no per-recipe enumeration chip'
+    );
+  });
+
   it('shows a Learned chip instead of a Learn button for an already-learned recipe', async () => {
-    const book = makeBook([{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: true }]);
+    const book = makeBook([
+      { id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: true },
+    ]);
     const { services } = makeBookServices(book);
     const target = await harness.mount({ services });
     await settle();
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
     assert.ok(detail.querySelector('[data-inventory-learned="r1"]'), 'renders a Learned chip');
-    assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button when learned');
+    assert.equal(
+      detail.querySelector('[data-inventory-learn="r1"]'),
+      null,
+      'no Learn button when learned'
+    );
   });
 
   it('renders a multi-recipe book as a searchable accordion that expands to the description', async () => {
@@ -472,14 +576,27 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     const accordion = detail.querySelector('[data-inventory-recipe-accordion]');
     assert.ok(accordion, 'renders the accordion for multiple recipes');
     // Search appears once a book teaches more than the smallest page (6).
-    assert.ok(detail.querySelector('[data-inventory-recipe-search]'), 'shows the recipe search over 6 recipes');
+    assert.ok(
+      detail.querySelector('[data-inventory-recipe-search]'),
+      'shows the recipe search over 6 recipes'
+    );
     // First page shows 6 of 8; the pager offers page-size 6/9/12.
-    assert.equal(accordion.querySelectorAll('[data-inventory-learn-recipe]').length, 6, 'first page shows six recipes');
+    assert.equal(
+      accordion.querySelectorAll('[data-inventory-learn-recipe]').length,
+      6,
+      'first page shows six recipes'
+    );
     assert.ok(detail.querySelector('[data-inventory-recipe-pager]'), 'renders the recipe pager');
 
     // The row description is collapsed until the header is toggled.
-    assert.equal(detail.querySelector('[data-inventory-recipe-body="r1"]'), null, 'description collapsed by default');
-    detail.querySelector('[data-inventory-learn-recipe="r1"] .inventory-detail-accordion-toggle').click();
+    assert.equal(
+      detail.querySelector('[data-inventory-recipe-body="r1"]'),
+      null,
+      'description collapsed by default'
+    );
+    detail
+      .querySelector('[data-inventory-learn-recipe="r1"] .inventory-detail-accordion-toggle')
+      .click();
     await settle();
     assert.match(
       detail.querySelector('[data-inventory-recipe-body="r1"]').textContent,
@@ -502,7 +619,11 @@ describe('InventoryView (mounted) — recipe-item books', () => {
 
     const detail = target.querySelector('[data-inventory-recipe-item]');
     assert.ok(detail.querySelector('[data-inventory-recipe-accordion]'), 'still an accordion');
-    assert.equal(detail.querySelector('[data-inventory-recipe-search]'), null, 'no search for a small book');
+    assert.equal(
+      detail.querySelector('[data-inventory-recipe-search]'),
+      null,
+      'no search for a small book'
+    );
   });
 
   it('lists an item-only (non-learnable) book without Learn controls', async () => {
@@ -517,8 +638,16 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     const detail = target.querySelector('[data-inventory-recipe-item]');
     assert.ok(detail, 'the item-only book still renders in the inventory');
     assert.match(detail.textContent, /Forge Breastplate/, 'it still lists its recipes');
-    assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item-only mode');
-    assert.equal(detail.querySelector('[data-inventory-learned="r1"]'), null, 'no Learned chip in item-only mode');
+    assert.equal(
+      detail.querySelector('[data-inventory-learn="r1"]'),
+      null,
+      'no Learn button in item-only mode'
+    );
+    assert.equal(
+      detail.querySelector('[data-inventory-learned="r1"]'),
+      null,
+      'no Learned chip in item-only mode'
+    );
   });
 
   it('item mode: always shows the list with Craft buttons, an access badge, and no reveal/learn-all', async () => {
@@ -540,14 +669,102 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     assert.match(badge.textContent, /NUses/, 'the badge reads the use cap');
     // No reveal CTA and no learn-all convenience in item mode.
     assert.equal(detail.querySelector('[data-inventory-read-learn]'), null, 'no reveal CTA');
-    assert.equal(detail.querySelector('[data-inventory-learn-all]'), null, 'no learn-all in item mode');
+    assert.equal(
+      detail.querySelector('[data-inventory-learn-all]'),
+      null,
+      'no learn-all in item mode'
+    );
 
     // The list is shown immediately with per-recipe Craft (not Learn), wired to navigate.
-    assert.equal(detail.querySelector('[data-inventory-learn="r1"]'), null, 'no Learn button in item mode');
+    assert.equal(
+      detail.querySelector('[data-inventory-learn="r1"]'),
+      null,
+      'no Learn button in item mode'
+    );
     const craft = detail.querySelector('[data-inventory-craft="r1"]');
     assert.ok(craft, 'renders a Craft button');
     craft.click();
     await settle();
     assert.deepEqual(calls.navigate, ['r1'], 'Craft navigates to the recipe to craft it');
+  });
+
+  it('renders book-level "Needs:" requirement chips with names, icons, and met/unmet tone (issue 544)', async () => {
+    const book = makeBook([
+      { id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false },
+    ]);
+    book.requirements = [
+      {
+        kind: 'knowledge',
+        id: 'r-known',
+        name: 'Cantrip',
+        icon: 'fas fa-graduation-cap',
+        met: true,
+      },
+      {
+        kind: 'character',
+        id: 'p-fail',
+        name: 'Master Only',
+        icon: 'fas fa-hat-wizard',
+        met: false,
+      },
+    ];
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    const row = detail.querySelector('[data-inventory-requirements]');
+    assert.ok(row, 'renders the requirement chip row');
+
+    const met = detail.querySelector('[data-inventory-requirement="r-known"]');
+    assert.ok(met, 'a met requirement chip renders');
+    assert.match(met.textContent, /Needs/, 'chip reads "Needs: <name>"');
+    assert.match(met.textContent, /Cantrip/, 'chip names the requirement');
+    assert.ok(
+      met.querySelector('i.fa-graduation-cap'),
+      'Required Knowledge chip has the graduation-cap icon'
+    );
+    assert.ok(met.classList.contains('is-met'), 'met chip uses the success (met) tone');
+    assert.equal(met.getAttribute('data-requirement-met'), 'true');
+    assert.equal(met.querySelector('button'), null, 'requirement chips are read-only');
+    // Non-colour state signals: a trailing status glyph + a stateful accessible name.
+    assert.ok(
+      met.querySelector('i.fa-circle-check[data-requirement-status="met"]'),
+      'met chip has a check status glyph'
+    );
+    assert.ok(
+      /RequirementMet/.test(met.getAttribute('aria-label') || ''),
+      'met chip aria-label states it is met'
+    );
+
+    const unmet = detail.querySelector('[data-inventory-requirement="p-fail"]');
+    assert.ok(unmet, 'an unmet requirement chip renders');
+    assert.match(unmet.textContent, /Master Only/);
+    assert.ok(unmet.querySelector('i.fa-hat-wizard'), 'character prereq chip uses its own icon');
+    assert.ok(unmet.classList.contains('is-unmet'), 'unmet chip uses the danger (unmet) tone');
+    assert.equal(unmet.getAttribute('data-requirement-met'), 'false');
+    assert.ok(
+      unmet.querySelector('i.fa-lock[data-requirement-status="unmet"]'),
+      'unmet chip has a lock status glyph'
+    );
+    assert.ok(
+      /RequirementUnmet/.test(unmet.getAttribute('aria-label') || ''),
+      'unmet chip aria-label states it is not met'
+    );
+  });
+
+  it('renders no requirement chip row when the book has no requirements', async () => {
+    const book = makeBook([
+      { id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false },
+    ]);
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assert.equal(
+      detail.querySelector('[data-inventory-requirements]'),
+      null,
+      'no requirement row without requirements'
+    );
   });
 });

@@ -1,6 +1,7 @@
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { getItemSourceReferences } from '../utils/sourceUuid.js';
 
+import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
 
 const LEARN_RECIPE_MESSAGES = {
@@ -11,6 +12,7 @@ const LEARN_RECIPE_MESSAGES = {
   noMatchingItem: 'FABRICATE.Knowledge.NoMatchingItem',
   learnBudgetSpent: 'FABRICATE.Knowledge.LearnBudgetSpent',
   prerequisiteNotMet: 'FABRICATE.Knowledge.PrerequisiteNotMet',
+  characterPrerequisiteNotMet: 'FABRICATE.Knowledge.CharacterPrerequisiteNotMet',
   learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe',
   learnedRecipes: 'FABRICATE.Knowledge.LearnedRecipes',
   learnedRecipesPartial: 'FABRICATE.Knowledge.LearnedRecipesPartial',
@@ -243,17 +245,83 @@ export class RecipeVisibilityService {
     return this._getRecipeItemCaps(recipe, definition).learn.learnScope || 'perInstance';
   }
 
-  // The recipeId a reader must already have learned before this recipe (or null).
-  _getRecipeItemPrerequisite(recipe, definition = this._getRecipeItemDefinition(recipe)) {
-    return this._getRecipeItemCaps(recipe, definition).learn.prerequisite || null;
+  // The recipeIds a reader must already have learned before this recipe (issue 544 —
+  // Required Knowledge, AND semantics). Empty when none are required.
+  _getRecipeItemPrerequisiteIds(recipe, definition = this._getRecipeItemDefinition(recipe)) {
+    const ids = this._getRecipeItemCaps(recipe, definition).learn.prerequisiteIds;
+    return Array.isArray(ids) ? ids : [];
   }
 
-  // A reader satisfies a recipe's prerequisite when it is unset, or the actor has
-  // already learned the prerequisite recipe.
+  // True when a Required-Knowledge id still resolves to an existing recipe in the
+  // world. A dangling id (its recipe was deleted) is treated as removed so the gate
+  // fails OPEN, mirroring the character-prerequisite gate (issue 544). Resolves via
+  // `getRecipe` when the manager exposes it, else scans `getRecipes()`.
+  _recipeExists(id) {
+    if (typeof this.recipeManager?.getRecipe === 'function') {
+      return this.recipeManager.getRecipe(id) != null;
+    }
+    const all = this.recipeManager?.getRecipes?.() || [];
+    return all.some((candidate) => String(candidate?.id) === String(id));
+  }
+
+  // A reader satisfies a recipe's Required Knowledge when Limited learning is OFF (the
+  // gate is not enforced then — issue 544), or when the actor has already learned
+  // EVERY still-existing required recipe. An empty requirement is always met, and a
+  // prerequisite id whose recipe was deleted is skipped (fail-open) rather than
+  // permanently bricking the book.
   _isPrerequisiteMet(recipe, actor, definition = this._getRecipeItemDefinition(recipe)) {
-    const prerequisiteId = this._getRecipeItemPrerequisite(recipe, definition);
-    if (!prerequisiteId) return true;
-    return !!this._getLearnedMap(actor)?.[prerequisiteId];
+    if (this._getRecipeItemCaps(recipe, definition).learn.limitLearning !== true) return true;
+    const ids = this._getRecipeItemPrerequisiteIds(recipe, definition);
+    if (ids.length === 0) return true;
+    const learned = this._getLearnedMap(actor);
+    return ids.filter((id) => this._recipeExists(id)).every((id) => !!learned?.[id]);
+  }
+
+  // The character-prerequisite ids a reader must ALL pass to learn a recipe from
+  // this book (issue 544) — references into `system.characterPrerequisites`. Read
+  // straight off the definition's caps (the runtime `_getRecipeItemCaps` reader
+  // rebuilds only the legacy cap fields and does not surface this list).
+  _getRecipeItemCharacterPrerequisiteIds(
+    recipe,
+    definition = this._getRecipeItemDefinition(recipe)
+  ) {
+    const ids = definition?.caps?.learn?.characterPrerequisiteIds;
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  // Evaluate the recipe's character-prerequisite learning gate against the acting
+  // actor's prepared roll data (AND semantics). A prerequisite id that no longer
+  // resolves to a system definition is skipped (fail-open — a deleted definition
+  // removes its gate). `rollData` is resolved once here when omitted; pass it in
+  // to avoid rebuilding it per recipe in a bulk loop.
+  _meetsCharacterPrerequisites(
+    recipe,
+    actor,
+    definition = this._getRecipeItemDefinition(recipe),
+    rollData
+  ) {
+    // The learning prerequisites gate only applies when Limited learning is ON
+    // (issue 544) — off means learn freely, neither gate enforced.
+    if (this._getRecipeItemCaps(recipe, definition).learn.limitLearning !== true) {
+      return { met: true, reason: '' };
+    }
+    const ids = this._getRecipeItemCharacterPrerequisiteIds(recipe, definition);
+    if (ids.length === 0) return { met: true, reason: '' };
+    const definitions = this._getCraftingSystem(recipe)?.characterPrerequisites;
+    const byId = new Map(
+      (Array.isArray(definitions) ? definitions : []).map((def) => [def.id, def])
+    );
+    const selected = ids.map((id) => byId.get(id)).filter(Boolean);
+    if (selected.length === 0) return { met: true, reason: '' };
+    const data = rollData ?? actor?.getRollData?.() ?? {};
+    const { passed, failures } = evaluatePrerequisites(data, selected);
+    return {
+      met: passed,
+      reason: failures
+        .map((failure) => failure.name || failure.preview)
+        .filter(Boolean)
+        .join(', '),
+    };
   }
 
   // The shared-pool key for a `total`-scope recipe item — system + book-definition
@@ -329,8 +397,17 @@ export class RecipeVisibilityService {
         : 'perInstance';
     const learningMode =
       learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
-    const prerequisite =
-      typeof learn.prerequisite === 'string' && learn.prerequisite ? learn.prerequisite : null;
+    // `prerequisiteIds` (issue 544) — recipes the reader must already know (AND).
+    // Prefer the array; fold the legacy single `prerequisite` string for un-migrated
+    // caps. Trim/String/dedupe to a clean id array.
+    const rawPrerequisiteIds = Array.isArray(learn.prerequisiteIds)
+      ? learn.prerequisiteIds
+      : learn.prerequisite
+        ? [learn.prerequisite]
+        : [];
+    const prerequisiteIds = [
+      ...new Set(rawPrerequisiteIds.map((value) => String(value ?? '').trim()).filter(Boolean)),
+    ];
 
     return {
       item: {
@@ -351,7 +428,7 @@ export class RecipeVisibilityService {
         learnsAllowed,
         learnScope,
         learningMode,
-        prerequisite,
+        prerequisiteIds,
       },
     };
   }
@@ -784,6 +861,21 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
     }
 
+    // Character-prerequisite gate is per-book — evaluate against the owned book
+    // (issue 544), not the recipe's first-member book.
+    const characterGate = this._meetsCharacterPrerequisites(
+      recipe,
+      craftingActor,
+      this._matchDefinitionForItem(recipe, selected.item)
+    );
+    if (!characterGate.met) {
+      return {
+        success: false,
+        message: LEARN_RECIPE_MESSAGES.characterPrerequisiteNotMet,
+        messageData: { name: recipe.name, reason: characterGate.reason },
+      };
+    }
+
     const next = {
       ...learnedMap,
       [recipe.id]: {
@@ -936,15 +1028,23 @@ export class RecipeVisibilityService {
       (recipe) => !this._isRecipeItemLearnCapped(recipe)
     );
     const learnedMap = this._getLearnedMap(actor);
+    // Resolve the reader's roll data once for the whole preview (issue 544).
+    const rollData = actor?.getRollData?.() ?? {};
     const alreadyLearnedRecipes = [];
     const learnableRecipes = [];
 
     for (const recipe of matchedRecipes) {
       if (learnedMap?.[recipe.id]) {
         alreadyLearnedRecipes.push(recipe);
-      } else {
-        learnableRecipes.push(recipe);
+        continue;
       }
+      // A reader who fails the recipe's Required-Knowledge or character-prerequisite
+      // gate cannot bulk-learn it from a dropped book — silently skipped, mirroring
+      // how the drop path already suppresses capped recipes.
+      const definition = this._matchDefinitionForItem(recipe, ownedItem);
+      if (!this._isPrerequisiteMet(recipe, actor, definition)) continue;
+      if (!this._meetsCharacterPrerequisites(recipe, actor, definition, rollData).met) continue;
+      learnableRecipes.push(recipe);
     }
 
     // `consumeOnLearn` is ignored for capped books (superseded by
@@ -1085,7 +1185,16 @@ export class RecipeVisibilityService {
     const remainingBudget = Number.isFinite(maxRecipes) ? Math.max(0, maxRecipes - count) : 0;
 
     const learnedMap = this._getLearnedMap(actor);
-    const unlearned = cappedCandidates.filter((recipe) => !learnedMap?.[recipe.id]);
+    // Exclude recipes the reader cannot learn (Required-Knowledge + character-
+    // prerequisite gates) — the picker must not offer a recipe that
+    // learnOneRecipeFromItem would then refuse (issue 544).
+    const rollData = actor?.getRollData?.() ?? {};
+    const unlearned = cappedCandidates.filter((recipe) => {
+      if (learnedMap?.[recipe.id]) return false;
+      const definition = this._matchDefinitionForItem(recipe, ownedItem);
+      if (!this._isPrerequisiteMet(recipe, actor, definition)) return false;
+      return this._meetsCharacterPrerequisites(recipe, actor, definition, rollData).met;
+    });
 
     return {
       recipes: remainingBudget > 0 ? unlearned : [],
@@ -1137,6 +1246,15 @@ export class RecipeVisibilityService {
 
     if (!this._isPrerequisiteMet(recipe, actor, definition)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.prerequisiteNotMet };
+    }
+
+    const characterGate = this._meetsCharacterPrerequisites(recipe, actor, definition);
+    if (!characterGate.met) {
+      return {
+        success: false,
+        message: LEARN_RECIPE_MESSAGES.characterPrerequisiteNotMet,
+        messageData: { name: recipe.name, reason: characterGate.reason },
+      };
     }
 
     const maxRecipes = this._getLearnCapForRecipe(recipe, definition);
@@ -1295,6 +1413,24 @@ export class RecipeVisibilityService {
     // through the budget-enforcing capped path; an invalid cap falls through to
     // uncapped.
     const selectedDefinition = this._matchDefinitionForItem(recipe, selected.item);
+
+    // The character-prerequisite gate is per-book, so evaluate it against the book
+    // the actor actually owns (issue 544) — a recipe can belong to several books
+    // with different prerequisites. (The capped branch re-checks inside
+    // learnOneRecipeFromItem against the same selected book.)
+    const characterGate = this._meetsCharacterPrerequisites(
+      recipe,
+      craftingActor,
+      selectedDefinition
+    );
+    if (!characterGate.met) {
+      return {
+        success: false,
+        message: LEARN_RECIPE_MESSAGES.characterPrerequisiteNotMet,
+        messageData: { name: recipe.name, reason: characterGate.reason },
+      };
+    }
+
     if (
       this._isRecipeItemLearnCapped(recipe, selectedDefinition) &&
       Number.isFinite(this._getLearnCapForRecipe(recipe, selectedDefinition))
@@ -1368,6 +1504,10 @@ export class RecipeVisibilityService {
     if (system.alchemy?.learnOnCraft !== true) return;
     const learnedMap = this._getLearnedMap(craftingActor);
     if (learnedMap?.[recipe.id]) return;
+    // A reader who fails the recipe's Required-Knowledge or character-prerequisite
+    // gate does not auto-learn it on craft (issue 544). Silent — craft side effect.
+    if (!this._isPrerequisiteMet(recipe, craftingActor)) return;
+    if (!this._meetsCharacterPrerequisites(recipe, craftingActor).met) return;
     const next = {
       ...learnedMap,
       [recipe.id]: {

@@ -14,6 +14,7 @@
   import { resolveDropData } from '../../util/dropUtils.js';
   import IconPicker from '../../components/IconPicker.svelte';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
+  import CharacterPrerequisitesCard from './system/CharacterPrerequisitesCard.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';
 
   let {
@@ -43,6 +44,12 @@
     onUpdateCharacterModifier = async () => {},
     onDeleteCharacterModifier = async () => {},
     onSeedCharacterModifierPresets = async () => {},
+    characterPrerequisiteLibrary = [],
+    characterPrerequisitePresetsSupported = false,
+    onAddCharacterPrerequisite = async () => null,
+    onUpdateCharacterPrerequisite = async () => {},
+    onDeleteCharacterPrerequisite = async () => {},
+    onSeedCharacterPrerequisitePresets = async () => {},
     currencyUnits = [],
     currencyPresetsSupported = false,
     currencySpendStrategy = 'actorProperty',
@@ -525,6 +532,15 @@
           {/if}
         </section>
       {/if}
+
+      <CharacterPrerequisitesCard
+        library={characterPrerequisiteLibrary}
+        presetsSupported={characterPrerequisitePresetsSupported}
+        onAdd={onAddCharacterPrerequisite}
+        onUpdate={onUpdateCharacterPrerequisite}
+        onDelete={onDeleteCharacterPrerequisite}
+        onSeedPresets={onSeedCharacterPrerequisitePresets}
+      />
 
       {#if currencyEnabled}
       <section class="manager-edit-card manager-currency-unit-card" data-system-currency-units aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Title', 'Currency units')}>

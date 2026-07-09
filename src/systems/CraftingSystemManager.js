@@ -22,6 +22,7 @@ import {
   getItemIdentityReferences,
 } from '../utils/sourceUuid.js';
 
+import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -174,6 +175,16 @@ export class CraftingSystemManager {
       // interactable browser, item-drop resolution, and gathering composition —
       // reads a single source of truth. Mirrors how `components` is normalized.
       tools: Array.isArray(system.tools) ? system.tools.map((t) => this._normalizeTool(t)) : [],
+      // System-owned character prerequisite library (issue 544). Reusable
+      // pass/fail conditions (`{ id, name, icon, path, op, value }`) the GM
+      // authors in System Settings and attaches to gate learning a recipe from a
+      // book/scroll (referenced by id from a recipe item's `caps.learn`).
+      // Normalized wholesale from the incoming array; settings replace (not
+      // deep-merge), so a removed entry does not resurrect.
+      characterPrerequisites: normalizeCharacterPrerequisiteList(
+        system.characterPrerequisites,
+        () => foundry.utils.randomID()
+      ),
       // Per-system gathering realm library (geography) + realm behavior
       // settings. Realms ride along with export/import for free because the
       // exporter clones the normalized system and import funnels back through
@@ -939,14 +950,18 @@ export class CraftingSystemManager {
       : learn.limitRecipes === true;
 
     // `learnsAllowed` (new) mirrors legacy `maxRecipes` — a finite positive count kept
-    // only while the limit is on. The new field wins when authored.
+    // only while the limit is on. The new field wins when authored. When the limit is
+    // ON but no positive count is authored, default to 1 (the value the UI stepper
+    // displays): a limit of "0/undefined" is meaningless and would wrongly read as
+    // "uncapped" downstream, hiding the learn-all CTA (issue 544). Off ⇒ left unset.
     const rawLearns = Object.prototype.hasOwnProperty.call(learn, 'learnsAllowed')
       ? learn.learnsAllowed
       : learn.maxRecipes;
-    const learnsAllowed =
-      limitLearning && Number.isFinite(Number(rawLearns)) && Number(rawLearns) > 0
+    const learnsAllowed = limitLearning
+      ? Number.isFinite(Number(rawLearns)) && Number(rawLearns) > 0
         ? Number(rawLearns)
-        : undefined;
+        : 1
+      : undefined;
 
     // `learnScope` ('perInstance' | 'total') is the canonical cap scope: `perInstance`
     // limits how many recipes may be learned from a SINGLE copy of the item in a
@@ -963,10 +978,35 @@ export class CraftingSystemManager {
     const learningMode =
       learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
 
-    const prerequisite =
-      typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
-        ? learn.prerequisite.trim()
-        : null;
+    // `prerequisiteIds` (issue 544) — the recipe ids a reader must ALREADY have
+    // learned (AND semantics) before learning from this book or scroll. Replaces the
+    // legacy single `prerequisite` string, which is folded in here so an un-migrated
+    // draft still reads correctly (there is no stored data to migrate — the field
+    // defaulted to null/absent). Trims/dedupes with the same shape as
+    // `characterPrerequisiteIds` below.
+    const rawPrerequisiteIds = Array.isArray(learn.prerequisiteIds)
+      ? learn.prerequisiteIds
+      : typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
+        ? [learn.prerequisite]
+        : [];
+    const prerequisiteIds = [
+      ...new Set(rawPrerequisiteIds.map((value) => String(value ?? '').trim()).filter(Boolean)),
+    ];
+
+    // `characterPrerequisiteIds` (issue 544) — the system-owned character
+    // prerequisites (`system.characterPrerequisites[].id`) a reader must ALL pass
+    // (AND semantics) to learn a recipe from this book. Distinct from
+    // `prerequisite` (a recipe the reader must already have learned): this gates
+    // on the actor's roll data, that gates on prior knowledge.
+    const characterPrerequisiteIds = Array.isArray(learn.characterPrerequisiteIds)
+      ? [
+          ...new Set(
+            learn.characterPrerequisiteIds
+              .map((value) => String(value ?? '').trim())
+              .filter(Boolean)
+          ),
+        ]
+      : [];
 
     return {
       item: {
@@ -985,7 +1025,8 @@ export class CraftingSystemManager {
         learnsAllowed,
         learnScope,
         learningMode,
-        prerequisite,
+        prerequisiteIds,
+        characterPrerequisiteIds,
         destroyWhenSpent: learn.destroyWhenSpent === true,
       },
     };
