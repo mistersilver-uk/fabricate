@@ -23,6 +23,9 @@
 
 import { getFabricateFlag } from '../config/flags.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
+// Single-sourced with the GM UI so the builder and the recipe-item editor share one
+// item-bag literal (the "treat as no image" sentinel).
+import { GENERIC_ITEM_IMAGE } from '../ui/svelte/util/craftingImageDefaults.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { getItemSourceReferences } from '../utils/sourceUuid.js';
 
@@ -37,10 +40,6 @@ const LEARN_CAPABLE_MODES = new Set(['learned', 'itemOrLearned']);
 // Knowledge modes in which the book grants crafting access by being held — the
 // only modes where its craft-use ("Crafting uses") limit is meaningful.
 const ITEM_ACCESS_MODES = new Set(['item', 'itemOrLearned']);
-
-// Foundry's generic default Item image — treated as "no image" for a recipe so it
-// falls back to the recipe blueprint rather than showing the bag SVG.
-const GENERIC_ITEM_IMAGE = 'icons/svg/item-bag.svg';
 
 function stringOrEmpty(value) {
   return typeof value === 'string' ? value : value == null ? '' : String(value);

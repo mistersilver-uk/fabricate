@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildRecipeItemPreviewRow } from '../../src/ui/svelte/util/recipeItemPreviewRow.js';
+import { DEFAULT_CRAFTING_IMAGE } from '../../src/ui/svelte/util/craftingImageDefaults.js';
 
 // The exact set of top-level keys `InventoryListingBuilder._buildRecipeItemRows`
 // emits (the contract `InventoryDetail` reads). Kept in lockstep with
@@ -145,4 +146,28 @@ test('an unmet requirement ⇒ blocked with reason listing ONLY the unmet names'
     'blocked when any requirement is unmet'
   );
   assert.equal(row.recipes[0].learnBlockedReason, 'Ritual, Master Only');
+});
+
+test('recipe images resolve the generic bag / empty to the blueprint, real paths pass through (issue 544)', () => {
+  const row = buildRecipeItemPreviewRow({
+    key: 'k',
+    mode: 'knowledge',
+    caps: { item: {}, learn: { limitLearning: true } },
+    recipes: [
+      { id: 'bag', name: 'Forge Club', img: 'icons/svg/item-bag.svg' },
+      { id: 'empty', name: 'Forge Handaxe', img: '' },
+      { id: 'none', name: 'Forge Spear' },
+      { id: 'real', name: 'Alloy Bronze', img: 'icons/tools/smithing/anvil.webp' },
+    ],
+    requirements: [],
+  });
+  const byId = Object.fromEntries(row.recipes.map((r) => [r.id, r.img]));
+  assert.equal(
+    byId.bag,
+    DEFAULT_CRAFTING_IMAGE,
+    'the generic item-bag falls back to the blueprint'
+  );
+  assert.equal(byId.empty, DEFAULT_CRAFTING_IMAGE, 'an empty image falls back to the blueprint');
+  assert.equal(byId.none, DEFAULT_CRAFTING_IMAGE, 'a missing image falls back to the blueprint');
+  assert.equal(byId.real, 'icons/tools/smithing/anvil.webp', 'a real authored path is preserved');
 });

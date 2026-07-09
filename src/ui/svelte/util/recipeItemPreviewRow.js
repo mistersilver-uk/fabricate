@@ -1,10 +1,13 @@
-// Pure, import-free helper that synthesizes ONE book "row" matching the exact shape
+// Pure helper that synthesizes ONE book "row" matching the exact shape
 // `InventoryListingBuilder._buildRecipeItemRows` produces (the shape locked by
 // `tests/inventory-listing-builder.test.js`). It lets the GM recipe-item editor feed
 // the REAL player `InventoryDetail.svelte` component a synthetic row so the "How
 // players see it" preview can never drift from the actual player UI.
 //
-// Import-free by design: the mounted-test harness can `rawModules` it verbatim.
+// It imports ONLY the sibling pure `craftingImageDefaults` helper (already a harness
+// rawModule), keeping the mounted-test allowlist minimal.
+
+import { resolveRecipeImage } from './craftingImageDefaults.js';
 
 function str(value) {
   return value == null ? '' : String(value);
@@ -54,7 +57,9 @@ export function buildRecipeItemPreviewRow({
     id: str(recipe?.id) || null,
     name: str(recipe?.name),
     description: str(recipe?.description),
-    img: recipe?.img ?? null,
+    // Mirror the builder's image resolution so an empty/generic-bag recipe image
+    // falls back to the blueprint (never the item-bag SVG) in the embedded preview.
+    img: resolveRecipeImage(recipe),
     learned: false,
     learnBlocked: blocked,
     learnBlockedReason: reason,

@@ -206,6 +206,29 @@ describe('RecipeItemEditor (mounted)', () => {
     assert.match(root.querySelector('[data-recipe-item-rules]').textContent, /every recipe/i);
   });
 
+  it('resolves a generic/empty recipe image to the blueprint in the embedded preview (issue 544)', async () => {
+    const root = await harness.mount({
+      recipeItem: draft({
+        caps: { item: {}, learn: { limitLearning: false } },
+      }),
+      linkedItem: LINKED_ITEM,
+      // A single linked recipe carrying Foundry's generic item-bag image.
+      linkedRecipes: [{ id: 'r1', name: 'Forge Club', img: 'icons/svg/item-bag.svg' }],
+      activeTab: 'overview',
+      visibilityMode: 'knowledge',
+    });
+    const thumb = root.querySelector(
+      '[data-recipe-item-preview] [data-inventory-learn-recipe="r1"] img'
+    );
+    assert.ok(thumb, 'the embedded recipe thumbnail renders');
+    assert.match(
+      thumb.getAttribute('src'),
+      /blueprint-recipe-alchemical\.webp$/,
+      'shows the blueprint'
+    );
+    assert.ok(!/item-bag\.svg$/.test(thumb.getAttribute('src')), 'never the generic item-bag SVG');
+  });
+
   it('renders the embedded player preview even when the book has no recipes', async () => {
     const root = await harness.mount({
       recipeItem: draft(),

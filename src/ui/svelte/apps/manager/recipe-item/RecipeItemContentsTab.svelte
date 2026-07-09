@@ -14,6 +14,9 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  // Shared pure resolver: an empty OR generic item-bag image falls back to the
+  // alchemical blueprint — matching the player builder + browser exactly (no drift).
+  import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
 
   let {
     linkedRecipes = [],
@@ -21,15 +24,6 @@
     onLinkRecipe = () => {},
     onRemoveRecipe = () => {}
   } = $props();
-
-  // The canonical recipe default (mirrors DEFAULT_RECIPE_IMAGE in models/Recipe.js).
-  // Inlined as a literal rather than imported so the mounted-component test harness
-  // does not have to resolve the model module. Recipes fall back to this alchemical
-  // blueprint — matching the GM recipe browser — never the generic bag/fire glyph.
-  const DEFAULT_RECIPE_IMAGE = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
-  function recipeImage(recipe) {
-    return recipe?.img || DEFAULT_RECIPE_IMAGE;
-  }
 
   let linkOpen = $state(false);
 
@@ -83,7 +77,7 @@
               data-recipe-item-link-recipe-option={recipe.id}
               onclick={() => linkRecipe(recipe.id)}
             >
-              <span class="manager-recipe-item-recipe-icon" aria-hidden="true"><img src={recipeImage(recipe)} alt="" /></span>
+              <span class="manager-recipe-item-recipe-icon" aria-hidden="true"><img src={resolveRecipeImage(recipe)} alt="" /></span>
               <span class="manager-recipe-item-recipe-name">{recipe.name}</span>
               <span class="manager-recipe-item-recipe-cat">{categoryLabel(recipe)}</span>
             </button>
@@ -102,7 +96,7 @@
       {#each linkedRecipes as recipe (recipe.id)}
         <li class="manager-recipe-item-recipe-row" data-recipe-item-recipe={recipe.id}>
           <span class="manager-recipe-item-recipe-icon" aria-hidden="true">
-            <img src={recipeImage(recipe)} alt="" />
+            <img src={resolveRecipeImage(recipe)} alt="" />
           </span>
           <div class="manager-recipe-item-recipe-copy">
             <span class="manager-recipe-item-recipe-name">{recipe.name}</span>
