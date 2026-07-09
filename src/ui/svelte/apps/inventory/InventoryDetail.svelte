@@ -237,22 +237,22 @@
       <i class="fas fa-check" aria-hidden="true"></i>
       {localize('FABRICATE.App.Inventory.Detail.Learned')}
     </span>
-  {:else if recipe.learnBlocked}
-    <span
-      class="inventory-chip inventory-detail-blocked"
-      data-inventory-learn-blocked={recipe.id}
-      title={recipe.learnBlockedReason}
-    >
-      <i class="fas fa-lock" aria-hidden="true"></i>
-      {localize('FABRICATE.App.Inventory.Detail.LearnBlocked', { reason: recipe.learnBlockedReason })}
-    </span>
   {:else}
+    <!-- A blocked recipe renders a DISABLED Learn button (canLearn is false when
+         learnBlocked). The blocking requirements are enumerated once, book-level, in
+         the "Needs:" chips above — not repeated per recipe row. -->
     <button
       type="button"
       class="inventory-detail-learn-btn"
       data-inventory-learn={recipe.id}
       disabled={!canLearn(recipe) || learningRecipeId != null}
       aria-busy={learningRecipeId === recipe.id}
+      title={recipe.learnBlocked
+        ? localize('FABRICATE.App.Inventory.Detail.LearnBlockedShort')
+        : undefined}
+      aria-label={recipe.learnBlocked
+        ? localize('FABRICATE.App.Inventory.Detail.LearnBlockedShort')
+        : undefined}
       onclick={() => learnRecipe(recipe.id)}
     >
       <i
@@ -303,42 +303,45 @@
             <span>{accessBadge.label}</span>
           </span>
         </div>
-        {#if requirements.length > 0}
-          <div
-            class="inventory-detail-requirements"
-            data-inventory-requirements
-            role="list"
-            aria-label={localize('FABRICATE.App.Inventory.Detail.RequirementsLabel')}
-          >
-            {#each requirements as req (req.id)}
-              <span
-                class="inventory-chip inventory-detail-requirement is-{req.met ? 'met' : 'unmet'}"
-                role="listitem"
-                data-inventory-requirement={req.id}
-                data-requirement-met={req.met}
-                aria-label={localize(
-                  req.met
-                    ? 'FABRICATE.App.Inventory.Detail.RequirementMet'
-                    : 'FABRICATE.App.Inventory.Detail.RequirementUnmet',
-                  { name: req.name }
-                )}
-              >
-                <i class={req.icon} aria-hidden="true"></i>
-                <span class="inventory-detail-requirement-name">{localize('FABRICATE.App.Inventory.Detail.Needs', { name: req.name })}</span>
-                <i
-                  class={req.met ? 'fas fa-circle-check' : 'fas fa-lock'}
-                  data-requirement-status={req.met ? 'met' : 'unmet'}
-                  aria-hidden="true"
-                ></i>
-              </span>
-            {/each}
-          </div>
-        {/if}
-        {#if bookDescription}
-          <p class="inventory-detail-book-desc">{bookDescription}</p>
-        {/if}
       </div>
     </header>
+
+    <!-- Requirements + description span the FULL detail width below the header (not
+         squeezed into the narrow heading column beside the thumbnail). -->
+    {#if requirements.length > 0}
+      <div
+        class="inventory-detail-requirements"
+        data-inventory-requirements
+        role="list"
+        aria-label={localize('FABRICATE.App.Inventory.Detail.RequirementsLabel')}
+      >
+        {#each requirements as req (req.id)}
+          <span
+            class="inventory-chip inventory-detail-requirement is-{req.met ? 'met' : 'unmet'}"
+            role="listitem"
+            data-inventory-requirement={req.id}
+            data-requirement-met={req.met}
+            aria-label={localize(
+              req.met
+                ? 'FABRICATE.App.Inventory.Detail.RequirementMet'
+                : 'FABRICATE.App.Inventory.Detail.RequirementUnmet',
+              { name: req.name }
+            )}
+          >
+            <i class={req.icon} aria-hidden="true"></i>
+            <span class="inventory-detail-requirement-name">{localize('FABRICATE.App.Inventory.Detail.Needs', { name: req.name })}</span>
+            <i
+              class={req.met ? 'fas fa-circle-check' : 'fas fa-lock'}
+              data-requirement-status={req.met ? 'met' : 'unmet'}
+              aria-hidden="true"
+            ></i>
+          </span>
+        {/each}
+      </div>
+    {/if}
+    {#if bookDescription}
+      <p class="inventory-detail-book-desc">{bookDescription}</p>
+    {/if}
 
     {#if canLearnAll}
       <button
@@ -904,7 +907,11 @@
 
   /* --- Recipe-item "book" learning ------------------------------------------ */
   .inventory-detail-book-desc {
-    margin: 4px 0 0;
+    margin: 0;
+    /* Full-width block child of the scrolling flex column: don't let the column
+       compress it below its clamped height (that clipped the text before the
+       4-line ellipsis). The column's own overflow-y handles any excess. */
+    flex-shrink: 0;
     font-size: 12px;
     line-height: 1.4;
     color: var(--fab-text-muted);
@@ -1037,21 +1044,17 @@
     color: var(--fab-success-text, var(--fab-text-muted));
   }
 
-  .inventory-detail-blocked {
-    flex: 0 0 auto;
-    border-color: var(--fab-danger-border, var(--fab-border));
-    background: var(--fab-danger-soft, var(--fab-surface-raised));
-    color: var(--fab-danger-text, var(--fab-text-muted));
-  }
-
-  /* Book-level "Needs: <name>" requirement chips (issue 544): met vs unmet is a
-     two-signal state — a success/danger ramp AND a trailing status glyph
-     (check / lock) plus a stateful aria-label — never colour alone. */
+  /* Book-level "Needs: <name>" requirement chips (issue 544): a full-width wrapping
+     row below the header. Met vs unmet is a two-signal state — a success/danger ramp
+     AND a trailing status glyph (check / lock) plus a stateful aria-label — never
+     colour alone. */
   .inventory-detail-requirements {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    margin-top: 4px;
+    /* Full-width child of the scrolling flex column — keep its natural height
+       (don't let the column squeeze the chip rows). */
+    flex-shrink: 0;
   }
 
   /* A long recipe/prereq name truncates instead of overflowing the narrow player

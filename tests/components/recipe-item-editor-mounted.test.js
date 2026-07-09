@@ -153,12 +153,16 @@ describe('RecipeItemEditor (mounted)', () => {
     const rkChip = needs.querySelector('[data-recipe-item-needs-chip="r1"]');
     assert.ok(rkChip, 'a Required Knowledge Needs chip renders');
     assert.match(rkChip.textContent, /Needs: Alloy Bronze/);
-    assert.ok(rkChip.querySelector('i.fa-scroll'), 'the Required Knowledge chip has a scroll icon');
+    assert.ok(rkChip.querySelector('i.fa-scroll'), 'the Required Knowledge chip has a leading scroll icon');
+    // Mirrors the player chip: a trailing lock glyph (the GM preview has no actor, so
+    // it shows the not-yet-qualified/locked appearance).
+    assert.ok(rkChip.querySelector('i.fa-lock'), 'the preview chip carries a trailing lock glyph');
     assert.equal(rkChip.querySelector('button'), null, 'the preview chip is read-only (no remove)');
     const cpChip = needs.querySelector('[data-recipe-item-needs-chip="p1"]');
     assert.ok(cpChip, 'a Learning prerequisite Needs chip renders');
     assert.match(cpChip.textContent, /Needs: Wizardly/);
-    assert.ok(cpChip.querySelector('i.fa-hat-wizard'), 'the prereq chip uses the prereq’s own icon');
+    assert.ok(cpChip.querySelector('i.fa-hat-wizard'), 'the prereq chip uses the prereq’s own leading icon');
+    assert.ok(cpChip.querySelector('i.fa-lock'), 'the prereq preview chip also carries a trailing lock glyph');
   });
 
   it('drops the "Needs:" rules and preview chips when Limited learning is off (gates toggle-gated)', async () => {

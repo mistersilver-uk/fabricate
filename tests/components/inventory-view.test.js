@@ -445,6 +445,23 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     );
   });
 
+  it('renders a DISABLED Learn button (not an enumeration chip) for a requirement-blocked recipe (issue 544)', async () => {
+    const book = makeBook([
+      { id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: false, learnBlocked: true, learnBlockedReason: 'Forge a Club' },
+    ]);
+    const { services } = makeBookServices(book);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    const learn = detail.querySelector('[data-inventory-learn="r1"]');
+    assert.ok(learn, 'a blocked recipe still shows the Learn button');
+    assert.equal(learn.disabled, true, 'the Learn button is disabled when the recipe is blocked');
+    assert.ok(/LearnBlockedShort/.test(learn.getAttribute('title') || ''), 'the disabled button explains itself');
+    // The per-recipe enumeration chip is gone — requirements live in the book-level chips.
+    assert.equal(detail.querySelector('[data-inventory-learn-blocked="r1"]'), null, 'no per-recipe enumeration chip');
+  });
+
   it('shows a Learned chip instead of a Learn button for an already-learned recipe', async () => {
     const book = makeBook([{ id: 'r1', name: 'Forge Breastplate', description: '', img: null, learned: true }]);
     const { services } = makeBookServices(book);

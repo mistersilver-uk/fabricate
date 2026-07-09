@@ -409,7 +409,7 @@
           "NoRecipeMatches": "No recipes match your search.",
           "NoRecipeDescription": "No description.",
           "LearnAction": "Learn",
-          "LearnBlocked": "Prerequisite not met: {reason}",
+          "LearnBlockedShort": "Requirements not met",
           "Learned": "Learned",
           "Needs": "Needs: {name}",
           "HiddenRecipe": "a hidden recipe",

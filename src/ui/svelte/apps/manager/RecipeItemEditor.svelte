@@ -309,7 +309,8 @@
                 {#each requirementChips as chip (chip.id)}
                   <span class="manager-chip manager-selected-tag-pill manager-recipe-item-needs-chip" role="listitem" data-recipe-item-needs-chip={chip.id}>
                     <i class={chip.icon} aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.Manager.RecipeItem.Preview.Needs', 'Needs: {name}').replace('{name}', chip.name)}</span>
+                    <span class="manager-recipe-item-needs-chip-name">{text('FABRICATE.Admin.Manager.RecipeItem.Preview.Needs', 'Needs: {name}').replace('{name}', chip.name)}</span>
+                    <i class="fas fa-lock" aria-hidden="true"></i>
                   </span>
                 {/each}
               </div>
@@ -414,11 +415,12 @@
   }
 
   /* "Needs: <name>" requirement chips inside the "How players see it" preview card
-     (issue 544): read-only, informational (no met/unmet — the GM preview has no
-     actor). Reuse the global `.manager-selected-tag-pill` SHAPE, but override its
-     success ramp to a NEUTRAL surface (a green chip would wrongly imply "met") and
-     restore symmetric right padding (the pill trims it for a remove button these
-     read-only chips don't carry). */
+     (issue 544): these MIRROR the player's requirement chip (leading type icon +
+     "Needs: {name}" + trailing lock glyph). The GM preview has no actor, so it shows
+     the chips in the player's UNMET/locked appearance (danger ramp) — i.e. what a
+     not-yet-qualified player would see. Reuse the `.manager-selected-tag-pill` SHAPE
+     but override its success ramp; restore symmetric right padding (the pill trims it
+     for a remove button these read-only chips don't carry). */
   .manager-recipe-item-preview-needs {
     display: flex;
     flex-wrap: wrap;
@@ -426,10 +428,20 @@
   }
 
   .manager-recipe-item-needs-chip {
+    max-width: 100%;
+    min-width: 0;
     padding-right: var(--fab-space-2);
-    border-color: var(--fab-mv2-border);
-    background: var(--fab-overlay-light-06);
-    color: var(--fab-mv2-text);
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+    color: var(--fab-danger-text);
+  }
+
+  /* Long names ellipsize so a chip can't blow out the ~280px preview card. */
+  .manager-recipe-item-needs-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   .manager-recipe-item-preview-card {
