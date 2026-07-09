@@ -950,14 +950,18 @@ export class CraftingSystemManager {
       : learn.limitRecipes === true;
 
     // `learnsAllowed` (new) mirrors legacy `maxRecipes` — a finite positive count kept
-    // only while the limit is on. The new field wins when authored.
+    // only while the limit is on. The new field wins when authored. When the limit is
+    // ON but no positive count is authored, default to 1 (the value the UI stepper
+    // displays): a limit of "0/undefined" is meaningless and would wrongly read as
+    // "uncapped" downstream, hiding the learn-all CTA (issue 544). Off ⇒ left unset.
     const rawLearns = Object.prototype.hasOwnProperty.call(learn, 'learnsAllowed')
       ? learn.learnsAllowed
       : learn.maxRecipes;
-    const learnsAllowed =
-      limitLearning && Number.isFinite(Number(rawLearns)) && Number(rawLearns) > 0
+    const learnsAllowed = limitLearning
+      ? Number.isFinite(Number(rawLearns)) && Number(rawLearns) > 0
         ? Number(rawLearns)
-        : undefined;
+        : 1
+      : undefined;
 
     // `learnScope` ('perInstance' | 'total') is the canonical cap scope: `perInstance`
     // limits how many recipes may be learned from a SINGLE copy of the item in a

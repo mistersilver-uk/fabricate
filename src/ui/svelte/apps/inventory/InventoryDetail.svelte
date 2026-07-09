@@ -352,7 +352,9 @@
         onclick={learnAll}
       >
         <i class="fas fa-graduation-cap" aria-hidden="true"></i>
-        <span>{localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', { total: recipeTotal })}</span>
+        <span>{recipeTotal === 1
+          ? localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipeSingular')
+          : localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', { total: recipeTotal })}</span>
       </button>
     {/if}
 

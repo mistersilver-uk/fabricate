@@ -16,8 +16,8 @@ function getProperty(object, path) {
 globalThis.foundry = {
   utils: {
     getProperty,
-    randomID: () => `id-${++idCounter}`
-  }
+    randomID: () => `id-${++idCounter}`,
+  },
 };
 
 globalThis.game = {
@@ -25,16 +25,16 @@ globalThis.game = {
   actors: [],
   settings: {
     get: () => [],
-    set: async () => {}
-  }
+    set: async () => {},
+  },
 };
 
 globalThis.ui = {
   notifications: {
     info: () => {},
     warn: () => {},
-    error: () => {}
-  }
+    error: () => {},
+  },
 };
 
 globalThis.fromUuid = async () => null;
@@ -62,9 +62,9 @@ test('_extractSourceDescription skips object fallback text instead of returning 
     manager._extractSourceDescription({
       system: {
         description: {
-          value: '<p>Dreamleaf petals.</p>'
-        }
-      }
+          value: '<p>Dreamleaf petals.</p>',
+        },
+      },
     }),
     'Dreamleaf petals.'
   );
@@ -72,9 +72,9 @@ test('_extractSourceDescription skips object fallback text instead of returning 
     manager._extractSourceDescription({
       system: {
         description: {
-          unexpected: '<p>Should not stringify the object.</p>'
-        }
-      }
+          unexpected: '<p>Should not stringify the object.</p>',
+        },
+      },
     }),
     ''
   );
@@ -92,8 +92,8 @@ test('_normalizeRecipeVisibility keeps only strategy fields (mode + dragDropEnab
     knowledge: {
       mode: 'itemOrLearned',
       item: { limitUses: true, maxUses: 2, destroyWhenExhausted: true },
-      learn: { consumeOnLearn: false, dragDropEnabled: false, limitRecipes: true, maxRecipes: 2 }
-    }
+      learn: { consumeOnLearn: false, dragDropEnabled: false, limitRecipes: true, maxRecipes: 2 },
+    },
   });
 
   assert.equal(normalized.listMode, 'knowledge');
@@ -149,7 +149,7 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
   const def = manager._normalizeRecipeItemDefinition({
     id: 'recipe-item-1',
     name: 'Formula Book',
-    sourceItemUuid: 'Compendium.world.formulas.book-1'
+    sourceItemUuid: 'Compendium.world.formulas.book-1',
   });
 
   assert.deepEqual(def.caps, {
@@ -158,7 +158,7 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
       maxUses: undefined,
       // Default whenSpent is 'destroyed'; the legacy boolean is kept in sync.
       destroyWhenExhausted: true,
-      whenSpent: 'destroyed'
+      whenSpent: 'destroyed',
     },
     learn: {
       consumeOnLearn: true,
@@ -170,8 +170,8 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
       learningMode: 'once',
       prerequisiteIds: [],
       characterPrerequisiteIds: [],
-      destroyWhenSpent: false
-    }
+      destroyWhenSpent: false,
+    },
   });
   // The definition defaults to enabled.
   assert.equal(def.enabled, true);
@@ -184,9 +184,13 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
 test('_normalizeRecipeItemDefinition round-trips enabled:false and defaults it to true', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
-  assert.equal(manager._normalizeRecipeItemDefinition({ id: 'a', sourceItemUuid: 'u' }).enabled, true);
   assert.equal(
-    manager._normalizeRecipeItemDefinition({ id: 'b', sourceItemUuid: 'u', enabled: false }).enabled,
+    manager._normalizeRecipeItemDefinition({ id: 'a', sourceItemUuid: 'u' }).enabled,
+    true
+  );
+  assert.equal(
+    manager._normalizeRecipeItemDefinition({ id: 'b', sourceItemUuid: 'u', enabled: false })
+      .enabled,
     false
   );
   assert.equal(
@@ -212,13 +216,13 @@ test('_normalizeRecipeItemCaps lets an authored whenSpent win and syncs destroyW
 
   // whenSpent wins even when the legacy boolean disagrees.
   const inert = manager._normalizeRecipeItemCaps({
-    item: { whenSpent: 'inert', destroyWhenExhausted: true }
+    item: { whenSpent: 'inert', destroyWhenExhausted: true },
   });
   assert.equal(inert.item.whenSpent, 'inert');
   assert.equal(inert.item.destroyWhenExhausted, false);
 
   const destroyed = manager._normalizeRecipeItemCaps({
-    item: { whenSpent: 'destroyed', destroyWhenExhausted: false }
+    item: { whenSpent: 'destroyed', destroyWhenExhausted: false },
   });
   assert.equal(destroyed.item.whenSpent, 'destroyed');
   assert.equal(destroyed.item.destroyWhenExhausted, true);
@@ -228,7 +232,7 @@ test('_normalizeRecipeItemCaps mirrors limitRecipes/maxRecipes to limitLearning/
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
   const legacy = manager._normalizeRecipeItemCaps({
-    learn: { limitRecipes: true, maxRecipes: 4 }
+    learn: { limitRecipes: true, maxRecipes: 4 },
   });
   assert.equal(legacy.learn.limitLearning, true);
   assert.equal(legacy.learn.learnsAllowed, 4);
@@ -237,7 +241,7 @@ test('_normalizeRecipeItemCaps mirrors limitRecipes/maxRecipes to limitLearning/
 
   // The new fields win and are mirrored back onto the legacy names.
   const modern = manager._normalizeRecipeItemCaps({
-    learn: { limitLearning: true, learnsAllowed: 2, learningMode: 'party' }
+    learn: { limitLearning: true, learnsAllowed: 2, learningMode: 'party' },
   });
   assert.equal(modern.learn.limitRecipes, true);
   assert.equal(modern.learn.maxRecipes, 2);
@@ -300,15 +304,18 @@ test('_normalizeRecipeItemCaps derives learnScope (per-copy vs total) with legac
 test('updateRecipeItemDefinition accepts an enabled patch alongside caps', async () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   manager.save = async () => {};
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Alchemy',
-    recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u' }]
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Alchemy',
+      recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u' }],
+    })
+  );
 
   const result = await manager.updateRecipeItemDefinition('sys-1', 'book-1', {
     enabled: false,
-    caps: { learn: { limitLearning: true, learnsAllowed: 3, learnScope: 'total' } }
+    caps: { learn: { limitLearning: true, learnsAllowed: 3, learnScope: 'total' } },
   });
 
   assert.equal(result.item.enabled, false);
@@ -333,9 +340,9 @@ test('_normalizeRecipeItemDefinition round-trips authored per-item caps', () => 
         consumeOnLearn: false,
         limitRecipes: true,
         maxRecipes: 2,
-        destroyWhenSpent: true
-      }
-    }
+        destroyWhenSpent: true,
+      },
+    },
   });
 
   assert.equal(def.caps.item.limitUses, true);
@@ -347,23 +354,40 @@ test('_normalizeRecipeItemDefinition round-trips authored per-item caps', () => 
   assert.equal(def.caps.learn.destroyWhenSpent, true);
 });
 
-test('_normalizeRecipeItemCaps keeps a finite positive learn maxRecipes only when limitRecipes is on', () => {
+test('_normalizeRecipeItemCaps clears the learn cap when off, defaults it to 1 when on with an invalid count', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
+  // Off ⇒ no cap value at all.
   const capOff = manager._normalizeRecipeItemCaps({
-    learn: { limitRecipes: false, maxRecipes: 4 }
+    learn: { limitRecipes: false, maxRecipes: 4 },
   });
   assert.equal(capOff.learn.maxRecipes, undefined);
+  assert.equal(capOff.learn.learnsAllowed, undefined);
 
+  // On with a non-positive/invalid count ⇒ default to 1 (the value the stepper shows);
+  // a "0/undefined" cap is meaningless and would wrongly read as uncapped (issue 544).
   const nonPositive = manager._normalizeRecipeItemCaps({
-    learn: { limitRecipes: true, maxRecipes: 0 }
+    learn: { limitRecipes: true, maxRecipes: 0 },
   });
-  assert.equal(nonPositive.learn.maxRecipes, undefined);
+  assert.equal(nonPositive.learn.maxRecipes, 1);
+  assert.equal(nonPositive.learn.learnsAllowed, 1);
 
   const enabled = manager._normalizeRecipeItemCaps({
-    learn: { limitRecipes: true, maxRecipes: 4 }
+    learn: { limitRecipes: true, maxRecipes: 4 },
   });
   assert.equal(enabled.learn.maxRecipes, 4);
+});
+
+test('_normalizeRecipeItemCaps defaults learnsAllowed to 1 when Limited learning is on but none is authored (issue 544)', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  const onNoCount = manager._normalizeRecipeItemCaps({ learn: { limitLearning: true } });
+  assert.equal(onNoCount.learn.learnsAllowed, 1, 'a limit with no count defaults to 1');
+  assert.equal(onNoCount.learn.maxRecipes, 1, 'the legacy mirror follows');
+
+  const off = manager._normalizeRecipeItemCaps({ learn: { limitLearning: false } });
+  assert.equal(off.learn.learnsAllowed, undefined, 'off leaves the count unset');
+  assert.equal(off.learn.maxRecipes, undefined);
 });
 
 test('addRecipeItemFromUuid adds a recipe item definition without creating a component', async () => {
@@ -374,23 +398,28 @@ test('addRecipeItemFromUuid adds a recipe item definition without creating a com
     img: 'icons/svg/book.svg',
     system: {
       description: {
-        value: '<p>Arcane instructions</p>'
-      }
-    }
+        value: '<p>Arcane instructions</p>',
+      },
+    },
   });
 
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   manager.save = async () => {};
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Alchemy',
-    components: [{
-      id: 'component-1',
-      name: 'Mandrake',
-      img: 'icons/svg/item-bag.svg',
-      description: ''
-    }]
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Alchemy',
+      components: [
+        {
+          id: 'component-1',
+          name: 'Mandrake',
+          img: 'icons/svg/item-bag.svg',
+          description: '',
+        },
+      ],
+    })
+  );
 
   const result = await manager.addRecipeItemFromUuid('sys-1', 'Compendium.world.formulas.book-1');
 
@@ -413,7 +442,9 @@ test('migrateLegacyRecipeItems reuses one recipe item definition for shared lega
       craftingSystemId: 'sys-1',
       recipeItemId: '',
       linkedRecipeItemUuid: 'Compendium.world.formulas.book-1',
-      toJSON() { return { ...this }; }
+      toJSON() {
+        return { ...this };
+      },
     },
     {
       id: 'recipe-2',
@@ -423,22 +454,32 @@ test('migrateLegacyRecipeItems reuses one recipe item definition for shared lega
       craftingSystemId: 'sys-1',
       recipeItemId: '',
       linkedRecipeItemUuid: 'Compendium.world.formulas.book-1',
-      toJSON() { return { ...this }; }
-    }
+      toJSON() {
+        return { ...this };
+      },
+    },
   ];
   const recipeManager = {
-    getRecipes: ({ craftingSystemId } = {}) => (craftingSystemId
-      ? recipes.filter(recipe => recipe.craftingSystemId === craftingSystemId)
-      : recipes),
-    save: async () => { recipesSaved = true; }
+    getRecipes: ({ craftingSystemId } = {}) =>
+      craftingSystemId
+        ? recipes.filter((recipe) => recipe.craftingSystemId === craftingSystemId)
+        : recipes,
+    save: async () => {
+      recipesSaved = true;
+    },
   };
 
   const manager = new CraftingSystemManager(recipeManager);
-  manager.save = async () => { systemsSaved = true; };
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Alchemy'
-  }));
+  manager.save = async () => {
+    systemsSaved = true;
+  };
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Alchemy',
+    })
+  );
 
   await manager._migrateLegacyRecipeItems();
 
@@ -460,7 +501,9 @@ test('deleteRecipeItemDefinition removes the system recipe item and clears affec
       craftingSystemId: 'sys-1',
       recipeItemId: 'recipe-item-1',
       linkedRecipeItemUuid: 'Compendium.world.formulas.book-1',
-      toJSON() { return { ...this }; }
+      toJSON() {
+        return { ...this };
+      },
     },
     {
       id: 'recipe-2',
@@ -468,35 +511,47 @@ test('deleteRecipeItemDefinition removes the system recipe item and clears affec
       craftingSystemId: 'sys-1',
       recipeItemId: '',
       linkedRecipeItemUuid: 'Compendium.world.formulas.book-1',
-      toJSON() { return { ...this }; }
-    }
+      toJSON() {
+        return { ...this };
+      },
+    },
   ];
 
   const recipeManager = {
-    getRecipes: ({ craftingSystemId } = {}) => (craftingSystemId
-      ? recipes.filter(recipe => recipe.craftingSystemId === craftingSystemId)
-      : recipes),
-    save: async () => { recipesSaved = true; }
+    getRecipes: ({ craftingSystemId } = {}) =>
+      craftingSystemId
+        ? recipes.filter((recipe) => recipe.craftingSystemId === craftingSystemId)
+        : recipes,
+    save: async () => {
+      recipesSaved = true;
+    },
   };
 
   const manager = new CraftingSystemManager(recipeManager);
-  manager.save = async () => { systemsSaved = true; };
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Alchemy',
-    recipeItemDefinitions: [{
-      id: 'recipe-item-1',
-      name: 'Formula Book',
-      img: 'icons/svg/book.svg',
-      sourceItemUuid: 'Compendium.world.formulas.book-1'
-    }]
-  }));
+  manager.save = async () => {
+    systemsSaved = true;
+  };
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Alchemy',
+      recipeItemDefinitions: [
+        {
+          id: 'recipe-item-1',
+          name: 'Formula Book',
+          img: 'icons/svg/book.svg',
+          sourceItemUuid: 'Compendium.world.formulas.book-1',
+        },
+      ],
+    })
+  );
 
   const result = await manager.deleteRecipeItemDefinition('sys-1', 'recipe-item-1');
 
   assert.equal(result.deleted, true);
   assert.deepEqual(
-    result.affectedRecipes.map(recipe => recipe.id),
+    result.affectedRecipes.map((recipe) => recipe.id),
     ['recipe-1', 'recipe-2']
   );
   assert.equal(manager.getRecipeItemDefinitions('sys-1').length, 0);
@@ -511,18 +566,23 @@ test('deleteRecipeItemDefinition removes the system recipe item and clears affec
 test('updateRecipeItemDefinition merges and normalizes a caps patch, persisting it', async () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   manager.save = async () => {};
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Alchemy',
-    recipeItemDefinitions: [{
-      id: 'book-1',
-      name: 'Formula Book',
-      sourceItemUuid: 'Compendium.world.formulas.book-1'
-    }]
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Alchemy',
+      recipeItemDefinitions: [
+        {
+          id: 'book-1',
+          name: 'Formula Book',
+          sourceItemUuid: 'Compendium.world.formulas.book-1',
+        },
+      ],
+    })
+  );
 
   const result = await manager.updateRecipeItemDefinition('sys-1', 'book-1', {
-    caps: { learn: { limitRecipes: true, maxRecipes: 3 } }
+    caps: { learn: { limitRecipes: true, maxRecipes: 3 } },
   });
 
   assert.equal(result.item.caps.learn.limitRecipes, true);
@@ -533,20 +593,26 @@ test('updateRecipeItemDefinition merges and normalizes a caps patch, persisting 
   assert.equal(stored.caps.item.limitUses, false);
 });
 
-test('updateRecipeItemDefinition drops an invalid maxRecipes via normalization', async () => {
+test('updateRecipeItemDefinition defaults an invalid maxRecipes to 1 while the limit is on (issue 544)', async () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   manager.save = async () => {};
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Alchemy',
-    recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u' }]
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Alchemy',
+      recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u' }],
+    })
+  );
 
   const result = await manager.updateRecipeItemDefinition('sys-1', 'book-1', {
-    caps: { learn: { limitRecipes: true, maxRecipes: 0 } }
+    caps: { learn: { limitRecipes: true, maxRecipes: 0 } },
   });
 
-  assert.equal(result.item.caps.learn.maxRecipes, undefined);
+  // A limit-on book with an invalid count normalizes to the minimum cap of 1, never
+  // an "uncapped" undefined that would hide the learn-all CTA.
+  assert.equal(result.item.caps.learn.maxRecipes, 1);
+  assert.equal(result.item.caps.learn.learnsAllowed, 1);
 });
 
 test('updateRecipeItemDefinition throws for a missing definition', async () => {
@@ -562,10 +628,12 @@ test('RecipeVisibilityService matches recipeItemId through the system recipe ite
     id: 'sys-1',
     resolutionMode: 'simple',
     recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'item' } },
-    recipeItemDefinitions: [{
-      id: 'recipe-item-1',
-      sourceItemUuid: 'Compendium.world.formulas.book-1'
-    }]
+    recipeItemDefinitions: [
+      {
+        id: 'recipe-item-1',
+        sourceItemUuid: 'Compendium.world.formulas.book-1',
+      },
+    ],
   };
   const service = new RecipeVisibilityService(
     { getRecipes: () => [] },
@@ -573,23 +641,23 @@ test('RecipeVisibilityService matches recipeItemId through the system recipe ite
       getSystem: (systemId) => (systemId === 'sys-1' ? system : null),
       getRecipeItemDefinition: (systemId, recipeItemId) =>
         systemId === 'sys-1'
-          ? system.recipeItemDefinitions.find(def => def.id === recipeItemId) || null
-          : null
+          ? system.recipeItemDefinitions.find((def) => def.id === recipeItemId) || null
+          : null,
     }
   );
 
   const recipe = {
     id: 'recipe-1',
     craftingSystemId: 'sys-1',
-    recipeItemId: 'recipe-item-1'
+    recipeItemId: 'recipe-item-1',
   };
   const item = {
     uuid: 'Item.actor-owned-formula',
     flags: {
       core: {
-        sourceId: 'Compendium.world.formulas.book-1'
-      }
-    }
+        sourceId: 'Compendium.world.formulas.book-1',
+      },
+    },
   };
 
   assert.equal(service._isMatchingRecipeItem(recipe, item), true);

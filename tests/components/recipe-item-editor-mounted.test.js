@@ -229,6 +229,28 @@ describe('RecipeItemEditor (mounted)', () => {
     assert.ok(!/item-bag\.svg$/.test(thumb.getAttribute('src')), 'never the generic item-bag SVG');
   });
 
+  it('renders the learn-all CTA in the embedded preview for a Limited-learning book with Recipes-allowed 1 (issue 544)', async () => {
+    const root = await harness.mount({
+      recipeItem: draft({
+        caps: {
+          item: {},
+          learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 1 },
+        },
+      }),
+      linkedItem: LINKED_ITEM,
+      linkedRecipes: [{ id: 'r1', name: 'Forge Club' }],
+      activeTab: 'overview',
+      visibilityMode: 'knowledge',
+    });
+    const cta = root.querySelector('[data-recipe-item-preview] [data-inventory-learn-all]');
+    assert.ok(
+      cta,
+      'the embedded learn-all CTA is not hidden when the cap (1) covers the single recipe'
+    );
+    // A single-recipe book reads the singular "Read & learn".
+    assert.match(cta.textContent, /ReadLearnAllRecipeSingular/, 'single recipe ⇒ singular CTA');
+  });
+
   it('renders the embedded player preview even when the book has no recipes', async () => {
     const root = await harness.mount({
       recipeItem: draft(),
@@ -296,7 +318,10 @@ describe('RecipeItemEditor (mounted)', () => {
     const preview = root.querySelector('[data-recipe-item-preview]');
     const rk = preview.querySelector('[data-inventory-requirement="r1"]');
     assert.ok(rk, 'the embedded preview renders the Required Knowledge chip');
-    assert.ok(rk.querySelector('i.fa-graduation-cap'), 'the Required Knowledge chip uses the graduation-cap icon');
+    assert.ok(
+      rk.querySelector('i.fa-graduation-cap'),
+      'the Required Knowledge chip uses the graduation-cap icon'
+    );
     assert.equal(rk.getAttribute('data-requirement-met'), 'true', 'default is satisfied/met');
     assert.ok(
       preview.querySelector('[data-inventory-requirement="p1"]'),

@@ -126,7 +126,15 @@
   }
 
   function toggleLimitLearning() {
-    patchLearn({ limitLearning: !limitLearning });
+    const next = !limitLearning;
+    const patch = { limitLearning: next };
+    // Turning ON must seed a real `learnsAllowed` in the SAME patch: the stepper only
+    // DISPLAYS the derived default (1) when unset, so without this the saved/preview
+    // cap stays `undefined` and the player learn-all CTA is wrongly hidden (issue 544).
+    if (next && !(Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0)) {
+      patch.learnsAllowed = learnsAllowed;
+    }
+    patchLearn(patch);
   }
   function selectLearnScope(value) {
     patchLearn({ learnScope: value });
