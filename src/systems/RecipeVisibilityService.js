@@ -1,5 +1,5 @@
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
-import { getItemSourceReferences } from '../utils/sourceUuid.js';
+import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
@@ -174,27 +174,39 @@ export class RecipeVisibilityService {
     );
   }
 
-  _isMatchingRecipeItem(recipe, item) {
-    if (!item) return false;
-    const uuids = this._getRecipeItemSourceUuids(recipe);
-    if (uuids.size === 0) return false;
-    // Match against the item's full source-reference set — live uuid, compendium
-    // source AND `_stats.duplicateSource` — so a book duplicated (dragged) from a
-    // world template still resolves. A recipe matches if the item is ANY of its books.
-    const refs = getItemSourceReferences(item);
-    return refs.some((ref) => uuids.has(ref));
+  // Member book definitions plus a synthetic entry for a recipe's legacy
+  // `linkedRecipeItemUuid`, so an un-migrated recipe that carries only the old
+  // single reverse ref (no authored definition) still resolves by its source
+  // pointer. The synthetic entry has no `id`, so it can only match the source-uuid
+  // tiers of the shared matcher, never the durable identity tier.
+  _recipeItemMatchDefinitions(recipe) {
+    const defs = this._getRecipeItemDefinitions(recipe);
+    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+    if (!legacyUuid) return defs;
+    if (defs.some((def) => String(def?.sourceItemUuid || '').trim() === legacyUuid)) return defs;
+    return [...defs, { id: null, sourceItemUuid: legacyUuid }];
   }
 
-  // The member book definition that a specific owned item IS (by source ref), so the
-  // learn/use paths read caps from the book actually being read. Falls back to the
-  // recipe's first member book.
+  // Resolve which member book an item IS, AND by which tier, through the one shared
+  // four-tier matcher (durable flag → own uuid → compendium source → duplicate source).
+  _matchRecipeItemForRecipe(recipe, item) {
+    return matchRecipeItemDefinition(item, this._recipeItemMatchDefinitions(recipe));
+  }
+
+  _isMatchingRecipeItem(recipe, item) {
+    if (!item) return false;
+    // A recipe matches when the item IS any of its member books, by any tier.
+    return itemMatchesRecipeItemSource(item, this._recipeItemMatchDefinitions(recipe));
+  }
+
+  // The member book definition that a specific owned item IS, so the learn/use paths
+  // read caps from the book actually being read. A SUPPLIED item that matches no
+  // member definition resolves to null (uncapped) — only an ABSENT item falls back
+  // to the recipe's first member book (issue 555, R6b).
   _matchDefinitionForItem(recipe, item) {
     const defs = this._getRecipeItemDefinitions(recipe);
     if (!item) return defs[0] || null;
-    const refs = getItemSourceReferences(item);
-    return (
-      defs.find((def) => refs.includes(String(def?.sourceItemUuid || '').trim())) || defs[0] || null
-    );
+    return matchRecipeItemDefinition(item, defs).definition;
   }
 
   _isActorOwnedItem(ownedItem, actor) {
@@ -950,12 +962,29 @@ export class RecipeVisibilityService {
   _getOwnedItemLearningCandidates({ ownedItem, mode = 'auto' } = {}) {
     if (!ownedItem) return [];
     const recipes = this.recipeManager?.getRecipes?.({ enabled: true }) || [];
-    return recipes.filter(
-      (recipe) =>
-        this._isRecipeEligibleForOwnedItemLearning(recipe, mode) &&
-        this._hasRecipeItemReference(recipe) &&
-        this._isMatchingRecipeItem(recipe, ownedItem)
-    );
+    return recipes.filter((recipe) => {
+      if (!this._isRecipeEligibleForOwnedItemLearning(recipe, mode)) return false;
+      if (!this._hasRecipeItemReference(recipe)) return false;
+      const { definition, tier } = this._matchRecipeItemForRecipe(recipe, ownedItem);
+      if (!definition) return false;
+      // R5 (issue 555): the bulk on-drop auto-learn path (`mode: 'auto'`, the createItem
+      // hook) must not silently grant a recipe whose owned item matches its definition
+      // ONLY via tier 4 — the un-migrated `_stats.duplicateSource` fallback, which is
+      // exactly the duplicated-book ambiguity. A silent bulk knowledge grant is not
+      // cheap or reversible, so it demands a higher-confidence match. Explicit learn,
+      // the item-sheet picker (`mode: 'manual'`), and every display path still honour
+      // tier 4. Paired with the mandatory primary-GM auto-stamp (R3), which flags every
+      // registered book so real books resolve at tier 1 and keep auto-learning.
+      //
+      // The refusal is limited to REGISTERED definitions (`definition.id`). A recipe
+      // linked only by the legacy `linkedRecipeItemUuid` — an un-migrated book, or a
+      // standalone alchemy formula item — resolves through the synthetic entry built by
+      // `_recipeItemMatchDefinitions`, which has `id: null` and therefore no source to
+      // stamp. Tier 4 is the only signal such an item can ever produce, so refusing it
+      // would disable its on-drop learning permanently rather than until R3 runs.
+      if (mode === 'auto' && tier === 'duplicate' && definition.id) return false;
+      return true;
+    });
   }
 
   _buildOwnedItemLearningResult({
@@ -1025,7 +1054,11 @@ export class RecipeVisibilityService {
     // bulk drop/manual path, so they are suppressed here per matched recipe
     // (DN2). Uncapped matched recipes in the same drop still learn in bulk.
     const matchedRecipes = this._getOwnedItemLearningCandidates({ ownedItem, mode }).filter(
-      (recipe) => !this._isRecipeItemLearnCapped(recipe)
+      // Resolve the cap against the SPECIFIC owned book (R6a, issue 555), not the
+      // recipe's first member book — a recipe can live in several books with different
+      // caps, and the un-resolved default previously read the wrong book's cap.
+      (recipe) =>
+        !this._isRecipeItemLearnCapped(recipe, this._matchDefinitionForItem(recipe, ownedItem))
     );
     const learnedMap = this._getLearnedMap(actor);
     // Resolve the reader's roll data once for the whole preview (issue 544).

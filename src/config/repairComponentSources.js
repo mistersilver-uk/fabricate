@@ -1,9 +1,10 @@
 /**
- * GM maintenance action + settings-menu button that reconciles component source
- * items so craft-time matching is durable: it strips a transitive
- * `_stats.duplicateSource` (so future inventory copies link to the component's own
- * source item, not a template it was copied from) and stamps a transferable
- * `flags.fabricate.componentId`.
+ * GM maintenance action + settings-menu button ("Repair item data") that reconciles
+ * component AND recipe-item (book/scroll) source items so craft-time and knowledge
+ * matching is durable: it strips a transitive `_stats.duplicateSource` (so future
+ * inventory copies link to the source item's own identity, not a template it was copied
+ * from), stamps the durable `flags.fabricate.componentId` / `recipeItemDefinitionId`,
+ * and re-points owned copies that a duplicate mislabelled.
  *
  * Foundry globals (`foundry.applications.api.*`, `game`, `ui`) are referenced lazily
  * inside functions so importing this module never evaluates a `class extends
@@ -39,6 +40,21 @@ export async function runComponentSourceRepair() {
     globalThis.ui?.notifications?.info?.(
       localize('FABRICATE.Settings.RepairComponentSources.Success', summary)
     );
+    // Secondary notices for the name-assisted re-point outcomes (issue 555). The
+    // reversible audit records live on `summary.repointLog` and are logged for the GM.
+    if (summary?.repointed > 0) {
+      if (Array.isArray(summary.repointLog) && summary.repointLog.length > 0) {
+        console.info('Fabricate | Repair item data re-point audit', summary.repointLog);
+      }
+      globalThis.ui?.notifications?.info?.(
+        localize('FABRICATE.Settings.RepairComponentSources.Repointed', summary)
+      );
+    }
+    if (summary?.skippedAmbiguous > 0) {
+      globalThis.ui?.notifications?.warn?.(
+        localize('FABRICATE.Settings.RepairComponentSources.Ambiguous', summary)
+      );
+    }
     return summary;
   } catch (error) {
     console.error('Fabricate | Component source repair failed', error);

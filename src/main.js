@@ -61,7 +61,7 @@ import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET } from './config/settings.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
@@ -2180,6 +2180,7 @@ Hooks.once('ready', async () => {
   bindFabricateGlobal();
   await fabricate.initialize();
   await processFabricateWorldTime();
+  await runRecipeItemFlagAutoStamp();
 
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
@@ -2252,6 +2253,33 @@ Hooks.once('ready', async () => {
 
   Hooks.callAll('fabricate.ready');
 });
+
+/**
+ * Issue 555 R3 — one-shot, primary-GM-gated backfill that stamps the durable
+ * `flags.fabricate.recipeItemDefinitionId` (and strips stale `_stats.duplicateSource`)
+ * on every registered recipe-item definition's writable source Item. Keyed by the
+ * `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
+ * Sources only — owned copies inherit the flag on future drags and are otherwise
+ * covered by the manual "Repair item data" action. This is NOT a MigrationRunner entry:
+ * that runner reads and writes only settings-data payloads and has no Item handle, so it
+ * cannot write Item flags.
+ */
+async function runRecipeItemFlagAutoStamp() {
+  try {
+    // Primary-GM only, so exactly one client performs the write in a multi-GM world.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (Number(getSetting(SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION)) >= RECIPE_ITEM_FLAG_STAMP_TARGET) {
+      return;
+    }
+    const manager = fabricate?.getCraftingSystemManager?.();
+    if (!manager?.autoStampRecipeItemSources) return;
+    const summary = await manager.autoStampRecipeItemSources();
+    console.debug?.('Fabricate | recipe-item durable-flag auto-stamp complete', summary);
+    await setSetting(SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION, RECIPE_ITEM_FLAG_STAMP_TARGET);
+  } catch (error) {
+    console.error('Fabricate | recipe-item durable-flag auto-stamp failed', error);
+  }
+}
 
 /**
  * Run the env-node-driven marker image sync across all scenes. Resolves the live

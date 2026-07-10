@@ -888,15 +888,17 @@
         "Hint": "Reserved for future experimental Fabricate features in this world. No current features are gated by this switch. Disabled by default."
       },
       "RepairComponentSources": {
-        "Name": "Repair Component Sources",
-        "Label": "Repair Component Sources",
-        "Hint": "Reconcile the source items behind your crafting components so inventory copies match reliably. Fixes items that were built by copying another item as a template.",
-        "Title": "Repair Component Sources",
-        "Body": "This scans your world items and unlocked compendiums, tags each component's source item with a durable component link, and clears misleading duplicate-source metadata. Locked (system/module) compendiums are skipped. Continue?",
+        "Name": "Repair Item Data",
+        "Label": "Repair Item Data",
+        "Hint": "Reconcile the source items behind your crafting components and recipe items (books and scrolls) so inventory copies match reliably. Fixes items that were built by duplicating another item as a template.",
+        "Title": "Repair Item Data",
+        "Body": "This scans your world items, unlocked compendiums, and actor inventories, tags each component and recipe-item source with a durable identity link, clears misleading duplicate-source metadata, and re-points owned copies that a duplicate mislabelled. Locked (system/module) compendiums are skipped. Continue?",
         "Confirm": "Repair",
         "Cancel": "Cancel",
-        "Success": "Component sources repaired: {stamped} tagged, {stripped} cleaned, {cleared} unlinked ({scanned} scanned, {skippedLocked} locked packs skipped).",
-        "Failed": "Component source repair failed. See the console for details.",
+        "Success": "Item data repaired: {stamped} tagged, {stripped} cleaned, {cleared} unlinked, {repointed} re-pointed ({scanned} scanned, {skippedLocked} locked packs skipped).",
+        "Ambiguous": "{skippedAmbiguous} owned copies were left as-is because their name matched more than one book or scroll — re-point them by deleting and re-dragging the correct source item.",
+        "Repointed": "{repointed} owned copies were re-pointed to the book or scroll their name matches. See the console log for the reversible details.",
+        "Failed": "Item data repair failed. See the console for details.",
         "Unavailable": "Fabricate is not ready — try again once the world has finished loading."
       },
       "InteractionPromptPosition": {

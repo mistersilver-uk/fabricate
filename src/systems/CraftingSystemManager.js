@@ -18,8 +18,12 @@ import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExp
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
   getSourceUuid,
+  getDuplicateSourceUuid,
   getComponentSourceReferences,
+  getRecipeItemSourceReferences,
   getItemIdentityReferences,
+  itemMatchesComponentSource,
+  matchRecipeItemDefinition,
 } from '../utils/sourceUuid.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
@@ -1041,13 +1045,33 @@ export class CraftingSystemManager {
       id = foundry.utils.randomID();
     }
 
-    const sourceItemUuid = String(entry.sourceItemUuid || '').trim() || null;
+    const sourceItemUuid = String(entry.sourceItemUuid || entry.sourceUuid || '').trim() || null;
+    // Union source refs, mirroring `_normalizeComponent`: a recipe item claims its
+    // registered live document (`sourceUuid`), its canonical compendium/source
+    // (`sourceItemUuid`), and any `fallbackItemIds`, so a compendium-imported book
+    // resolves for owned copies dragged from EITHER the compendium item or the imported
+    // world item (issue 555). Existing definitions carry only `sourceItemUuid`; it is
+    // never recomputed, and `sourceUuid` defaults to it, so their matching is unchanged.
+    const sourceUuid = String(entry.sourceUuid || entry.sourceItemUuid || '').trim() || null;
+    const primaryRefs = new Set([sourceUuid, sourceItemUuid].filter(Boolean));
+    const fallbackItemIds = Array.isArray(entry.fallbackItemIds)
+      ? [
+          ...new Set(
+            entry.fallbackItemIds
+              .filter((id) => typeof id === 'string')
+              .map((id) => id.trim())
+              .filter((id) => id && !primaryRefs.has(id))
+          ),
+        ]
+      : [];
     return {
       id,
       name: String(entry.name || '').trim() || this._labelFromUuid(sourceItemUuid) || 'Recipe Item',
       description: this._normalizeComponentDescription(entry.description),
       img: String(entry.img || '').trim() || 'icons/svg/item-bag.svg',
       sourceItemUuid,
+      sourceUuid,
+      fallbackItemIds,
       // Per-recipe-item enable toggle (issue 511, PR-B). Defaults on; a disabled
       // definition still round-trips but the library UI can hide/skip it.
       enabled: entry.enabled !== false,
@@ -1207,8 +1231,12 @@ export class CraftingSystemManager {
     };
   }
 
-  _buildRecipeItemSourceSnapshot(itemUuid, source = null, fallbackDefinition = null) {
-    const sourceData = this._resolveImportedSourceData(itemUuid, source);
+  async _buildRecipeItemSourceSnapshot(itemUuid, source = null, fallbackDefinition = null) {
+    // Resolve the same union of source refs a component records (live document uuid +
+    // canonical compendium uuid + broken-source fallbacks), so a recipe item claims the
+    // full breadth for matching (issue 555). Clone-gated identity is applied inside
+    // `_resolveImportedSourceData`, so a duplicated source keys on its own uuid.
+    const sourceData = await this._resolveImportedComponentSourceData(itemUuid, source);
     const fallbackName = fallbackDefinition?.name || itemUuid?.split('.')?.pop() || 'Recipe Item';
     const fallbackImg = fallbackDefinition?.img || 'icons/svg/item-bag.svg';
 
@@ -1218,7 +1246,9 @@ export class CraftingSystemManager {
       description: source
         ? this._extractSourceDescription(source)
         : this._normalizeComponentDescription(fallbackDefinition?.description),
+      sourceUuid: sourceData.currentUuid,
       sourceItemUuid: sourceData.canonicalUuid,
+      fallbackItemIds: sourceData.fallbackItemIds,
     };
   }
 
@@ -1565,7 +1595,7 @@ export class CraftingSystemManager {
           }
 
           definition = this._normalizeRecipeItemDefinition(
-            this._buildRecipeItemSourceSnapshot(legacyUuid, source, {
+            await this._buildRecipeItemSourceSnapshot(legacyUuid, source, {
               name: recipe?.name || 'Recipe Item',
               img: recipe?.img || 'icons/svg/item-bag.svg',
               description: recipe?.description || '',
@@ -1620,14 +1650,21 @@ export class CraftingSystemManager {
       throw new Error(`Cannot add non-Item document (${source.documentName}) as a recipe item`);
     }
 
-    const snapshot = this._buildRecipeItemSourceSnapshot(itemUuid, source);
-    const existing = this._findRecipeItemDefinitionBySourceUuid(system, snapshot.sourceItemUuid);
+    const snapshot = await this._buildRecipeItemSourceSnapshot(itemUuid, source);
+    const existing = this._findRecipeItemDefinitionForSource(system, snapshot, source);
     if (existing) {
       const unchanged =
         existing.name === snapshot.name &&
         existing.img === snapshot.img &&
         existing.description === snapshot.description &&
         existing.sourceItemUuid === snapshot.sourceItemUuid;
+
+      // Stamp the durable identity flag (and strip a clone's stale `_stats`) on BOTH
+      // the skipped and updated branches. This makes `skipped` a user-accessible
+      // recovery path: re-registering an unchanged definition whose source predates
+      // the flag still stamps and strips it (issue 555).
+      const previousSourceUuid = existing.sourceItemUuid;
+      await this._stampSourceIdentity(source, 'recipeItemDefinitionId', existing.id);
 
       if (unchanged) {
         return { item: existing, action: 'skipped' };
@@ -1639,6 +1676,11 @@ export class CraftingSystemManager {
       existing.sourceItemUuid = snapshot.sourceItemUuid;
 
       await this.save();
+      // A source-uuid change is a re-point: clear the durable flag off the old source
+      // document so it no longer claims this definition.
+      if (previousSourceUuid && previousSourceUuid !== snapshot.sourceItemUuid) {
+        await this._clearSourceFlag(previousSourceUuid, 'recipeItemDefinitionId', existing.id);
+      }
       return { item: existing, action: 'updated' };
     }
 
@@ -1652,6 +1694,7 @@ export class CraftingSystemManager {
     recipeItemDefinitions.push(item);
     system.recipeItemDefinitions = recipeItemDefinitions;
 
+    await this._stampSourceIdentity(source, 'recipeItemDefinitionId', item.id);
     await this.save();
     return { item, action: 'added' };
   }
@@ -2231,15 +2274,30 @@ export class CraftingSystemManager {
     if (typeof itemUuid === 'string' && itemUuid.trim()) {
       references.push(itemUuid.trim());
     }
-    // Identity references only (live uuid + compendium source). Excludes the
-    // world-duplicate source so an item cloned from another world item is not
-    // de-duplicated against the original's component on import.
-    for (const ref of getItemIdentityReferences(source)) {
+    // A WORLD SOURCE ITEM being registered that carries `_stats.duplicateSource` is a
+    // sidebar-Duplicate/clone. Its inherited `_stats.compendiumSource` still points at
+    // the ORIGINAL's pack, so keying identity on it would (a) de-dup the clone onto the
+    // original at find-existing and (b) silently OVERWRITE the original's definition at
+    // the `updated` branch (issue 555, flow 4b). So a clone keys purely on its own uuid,
+    // excluding the inherited compendium source from BOTH the find-existing references
+    // AND the canonical uuid — it becomes a NEW definition/component.
+    //
+    // This is a REGISTRATION / source-repair rule ONLY. `duplicateSource` means "suspect
+    // clone" for a world source being registered, but it means NOTHING for an actor-owned
+    // copy: Foundry stamps `duplicateSource` on every non-compendium drag-drop
+    // (`client-document.mjs`), while that copy's `compendiumSource` is legitimate
+    // provenance. So this clone-gate must never reach the runtime matcher — which is why
+    // `matchRecipeItemDefinition` carries no clone-gate and trusts tier-3 compendium.
+    const isClone = !!getDuplicateSourceUuid(source);
+    const identityRefs = isClone
+      ? [source?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
+      : getItemIdentityReferences(source);
+    for (const ref of identityRefs) {
       if (!references.includes(ref)) references.push(ref);
     }
     const currentUuid = references[0] || null;
-    const canonicalUuid = getSourceUuid(source) || currentUuid;
-    return { currentUuid, canonicalUuid, references };
+    const canonicalUuid = (isClone ? null : getSourceUuid(source)) || currentUuid;
+    return { currentUuid, canonicalUuid, references, isClone };
   }
 
   /**
@@ -2260,6 +2318,12 @@ export class CraftingSystemManager {
     const sourceData = this._resolveImportedSourceData(itemUuid, source);
     const sourceFallbacks = [];
     const fallbackItemIds = [];
+    // A clone was already stripped of its inherited compendium source by
+    // `_resolveImportedSourceData`; never resurrect it through the broken-source
+    // fallback below (which reads the raw `getSourceUuid`).
+    if (sourceData.isClone) {
+      return { ...sourceData, fallbackItemIds, sourceFallbacks };
+    }
     const recordedCanonicalUuid = getSourceUuid(source);
     const currentUuid = sourceData.currentUuid;
     if (!recordedCanonicalUuid || !currentUuid || recordedCanonicalUuid === currentUuid) {
@@ -2310,16 +2374,6 @@ export class CraftingSystemManager {
       (system.components || []).find((item) => {
         if (excludeItemId && item.id === excludeItemId) return false;
         return getComponentSourceReferences(item).some((ref) => claimedRefs.has(ref));
-      }) || null
-    );
-  }
-
-  _findRecipeItemDefinitionBySourceUuid(system, sourceItemUuid, excludeRecipeItemId = null) {
-    if (!sourceItemUuid) return null;
-    return (
-      (system.recipeItemDefinitions || []).find((def) => {
-        if (excludeRecipeItemId && def.id === excludeRecipeItemId) return false;
-        return def.sourceItemUuid === sourceItemUuid;
       }) || null
     );
   }
@@ -2448,29 +2502,88 @@ export class CraftingSystemManager {
    * }>}
    */
   /**
-   * Persist a transferable `flags.fabricate.componentId` on a component's source
-   * WORLD item, so any future inventory copy (drag/duplicate) inherits it and matches
-   * this component even when Foundry's transitive `_stats.duplicateSource` points at a
-   * template rather than this source (the GM "copy an item as a template" workflow).
-   * No-op for compendium/locked/non-Item sources (not writable in place — those still
-   * match via source UUIDs). GM context is guaranteed by the callers.
+   * Strip a clone's stale `_stats` provenance (`duplicateSource` + inherited
+   * `compendiumSource`) from a registered source Item. Kind-agnostic. Only touches a
+   * source that is itself a clone (carries `_stats.duplicateSource`); a non-clone's
+   * `compendiumSource` is legitimate provenance and is preserved. Returns whether
+   * anything was written.
    * @private
+   * @returns {Promise<boolean>}
    */
-  async _stampComponentSourceFlag(source, componentId) {
-    if (!componentId) return;
-    if (!source || source.pack || (source.documentName && source.documentName !== 'Item')) return;
-    if (typeof source.setFlag !== 'function') return;
-    if (getFabricateFlag(source, 'componentId', null) === componentId) return;
-    await setFabricateFlag(source, 'componentId', componentId);
+  async _stripCloneSourceProvenance(source) {
+    if (!getDuplicateSourceUuid(source) || typeof source.update !== 'function') return false;
+    const patch = {};
+    if (source._stats?.duplicateSource || source.system?._stats?.duplicateSource) {
+      patch['_stats.duplicateSource'] = null;
+    }
+    if (source._stats?.compendiumSource || source.system?._stats?.compendiumSource) {
+      patch['_stats.compendiumSource'] = null;
+    }
+    if (Object.keys(patch).length === 0) return false;
+    await source.update(patch);
+    return true;
   }
 
   /**
-   * Clear a stale `flags.fabricate.componentId` from a world item that no longer
-   * sources the given component (used when a component is re-pointed to a new source).
+   * Core identity write, KIND-GENERIC over the durable flag key: strip a clone's stale
+   * `_stats` provenance and stamp `flags.fabricate.<flagKey>` (overwriting an inherited
+   * marker). Writes stay conditional. Assumes the caller has already checked writability
+   * (world item, or unlocked pack). Shared by every registered kind — components, recipe
+   * items, and any future first-class kind (issue 561) — and by the one-shot auto-stamp.
+   *
+   * @private
+   * @returns {Promise<{stripped: boolean, stamped: boolean}>}
+   */
+  async _writeSourceIdentity(source, flagKey, id) {
+    const stripped = await this._stripCloneSourceProvenance(source);
+    let stamped = false;
+    if (getFabricateFlag(source, flagKey, null) !== id) {
+      await setFabricateFlag(source, flagKey, id);
+      stamped = true;
+    }
+    return { stripped, stamped };
+  }
+
+  /**
+   * Persist a transferable durable identity (`flags.fabricate.<flagKey>`) on a
+   * registered source WORLD item, so any future inventory copy (drag/duplicate) inherits
+   * it and resolves to this registration even when Foundry's transitive
+   * `_stats.duplicateSource` points at a template. A clone source is also stripped of its
+   * stale `_stats` provenance. KIND-GENERIC — the flag key names the kind. No-op for
+   * compendium/locked/non-Item sources (not writable in place; their copies still resolve
+   * via source UUIDs). GM context is guaranteed by the callers.
+   *
+   * The clone-gate (strip `_stats.duplicateSource`) is safe HERE — and only here and in
+   * world/pack source repair — because a registered SOURCE item that carries
+   * `duplicateSource` is a genuine sidebar-Duplicate whose inherited provenance would
+   * otherwise collide it with its original. It must NEVER be applied to actor-owned
+   * copies: Foundry stamps `duplicateSource` on every non-compendium drag-drop, so an
+   * ordinary owned copy carries it legitimately, and stripping or distrusting it there
+   * would break the hand-a-player-a-copy case. See {@link matchRecipeItemDefinition} in
+   * `src/utils/sourceUuid.js` for the runtime matcher that deliberately has no gate.
    * @private
    */
-  async _clearComponentSourceFlag(sourceUuid, componentId) {
-    if (!sourceUuid || !componentId) return;
+  async _stampSourceIdentity(source, flagKey, id) {
+    if (!id) return;
+    if (!source || source.pack || (source.documentName && source.documentName !== 'Item')) return;
+    if (typeof source.setFlag !== 'function') return;
+    const { stripped } = await this._writeSourceIdentity(source, flagKey, id);
+    if (stripped) {
+      console.debug?.(
+        'Fabricate | stripped clone provenance from a registered source',
+        source.uuid
+      );
+    }
+  }
+
+  /**
+   * Clear a stale `flags.fabricate.<flagKey>` from a world item that no longer sources
+   * the given registration (used when a definition/component is re-pointed to a new
+   * source). KIND-GENERIC.
+   * @private
+   */
+  async _clearSourceFlag(sourceUuid, flagKey, id) {
+    if (!sourceUuid || !id) return;
     let doc;
     try {
       doc = await fromUuid(sourceUuid);
@@ -2478,79 +2591,312 @@ export class CraftingSystemManager {
       doc = null;
     }
     if (!doc || doc.pack || typeof doc.unsetFlag !== 'function') return;
-    if (getFabricateFlag(doc, 'componentId', null) !== componentId) return;
+    if (getFabricateFlag(doc, flagKey, null) !== id) return;
     try {
-      await doc.unsetFlag(FABRICATE_FLAG_NAMESPACE, 'fabricate.componentId');
+      await doc.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${flagKey}`);
     } catch {
       // Non-fatal.
     }
   }
 
   /**
-   * Repair a single source item against the known components: if it is the source
-   * of a component (matched by IDENTITY — its own uuid / compendium source, NOT the
-   * transitive duplicateSource), strip a lingering `_stats.duplicateSource` so future
-   * copies link to THIS item, and stamp `flags.fabricate.componentId`. If it carries
-   * a stale component flag but sources no component, clear it. Compendium/locked and
-   * non-writable items are skipped by the callers.
+   * R3 one-shot auto-stamp (issue 555): stamp the durable `recipeItemDefinitionId` flag
+   * (and strip a clone's stale `_stats`) on every registered recipe-item definition's
+   * writable source Item — world items and unlocked-pack items. Locked packs and
+   * unresolvable sources are counted and skipped. Idempotent: a second run finds every
+   * source already stamped and performs zero writes. Sources only — owned copies are
+   * covered by future drags (the durable flag is inherited) and by the manual repair.
+   * Callers gate this on primary-GM + the one-shot setting version; it does no gating of
+   * its own beyond writability, so it is safe to unit-test directly.
+   *
+   * @returns {Promise<{scanned:number, stamped:number, stripped:number, skippedLocked:number, skippedMissing:number}>}
+   */
+  async autoStampRecipeItemSources() {
+    const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
+    for (const system of this.getSystems()) {
+      for (const def of system.recipeItemDefinitions || []) {
+        const uuid = def?.sourceItemUuid;
+        if (!uuid || !def?.id) continue;
+        summary.scanned += 1;
+        let source;
+        try {
+          source = typeof fromUuid === 'function' ? await fromUuid(uuid) : null;
+        } catch {
+          source = null;
+        }
+        if (!source || typeof source.setFlag !== 'function') {
+          summary.skippedMissing += 1;
+          continue;
+        }
+        if (source.pack) {
+          const pack = globalThis.game?.packs?.get?.(source.pack);
+          if (!pack || pack.locked) {
+            summary.skippedLocked += 1;
+            continue;
+          }
+        }
+        const { stamped, stripped } = await this._writeSourceIdentity(
+          source,
+          'recipeItemDefinitionId',
+          def.id
+        );
+        if (stamped) summary.stamped += 1;
+        if (stripped) summary.stripped += 1;
+      }
+    }
+    return summary;
+  }
+
+  /**
+   * Resolve the existing definition a registered source maps to. A NON-clone source's
+   * durable `recipeItemDefinitionId` flag is authoritative (it resolves to its
+   * definition even if the recorded `sourceItemUuid` drifted); a CLONE's inherited flag
+   * belongs to the ORIGINAL and is ignored (the clone-gate), so a duplicated source
+   * becomes its own definition (issue 555, flow 4b). Falls back to the `sourceItemUuid`
+   * lookup, which is already clone-gated via `_resolveImportedSourceData`.
+   * @private
+   */
+  _findRecipeItemDefinitionForSource(system, snapshot, source) {
+    const definitions = Array.isArray(system.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+    if (!getDuplicateSourceUuid(source)) {
+      const flagId = getFabricateFlag(source, 'recipeItemDefinitionId', null);
+      if (flagId) {
+        const byFlag = definitions.find((def) => def.id === flagId);
+        if (byFlag) return byFlag;
+      }
+    }
+    // Union find-existing over the snapshot's full ref set. The snapshot's refs are
+    // already clone-gated by `_resolveImportedSourceData` (a clone contributes only its
+    // own uuid), so a duplicated source can never collide with the original here — the
+    // 4b overwrite stays fixed even with union matching.
+    const claimed = new Set(getRecipeItemSourceReferences(snapshot));
+    if (claimed.size === 0) return null;
+    return (
+      definitions.find((def) =>
+        getRecipeItemSourceReferences(def).some((ref) => claimed.has(ref))
+      ) || null
+    );
+  }
+
+  // Normalize a name for the name-assisted re-point: trim, collapse internal
+  // whitespace, and lowercase. Exact (post-normalization) equality only — no fuzzy or
+  // substring matching. Names are literal snapshot strings captured at registration,
+  // not localized keys, so a client-language change cannot move the match.
+  _normalizeMatchName(name) {
+    return String(name ?? '')
+      .trim()
+      .replaceAll(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
+  // Resolve a definition by GLOBALLY-unique exact name across the whole definition set
+  // (all systems). Returns the single match, `'ambiguous'` when two or more definitions
+  // share the name anywhere, or `null` when none match.
+  _uniqueDefinitionByName(name, definitions) {
+    const normalized = this._normalizeMatchName(name);
+    if (!normalized) return null;
+    const matches = definitions.filter((def) => this._normalizeMatchName(def?.name) === normalized);
+    if (matches.length === 0) return null;
+    if (matches.length >= 2) return 'ambiguous';
+    return matches[0];
+  }
+
+  // Owner resolution for a WORLD / WRITABLE-PACK SOURCE item. Clone-gated: a source
+  // carrying `_stats.duplicateSource` is a sidebar-Duplicate, so it must NOT be
+  // identity-matched onto the ORIGINAL through its inherited `compendiumSource` (the
+  // self-corruption hazard — it would be stamped with the original's id). A clone
+  // keys on its own uuid only; a non-clone keys on uuid + compendium source.
+  _resolveSourceRepairOwner(item, kind) {
+    const isClone = !!getDuplicateSourceUuid(item);
+    const refs = new Set(
+      isClone
+        ? [item?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
+        : getItemIdentityReferences(item)
+    );
+    if (refs.size === 0) return null;
+    return (
+      kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.has(ref))) || null
+    );
+  }
+
+  // Owner resolution for an ACTOR-OWNED item, returning `{definition, tier}`. NO
+  // clone-gate: an owned copy legitimately carries `duplicateSource` (Foundry stamps it
+  // on drag-drop) and its `compendiumSource` is real provenance, so it resolves through
+  // the ordinary runtime matchers — the four-tier recipe-item matcher (which surfaces the
+  // tier), or the component source matcher (`tier: null`).
+  _resolveOwnedRepairOwner(item, kind) {
+    if (kind.bucket === 'recipeItems') {
+      return matchRecipeItemDefinition(item, kind.definitions);
+    }
+    const definition =
+      kind.definitions.find((def) => itemMatchesComponentSource(item, def)) || null;
+    return { definition, tier: null };
+  }
+
+  /**
+   * Write the durable identity onto ONE item given its already-resolved owner
+   * definition. Authored once and shared by the world/pack-source and actor-owned
+   * passes for both kinds. Strips a lingering `_stats.duplicateSource` when an owner is
+   * found (so future copies key on THIS item), stamps the kind's durable flag, and
+   * clears a stale flag when the item sources nothing. Writes stay conditional exactly
+   * as before (only on an actual change).
    *
    * @private
-   * @param {object} item - a Foundry Item document
-   * @param {object[]} components - all managed components across systems
-   * @param {{stamped:number, stripped:number, cleared:number}} summary - mutated in place
    */
-  async _repairSourceItem(item, components, summary) {
+  async _repairSourceItem(item, owner, kind, summary) {
     if (!item || typeof item.update !== 'function') return;
-    const identityRefs = new Set(getItemIdentityReferences(item));
-    const owner =
-      identityRefs.size > 0
-        ? components.find((component) =>
-            getComponentSourceReferences(component).some((ref) => identityRefs.has(ref))
-          )
-        : null;
-    const currentFlag = getFabricateFlag(item, 'componentId', null);
+    const currentFlag = getFabricateFlag(item, kind.flagKey, null);
+    const bucket = summary[kind.bucket];
 
     if (owner) {
       if (item._stats?.duplicateSource) {
         await item.update({ '_stats.duplicateSource': null });
         summary.stripped += 1;
+        bucket.stripped += 1;
       }
       if (currentFlag !== owner.id) {
-        await setFabricateFlag(item, 'componentId', owner.id);
+        await setFabricateFlag(item, kind.flagKey, owner.id);
         summary.stamped += 1;
+        bucket.stamped += 1;
       }
     } else if (currentFlag && typeof item.unsetFlag === 'function') {
-      await item.unsetFlag(FABRICATE_FLAG_NAMESPACE, 'fabricate.componentId');
+      await item.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${kind.flagKey}`);
       summary.cleared += 1;
+      bucket.cleared += 1;
     }
   }
 
   /**
-   * GM maintenance: reconcile every component's source item so craft-time matching
-   * is durable. For each source item this strips a transitive `_stats.duplicateSource`
-   * (so future inventory copies link back to it) and stamps a transferable
-   * `flags.fabricate.componentId`. World-directory items are always processed;
-   * compendium items are processed only when the pack is writable (unlocked world
-   * pack) — locked/module packs are counted and skipped (their copies already match
-   * via `_stats.compendiumSource`, so no repair is needed).
+   * Reconcile ONE actor-owned item for one kind. A flagged owned copy is authoritative
+   * and left untouched. Otherwise it resolves through the ordinary runtime matcher and,
+   * for recipe items only, may be re-pointed by name: an unflagged copy whose name
+   * uniquely matches a DIFFERENT definition than the one its `duplicateSource` names is
+   * re-pointed to the name-matched definition (the duplicated-scroll-mislabelled-as-book
+   * case). This never triggers a learn — it only writes item identity metadata.
    *
-   * @param {{ includeCompendiums?: boolean }} [options]
-   * @returns {Promise<{scanned:number, stamped:number, stripped:number, cleared:number, skippedLocked:number}>}
+   * @private
    */
-  async repairComponentSourceFlags({ includeCompendiums = true } = {}) {
-    this._assertGM('repair component sources');
+  async _repairOwnedItem(item, kind, summary, auditLog) {
+    if (!item || typeof item.update !== 'function') return;
+    // A flagged owned copy already carries its identity-of-record — authoritative,
+    // left exactly as-is (no re-point, no strip, no learn).
+    if (getFabricateFlag(item, kind.flagKey, null)) return;
 
-    const components = [];
-    for (const system of this.getSystems()) {
-      for (const component of system.components || []) components.push(component);
+    const { definition, tier } = this._resolveOwnedRepairOwner(item, kind);
+
+    // Components, and recipe items matched by a RELIABLE tier (durable flag / own uuid /
+    // compendium source), are stamped directly to the resolved owner.
+    if (kind.bucket !== 'recipeItems' || (definition && tier !== 'duplicate')) {
+      await this._repairSourceItem(item, definition, kind, summary);
+      return;
     }
 
-    const summary = { scanned: 0, stamped: 0, stripped: 0, cleared: 0, skippedLocked: 0 };
+    // Recipe item matched ONLY via tier 4 (duplicateSource), or unmatched. Tier 4 is the
+    // unreliable signal at the heart of issue 555, so an owned copy here is only stamped
+    // when its NAME confirms an identity. Without a duplicateSource there is nothing to
+    // re-point against, so stamp whatever (if anything) matched.
+    if (!getDuplicateSourceUuid(item)) {
+      await this._repairSourceItem(item, definition, kind, summary);
+      return;
+    }
+
+    const byName = this._uniqueDefinitionByName(item?.name, kind.definitions);
+    if (byName === 'ambiguous') {
+      // A name matching two or more definitions cannot be safely resolved — leave the
+      // copy untouched (it stays a tier-4 fallback, which R5 refuses for bulk auto-learn).
+      summary.skippedAmbiguous += 1;
+      return;
+    }
+    if (!byName) {
+      // No name confirmation for a tier-4-only copy — leave it as-is.
+      return;
+    }
+    // The copy's name uniquely names a definition. When that differs from the one its
+    // duplicateSource resolves to, it is a re-point (the duplicated-scroll-mislabelled
+    // case); log an auditable, reversible record. When it confirms the same definition,
+    // stamp it without counting a re-point.
+    if (!definition || byName.id !== definition.id) {
+      auditLog.push({
+        itemUuid: item.uuid || null,
+        oldDuplicateSourceTarget: getDuplicateSourceUuid(item),
+        newlyStampedDefinitionId: byName.id,
+      });
+      summary.repointed += 1;
+    }
+    await this._repairSourceItem(item, byName, kind, summary);
+  }
+
+  /**
+   * GM maintenance ("Repair item data"): reconcile every crafting component AND recipe-item
+   * definition's identity across world items, writable packs, and actor-owned items so
+   * matching is durable. World/pack SOURCE items are strip-and-stamped with a clone-gated
+   * identity (a duplicated source becomes its own definition, never overwriting the
+   * original). Actor-owned copies are resolved with the ordinary runtime matchers and,
+   * for recipe items, a guardrailed name-assisted re-point. Locked packs are counted and
+   * skipped. Synthetic/unlinked token actors and compendium-resident actors are not in
+   * `game.actors` and are not scanned. Never triggers a learn.
+   *
+   * @param {{ includeCompendiums?: boolean }} [options]
+   * @returns {Promise<object>} summary with flat totals plus per-kind buckets, repointed,
+   *   skippedAmbiguous, skippedLocked, and the re-point audit log.
+   */
+  async repairComponentSourceFlags({ includeCompendiums = true } = {}) {
+    this._assertGM('repair item data');
+
+    const componentDefinitions = [];
+    const recipeItemDefinitions = [];
+    for (const system of this.getSystems()) {
+      for (const component of system.components || []) componentDefinitions.push(component);
+      for (const def of system.recipeItemDefinitions || []) recipeItemDefinitions.push(def);
+    }
+
+    const kinds = [
+      {
+        bucket: 'components',
+        flagKey: 'componentId',
+        definitions: componentDefinitions,
+        refExtractor: (def) => getComponentSourceReferences(def),
+      },
+      {
+        bucket: 'recipeItems',
+        flagKey: 'recipeItemDefinitionId',
+        definitions: recipeItemDefinitions,
+        refExtractor: (def) => getRecipeItemSourceReferences(def),
+      },
+    ];
+
+    const summary = {
+      scanned: 0,
+      skippedLocked: 0,
+      // Flat totals (kept for back-compat with the component-source repair contract).
+      stamped: 0,
+      stripped: 0,
+      cleared: 0,
+      // Name-assisted re-point outcomes.
+      repointed: 0,
+      skippedAmbiguous: 0,
+      components: { stamped: 0, stripped: 0, cleared: 0 },
+      recipeItems: { stamped: 0, stripped: 0, cleared: 0 },
+      repointLog: [],
+    };
+
+    const repairSource = async (item) => {
+      for (const kind of kinds) {
+        await this._repairSourceItem(
+          item,
+          this._resolveSourceRepairOwner(item, kind),
+          kind,
+          summary
+        );
+      }
+    };
 
     const worldItems = globalThis.game?.items ? [...globalThis.game.items] : [];
     for (const item of worldItems) {
       summary.scanned += 1;
-      await this._repairSourceItem(item, components, summary);
+      await repairSource(item);
     }
 
     if (includeCompendiums) {
@@ -2569,7 +2915,20 @@ export class CraftingSystemManager {
         }
         for (const item of docs) {
           summary.scanned += 1;
-          await this._repairSourceItem(item, components, summary);
+          await repairSource(item);
+        }
+      }
+    }
+
+    // Actor-owned copies. Guarded exactly like `game?.items` / `game?.packs` above so a
+    // world with no `game.actors` (e.g. the pure-logic test harness) is a clean no-op.
+    const actors = globalThis.game?.actors ? [...globalThis.game.actors] : [];
+    for (const actor of actors) {
+      const items = actor?.items ? [...actor.items] : [];
+      for (const item of items) {
+        summary.scanned += 1;
+        for (const kind of kinds) {
+          await this._repairOwnedItem(item, kind, summary, summary.repointLog);
         }
       }
     }
@@ -2623,7 +2982,7 @@ export class CraftingSystemManager {
 
       // Stamp the source (both skipped + updated) so a source that predates this
       // flag — or was re-imported — always carries the transferable component id.
-      await this._stampComponentSourceFlag(source, existing.id);
+      await this._stampSourceIdentity(source, 'componentId', existing.id);
 
       if (unchanged) {
         return { item: existing, action: 'skipped', sourceFallbacks: nextSnapshot.sourceFallbacks };
@@ -2651,7 +3010,7 @@ export class CraftingSystemManager {
 
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
-    await this._stampComponentSourceFlag(source, item.id);
+    await this._stampSourceIdentity(source, 'componentId', item.id);
     await this.save();
     return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
@@ -2718,9 +3077,9 @@ export class CraftingSystemManager {
     // Re-point the transferable flag: clear the old source (if it still points here)
     // and stamp the new source, so copies match the current source, not the old one.
     if (previousSourceUuid && previousSourceUuid !== itemUuid) {
-      await this._clearComponentSourceFlag(previousSourceUuid, itemId);
+      await this._clearSourceFlag(previousSourceUuid, 'componentId', itemId);
     }
-    await this._stampComponentSourceFlag(source, itemId);
+    await this._stampSourceIdentity(source, 'componentId', itemId);
     await this.save();
     return { item: updatedItem, sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
