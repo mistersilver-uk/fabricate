@@ -1715,7 +1715,15 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
     await csm.updateSystem(cauldronId, {
       resolutionMode: 'alchemy',
       enabled: true,
-      alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false }
+      // Simple check mode (#554): a mandatory pass/fail check + a reserved failure
+      // result set. Exercises the check-gated workbench + the failure-group authoring.
+      alchemy: {
+        learnOnCraft: true,
+        consumeOnFail: true,
+        showAttemptHistoryToPlayers: false,
+        checkMode: 'simple'
+      },
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 10 } }
     });
     const cauldronMap = {
       'Mystic Herb': await registerComponent(cauldronId, requireWorldItem('Mystic Herb')),
@@ -1729,7 +1737,6 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
       description: 'Alchemy: two mystic herbs reduce to a vigor elixir.',
       craftingSystemId: cauldronId,
       img: 'icons/consumables/potions/potion-tube-corked-red.webp',
-      resultSelection: { provider: 'ingredientSet' },
       ingredientSets: [{
         name: 'Herbal base',
         ingredientGroups: [{
@@ -1737,10 +1744,18 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
           options: [{ quantity: 2, match: { type: 'component', componentId: cauldronMap['Mystic Herb'] } }]
         }]
       }],
-      resultGroups: [{
-        name: 'Elixir',
-        results: [{ componentId: cauldronMap['Elixir of Vigor'], quantity: 1 }]
-      }]
+      resultGroups: [
+        {
+          name: 'Elixir',
+          results: [{ componentId: cauldronMap['Elixir of Vigor'], quantity: 1 }]
+        },
+        {
+          // Reserved failure result set (#554): produced on a failed Simple check.
+          role: 'failure',
+          name: '',
+          results: [{ componentId: cauldronMap['Dragon Scale'], quantity: 1 }]
+        }
+      ]
     });
     const tonicRecipe = await rm.createRecipe({
       name: 'Verdant Tonic',
