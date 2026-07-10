@@ -116,24 +116,118 @@ export function getComponentSourceReferences(component) {
 }
 
 /**
- * Determine whether an item matches any source reference claimed by a component.
+ * Whether an item's raw source-reference chain intersects a component's — the
+ * durable-flag-agnostic tail of component matching. Kept as an INTERNAL helper
+ * only: the exported `itemMatchesComponentSource` pairwise matcher was retired in
+ * favour of the list-aware, system-scoped {@link resolveComponentForItem}, which
+ * owns identity/exclusivity. This helper is the resolver's raw-reference
+ * fall-through tier and nothing else.
  *
- * @param {Item|object|null} item - Item-like object with `uuid` and optional source metadata
- * @param {object|null} component - Component-like object with source UUID fields
- * @returns {boolean} True when the item overlaps the component's source reference chain
+ * @param {Set<string>} itemRefs - The item's precomputed source-reference set.
+ * @param {object|null} component - Component-like object with source UUID fields.
+ * @returns {boolean} True when the item's refs overlap the component's source refs.
  */
-export function itemMatchesComponentSource(item, component) {
-  // A `flags.fabricate.componentId` on the item — copied from the component's flagged
-  // source world item and inherited by every duplicate — is the most durable link: it
-  // survives Foundry's transitive `_stats.duplicateSource` template chaining, which
-  // source-UUID matching cannot (the copy loses the ref back to the component source).
-  const componentId = component ? component.id : null;
-  if (componentId && getFabricateFlag(item, 'componentId', null) === componentId) {
-    return true;
-  }
-  const itemRefs = new Set(getItemSourceReferences(item));
-  if (itemRefs.size === 0) return false;
+function itemSourceRefsIntersectComponent(itemRefs, component) {
   return getComponentSourceReferences(component).some((ref) => itemRefs.has(ref));
+}
+
+/**
+ * Read the per-system durable component identity claimed by an item's
+ * `flags.fabricate.roles[systemId].componentId`, applying the hygiene rule:
+ * an absent `roles`, an absent or empty `roles[systemId]`, or a nullish
+ * `componentId` is NO claim (returns null). Tested BEFORE any membership check so
+ * `{}` or `{ componentId: null }` (a restamp interrupted midway) can never
+ * spuriously match a component whose id is itself nullish.
+ *
+ * @param {Item|object|null} item
+ * @param {string|null|undefined} systemId
+ * @returns {string|null} The claimed component id, or null when there is no claim.
+ */
+function claimedRoleComponentId(item, systemId) {
+  if (systemId == null) return null;
+  const roles = getFabricateFlag(item, 'roles', null);
+  if (!roles || typeof roles !== 'object') return null;
+  const perSystem = roles[systemId];
+  if (!perSystem || typeof perSystem !== 'object') return null;
+  const componentId = perSystem.componentId;
+  return componentId == null ? null : componentId;
+}
+
+/**
+ * Resolve which single component an owned item IS, within ONE crafting system's
+ * candidate set, scoped by that system's id. The shared, list-aware, system-scoped
+ * component matcher — the component-kind analogue of {@link matchRecipeItemDefinition}.
+ * Evaluated as tiers WITH fall-through (the FIRST tier that names a component in the
+ * set wins; a claimed id naming nothing in this set is not "foreign", it is
+ * irrelevant, so evaluation falls through):
+ *
+ *   1. identity (roles) — `flags.fabricate.roles[systemId].componentId` names a
+ *      component in `components` ⇒ that component, exclusively; siblings fail closed.
+ *   2. identity (legacy) — else the legacy scalar `flags.fabricate.componentId`
+ *      names a component in the set ⇒ that component, exclusively (honored until the
+ *      one-shot restamp backfills the map; the scalar carries no system so it stays
+ *      list-aware).
+ *   3. fall-through — else the item's raw source references (`uuid`,
+ *      `_stats.compendiumSource`/`flags.core.sourceId`, transitive
+ *      `_stats.duplicateSource`) intersect a component's; the first such component,
+ *      else null. Load-bearing for un-stamped pre-#555 worlds, stale flags, and
+ *      multi-system worlds.
+ *
+ * `systemId` is threaded, not derivable: component ids are NOT globally unique (a
+ * copy-imported system preserves its origin's component ids), so identity is scoped
+ * per system. The invariant is only that within a single system's set at most one
+ * component bears a given id.
+ *
+ * There is NO clone-gate here and there must never be one — Foundry stamps
+ * `_stats.duplicateSource` on every non-compendium drag-drop, so distrusting it here
+ * would break the ordinary hand-a-player-a-copy case (issue 555).
+ *
+ * @param {Item|object|null} item - Item-like object with `uuid`, source metadata, and `getFlag`.
+ * @param {Array<object>|null} components - The candidate component set of ONE system.
+ * @param {string|null|undefined} systemId - That system's id.
+ * @returns {object|null} The single component the item IS, or null.
+ */
+export function resolveComponentForItem(item, components, systemId) {
+  if (!item || typeof item !== 'object') return null;
+  const candidates = Array.isArray(components) ? components : [];
+  if (candidates.length === 0) return null;
+
+  // Tier 1: durable per-system identity map.
+  const roleId = claimedRoleComponentId(item, systemId);
+  if (roleId != null) {
+    const byRole = candidates.find((component) => component && component.id === roleId);
+    if (byRole) return byRole;
+  }
+
+  // Tier 2: legacy scalar identity, honored until the restamp backfills the map.
+  const legacyId = getFabricateFlag(item, 'componentId', null);
+  if (legacyId != null) {
+    const byLegacy = candidates.find((component) => component && component.id === legacyId);
+    if (byLegacy) return byLegacy;
+  }
+
+  // Tier 3: raw source-reference intersection.
+  const itemRefs = new Set(getItemSourceReferences(item));
+  if (itemRefs.size === 0) return null;
+  return (
+    candidates.find((component) => itemSourceRefsIntersectComponent(itemRefs, component)) || null
+  );
+}
+
+/**
+ * Boolean companion to {@link resolveComponentForItem}: whether the item resolves,
+ * within `components` scoped by `systemId`, to the specific `component`.
+ *
+ * @param {Item|object|null} item
+ * @param {object|null} component - The component to test identity against.
+ * @param {Array<object>|null} components - The candidate set the identity is scoped to.
+ * @param {string|null|undefined} systemId
+ * @returns {boolean}
+ */
+export function itemResolvesToComponent(item, component, components, systemId) {
+  if (!component || component.id == null) return false;
+  const resolved = resolveComponentForItem(item, components, systemId);
+  return resolved != null && resolved.id === component.id;
 }
 
 /**
@@ -160,7 +254,7 @@ export function getRecipeItemSourceReferences(definition) {
  * Resolve which recipe-item definition an item IS, and by how durable a link.
  *
  * This is the single shared matcher for recipe items, mirroring
- * {@link itemMatchesComponentSource}'s durable-flag-first split. It evaluates four
+ * {@link resolveComponentForItem}'s durable-identity-first, list-aware split. It evaluates four
  * tiers in strict precedence order — the FIRST tier that yields any matching
  * definition wins and there is NO fall-through to a lower tier:
  *
@@ -233,24 +327,64 @@ export function itemMatchesRecipeItemSource(item, definitions) {
 }
 
 /**
+ * Resolve the durable component identity of a gathering-award SOURCE. A Foundry
+ * Item source (it exposes `getFlag`) is resolved through the list-aware, system-
+ * scoped {@link resolveComponentForItem}; a bare component source IS its own
+ * identity. An Item's Foundry document `.id` is NEVER its component identity.
+ *
+ * @param {object|null} source
+ * @param {Array<object>} components - The awarding system's resolved component set.
+ * @param {string|null|undefined} systemId
+ * @returns {object|null} The component the source IS, or null.
+ */
+function resolveSourceComponentIdentity(source, components, systemId) {
+  if (!source || typeof source !== 'object') return null;
+  if (typeof source.getFlag === 'function') {
+    return resolveComponentForItem(source, components, systemId);
+  }
+  // A bare component source's identity is itself.
+  return source;
+}
+
+/**
  * Find an existing actor item that should stack with a freshly-awarded source —
- * i.e. one that shares a source-UUID reference with `source` AND carries a
+ * one that shares a source-UUID reference with `source` AND carries a
  * `system.quantity` field (so it can be incremented). Items without a quantity
  * field (unique gear) or with no shared source never match, so they create a new
  * document instead of stacking.
  *
+ * Durable-identity guard (issue 556): a candidate that resolves — within the
+ * awarding system's `components` scoped by `systemId` — to a DIFFERENT component
+ * than the award source is skipped, so an award is never folded into an unrelated
+ * owned stack merely because a transitive `_stats.duplicateSource` shares a raw
+ * source reference. A candidate is skipped ONLY when BOTH the source and the
+ * candidate resolve to components and those components differ; when either does not
+ * resolve, stacking falls back to shared raw source references exactly as before.
+ *
+ * DOCUMENTED DEGRADE: `components`/`systemId` default to absent so a 2-arg call
+ * reverts to pure raw-ref matching (the resolver returns null on both sides, so no
+ * candidate is ever skipped) — a deliberate, tested fallback.
+ *
  * @param {Array<object>} items - The actor's existing items (item-like objects).
  * @param {object} source - The resolved award source (a Foundry item or component).
+ * @param {Array<object>} [components] - The awarding system's resolved component set.
+ * @param {string} [systemId] - The awarding system's id.
  * @returns {object|null} The stackable match, or null.
  */
-export function findStackableMatch(items, source) {
+export function findStackableMatch(items, source, components = [], systemId) {
   const sourceRefs = new Set(
     [...getItemSourceReferences(source), ...getComponentSourceReferences(source)].filter(Boolean)
   );
   if (sourceRefs.size === 0) return null;
+  const sourceComponent = resolveSourceComponentIdentity(source, components, systemId);
   for (const item of Array.isArray(items) ? items : []) {
     const quantity = item?.system?.quantity;
     if (quantity === undefined || quantity === null) continue;
+    const candidateComponent = resolveComponentForItem(item, components, systemId);
+    // Skip ONLY when both identities resolve and name different components.
+    if (sourceComponent && candidateComponent && sourceComponent.id !== candidateComponent.id) {
+      continue;
+    }
     if (getItemSourceReferences(item).some((ref) => sourceRefs.has(ref))) return item;
   }
   return null;

@@ -4,7 +4,7 @@ import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringTo
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
-import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
+import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { buildCurrencyAffordProbe } from './currencyAffordance.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -1036,7 +1036,15 @@ export class RecipeManager {
       const managedItem = this._getComponent(recipe, componentId);
       if (!managedItem) return false;
 
-      if (itemMatchesComponentSource(item, managedItem)) return true;
+      if (
+        itemResolvesToComponent(
+          item,
+          managedItem,
+          this._getSystemComponents(recipe),
+          recipe?.craftingSystemId
+        )
+      )
+        return true;
 
       // Source-UUID matching failed — fall back to an exact (case-insensitive) name
       // match, even when the component carries a sourceUuid. Foundry's transitive
@@ -1078,7 +1086,15 @@ export class RecipeManager {
     // case-insensitive name match — mirroring ingredientMatchesItem — so a
     // template-copied tool item (whose transitive `_stats.duplicateSource` points at
     // the original template rather than this component's source) still satisfies it.
-    if (itemMatchesComponentSource(item, managedItem)) return true;
+    if (
+      itemResolvesToComponent(
+        item,
+        managedItem,
+        this._getSystemComponents(recipe),
+        recipe?.craftingSystemId
+      )
+    )
+      return true;
     return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
   }
 
@@ -1277,6 +1293,7 @@ export class RecipeManager {
   _accumulateEssences(items, recipe = null) {
     return accumulateItemEssences(items, {
       components: this._getSystemComponents(recipe),
+      systemId: recipe?.craftingSystemId,
       multiplyByQuantity: true,
     });
   }

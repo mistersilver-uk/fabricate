@@ -61,7 +61,7 @@ import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET } from './config/settings.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
@@ -239,8 +239,16 @@ function createGatheringResultCreator(craftingSystemManager) {
         }
 
         // Stack onto an existing matching item (same source UUID chain) that uses
-        // a quantity field, rather than creating a duplicate document.
-        const existing = findStackableMatch(normalizeFoundryCollection(actor.items), source);
+        // a quantity field, rather than creating a duplicate document — but never fold
+        // an award into an owned item that resolves to a DIFFERENT component (issue 556),
+        // so hand the guard the resolved component set + system id.
+        const stackComponents = resolveGatheringSystemComponents(system, craftingSystemManager);
+        const existing = findStackableMatch(
+          normalizeFoundryCollection(actor.items),
+          source,
+          stackComponents,
+          system?.id
+        );
         if (existing) {
           const next = Number(existing.system?.quantity || 0) + Number(result.quantity || 1);
           await existing.update({ 'system.quantity': next });
@@ -349,6 +357,18 @@ async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
 
 function flattenGatheringResults(resultGroups = []) {
   return resultGroups.flatMap(group => Array.isArray(group?.results) ? group.results : []);
+}
+
+// Resolve the awarding system's component set the SAME way `resolveGatheringResultSource`
+// does — the in-memory `system.components`, falling back to the manager-loaded system's
+// components when the passed system carries none. The gathering stack guard
+// (`findStackableMatch`) must be handed this exact set + `system.id` so a fresh award is
+// never folded into an owned item that resolves to a different component (issue 556).
+function resolveGatheringSystemComponents(system, craftingSystemManager) {
+  const own = Array.isArray(system?.components) ? system.components : [];
+  if (own.length > 0) return own;
+  const resolved = craftingSystemManager?.getSystem?.(system?.id)?.components;
+  return Array.isArray(resolved) ? resolved : [];
 }
 
 function resolveGatheringResultSource(result, system, craftingSystemManager) {
@@ -2181,6 +2201,7 @@ Hooks.once('ready', async () => {
   await fabricate.initialize();
   await processFabricateWorldTime();
   await runRecipeItemFlagAutoStamp();
+  await runComponentFlagAutoStamp();
 
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
@@ -2278,6 +2299,33 @@ async function runRecipeItemFlagAutoStamp() {
     await setSetting(SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION, RECIPE_ITEM_FLAG_STAMP_TARGET);
   } catch (error) {
     console.error('Fabricate | recipe-item durable-flag auto-stamp failed', error);
+  }
+}
+
+/**
+ * Issue 556 — one-shot, primary-GM-gated backfill that stamps the durable per-system
+ * `flags.fabricate.roles[system.id].componentId` (and strips a clone's stale
+ * `_stats.duplicateSource`) on every registered component's writable source Item. Keyed
+ * by the `COMPONENT_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
+ * Placed BEFORE the `updateItem` hook registers, so restamp writes cannot trigger a
+ * metadata-refresh storm. Sources only — owned copies inherit the flag on future drags
+ * and are otherwise covered by the manual "Repair item data" action. NOT a MigrationRunner
+ * entry: that runner reads/writes only settings-data payloads and cannot write Item flags.
+ */
+async function runComponentFlagAutoStamp() {
+  try {
+    // Primary-GM only, so exactly one client performs the write in a multi-GM world.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (Number(getSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION)) >= COMPONENT_FLAG_STAMP_TARGET) {
+      return;
+    }
+    const manager = fabricate?.getCraftingSystemManager?.();
+    if (!manager?.autoStampComponentSources) return;
+    const summary = await manager.autoStampComponentSources();
+    console.debug?.('Fabricate | component durable-flag auto-stamp complete', summary);
+    await setSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION, COMPONENT_FLAG_STAMP_TARGET);
+  } catch (error) {
+    console.error('Fabricate | component durable-flag auto-stamp failed', error);
   }
 }
 
