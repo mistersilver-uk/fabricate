@@ -137,6 +137,102 @@ export function itemMatchesComponentSource(item, component) {
 }
 
 /**
+ * The tier order for {@link matchRecipeItemDefinition}, most to least durable.
+ * @type {['identity','uuid','compendium','duplicate']}
+ */
+export const RECIPE_ITEM_MATCH_TIERS = ['identity', 'uuid', 'compendium', 'duplicate'];
+
+/**
+ * Collect the UUID references a recipe-item definition can match against — the union
+ * of its `sourceUuid` (the registered live document), `sourceItemUuid` (the canonical
+ * compendium/source uuid), and any `fallbackItemIds`. Mirrors
+ * {@link getComponentSourceReferences} so a recipe item claims the same breadth of
+ * source refs a component does (match on everything; craft spawns from `sourceUuid`).
+ *
+ * @param {object|null} definition - Recipe-item definition with source UUID fields
+ * @returns {string[]} Unique UUID references
+ */
+export function getRecipeItemSourceReferences(definition) {
+  return getComponentSourceReferences(definition);
+}
+
+/**
+ * Resolve which recipe-item definition an item IS, and by how durable a link.
+ *
+ * This is the single shared matcher for recipe items, mirroring
+ * {@link itemMatchesComponentSource}'s durable-flag-first split. It evaluates four
+ * tiers in strict precedence order — the FIRST tier that yields any matching
+ * definition wins and there is NO fall-through to a lower tier:
+ *
+ *   1. `identity`   — `flags.fabricate.recipeItemDefinitionId === def.id` (the
+ *                     durable, transferable identity-of-record; survives Foundry's
+ *                     transitive `_stats.duplicateSource` template chaining).
+ *   2. `uuid`       — `item.uuid === def.sourceItemUuid` (the item IS the source).
+ *   3. `compendium` — `getSourceUuid(item) === def.sourceItemUuid` (compendium
+ *                     provenance; a pack copy of the registered source).
+ *   4. `duplicate`  — `getDuplicateSourceUuid(item) === def.sourceItemUuid` (a
+ *                     drag/duplicate copy of an un-migrated world-template source).
+ *
+ * There is no clone-gate here, and there must never be one. Foundry stamps
+ * `_stats.duplicateSource` on EVERY non-compendium drag-drop, so every legitimate
+ * actor-owned copy carries it: a player's copy of a compendium-imported book holds both
+ * an inherited `_stats.compendiumSource` (real provenance, tier 3) and a
+ * `_stats.duplicateSource` (tier 4). Treating "has a duplicateSource" as "is a suspect
+ * clone" here would misclassify every owned copy and refuse to resolve it through its
+ * legitimate compendium source, breaking the common hand-a-player-a-copy case. The
+ * clone-gate is a REGISTRATION and world/pack source-repair rule ONLY — it decides which
+ * refs a duplicated SOURCE item contributes so a registered duplicate becomes its own
+ * definition instead of overwriting the original — and it must never reach this matcher
+ * or the repair of actor-owned copies. A future reader who "simplifies" the two paths
+ * into one gate reintroduces issue 555.
+ *
+ * @param {Item|object|null} item - Item-like object with `uuid`, source metadata, and `getFlag`
+ * @param {Array<object>|null} definitions - Candidate recipe-item definitions
+ * @returns {{definition: object|null, tier: ('identity'|'uuid'|'compendium'|'duplicate'|null)}}
+ */
+export function matchRecipeItemDefinition(item, definitions) {
+  const empty = { definition: null, tier: null };
+  if (!item || typeof item !== 'object') return empty;
+  const defs = Array.isArray(definitions) ? definitions : [];
+  if (defs.length === 0) return empty;
+
+  const flagValue = getFabricateFlag(item, 'recipeItemDefinitionId', null);
+  const uuid = typeof item.uuid === 'string' ? item.uuid : null;
+  const compendium = getSourceUuid(item);
+  const duplicate = getDuplicateSourceUuid(item);
+
+  // Tiers 2/3/4 test membership in the definition's UNION of source refs (its
+  // `sourceUuid` + `sourceItemUuid` + fallbacks), so a compendium-imported book
+  // resolves whether the owned copy was dragged from the compendium item or the
+  // imported world item. Tier 1 (the durable flag) still wins outright.
+  const refSets = new Map(defs.map((def) => [def, new Set(getRecipeItemSourceReferences(def))]));
+  const predicates = {
+    identity: (def) => flagValue != null && def?.id != null && String(def.id) === String(flagValue),
+    uuid: (def) => uuid != null && refSets.get(def).has(uuid),
+    compendium: (def) => compendium != null && refSets.get(def).has(compendium),
+    duplicate: (def) => duplicate != null && refSets.get(def).has(duplicate),
+  };
+
+  for (const tier of RECIPE_ITEM_MATCH_TIERS) {
+    const definition = defs.find(predicates[tier]);
+    if (definition) return { definition, tier };
+  }
+  return empty;
+}
+
+/**
+ * Whether an item matches any of the given recipe-item definitions, by any tier.
+ * The boolean companion to {@link matchRecipeItemDefinition}.
+ *
+ * @param {Item|object|null} item
+ * @param {Array<object>|null} definitions
+ * @returns {boolean}
+ */
+export function itemMatchesRecipeItemSource(item, definitions) {
+  return matchRecipeItemDefinition(item, definitions).definition != null;
+}
+
+/**
  * Find an existing actor item that should stack with a freshly-awarded source —
  * i.e. one that shares a source-UUID reference with `source` AND carries a
  * `system.quantity` field (so it can be incremented). Items without a quantity

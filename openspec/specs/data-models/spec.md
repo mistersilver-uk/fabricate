@@ -522,7 +522,13 @@ RecipeItemDefinition = {
   name: string,
   img: string,
   description?: string,
-  sourceItemUuid: string,
+
+  // Union of source references, mirroring Component (issue 555). Match on the union;
+  // recipe items spawn no output, so there is no "spawn from" field. Existing
+  // definitions carry only sourceItemUuid and are never recomputed.
+  sourceUuid: string | null,         // the registered live document uuid
+  sourceItemUuid: string,            // the canonical compendium/source uuid (identity-of-record: the durable flag)
+  fallbackItemIds: string[],         // default []; broken-canonical-source fallbacks
 
   // Canonical recipe↔book membership (issue 511, PR-B). Many-to-many: a recipe may
   // belong to several books, and a book may contain several recipes. This inverts the
@@ -578,6 +584,9 @@ RecipeItemDefinition = {
 1. `sourceItemUuid` points to the canonical world or compendium item template used for recipe-item matching.
 2. New recipe item definitions are created from dropped or selected Foundry items; manual UUID entry is not part of the canonical UI flow.
 3. If the source template later becomes unresolved, the stored `sourceItemUuid` is retained and the definition becomes stale-but-readable.
+A recipe item records the same union of source references a component does — `sourceUuid` (the registered live document), `sourceItemUuid` (the canonical compendium/source uuid), and `fallbackItemIds` (issue 555) — so a compendium-imported book resolves owned copies dragged from either the compendium item or the imported world item.
+The durable `flags.fabricate.recipeItemDefinitionId` on the source Item is the identity-of-record; `sourceItemUuid` is a best-effort source pointer, is never recomputed for an existing definition, and `sourceUuid` defaults to it when absent.
+See **Recipe Item Identity → Registration Source Identity** for the clone-gate and stamping rules.
 4. `recipeIds[]` is the **canonical** recipe↔book membership (issue 511, PR-B): it is many-to-many, so a book may contain several recipes and a recipe may belong to several books.
 This is the canonical way to model shared formulas, books, schematics, or recipe scrolls.
 The scalar reverse ref `recipe.recipeItemId` (and the legacy `recipe.linkedRecipeItemUuid` book alias) is removed by the `1.13.0` migration, which inverts it onto `recipeIds`; membership is authored book-side on the Contents tab, and the runtime falls back to the legacy reverse ref only for a fully un-migrated system (no book carries `recipeIds` yet).
@@ -814,14 +823,39 @@ Define matching between a recipe's system-managed recipe item definition and own
 
 ### Match Rule
 
-A candidate owned item matches when either condition is true:
-
-1. `ownedItem.uuid === recipeItemDefinition.sourceItemUuid`
-2. `ownedItem._stats.compendiumSource === recipeItemDefinition.sourceItemUuid`
-3. `ownedItem.flags.core.sourceId === recipeItemDefinition.sourceItemUuid` (legacy fallback)
-
+A candidate owned item is matched through the shared four-tier matcher defined in the recipe-visibility spec (**Recipe Item Matching**): the durable `flags.fabricate.recipeItemDefinitionId` identity flag first (tier 1), then membership in the definition's union of source references (`sourceUuid` + `sourceItemUuid` + `fallbackItemIds`) by the candidate's own uuid (tier 2), compendium source (tier 3), or transitive `_stats.duplicateSource` (tier 4).
+The first tier that yields a match wins, with no fall-through.
 Foundry v12+ uses `_stats.compendiumSource`; Foundry v11 and earlier used `flags.core.sourceId`.
-Runtime implementations should call the shared source UUID resolver defined in `006-recipe-visibility.md`.
+Runtime implementations call the shared source UUID resolver and the shared matcher; they must not re-implement it.
+
+### Registration Source Identity
+
+At registration (both recipe items and components), a definition's `sourceItemUuid` is a best-effort source POINTER; the durable flag (`recipeItemDefinitionId` for recipe items, `componentId` for components) is the identity-OF-RECORD.
+
+- A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
+A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
+So a registered duplicate becomes a NEW definition or component instead of overwriting the original.
+- This clone-gate is a REGISTRATION and source-repair rule only.
+It must never reach the runtime matcher: an actor-owned drag copy also carries `_stats.duplicateSource`, but its `compendiumSource` is legitimate provenance there (tier 3).
+- Registration stamps the durable flag (overwriting any marker inherited from a duplicated original), strips a clone's stale `_stats.duplicateSource`, and clears a clone's stale `_stats.compendiumSource`.
+- Existing stored `sourceItemUuid` values are never recomputed.
+A recipe item records the same union of source references a component does (`sourceUuid` = the registered live document, `sourceItemUuid` = the canonical compendium/source uuid, `fallbackItemIds` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item.
+
+Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: the second registration is a non-clone whose `compendiumSource` still matches, so find-existing dedups.
+It is cleanly distinguishable from the duplicate case by the absence of `_stats.duplicateSource`.
+
+### Repair and Auto-Stamp
+
+- A primary-GM-gated (`game.users.activeGM?.id === game.user?.id`), idempotent, one-shot `ready`-body pass — keyed by the `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting — stamps `recipeItemDefinitionId` on every registered definition's writable source Item (world items and unlocked-pack items; locked packs skipped), and strips a clone's stale `_stats`.
+This removes the confirmed regression whereby a real registered book and an unregistered duplicate of it are byte-for-byte identical on the matcher's inputs (tier-4 only).
+It is NOT a `MigrationRunner` entry: that runner reads and writes only settings-data payloads and has no Item handle, so it cannot write Item flags.
+- A GM **Repair item data** maintenance action reconciles both kinds across world items, writable packs, and actor-owned items.
+World/pack SOURCE items use the same clone-gated identity (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
+Actor-owned copies use the ordinary four-tier matcher (no clone-gate).
+For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by a globally-unique, exact (case/whitespace-normalized) name match to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions anywhere is skipped as ambiguous.
+A flagged owned copy is authoritative and left untouched, and repair never triggers a learn.
+- Cross-system shared source (two systems each owning a definition with the same `sourceItemUuid`) keeps a single flag: last writer wins, and the other system's copies fall to tier 4 (their bulk auto-learn refused by the confidence gate, while explicit learn and display still work).
+This is a documented, tested limitation.
 
 ### Match Context Contract
 

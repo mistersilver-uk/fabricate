@@ -282,6 +282,54 @@ The "Craftable only" filter will include the recipe once all required items are 
 
 ---
 
+## Repairing Item Data
+
+Fabricate can reconcile the items behind your crafting components and recipe items so copies in players' inventories match reliably.
+This is the **Repair Item Data** maintenance action.
+
+**Where to find it:** Open Foundry's **Game Settings**, choose **Configure Settings**, and open the **Fabricate** module settings (the same panel as the theme selector).
+Click **Repair Item Data** and confirm.
+The action is available to GMs only.
+
+**What it does:**
+
+- It scans your world items, your unlocked compendiums, and every actor's inventory.
+- It tags each component and each recipe item (book or scroll) source with a durable identity link, so future copies always resolve to the right one.
+- It clears misleading duplicate-source metadata that a copied item inherited from the item it was copied from.
+- It re-points an owned copy that a duplicate mislabelled, but only when the copy's name clearly identifies a single book or scroll.
+- Locked (system and module) compendiums are skipped, because Fabricate cannot write to them.
+- It never teaches or removes a recipe.
+  It only repairs how items are identified.
+
+After it runs, Fabricate reports how many items were tagged, cleaned, unlinked, and re-pointed.
+When a copy's name matched more than one book or scroll, it is left as-is and counted separately, with a note to fix it by hand.
+
+**When to run it:**
+
+- After updating to a version of Fabricate that added durable item identity, if players hold copies that were duplicated in an older world.
+- When a player's duplicated copy of a book or scroll shows the wrong title in their inventory, or auto-learned the wrong recipes when it was dropped on the actor.
+- When a duplicated component is confused with the item it was copied from.
+- After you duplicate items to author new content in a world that predates the durable identity.
+
+**What it cannot fix:**
+
+- **A copy that can no longer be identified.**
+  If a copy was duplicated before the fix, and its only remaining link points at a different book or scroll, Fabricate can re-point it only when its name uniquely matches one book or scroll.
+  When the name matches more than one, or matches none, the copy is left untouched.
+  Delete that copy and drag a fresh one from the correct source item to restore it.
+- **A book, scroll, or component whose original details were already overwritten.**
+  In older versions, registering a duplicate of a compendium-linked item could overwrite the original entry's own name, image, and description with the duplicate's.
+  Those original details are gone and cannot be reconstructed.
+  The repair flags the affected entry so you can spot it, but you must restore its name, image, description, and linked recipes by hand, or re-import it from a backup or its compendium.
+
+The repair scans the actors in your world's Actors directory.
+It does not reach unlinked token copies that were never saved as world actors, or actors stored inside a compendium.
+
+**See also:** [Visibility & Knowledge]({% link visibility.md %}#duplicating-a-book-or-scroll) covers duplicating books and scrolls as an authoring workflow.
+[Crafting Systems]({% link crafting-systems.md %}#adding-components) covers duplicating items to author components.
+
+---
+
 ## Crafting App Fails to Open
 
 **Symptom:** Clicking **Craft Item** from the Items sidebar does nothing, or the Crafting App opens briefly then closes.

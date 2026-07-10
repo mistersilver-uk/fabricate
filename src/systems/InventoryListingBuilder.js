@@ -27,7 +27,7 @@ import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../ui/svelte/util/craftingImageDefaults.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
-import { getItemSourceReferences } from '../utils/sourceUuid.js';
+import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 
@@ -605,22 +605,15 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * Resolve the recipe-item definition an owned item matches, mirroring the
-   * runtime learn matcher (`RecipeVisibilityService._isMatchingRecipeItem`): a
-   * definition matches when the definition's `sourceItemUuid` is among the item's
-   * source references — its live uuid, compendium source, or `_stats.duplicateSource`.
-   * The duplicate-source reference is essential: a book dragged from a world
-   * template carries the link only there, and source-uuid-only matching misses it.
+   * Resolve the recipe-item definition an owned item matches, through the one shared
+   * four-tier matcher (`matchRecipeItemDefinition`) that the runtime
+   * `RecipeVisibilityService` also consumes — durable `recipeItemDefinitionId` flag
+   * first, then own uuid, then compendium source, then `_stats.duplicateSource`.
+   * Routing both consumers through the single matcher keeps them from drifting.
    * @private
    */
   _matchRecipeItemDefinition(item, definitions) {
-    if (!item) return null;
-    const refs = getItemSourceReferences(item);
-    if (refs.length === 0) return null;
-    for (const def of definitions) {
-      if (def?.sourceItemUuid && refs.includes(def.sourceItemUuid)) return def;
-    }
-    return null;
+    return matchRecipeItemDefinition(item, definitions).definition;
   }
 
   /**

@@ -2750,3 +2750,111 @@ test('PREREQ - a dangling Required Knowledge id (deleted recipe) fails open (iss
   const result = await service.learnRecipeFromOwnedBook({ recipe: advancedRecipe, craftingActor: actor });
   assert.equal(result.success, true, 'a deleted prerequisite recipe does not brick the book');
 });
+
+// ---------------------------------------------------------------------------
+// Issue 555 — R5 tier-4-only bulk auto-learn refusal + R6 cap resolution
+// ---------------------------------------------------------------------------
+
+test('555 R5 - bulk auto-learn REFUSES a recipe whose owned item matches only via tier 4 (duplicateSource)', () => {
+  const system = buildUncappedLearnSystem({ consumeOnLearn: false });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.copy' });
+  // Tier-4 ONLY: no durable flag, no compendium source, just a transitive duplicateSource.
+  item._stats = { duplicateSource: 'Compendium.world.items.book' };
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const preview = service.previewOwnedItemLearning({ ownedItem: item, actor, mode: 'auto' });
+  assert.equal(preview.matchedRecipes.length, 0, 'a tier-4-only match is refused in the bulk auto path');
+});
+
+test('555 R5 - bulk auto-learn GRANTS a tier-1 flagged item', () => {
+  const system = buildUncappedLearnSystem({ consumeOnLearn: false });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const item = new FakeItem({
+    uuid: 'Actor.a1.Item.copy',
+    flagsArg: { fabricate: { recipeItemDefinitionId: 'book' } }
+  });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const preview = service.previewOwnedItemLearning({ ownedItem: item, actor, mode: 'auto' });
+  assert.equal(preview.learnedRecipes.length, 1, 'a tier-1 flagged item still auto-learns');
+});
+
+test('555 R5 - bulk auto-learn GRANTS a tier-3 compendium-source item', () => {
+  const system = buildUncappedLearnSystem({ consumeOnLearn: false });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.copy', compendiumSource: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const preview = service.previewOwnedItemLearning({ ownedItem: item, actor, mode: 'auto' });
+  assert.equal(preview.learnedRecipes.length, 1, 'a tier-3 compendium item still auto-learns');
+});
+
+test('555 R5 - the item-sheet picker (mode manual) STILL resolves a tier-4 match', () => {
+  const system = buildCappedSystem({ maxRecipes: 3 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.copy' });
+  item._stats = { duplicateSource: 'Compendium.world.items.book' };
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const state = service.getLearnableRecipesFromItem({ ownedItem: item, actor });
+  assert.ok(state.recipes.some((r) => r.id === 'r-a'), 'tier 4 still resolves for the manual picker');
+});
+
+test('555 R6b - _matchDefinitionForItem: a SUPPLIED item matching no member definition yields null (uncapped)', () => {
+  const system = buildCappedSystem({ maxRecipes: 2 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const service = buildService({ system, recipes: [recipe] });
+  const item = new FakeItem({ uuid: 'Item.unrelated' }); // matches no member definition
+  assert.equal(service._matchDefinitionForItem(recipe, item), null);
+});
+
+test('555 R6b - _matchDefinitionForItem: an ABSENT item still yields the first member definition', () => {
+  const system = buildCappedSystem({ maxRecipes: 2 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const service = buildService({ system, recipes: [recipe] });
+  const def = service._matchDefinitionForItem(recipe, null);
+  assert.equal(def?.id, 'book', 'item == null falls back to defs[0]');
+});
+
+// A recipe linked only by the legacy `linkedRecipeItemUuid` — an un-migrated book, or a
+// standalone alchemy formula item — resolves through the synthetic entry built by
+// `_recipeItemMatchDefinitions`, which carries `id: null`. It has no registered definition,
+// so `autoStampRecipeItemSources` can never stamp its source and tier 1 is unreachable.
+// Refusing its tier-4 match would disable on-drop learning permanently, not until R3 runs.
+function buildLegacyLinkedRecipe(uuid) {
+  return buildMockRecipe({ id: 'r-legacy', recipeItemId: null, linkedRecipeItemUuid: uuid });
+}
+
+test('555 R5 - bulk auto-learn GRANTS a legacy `linkedRecipeItemUuid` recipe matched at tier 4', () => {
+  const system = buildUncappedLearnSystem({ consumeOnLearn: false });
+  const recipe = buildLegacyLinkedRecipe('Item.formula');
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.copy' });
+  // A world-template drag: duplicateSource is the only surviving link, and no flag is possible.
+  item._stats = { duplicateSource: 'Item.formula' };
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const preview = service.previewOwnedItemLearning({ ownedItem: item, actor, mode: 'auto' });
+  assert.equal(
+    preview.matchedRecipes.length,
+    1,
+    'a definition-less legacy link must still auto-learn: the auto-stamp cannot rescue it'
+  );
+});
+
+test('555 R5 - the tier-4 refusal still applies to a REGISTERED definition', () => {
+  const system = buildUncappedLearnSystem({ consumeOnLearn: false });
+  const recipe = buildCappedRecipe({ id: 'r-a' }); // member of the registered `book` definition
+  const item = new FakeItem({ uuid: 'Actor.a1.Item.copy' });
+  item._stats = { duplicateSource: 'Compendium.world.items.book' };
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const preview = service.previewOwnedItemLearning({ ownedItem: item, actor, mode: 'auto' });
+  assert.equal(preview.matchedRecipes.length, 0, 'a registered book is still refused at tier 4');
+});

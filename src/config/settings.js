@@ -32,7 +32,16 @@ export const SETTING_KEYS = Object.freeze({
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
   INTERACTION_PROMPT_POSITION: 'interactionPromptPosition',
+  // Issue 555: version stamp for the one-shot primary-GM recipe-item durable-flag
+  // backfill. Bumped past `RECIPE_ITEM_FLAG_STAMP_TARGET` once the pass has run so it
+  // never repeats.
+  RECIPE_ITEM_FLAG_STAMP_VERSION: 'recipeItemFlagStampVersion',
 });
+
+// The target version for the one-shot recipe-item flag auto-stamp. When the stored
+// `RECIPE_ITEM_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once
+// on `ready` and writes this value back.
+export const RECIPE_ITEM_FLAG_STAMP_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.RECIPES]: {
@@ -179,6 +188,13 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: String,
     default: '',
+  },
+  [SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION]: {
+    name: 'Recipe Item Flag Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
   },
 });
 
