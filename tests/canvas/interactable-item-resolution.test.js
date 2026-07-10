@@ -1,8 +1,10 @@
 /**
  * Fix 4 — `resolveItemUuidToTool`: map a dropped Foundry Item uuid to a
- * crafting-system Tool by matching the item against each tool's managed-component
- * source refs (reusing `itemMatchesComponentSource`). Pure + injected fakes; no
- * live Foundry. Also covers the `classifyInteractableDrop` Tier-2 integration.
+ * crafting-system Tool by resolving the item to the single component it IS through
+ * the list-aware, system-scoped `resolveComponentForItem`, then matching the tool
+ * whose componentId equals the resolved id. Pure + injected fakes; no live Foundry.
+ * Also covers the `classifyInteractableDrop` Tier-2 integration and the issue-559
+ * durable-identity guard.
  */
 
 import test from 'node:test';
@@ -18,6 +20,22 @@ function systemWith({ id, tools, components }) {
 
 // World item with a uuid that a component claims as its source.
 const AXE_ITEM = { uuid: 'Item.axe-1', _stats: { compendiumSource: 'Compendium.world.tools.Item.axe-src' } };
+
+// A dropped item carrying a durable `flags.fabricate.roles` identity (and optional
+// raw refs), beside AXE_ITEM which has no getFlag. Mirrors getFabricateFlag's
+// 'fabricate.<key>' normalization.
+function droppedItemWithComponentFlag({ uuid, roles, componentId, duplicateSource, compendiumSource } = {}) {
+  return {
+    uuid,
+    _stats: { compendiumSource: compendiumSource ?? null, duplicateSource: duplicateSource ?? null },
+    getFlag(scope, key) {
+      if (scope !== 'fabricate') return undefined;
+      if (key === 'fabricate.roles') return roles;
+      if (key === 'fabricate.componentId') return componentId;
+      return undefined;
+    }
+  };
+}
 
 function getSystems() {
   return [
@@ -43,7 +61,7 @@ test('matches a dropped item to a tool by the tool component source ref', () => 
   assert.deepEqual(match, { systemId: 'sysA', toolId: 'tool-axe' });
 });
 
-test('matches via the compendium source-uuid chain (itemMatchesComponentSource reuse)', () => {
+test('matches via the compendium source-uuid chain (resolveComponentForItem raw-ref tier)', () => {
   // The component claims the item's compendium source rather than its live uuid.
   const systems = [systemWith({
     id: 'sysB',
@@ -55,6 +73,32 @@ test('matches via the compendium source-uuid chain (itemMatchesComponentSource r
     getSystems: () => systems
   });
   assert.deepEqual(match, { systemId: 'sysB', toolId: 'tool-axe' });
+});
+
+test('A3 - #559: a dropped item whose durable identity names a DIFFERENT component is not resolved to a Tool via an inherited duplicateSource', () => {
+  // The system has the tool's component (comp-axe, source Item.axe-src) and an unrelated
+  // comp-other. The dropped item carries roles naming comp-other AND a duplicateSource
+  // resolving to comp-axe's source. On origin/main the flag-blind raw-ref fall-through
+  // matches comp-axe via duplicateSource and spawns the Woodaxe tile — the bug. After the
+  // fix the resolver reads roles, resolves comp-other, and the drop is left to Foundry.
+  const systems = [systemWith({
+    id: 'sysA',
+    components: [
+      { id: 'comp-axe', sourceItemUuid: 'Item.axe-src' },
+      { id: 'comp-other', sourceItemUuid: 'Item.other-src' }
+    ],
+    tools: [{ id: 'tool-axe', componentId: 'comp-axe' }]
+  })];
+  const dropped = droppedItemWithComponentFlag({
+    uuid: 'Item.dropped',
+    duplicateSource: 'Item.axe-src', // overlaps the tool component's source ref
+    roles: { sysA: { componentId: 'comp-other' } }
+  });
+  const match = resolveItemUuidToTool('Item.dropped', {
+    resolveItem: () => dropped,
+    getSystems: () => systems
+  });
+  assert.equal(match, null);
 });
 
 test('returns null when no tool component matches the item', () => {

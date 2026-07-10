@@ -24,11 +24,14 @@ const {
   getItemIdentityReferences,
   getComponentSourceReferences,
   getRecipeItemSourceReferences,
-  itemMatchesComponentSource,
+  resolveComponentForItem,
+  itemResolvesToComponent,
   matchRecipeItemDefinition,
   itemMatchesRecipeItemSource,
   findStackableMatch
 } = await import('../src/utils/sourceUuid.js');
+
+const { component, componentSet, roleItem } = await import('./helpers/componentIdentityFixtures.js');
 
 // An item-like object whose `getFlag` returns the durable recipe-item flag, mirroring
 // how getFabricateFlag normalizes 'recipeItemDefinitionId' -> 'fabricate.recipeItemDefinitionId'.
@@ -115,18 +118,17 @@ test('10 - getComponentSourceReferences includes sourceUuid, sourceItemUuid, and
   ]);
 });
 
-test('11 - itemMatchesComponentSource matches canonical sourceItemUuid when live uuid differs', () => {
+test('11 - resolveComponentForItem matches canonical sourceItemUuid when live uuid differs (raw-ref tier)', () => {
   const item = {
     uuid: 'Item.actor-owned-2',
     _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
     flags: {}
   };
-  const component = {
+  const ironOre = component('comp-iron', {
     sourceUuid: 'Compendium.world.items.iron-ore-live',
-    sourceItemUuid: 'Compendium.source.items.iron-ore',
-    fallbackItemIds: []
-  };
-  assert.equal(itemMatchesComponentSource(item, component), true);
+    sourceItemUuid: 'Compendium.source.items.iron-ore'
+  });
+  assert.equal(resolveComponentForItem(item, [ironOre], 'sysA'), ironOre);
 });
 
 test('12 - getDuplicateSourceUuid reads item._stats.duplicateSource', () => {
@@ -166,32 +168,35 @@ test('16 - getItemSourceReferences includes duplicateSource as a third reference
   ]);
 });
 
-test('17 - itemMatchesComponentSource matches a duplicate-source-only item via sourceItemUuid', () => {
+test('17 - resolveComponentForItem matches a duplicate-source-only item via sourceItemUuid (raw-ref tier)', () => {
   const item = {
     uuid: 'Item.actor-drag-copy',
     _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
     flags: {}
   };
-  const component = {
+  const pick = component('comp-pick', {
     sourceUuid: 'Compendium.world.items.pick-live',
-    sourceItemUuid: 'Item.world-pick',
-    fallbackItemIds: []
-  };
-  assert.equal(itemMatchesComponentSource(item, component), true);
+    sourceItemUuid: 'Item.world-pick'
+  });
+  assert.equal(resolveComponentForItem(item, [pick], 'sysA'), pick);
 });
 
-test('18 - itemMatchesComponentSource does NOT match on flags.fabricate.mythwrightId alone', () => {
+test('18 - resolveComponentForItem does NOT produce identity from an irrelevant flags.fabricate.mythwrightId (negative guard)', () => {
   const item = {
     uuid: 'Item.actor-seeded',
     _stats: {},
-    flags: { fabricate: { mythwrightId: 'mw-pick' } }
+    flags: { fabricate: { mythwrightId: 'mw-pick' } },
+    // An unrelated third-party flag: getFabricateFlag('roles'/'componentId') must miss.
+    getFlag: (scope, key) =>
+      scope === 'fabricate' && key === 'fabricate.mythwrightId' ? 'mw-pick' : undefined
   };
-  const component = {
+  const pick = component('comp-pick', {
     sourceUuid: 'Compendium.world.items.pick-live',
-    sourceItemUuid: 'Item.world-pick',
-    fallbackItemIds: []
-  };
-  assert.equal(itemMatchesComponentSource(item, component), false);
+    sourceItemUuid: 'Item.world-pick'
+  });
+  // No roles, no legacy scalar, no overlapping raw refs ⇒ no match.
+  assert.equal(resolveComponentForItem(item, [pick], 'sysA'), null);
+  assert.equal(itemResolvesToComponent(item, pick, [pick], 'sysA'), false);
 });
 
 test('19 - findStackableMatch: returns an existing quantity item sharing the source uuid', () => {
@@ -223,6 +228,74 @@ test('21 - findStackableMatch: no match when source refs do not overlap', () => 
 test('22 - findStackableMatch: empty source refs never match (no false positives)', () => {
   const items = [{ uuid: 'Item.x', system: { quantity: 1 } }];
   assert.equal(findStackableMatch(items, {}), null);
+});
+
+// findStackableMatch durable-identity guard (issue 556). Tests 19-22 above are the
+// documented 2-arg degrade (B7): resolver returns null on both sides ⇒ pure raw-ref.
+
+test('A2 - findStackableMatch does NOT fold an award into a candidate resolving to a DIFFERENT component (both source shapes)', () => {
+  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const compB = component('comp-b', { sourceItemUuid: 'Item.b-src' });
+  const components = [compA, compB];
+  // The candidate resolves to compB (roles) but shares the award source's raw ref via a
+  // transitive duplicateSource. On origin/main (raw-ref only) the award folds into it —
+  // the bug. After the fix the differing identities skip it.
+  const candidate = roleItem({
+    uuid: 'Item.owned-b',
+    duplicateSource: 'Item.award-src',
+    roles: { sysA: { componentId: 'comp-b' } },
+    quantity: 4
+  });
+
+  // Foundry-Item award source resolving to compA. Trap: its Foundry .id collides with
+  // the candidate's claimed id (comp-b) — that is NOT identity agreement.
+  const itemSource = roleItem({
+    uuid: 'Item.award-src',
+    roles: { sysA: { componentId: 'comp-a' } }
+  });
+  itemSource.id = 'comp-b';
+  assert.equal(findStackableMatch([candidate], itemSource, components, 'sysA'), null);
+
+  // Bare-component award source (its identity is itself, compA).
+  assert.equal(findStackableMatch([candidate], compA, components, 'sysA'), null);
+});
+
+test('B3 - findStackableMatch still stacks on a shared raw ref when identities agree or are absent (both source shapes)', () => {
+  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const components = [compA];
+  // Identity agreement: candidate resolves to compA and shares a raw ref.
+  const agreeing = roleItem({
+    uuid: 'Item.owned-a',
+    compendiumSource: 'Item.a-src',
+    roles: { sysA: { componentId: 'comp-a' } },
+    quantity: 2
+  });
+  assert.equal(findStackableMatch([agreeing], compA, components, 'sysA'), agreeing);
+
+  // Flagless candidate: it resolves to compA only via the raw-ref tier (its
+  // duplicateSource), agreeing with the source ⇒ the shared raw ref stacks it.
+  const flagless = {
+    uuid: 'Item.owned-flagless',
+    _stats: { duplicateSource: 'Item.a-src' },
+    flags: {},
+    system: { quantity: 3 }
+  };
+  const itemSource = roleItem({ uuid: 'Item.a-src', roles: { sysA: { componentId: 'comp-a' } } });
+  assert.equal(findStackableMatch([flagless], itemSource, components, 'sysA'), flagless);
+});
+
+test('B4 - findStackableMatch does NOT stack a correct-identity candidate with zero ref overlap (a new document is created)', () => {
+  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  // Candidate resolves to compA (agreement) but shares NO raw ref with the source, so
+  // the raw-ref positive signal is absent and nothing stacks.
+  const candidate = roleItem({
+    uuid: 'Item.owned-a',
+    compendiumSource: 'Item.unrelated',
+    roles: { sysA: { componentId: 'comp-a' } },
+    quantity: 2
+  });
+  const itemSource = roleItem({ uuid: 'Item.a-src', roles: { sysA: { componentId: 'comp-a' } } });
+  assert.equal(findStackableMatch([candidate], itemSource, [compA], 'sysA'), null);
 });
 
 test('23 - getItemIdentityReferences returns uuid and compendium source, EXCLUDING duplicateSource', () => {
@@ -264,43 +337,135 @@ test('26 - getItemIdentityReferences returns [] for null/non-object', () => {
   assert.deepEqual(getItemIdentityReferences('Item.x'), []);
 });
 
-// flags.fabricate.componentId short-circuit — a transferable link that survives
-// Foundry's transitive _stats.duplicateSource template chaining.
+// ---------------------------------------------------------------------------
+// resolveComponentForItem — list-aware, system-scoped, per-system `roles` map +
+// legacy-scalar identity tiers with a raw-reference fall-through.
+// ---------------------------------------------------------------------------
 
-function itemWithComponentFlag(componentId, extra = {}) {
-  return {
+test('27 - resolveComponentForItem matches on the legacy scalar flags.fabricate.componentId even when source UUIDs differ', () => {
+  // A restamp not yet run: identity carried by the legacy scalar. The scalar has no
+  // system, so it stays list-aware — it names a component in the set.
+  const item = roleItem({
     uuid: 'Item.actor-templated',
-    _stats: { duplicateSource: 'Item.some-template' },
-    flags: { fabricate: { componentId } },
-    // getFabricateFlag normalizes 'componentId' -> 'fabricate.componentId'
-    getFlag(scope, key) {
-      if (scope === 'fabricate' && key === 'fabricate.componentId') return componentId;
-      return undefined;
-    },
-    ...extra
-  };
-}
-
-test('27 - itemMatchesComponentSource matches on flags.fabricate.componentId even when source UUIDs differ', () => {
-  const item = itemWithComponentFlag('comp-abc');
-  const component = {
-    id: 'comp-abc',
+    duplicateSource: 'Item.some-template',
+    componentId: 'comp-abc'
+  });
+  const abc = component('comp-abc', {
     sourceUuid: 'Item.component-source',
-    sourceItemUuid: 'Item.component-source',
-    fallbackItemIds: []
-  };
-  assert.equal(itemMatchesComponentSource(item, component), true);
+    sourceItemUuid: 'Item.component-source'
+  });
+  assert.equal(resolveComponentForItem(item, [abc], 'sysA'), abc);
 });
 
-test('28 - itemMatchesComponentSource does NOT match a different componentId flag', () => {
-  const item = itemWithComponentFlag('comp-other');
-  const component = {
-    id: 'comp-abc',
-    sourceUuid: 'Item.component-source',
-    sourceItemUuid: 'Item.component-source',
-    fallbackItemIds: []
-  };
-  assert.equal(itemMatchesComponentSource(item, component), false);
+test('A1 - within-system exclusivity: a roles-flagged item whose duplicateSource overlaps a sibling resolves to its flagged component ONLY', () => {
+  // (Migrated from the vacuous committed test 28.) On origin/main the matcher reads
+  // only the scalar and falls through to the raw-ref tier, which matches sibling Y via
+  // the transitive duplicateSource — the bug. The resolver reads roles and returns X.
+  const compX = component('comp-x', { sourceItemUuid: 'Item.x-src' });
+  const compY = component('comp-y', { sourceItemUuid: 'Item.y-src' });
+  const item = roleItem({
+    uuid: 'Item.actor-templated',
+    duplicateSource: 'Item.y-src', // overlaps sibling Y's source ref
+    roles: { sysA: { componentId: 'comp-x' } }
+  });
+  assert.equal(resolveComponentForItem(item, [compX, compY], 'sysA'), compX);
+  assert.equal(itemResolvesToComponent(item, compY, [compX, compY], 'sysA'), false);
+});
+
+test('A0-map - roles map is the sole identity: refs decoupled from the flagged component still resolve to it', () => {
+  // Identity carried SOLELY by roles; the item's raw refs do NOT overlap compA. On
+  // origin/main the matcher cannot read roles and the decoupled refs miss ⇒ null.
+  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const item = roleItem({
+    uuid: 'Item.decoupled',
+    compendiumSource: 'Item.unrelated',
+    roles: { sysA: { componentId: 'comp-a' } }
+  });
+  assert.equal(resolveComponentForItem(item, [compA], 'sysA'), compA);
+});
+
+test('A4 - read-side cross-system: one source registered in two systems resolves to the right component in EACH (map load-bearing, no scalar)', () => {
+  // roles names compA under sysA and compB under sysB; refs decoupled from both; NO
+  // legacy scalar (post-restamp). Both halves fail on main (decoupled refs, no scalar).
+  const sysA = componentSet('sysA', [component('comp-a', { sourceItemUuid: 'Item.a-src' })]);
+  const sysB = componentSet('sysB', [component('comp-b', { sourceItemUuid: 'Item.b-src' })]);
+  const item = roleItem({
+    uuid: 'Item.shared-source',
+    compendiumSource: 'Item.unrelated',
+    roles: { sysA: { componentId: 'comp-a' }, sysB: { componentId: 'comp-b' } }
+  });
+  assert.equal(resolveComponentForItem(item, sysA.components, sysA.id).id, 'comp-a');
+  assert.equal(resolveComponentForItem(item, sysB.components, sysB.id).id, 'comp-b');
+});
+
+test('A6 - systemId keying defeats copy-import id-collision: same component id in two systems resolves per system', () => {
+  // Both systems own a DIFFERENT-source component with id comp-5 (copy-import id reuse).
+  // The item's roles names comp-5 ONLY under sysA; refs decoupled. It must resolve to
+  // sysA's comp-5 and NOT sysB's. The sysB half additionally defeats any systemId-free
+  // or union-over-roles-values resolver.
+  const sysA = componentSet('sysA', [component('comp-5', { sourceItemUuid: 'Item.a5-src' })]);
+  const sysB = componentSet('sysB', [component('comp-5', { sourceItemUuid: 'Item.b5-src' })]);
+  const item = roleItem({
+    uuid: 'Item.decoupled',
+    compendiumSource: 'Item.unrelated',
+    roles: { sysA: { componentId: 'comp-5' } }
+  });
+  assert.equal(resolveComponentForItem(item, sysA.components, 'sysA'), sysA.components[0]);
+  assert.equal(resolveComponentForItem(item, sysB.components, 'sysB'), null);
+});
+
+test('B2 - flag-irrelevant item still matches on raw refs (including via duplicateSource)', () => {
+  // No roles, no scalar — a pre-#555 unstamped world. The raw-ref fall-through is
+  // load-bearing and unchanged. Green both ways.
+  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const item = { uuid: 'Item.owned', _stats: { duplicateSource: 'Item.a-src' }, flags: {} };
+  assert.equal(resolveComponentForItem(item, [compA], 'sysA'), compA);
+});
+
+test('B5 - hygiene tier: an empty or nullish roles[sys] never yields identity, even against a nullish-id component', () => {
+  // {} or { componentId: null } (a restamp interrupted midway) must be NO identity,
+  // tested before the membership check. Guards the hygiene tier before #561 adds toolId.
+  const nullishIdComp = component(undefined, { sourceItemUuid: 'Item.other-src' });
+  const emptyRoles = roleItem({ uuid: 'Item.mid-restamp', roles: { sysA: {} } });
+  const nullComponentId = roleItem({
+    uuid: 'Item.mid-restamp',
+    roles: { sysA: { componentId: null } }
+  });
+  assert.equal(resolveComponentForItem(emptyRoles, [nullishIdComp], 'sysA'), null);
+  assert.equal(resolveComponentForItem(nullComponentId, [nullishIdComp], 'sysA'), null);
+});
+
+test('B6 - scalar multi-system (anti-pairwise guard): item IS compA, legacy scalar = compB, refs overlap compA ⇒ resolves compA under sysA', () => {
+  // Protects against re-introducing the pairwise fail-close (which would flip true→false
+  // for a system whose scalar was overwritten by a later registration in another system).
+  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const item = roleItem({
+    uuid: 'Item.owned',
+    compendiumSource: 'Item.a-src', // raw ref overlaps compA
+    componentId: 'comp-b' // legacy scalar names a component absent from sysA's set
+  });
+  // Scalar comp-b names nothing in [compA] ⇒ fall through to raw refs ⇒ compA.
+  assert.equal(resolveComponentForItem(item, [compA], 'sysA'), compA);
+});
+
+test('B8 - three-system + stale-entry boundary: a claimed id absent from the set under test falls through; a dead-system roles entry is inert', () => {
+  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  // The item's roles names comp-3, which lives only in a THIRD system, absent here; its
+  // refs overlap compA ⇒ fall through to raw refs ⇒ compA.
+  const thirdSystemClaim = roleItem({
+    uuid: 'Item.owned',
+    compendiumSource: 'Item.a-src',
+    roles: { sysC: { componentId: 'comp-3' } }
+  });
+  assert.equal(resolveComponentForItem(thirdSystemClaim, [compA], 'sysA'), compA);
+  // A stale roles entry for a dead system, queried against a live system's set with no
+  // ref overlap, is inert (no match).
+  const staleOnly = roleItem({
+    uuid: 'Item.stale',
+    compendiumSource: 'Item.unrelated',
+    roles: { deadSys: { componentId: 'comp-x' } }
+  });
+  assert.equal(resolveComponentForItem(staleOnly, [compA], 'sysA'), null);
 });
 
 // ---------------------------------------------------------------------------

@@ -2025,7 +2025,7 @@ test('onDropItem integration — compendium pack drop with no system selected sh
 // Transferable component-id flag on the source WORLD item (import stamping)
 // ---------------------------------------------------------------------------
 
-test('addItemFromUuid — stamps flags.fabricate.componentId on a world source item', async () => {
+test('addItemFromUuid — stamps flags.fabricate.roles[sys].componentId on a world source item', async () => {
   const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
 
   const setFlags = [];
@@ -2048,7 +2048,7 @@ test('addItemFromUuid — stamps flags.fabricate.componentId on a world source i
   assert.equal(result.action, 'added');
   assert.equal(setFlags.length, 1, 'the source world item is stamped once');
   assert.equal(setFlags[0].scope, 'fabricate');
-  assert.equal(setFlags[0].key, 'fabricate.componentId');
+  assert.equal(setFlags[0].key, 'fabricate.roles.sys1.componentId');
   assert.equal(setFlags[0].value, result.item.id, 'stamped with the new component id');
 
   globalThis.fromUuid = async () => null;
