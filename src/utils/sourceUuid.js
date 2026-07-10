@@ -131,18 +131,6 @@ function itemSourceRefsIntersectComponent(itemRefs, component) {
   return getComponentSourceReferences(component).some((ref) => itemRefs.has(ref));
 }
 
-/**
- * Read the per-system durable component identity claimed by an item's
- * `flags.fabricate.roles[systemId].componentId`, applying the hygiene rule:
- * an absent `roles`, an absent or empty `roles[systemId]`, or a nullish
- * `componentId` is NO claim (returns null). Tested BEFORE any membership check so
- * `{}` or `{ componentId: null }` (a restamp interrupted midway) can never
- * spuriously match a component whose id is itself nullish.
- *
- * @param {Item|object|null} item
- * @param {string|null|undefined} systemId
- * @returns {string|null} The claimed component id, or null when there is no claim.
- */
 // Systems already warned-about, so a per-item resolve loop emits at most one console
 // line per offending system id rather than one per candidate item.
 const _warnedUnsafeSystemIds = new Set();
@@ -156,6 +144,18 @@ function warnUnsafeSystemIdOnce(systemId) {
   );
 }
 
+/**
+ * Read the per-system durable component identity claimed by an item's
+ * `flags.fabricate.roles[systemId].componentId`, applying the hygiene rule:
+ * an absent `roles`, an absent or empty `roles[systemId]`, or a nullish
+ * `componentId` is NO claim (returns null). Tested BEFORE any membership check so
+ * `{}` or `{ componentId: null }` (a restamp interrupted midway) can never
+ * spuriously match a component whose id is itself nullish.
+ *
+ * @param {Item|object|null} item
+ * @param {string|null|undefined} systemId
+ * @returns {string|null} The claimed component id, or null when there is no claim.
+ */
 function claimedRoleComponentId(item, systemId) {
   // A `systemId` that is not a safe single dotted-path segment (absent, or containing
   // a `.` that `expandObject` would have nested on write) can never index the `roles`
