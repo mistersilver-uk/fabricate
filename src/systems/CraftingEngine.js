@@ -1586,23 +1586,9 @@ export class CraftingEngine {
     // resolver, never re-derived per group from raw source references. Do NOT loop
     // the resolver per candidate component: that would double-count a submission
     // matching several components of one group.
-    const resolvedComponentIds = submittedItems.map((item) => {
-      const resolved = resolveComponentForItem(item, components, systemId);
-      if (resolved) return resolved.id;
-      // Narrow LOCAL supplement for the one legacy field the shared resolver
-      // structurally cannot see: a bare top-level `item.sourceUuid`. It is a
-      // source-ref-only fall-through (it re-derives no identity/exclusivity rule),
-      // attributing the item to the first component whose source references
-      // include that bare uuid.
-      const bareSourceUuid = item?.sourceUuid;
-      if (bareSourceUuid) {
-        const byBare = components.find((comp) =>
-          getComponentSourceReferences(comp).includes(bareSourceUuid)
-        );
-        if (byBare) return byBare.id;
-      }
-      return null;
-    });
+    const resolvedComponentIds = submittedItems.map((item) =>
+      this._resolveSubmissionComponentId(item, components, systemId)
+    );
 
     // Count submissions whose resolved component id is one of the given component
     // IDs. Each submission resolved to exactly one component, so it contributes at
@@ -1743,30 +1729,39 @@ export class CraftingEngine {
   }
 
   /**
-   * Map submitted items to a plain-component multiset `{ componentId: units }` by
-   * matching each submission's source references against the system components,
-   * mirroring the per-unit occurrence counting {@link _matchAlchemySignature} uses.
-   * A submission that resolves to no component is skipped.
+   * Resolve one submitted item to at most one component id, durable-flag-first via
+   * the shared, list-aware, system-scoped resolver {@link resolveComponentForItem},
+   * with a narrow LOCAL supplement for the one legacy field the shared resolver
+   * structurally cannot see: a bare top-level `item.sourceUuid` (a source-ref-only
+   * fall-through that re-derives no identity/exclusivity rule). Shared by
+   * {@link _matchAlchemySignature} and {@link _submittedComponentMultiset} so the
+   * dead-end key can never drift from the signature it was matched against.
    * @private
    */
-  _submittedComponentMultiset(submittedItems, components) {
-    const componentByRef = new Map();
-    for (const component of Array.isArray(components) ? components : []) {
-      for (const ref of getComponentSourceReferences(component)) {
-        if (!componentByRef.has(ref)) componentByRef.set(ref, component.id);
-      }
+  _resolveSubmissionComponentId(item, components, systemId) {
+    const resolved = resolveComponentForItem(item, components, systemId);
+    if (resolved) return resolved.id;
+    const bareSourceUuid = item?.sourceUuid;
+    if (bareSourceUuid) {
+      const byBare = (Array.isArray(components) ? components : []).find((comp) =>
+        getComponentSourceReferences(comp).includes(bareSourceUuid)
+      );
+      if (byBare) return byBare.id;
     }
+    return null;
+  }
+
+  /**
+   * Map submitted items to a plain-component multiset `{ componentId: units }`
+   * through the same {@link _resolveSubmissionComponentId} resolver
+   * {@link _matchAlchemySignature} uses (each submission contributes at most one
+   * unit). A submission that resolves to no component is skipped.
+   * @private
+   */
+  _submittedComponentMultiset(submittedItems, components, systemId) {
     const multiset = {};
     for (const item of Array.isArray(submittedItems) ? submittedItems : []) {
-      const refs = new Set(getItemSourceReferences(item));
-      if (item?.sourceUuid) refs.add(item.sourceUuid);
-      let componentId = null;
-      for (const ref of refs) {
-        if (componentByRef.has(ref)) {
-          componentId = componentByRef.get(ref);
-          break;
-        }
-      }
+      const componentId = this._resolveSubmissionComponentId(item, components, systemId);
       if (!componentId) continue;
       multiset[componentId] = (multiset[componentId] || 0) + 1;
     }
@@ -1786,7 +1781,9 @@ export class CraftingEngine {
   async _recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, components, alchemyCfg) {
     if (alchemyCfg?.showAttemptHistoryToPlayers !== true) return;
     if (!systemId || typeof craftingActor?.setFlag !== 'function') return;
-    const key = canonicalSignatureKey(this._submittedComponentMultiset(submittedItems, components));
+    const key = canonicalSignatureKey(
+      this._submittedComponentMultiset(submittedItems, components, systemId)
+    );
     if (!key) return;
     const deadEnds = getFabricateFlag(craftingActor, 'alchemyDeadEnds', {});
     const current = deadEnds && typeof deadEnds === 'object' ? deadEnds : {};
