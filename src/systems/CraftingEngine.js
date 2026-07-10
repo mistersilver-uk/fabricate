@@ -7,9 +7,9 @@ import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceRes
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import {
-  getItemSourceReferences,
   getComponentSourceReferences,
   itemResolvesToComponent,
+  resolveComponentForItem,
 } from '../utils/sourceUuid.js';
 
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
@@ -1257,46 +1257,69 @@ export class CraftingEngine {
    * option's components share its source-reference chain. Essence requirements,
    * when the system supports essences, must also be met for a set to match.
    *
+   * Component identity is resolved durable-flag-first through the shared,
+   * list-aware, system-scoped resolver {@link resolveComponentForItem}: each
+   * submission resolves ONCE, against the FULL component set scoped by the system
+   * id, to the single component it IS — exclusive on a resolvable
+   * `flags.fabricate.roles[systemId].componentId` (or the legacy scalar) and inert
+   * on a stale/foreign one — with a raw source-reference fall-through for
+   * unstamped items. The one legacy field the shared resolver structurally cannot
+   * read is a bare top-level `item.sourceUuid` (not part of
+   * {@link getItemSourceReferences}), so a narrow LOCAL supplement attributes such
+   * an item by that field alone when the resolver returns null. Resolving once per
+   * submission preserves the one-unit-per-group semantics by construction (an item
+   * IS exactly one component, so it is counted at most once per group); a
+   * submission whose raw refs overlap components in DIFFERENT groups now resolves
+   * to a single component (the first match in the full set, order-dependent),
+   * rather than being counted in each — the intended "one item = one component"
+   * tightening over the pre-fix flag-blind intersection.
+   *
    * Returns { matched: true, recipe, ingredientSetId } or { matched: false }.
    * @private
    */
   _matchAlchemySignature(submittedItems, recipes, components, signatureValidator, options = {}) {
-    // Retain each submission's source references so group satisfaction can be
-    // quantity-aware. Each submission counts as one unit toward a group: the
-    // workbench expands a stack into one submission per unit (mirroring essence
-    // accumulation and {@link _consumeSubmittedAlchemyItems}, which both count
-    // occurrences rather than reading `system.quantity`).
-    const submittedEntries = submittedItems.map((item) => {
-      const refs = new Set(getItemSourceReferences(item));
-      if (item?.sourceUuid) refs.add(item.sourceUuid);
-      return { refs };
+    const system = options?.system;
+    const systemId = system?.id;
+
+    // Resolve each submission ONCE to at most one component id, against the FULL
+    // system component set scoped by `systemId`. Component identity is a property
+    // of the item (an item IS one component), not of the group under test, so
+    // bucketing happens exactly once here — durable-flag-first via the shared
+    // resolver, never re-derived per group from raw source references. Do NOT loop
+    // the resolver per candidate component: that would double-count a submission
+    // matching several components of one group.
+    const resolvedComponentIds = submittedItems.map((item) => {
+      const resolved = resolveComponentForItem(item, components, systemId);
+      if (resolved) return resolved.id;
+      // Narrow LOCAL supplement for the one legacy field the shared resolver
+      // structurally cannot see: a bare top-level `item.sourceUuid`. It is a
+      // source-ref-only fall-through (it re-derives no identity/exclusivity rule),
+      // attributing the item to the first component whose source references
+      // include that bare uuid.
+      const bareSourceUuid = item?.sourceUuid;
+      if (bareSourceUuid) {
+        const byBare = components.find((comp) =>
+          getComponentSourceReferences(comp).includes(bareSourceUuid)
+        );
+        if (byBare) return byBare.id;
+      }
+      return null;
     });
 
-    // Count submissions whose source references match ANY of the given component
-    // IDs. A submission contributes at most once even if several of the group's
-    // components share its reference chain.
+    // Count submissions whose resolved component id is one of the given component
+    // IDs. Each submission resolved to exactly one component, so it contributes at
+    // most one unit toward a group even when several of the group's components
+    // share its reference chain.
     const availableForComponentIds = (componentIds) => {
-      const groupRefs = new Set();
-      for (const componentId of componentIds) {
-        const comp = components.find((c) => c.id === componentId);
-        if (!comp) continue;
-        for (const ref of getComponentSourceReferences(comp)) groupRefs.add(ref);
-      }
-      if (groupRefs.size === 0) return 0;
+      const idSet = componentIds instanceof Set ? componentIds : new Set(componentIds);
       let available = 0;
-      for (const entry of submittedEntries) {
-        for (const ref of entry.refs) {
-          if (groupRefs.has(ref)) {
-            available += 1;
-            break;
-          }
-        }
+      for (const resolvedId of resolvedComponentIds) {
+        if (resolvedId != null && idSet.has(resolvedId)) available += 1;
       }
       return available;
     };
 
     // Check whether the system supports essences
-    const system = options?.system;
     const essencesEnabled = system?.features?.essences === true;
 
     // Accumulate essences from ALL submitted items (duplicates count multiple times)

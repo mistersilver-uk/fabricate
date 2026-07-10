@@ -40,6 +40,8 @@ const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
+const { getItemSourceReferences } = await import('../src/utils/sourceUuid.js');
+const { component, roleItem } = await import('./helpers/componentIdentityFixtures.js');
 
 // ---------------------------------------------------------------------------
 // Flag helpers (same pattern as recipe-visibility-service.test.js)
@@ -1120,4 +1122,197 @@ test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals i
 
   assert.equal(deleteCalls.length, 1, 'should delete when count >= qty');
   assert.equal(updateCalls.length, 0);
+});
+
+// ============================================================================
+// CraftingEngine._matchAlchemySignature: durable component identity (issue 558)
+//
+// Signature bucketing routes through the shared, list-aware, system-scoped
+// resolver `resolveComponentForItem`, so a submission is attributed to the single
+// component it IS (durable-flag-first), not to whichever component its raw
+// source-reference chain happens to overlap.
+// ============================================================================
+
+// Convenience: the SignatureValidator these signature tests always feed the same
+// three no-op lookups plus one component set. Hoisted so the new-code duplication
+// stays under the SonarCloud gate.
+function buildSignatureValidator(components) {
+  return new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components,
+  });
+}
+
+// A single-group signature recipe requiring one component by id.
+function buildComponentRecipe(id, componentId) {
+  return buildRecipe(
+    id,
+    [buildIngredientSet([buildIngredientGroup(componentId)])],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+}
+
+// A single-group signature recipe whose one option matches by tag and requires
+// `quantity` units. Used to exercise one-unit-per-group counting: the option
+// expands to every component carrying `tag`.
+function buildTagGroupRecipe(id, tag, quantity) {
+  return buildRecipe(
+    id,
+    [
+      buildIngredientSet([
+        {
+          id: `g-${Math.random().toString(36).slice(2)}`,
+          options: [{ match: { type: 'tags', tags: [tag], tagMatch: 'any' }, quantity }],
+        },
+      ]),
+    ],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+}
+
+test('_matchAlchemySignature attributes a submission to its durable componentId flag, not its duplicate-lineage raw refs (A1, issue 558)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const sys = 'alchemy-sys';
+  // Two distinct components; A's source ref is Item.A, B's is Item.B.
+  const componentA = component('cA', { sourceUuid: 'Item.A', sourceItemUuid: 'Item.A' });
+  const componentB = component('cB', { sourceUuid: 'Item.B', sourceItemUuid: 'Item.B' });
+  const components = [componentA, componentB];
+  const validator = buildSignatureValidator(components);
+
+  // A submission the collector attributed to B (durable roles flag) that STILL
+  // carries a transitive duplicateSource pointing at A's source. Its raw refs
+  // ([uuid, Item.A]) genuinely overlap A, so the pre-fix flag-blind matcher
+  // credited A (non-vacuity: without the Item.A overlap this would pass for the
+  // wrong reason).
+  const item = roleItem({
+    uuid: 'Item.owned-copy-of-A',
+    duplicateSource: 'Item.A',
+    roles: { [sys]: { componentId: 'cB' } },
+    name: 'Restamped Draught',
+  });
+  assert.ok(
+    getItemSourceReferences(item).includes('Item.A'),
+    'non-vacuity: the submission raw refs must genuinely overlap component A'
+  );
+
+  const matchesB = engine._matchAlchemySignature(
+    [item],
+    [buildComponentRecipe('needs-B', 'cB')],
+    components,
+    validator,
+    { system: { id: sys } }
+  );
+  const matchesA = engine._matchAlchemySignature(
+    [item],
+    [buildComponentRecipe('needs-A', 'cA')],
+    components,
+    validator,
+    { system: { id: sys } }
+  );
+
+  assert.equal(matchesB.matched, true, 'submission is credited to its durable componentId B');
+  assert.equal(
+    matchesA.matched,
+    false,
+    'submission is NOT credited to duplicate-lineage component A'
+  );
+});
+
+test('_matchAlchemySignature resolves a submission carrying only a bare top-level sourceUuid (A2b, characterization)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [buildComponent('bare', 'Item.bare-source')];
+  const validator = buildSignatureValidator(components);
+
+  // The item carries ONLY a bare top-level `sourceUuid` — no uuid, no
+  // _stats.compendiumSource, no duplicateSource — so `getItemSourceReferences`
+  // (and thus the shared resolver) sees nothing; only the LOCAL bare-sourceUuid
+  // supplement can attribute it.
+  const result = engine._matchAlchemySignature(
+    [{ sourceUuid: 'Item.bare-source' }],
+    [buildComponentRecipe('bare-recipe', 'bare')],
+    components,
+    validator
+  );
+
+  assert.equal(result.matched, true, 'bare top-level sourceUuid still resolves to its component');
+});
+
+test('_matchAlchemySignature counts a submission matching several of a group\'s components as one unit (A2c)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  // Two components sharing a tag but with distinct source refs.
+  const components = [
+    { ...buildComponent('c1', 'Item.c1'), tags: ['metal'] },
+    { ...buildComponent('c2', 'Item.c2'), tags: ['metal'] },
+  ];
+  const validator = buildSignatureValidator(components);
+  // A single submission whose raw refs overlap BOTH components.
+  const submission = { uuid: 'Item.c1', _stats: { compendiumSource: 'Item.c2' }, flags: {} };
+
+  const result = engine._matchAlchemySignature(
+    [submission],
+    [buildTagGroupRecipe('needs-two-metal', 'metal', 2)],
+    components,
+    validator
+  );
+
+  // Counted as one unit (not two), so a group needing two metal units is unmet.
+  assert.equal(result.matched, false, 'one submission contributes at most one unit to a group');
+});
+
+test('_matchAlchemySignature falls through a stale/foreign identity flag to the raw-ref tier (A2d)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const sys = 'alchemy-sys';
+  const components = [component('cC', { sourceUuid: 'Item.C', sourceItemUuid: 'Item.C' })];
+  const validator = buildSignatureValidator(components);
+  // The roles flag names a component absent from this system's set (stale/foreign),
+  // so it is inert; the raw refs overlap the real component C.
+  const item = roleItem({
+    uuid: 'Item.owned-C',
+    compendiumSource: 'Item.C',
+    roles: { [sys]: { componentId: 'ghost' } },
+    name: 'Owned C',
+  });
+
+  const result = engine._matchAlchemySignature(
+    [item],
+    [buildComponentRecipe('needs-C', 'cC')],
+    components,
+    validator,
+    { system: { id: sys } }
+  );
+
+  assert.equal(result.matched, true, 'an inert flag does not suppress the legitimate raw-ref match');
+});
+
+test('_matchAlchemySignature resolves a cross-group multi-overlap submission to a single component (order-dependent, issue 558)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  // Component identity is now "one item = one component": a submission whose raw
+  // refs overlap components in DIFFERENT groups resolves to the FIRST match in the
+  // full set (order-dependent by design), not counted in both groups as the
+  // pre-fix flag-blind intersection did.
+  const componentX = component('cX', { sourceUuid: 'Item.X', sourceItemUuid: 'Item.X' });
+  const componentY = component('cY', { sourceUuid: 'Item.Y', sourceItemUuid: 'Item.Y' });
+  const components = [componentX, componentY];
+  const validator = buildSignatureValidator(components);
+  // Raw refs overlap both X and Y; cX is first in the set, so it resolves to cX.
+  const submission = { uuid: 'Item.X', _stats: { compendiumSource: 'Item.Y' }, flags: {} };
+
+  const matchesX = engine._matchAlchemySignature(
+    [submission],
+    [buildComponentRecipe('needs-X', 'cX')],
+    components,
+    validator
+  );
+  const matchesY = engine._matchAlchemySignature(
+    [submission],
+    [buildComponentRecipe('needs-Y', 'cY')],
+    components,
+    validator
+  );
+
+  assert.equal(matchesX.matched, true, 'resolves to the first overlapping component (cX)');
+  assert.equal(matchesY.matched, false, 'not also counted toward the second overlapping component (cY)');
 });
