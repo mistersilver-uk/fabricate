@@ -562,6 +562,61 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('alchemy Simple: two labeled result sets, reserved failure set undeletable, no Add result set (issue 554)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        alchemySimple: true,
+        complex: false,
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: {
+          ...RECIPE,
+          resultGroups: [
+            { id: 'rg-ok', name: 'On success', results: [{ componentId: 'cmp-herb', quantity: 1 }] },
+          ],
+        },
+        onUpdateRecipe: () => {},
+      })
+    );
+    clickTab(target, 'results');
+    await flushRender();
+
+    const view = target.querySelector('[data-recipe-result-alchemy-simple]');
+    assert.ok(view, 'the alchemy Simple two-slot view renders');
+
+    // Exactly two result-set cards, each with a STATIC label (no free-text name input).
+    const cards = view.querySelectorAll('[data-recipe-set]');
+    assert.equal(cards.length, 2, 'exactly two result sets (success + reserved failure)');
+    const labels = [...view.querySelectorAll('[data-recipe-result-set-static-label]')].map((node) =>
+      node.textContent.trim()
+    );
+    assert.ok(
+      labels.some((label) => label.includes('On success')),
+      'the success set shows a static "On success" label'
+    );
+    assert.ok(
+      labels.some((label) => label.includes('On a failed check')),
+      'the reserved failure set shows a static "On a failed check" label'
+    );
+    assert.equal(
+      view.querySelector('[data-recipe-result-set-field="name"]'),
+      null,
+      'no free-text result-set name input in the alchemy Simple view'
+    );
+
+    // Neither set is removable, and there is no "Add result set" affordance.
+    assert.equal(
+      view.querySelector('[data-recipe-remove="result-set"]'),
+      null,
+      'the reserved failure set (and the success set) cannot be removed'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-add="result-set"]'),
+      null,
+      'the "Add result set" button is suppressed in the alchemy Simple view'
+    );
+    editHarness.remount();
+  });
+
   it('check mode: result sets assign outcome tiers, disabling tiers used elsewhere', async () => {
     const groups = [
       {

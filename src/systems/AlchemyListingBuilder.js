@@ -29,6 +29,7 @@
 
 import { getFabricateFlag } from '../config/flags.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
+import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
 
 import { SignatureValidator } from './SignatureValidator.js';
 
@@ -308,6 +309,9 @@ export class AlchemyListingBuilder {
     const signatureSummary = sets.map((set) => this._projectSet(set, recipe, system, components));
     const headline = signatureSummary[0]?.result ?? null;
     const concrete = this._concreteMultiset(sets, components);
+    // Carry the system-level alchemy check mode so the workbench can flag a
+    // check-gated outcome ("a check gates this result") for simple/tiered brews.
+    const checkMode = system?.alchemy?.checkMode || 'none';
     return {
       id: stringOrNull(recipe.id),
       name: stringOrEmpty(recipe.name),
@@ -316,6 +320,8 @@ export class AlchemyListingBuilder {
       signatureSummary,
       result: headline,
       concrete,
+      checkMode,
+      checkGated: checkMode === 'simple' || checkMode === 'tiered',
     };
   }
 
@@ -328,7 +334,7 @@ export class AlchemyListingBuilder {
       setId: stringOrNull(set?.id),
       groups,
       essences,
-      result: this._projectResult(recipe, set, components),
+      result: this._projectResult(recipe, set, system, components),
     };
   }
 
@@ -378,17 +384,33 @@ export class AlchemyListingBuilder {
   }
 
   /**
-   * The result a set routes to. Alchemy's `ingredientSet` provider routes by
-   * `IngredientSet.resultGroupId`; otherwise the first result group is used. The
-   * projected result is the first result in that group, resolved to its component.
+   * The SUCCESS result a set routes to, projected as a leak-safe headline (the
+   * reserved `role: 'failure'` group is NEVER surfaced to Produces). Dispatched on
+   * the system-level `alchemy.checkMode`:
+   *  - none / simple → the first non-failure (success) group;
+   *  - tiered → the TOP SUCCESS TIER's assigned group (routed outcome-tier order),
+   *    falling back to the first non-failure group when no tier is routed yet.
+   * The projected result is the first result in that group, resolved to its component.
    */
-  _projectResult(recipe, set, components) {
+  _projectResult(recipe, set, system, components) {
     const groups = Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [];
-    if (groups.length === 0) return null;
-    const routed = set?.resultGroupId
-      ? groups.find((group) => group.id === set.resultGroupId)
-      : null;
-    const group = routed || groups[0];
+    const successGroups = groups.filter((group) => group?.role !== 'failure');
+    if (successGroups.length === 0) return null;
+    const checkMode = system?.alchemy?.checkMode || 'none';
+    let group = successGroups[0];
+    if (checkMode === 'tiered') {
+      const tiers = routedSuccessTierOptions(system?.craftingCheck?.routed);
+      for (const tier of tiers) {
+        const match = successGroups.find(
+          (candidate) =>
+            Array.isArray(candidate.checkOutcomeIds) && candidate.checkOutcomeIds.includes(tier.id)
+        );
+        if (match) {
+          group = match;
+          break;
+        }
+      }
+    }
     const results = Array.isArray(group?.results) ? group.results : [];
     const first = results[0];
     if (!first) return null;

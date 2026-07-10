@@ -94,10 +94,12 @@ export function classifyModeChange(recipeJSON, fromMode, toMode, system = {}) {
  * @param {object} recipeJSON Recipe JSON (as produced by `Recipe#toJSON`).
  * @param {string} fromMode The current system resolution mode.
  * @param {string} toMode The target system resolution mode.
- * @param {object} [system] The target system (used to choose the seed provider).
+ * @param {object} [_system] The target system. Retained for call-site parity with
+ *   `classifyModeChange`; the per-recipe pass no longer seeds a provider (alchemy's
+ *   routing basis moved to the system-level `alchemy.checkMode`), so it is unused.
  * @returns {ModeChangeResult}
  */
-export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system = {}) {
+export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system = {}) {
   if (!_isPlainObject(recipeJSON)) {
     return { outcome: 'carry', recipe: recipeJSON, reasons: [] };
   }
@@ -129,21 +131,29 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system 
     };
   }
 
-  // Alchemy is the only provider-routed target: seed its provider. A routed source
-  // pins the matching provider (RI → ingredientSet, RC → check); other sources use
-  // the system-aware default. Seeding never clobbers an existing valid provider.
+  // Alchemy no longer routes via a per-recipe `resultSelection.provider` (retired for
+  // the system-level `alchemy.checkMode`) and requires EXACTLY ONE ingredient set.
+  // Migrating INTO alchemy therefore clears any stale `resultSelection` and collapses
+  // a multi-INGREDIENT-SET recipe to its first set (multi-STEP was already deleted
+  // above). The system-level `checkMode` is seeded separately (defaults to `none`
+  // when the system switches to alchemy); this per-recipe pass never seeds a provider.
   if (toMode === 'alchemy') {
-    const provider =
-      fromMode === 'routedByIngredients'
-        ? 'ingredientSet'
-        : fromMode === 'routedByCheck'
-          ? 'check'
-          : chooseSeedProvider(system, 'alchemy');
-    _seedProvider(recipeJSON, provider);
+    const reasons = [];
+    let changed = false;
+    if (Array.isArray(recipeJSON.ingredientSets) && recipeJSON.ingredientSets.length > 1) {
+      recipeJSON.ingredientSets = recipeJSON.ingredientSets.slice(0, 1);
+      changed = true;
+      reasons.push('collapsed multiple ingredient sets to the first set for alchemy mode');
+    }
+    if (recipeJSON.resultSelection != null) {
+      recipeJSON.resultSelection = null;
+      changed = true;
+      reasons.push('cleared resultSelection for alchemy mode');
+    }
     return {
-      outcome: 'seeded',
+      outcome: changed ? 'cleared' : 'lossless',
       recipe: recipeJSON,
-      reasons: [`seeded resultSelection.provider = "${provider}" for alchemy mode`],
+      reasons: reasons.length > 0 ? reasons : ['no alchemy reshaping required'],
     };
   }
 
@@ -224,12 +234,6 @@ export function chooseSeedProvider(system, toMode) {
   return hasUsableFormula ? 'check' : 'ingredientSet';
 }
 
-/** Whether the recipe already carries one of the two valid routed providers. */
-function _hasValidProvider(recipe) {
-  const provider = recipe?.resultSelection?.provider;
-  return provider === 'ingredientSet' || provider === 'check';
-}
-
 /** Number of authoring steps on the recipe (0 for a flat recipe). */
 function _stepCount(recipe) {
   return Array.isArray(recipe.steps) ? recipe.steps.length : 0;
@@ -247,22 +251,6 @@ function _isOneByOne(recipe) {
   const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
   const resultGroups = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
   return ingredientSets.length <= 1 && resultGroups.length <= 1;
-}
-
-/**
- * Seed `resultSelection.provider` on a recipe without clobbering an existing valid
- * selection. Mirrors the `_seedProvider` idiom from `migrateLegacyResolutionModes.js`.
- * @param {object} recipe
- * @param {string} provider
- */
-function _seedProvider(recipe, provider) {
-  if (!_isPlainObject(recipe.resultSelection)) {
-    recipe.resultSelection = { provider };
-    return;
-  }
-  if (!_hasValidProvider(recipe)) {
-    recipe.resultSelection.provider = provider;
-  }
 }
 
 function _trimmed(value) {

@@ -35,6 +35,7 @@
   // root which check sub-tab is active so the shared header Save persists the right draft.
   let {
     resolutionMode = 'simple',
+    alchemyCheckMode = 'none',
     craftingCheck = null,
     craftingCheckSimple = null,
     craftingCheckProgressive = null,
@@ -75,11 +76,18 @@
   // Only `routedByCheck` uses the tier-routing CraftingCheckEditor. `routedByIngredients`
   // authors its optional pass/fail check via the shared SimpleCraftingCheckEditor
   // (bound to `craftingCheck.simple`), alongside `simple`/`alchemy`.
-  const craftingRouted = $derived(resolutionMode === 'routedByCheck');
+  // Alchemy's crafting-check editor is chosen by the system-level `alchemy.checkMode`:
+  // none → a read-only "resolves without a check" panel; simple → the pass/fail
+  // editor; tiered → the routed outcome-tier editor (identical to routedByCheck).
+  const craftingAlchemy = $derived(resolutionMode === 'alchemy');
+  const craftingNone = $derived(craftingAlchemy && alchemyCheckMode === 'none');
+  const craftingRouted = $derived(
+    resolutionMode === 'routedByCheck' || (craftingAlchemy && alchemyCheckMode === 'tiered')
+  );
   const craftingSimple = $derived(
     resolutionMode === 'simple' ||
-      resolutionMode === 'alchemy' ||
-      resolutionMode === 'routedByIngredients'
+      resolutionMode === 'routedByIngredients' ||
+      (craftingAlchemy && alchemyCheckMode === 'simple')
   );
   const craftingProgressive = $derived(resolutionMode === 'progressive');
   const salvageRouted = $derived(salvageResolutionMode === 'routed');
@@ -217,6 +225,21 @@
       {:else if activeTab === 'crafting' && craftingProgressive}
         <div data-checks-panel="crafting">
           <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckProgressive} />
+        </div>
+      {:else if activeTab === 'crafting' && craftingNone}
+        <div class="manager-checks-page" data-checks-panel="crafting" data-alchemy-none-readonly>
+          <section class="manager-inspector-card">
+            <p class="manager-kicker">{pageKicker}</p>
+            <h2 class="manager-card-title">
+              {text('FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneTitle', 'Resolves without a check')}
+            </h2>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneLead',
+                'This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author a crafting check.'
+              )}
+            </p>
+          </section>
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
         <div data-checks-panel="salvage">

@@ -10,7 +10,8 @@ nav_order: 5
 Alchemy mode turns recipe crafting into a discovery game.
 Players cannot see recipe names or ingredient lists up front.
 Instead, a player submits a chosen combination of items to be tried.
-If the combination matches a recipe, the craft succeeds.
+If the combination matches a recipe, that recipe is brewed.
+Depending on the system's Alchemy check setting, a match either succeeds straight away or turns on a crafting roll that decides the outcome.
 If it does not match, the items may be silently consumed.
 
 Use alchemy mode for systems where recipes are secrets, such as a witch's grimoire, an alchemist's bench, or any scenario where players are meant to experiment rather than follow a known formula.
@@ -20,7 +21,7 @@ Use alchemy mode for systems where recipes are secrets, such as a witch's grimoi
 ## Current State
 
 Alchemy recipes and systems are authored mainly through the API today.
-An early GM recipe editor in the Crafting Admin panel can edit a recipe's identity and link a recipe item, but full recipe authoring is still in progress.
+The Crafting Admin panel sets the system's Alchemy check and edits a recipe's identity, its result sets, and its linked recipe item, but full recipe authoring is still in progress.
 Players craft alchemy from the Alchemy Workbench, a tab in the Fabricate window.
 See [The Alchemy Workbench](#the-alchemy-workbench) below.
 
@@ -35,7 +36,9 @@ See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) for t
 1. A crafting system is created with its resolution mode set to Alchemy.
 2. A player submits a chosen combination of items for their crafting character.
 3. Fabricate matches the submitted items against all enabled recipes in the system.
-4. If a matching recipe is found, the normal crafting flow runs (ingredients consumed, results created).
+4. If a matching recipe is found, the system's Alchemy check decides the outcome.
+   With no check the brew always succeeds and produces the recipe's result set.
+   With a check the crafter rolls, and the roll decides which result set is produced.
 5. If no recipe matches, the attempt ends.
    Depending on system configuration, the submitted items may or may not be consumed.
 
@@ -50,11 +53,48 @@ Fabricate finds a recipe match by comparing the submitted items against the ingr
 - The options in a group are alternatives, so satisfying any single option satisfies the whole group.
 - Quantity is counted by how many matching items the player submits, so a stack of three counts as three units.
 - An item is recognised whether it is the original world or compendium item, a copy of it, or an item that was duplicated from it.
-- If every group in an ingredient set is satisfied, the recipe is a match and crafting proceeds using that ingredient set.
+- An alchemy recipe always has exactly one ingredient set, so each recipe has a single combination to match.
+- If every group in that ingredient set is satisfied, the recipe is a match and crafting proceeds.
 - Recipes are checked in order, and the first match is used.
 
 {: .note }
 > A submitted item still matches a component even if the item it was copied from has since changed, as long as Fabricate can trace it back to that component.
+
+---
+
+## The Alchemy check
+
+The **Alchemy check** setting decides how a matched brew is resolved.
+It is a system-wide setting, chosen once under **Recipe resolution** on the system's **Settings** page, and it applies to every recipe in the alchemy system.
+There are three choices.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Alchemy check | What happens on a match |
+|:--------------|:-------------------------------------------------------------------------------------------------|
+| No check | A matched brew always succeeds and produces its single result set. There is no roll. |
+| Simple check | A matched brew rolls a pass or fail check. A pass produces the success result set. A fail produces a separate failure result set. |
+| Tiered check | A matched brew rolls a check with named outcome tiers. The tier that the roll lands on selects which result set is produced. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The check applies only to a combination that matches a recipe.
+A combination that matches nothing still fizzles without a roll, whatever the Alchemy check setting is.
+
+With **No check**, each alchemy recipe has one result set, and a match always produces it.
+
+With a **Simple check**, each recipe has two result sets, shown in the recipe editor as **On success** and **On a failed check**.
+A passed roll produces the success set.
+A failed roll produces the failure set.
+A failed check is still a genuine outcome, not a fizzle, so the components are consumed and the recipe can still be learned.
+The failure set may be left empty, in which case a failed brew consumes the components and produces nothing, but it is still recorded as a failed brew rather than a fizzle.
+
+With a **Tiered check**, each success outcome tier is assigned its own result set, exactly the way [Routed by check]({% link recipes/routed.md %}) recipes work.
+A brew that fails the tiered check produces nothing.
+
+When the Alchemy check is Simple or Tiered a crafting check must be configured for the system.
+Until one is, brews cannot resolve.
+See [Crafting Checks]({% link crafting-checks.md %}) for how the check is authored and rolled.
 
 ---
 
@@ -75,13 +115,15 @@ See the [System Manager API reference]({% link api/system-manager.md %}) for the
 
 ## Learn on Craft
 
-When the system's Learn on Craft setting is on, a player who successfully discovers a recipe has that recipe marked as learned for their character.
+When the system's Learn on Craft setting is on, a player whose combination matches a recipe has that recipe marked as learned for their character.
+A match counts as a discovery whether or not the brew passed its check, so a failed Simple brew still teaches the recipe.
+A combination that matches nothing is never a discovery and teaches nothing.
 That learned state can be read to show discovered recipes and help players reproduce known combinations.
 
-| Learn on Craft | Behaviour on success |
+| Learn on Craft | Behaviour on a match |
 |:---------------------|:---------------------|
 | Off (default) | Every attempt is anonymous, players never see recipe names |
-| On | Discovered recipes are remembered for the character and can be surfaced in future sessions |
+| On | A matched recipe is remembered for the character and can be surfaced in future sessions |
 
 This setting also lives under the system's Alchemy options.
 See the [System Manager API reference]({% link api/system-manager.md %}) for the API that updates a system.
@@ -179,24 +221,30 @@ When that option is off, a combination that makes nothing keeps reading as **Unt
 
 **Brew** submits the components on the bench as an attempt for the selected character.
 
-- If the combination matches a recipe, that recipe is crafted.
+- If the combination matches a recipe, that recipe is brewed.
 Its ingredients are consumed, its results are created, and a newly discovered recipe is added to your Known recipes list.
 - If the combination matches nothing, the attempt fizzles.
 Whether the components are consumed then depends on the system's [Consume on Fail](#consume-on-fail) setting.
 
-When the alchemy system uses a crafting check, brewing a matching recipe prompts you to roll, the same way a check works elsewhere in Fabricate.
+When the system's [Alchemy check](#the-alchemy-check) is Simple or Tiered, brewing a matching recipe prompts you to roll, the same way a check works elsewhere in Fabricate.
+The roll decides which result set the brew produces.
+A failed Simple check produces the recipe's failure result set instead of its success set, and it still counts as a brew, so the recipe can still be discovered.
 A combination that fizzles never runs a check, so there is no roll when an untried mix turns out to make nothing.
 
-A banner confirms the outcome after each brew, telling you whether you discovered a recipe, brewed a known one, or the mixture fizzled.
+A banner confirms the outcome after each brew.
+It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, or the mixture fizzled.
 
 ---
 
 ## Setting Up an Alchemy System
 
-To set up an alchemy system, create a crafting system with its resolution mode set to Alchemy, add the managed components that act as ingredients, then author recipes whose ingredient sets define the hidden combinations players must discover by experiment and whose result groups define what is produced on a successful match.
+To set up an alchemy system, create a crafting system with its resolution mode set to Alchemy, then choose the **Alchemy check** under **Recipe resolution** on the system's **Settings** page.
+Add the managed components that act as ingredients, then author recipes.
+Each recipe has a single ingredient set that defines the hidden combination players must discover by experiment, and one or more result sets that define what is produced.
+With a Simple check, each recipe has an **On success** result set and a separate **On a failed check** result set.
+Fill the failure set when you want a failed brew to produce something, or leave it empty to have a failed brew produce nothing.
 Enable each recipe, because disabled recipes are never matched.
 The system's Alchemy options carry the Consume on Fail and Learn on Craft settings.
-Recipes and systems can be authored through the API only.
 See the [System Manager API reference]({% link api/system-manager.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create and configure systems and recipes.
 
 {: .warning }

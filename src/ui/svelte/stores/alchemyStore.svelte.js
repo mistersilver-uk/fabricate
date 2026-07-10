@@ -313,6 +313,10 @@ export function createAlchemyStore({ services } = {}) {
     if (brewInFlight || !brewEnabled) return null;
     brewInFlight = true;
     const priorKnown = new Set((Array.isArray(listing?.recipes) ? listing.recipes : []).map((r) => r.id));
+    // Capture the pre-brew target/selection so a Tiered success can be flagged as a
+    // tiered-tier banner even after the bench is cleared and the listing reloads.
+    const priorTarget = target;
+    const priorSelected = selectedRecipe;
     try {
       const result = await services?.submitAlchemyAttempt?.({
         actorId: currentActorId(),
@@ -327,18 +331,39 @@ export function createAlchemyStore({ services } = {}) {
       await load(true);
       const nowKnown = Array.isArray(listing?.recipes) ? listing.recipes : [];
       const discovered = nowKnown.find((recipe) => !priorKnown.has(recipe.id)) ?? null;
+      const discoveredName = discovered?.name ?? null;
+      // Brew status enum (replaces the old `ok` boolean; the banner styles each):
+      //  success           — a passed brew produced its success result set;
+      //  tiered-tier       — a passed Tiered brew produced its outcome-tier result set;
+      //  produced-on-failure — a matched Simple brew FAILED its check and produced the
+      //                        reserved failure result set (must NOT read as success-green);
+      //  no-match-fizzle   — no reaction (or a Tiered fail / misconfiguration).
       if (result && result.success === true) {
-        lastBrew = { ok: true, discovered: discovered?.name ?? null, message: result.message ?? '' };
+        const tiered =
+          discovered?.checkMode === 'tiered' ||
+          priorTarget?.checkMode === 'tiered' ||
+          priorSelected?.checkMode === 'tiered';
+        lastBrew = {
+          status: tiered ? 'tiered-tier' : 'success',
+          discovered: discoveredName,
+          message: result.message ?? '',
+        };
+      } else if (result && result.disposition === 'produced-on-failure') {
+        lastBrew = {
+          status: 'produced-on-failure',
+          discovered: discoveredName,
+          message: result.message ?? '',
+        };
       } else if (result && result.disposition === 'no-match') {
-        lastBrew = { ok: false, discovered: null, message: result.message ?? '' };
+        lastBrew = { status: 'no-match-fizzle', discovered: null, message: result.message ?? '' };
       } else {
-        lastBrew = { ok: false, discovered: null, message: result?.message ?? '' };
+        lastBrew = { status: 'no-match-fizzle', discovered: null, message: result?.message ?? '' };
         if (result?.message) services?.notify?.(result.message);
       }
       return result ?? null;
     } catch (err) {
       services?.notify?.(services?.craftErrorMessage?.() ?? '');
-      lastBrew = { ok: false, discovered: null, message: err?.message ?? String(err) };
+      lastBrew = { status: 'no-match-fizzle', discovered: null, message: err?.message ?? String(err) };
       return { success: false, results: null, message: err?.message ?? String(err) };
     } finally {
       brewInFlight = false;

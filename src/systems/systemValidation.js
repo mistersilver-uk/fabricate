@@ -252,12 +252,15 @@ function collectRecipeIssues(system, recipes, systemComponents) {
   const issues = [];
   for (const recipe of asArray(recipes)) {
     const projected = projectRecipe(recipe);
-    const routingProvider =
-      mode === 'routedByCheck'
-        ? 'check'
-        : mode === 'alchemy'
-          ? projected.resultSelection?.provider || null
-          : null;
+    // The routing basis is the system MODE. Alchemy derives it from the
+    // system-level `alchemy.checkMode` (the retired per-recipe provider is gone):
+    // tiered routes by the routed check (`'check'`), None/Simple route by neither.
+    let routingProvider = null;
+    if (mode === 'routedByCheck') {
+      routingProvider = 'check';
+    } else if (mode === 'alchemy' && system?.alchemy?.checkMode === 'tiered') {
+      routingProvider = 'check';
+    }
     const { issues: recipeIssues } = evaluateRecipeReadiness(projected, {
       systemComponents,
       routingProvider,
@@ -510,6 +513,34 @@ function collectSystemBlockers(system, recipes, components) {
       message: 'Multi-step recipes cannot be used while the system is in alchemy mode.',
       nav: { view: 'system-overview' },
     });
+  }
+
+  // Alchemy Simple/Tiered check modes make the crafting check MANDATORY, so the
+  // whole system cannot resolve a brew until the selected check slot has an
+  // authored roll formula (Tiered → `craftingCheck.routed`, Simple →
+  // `craftingCheck.simple`). None never checks and never blocks. Readiness is
+  // derived from `alchemy.checkMode`, NOT the retired per-recipe provider.
+  if (mode === 'alchemy') {
+    const alchemyCheckMode = system?.alchemy?.checkMode || 'none';
+    const mandatorySlot =
+      alchemyCheckMode === 'tiered'
+        ? check.routed
+        : alchemyCheckMode === 'simple'
+          ? check.simple
+          : null;
+    if (mandatorySlot && !trimmed(mandatorySlot.rollFormula)) {
+      blockers.push({
+        kind: 'system',
+        entityId: null,
+        entityName: trimmed(system?.name) || system?.id || 'system',
+        severity: 'critical',
+        blocks: 'system',
+        code: 'alchemyCheckNoFormula',
+        message:
+          'The alchemy check mode is Simple or Tiered but no crafting check roll formula is configured; no brew can resolve until one is set.',
+        nav: { view: 'system-overview' },
+      });
+    }
   }
 
   blockers.push(...collectAlchemySignatureBlockers(system, recipes, components));

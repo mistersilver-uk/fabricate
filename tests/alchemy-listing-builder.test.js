@@ -308,3 +308,95 @@ test('the concrete reduction key matches the shared canonical signature-key help
   const vigor = listing.recipes[0];
   assert.equal(canonicalSignatureKey(vigor.concrete), 'emberroot:1|springwater:2');
 });
+
+// ---------------------------------------------------------------------------
+// Reserved failure-group leak invariant + checkMode projection (issue 554)
+// ---------------------------------------------------------------------------
+
+const SECRET_COMPONENT = component('sludge', 'Toxic Sludge');
+
+function simpleFailRecipe(id, name, systemId) {
+  return {
+    id,
+    name,
+    img: `icons/${id}.webp`,
+    description: '',
+    enabled: true,
+    craftingSystemId: systemId,
+    ingredientSets: [
+      {
+        id: `${id}-set`,
+        ingredientGroups: [
+          { id: `${id}-g`, options: [{ match: { type: 'component', componentId: 'emberroot' }, componentId: 'emberroot', quantity: 1 }] },
+        ],
+        essences: {},
+      },
+    ],
+    resultGroups: [
+      { id: `${id}-ok`, name: 'On success', results: [{ componentId: 'quicksilver', quantity: 1 }] },
+      { id: `${id}-fail`, name: 'On a failed check', role: 'failure', results: [{ componentId: 'sludge', quantity: 1 }] },
+    ],
+  };
+}
+
+test('LEAK INVARIANT: a Simple recipe never surfaces its reserved failure-group result to the workbench', () => {
+  const brew = simpleFailRecipe('brew', 'Volatile Draught', 'sys-a');
+  const system = { ...makeSystem('sys-a', 'Herbalism', [brew], [...COMPONENTS, SECRET_COMPONENT]), alchemy: { checkMode: 'simple' } };
+  const actor = makeActor('pc', { learned: { brew: {} } });
+  const listing = build([{ system, recipes: [brew] }], {
+    craftingActor: actor,
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  });
+
+  const projected = listing.recipes[0];
+  // The success group drives Produces; the failure group is excluded.
+  assert.equal(projected.result.componentId, 'quicksilver', 'the success result is the headline');
+  assert.equal(projected.checkMode, 'simple');
+  assert.equal(projected.checkGated, true, 'a simple brew is check-gated');
+
+  const serialized = JSON.stringify(listing);
+  assert.ok(!serialized.includes('Toxic Sludge'), 'the failure-group result name must not leak');
+  assert.ok(!serialized.includes('sludge'), 'the failure-group result component id must not leak');
+});
+
+test('Tiered projection surfaces the top success tier group and carries checkMode', () => {
+  const tiered = {
+    id: 'tonic',
+    name: 'Tonic',
+    img: null,
+    description: '',
+    enabled: true,
+    craftingSystemId: 'sys-a',
+    ingredientSets: [
+      { id: 'tonic-set', ingredientGroups: [{ id: 'tonic-g', options: [{ match: { type: 'component', componentId: 'emberroot' }, componentId: 'emberroot', quantity: 1 }] }], essences: {} },
+    ],
+    resultGroups: [
+      { id: 'tonic-fine', name: 'Fine', checkOutcomeIds: ['t-fine'], results: [{ componentId: 'quicksilver', quantity: 1 }] },
+      { id: 'tonic-superb', name: 'Superb', checkOutcomeIds: ['t-superb'], results: [{ componentId: 'ashsalt', quantity: 2 }] },
+    ],
+  };
+  const system = {
+    ...makeSystem('sys-a', 'Herbalism', [tiered], COMPONENTS),
+    alchemy: { checkMode: 'tiered' },
+    craftingCheck: {
+      routed: {
+        type: 'relative',
+        relativeOutcomes: [
+          { id: 't-fine', name: 'Fine', success: true },
+          { id: 't-superb', name: 'Superb', success: true },
+        ],
+      },
+    },
+  };
+  const actor = makeActor('pc', { learned: { tonic: {} } });
+  const listing = build([{ system, recipes: [tiered] }], {
+    craftingActor: actor,
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  });
+  const projected = listing.recipes[0];
+  assert.equal(projected.checkMode, 'tiered');
+  // The first routed success tier (Fine) is the headline.
+  assert.equal(projected.result.componentId, 'quicksilver');
+});

@@ -420,26 +420,43 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(buildOne({ system: enabled }).recipe.check.mandatory, true, 'checks enabled → required');
   });
 
-  it('alchemy mode: the check is optional, identical to simple (disabled → optional, enabled → required)', () => {
-    const disabled = makeSystem({
+  it('alchemy checkMode=none: no check card (null)', () => {
+    const system = makeSystem({
       resolutionMode: 'alchemy',
+      alchemy: { checkMode: 'none' },
       craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
     });
-    const off = buildOne({ system: disabled }).recipe.check;
-    assert.equal(off.usable, true);
-    assert.equal(off.optional, true, 'an alchemy check with checks disabled is optional, like simple');
-    assert.equal(off.mandatory, false, 'alchemy is not a mandatory-check mode');
+    assert.equal(buildOne({ system }).recipe.check, null, 'None mode surfaces no crafting-check card');
+  });
 
-    const enabled = makeSystem({
+  it('alchemy checkMode=simple: mandatory pass/fail check, ungated by checksEnabled', () => {
+    const system = makeSystem({
       resolutionMode: 'alchemy',
-      features: { craftingChecks: true },
-      craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
+      alchemy: { checkMode: 'simple' },
+      // checks disabled at the master toggle — alchemy simple is still mandatory
+      craftingCheck: { enabled: false, simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
     });
-    assert.equal(
-      buildOne({ system: enabled }).recipe.check.mandatory,
-      true,
-      'an authored alchemy check is required only when checks are enabled, like simple'
-    );
+    const check = buildOne({ system }).recipe.check;
+    assert.equal(check.usable, true);
+    assert.equal(check.mandatory, true, 'alchemy simple is mandatory regardless of checksEnabled');
+    assert.equal(check.optional, false);
+    assert.equal(check.dc, 10, 'the pass/fail gate uses the simple DC');
+  });
+
+  it('alchemy checkMode=tiered: mandatory routed check (routed slot); fixed nulls the DC', () => {
+    const system = makeSystem({
+      resolutionMode: 'alchemy',
+      alchemy: { checkMode: 'tiered' },
+      craftingCheck: {
+        simple: {},
+        routed: { rollFormula: '1d20', dc: 12, type: 'fixed' },
+        progressive: {},
+      },
+    });
+    const check = buildOne({ system }).recipe.check;
+    assert.equal(check.usable, true);
+    assert.equal(check.mandatory, true, 'alchemy tiered is mandatory');
+    assert.equal(check.dc, null, 'a fixed routed check has no meaningful DC');
   });
 
   it('resolves the check formula against the actor via the injected resolver', () => {

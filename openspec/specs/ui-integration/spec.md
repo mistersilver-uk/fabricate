@@ -822,9 +822,24 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
   - A step with exactly one result group needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
 
+### Alchemy check settings sub-section (issue 554)
+
+- Under **Recipe Resolution** on the Crafting Settings page, shown only when `resolutionMode === "alchemy"`: a nested, indented `config-card` selector for `alchemy.checkMode` (`none` / `simple` / `tiered`), persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
+
+### Checks tab per-mode behaviour (issue 554)
+
+- alchemy + `simple` → the simple pass/fail editor; alchemy + `tiered` → the routed editor; BOTH cannot be disabled (the Active card shows the requiredHint, ungated by `checksEnabled`).
+- alchemy + `none` → a read-only "resolves without a check" panel (no editor, no Active card, a distinct "no check" hint — NOT the requiredHint).
+- The Crafting checks help copy describes none/simple/tiered.
+
 ### Alchemy Recipe UI (GM Editor)
 
-- Provides the `resultSelection.provider` selector (`ingredientSet` / `check`) — alchemy is the only mode that still routes via a per-recipe provider.
+- Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
+Ingredient-set vs result-group rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
+  - **None** → single ingredient set + single result set.
+  - **Simple** → a labeled "On success" result set + a reserved, static-labeled ("On a failed check", warning/danger accent), undeletable, empty-by-default failure result set (synthesized in the derived view, persisted on first edit; `Recipe.validate` tolerates its absence).
+No "add result set" beyond the two.
+  - **Tiered** → result groups with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
 - Save remains blocked until all collisions are resolved.
 

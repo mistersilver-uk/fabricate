@@ -35,6 +35,16 @@
     // success-filtered `outcomeTierOptions` is empty this disambiguates "no tiers
     // authored yet" from "tiers exist but none is a Success" for the empty hint.
     outcomeTiersDefined = false,
+    // Alchemy Simple two-slot editor (issue 554). `staticLabel` replaces the free-text
+    // name input with a fixed header label (used by both the "On success" and the
+    // reserved "On a failed check" slots). `reserved` marks the failure slot: it adds
+    // a warning icon and (with `hideRemove`) suppresses the remove button and stamps
+    // `role: 'failure'` on edit (done by the parent). `roleAccent` (e.g. 'warning')
+    // tones the static label. `hideRemove` suppresses the remove button on both slots.
+    staticLabel = '',
+    reserved = false,
+    roleAccent = '',
+    hideRemove = false,
     // Progressive systems award the group's results in ORDER (the award loop spends
     // the check budget down the list), so the GM needs to reorder them. When set,
     // each result row grows a drag handle wired to drag-and-drop reorder; other
@@ -138,10 +148,20 @@
   }
 </script>
 
-<div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`} data-recipe-set data-recipe-result-set-id={group?.id || ''}>
+<div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''} ${reserved ? 'is-reserved' : ''}`} data-recipe-set data-recipe-result-set-id={group?.id || ''}>
   {#if !chromeless}
     <div class="manager-recipe-ingredient-set-head">
-      {#if isIngredientRouting}
+      {#if staticLabel}
+        <div
+          class={`manager-recipe-result-set-static-label ${roleAccent ? `is-${roleAccent}` : ''}`}
+          data-recipe-result-set-static-label
+        >
+          {#if reserved}
+            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+          {/if}
+          <span>{staticLabel}</span>
+        </div>
+      {:else if isIngredientRouting}
         <RecipeRoutingAssignment
           options={ingredientSetOptions}
           selectedIds={assignedIngredientSetIds}
@@ -182,14 +202,16 @@
           aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
         />
       {/if}
-      <button
-        type="button"
-        class="manager-icon-button is-danger"
-        data-recipe-remove="result-set"
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
-        title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
-        onclick={() => onRemove()}
-      ><i class="fas fa-trash" aria-hidden="true"></i></button>
+      {#if !hideRemove && !reserved}
+        <button
+          type="button"
+          class="manager-icon-button is-danger"
+          data-recipe-remove="result-set"
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
+          title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
+          onclick={() => onRemove()}
+        ><i class="fas fa-trash" aria-hidden="true"></i></button>
+      {/if}
     </div>
   {/if}
 
@@ -261,3 +283,32 @@
     />
   </div>
 </div>
+
+<style>
+  /* Alchemy Simple two-slot editor: a fixed header label replacing the free-text
+     result-set name input (issue 554). The reserved failure slot tones warning. */
+  .manager-recipe-result-set-static-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--fab-mv2-text, var(--fab-text));
+  }
+
+  .manager-recipe-result-set-static-label.is-warning {
+    color: var(--fab-warning-text);
+  }
+
+  .manager-recipe-result-set-static-label i {
+    font-size: 0.8rem;
+  }
+
+  .manager-recipe-ingredient-set.is-reserved {
+    border-color: var(--fab-warning-border);
+    background: var(--fab-warning-soft);
+  }
+</style>

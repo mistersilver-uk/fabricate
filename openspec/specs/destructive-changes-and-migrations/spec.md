@@ -21,9 +21,10 @@ When `CraftingSystem.resolutionMode` changes:
    The confirmation reports accurate counts from a dry run: how many recipes will be migrated to the new mode and, only when any cannot be migrated, how many will be deleted and their names.
    When no recipe will be deleted the confirmation must not mention deletion.
 2. Persist the merged system (with its new mode) before migrating recipes, so recipe migration and validation read the new mode.
-3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `004-resolution-modes.md § Mode Invariant` (seed a result-selection provider, clear the routed selection, or carry it verbatim).
+3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `004-resolution-modes.md § Mode Invariant` (clear the routed selection, collapse a multi-ingredient-set recipe into alchemy, or carry it verbatim).
+   Migrating *into* `alchemy` seeds NO per-recipe provider (retired, issue 554): it clears any `resultSelection` and collapses a multi-INGREDIENT-SET recipe to its first set; the system-level `alchemy.checkMode` is seeded separately (defaults to `none`).
    Migrated recipes are persisted on structural validity alone.
-4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met by seed/clear: narrowing into `simple`/`progressive` from a recipe that is not 1×1, or moving a multi-step recipe into `alchemy`.
+4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met: narrowing into `simple`/`progressive` from a recipe that is not 1×1, or moving a multi-STEP recipe into `alchemy` (a multi-INGREDIENT-SET recipe is collapsed, not deleted).
 5. System-level gaps other than alchemy signature collisions (for example a target mode whose required check is unconfigured) never delete or disable a recipe here; they are surfaced as system-validation issues that gate visibility (see `recipe-visibility`), not deletions.
    An alchemy signature collision is the exception, handled by item 7 below: migrating *into* `alchemy` disables (`enabled = false`) the colliding recipes rather than deleting them or hard-blocking the switch.
    Migrating into routed `check` seeds the provider but does NOT author outcome tiers or mark any tier `success`, so a migrated routed system produces no result until a GM authors at least one Success outcome tier and routes a result group to it; this is surfaced as a validation issue, never auto-healed.
@@ -258,6 +259,33 @@ Fan-in (multiple outcomes -> one group) splits the group into per-outcome clones
 The salvage `salvageResolutionMode: "routed"` and the gathering economy
 `resolutionMode: "routed"` are unrelated routing concepts on separate enums and are
 explicitly untouched by this split — they keep the `routed` token.
+
+### Alchemy Check-Mode Migration (`1.14.0`, best-effort, per system)
+
+The per-recipe alchemy `resultSelection.provider` is retired for the system-level
+`alchemy.checkMode` (`none` | `simple` | `tiered`), issue 554.
+Per ALCHEMY system
+(`resolutionMode === "alchemy"`, incl. the legacy `cauldron` alias):
+
+1. Reduce over the system's alchemy recipes: `hasCheckProvider` = any recipe with
+   `resultSelection.provider === "check"`; `hasTieredShape` = any such `check` recipe
+   carrying MORE THAN ONE result group with a non-empty `checkOutcomeIds` (the tiered
+   routing shape).
+Seed `alchemy.checkMode = hasCheckProvider ? (hasTieredShape ?
+   "tiered" : "simple") : "none"`, but only when the system does not already carry a
+   valid `checkMode` (idempotency).
+2. Strip `resultSelection` from every alchemy recipe.
+A former `ingredientSet`-provider
+   recipe with a usable `craftingCheck.simple` that maps to `none` intentionally stops
+   running that check — `checkMode` is now the sole authority, not data loss.
+3. Collapse any multi-INGREDIENT-SET alchemy recipe to its first set (alchemy requires
+   exactly one set) with a single `console.warn`.
+This is DISTINCT from a multi-STEP
+   alchemy recipe, which stays unsupported (delete-on-migrate), not collapsed here.
+   Stale `checkOutcomeIds` on a Tiered→Simple/None reduction are left intact (inert,
+   preserved for round-trip).
+4. Idempotent once no alchemy `resultSelection` remains and each alchemy system has a
+   `checkMode` (re-run ⇒ no mutation, no duplicate warn, stable `checkMode`).
 
 ### Recipe Item Library Migration (Pre-Release)
 

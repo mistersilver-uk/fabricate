@@ -908,6 +908,9 @@
         "Banner": {
           "Discovered": "Discovered {name}!",
           "Brewed": "Brewed successfully.",
+          "TieredTier": "Brewed successfully — the check outcome selected the result.",
+          "ProducedOnFailure": "The brew failed its check and yielded the failure result.",
+          "DiscoveredOnFailure": "Learned {name} — the brew failed and yielded the failure result.",
           "Fizzled": "The mixture fizzles — no reaction."
         },
         "Workbench": "Workbench",
@@ -1353,6 +1356,7 @@
           "IssueProgressiveNoCheck": "Progressive mode requires a configured progressive crafting check.",
           "IssueProgressiveNoDifficulty": "Progressive mode requires at least one component with a difficulty of 1 or more.",
           "IssueMultiStepInAlchemy": "Multi-step recipes cannot be used while the system is in alchemy mode.",
+          "IssueAlchemyCheckNoFormula": "The alchemy check mode is Simple or Tiered but no crafting check roll formula is configured; no brew can resolve until one is set.",
           "IssueAlchemySignatureCollision": "Two recipes share an ingredient signature, so alchemy attempts are ambiguous."
         },
         "Nav": {
@@ -1635,6 +1639,8 @@
           "AddResultSet": "Add result set",
           "RemoveResultSet": "Remove result set",
           "ResultSetNamePlaceholder": "Result set name",
+          "AlchemyOnSuccess": "On success",
+          "AlchemyOnFailure": "On a failed check",
           "RoutingIngredientSets": "Produced by",
           "RoutingAddIngredientSet": "Add ingredient set",
           "RoutingSearchIngredientSets": "Search ingredient sets...",
@@ -3351,15 +3357,18 @@
             "Title": "Active",
             "OptionalHint": "Turn this check on to require a roll for the activity, or off to resolve it without one.",
             "RequiredHint": "The current resolution mode requires this check, so it cannot be turned off here.",
-            "GatheringHint": "In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here."
+            "GatheringHint": "In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.",
+            "AlchemyNoneHint": "This alchemy system resolves without a crafting check. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author one."
           },
           "Crafting": {
             "PageTitle": "Crafting check",
             "PageLead": "A system has a single crafting check. Its shape is determined by the system's resolution mode and preserved when you switch modes.",
             "ConfigHint": "Roll, difficulty, and outcome settings for the crafting check will appear here.",
+            "AlchemyNoneTitle": "Resolves without a check",
+            "AlchemyNoneLead": "This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author a crafting check.",
             "HelpKicker": "Crafting checks",
             "HelpTitle": "About crafting checks",
-            "HelpDesc": "The crafting check is shaped by the system resolution mode: simple and alchemy author a pass/fail check, routed authors outcome tiers, and progressive requires a check.",
+            "HelpDesc": "The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.",
             "Docs": "Docs",
             "TypeTitle": "Check type",
             "TypeRelative": "Relative",
@@ -3829,7 +3838,15 @@
           "Hint": "Configure the learning and failure behavior used by alchemy attempts in this crafting system.",
           "LearnOnCraft": "Learn recipes after a successful attempt",
           "ConsumeOnFail": "Consume submitted ingredients on failed attempts",
-          "ShowAttemptHistoryToPlayers": "Show attempt history to players"
+          "ShowAttemptHistoryToPlayers": "Show attempt history to players",
+          "CheckModeHeading": "Alchemy check",
+          "CheckModeIntro": "Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.",
+          "CheckModeNone": "No check",
+          "CheckModeNoneDesc": "A matched brew always succeeds and produces its single result set. No crafting check.",
+          "CheckModeSimple": "Simple check",
+          "CheckModeSimpleDesc": "A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.",
+          "CheckModeTiered": "Tiered check",
+          "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check."
         },
         "OutcomeRouting": {
           "Title": "Outcome Routing",

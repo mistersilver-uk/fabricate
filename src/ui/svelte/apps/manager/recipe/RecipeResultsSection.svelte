@@ -27,6 +27,10 @@
   let {
     resultGroups = [],
     complex = true,
+    // Alchemy Simple mode (issue 554): render a FIXED two-slot view — a labeled
+    // "On success" result set + a reserved, undeletable "On a failed check" set —
+    // instead of the generic add/remove group list. Decoupled from `complex`.
+    alchemySimple = false,
     componentOptions = [],
     // Result routing (routed systems only). `ingredientSets` is this scope's set
     // list (read to build per-result-set options + current assignments);
@@ -119,6 +123,39 @@
     onChange(groups.map((group, i) => (i === index ? nextGroup : group)));
   }
 
+  // Alchemy Simple two-slot view. The success set is the first non-failure group
+  // (mirroring `simpleGroup`); the failure set is the reserved `role: 'failure'`
+  // group, synthesized empty for display when absent. On either card's edit both
+  // slots are reconstructed (spread-to-preserve id/name like `updateSimpleGroup`),
+  // stamping `role: 'failure'` onto the failure slot — persist-on-first-edit.
+  const alchemySuccessGroup = $derived(
+    groups.find((group) => group?.role !== 'failure') || groups[0] || { results: [] }
+  );
+  const alchemyFailureGroup = $derived(
+    groups.find((group) => group?.role === 'failure') || { role: 'failure', results: [] }
+  );
+
+  function updateAlchemyPair(slot, nextGroup) {
+    const success =
+      slot === 'success'
+        ? {
+            ...alchemySuccessGroup,
+            ...nextGroup,
+            id: alchemySuccessGroup.id || nextGroup?.id || newId(),
+          }
+        : { ...alchemySuccessGroup, id: alchemySuccessGroup.id || newId() };
+    const failure =
+      slot === 'failure'
+        ? {
+            ...alchemyFailureGroup,
+            ...nextGroup,
+            role: 'failure',
+            id: alchemyFailureGroup.id || nextGroup?.id || newId(),
+          }
+        : { ...alchemyFailureGroup, role: 'failure', id: alchemyFailureGroup.id || newId() };
+    onChange([success, failure]);
+  }
+
   function addGroup() {
     onChange([...groups, { id: newId(), name: '', checkOutcomeIds: [], results: [] }]);
   }
@@ -134,7 +171,28 @@
       <h3>{text('FABRICATE.Admin.Manager.Recipe.ResultsSection', 'Results')}</h3>
     </div>
   </div>
-  {#if !effectiveComplex}
+  {#if alchemySimple}
+    <!-- Alchemy Simple: exactly two labeled result sets (success + reserved failure);
+         no add-set, no remove on either. -->
+    <div class="manager-recipe-result-set-alchemy-simple" data-recipe-result-alchemy-simple>
+      <RecipeResultGroupCard
+        group={alchemySuccessGroup}
+        {componentOptions}
+        hideRemove={true}
+        staticLabel={text('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
+        onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
+      />
+      <RecipeResultGroupCard
+        group={alchemyFailureGroup}
+        {componentOptions}
+        reserved={true}
+        hideRemove={true}
+        roleAccent="warning"
+        staticLabel={text('FABRICATE.Admin.Manager.Recipe.AlchemyOnFailure', 'On a failed check')}
+        onChange={(nextGroup) => updateAlchemyPair('failure', nextGroup)}
+      />
+    </div>
+  {:else if !effectiveComplex}
     <!-- Simple mode: a single result group with no Set-N label, remove, or add-set. -->
     <div class="manager-recipe-result-set-simple" data-recipe-result-simple>
       <RecipeResultGroupCard

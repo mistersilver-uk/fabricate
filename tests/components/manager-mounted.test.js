@@ -410,6 +410,15 @@ function createStore(calls = [], options = {}) {
       name: 'Alchemy',
       description: 'Potion and essence work',
       resolutionMode: options.alchemyResolutionMode || 'alchemy',
+      // System-level alchemy check mode (issue 554). Defaults to `simple` so the
+      // Checks tab renders the simple pass/fail editor for the default fixture;
+      // tests exercising None/Tiered pass their own `alchemyConfig`.
+      alchemy: options.alchemyConfig ?? {
+        checkMode: 'simple',
+        learnOnCraft: true,
+        consumeOnFail: true,
+        showAttemptHistoryToPlayers: false,
+      },
       craftingCheck: options.craftingCheck,
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
       salvageCraftingCheck: options.salvageCraftingCheck,
@@ -1963,6 +1972,74 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  async function mountChecksWithAlchemyCheckMode(checkMode) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { alchemyConfig: { checkMode } }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+  }
+
+  it('Checks: alchemy checkMode=none shows the read-only "resolves without a check" panel and no Active toggle (issue 554)', async () => {
+    await mountChecksWithAlchemyCheckMode('none');
+    assert.ok(
+      target.querySelector('[data-alchemy-none-readonly]'),
+      'None mode renders the read-only crafting panel'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      null,
+      'no editor in None mode'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-active-toggle]'),
+      null,
+      'None mode does not offer an Active toggle'
+    );
+  });
+
+  it('Checks: alchemy checkMode=simple renders the simple editor and cannot be disabled (issue 554)', async () => {
+    await mountChecksWithAlchemyCheckMode('simple');
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      'Simple mode renders the simple pass/fail editor'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-active-toggle]'),
+      null,
+      'Simple mode is mandatory — no Active toggle'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-active-required]'),
+      'Simple mode shows the cannot-be-disabled required hint'
+    );
+  });
+
+  it('Checks: alchemy checkMode=tiered renders the routed editor and cannot be disabled (issue 554)', async () => {
+    await mountChecksWithAlchemyCheckMode('tiered');
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-crafting-check-editor]'),
+      'Tiered mode renders the routed outcome-tier editor'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-active-toggle]'),
+      null,
+      'Tiered mode is mandatory — no Active toggle'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-active-required]'),
+      'Tiered mode shows the cannot-be-disabled required hint'
+    );
+  });
+
   it('points each Checks help card at the matching documentation page', () => {
     const cases = [
       {
@@ -3410,6 +3487,58 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target.querySelector('[data-crafting-settings-context] [data-crafting-effect]'),
       'the effect panel renders alongside the cards'
+    );
+  });
+
+  it('CraftingSettingsView shows the alchemy check-mode sub-section for alchemy and persists via setAlchemyCheckMode (issue 554)', () => {
+    const persisted = [];
+    mountCraftingSettingsView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'Alchemy System',
+        resolutionMode: 'alchemy',
+        visibilityMode: 'knowledge',
+        alchemy: { checkMode: 'none' },
+        features: {},
+        craftingEffect: { summaryKey: 'FABRICATE.Admin.Manager.Crafting.Effect.SummaryKnowledge' },
+      },
+      onSetAlchemyCheckMode: (mode) => persisted.push(mode),
+    });
+    assert.ok(
+      target.querySelector('[data-crafting-alchemy-checkmode-section]'),
+      'the alchemy check-mode sub-section renders under Recipe resolution'
+    );
+    const options = Array.from(
+      target.querySelectorAll('[data-crafting-alchemy-checkmode-option]')
+    ).map((option) => option.getAttribute('data-crafting-alchemy-checkmode-option'));
+    for (const mode of ['none', 'simple', 'tiered']) {
+      assert.ok(options.includes(mode), `check-mode option "${mode}" is offered`);
+    }
+    // Selecting Tiered persists live through setAlchemyCheckMode.
+    const tieredRadio = target.querySelector(
+      '[data-crafting-alchemy-checkmode-option="tiered"] input'
+    );
+    tieredRadio.checked = true;
+    tieredRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(persisted, ['tiered'], 'the sub-section persists the chosen check mode');
+  });
+
+  it('CraftingSettingsView hides the alchemy check-mode sub-section for non-alchemy systems (issue 554)', () => {
+    mountCraftingSettingsView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'Simple System',
+        resolutionMode: 'simple',
+        visibilityMode: 'knowledge',
+        features: {},
+        craftingEffect: { summaryKey: 'FABRICATE.Admin.Manager.Crafting.Effect.SummaryKnowledge' },
+      },
+    });
+    assert.equal(
+      target.querySelector('[data-crafting-alchemy-checkmode-section]'),
+      null,
+      'no alchemy sub-section for a non-alchemy system'
     );
   });
 

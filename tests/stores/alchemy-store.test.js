@@ -304,7 +304,7 @@ describe('alchemyStore', () => {
     assert.deepEqual(harness.calls.submit[0].submittedComponentIds, ['ashsalt', 'ashsalt']);
     assert.equal(harness.calls.submit[0].interactive, true);
     assert.equal(store.benchEmpty, true, 'the bench clears after a brew');
-    assert.equal(store.lastBrew.ok, true);
+    assert.equal(store.lastBrew.status, 'success');
     assert.equal(store.lastBrew.discovered, 'Smoke Bomb');
   });
 
@@ -319,7 +319,7 @@ describe('alchemyStore', () => {
     flushSync();
     await store.brew();
     flushSync();
-    assert.equal(store.lastBrew.ok, false);
+    assert.equal(store.lastBrew.status, 'no-match-fizzle');
     assert.equal(store.lastBrew.discovered, null);
     assert.equal(store.benchEmpty, true);
   });

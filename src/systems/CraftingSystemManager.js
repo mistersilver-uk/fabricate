@@ -1464,7 +1464,14 @@ export class CraftingSystemManager {
   _normalizeAlchemyConfig(config, resolutionMode) {
     if (resolutionMode !== 'alchemy' && resolutionMode !== 'cauldron') return null; // T-189: accept both
     const c = config && typeof config === 'object' ? config : {};
+    // System-level alchemy check mode (replaces the retired per-recipe
+    // `resultSelection.provider`): `none` (no check, matched brew always
+    // succeeds), `simple` (mandatory pass/fail check; pass → success group,
+    // fail → the reserved failure group), or `tiered` (mandatory routed check,
+    // identical routing to `routedByCheck`). Defaults to `none`.
+    const checkMode = ['none', 'simple', 'tiered'].includes(c.checkMode) ? c.checkMode : 'none';
     return {
+      checkMode,
       learnOnCraft: c.learnOnCraft === true,
       consumeOnFail: c.consumeOnFail !== false,
       showAttemptHistoryToPlayers: c.showAttemptHistoryToPlayers !== false,

@@ -18,6 +18,10 @@
     multiStepEnabled = false,
     complex = false,
     multiSetAllowed = false,
+    // Alchemy recipes always have exactly one ingredient set and derive their result
+    // shape from the system-level alchemy.checkMode, so the Simple/Complex toggle is
+    // never shown for them (the retired per-recipe routing basis is gone).
+    hideComplexToggle = false,
     onSetComplexity = () => {},
     onAddRecipeItem = () => {},
     onSetRecipeItem = () => {},
@@ -130,7 +134,7 @@
 
   // Simple vs Complex authoring mode. Complex is gated on the system's resolution
   // mode (multiSetAllowed); a recipe that is already complex can always stay complex.
-  const complexAllowed = $derived(multiSetAllowed || complex);
+  const complexAllowed = $derived(!hideComplexToggle && (multiSetAllowed || complex));
 
   function selectComplexity(next) {
     if (next === complex) return;

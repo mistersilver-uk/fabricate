@@ -405,7 +405,7 @@ If recipe-level sets are absent, display the active step's sets or a step overvi
   - OR across ingredient sets
   - AND across groups within a set
   - OR within group options
-- Unit tests for routed resolution per mode (`routedByIngredients`, `routedByCheck`) and the alchemy providers (`ingredientSet`, `check`).
+- Unit tests for routed resolution per mode (`routedByIngredients`, `routedByCheck`) and the alchemy check-mode matrix (`none`, `simple` pass/fail incl. the reserved failure-group path, `tiered`).
 - Unit tests for time/currency gate checks.
 - Integration tests for end-to-end multistep crafting, resume, and completion.
 - Unit tests for alchemy no-signature handling (failure + ingredient consumption + history entry).

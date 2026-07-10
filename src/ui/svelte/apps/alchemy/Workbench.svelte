@@ -75,12 +75,36 @@
   const showUnknown = $derived(mode === 'untried');
   const showMissing = $derived(mode === 'assembling' && missing.length > 0);
 
+  // Brew status enum → banner tone + icon. `produced-on-failure` is a distinct
+  // WARNING state (a failed Simple brew that still yielded the failure result set),
+  // never success-green; a discovery composes with it.
+  const bannerStatus = $derived(lastBrew?.status ?? null);
+  const bannerTone = $derived.by(() => {
+    if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'is-success';
+    if (bannerStatus === 'produced-on-failure') return 'is-warning';
+    return 'is-danger';
+  });
+  const bannerIcon = $derived.by(() => {
+    if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'fa-circle-check';
+    if (bannerStatus === 'produced-on-failure') return 'fa-triangle-exclamation';
+    return 'fa-circle-xmark';
+  });
+
   const bannerText = $derived.by(() => {
     if (!lastBrew) return '';
-    if (lastBrew.ok) {
+    if (bannerStatus === 'produced-on-failure') {
       return lastBrew.discovered
-        ? localize('FABRICATE.App.Alchemy.Banner.Discovered', { name: lastBrew.discovered })
-        : lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.Brewed');
+        ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredOnFailure', { name: lastBrew.discovered })
+        : localize('FABRICATE.App.Alchemy.Banner.ProducedOnFailure');
+    }
+    if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') {
+      if (lastBrew.discovered) {
+        return localize('FABRICATE.App.Alchemy.Banner.Discovered', { name: lastBrew.discovered });
+      }
+      if (bannerStatus === 'tiered-tier') {
+        return lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.TieredTier');
+      }
+      return lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.Brewed');
     }
     return lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.Fizzled');
   });
@@ -217,8 +241,12 @@
 
   <div class="alchemy-brew-area">
     {#if lastBrew}
-      <div class="alchemy-banner" class:is-ok={lastBrew.ok} data-alchemy-banner>
-        <i class="fas {lastBrew.ok ? 'fa-circle-check' : 'fa-circle-xmark'}" aria-hidden="true"></i>
+      <div
+        class="alchemy-banner {bannerTone}"
+        data-alchemy-banner
+        data-alchemy-banner-status={bannerStatus}
+      >
+        <i class="fas {bannerIcon}" aria-hidden="true"></i>
         <span>{bannerText}</span>
       </div>
     {/if}
@@ -638,10 +666,16 @@
     color: var(--fab-danger-text);
   }
 
-  .alchemy-banner.is-ok {
+  .alchemy-banner.is-success {
     background: var(--fab-success-soft);
     border-color: var(--fab-success-border);
     color: var(--fab-success-text);
+  }
+
+  .alchemy-banner.is-warning {
+    background: var(--fab-warning-soft);
+    border-color: var(--fab-warning-border);
+    color: var(--fab-warning-text);
   }
 
   .alchemy-brew {

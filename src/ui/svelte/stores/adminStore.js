@@ -2093,6 +2093,9 @@ function _buildSelectedSystemViewData(
     alchemy:
       selectedSystem.resolutionMode === 'alchemy'
         ? {
+            checkMode: ['none', 'simple', 'tiered'].includes(selectedSystem.alchemy?.checkMode)
+              ? selectedSystem.alchemy.checkMode
+              : 'none',
             learnOnCraft: selectedSystem.alchemy?.learnOnCraft === true,
             consumeOnFail: selectedSystem.alchemy?.consumeOnFail !== false,
             showAttemptHistoryToPlayers:
@@ -7076,13 +7079,37 @@ export function createAdminStore(services) {
     if (!system) return;
 
     const existing = system.alchemy || {};
+    const checkMode = ['none', 'simple', 'tiered'].includes(config.checkMode)
+      ? config.checkMode
+      : ['none', 'simple', 'tiered'].includes(existing.checkMode)
+        ? existing.checkMode
+        : 'none';
     await systemManager.updateSystem(sysId, {
       alchemy: {
         ...existing,
+        checkMode,
         learnOnCraft: config.learnOnCraft === true,
         consumeOnFail: config.consumeOnFail !== false,
         showAttemptHistoryToPlayers: config.showAttemptHistoryToPlayers !== false,
       },
+    });
+    await refresh();
+  }
+
+  // Live-set ONLY the system-level alchemy check mode (none/simple/tiered) from the
+  // Recipe Resolution settings sub-section. MUST spread the nested alchemy block:
+  // updateSystem shallow-merges the top level, so a naive `{ alchemy: { checkMode } }`
+  // would drop learnOnCraft/consumeOnFail/showAttemptHistoryToPlayers and silently
+  // re-default them.
+  async function setAlchemyCheckMode(checkMode) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const next = ['none', 'simple', 'tiered'].includes(checkMode) ? checkMode : 'none';
+    await systemManager.updateSystem(sysId, {
+      alchemy: { ...(system.alchemy || {}), checkMode: next },
     });
     await refresh();
   }
@@ -7648,6 +7675,7 @@ export function createAdminStore(services) {
     clearCurrencyMacro,
     seedCurrencyUnitPresets,
     saveAlchemyConfig,
+    setAlchemyCheckMode,
     saveTeaserConfig,
     createRecipe,
     deleteRecipe,

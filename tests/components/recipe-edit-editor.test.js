@@ -198,35 +198,28 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(/\n[ \t]*confirmRecipeAction,/.test(storeSource), 'store exports confirmRecipeAction');
   });
 
-  it('seeds an alchemy routing provider when a recipe is switched to Complex (so the basis is never left unselected)', () => {
-    // A freshly-created recipe carries no resultSelection. ALCHEMY is the only mode
-    // that still routes via a recipe-level provider, so entering Complex in an
-    // alchemy system must seed a provider. The routed crafting modes derive their
-    // basis from the system mode and carry no resultSelection.
+  it('never seeds an alchemy routing provider on Complex (the per-recipe provider is retired)', () => {
+    // Alchemy now routes on the system-level alchemy.checkMode, so the per-recipe
+    // resultSelection.provider is retired: entering Complex seeds NOTHING, and the
+    // Complex toggle is hidden for alchemy (its shape derives from checkMode).
     assert.ok(
-      rootSource.includes(
+      !rootSource.includes(
         "import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js'"
       ),
-      'root reuses the migration provider-choice contract (no drift)'
-    );
-    const start = rootSource.indexOf('async function handleSetRecipeComplexity(');
-    assert.ok(start !== -1, 'handleSetRecipeComplexity defined');
-    const body = rootSource.slice(start, rootSource.indexOf('\n  }', start));
-    assert.ok(
-      body.includes("=== 'alchemy'"),
-      'the provider seed is gated on alchemy (the routed modes carry no provider)'
+      'root no longer imports the retired provider-choice contract'
     );
     assert.ok(
-      body.includes("existingProvider !== 'check' && existingProvider !== 'ingredientSet'"),
-      'only seeds when the draft has no valid provider (never clobbers an authored choice)'
+      !rootSource.includes('chooseSeedProvider('),
+      'root no longer seeds an alchemy resultSelection.provider'
+    );
+    // The alchemy recipe editor hides the Simple/Complex toggle entirely.
+    assert.ok(
+      rootSource.includes("hideComplexToggle={selectedSystem?.resolutionMode === 'alchemy'}"),
+      'the recipe inspector hides the Complex toggle for alchemy'
     );
     assert.ok(
-      body.includes('chooseSeedProvider(selectedSystem'),
-      'seeds via the shared chooseSeedProvider using the selected system'
-    );
-    assert.ok(
-      /patch\.resultSelection = \{\s*provider: chooseSeedProvider/.test(body),
-      'the seeded provider is staged onto the draft resultSelection'
+      inspectorSource.includes('hideComplexToggle'),
+      'RecipeItemInspector honours a hideComplexToggle prop'
     );
   });
 

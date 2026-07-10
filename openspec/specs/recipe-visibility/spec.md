@@ -240,12 +240,14 @@ Reject if knowledge access is denied.
 Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 
 1. Recipe lists are hidden from non-GM users by default.
-2. Learned visibility behavior:
-   - if `alchemy.learnOnCraft === true`, a recipe may become visible only after successful craft completion and learning.
-   - if `alchemy.learnOnCraft !== true`, recipes remain hidden to non-GM users.
-3. Learning is never granted by failed attempts.
-4. No-signature attempts are treated as failed attempts (not misconfiguration errors).
+2. Learned visibility behavior — discovery is on a MATCHED SIGNATURE, decoupled from check success (issue 554):
+   - if `alchemy.learnOnCraft === true`, a matched-signature attempt learns the recipe REGARDLESS of the check outcome — a passed OR failed Simple brew (and any matched Tiered brew) learns it; the recipe becomes visible after learning.
+   - if `alchemy.learnOnCraft !== true`, recipes remain hidden to non-GM users (learning off ⇒ nothing learned).
+3. Learning is never granted by a NO-SIGNATURE fizzle (which still grants nothing — dead-end/`no-reaction` memory only).
+A matched-signature check FAILURE is a genuine discovery, not a fizzle.
+4. No-signature attempts are treated as failed attempts (fizzles, not misconfiguration errors).
 5. If a matched alchemy attempt cannot route to a valid result group, classify as crafting-system misconfiguration error (GM-fix required), not a player-failure outcome.
+This applies to **Tiered only** (None/Simple never route by name).
 6. The player listing projection (`AlchemyListingBuilder`) surfaces learned recipes plus the undiscovered **count** only.
 The count is derived behind the viewer-enforcing seam via the System-Validity Gate + Listing Algorithm step-2 enabled filter — the client never receives the undiscovered list to count locally, and no undiscovered name/signature/result reaches any client field.
 7. A fizzled attempt MAY record a per-character dead-end key at `Actor.flags.fabricate.alchemyDeadEnds`, gated by `alchemy.showAttemptHistoryToPlayers`.

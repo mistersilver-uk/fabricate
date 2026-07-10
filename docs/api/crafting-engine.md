@@ -75,14 +75,22 @@ A check is only "usable" when its resolution-mode sub-object carries an authored
 
 | Resolution mode | Sub-object | Usable when |
 |:----------------|:-----------|:------------|
-| `simple` / `alchemy` | `system.craftingCheck.simple` | `simple.rollFormula` is set |
+| `simple` | `system.craftingCheck.simple` | `simple.rollFormula` is set |
 | `routedByCheck` | `system.craftingCheck.routed` | `routed.rollFormula` is set |
 | `routedByIngredients` | `system.craftingCheck.routed` | `routed.rollFormula` is set (the check is optional and does not select the result) |
 | `progressive` | `system.craftingCheck.progressive` | `progressive.rollFormula` is set |
+| `alchemy`, `checkMode: 'none'` | — | never (a matched brew always succeeds) |
+| `alchemy`, `checkMode: 'simple'` | `system.craftingCheck.simple` | mandatory (`simple.rollFormula` must be set) |
+| `alchemy`, `checkMode: 'tiered'` | `system.craftingCheck.routed` | mandatory (`routed.rollFormula` must be set) |
 
 In simple mode the check is optional.
 It runs only when `simple.rollFormula` is set and the system enables crafting checks (`craftingCheck.enabled` is `true` or the system's `craftingChecks` feature is on).
-In alchemy mode the check is always on whenever `simple.rollFormula` is set.
+
+In alchemy mode the check is driven by the system-level `alchemy.checkMode`, not the `craftingChecks` toggle.
+`none` runs no check, and a matched brew always succeeds.
+`simple` runs the mandatory pass/fail check from `craftingCheck.simple`.
+`tiered` runs the mandatory routed check from `craftingCheck.routed`, exactly like `routedByCheck`.
+Both `simple` and `tiered` are mandatory, so a missing roll formula is a misconfiguration that fails the attempt loudly before anything is consumed.
 
 Routed-by-check and progressive modes both require a usable check.
 When the resolution mode requires a check but no roll formula is configured, the engine fails loudly with `success: false` and a message of the form `<mode> mode requires a configured crafting check roll formula`, so the misconfiguration is visible.

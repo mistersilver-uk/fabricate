@@ -537,9 +537,13 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(managerSource.includes('store.saveSystemDetails?.('), 'system edit should save details through the admin store');
     assert.ok(managerSource.includes('onSetResolutionMode(nextMode)') || managerSource.includes('store.setResolutionMode?.(nextMode)'), 'system edit should delegate resolution changes to the admin store');
     assert.ok(rootSource.includes('store.setResolutionMode?.'), 'root should pass the resolution-mode callback through to the system-edit view');
-    assert.ok(managerSource.includes("value: 'routed'"), 'system edit should offer the canonical routed persistence value');
-    assert.ok(!managerSource.includes("value: 'mapped'"), 'system edit should not offer the legacy mapped persistence value');
-    assert.ok(!managerSource.includes("value: 'tiered'"), 'system edit should not offer the legacy tiered persistence value');
+    // Scope the resolution/salvage persistence-value assertions to the resolution
+    // mode options module: the alchemy check-mode selector on the Crafting Settings
+    // page legitimately carries a `value: 'tiered'` check-mode option that is
+    // unrelated to the retired legacy resolution/salvage `tiered` mode.
+    assert.ok(resolutionModeOptionsSource.includes("value: 'routed'"), 'salvage resolution should offer the canonical routed persistence value');
+    assert.ok(!resolutionModeOptionsSource.includes("value: 'mapped'"), 'resolution options should not offer the legacy mapped persistence value');
+    assert.ok(!resolutionModeOptionsSource.includes("value: 'tiered'"), 'resolution options should not offer the legacy tiered persistence value');
     assert.ok(!rootSource.includes('store.toggleAdvancedOptions?.'), 'root should not retain the removed advanced visibility toggle wiring');
     assert.ok(rootSource.includes('store.toggleFeature?.'), 'root should delegate feature toggles to the admin store');
     assert.ok(!managerSource.includes("storeKey: 'complexRecipes'"), 'system edit should not reintroduce the legacy complex recipes toggle');

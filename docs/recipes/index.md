@@ -83,7 +83,7 @@ The resolution mode determines how ingredients map to results:
 | [Routed by ingredients]({% link recipes/routed.md %})         | 1+   | 1+            | Optional       | The ingredients used select the result                      |
 | [Routed by check]({% link recipes/routed.md %})               | 1+   | 1+            | **Yes**        | A skill-check outcome selects the result                    |
 | [Progressive]({% link recipes/progressive.md %})              | 1    | 1 (ordered)   | **Yes**        | Skill check value "buys" results in order                   |
-| [Alchemy]({% link recipes/alchemy.md %})                      | 1+   | 1+            | Optional       | Players experiment with ingredients. Recipe names are hidden |
+| [Alchemy]({% link recipes/alchemy.md %})                      | 1    | 1+            | Set by check mode | Players experiment with ingredients. Recipe names are hidden |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 

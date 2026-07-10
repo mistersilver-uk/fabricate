@@ -42,7 +42,7 @@ new Recipe({
   resultGroups,          // object[]
   toolIds,               // string[] (library Tool ids required for crafting)
   transferEffects,       // boolean (default false)
-  resultSelection: {     // object (alchemy mode only)
+  resultSelection: {     // object (legacy, retired — round-trip only)
     provider             // "ingredientSet" | "check"
   },
   metadata               // object (created, modified, author, version)
@@ -50,8 +50,9 @@ new Recipe({
 ```
 
 {: .note }
-> `resultSelection.provider` now applies to alchemy recipes only.
-> The two routed crafting modes (`routedByIngredients` and `routedByCheck`) derive their routing basis from the system mode and carry no `resultSelection`.
+> The per-recipe `resultSelection.provider` is retired (issue 554).
+> No live resolution mode reads it: alchemy routing moved to the system-level alchemy check mode (`system.alchemy.checkMode`), and the two routed crafting modes (`routedByIngredients` and `routedByCheck`) derive their routing basis from the system mode.
+> The field is still normalised so a legacy recipe round-trips until migration strips it, but authoring no longer sets it.
 > `routedByIngredients` routes by each `IngredientSet.resultGroupId`, and `routedByCheck` routes by the system's routed crafting-check outcome.
 > The legacy `outcomeRouting` field and the legacy `mapped`/`tiered` and single `routed` modes are normalised on load.
 > `mapped` becomes `routedByIngredients` and `tiered` becomes `routedByCheck`.

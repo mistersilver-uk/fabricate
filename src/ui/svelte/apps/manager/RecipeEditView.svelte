@@ -26,6 +26,10 @@
   let {
     recipe = null,
     complex = false,
+    // Alchemy Simple two-slot result editor (issue 554). Declared+forwarded here so
+    // the Results tab receives it through the wrapper (a tab prop that skips this
+    // wrapper silently drops to its default and never renders).
+    alchemySimple = false,
     saving = false,
     saveFailed = false,
     onPickImagePath = null,
@@ -261,6 +265,7 @@
           <RecipeResultsTab
             {recipe}
             {complex}
+            {alchemySimple}
             {isMultiStep}
             {componentOptions}
             {routingProvider}
