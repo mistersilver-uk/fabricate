@@ -678,6 +678,10 @@ Represent one curated item entry available to recipes and salvage operations.
 5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
 Explicit `fabricate.essences` item flags remain a compatibility override for that item.
+The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
+The separate name fallback some callers apply after the resolver returns null is not part of this matcher and is unchanged here.
+That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine._findComponentItems`.
+Closing that name path is deferred to issue 557.
 7. `salvage.outcomeRouting` is only meaningful when `salvageResolutionMode` is `"routed"`.
 In routed salvage mode it keys on the salvage check's outcome-tier NAMES (`salvageCraftingCheck.routed.{relativeOutcomes,fixedOutcomes}` for the active `type`) — the same source the per-component routing editor offers and the runtime routes by — NOT the legacy flat `salvageCraftingCheck.outcomes` list.
 Every SUCCESS tier must route to an existing result group; failure tiers may stay unrouted (the runtime yields nothing for an unrouted outcome), and a route pointing at a deleted group is invalid.
@@ -828,9 +832,26 @@ The first tier that yields a match wins, with no fall-through.
 Foundry v12+ uses `_stats.compendiumSource`; Foundry v11 and earlier used `flags.core.sourceId`.
 Runtime implementations call the shared source UUID resolver and the shared matcher; they must not re-implement it.
 
+### Component Item Matching
+
+A candidate owned item is resolved to the single component it IS through one shared, list-aware, system-scoped resolver, `resolveComponentForItem(item, components, systemId)`, evaluated against one crafting system's component set.
+The resolver is expressed as tiers with fall-through, parallel to the recipe-item matcher `matchRecipeItemDefinition`.
+Identity tier: when the item's `roles[systemId].componentId`, or failing that its legacy scalar `componentId`, names a component in the set, that component is the identity and it matches exclusively; every other component in the set fails closed.
+Fall-through: when no claimed id names a component in the set, the resolver falls through to the union of raw source references (`uuid`, `_stats.compendiumSource` / `flags.core.sourceId`, and the transitive `_stats.duplicateSource`), exactly as before.
+The raw-reference fall-through is load-bearing for multi-system worlds, stale flags, and un-stamped pre-#555 worlds.
+The invariant is that within a single system's component set at most one component bears a given id; component ids are NOT globally unique because a copy-imported system preserves its origin's component ids.
+The resolver is the single component matcher used across crafting ingredient and collection matching, recipe tool matching, essence resolution, the inventory used-by listing, owned-item repair, gathering award-stacking, and canvas Item→Tool drop resolution.
+This closes the transitive-`_stats.duplicateSource` false positive on the source-reference path while preserving a system's recognition of its own component in multi-system worlds.
+Residual, time-boxed to close with issue 561: two copy-imported systems can share a component id, so a legacy-scalar-only item can still resolve to a same-numbered component in another system; the per-system `roles` map removes this for restamped items, and issue 561 relieves `componentId` of its cross-system Tool-reference duty so copy-import may then regenerate component ids and close the residual entirely.
+
 ### Registration Source Identity
 
-At registration (both recipe items and components), a definition's `sourceItemUuid` is a best-effort source POINTER; the durable flag (`recipeItemDefinitionId` for recipe items, `componentId` for components) is the identity-OF-RECORD.
+At registration (both recipe items and components), a definition's `sourceItemUuid` is a best-effort source POINTER; the durable flag is the identity-OF-RECORD.
+A component's durable identity-of-record is `flags.fabricate.roles[systemId].componentId`, a per-system role map, while a recipe item still uses the single scalar `flags.fabricate.recipeItemDefinitionId`.
+The earlier framing of one symmetric durable flag across both kinds no longer holds and is corrected here to name this interim asymmetry.
+A legacy scalar `flags.fabricate.componentId` is still honored at match time as a claimed id until the one-shot component restamp runs.
+`flags.fabricate.roles` is the unified, final per-system role map and the single eventual home for all three durable identities; issue 556 populates `componentId`, issue 561 populates `toolId`, and the recipe-item follow-up populates `recipeItemDefinitionId` (retiring the scalar and its cross-system limitation below), each an additive sibling key.
+Registration stamps `roles[system.id].componentId` and clears only that per-system key on re-point or repair, never the whole flag.
 
 - A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
 A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
@@ -847,15 +868,18 @@ It is cleanly distinguishable from the duplicate case by the absence of `_stats.
 ### Repair and Auto-Stamp
 
 - A primary-GM-gated (`game.users.activeGM?.id === game.user?.id`), idempotent, one-shot `ready`-body pass — keyed by the `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting — stamps `recipeItemDefinitionId` on every registered definition's writable source Item (world items and unlocked-pack items; locked packs skipped), and strips a clone's stale `_stats`.
+A separate one-shot, primary-GM-gated, `ready`-body restamp — keyed by the `COMPONENT_FLAG_STAMP_VERSION` world setting — backfills `roles[system.id].componentId` for every registered component's writable source Item; it mirrors the recipe-item auto-stamp and is likewise NOT a `MigrationRunner` entry.
 This removes the confirmed regression whereby a real registered book and an unregistered duplicate of it are byte-for-byte identical on the matcher's inputs (tier-4 only).
 It is NOT a `MigrationRunner` entry: that runner reads and writes only settings-data payloads and has no Item handle, so it cannot write Item flags.
 - A GM **Repair item data** maintenance action reconciles both kinds across world items, writable packs, and actor-owned items.
 World/pack SOURCE items use the same clone-gated identity (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
-Actor-owned copies use the ordinary four-tier matcher (no clone-gate).
+Actor-owned copies use the ordinary runtime matchers — the four-tier recipe-item matcher, or the list-aware, system-scoped component resolver (no clone-gate).
+Components are reconciled PER SYSTEM: the repair resolves each item against one system's component set with that system's id, and writes or clears ONLY that system's `roles[systemId].componentId` map key, so a non-owning system's null-owner pass finds its own leaf unset and no-ops — it can never clear another system's identity regardless of `getSystems()` order.
 For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by a globally-unique, exact (case/whitespace-normalized) name match to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions anywhere is skipped as ambiguous.
 A flagged owned copy is authoritative and left untouched, and repair never triggers a learn.
-- Cross-system shared source (two systems each owning a definition with the same `sourceItemUuid`) keeps a single flag: last writer wins, and the other system's copies fall to tier 4 (their bulk auto-learn refused by the confidence gate, while explicit learn and display still work).
-This is a documented, tested limitation.
+- Cross-system shared source (two systems each owning a definition with the same `sourceItemUuid`) keeps a single flag for RECIPE ITEMS only, as a transitional exception, because their identity remains a scalar for now: last writer wins, and the other system's copies fall to tier 4 (their bulk auto-learn refused by the confidence gate, while explicit learn and display still work).
+This is a documented, tested limitation — not a permanent difference; the recipe-item follow-up moves it onto `roles[systemId].recipeItemDefinitionId` and removes it.
+Components no longer have that limitation: the per-system `roles` map lets a source registered in several systems resolve to the correct component in EACH system.
 
 ### Match Context Contract
 
@@ -1708,6 +1732,11 @@ A virtual-present match fires only when the evaluated task/recipe's own crafting
 With no active tool the payload is null (inert).
 4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`.
 The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
+
+### Item → Tool Drop Resolution
+
+When a GM drops a real Foundry Item onto the canvas, the dropped Item is resolved to a Tool through the list-aware, system-scoped component resolver (**Component Item Matching**) above, against the system's component set: the item is resolved once to the single component it IS, and the drop spawns the Tool whose `componentId` equals that resolved id.
+An Item whose durable identity names a different component is NOT resolved to a Tool via an inherited, transitive `_stats.duplicateSource`.
 
 ### Drop-Time Environment Resolution Precedence
 
