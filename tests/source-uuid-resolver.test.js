@@ -23,9 +23,24 @@ const {
   getItemSourceReferences,
   getItemIdentityReferences,
   getComponentSourceReferences,
+  getRecipeItemSourceReferences,
   itemMatchesComponentSource,
+  matchRecipeItemDefinition,
+  itemMatchesRecipeItemSource,
   findStackableMatch
 } = await import('../src/utils/sourceUuid.js');
+
+// An item-like object whose `getFlag` returns the durable recipe-item flag, mirroring
+// how getFabricateFlag normalizes 'recipeItemDefinitionId' -> 'fabricate.recipeItemDefinitionId'.
+function itemWithRecipeItemFlag(definitionId, extra = {}) {
+  return {
+    getFlag(scope, key) {
+      if (scope === 'fabricate' && key === 'fabricate.recipeItemDefinitionId') return definitionId;
+      return undefined;
+    },
+    ...extra
+  };
+}
 
 test('1 - returns _stats.compendiumSource when present (v12+ canonical field)', () => {
   const item = {
@@ -286,4 +301,71 @@ test('28 - itemMatchesComponentSource does NOT match a different componentId fla
     fallbackItemIds: []
   };
   assert.equal(itemMatchesComponentSource(item, component), false);
+});
+
+// ---------------------------------------------------------------------------
+// matchRecipeItemDefinition — four-tier precedence, no fall-through, union refs
+// ---------------------------------------------------------------------------
+
+const BOOK_DEF = { id: 'def-book', sourceUuid: 'Item.book', sourceItemUuid: 'Compendium.mod.book', fallbackItemIds: [] };
+
+test('29 - matchRecipeItemDefinition: tier 1 (durable flag) wins even when source uuids point elsewhere', () => {
+  const item = itemWithRecipeItemFlag('def-book', { uuid: 'Item.unrelated', _stats: {} });
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'identity' });
+});
+
+test('30 - matchRecipeItemDefinition: tier 2 (own uuid) matches sourceUuid via the union', () => {
+  const item = { uuid: 'Item.book', _stats: {}, getFlag: () => undefined };
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'uuid' });
+});
+
+test('31 - matchRecipeItemDefinition: tier 3 (compendium source) matches sourceItemUuid', () => {
+  const item = { uuid: 'Item.copy', _stats: { compendiumSource: 'Compendium.mod.book' }, getFlag: () => undefined };
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'compendium' });
+});
+
+test('32 - matchRecipeItemDefinition: tier 4 (duplicate source) is the last resort', () => {
+  const item = { uuid: 'Item.copy', _stats: { duplicateSource: 'Item.book' }, getFlag: () => undefined };
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'duplicate' });
+});
+
+test('33 - matchRecipeItemDefinition: no fall-through — a flag match to one def never falls to a uuid match on another', () => {
+  const flagged = { id: 'def-flag', sourceItemUuid: 'Item.nowhere' };
+  const bySource = { id: 'def-src', sourceUuid: 'Item.book', sourceItemUuid: 'Item.book' };
+  const item = itemWithRecipeItemFlag('def-flag', { uuid: 'Item.book', _stats: {} });
+  // Tier 1 resolves def-flag; it must NOT fall through to the tier-2 uuid match on def-src.
+  assert.deepEqual(matchRecipeItemDefinition(item, [flagged, bySource]), { definition: flagged, tier: 'identity' });
+});
+
+test('34 - matchRecipeItemDefinition: union resolves BOTH drag routes of a compendium-imported book', () => {
+  const fromCompendium = { uuid: 'Item.a', _stats: { compendiumSource: 'Compendium.mod.book' }, getFlag: () => undefined };
+  const fromWorldItem = { uuid: 'Item.b', _stats: { compendiumSource: 'Compendium.mod.book', duplicateSource: 'Item.book' }, getFlag: () => undefined };
+  assert.equal(matchRecipeItemDefinition(fromCompendium, [BOOK_DEF]).definition, BOOK_DEF);
+  assert.equal(matchRecipeItemDefinition(fromWorldItem, [BOOK_DEF]).definition, BOOK_DEF);
+});
+
+// False-positive guards (companions to tests 16-17, 19-22 which only assert true-positives).
+
+test('35 - matchRecipeItemDefinition: an item sharing NO ref returns no match', () => {
+  const item = { uuid: 'Item.other', _stats: { compendiumSource: 'Compendium.mod.other', duplicateSource: 'Item.other' }, getFlag: () => undefined };
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: null, tier: null });
+  assert.equal(itemMatchesRecipeItemSource(item, [BOOK_DEF]), false);
+});
+
+test('36 - matchRecipeItemDefinition: a non-matching durable flag does NOT match (no false positive on flag)', () => {
+  const item = itemWithRecipeItemFlag('def-other', { uuid: 'Item.x', _stats: {} });
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: null, tier: null });
+});
+
+test('37 - matchRecipeItemDefinition: empty definitions, null item, and blank refs never match', () => {
+  assert.deepEqual(matchRecipeItemDefinition({ uuid: 'Item.book', getFlag: () => undefined }, []), { definition: null, tier: null });
+  assert.deepEqual(matchRecipeItemDefinition(null, [BOOK_DEF]), { definition: null, tier: null });
+  const blankDef = { id: 'blank', sourceItemUuid: '  ' };
+  const item = { uuid: '', _stats: {}, getFlag: () => undefined };
+  assert.equal(itemMatchesRecipeItemSource(item, [blankDef]), false);
+});
+
+test('38 - getRecipeItemSourceReferences unions sourceUuid, sourceItemUuid, and fallbacks like the component helper', () => {
+  const def = { sourceUuid: 'Item.book', sourceItemUuid: 'Compendium.mod.book', fallbackItemIds: ['Item.old', 'Item.book'] };
+  assert.deepEqual(getRecipeItemSourceReferences(def), ['Item.book', 'Compendium.mod.book', 'Item.old']);
 });
