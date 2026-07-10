@@ -82,8 +82,10 @@ function installSystem(system) {
 const ACTOR_REF = { uuid: 'Actor.a1' };
 
 // Build an owned tool item on top of the shared `roleItem` fixture (A4-compliant
-// durable-flag surface) and add the mutation methods the breakage path calls.
-function ownedTool(spec) {
+// durable-flag surface) and add the mutation methods the breakage path calls. The
+// `toolUsage` flag is OBSERVABLE (a live `timesUsed` counter) so a `limitedUses`
+// usage-increment gate can be asserted, not just the `delete()` side effect.
+function ownedTool(spec = {}) {
   const item = roleItem(spec);
   item.parent = ACTOR_REF;
   item.deleted = false;
@@ -91,7 +93,17 @@ function ownedTool(spec) {
     item.deleted = true;
   };
   item.update = async () => {};
-  item.setFlag = async () => {};
+  let toolUsage = { timesUsed: spec.timesUsed ?? 0 };
+  const baseGetFlag = item.getFlag;
+  item.getFlag = (scope, key) => {
+    if (scope === 'fabricate' && key === 'fabricate.toolUsage') return toolUsage;
+    return baseGetFlag(scope, key);
+  };
+  item.setFlag = async (scope, key, value) => {
+    if (scope === 'fabricate' && key === 'fabricate.toolUsage') toolUsage = value;
+    return value;
+  };
+  Object.defineProperty(item, 'timesUsed', { get: () => toolUsage?.timesUsed });
   return item;
 }
 
@@ -99,6 +111,14 @@ function ownedTool(spec) {
 const HAMMER_TOOL = {
   componentId: 'c-hammer',
   breakage: { mode: 'breakageChance', breakageChance: 100 },
+  onBreak: { mode: 'destroy' },
+};
+
+// A limitedUses tool with an unbounded cap: it is USAGE-incremented on every attempt
+// but never breaks, isolating the usage gate from the breakage gate.
+const HAMMER_LIMITED_TOOL = {
+  componentId: 'c-hammer',
+  breakage: { mode: 'limitedUses', maxUses: null },
   onBreak: { mode: 'destroy' },
 };
 
@@ -136,10 +156,10 @@ function compendiumHammer() {
 // Crafting acceptance — real RecipeManager, real CraftingEngine
 // ===========================================================================
 
-async function craftingBreakage(items) {
+async function craftingBreakage(items, tool = HAMMER_TOOL) {
   installSystem(hammerSystem());
   const engine = new CraftingEngine(new RecipeManager());
-  const validation = await engine._validateTools([{ items }], RECIPE, [HAMMER_TOOL]);
+  const validation = await engine._validateTools([{ items }], RECIPE, [tool]);
   // A3: the presence gate must still succeed (spared !== "no longer matches").
   assert.equal(validation.valid, true, 'presence gate should still succeed');
   const used = await engine._applyToolBreakage(RECIPE, validation.tools);
@@ -184,6 +204,21 @@ test('crafting: the durable tool is preferred over an earlier-sorting decoy', as
   assert.equal(durable.deleted, true, 'the durable tool must be the one broken');
 });
 
+test('crafting: a limitedUses decoy is spared AND its usage counter is NOT incremented', async () => {
+  const decoy = duplicateSourceDecoy();
+  await craftingBreakage([decoy], HAMMER_LIMITED_TOOL);
+  assert.equal(decoy.deleted, false, 'decoy must not be destroyed');
+  // The gate covers usage, not breakage alone: a spared pair never reaches applyUsage.
+  assert.equal(decoy.timesUsed, 0, 'a spared decoy must not be usage-incremented');
+});
+
+test('crafting: a durable limitedUses tool IS usage-incremented', async () => {
+  const tool = durableFlagHammer();
+  await craftingBreakage([tool], HAMMER_LIMITED_TOOL);
+  assert.equal(tool.deleted, false, 'maxUses null never breaks');
+  assert.equal(tool.timesUsed, 1, 'a durable tool must be usage-incremented');
+});
+
 // ===========================================================================
 // Gathering acceptance — real matchGatheringTools + real RecipeManager +
 // shared createToolBreakageRuntime
@@ -201,7 +236,7 @@ function gatheringRuntime(craftingSystemManager) {
   });
 }
 
-async function gatheringBreakage(items) {
+async function gatheringBreakage(items, tool = HAMMER_TOOL) {
   installSystem(hammerSystem());
   const recipeManager = new RecipeManager();
   const craftingSystemManager = { recipeManager };
@@ -213,12 +248,12 @@ async function gatheringBreakage(items) {
     actor,
     system,
     task,
-    tools: [HAMMER_TOOL],
+    tools: [tool],
     craftingSystemManager,
   });
   assert.equal(matched.missing.length, 0, 'gathering presence gate should still succeed');
   const runtime = gatheringRuntime(craftingSystemManager);
-  const evidence = await runtime.apply({ actor, system, task, tools: [HAMMER_TOOL] });
+  const evidence = await runtime.apply({ actor, system, task, tools: [tool] });
   return { matched, evidence };
 }
 
@@ -255,6 +290,20 @@ test('gathering: the durable tool is preferred over an earlier-sorting decoy', a
   await gatheringBreakage([decoy, durable]);
   assert.equal(decoy.deleted, false, 'the decoy must be spared');
   assert.equal(durable.deleted, true, 'the durable tool must be the one broken');
+});
+
+test('gathering: a limitedUses decoy is spared AND its usage counter is NOT incremented', async () => {
+  const decoy = duplicateSourceDecoy();
+  await gatheringBreakage([decoy], HAMMER_LIMITED_TOOL);
+  assert.equal(decoy.deleted, false, 'decoy must not be destroyed');
+  assert.equal(decoy.timesUsed, 0, 'a spared decoy must not be usage-incremented');
+});
+
+test('gathering: a durable limitedUses tool IS usage-incremented', async () => {
+  const tool = durableFlagHammer();
+  await gatheringBreakage([tool], HAMMER_LIMITED_TOOL);
+  assert.equal(tool.deleted, false, 'maxUses null never breaks');
+  assert.equal(tool.timesUsed, 1, 'a durable tool must be usage-incremented');
 });
 
 // ===========================================================================
