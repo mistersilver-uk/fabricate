@@ -4,7 +4,7 @@ import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringTo
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
-import { itemResolvesToComponent } from '../utils/sourceUuid.js';
+import { itemIsComponentByDurableIdentity, itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { buildCurrencyAffordProbe } from './currencyAffordance.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -1096,6 +1096,36 @@ export class RecipeManager {
     )
       return true;
     return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
+  }
+
+  /**
+   * Whether an owned item may be selected for a Tool's **usage or breakage** — the
+   * narrow durable-identity gate (issue 557). Mirrors {@link toolMatchesItem} in
+   * resolving `tool.componentId || tool.systemItemId` to a managed component, but
+   * delegates to {@link itemIsComponentByDurableIdentity}, which accepts ONLY the
+   * durable-flag identity or the item's own uuid/compendium source — never a
+   * transitive `_stats.duplicateSource` reference and never a name fallback.
+   *
+   * This is the destructive-path counterpart to the wide {@link toolMatchesItem}
+   * presence matcher (which is unchanged): an item that satisfies presence only by
+   * duplicate-source or name is NOT selected to be consumed or destroyed.
+   *
+   * @param {Recipe} recipe
+   * @param {{componentId?: string, systemItemId?: string}} tool
+   * @param {Item} item
+   * @returns {boolean}
+   */
+  toolMatchesItemByIdentity(recipe, tool, item) {
+    const componentId = tool?.componentId || tool?.systemItemId;
+    if (!componentId) return false; // No componentId means the tool cannot be matched.
+    const managedItem = this._getComponent(recipe, componentId);
+    if (!managedItem) return false;
+    return itemIsComponentByDurableIdentity(
+      item,
+      managedItem,
+      this._getSystemComponents(recipe),
+      recipe?.craftingSystemId
+    );
   }
 
   _matchesIngredient(ingredient, item, features) {

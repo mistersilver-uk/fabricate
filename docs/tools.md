@@ -42,6 +42,15 @@ This is the same behaviour gathering tasks use.
 Every applicable Tool must be **present** in the source actor's inventory and must **pass its optional requirement** before the activity can proceed.
 The owned item is recognised whether it is the Tool component's source world item or a copy duplicated from it.
 
+{: .note }
+> Presence is matched broadly, but breakage and usage are not.
+> Only an item Fabricate can identify as the Tool by a durable link is ever consumed, marked as broken, or has its usage counter advanced.
+> A loosely recognised copy still satisfies presence but is spared from breakage and usage until you repair or re-issue it.
+> This covers a copy duplicated from another item in a world that has not been repaired, or a copy that merely shares the Tool's name.
+> Sparing it is deliberate, so Fabricate never destroys the wrong item.
+> Run **Repair Item Data**, or re-issue the Tool from its source component, to restore breakage and usage tracking for such a copy.
+> See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
+
 A Tool's optional requirement is a condition checked against the acting character that must pass.
 You write it as a single roll expression evaluated against the character's roll data, for example a proficiency check.
 A requirement with no expression is invalid.

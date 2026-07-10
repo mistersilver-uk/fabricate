@@ -171,6 +171,43 @@ function claimedRoleComponentId(item, systemId) {
 }
 
 /**
+ * The two durable-flag tiers of component identity, shared by
+ * {@link resolveComponentForItem} and {@link itemIsComponentByDurableIdentity}
+ * so the flag hygiene and fall-through order live in exactly one place. Evaluated
+ * as tiers WITH fall-through (the FIRST tier that names a component in the set
+ * wins; a claimed id naming nothing in this set is irrelevant, so evaluation
+ * falls through):
+ *
+ *   1. identity (roles) — `flags.fabricate.roles[systemId].componentId` names a
+ *      component in `candidates` ⇒ that component, exclusively.
+ *   2. identity (legacy) — else the legacy scalar `flags.fabricate.componentId`
+ *      names a component in the set ⇒ that component, exclusively (honored until
+ *      the one-shot restamp backfills the map).
+ *
+ * @param {Item|object|null} item
+ * @param {Array<object>} candidates - The candidate component set of ONE system.
+ * @param {string|null|undefined} systemId
+ * @returns {object|null} The durably-claimed component, or null when no flag names one.
+ */
+function durableClaimedComponent(item, candidates, systemId) {
+  // Tier 1: durable per-system identity map.
+  const roleId = claimedRoleComponentId(item, systemId);
+  if (roleId != null) {
+    const byRole = candidates.find((component) => component && component.id === roleId);
+    if (byRole) return byRole;
+  }
+
+  // Tier 2: legacy scalar identity, honored until the restamp backfills the map.
+  const legacyId = getFabricateFlag(item, 'componentId', null);
+  if (legacyId != null) {
+    const byLegacy = candidates.find((component) => component && component.id === legacyId);
+    if (byLegacy) return byLegacy;
+  }
+
+  return null;
+}
+
+/**
  * Resolve which single component an owned item IS, within ONE crafting system's
  * candidate set, scoped by that system's id. The shared, list-aware, system-scoped
  * component matcher — the component-kind analogue of {@link matchRecipeItemDefinition}.
@@ -178,12 +215,8 @@ function claimedRoleComponentId(item, systemId) {
  * set wins; a claimed id naming nothing in this set is not "foreign", it is
  * irrelevant, so evaluation falls through):
  *
- *   1. identity (roles) — `flags.fabricate.roles[systemId].componentId` names a
- *      component in `components` ⇒ that component, exclusively; siblings fail closed.
- *   2. identity (legacy) — else the legacy scalar `flags.fabricate.componentId`
- *      names a component in the set ⇒ that component, exclusively (honored until the
- *      one-shot restamp backfills the map; the scalar carries no system so it stays
- *      list-aware).
+ *   1-2. durable-flag identity ({@link durableClaimedComponent}): the per-system
+ *      `roles` map, then the legacy scalar `componentId`.
  *   3. fall-through — else the item's raw source references (`uuid`,
  *      `_stats.compendiumSource`/`flags.core.sourceId`, transitive
  *      `_stats.duplicateSource`) intersect a component's; the first such component,
@@ -221,19 +254,9 @@ export function resolveComponentForItem(item, components, systemId) {
     warnUnsafeSystemIdOnce(systemId);
   }
 
-  // Tier 1: durable per-system identity map.
-  const roleId = claimedRoleComponentId(item, systemId);
-  if (roleId != null) {
-    const byRole = candidates.find((component) => component && component.id === roleId);
-    if (byRole) return byRole;
-  }
-
-  // Tier 2: legacy scalar identity, honored until the restamp backfills the map.
-  const legacyId = getFabricateFlag(item, 'componentId', null);
-  if (legacyId != null) {
-    const byLegacy = candidates.find((component) => component && component.id === legacyId);
-    if (byLegacy) return byLegacy;
-  }
+  // Tiers 1-2: durable-flag identity.
+  const durable = durableClaimedComponent(item, candidates, systemId);
+  if (durable) return durable;
 
   // Tier 3: raw source-reference intersection.
   const itemRefs = new Set(getItemSourceReferences(item));
@@ -241,6 +264,58 @@ export function resolveComponentForItem(item, components, systemId) {
   return (
     candidates.find((component) => itemSourceRefsIntersectComponent(itemRefs, component)) || null
   );
+}
+
+/**
+ * Whether an owned item IS the given `component` by **durable-identity matching** —
+ * the NARROW gate for destructive/consumptive tool selection (issue 557). Unlike
+ * {@link resolveComponentForItem}, whose fall-through tier accepts the transitive
+ * `_stats.duplicateSource` reference and (in the caller) a name fallback, this
+ * predicate only accepts:
+ *
+ *   1-2. the durable-flag identity ({@link durableClaimedComponent}); OR
+ *   3. the item's OWN identity references — its live `uuid` or its compendium
+ *      source ({@link getItemIdentityReferences}, which EXCLUDES the transitive
+ *      `_stats.duplicateSource`) — intersecting a component's source refs.
+ *
+ * There is NO name fallback. Sibling-exclusivity mirrors the resolver: the item is
+ * resolved to the single component it durably IS within `components`, and matches
+ * only when that is the target — so an item durably claiming component X never
+ * matches sibling Y even if a raw ref happens to overlap. A world-template copy
+ * carrying neither a durable flag nor a compendium source (only a transitive
+ * `_stats.duplicateSource`) resolves to NO component here, so it is spared from
+ * usage/breakage while still satisfying the wider presence gate elsewhere.
+ *
+ * @param {Item|object|null} item - Item-like object with `uuid`, source metadata, and `getFlag`.
+ * @param {object|null} component - The component to test durable identity against.
+ * @param {Array<object>|null} components - The candidate set the identity is scoped to.
+ * @param {string|null|undefined} systemId
+ * @returns {boolean}
+ */
+export function itemIsComponentByDurableIdentity(item, component, components, systemId) {
+  if (!item || typeof item !== 'object') return false;
+  if (!component || component.id == null) return false;
+  const candidates = Array.isArray(components) ? components : [];
+  if (candidates.length === 0) return false;
+
+  if (systemId != null && !isSafeFlagKeySegment(systemId)) {
+    warnUnsafeSystemIdOnce(systemId);
+  }
+
+  // Tiers 1-2: durable-flag identity is exclusive — a claimed component is the ONLY
+  // one this item matches, so a claim naming a sibling fails closed without falling
+  // through to raw refs.
+  const durable = durableClaimedComponent(item, candidates, systemId);
+  if (durable) return durable.id === component.id;
+
+  // Tier 3 (narrowed): the item's OWN identity refs (uuid + compendium source, NOT
+  // duplicate source) intersect a component's. Resolve to the first such component
+  // and match only when it is the target, mirroring the resolver's exclusivity.
+  const itemRefs = new Set(getItemIdentityReferences(item));
+  if (itemRefs.size === 0) return false;
+  const resolved =
+    candidates.find((candidate) => itemSourceRefsIntersectComponent(itemRefs, candidate)) || null;
+  return resolved != null && resolved.id === component.id;
 }
 
 /**

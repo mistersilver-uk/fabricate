@@ -29,6 +29,7 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 const { Recipe } = await import('../src/models/Recipe.js');
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
+const { component, roleItem } = await import('./helpers/componentIdentityFixtures.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -271,4 +272,74 @@ test('canCraft passes through missing.tools', () => {
   const result = manager.canCraft([actor([item('Iron')])], recipe);
   assert.equal(result.canCraft, false);
   assert.equal(result.missing.tools.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// toolMatchesItemByIdentity — durable-identity gate for usage/breakage (issue 557)
+// ---------------------------------------------------------------------------
+
+function identitySystem() {
+  return installSystem({
+    id: 'sys-1',
+    components: [
+      component('c-hammer', { sourceUuid: 'Item.hammer-src', name: 'Hammer' }),
+      component('c-tongs', { sourceUuid: 'Item.tongs-src', name: 'Tongs' })
+    ],
+    tools: [{ id: 'tool-hammer', componentId: 'c-hammer' }]
+  });
+}
+
+test('toolMatchesItemByIdentity: durable roles-flag item matches its component', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const tool = { componentId: 'c-hammer' };
+  const durable = roleItem({ uuid: 'Item.h1', roles: { 'sys-1': { componentId: 'c-hammer' } }, name: 'Hammer' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, tool, durable), true);
+});
+
+test('toolMatchesItemByIdentity: an own-compendiumSource item matches its component', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const tool = { componentId: 'c-hammer' };
+  const copy = roleItem({ uuid: 'Item.h2', compendiumSource: 'Item.hammer-src', name: 'Hammer' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, tool, copy), true);
+});
+
+test('toolMatchesItemByIdentity: a duplicateSource decoy does NOT match (but presence does)', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const tool = { componentId: 'c-hammer' };
+  const decoy = roleItem({ uuid: 'Item.h3', duplicateSource: 'Item.hammer-src', name: 'Mallet' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, tool, decoy), false);
+  // The wide presence matcher still accepts it — proving this is narrower, not vacuous.
+  assert.equal(manager.toolMatchesItem(recipe, tool, decoy), true);
+});
+
+test('toolMatchesItemByIdentity: a same-name decoy does NOT match (but presence does)', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const tool = { componentId: 'c-hammer' };
+  const decoy = roleItem({ uuid: 'Item.h4', name: 'Hammer' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, tool, decoy), false);
+  assert.equal(manager.toolMatchesItem(recipe, tool, decoy), true);
+});
+
+test('toolMatchesItemByIdentity: false when the tool has no componentId', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const durable = roleItem({ uuid: 'Item.h5', roles: { 'sys-1': { componentId: 'c-hammer' } } });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, {}, durable), false);
+});
+
+test('toolMatchesItemByIdentity: false when no managed component resolves the id', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const durable = roleItem({ uuid: 'Item.h6', roles: { 'sys-1': { componentId: 'c-hammer' } }, name: 'Hammer' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, { componentId: 'c-unknown' }, durable), false);
 });

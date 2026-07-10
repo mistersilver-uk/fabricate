@@ -1335,6 +1335,8 @@ Tool usage/breakage semantics for terminal gathering attempts:
 - Gathering tasks do not draw Tools from component source actors; tool presence and terminal tool usage/breakage are both evaluated against the selected acting actor.
 - Terminal tool usage/breakage is applied only after the gathering outcome has resolved to `succeeded` or `failed`.
 - A virtual-present Tool injected by a canvas Tool station (`presentTools`, system-scoped) satisfies the gate without an owned item and is excluded from usage/breakage.
+- Tool **presence** uses the wide shared matcher, but terminal tool **usage/breakage** applies only to an owned item matching the required tool by **durable-identity matching** per `data-models` (durable flag, or the item's own uuid/compendium source — never a transitive `_stats.duplicateSource` reference and never name alone).
+A presence-only match is spared from usage/breakage and recorded as skipped, and where an actor owns both, the durable-identity item is the one used or broken.
 - Under `CraftingSystem.toolBreakage.authority === "checkDriven"`, the active gathering check's `checkBreakage` triggers decide whether **all required tools** break for the attempt via the single shared evaluator (`evaluateCheckBreakage`), reaching parity with crafting and salvage; each Tool's own `breakage.mode` is ignored except `immune`.
 This is orthogonal to the realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`), which still governs whether a broken tool fails the gather outcome and is applied independently.
 Crafting and gathering route the same trigger + roll through the same evaluator, so the break decision cannot drift between surfaces.

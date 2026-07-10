@@ -385,20 +385,23 @@ export function createToolBreakageRuntime({
           : { forceBreak: false, triggerId: null, reason: null };
       const checkId = checkResult?.data?.checkId ?? checkResult?.checkId ?? null;
       const planned = [];
-      for (const { tool, item, virtual } of matched.items) {
+      for (const { tool, item, virtual, breakable } of matched.items) {
         const model = tool instanceof Tool ? tool : Tool.fromJSON(tool);
+        // A presence-only match (durable-identity gate, issue 557) has an owned item
+        // but must NOT be consumed or destroyed; treat it like a virtual match.
+        const spared = breakable === false && !virtual && !!item;
         // Virtual-present (canvas-tool) matches have no owned item to break/use.
-        // Under checkDriven they are still recorded as skipped evidence.
-        if (virtual || !item) {
+        // Under checkDriven both are still recorded as skipped evidence.
+        if (virtual || !item || spared) {
           if (authority === 'checkDriven') {
             planned.push({
               componentId: model.componentId,
               itemRef: null,
               mode: model.breakage?.mode ?? null,
               broken: false,
-              evidence: { authority, virtual: true },
+              evidence: spared ? { authority, spared: true } : { authority, virtual: true },
               authority,
-              virtual: true,
+              ...(spared ? { spared: true } : { virtual: true }),
             });
           }
           continue;
@@ -473,20 +476,23 @@ export function createToolBreakageRuntime({
           : { forceBreak: false, triggerId: null, reason: null };
       const checkId = checkResult?.data?.checkId ?? checkResult?.checkId ?? null;
       const evidence = [];
-      for (const { tool: toolData, item, virtual } of matched.items) {
+      for (const { tool: toolData, item, virtual, breakable } of matched.items) {
         const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
+        // A presence-only match (durable-identity gate, issue 557) has an owned item
+        // but must NOT be consumed or destroyed; treat it like a virtual match.
+        const spared = breakable === false && !virtual && !!item;
         // Virtual-present (canvas-tool) matches have no owned item to break/use;
-        // under checkDriven they are recorded as skipped evidence (not mutated).
-        if (virtual || !item) {
+        // under checkDriven both are recorded as skipped evidence (not mutated).
+        if (virtual || !item || spared) {
           if (authority === 'checkDriven') {
             evidence.push({
               componentId: tool.componentId,
               itemRef: null,
               mode: tool.breakage?.mode ?? null,
               broken: false,
-              evidence: { authority, virtual: true },
+              evidence: spared ? { authority, spared: true } : { authority, virtual: true },
               authority,
-              virtual: true,
+              ...(spared ? { spared: true } : { virtual: true }),
             });
           }
           continue;

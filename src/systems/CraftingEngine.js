@@ -1504,8 +1504,15 @@ export class CraftingEngine {
    * Validate that all required library Tools resolved for this recipe/step are
    * present (a matching, non-broken item) on the component source actors.
    *
-   * Returns the matched `{ tool, item }` pairs so the caller can apply
+   * Returns the matched `{ tool, item, breakable }` pairs so the caller can apply
    * usage/breakage on the success and failure-consumption paths.
+   *
+   * Durable-identity selection (issue 557): the item PREFERRED for each tool is one
+   * that matches by durable identity (the only kind that may be consumed or
+   * destroyed). A presence-only (wide) match is used solely to satisfy the presence
+   * gate and is returned with `breakable: false` so {@link _applyToolBreakage}
+   * spares it. When the manager exposes no identity matcher (legacy/test managers) a
+   * presence match is treated as breakable, preserving prior behaviour.
    *
    * Virtual-present injection (Phase 4): a tool whose `componentId` is in the
    * active canvas Tool's `presentTools` payload AND whose recipe crafting system
@@ -1521,7 +1528,7 @@ export class CraftingEngine {
    * @param {Recipe} recipe
    * @param {Array<object>} tools - resolved library Tool objects
    * @param {{ systemId?: string|null, componentIds?: string[] }|null} [presentTools] - virtual-present payload
-   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean}> }>}
+   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean, breakable?: boolean}> }>}
    */
   async _validateTools(actors, recipe, tools = [], presentTools = null) {
     const toolItems = [];
@@ -1531,19 +1538,41 @@ export class CraftingEngine {
     });
 
     for (const tool of tools) {
-      let found = null;
+      // Durable-identity selection (issue 557): PREFER an owned item that matches the
+      // tool by durable identity (the only kind that may be consumed/destroyed), and
+      // fall back to a presence-only (wide) match ONLY to satisfy the presence gate —
+      // tagging that pair `breakable: false` so `_applyToolBreakage` spares it. When
+      // an actor owns both the real durably-identified tool and a decoy, the durable
+      // tool is the one carried into breakage even if the decoy sorts earlier.
+      const hasIdentityMatcher =
+        typeof this.recipeManager?.toolMatchesItemByIdentity === 'function';
+      let identityItem = null;
+      let presenceItem = null;
       for (const actor of actors) {
-        const matching = [...(actor?.items ?? [])].find(
-          (item) => !isToolBroken(item) && this.recipeManager.toolMatchesItem(recipe, tool, item)
-        );
-        if (matching) {
-          found = matching;
-          break;
+        for (const item of actor?.items ?? []) {
+          if (isToolBroken(item)) continue;
+          if (!presenceItem && this.recipeManager.toolMatchesItem(recipe, tool, item)) {
+            presenceItem = item;
+          }
+          if (
+            hasIdentityMatcher &&
+            !identityItem &&
+            this.recipeManager.toolMatchesItemByIdentity(recipe, tool, item) === true
+          ) {
+            identityItem = item;
+          }
+          if (identityItem) break;
         }
+        if (identityItem) break;
       }
 
+      const found = identityItem ?? presenceItem;
       if (found) {
-        toolItems.push({ tool, item: found });
+        // When the manager exposes no identity matcher (legacy/test managers) preserve
+        // prior behaviour and treat a presence match as breakable; otherwise only a
+        // durable-identity match is breakable.
+        const breakable = hasIdentityMatcher ? identityItem != null : true;
+        toolItems.push({ tool, item: found, breakable });
       } else if (presentSet.has(tool?.componentId)) {
         // Virtual-present: satisfied by the active canvas Tool, no owned item.
         toolItems.push({ tool, item: null, virtual: true });
@@ -1576,9 +1605,17 @@ export class CraftingEngine {
    * `toolSpecific` (default) behaviour is unchanged: each tool's own mode decides and
    * a legacy `breakTools` force-break still applies on top.
    *
+   * Durable-identity gate (issue 557): an owned item is used OR broken only when it
+   * matches the tool by durable identity, re-checked authoritatively here via the
+   * identity matcher so a presence-only item can never reach `delete()`. A spared
+   * (non-breakable) item is left untouched and recorded as skipped evidence under
+   * `checkDriven`, mirroring the virtual-present skip. When the manager exposes no
+   * identity matcher (legacy/test managers) the selection `breakable` tag is honored,
+   * defaulting to breakable to preserve prior behaviour.
+   *
    * @private
    * @param {Recipe} recipe
-   * @param {Array<{tool: object, item: Item}>} toolItems
+   * @param {Array<{tool: object, item: Item, virtual?: boolean, breakable?: boolean}>} toolItems
    * @param {{ forceBreak?: boolean, authority?: string, reason?: string|null, triggerId?: string|null, checkId?: string|null }} [options]
    * @returns {Promise<Array<{ actorUuid: string|null, itemUuid: string|null, quantity: number, componentId: string|null, broken: boolean }>>}
    */
@@ -1595,7 +1632,7 @@ export class CraftingEngine {
   ) {
     const checkDriven = authority === 'checkDriven';
     const evidence = [];
-    for (const { tool: toolData, item, virtual } of toolItems) {
+    for (const { tool: toolData, item, virtual, breakable: selectedBreakable } of toolItems) {
       const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
       // Virtual-present (canvas-tool) matches have no owned item to use/break.
       // Under checkDriven they are recorded as skipped evidence (not mutated);
@@ -1610,6 +1647,32 @@ export class CraftingEngine {
             broken: false,
             authority,
             virtual: true,
+          });
+        }
+        continue;
+      }
+      // Durable-identity gate (issue 557): an owned item is used OR broken only when
+      // it matches the tool by durable identity. Re-check authoritatively via the
+      // identity matcher so a mis-tagged, presence-only item can never reach delete();
+      // when the manager exposes no identity matcher (legacy/test managers) fall back
+      // to the selection tag, defaulting to breakable to preserve prior behaviour. A
+      // spared item is left untouched — recorded as skipped evidence under checkDriven
+      // (consistent with the virtual skip), silent under toolSpecific.
+      const identityMatcher = this.recipeManager?.toolMatchesItemByIdentity;
+      const breakable =
+        typeof identityMatcher === 'function'
+          ? identityMatcher.call(this.recipeManager, recipe, toolData, item) === true
+          : selectedBreakable !== false;
+      if (!breakable) {
+        if (checkDriven) {
+          evidence.push({
+            actorUuid: item?.parent?.uuid ?? null,
+            itemUuid: item?.uuid ?? null,
+            quantity: 1,
+            componentId: tool.componentId ?? null,
+            broken: false,
+            authority,
+            spared: true,
           });
         }
         continue;

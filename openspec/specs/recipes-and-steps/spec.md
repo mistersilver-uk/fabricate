@@ -71,6 +71,8 @@ They are referenced by id at recipe level, step level, and ingredient-set level 
 Every applicable Tool must be present (matched via the shared tool matcher) and pass its optional `requirement` before the recipe is craftable; `RecipeManager.evaluateCraftability` returns `toolStates` and `missing.tools`.
 - `CraftingEngine` validates Tools (`_validateTools`) and, on a committed craft, applies tool usage/breakage through the shared breakage runtime (`src/toolBreakageRuntime.js`), recording `usedTools` evidence.
 Tool usage/breakage is tracked on owned item instances.
+- Tool **presence** validation matches via the wide shared tool matcher (durable flag, source references, name), but the item **selected for usage or breakage** must additionally match the tool by **durable-identity matching** per `data-models` (durable flag, or the item's own uuid/compendium source — never a transitive `_stats.duplicateSource` reference and never name alone).
+A presence-only match is spared from usage/breakage and recorded as skipped, and where an actor owns both, the durable-identity item is the one used or broken.
 - A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
 
 ## Execution Lifecycle
