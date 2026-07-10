@@ -34,6 +34,7 @@ const { CraftingSystemManager } = await import('../src/systems/CraftingSystemMan
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
+const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
 const { component, componentSet, roleItem } = await import('./helpers/componentIdentityFixtures.js');
 
 // A world-item document with nested dotted-key flag support (mirrors getFabricateFlag's
@@ -163,6 +164,51 @@ test('A9b - recipe-availability: _accumulateEssences threads recipe.craftingSyst
 });
 
 // ---------------------------------------------------------------------------
+// A10 — gathering award STACK GUARD driven through the real award closure
+// (createGatheringResultCreator.create → findStackableMatch at the call site).
+// This is the surface #556 is named for; a direct 4-arg findStackableMatch unit
+// test (A2) cannot see a regression at THIS call site, so it must be driven here.
+// ---------------------------------------------------------------------------
+
+test('A10 - award: a fresh award is NOT folded into an owned stack that resolves to a DIFFERENT component via a transitive duplicateSource', async () => {
+  const awardComp = component('comp-award', { sourceItemUuid: 'Item.award-src' }); // no sourceUuid ⇒ bare-component source
+  const otherComp = component('comp-other', { sourceItemUuid: 'Item.other-src' });
+  const system = { id: 'sysA', components: [awardComp, otherComp] };
+  const craftingSystemManager = { getSystem: (id) => (id === 'sysA' ? system : null) };
+
+  // The owned candidate is a DIFFERENT component by durable identity, but its transitive
+  // duplicateSource overlaps the award source's ref — the exact #556 false-positive shape.
+  const candidate = roleItem({
+    uuid: 'Item.owned',
+    duplicateSource: 'Item.award-src',
+    roles: { sysA: { componentId: 'comp-other' } },
+    quantity: 5,
+  });
+  let stackedInto = false;
+  candidate.update = async () => {
+    stackedInto = true;
+  };
+
+  const createdDocs = [];
+  const actor = {
+    uuid: 'Actor.a',
+    items: [candidate],
+    async createEmbeddedDocuments(_type, data) {
+      const made = data.map((d, i) => ({ ...d, id: `new-${i}`, uuid: `Actor.a.Item.new-${i}` }));
+      createdDocs.push(...made);
+      return made;
+    },
+  };
+
+  const resultGroups = [{ results: [{ componentId: 'comp-award', quantity: 1 }] }];
+  await createGatheringResultCreator(craftingSystemManager).create({ actor, system, resultGroups });
+
+  assert.equal(stackedInto, false, 'the unrelated owned stack is NOT inflated');
+  assert.equal(candidate.system.quantity, 5, 'the owned stack quantity is unchanged');
+  assert.equal(createdDocs.length, 1, 'a new document is created for the award instead');
+});
+
+// ---------------------------------------------------------------------------
 // A5 — per-system repair clears/writes only the map key (no cross-system clear)
 // ---------------------------------------------------------------------------
 
@@ -192,6 +238,27 @@ test('A5 - repair writes roles[sysB].componentId for a source owned by system B 
     );
     assert.ok(summary.stamped >= 1);
   }
+  globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [], packs: [] };
+});
+
+// ---------------------------------------------------------------------------
+// A11a — a dotted system id is rejected LOUDLY at creation/import, never accepted
+// as a booby-trapped durable-flag map key that silently degrades matching.
+// ---------------------------------------------------------------------------
+
+test('A11a - createSystem rejects a dotted system id with a clear error and accepts a randomID-shaped id', async () => {
+  const mgr = buildManager({});
+  globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [], packs: [] };
+
+  await assert.rejects(
+    () => mgr.createSystem({ id: 'my.system', name: 'Dotted' }),
+    /Invalid crafting system id "my\.system"/,
+    'a dotted id is rejected, naming the offending id'
+  );
+
+  const ok = await mgr.createSystem({ id: 'abc123XYZ_-', name: 'Fine' });
+  assert.equal(ok.id, 'abc123XYZ_-', 'a randomID-shaped id is accepted unchanged (never rewritten)');
+
   globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [], packs: [] };
 });
 

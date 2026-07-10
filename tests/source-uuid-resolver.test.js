@@ -468,6 +468,29 @@ test('B8 - three-system + stale-entry boundary: a claimed id absent from the set
   assert.equal(resolveComponentForItem(staleOnly, [compA], 'sysA'), null);
 });
 
+test('A11b - an unsafe (dotted) systemId skips the roles tier and still resolves via raw refs (unstamped behaviour), while a safe systemId resolves via the map', () => {
+  const compRoles = component('comp-roles', { sourceItemUuid: 'Item.roles-src' });
+  const compDup = component('comp-dup', { sourceItemUuid: 'Item.dup-src' });
+  const components = [compRoles, compDup];
+
+  // Safe systemId: the durable `roles` map resolves to compRoles via tier 1, exclusively.
+  const safeItem = roleItem({ uuid: 'Item.safe', roles: { sysA: { componentId: 'comp-roles' } } });
+  assert.equal(resolveComponentForItem(safeItem, components, 'sysA'), compRoles);
+
+  // Unsafe (dotted) systemId carrying a stray FLAT dotted `roles` key (the shape a naive
+  // reader would wrongly honour). Such a key can never have been WRITTEN — every stamp
+  // site skips an unsafe id and `setFlag` would nest on the dot anyway — so tier 1 is
+  // skipped and matching falls through to the load-bearing raw-ref tier (the ordinary
+  // UNSTAMPED case), NOT refused. Refusing would break crafting for a legacy dotted-id
+  // world entirely, which is worse than the pre-#556 mis-attribution it would prevent.
+  const unsafeItem = roleItem({
+    uuid: 'Item.unsafe',
+    duplicateSource: 'Item.dup-src', // raw-ref overlaps compDup
+    roles: { 'my.system': { componentId: 'comp-roles' } }
+  });
+  assert.equal(resolveComponentForItem(unsafeItem, components, 'my.system'), compDup);
+});
+
 // ---------------------------------------------------------------------------
 // matchRecipeItemDefinition — four-tier precedence, no fall-through, union refs
 // ---------------------------------------------------------------------------
