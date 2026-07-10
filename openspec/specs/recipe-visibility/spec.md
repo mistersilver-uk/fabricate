@@ -59,14 +59,32 @@ This ensures consistent behaviour across Foundry versions.
 
 ## Recipe Item Matching
 
-A candidate owned item matches a recipe's selected recipe item definition when any of the following is true:
+A candidate owned item is matched to a recipe item definition through one shared matcher (`matchRecipeItemDefinition`) that evaluates four tiers in strict precedence order (issue 555).
+The FIRST tier that yields a matching definition wins, and there is NO fall-through to a lower tier.
+Tiers 2–4 test membership in the definition's UNION of source references — its `sourceUuid` (the registered live document), its `sourceItemUuid` (the canonical compendium/source uuid), and any `fallbackItemIds`.
 
-1. `candidate.uuid === recipeItemDefinition.sourceItemUuid`
-2. `resolveSourceUuid(candidate) === recipeItemDefinition.sourceItemUuid`
+1. `identity` — `getFabricateFlag(candidate, 'recipeItemDefinitionId') === recipeItemDefinition.id`.
+2. `uuid` — `candidate.uuid` is among the definition's source references.
+3. `compendium` — `resolveSourceUuid(candidate)` is among the definition's source references.
+4. `duplicate` — `resolveDuplicateSourceUuid(candidate)` (the transitive `_stats.duplicateSource`) is among the definition's source references.
 
-The second condition covers compendium-derived copies.
-On Foundry v12+, `_stats.compendiumSource` carries this value; on v11, `flags.core.sourceId` carries it.
-The resolver handles both transparently.
+Tier 1 is the durable identity-of-record: `flags.fabricate.recipeItemDefinitionId` is a transferable marker, copied into every drag/duplicate copy, that survives Foundry's transitive `_stats.duplicateSource` template chaining, which source-uuid matching cannot.
+This mirrors the component `flags.fabricate.componentId` identity/matching split.
+Tiers 3 and 4 cover compendium-derived and world-duplicate copies; on Foundry v12+, `_stats.compendiumSource` carries the tier-3 value and on v11 `flags.core.sourceId` does, and the resolver handles both transparently.
+The tier-4 `_stats.duplicateSource` condition was matched at runtime before issue 555 but undocumented here; it is now part of the precedence.
+
+There is no clone-gate in this matcher: tier 3 is always trusted at match time, because an actor-owned copy legitimately carries both an inherited `_stats.compendiumSource` (provenance) and a `_stats.duplicateSource` (Foundry stamps it on every non-compendium drag-drop).
+The clone-gate is a REGISTRATION and source-repair rule only (see the data-models spec) and must never reach this matcher.
+
+### Bulk auto-learn confidence gate (tier 4)
+
+The `createItem` bulk on-drop auto-learn path (`mode: 'auto'`) must NOT auto-grant a recipe whose owned item matches a **registered** definition (one that carries an `id`) ONLY via tier 4 (the un-migrated `_stats.duplicateSource` fallback).
+A silent bulk grant of recipe knowledge is neither cheap nor reversible, so it demands a higher-confidence match.
+The refusal is scoped to registered definitions on purpose.
+A recipe linked solely by the legacy `linkedRecipeItemUuid` — an un-migrated book, or a standalone alchemy formula item — resolves through the id-less synthetic entry `_recipeItemMatchDefinitions` builds (`{ id: null, sourceItemUuid: legacyUuid }`), which has no source the auto-stamp can ever reach because `autoStampRecipeItemSources` iterates `system.recipeItemDefinitions` and an id-less entry is not one of them.
+Tier 4 is therefore the only signal such an item can ever produce, so refusing it would disable its on-drop learning **permanently** rather than only until the auto-stamp runs; the guard checks `definition.id` precisely so an id-less link still auto-learns.
+Explicit learn, the item-sheet picker (`mode: 'manual'`), and every display path still honour tier 4.
+This gate is paired with the mandatory primary-GM auto-stamp (see the data-models spec), which flags every registered book so real books resolve at tier 1 and keep auto-learning.
 
 > Authoring note (issue 511, PR-B): recipe↔book membership is authored **book-side** on the Books & Scrolls item Contents tab — each recipe item definition owns a `recipeIds[]` list of the recipes it contains.
 The recipe editor no longer writes a book link.
@@ -97,9 +115,14 @@ The `1.13.0` migration inverts each recipe's former book onto `recipeIds` and st
 
 The use cap (craft charges) and the learn cap are **per recipe item**, not a single system-wide config.
 They are read from the recipe's member book definition (`RecipeItemDefinition.recipeIds` → that definition's `caps`), so two books in one crafting system may enforce different caps.
-Because membership is many-to-many, the learn/use paths anchor caps on the **specific owned book** the reader holds (`_matchDefinitionForItem` selects the definition whose `sourceItemUuid` matches the owned item), falling back to the recipe's first member book.
+Because membership is many-to-many, the learn/use paths anchor caps on the **specific owned book** the reader holds (`_matchDefinitionForItem` selects the definition the owned item matches through the shared four-tier matcher).
 
-Cap resolution **fails closed**: when a recipe resolves to no `RecipeItemDefinition`, the caps default to uncapped (unlimited uses, no learn cap, `consumeOnLearn` on).
+Cap resolution has two distinct fallback cases (issue 555, R6):
+
+- A **supplied** item that matches no member definition resolves to **no** definition (`null`), so its caps are uncapped — the reader is not held to some other book's cap it does not hold.
+- An **absent** item (`null`) resolves to the recipe's **first** member book, used for system-wide defaults and previews.
+
+Cap resolution otherwise **fails closed**: when a recipe resolves to no `RecipeItemDefinition`, the caps default to uncapped (unlimited uses, no learn cap, `consumeOnLearn` on).
 An unresolved link therefore never bricks a recipe with a zero budget.
 
 The per-**document** runtime counters are unchanged by this move: craft charges accumulate in `Item.flags.fabricate.recipeItemUsage.timesUsed`, and the `perInstance`-scope learn budget accumulates in `Item.flags.fabricate.recipeItemLearning.learnedCount`.
@@ -467,13 +490,11 @@ Matching is otherwise based solely on the resolved recipe item definition identi
 
 #### Matching Rules
 
-A dropped item matches a recipe when any of the following is true:
-
-1. `droppedItem.uuid === recipeItemDefinition.sourceItemUuid`
-2. `resolveSourceUuid(droppedItem) === recipeItemDefinition.sourceItemUuid`
-
+A dropped item is matched to a recipe item definition through the shared four-tier matcher (`matchRecipeItemDefinition`) defined in **Recipe Item Matching** above: the durable `recipeItemDefinitionId` flag (tier 1) first, then membership in the definition's union of source references by the item's own uuid (tier 2), its compendium source (tier 3), or its transitive `_stats.duplicateSource` (tier 4).
+The first tier that yields a match wins, with no fall-through.
 `resolveSourceUuid` reads `_stats.compendiumSource` first (Foundry v12+), then falls back to `flags.core.sourceId` (Foundry v11 and earlier).
-A match on any condition is sufficient.
+
+The `createItem` bulk auto-learn path applies the tier-4 confidence gate above; explicit learn, the picker, and display do not.
 
 #### Multi-Recipe Matching
 

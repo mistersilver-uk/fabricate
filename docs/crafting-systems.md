@@ -332,6 +332,14 @@ If the stored name, image, or linked item is out of date, Fabricate updates the 
 
 If Foundry reports an original compendium source but that source no longer exists, Fabricate links to the item you dropped instead, remembers the broken source link as a fallback, and warns the GM.
 
+{: .note }
+> **Duplicating an item to author another component is fully supported.**
+> Each component you register is given its own durable identity, so a player's owned copies always resolve back to the right component.
+> You can right-click an item in the Items sidebar, choose **Duplicate**, change the copy's name, art, and setup, and register that copy as a separate component.
+> The copy becomes its own component and does not collide with, or overwrite, the original.
+> This holds even when the original was imported from a compendium.
+> A copy that was distributed to players before you updated Fabricate can be reconciled with [Repair Item Data]({% link troubleshooting.md %}#repairing-item-data).
+
 After import, Fabricate also listens for linked Foundry Item updates from a GM client.
 When a linked item changes its name, image, or description, matching components refresh their stored name, image, and display-safe plain-text description automatically.
 

@@ -138,6 +138,25 @@ This means recipe scrolls work whether a player picks up the item directly or co
 
 > **Tip:** If a player owns a recipe scroll that was copied from a compendium but the recipe still shows as unknown, the copy may have lost track of the item it came from.
 Re-importing the recipe item from the compendium restores the link.
+A GM can also reconcile already-distributed copies in bulk with [Repair Item Data]({% link troubleshooting.md %}#repairing-item-data).
+
+### Duplicating a Book or Scroll
+
+Duplicating an item is a fully supported way to author a new book or scroll.
+Each book or scroll you register is given its own durable identity, so a player's owned copies always resolve back to the right one.
+
+To build a second book from an existing one, right-click the book in the Items sidebar, choose **Duplicate**, then change the copy's name, art, and the recipes it links.
+Register that copy as its own book, and give it its own limits and contents.
+The copy becomes a separate book and does not collide with, or overwrite, the original, even when the original was imported from a compendium.
+
+This means a common authoring pattern works cleanly.
+You can keep a large "master" tome that teaches many recipes freely, duplicate it into a short scroll that teaches only a few recipes with a strict learn cap, and hand each out independently.
+A player holding the scroll learns only the scroll's recipes, and a player holding the tome learns only the tome's.
+
+{: .note }
+> This durable identity was added in a later version of Fabricate.
+> A copy that was duplicated and handed to a player before you updated may still be labelled as the item it was copied from.
+> A GM can reconcile those copies in bulk with [Repair Item Data]({% link troubleshooting.md %}#repairing-item-data).
 
 ### Limited Uses
 
