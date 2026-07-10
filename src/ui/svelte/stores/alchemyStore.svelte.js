@@ -12,10 +12,14 @@
  * the `workbench` component multiset, `selectedRecipeId`, `search`, `lastBrew`) and
  * the brew action. It derives the five-mode status CLIENT-SIDE against learned
  * recipes plus the local fizzle set — but the client mode is BEST-EFFORT and
- * ADVISORY: `ready`/`assembling` (and select-to-load auto-fill) are scoped to
- * learned recipes reducible to a concrete plain-component multiset. For any recipe
- * with alternatives / tags / essences / multiple ingredient sets the store FAILS
- * SAFE to `untried` and never emits a false `ready`/`assembling`; the engine
+ * ADVISORY. `ready`/`assembling` resolve for two recipe shapes: a concrete
+ * plain-component multiset (exact match), and an ESSENCE-ONLY requirement (`>=`
+ * match, mirroring the engine so surplus essences still read as `ready`).
+ * Select-to-load auto-fill stays scoped to the concrete shape — an essence
+ * requirement has no unique component solution, so the store never picks which of
+ * the player's items to burn. For any recipe with alternatives / tags / multiple
+ * ingredient sets, or a set mixing ingredient groups with essences, the store
+ * FAILS SAFE to `untried` and never emits a false `ready`/`assembling`; the engine
  * remains authoritative on brew.
  *
  * @param {object} deps
@@ -35,6 +39,7 @@ export function createAlchemyStore({ services } = {}) {
   let workbench = $state({});
   let selectedRecipeId = $state(null);
   let search = $state('');
+  let componentSearch = $state('');
   let lastBrew = $state(null);
   let brewInFlight = $state(false);
 
@@ -76,22 +81,38 @@ export function createAlchemyStore({ services } = {}) {
   const undiscoveredCount = $derived(Number(listing?.undiscoveredCount ?? 0));
   const fizzleKeys = $derived(new Set(Array.isArray(listing?.fizzleKeys) ? listing.fizzleKeys : []));
 
-  /** Owned components with availability (held minus placed on the bench). */
+  // True when the actor owns any component in this discipline, regardless of the
+  // component-name search. The column uses this to tell the onboarding "acquire
+  // components" empty state apart from the "no matches" filtered-empty state.
+  const hasOwnedComponents = $derived(
+    Array.isArray(listing?.components) && listing.components.length > 0
+  );
+
+  /**
+   * Owned components with availability (held minus placed on the bench), filtered
+   * by the component-name search. Availability math runs before the filter so a
+   * placed component still reserves its held units even while hidden by the search.
+   */
   const components = $derived.by(() => {
     const owned = Array.isArray(listing?.components) ? listing.components : [];
-    return owned.map((component) => {
+    const rows = owned.map((component) => {
       const placed = workbench[component.componentId] || 0;
       const available = Math.max(0, Number(component.held || 0) - placed);
       return {
         componentId: component.componentId,
         name: component.name,
         img: component.img,
+        essences: Array.isArray(component.essences) ? component.essences : [],
         held: Number(component.held || 0),
         placed,
         available,
         disabled: available <= 0,
       };
     });
+    const query = componentSearch.trim().toLowerCase();
+    return query
+      ? rows.filter((row) => String(row.name ?? '').toLowerCase().includes(query))
+      : rows;
   });
 
   const componentById = $derived.by(() => {
@@ -112,6 +133,7 @@ export function createAlchemyStore({ services } = {}) {
           componentId,
           name: component?.name ?? componentId,
           img: component?.img ?? null,
+          essences: Array.isArray(component?.essences) ? component.essences : [],
           qty,
         };
       })
@@ -120,29 +142,110 @@ export function createAlchemyStore({ services } = {}) {
   const benchEmpty = $derived(benchChips.length === 0);
   const benchKey = $derived(signatureKey(workbench));
 
+  /**
+   * The aggregate essence profile of everything on the bench: each placed
+   * component's PER-UNIT essences multiplied by its placed quantity, summed by
+   * essence id. This mirrors the engine's `accumulateItemEssences`, which counts
+   * one occurrence per submitted unit. It drives both the bench readout and the
+   * essence-aware `ready`/`assembling` resolution below. Zero/absent essences drop
+   * out, so the readout renders only where it is meaningful.
+   */
+  const benchEssences = $derived.by(() => {
+    const totals = new Map();
+    for (const chip of benchChips) {
+      const placed = Number(chip?.qty) || 0;
+      if (placed <= 0) continue;
+      for (const essence of Array.isArray(chip.essences) ? chip.essences : []) {
+        if (!essence?.id) continue;
+        const perUnit = Number(essence.quantity) || 0;
+        if (perUnit <= 0) continue;
+        const existing = totals.get(essence.id);
+        if (existing) {
+          existing.quantity += perUnit * placed;
+        } else {
+          totals.set(essence.id, {
+            id: essence.id,
+            name: essence.name ?? essence.id,
+            icon: essence.icon ?? null,
+            quantity: perUnit * placed,
+          });
+        }
+      }
+    }
+    return [...totals.values()]
+      .filter((essence) => essence.quantity > 0)
+      .sort((left, right) => String(left.name).localeCompare(String(right.name)));
+  });
+
   const selectedRecipe = $derived.by(() => {
     const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
     return recipes.find((recipe) => recipe?.id === selectedRecipeId) ?? null;
   });
 
+  /** The bench essence profile keyed by essence id, for requirement math. */
+  const benchEssenceTotals = $derived.by(() => {
+    const totals = {};
+    for (const essence of benchEssences) totals[essence.id] = essence.quantity;
+    return totals;
+  });
+
+  /**
+   * Whether the bench satisfies an ESSENCE-ONLY recipe's requirement. Mirrors the
+   * engine (`_matchAlchemySignature`), which satisfies an essence when the
+   * submitted total is at LEAST the required quantity — so surplus essences still
+   * match and must still read as `ready`.
+   */
+  function essencesSatisfied(requirement) {
+    return requirement.every(
+      (essence) => (benchEssenceTotals[essence.id] || 0) >= essence.quantity
+    );
+  }
+
+  /** The per-essence shortfall toward a requirement, as `missing`-shaped rows. */
+  function essenceShortfall(requirement) {
+    return requirement
+      .map((essence) => ({
+        componentId: essence.id,
+        name: essence.name,
+        img: null,
+        need: essence.quantity - (benchEssenceTotals[essence.id] || 0),
+      }))
+      .filter((row) => row.need > 0);
+  }
+
+  /** An essence-only recipe's resolved requirement, or null when not resolvable. */
+  function essenceRequirementOf(recipe) {
+    const requirement = recipe?.essenceRequirement;
+    return Array.isArray(requirement) && requirement.length > 0 ? requirement : null;
+  }
+
   /**
    * Five-mode resolution (best-effort, engine-authoritative, fail-safe to
-   * `untried`). `ready`/`assembling` are scoped to recipes with a `concrete`
-   * plain-component multiset; a rich-signature recipe never yields a false
-   * `ready`/`assembling`.
+   * `untried`). Two recipe shapes resolve client-side:
+   *  - a COMPONENT recipe with a `concrete` plain-component multiset (exact match);
+   *  - an ESSENCE-ONLY recipe with an `essenceRequirement` (`>=` match, mirroring
+   *    the engine, so surplus essences still read as `ready`).
+   * Anything else — alternatives, tags, multiple sets, or a set mixing ingredient
+   * groups with essences — has neither projection and fails safe to `untried`, so
+   * a rich-signature recipe never yields a false `ready`/`assembling`.
    */
   const resolution = $derived.by(() => {
     if (benchEmpty) return { mode: 'empty', target: null, missing: [] };
 
-    // 1. Bench equals a known recipe's concrete signature -> ready.
+    // 1. Bench satisfies a revealed recipe -> ready.
     for (const recipe of Array.isArray(listing?.recipes) ? listing.recipes : []) {
       if (recipe?.concrete && signatureKey(recipe.concrete) === benchKey) {
         return { mode: 'ready', target: recipe, missing: [] };
       }
+      const requirement = essenceRequirementOf(recipe);
+      if (requirement && essencesSatisfied(requirement)) {
+        return { mode: 'ready', target: recipe, missing: [] };
+      }
     }
 
-    // 2. Bench is a strict subset of the SELECTED known recipe's concrete
-    //    signature -> assembling (with the still-needed components).
+    // 2. Bench is progressing toward the SELECTED recipe -> assembling (with the
+    //    still-needed components or essences). A satisfied selection already
+    //    returned `ready` above, so reaching here means the requirement is unmet.
     if (selectedRecipe?.concrete) {
       const concrete = selectedRecipe.concrete;
       const entries = Object.entries(workbench).filter(([, qty]) => qty > 0);
@@ -161,6 +264,15 @@ export function createAlchemyStore({ services } = {}) {
           })
           .filter((row) => row.need > 0);
         return { mode: 'assembling', target: selectedRecipe, missing };
+      }
+    } else {
+      const requirement = essenceRequirementOf(selectedRecipe);
+      if (requirement) {
+        return {
+          mode: 'assembling',
+          target: selectedRecipe,
+          missing: essenceShortfall(requirement),
+        };
       }
     }
 
@@ -231,6 +343,7 @@ export function createAlchemyStore({ services } = {}) {
     services?.setSelectedAlchemySystemId?.('');
     resetBench();
     search = '';
+    componentSearch = '';
     load();
   }
 
@@ -242,6 +355,11 @@ export function createAlchemyStore({ services } = {}) {
 
   function setSearch(value) {
     search = typeof value === 'string' ? value : '';
+  }
+
+  /** Filter the owned-component inventory by name. */
+  function setComponentSearch(value) {
+    componentSearch = typeof value === 'string' ? value : '';
   }
 
   /** Available (held minus placed) units of a component. */
@@ -263,6 +381,15 @@ export function createAlchemyStore({ services } = {}) {
     const next = { ...workbench };
     next[componentId] = (next[componentId] || 0) - 1;
     if (next[componentId] <= 0) delete next[componentId];
+    workbench = next;
+    lastBrew = null;
+  }
+
+  /** Remove EVERY placed unit of a component from the bench (delete the key). */
+  function removeAll(componentId) {
+    if (!componentId || !(componentId in workbench)) return;
+    const next = { ...workbench };
+    delete next[componentId];
     workbench = next;
     lastBrew = null;
   }
@@ -410,8 +537,17 @@ export function createAlchemyStore({ services } = {}) {
     get components() {
       return components;
     },
+    get hasOwnedComponents() {
+      return hasOwnedComponents;
+    },
+    get componentSearch() {
+      return componentSearch;
+    },
     get benchChips() {
       return benchChips;
+    },
+    get benchEssences() {
+      return benchEssences;
     },
     get benchEmpty() {
       return benchEmpty;
@@ -451,8 +587,10 @@ export function createAlchemyStore({ services } = {}) {
     chooseSystem,
     switchDiscipline,
     setSearch,
+    setComponentSearch,
     add,
     removeOne,
+    removeAll,
     clear,
     selectRecipe,
     brew,

@@ -1,11 +1,16 @@
 <!-- Svelte 5 runes mode -->
 <!--
   KnownRecipesColumn — the left column of the Alchemy workbench: the recipes the
-  player has discovered (LEARNED only; undiscovered recipes are never named here —
-  only their count in the footer). Search, recipe rows with a signature summary and
-  a live-match badge, a zero-known empty state, and the undiscovered-count footer.
-  A "Switch discipline" button appears only when more than one discipline exists.
-  Prop-driven.
+  discipline has REVEALED to this player. Reveal is broader than "learned by brew":
+  per the system's visibility mode a recipe is revealed by a held book/scroll
+  (item), by learning it (knowledge), by a GM access grant (Manual), or by
+  discovering it through brewing — all project identically here. Non-revealed
+  recipes are never named; only their count shows in the footer. The discipline
+  block (system name + Switch) sits above the heading, a name search, recipe rows
+  with a signature summary and a live-match badge, an onboarding zero-revealed
+  empty state, a distinct filtered "no matches" state, and the non-revealed-count
+  footer. A "Switch discipline" button appears only when more than one discipline
+  exists. Prop-driven.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -24,7 +29,7 @@
     onSwitch = null
   } = $props();
 
-  /** A short, safe signature summary for a LEARNED recipe (the player knows it). */
+  /** A short, safe signature summary for a revealed recipe (the discipline has revealed it to the player). */
   function sigSummary(recipe) {
     const set = recipe?.signatureSummary?.[0];
     if (!set) return '';
@@ -53,11 +58,6 @@
 </script>
 
 <div class="alchemy-known">
-  <div class="alchemy-known-head">
-    <div class="alchemy-known-title">{localize('FABRICATE.App.Alchemy.KnownRecipes')}</div>
-    <span class="alchemy-known-count">{knownCount}</span>
-  </div>
-
   {#if activeSystemName || canSwitch}
     <div class="alchemy-known-system">
       <span class="alchemy-known-system-name">{activeSystemName}</span>
@@ -75,6 +75,11 @@
     </div>
   {/if}
 
+  <div class="alchemy-known-head">
+    <div class="alchemy-known-title">{localize('FABRICATE.App.Alchemy.KnownRecipes')}</div>
+    <span class="alchemy-known-count">{knownCount}</span>
+  </div>
+
   <label class="alchemy-known-search">
     <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
     <input
@@ -86,7 +91,13 @@
     />
   </label>
 
-  {#if recipes.length === 0}
+  {#if recipes.length === 0 && knownCount > 0}
+    <div class="alchemy-known-empty" data-alchemy-known-no-matches>
+      <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+      <p class="alchemy-known-empty-title">{localize('FABRICATE.App.Alchemy.NoRecipeMatchesTitle')}</p>
+      <p class="alchemy-known-empty-hint">{localize('FABRICATE.App.Alchemy.NoRecipeMatchesHint')}</p>
+    </div>
+  {:else if recipes.length === 0}
     <div class="alchemy-known-empty" data-alchemy-zero-known>
       <i class="fas fa-flask-vial" aria-hidden="true"></i>
       <p class="alchemy-known-empty-title">{localize('FABRICATE.App.Alchemy.ZeroKnownTitle')}</p>
@@ -178,13 +189,14 @@
 
   .alchemy-known-system {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
 
   .alchemy-known-system-name {
+    max-width: 100%;
     font-size: 11px;
     font-weight: 600;
     color: var(--fab-text-secondary);
@@ -237,8 +249,11 @@
 
   .alchemy-known-list {
     list-style: none;
-    margin: 0 -4px;
-    padding: 0 4px;
+    margin: 0;
+    /* No negative horizontal margin here: `overflow-y: auto` coerces `overflow-x`
+       to auto, which clips the first/last row's focus outline + border-radius at
+       the top/bottom edge. Use padding + outline-offset room instead. */
+    padding: 2px 4px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -248,10 +263,14 @@
   }
 
   .alchemy-recipe {
+    box-sizing: border-box;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 9px;
+    min-height: 56px;
     padding: 12px 13px;
     border-radius: 11px;
     border: 1px solid var(--fab-border);
@@ -259,12 +278,27 @@
     color: var(--fab-text);
     cursor: pointer;
     text-align: left;
+    /* Reset Foundry's global <button> styling (fixed height + line-height) so the
+       card lays out like a plain auto-height flex column; otherwise the fixed
+       height crops the box and the result row spills below the border. */
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+    font: inherit;
+    line-height: normal;
+    height: auto;
+    overflow: visible;
   }
 
   .alchemy-recipe.is-selected,
   .alchemy-recipe.is-match {
     border-color: var(--fab-accent-border);
     background: var(--fab-surface-active);
+  }
+
+  .alchemy-recipe:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 
   .alchemy-recipe-top {

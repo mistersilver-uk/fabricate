@@ -115,15 +115,18 @@ See the [System Manager API reference]({% link api/system-manager.md %}) for the
 
 ## Learn on Craft
 
-When the system's Learn on Craft setting is on, a player whose combination matches a recipe has that recipe marked as learned for their character.
-A match counts as a discovery whether or not the brew passed its check, so a failed Simple brew still teaches the recipe.
-A combination that matches nothing is never a discovery and teaches nothing.
-That learned state can be read to show discovered recipes and help players reproduce known combinations.
+When the system's Learn on Craft setting is on, a player whose combination matches a recipe has that recipe remembered for their character and revealed in their Known recipes list.
+A match counts as a discovery whether or not the brew passed its check, so a failed Simple brew still reveals the recipe.
+A combination that matches nothing is never a discovery and reveals nothing.
+
+Learn on Craft only controls whether brewing reveals a recipe.
+A discipline's visibility setting can also reveal recipes in other ways, such as through a book, a scroll, or a GM grant, and those work whether or not Learn on Craft is on.
+See [Visibility Rules](#visibility-rules).
 
 | Learn on Craft | Behaviour on a match |
 |:---------------------|:---------------------|
-| Off (default) | Every attempt is anonymous, players never see recipe names |
-| On | A matched recipe is remembered for the character and can be surfaced in future sessions |
+| Off (default) | Brewing a match never reveals the recipe, so it is revealed only by the discipline's other visibility settings |
+| On | A matched recipe is remembered for the character and revealed in their Known recipes list |
 
 This setting also lives under the system's Alchemy options.
 See the [System Manager API reference]({% link api/system-manager.md %}) for the API that updates a system.
@@ -138,11 +141,20 @@ Open the Fabricate window, choose the Alchemy tab, then pick a character you own
 
 The workbench has three columns.
 
-- **Known recipes** on the left lists every recipe this character has discovered, with the ingredients and result for each.
+- **Known recipes** on the left lists every recipe this discipline has revealed to this character, with the ingredients and result for each.
+See [Visibility Rules](#visibility-rules) for what "revealed" means and how a discipline decides it.
 - **Workbench** in the middle is the bench where you place components and brew them.
-- **Your components** on the right lists the alchemy components this character is carrying.
+- **Your components** on the right lists the alchemy components this character is carrying, with a search box to filter them by name.
 
 On a narrow window the three columns stack, with the workbench on top.
+
+The discipline's name and its **Switch discipline** button sit above the **Known recipes** heading.
+
+### Pulling components from other characters
+
+By default the workbench only shows the components carried by the character you selected.
+A bar above the columns lets you add other characters you own as extra component sources.
+Their alchemy components then appear in **Your components** alongside the selected character's, so you can brew with items spread across several characters.
 
 ### Choosing a discipline
 
@@ -157,30 +169,46 @@ Once you are in a discipline, a **Switch discipline** button lets you return to 
 Switching clears the bench and your current selection, and everything on screen then refers to the new discipline.
 The workbench remembers the last discipline you used on this device.
 
-### Learning recipes
+### How recipes appear in your Known list
 
-A character learns alchemy recipes in two ways.
+The **Known recipes** list shows the recipes this discipline has revealed to your character.
+A discipline decides what to reveal with its visibility setting, so exactly which recipes appear depends on how the GM set the discipline up.
+See [Visibility Rules](#visibility-rules) for what each setting reveals.
+
+The most common ways a recipe is revealed are:
 
 - **By experimentation.** Combine components on the bench and brew them.
-If the combination matches a recipe, that recipe is discovered and added to your Known recipes list.
+When the discipline remembers your brews, a combination that matches a recipe reveals that recipe and adds it to your Known recipes list.
 - **By reading books and scrolls.** Some recipes are taught by an in-world item, such as a recipe book or a scroll.
 Learn these from the **Inventory** tab, and they appear in your Known recipes list too.
 See [Recipe Discovery]({% link how-to/recipe-discovery.md %}) for how books and scrolls are set up and learned.
 
-Until a character has discovered a recipe, the Known recipes list shows an encouraging empty state that invites them to experiment on the bench.
+Revealing a recipe never changes what you can brew.
+A revealed recipe is simply one the workbench will name for you and can load onto the bench.
+You can always brew any combination, whether or not its recipe has been revealed.
 
-Below the list, a count tells you how many recipes in this discipline are still undiscovered.
-You are never shown the names, ingredients, or results of a recipe you have not discovered.
+Until a recipe has been revealed to your character, the Known recipes list shows an encouraging empty state that invites you to reveal recipes.
+
+Below the list, a count tells you how many recipes in this discipline are still hidden from you.
+You are never shown the names, ingredients, or results of a recipe that has not been revealed to you.
 That count is the only hint that there is more to find.
 
 ### Building a combination
 
 Add a component to the bench by tapping it in Your components, or by dragging it onto the bench.
+A grip handle on each row shows that it can be dragged.
 Each component in Your components shows how many are available, which is how many you are carrying minus how many you have already placed.
 Placing a component reduces the available count, and a component with none available cannot be added.
+A search box above the list filters Your components by name, which helps when a character carries a lot of items.
 
-Remove a placed component with its remove control, or by right-clicking it.
-**Clear** empties the bench in one step.
+On the bench, each component appears once with a badge counting how many you have placed.
+Tap a bench component to add another of the same.
+Remove a single copy with its remove-one control, by right-clicking it, or by pressing Shift while activating it.
+Remove every copy of a component at once with its remove-all control.
+**Clear** empties the whole bench in one step.
+
+When the discipline uses essences, each component shows its essence icons and amounts, in Your components, on the bench, and in the result preview.
+This lets you see what each ingredient contributes and what a recipe will make.
 
 Selecting a recipe in your Known recipes list loads its ingredients onto the bench when the recipe uses a single, fixed set of components, so you can brew a recipe you already know without hunting for its parts.
 A recipe that accepts alternative or optional ingredients still shows its full ingredient list for you to assemble by hand.
@@ -254,14 +282,30 @@ See the [System Manager API reference]({% link api/system-manager.md %}) and the
 
 ## Visibility Rules
 
-In alchemy mode, recipe visibility follows special rules no matter how the system's recipe list visibility is set:
+Alchemy visibility works differently from the other crafting modes.
+In other modes a system's visibility setting decides which recipes a player can craft.
+In alchemy it only decides which recipes are revealed in the Known recipes list.
+Brewing is never gated by visibility.
+A player can always brew any combination, and a matched combination always brews its recipe, whether or not that recipe has been revealed to the player.
 
-| Viewer | Visibility result |
-|:-------|:---------------------------------------|
-| GM | All recipes visible (for authoring and checking your work) |
-| Player, when Learn on Craft is off | No recipes visible |
-| Player, when Learn on Craft is on and the recipe has not been discovered | Recipe not visible |
-| Player, when Learn on Craft is on and the recipe was discovered earlier | Recipe visible |
+The GM chooses how recipes are revealed with the discipline's visibility setting, on the system's visibility settings page.
+For an alchemy system the setting offers these choices:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Setting | What reveals a recipe to a player |
+|:--------|:----------------------------------|
+| Global | Brewing a match reveals that recipe. This is the discovery game, so it relies on Learn on Craft being on. |
+| Item | A recipe is revealed while the character, or one of their component sources, holds its linked book or scroll. Put the book away and the recipe is hidden again. |
+| Knowledge | A recipe is revealed once the character learns it from a book or scroll on the Inventory tab, and it stays revealed afterwards. |
+| Manual (GM-granted access) | The GM reveals recipes to chosen characters or players on the Access tab. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+A GM always sees every recipe, for authoring and for checking their work.
+
+Whatever the setting, brewing a match also reveals that recipe when Learn on Craft is on, so experimentation adds to the Known list in every mode.
+Recipes that have not been revealed to a player are never named for them, and only their count is shown.
 
 ---
 

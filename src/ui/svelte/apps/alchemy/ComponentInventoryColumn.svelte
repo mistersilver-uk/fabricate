@@ -1,18 +1,26 @@
 <!-- Svelte 5 runes mode -->
 <!--
   ComponentInventoryColumn — the right column of the Alchemy workbench: the owned
-  components the player can place on the bench. Each row shows the component,
-  "X of Y available", and a real focusable `+` add button; unavailable rows carry
-  the `disabled` attribute (not merely muted style). Rows are draggable so the
-  workbench drop zone can accept them, and are the tap/left-click add affordance.
+  components the player can place on the bench. A name-search input filters the
+  list. Each row shows the component, "X of Y available", an `aria-hidden` grip
+  drag handle, and a real focusable `+` add button; unavailable rows carry the
+  `disabled` attribute (not merely muted style). Rows are draggable so the
+  workbench drop zone can accept them (drag stays mouse-only), and are the
+  tap/left-click add affordance (keyboard-reachable). Two empty states: the
+  onboarding "no components owned" state (`data-alchemy-empty-inventory`) and the
+  distinct "no matches" filtered-empty state when the search hides every row.
   Prop-driven so it can be mounted in isolation.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import EssenceChips from './EssenceChips.svelte';
 
   let {
     components = [],
+    search = '',
+    hasComponents = false,
     onAdd = null,
+    onSearch = null,
     onDragStart = null
   } = $props();
 </script>
@@ -23,11 +31,28 @@
     <div class="alchemy-inventory-hint">{localize('FABRICATE.App.Alchemy.TapToPlace')}</div>
   </div>
 
-  {#if components.length === 0}
+  <label class="alchemy-inventory-search">
+    <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+    <input
+      type="text"
+      value={search}
+      placeholder={localize('FABRICATE.App.Alchemy.SearchComponents')}
+      aria-label={localize('FABRICATE.App.Alchemy.SearchComponents')}
+      oninput={(event) => onSearch?.(event.target.value)}
+    />
+  </label>
+
+  {#if components.length === 0 && !hasComponents}
     <div class="alchemy-inventory-empty" data-alchemy-empty-inventory>
       <i class="fas fa-box-open" aria-hidden="true"></i>
       <p class="alchemy-inventory-empty-title">{localize('FABRICATE.App.Alchemy.EmptyInventoryTitle')}</p>
       <p class="alchemy-inventory-empty-hint">{localize('FABRICATE.App.Alchemy.EmptyInventoryHint')}</p>
+    </div>
+  {:else if components.length === 0}
+    <div class="alchemy-inventory-empty" data-alchemy-inventory-no-matches>
+      <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+      <p class="alchemy-inventory-empty-title">{localize('FABRICATE.App.Alchemy.NoComponentMatchesTitle')}</p>
+      <p class="alchemy-inventory-empty-hint">{localize('FABRICATE.App.Alchemy.NoComponentMatchesHint')}</p>
     </div>
   {:else}
     <ul class="alchemy-inventory-list">
@@ -44,6 +69,7 @@
             onclick={() => !component.disabled && onAdd?.(component.componentId)}
             ondragstart={(event) => onDragStart?.(event, component.componentId)}
           >
+            <span class="alchemy-inventory-grip" aria-hidden="true"><i class="fas fa-grip-vertical"></i></span>
             <span class="alchemy-inventory-icon">
               {#if component.img}
                 <img src={component.img} alt="" />
@@ -59,6 +85,9 @@
                   held: component.held
                 })}</span
               >
+              {#if component.essences?.length}
+                <EssenceChips essences={component.essences} />
+              {/if}
             </span>
             <span class="alchemy-inventory-add" aria-hidden="true"><i class="fas fa-plus"></i></span>
           </button>
@@ -98,10 +127,36 @@
     margin-top: 2px;
   }
 
+  .alchemy-inventory-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 12px 10px;
+    padding: 0 11px;
+    height: 34px;
+    background: var(--fab-surface);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    color: var(--fab-text-subtle);
+    flex: 0 0 auto;
+  }
+
+  .alchemy-inventory-search input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    color: var(--fab-text);
+    font-size: 12.5px;
+  }
+
   .alchemy-inventory-list {
     list-style: none;
     margin: 0;
-    padding: 0 12px 14px;
+    /* No negative horizontal margin: it would coerce overflow-x to auto (with the
+       vertical scroll) and clip the first/last row's focus outline + radius at the
+       edges. Padding + outline-offset room keeps the rows uncut. */
+    padding: 2px 12px 14px;
     display: flex;
     flex-direction: column;
     gap: 7px;
@@ -111,26 +166,56 @@
   }
 
   .alchemy-inventory-row {
+    box-sizing: border-box;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 9px 10px;
+    min-height: 56px;
+    padding: 12px 11px;
     border-radius: 9px;
     border: 1px solid var(--fab-border);
     background: var(--fab-surface);
     color: var(--fab-text);
     cursor: pointer;
     text-align: left;
+    /* Reset Foundry's global <button> styling (fixed height + line-height): with a
+       fixed height shorter than the essence-bearing content, align-items:center
+       pushes the essence chips past the bottom border. height:auto lets the row
+       grow so the essences sit inside with breathing room. */
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+    font: inherit;
+    line-height: normal;
+    height: auto;
+    overflow: visible;
   }
 
   .alchemy-inventory-row:hover:not(.is-disabled) {
     background: var(--fab-surface-active);
   }
 
+  .alchemy-inventory-row:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
   .alchemy-inventory-row.is-disabled {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+
+  .alchemy-inventory-grip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fab-text-disabled);
+    font-size: 11px;
+    cursor: grab;
   }
 
   .alchemy-inventory-icon {
@@ -170,6 +255,10 @@
   .alchemy-inventory-avail {
     font-size: 9.5px;
     color: var(--fab-text-subtle);
+  }
+
+  .alchemy-inventory-meta :global([data-alchemy-essences]) {
+    margin-top: 4px;
   }
 
   .alchemy-inventory-add {

@@ -1335,6 +1335,7 @@ class Fabricate {
     this._alchemyListingBuilder = new AlchemyListingBuilder({
       recipeManager: this.recipeManager,
       craftingSystemManager: this.craftingSystemManager,
+      recipeVisibility: this.recipeVisibilityService,
       localize: (key, data) =>
         data !== undefined
           ? (game.i18n?.format?.(key, data) ?? key)

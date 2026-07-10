@@ -289,6 +289,9 @@ It is no longer on the System Overview page, and it authors the flat `visibility
 
 - A single radio-card selector (the shared `ResolutionModeCard` primitive) offers exactly four mutually-exclusive options: `global`, `restricted`, `item`, and `knowledge`.
 Each option carries a label and description; exactly one mode is active for the whole system.
+- **Alchemy relabel (reveal-not-gate).** When `resolutionMode === "alchemy"` the card keys a `$derived` option set that renders the `restricted` option as "Manual (GM-granted access)" and rewords the item/knowledge/global descriptions from *gating* to *reveal* language (per `recipe-visibility`), because brewing is never gated by visibility.
+A non-alchemy system renders "Restricted" with gating language.
+The STORED enum value is unchanged in both (`restricted` stays `restricted` — no new enum value and no migration), so the Access tab (shown for `visibilityMode === "restricted"`) stays reachable to author the per-recipe grant.
 - Selecting an option live-applies it through `setVisibilityMode(mode)`, which persists `visibilityMode` and refreshes; the change is non-destructive (migrates no recipes) and there is no separate save action.
 - A `CraftingEffectPanel` beside the selector summarizes the active mode's effect (from the projected `craftingEffect(visibilityMode)` matrix): whether the Access tab, Books & Scrolls, limited-use, and learning-limits surfaces are shown.
 - Per-recipe-item use and learn caps are NOT authored here — each recipe item's caps live on its own Books & Scrolls item page (see Books & Scrolls Surface).
@@ -1080,40 +1083,47 @@ Its content mounts inside `.fabricate-app-content` — the shell's 84px nav rail
 The sides are compressible (`minmax(230px,280px)` each) with a floored, growable centre (`minmax(340px,1fr)`) so the 340px workbench floor coexists with the 1024px minimum window; it stacks at the `@container (max-width:900px)` breakpoint with the **workbench leading** the stacked order.
 It uses `--fab-*` design tokens only (no hex — see the theme-colour contract).
 
-The a11y contract: the status pill is `aria-live="polite"`; `+` add and `x` remove are real focusable `<button>`s (right-click remove has no keyboard path, so the `x` is the required parity affordance); unavailable inventory rows carry the `disabled` attribute; the drop zone has an accessible name/role plus a non-color dragover cue (a thicker dashed border); chooser cards and "Switch discipline" are real buttons; on Switch, focus moves to the chooser heading; the ready-state `brewpulse` animation honors `prefers-reduced-motion`.
+The additional component-sources bar (`ComponentSourcesBar`) renders in the shared top bar on the alchemy tab (`ActorSelectTopBar` `showSourcesBar` includes `activeTab === "alchemy"`), so a player can pull components from other actors; the discipline block (system name + Switch) sits ABOVE the "Known recipes" heading, stacked (name on its own line, Switch below).
+
+The a11y contract: the status pill is `aria-live="polite"`; the bench chip body is a focusable `role="button"` (Enter/Space add one; Shift+Enter removes one), the chip `−` (remove-one) and `×` (remove-all) are real focusable `<button>`s that `stopPropagation` so they never also add, and the palette `+` add is a real focusable `<button>` (drag is mouse-only, so the keyboard add is the required parity affordance); unavailable inventory rows carry the `disabled` attribute; the drop zone has an accessible name/role plus a non-color dragover cue (a thicker dashed border); chooser cards and "Switch discipline" are real buttons; on Switch, focus moves to the chooser heading; the ready-state `brewpulse` animation honors `prefers-reduced-motion`.
 
 #### Alchemy System Selector
 
 - Shown only when multiple alchemy-mode systems exist; a chooser card per system carries `N known . M total` and an Enter action, and a "Switch discipline" button (shown only with more than one system) returns to the chooser and resets the per-selection workbench state.
+- `N known` counts REVEALED recipes (per `recipe-visibility`), threading `componentSourceActors` into the summary so it matches the panel for item/Manual modes, not learned-only.
 - Auto-enters if exactly one alchemy system is available.
 - Persisted in the `fabricate.lastAlchemySystem` client setting.
 
 #### Component Palette
 
 - Grid of all components in selected alchemy system owned by component source actor(s).
-- Shows: image, name, available quantity (inventory minus workbench count).
+- A name-search input filters the list, with a distinct filtered-empty "no matches" state separate from the onboarding "no components owned" state.
+- Shows: image, name, available quantity (inventory minus workbench count), and — when the system has essences enabled and the component carries essences — the component's essence icons + per-unit counts.
+- A visible per-row `fa-grip-*` drag handle (`aria-hidden`, inside the row button) signals draggability; drag stays mouse-only while the row's `+` add stays keyboard-reachable.
 - Zero-quantity components remain visible but visually distinguished.
 - Left-click: add one to workbench.
-- Right-click: remove one from workbench (only if component is in workbench).
 - Drag-drop from external sources remains supported.
 
 #### The Workbench
 
-- Session-scoped working set displayed as compact grid with quantity badges (e.g., "Iron Ore x3").
+- Session-scoped working set displayed as compact grid with quantity badges (e.g., "Iron Ore x3"); a placed component's essence icons + counts show on its chip.
 - Each unique component appears once; adding increments the badge count.
-- Supports: add from palette, remove (right-click or direct action), clear all, submit.
+- Chip interactions: the chip body adds one (left-click / Enter / Space); a right-click, Shift+Enter, or the focus/hover `−` control removes one; the `×` control removes all (delete the key).
+The `−` and `×` `stopPropagation` so they never also add.
+- Supports: add from palette, add/remove/remove-all on a chip, clear all, submit.
 - Submit triggers signature matching per existing Signature Resolution rules in `004`.
+- The Produces preview surfaces the result component's essence icons + counts when essences are enabled.
 - Drives the **five-mode status model** (`empty` / `assembling` / `ready` / `untried` / `no-reaction`, per `resolution-modes`) governing the status pill, Produces panel, and Brew button; client mode is advisory and fails safe to `untried` for any non-concrete signature (the engine is authoritative on brew).
 - A brew-in-flight busy/disabled guard on Brew prevents double-submit (mirrors CraftingView's `busy` guard).
 
 #### Discovered Recipes Panel
 
-- Always visible on the left, with a zero-known empty state when no recipes have been discovered.
-- Shows recipes from the selected alchemy system where the crafting actor has an entry in `learnedRecipes` (GM sees all, consistent with GM-sees-all).
+- Always visible on the left, with an onboarding zero-revealed empty state when nothing has been revealed and a distinct filtered "no matches" state when a search hides every revealed recipe.
+- Shows recipes the viewer has **REVEALED** (per `recipe-visibility` — learned-by-brew ∪ the mode's reveal source), not learned-only (GM sees all, consistent with GM-sees-all).
 - Searchable by recipe name.
-- Selecting a known recipe **auto-loads** its signature onto the bench (a selection side effect, not a per-recipe button), scoped to recipes reducible to a concrete plain-component multiset.
+- Selecting a revealed recipe **auto-loads** its signature onto the bench (a selection side effect, not a per-recipe button), scoped to recipes reducible to a concrete plain-component multiset.
 - The "Craftable only" filter is DEFERRED this iteration.
-- The undiscovered-recipe **count** (never names/results/signatures) is shown in a footer.
+- The non-revealed-recipe **count** (`valid − revealed`, never names/results/signatures) is shown in a footer.
 - Visibility and learning semantics defined in `006`.
 
 #### Active Runs and History (cross-reference reconciliation)

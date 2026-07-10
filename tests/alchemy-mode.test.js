@@ -483,7 +483,10 @@ test('RecipeVisibilityService: GM sees all alchemy recipes', () => {
   assert.equal(result.craftable, true);
 });
 
-test('RecipeVisibilityService: non-GM sees no recipes in alchemy mode when learnOnCraft=false', () => {
+test('RecipeVisibilityService: reveal-not-gate — a non-revealed global-mode recipe is NOT revealed but is still craftable', () => {
+  // global mode reveals discovery-only; learnOnCraft off + not learned => not
+  // revealed. Reveal-not-gate: craftable stays true (matched signature is the sole
+  // brew gate).
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: false, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -495,10 +498,11 @@ test('RecipeVisibilityService: non-GM sees no recipes in alchemy mode when learn
     craftingActor: actor
   });
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'alchemy-hidden');
+  assert.equal(result.craftable, true, 'brewing is never gated by reveal state');
+  assert.equal(result.reason, 'alchemy-unrevealed');
 });
 
-test('RecipeVisibilityService: non-GM sees learned recipe when learnOnCraft=true', () => {
+test('RecipeVisibilityService: a brew-discovered (learned) global-mode recipe is revealed and craftable', () => {
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -512,10 +516,11 @@ test('RecipeVisibilityService: non-GM sees learned recipe when learnOnCraft=true
     craftingActor: actor
   });
   assert.equal(result.visible, true);
-  assert.equal(result.reason, 'alchemy-learned');
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'alchemy-revealed');
 });
 
-test('RecipeVisibilityService: non-GM does NOT see un-learned recipe when learnOnCraft=true', () => {
+test('RecipeVisibilityService: an un-learned global-mode recipe is not revealed but stays craftable (brew never gated)', () => {
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -527,7 +532,8 @@ test('RecipeVisibilityService: non-GM does NOT see un-learned recipe when learnO
     craftingActor: actor
   });
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'alchemy-not-learned');
+  assert.equal(result.craftable, true, 'brewing is never gated by reveal state');
+  assert.equal(result.reason, 'alchemy-unrevealed');
 });
 
 test('RecipeVisibilityService.learnRecipeOnCraft: adds recipe to actor learned map', async () => {

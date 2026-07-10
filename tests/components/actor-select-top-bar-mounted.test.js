@@ -474,6 +474,15 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.Unknown'), 'unknown label');
   });
 
+  it('renders the component-sources bar on the alchemy tab', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'alchemy' });
+
+    const right = target.querySelector('.actor-bar-right');
+    assert.ok(right, 'the alchemy tab surfaces the right-side context cluster');
+    assert.ok(right.querySelector('[data-crafting-sources]'), 'the component-sources bar renders on the alchemy tab');
+  });
+
   it('hides the gathering-only context on tabs with no right-side context', async () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,

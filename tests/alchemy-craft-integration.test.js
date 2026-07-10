@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
+import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { SignatureValidator } from '../src/systems/SignatureValidator.js';
 import { getItemSourceReferences, getComponentSourceReferences } from '../src/utils/sourceUuid.js';
 
@@ -381,6 +382,52 @@ test('Simple FAIL with learnOnCraft=false consumes + produces but does NOT learn
 // ===========================================================================
 // Tiered: a success outcome routes to its assigned tier group
 // ===========================================================================
+
+// ===========================================================================
+// Brew is NEVER gated by visibility (issue 563): exercise the REAL
+// RecipeVisibilityService.guardCraftStart (not the {craftable:true} stub) so a
+// NON-revealed recipe under every mode still succeeds + produces for a non-GM.
+// Reverting the `craftable`-decoupling in the alchemy branch makes this fail:
+// guardCraftStart would return craftable:false and craft() would short-circuit.
+// ===========================================================================
+
+test('brew is never gated by reveal: a non-revealed recipe still brews + produces under every mode (real service)', async () => {
+  for (const mode of ['restricted', 'item', 'knowledge', 'global']) {
+    const { engine, system, recipe, validator } = setup({
+      checkMode: 'none',
+      learnOnCraft: false,
+      resultGroups: [{ id: 'rg', name: 'Result', results: [{ id: 'r', componentId: 'potion', quantity: 1 }] }],
+    });
+    system.visibilityMode = mode;
+    // A Manual (restricted) grant that EXCLUDES the viewer, so restricted mode is
+    // genuinely non-revealed (an un-restricted recipe would fall back to visible).
+    recipe.access = { playerIds: ['someone-else'], characterIds: [] };
+
+    const realService = new RecipeVisibilityService(
+      { getRecipes: () => [recipe], getRecipe: (id) => (id === recipe.id ? recipe : null) },
+      { getSystem: (id) => (id === 'sys-a' ? system : null) }
+    );
+    // Non-GM viewer; the crafting actor has learned nothing and holds no book.
+    game.user = { id: 'player1', isGM: false };
+    game.fabricate.getRecipeVisibilityService = () => realService;
+
+    // The recipe is genuinely NOT revealed to this viewer, yet still craftable.
+    const access = realService.evaluateRecipeAccess({
+      recipe,
+      viewer: game.user,
+      craftingActor: new FakeActor('probe'),
+    });
+    assert.equal(access.visible, false, `${mode}: the recipe is not revealed`);
+    assert.equal(access.craftable, true, `${mode}: brewing is never gated by reveal`);
+
+    // The brew succeeds and produces through the REAL guardCraftStart.
+    const inputs = brewInputs();
+    const result = await brew(engine, validator, inputs);
+    assert.equal(result.success, true, `${mode}: a matched brew succeeds despite being unrevealed`);
+    assert.equal(result.results[0].name, 'Potion of Vigor', `${mode}: the success group is produced`);
+    assert.equal(inputs.owned._deleted, true, `${mode}: the ingredient is consumed`);
+  }
+});
 
 test('Tiered success routes the outcome to its assigned tier group and produces it', async () => {
   const routed = {

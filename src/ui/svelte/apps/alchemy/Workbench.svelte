@@ -6,18 +6,31 @@
   from `mode` + `targetName` so it can be mounted in isolation and asserts the
   mode -> status-pill + Brew-disabled binding.
 
+  Below the component signature it shows the bench's AGGREGATE ESSENCE readout
+  (`benchEssences`) whenever the placed components carry essences. An
+  essence-authored recipe is identified by its essence totals rather than by named
+  components, so this readout — together with the `assembling` still-needed rows —
+  is the progress signal such a discipline reads, and is load-bearing rather than
+  decorative.
+
   Interactions: it is BOTH a drop target (drag a component in, dashed dragover cue)
-  and hosts tap-added chips; each chip's `x` is a real focusable button and a
-  right-click removes it. The status pill is `aria-live="polite"`; the drop zone
-  has an accessible name/role plus a non-color dragover cue (the dashed border
-  thickens). The ready-state `brewpulse` animation honors prefers-reduced-motion.
+  and hosts placed chips. Each chip supports three actions with keyboard/touch
+  parity: the chip BODY is a focusable `role="button"` that ADDS one on click /
+  Enter / Space (capped by availability upstream); a right-click, Shift+Enter, or
+  the focus/hover `−` control REMOVES one; and the `×` button REMOVES ALL (it
+  `stopPropagation`s so it never also adds). The status pill is `aria-live="polite"`;
+  the drop zone has an accessible name/role plus a non-color dragover cue (the
+  dashed border thickens). The ready-state `brewpulse` animation honors
+  prefers-reduced-motion.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import EssenceChips from './EssenceChips.svelte';
 
   let {
     benchChips = [],
     benchEmpty = true,
+    benchEssences = [],
     signatureText = '',
     mode = 'empty',
     targetName = '',
@@ -27,10 +40,26 @@
     brewInFlight = false,
     lastBrew = null,
     onClear = null,
+    onAdd = null,
     onRemoveOne = null,
+    onRemoveAll = null,
     onBrew = null,
     onDrop = null
   } = $props();
+
+  // Chip-body keyboard parity: Enter/Space add one; Shift+Enter/Shift+Space remove
+  // one (the keyboard/touch analogue of the right-click remove-one gesture). Guard
+  // on `target === currentTarget` so an Enter/Space keydown that bubbles up from a
+  // FOCUSED nested control (the `−`/`×` buttons) does NOT trigger the chip-body add
+  // — otherwise `preventDefault()` would cancel the button's native activation and
+  // Enter on `×` would add instead of remove-all.
+  function handleChipKeydown(event, componentId) {
+    if (event.target !== event.currentTarget) return;
+    if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+    event.preventDefault();
+    if (event.shiftKey) onRemoveOne?.(componentId);
+    else onAdd?.(componentId);
+  }
 
   let dragOver = $state(false);
 
@@ -161,8 +190,13 @@
         {#each benchChips as chip (chip.componentId)}
           <div
             class="alchemy-chip"
-            role="group"
-            aria-label={chip.name}
+            role="button"
+            tabindex="0"
+            data-alchemy-chip={chip.componentId}
+            aria-label={localize('FABRICATE.App.Alchemy.ChipActions', { name: chip.name })}
+            title={localize('FABRICATE.App.Alchemy.ChipActions', { name: chip.name })}
+            onclick={() => onAdd?.(chip.componentId)}
+            onkeydown={(event) => handleChipKeydown(event, chip.componentId)}
             oncontextmenu={(event) => {
               event.preventDefault();
               onRemoveOne?.(chip.componentId);
@@ -170,10 +204,25 @@
           >
             <button
               type="button"
+              class="alchemy-chip-remove-one"
+              data-alchemy-chip-remove-one={chip.componentId}
+              aria-label={localize('FABRICATE.App.Alchemy.RemoveOneComponent', { name: chip.name })}
+              onclick={(event) => {
+                event.stopPropagation();
+                onRemoveOne?.(chip.componentId);
+              }}
+            >
+              <i class="fas fa-minus" aria-hidden="true"></i>
+            </button>
+            <button
+              type="button"
               class="alchemy-chip-remove"
               data-alchemy-chip-remove={chip.componentId}
-              aria-label={localize('FABRICATE.App.Alchemy.RemoveComponent', { name: chip.name })}
-              onclick={() => onRemoveOne?.(chip.componentId)}
+              aria-label={localize('FABRICATE.App.Alchemy.RemoveAllComponent', { name: chip.name })}
+              onclick={(event) => {
+                event.stopPropagation();
+                onRemoveAll?.(chip.componentId);
+              }}
             >
               <i class="fas fa-xmark" aria-hidden="true"></i>
             </button>
@@ -186,6 +235,9 @@
             </span>
             <div class="alchemy-chip-name">{chip.name}</div>
             <span class="alchemy-chip-qty">×{chip.qty}</span>
+            {#if chip.essences?.length}
+              <EssenceChips essences={chip.essences} />
+            {/if}
           </div>
         {/each}
       </div>
@@ -193,6 +245,12 @@
         <span class="alchemy-signature-label">{localize('FABRICATE.App.Alchemy.Signature')}</span>
         <span class="alchemy-signature-text">{signatureText}</span>
       </div>
+      {#if benchEssences.length}
+        <div class="alchemy-bench-essences" data-alchemy-bench-essences>
+          <span class="alchemy-signature-label">{localize('FABRICATE.App.Alchemy.EssenceTotal')}</span>
+          <EssenceChips essences={benchEssences} size="md" />
+        </div>
+      {/if}
     {/if}
   </div>
 
@@ -213,6 +271,9 @@
       </span>
       <div class="alchemy-result-meta">
         <div class="alchemy-result-name">{result.name}</div>
+        {#if result.essences?.length}
+          <EssenceChips essences={result.essences} size="md" />
+        {/if}
       </div>
       <span class="alchemy-result-qty">×{result.quantity}</span>
     </div>
@@ -398,12 +459,22 @@
     flex-direction: column;
     align-items: center;
     gap: 7px;
+    cursor: pointer;
   }
 
-  .alchemy-chip-remove {
+  .alchemy-chip:hover {
+    background: var(--fab-surface-active);
+  }
+
+  .alchemy-chip:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .alchemy-chip-remove,
+  .alchemy-chip-remove-one {
     position: absolute;
     top: 6px;
-    right: 6px;
     width: 20px;
     height: 20px;
     border-radius: 6px;
@@ -415,6 +486,32 @@
     color: var(--fab-danger-text);
     font-size: 9px;
     cursor: pointer;
+  }
+
+  .alchemy-chip-remove {
+    right: 6px;
+  }
+
+  /* The remove-one `−` is the keyboard/touch analogue of the right-click gesture:
+     subtle by default, revealed when the chip is hovered or anything inside it is
+     focused (so keyboard users can reach it). */
+  .alchemy-chip-remove-one {
+    left: 6px;
+    color: var(--fab-text-muted);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+
+  .alchemy-chip:hover .alchemy-chip-remove-one,
+  .alchemy-chip:focus-within .alchemy-chip-remove-one,
+  .alchemy-chip-remove-one:focus-visible {
+    opacity: 1;
+  }
+
+  .alchemy-chip-remove:focus-visible,
+  .alchemy-chip-remove-one:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 1px;
   }
 
   .alchemy-chip-icon {
@@ -450,6 +547,14 @@
     color: var(--fab-accent);
   }
 
+  .alchemy-chip :global([data-alchemy-essences]) {
+    justify-content: center;
+  }
+
+  .alchemy-result-meta :global([data-alchemy-essences]) {
+    margin-top: 5px;
+  }
+
   .alchemy-signature {
     margin-top: 14px;
     padding-top: 12px;
@@ -471,6 +576,14 @@
     font-family: var(--font-primary);
     font-size: 11px;
     color: var(--fab-text-secondary);
+  }
+
+  .alchemy-bench-essences {
+    margin-top: 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .alchemy-status {

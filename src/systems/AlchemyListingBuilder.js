@@ -9,22 +9,29 @@
  * actor objects passed to `buildListing`, so GM and player viewers resolve through
  * one code path.
  *
+ * REVEAL-not-gate. `visibilityMode` selects which source(s) REVEAL a recipe in the
+ * Known list (item = a held book/scroll, knowledge = learned, Manual = a per-recipe
+ * access grant, global = brew-discovery), with discovery-by-brew unioned across all
+ * modes. Brewing is NEVER gated by reveal — the builder reads only the reveal signal
+ * (`access.visible`) through the injected `recipeVisibility` collaborator, never
+ * `craftable`. A revealed recipe projects identically to a brew-discovered one.
+ *
  * THE LEAK INVARIANT. For a non-GM viewer the builder projects, per (actor x chosen
  * system):
- *  - LEARNED recipes only (id, name, icon, a rich structured signature summary, and
- *    result — all safe because the player already knows them);
- *  - the COUNT of undiscovered recipes only, derived behind this seam from the
- *    enabled + system-validity filter — the undiscovered list is NEVER sent to the
- *    client to count locally, and no undiscovered name / signature / result reaches
- *    any client field;
+ *  - REVEALED recipes only (id, name, icon, a rich structured signature summary, and
+ *    result — all safe because the discipline has revealed them to this player);
+ *  - the COUNT of non-revealed valid recipes only (`undiscoveredCount = valid −
+ *    revealed`), derived behind this seam — the non-revealed list is NEVER sent to
+ *    the client to count locally, and no non-revealed name / signature / result
+ *    reaches any client field;
  *  - the owned components in that system with held quantities;
  *  - the actor's fizzled-signature keys for that system (read only through
  *    `getFabricateFlag`, never a raw flag path);
  *  - and cross-system chooser summaries (`N known . M total` per enabled alchemy
- *    system).
+ *    system, where `N` is the revealed count).
  *
- * A GM viewer sees every enabled recipe as "known" (alchemy visibility grants a GM
- * full access), so the undiscovered count is zero for a GM.
+ * A GM viewer has every enabled recipe revealed (alchemy visibility grants a GM full
+ * access), so the non-revealed count is zero for a GM.
  */
 
 import { getFabricateFlag } from '../config/flags.js';
@@ -66,12 +73,19 @@ export class AlchemyListingBuilder {
     recipeManager = null,
     craftingSystemManager = null,
     signatureValidator = null,
+    recipeVisibility = null,
     getViewer = null,
     localize = (key) => key,
   } = {}) {
     this.recipeManager = recipeManager;
     this.craftingSystemManager = craftingSystemManager;
     this.signatureValidator = signatureValidator ?? new SignatureValidator({});
+    // Reveal collaborator (`RecipeVisibilityService`). The builder reads only the
+    // `visible` (reveal) signal, NEVER `craftable`, and single-sources the reveal
+    // decision here rather than reimplementing it. When absent it degrades to a
+    // null collaborator that reveals nothing beyond GM/learned (the Foundry-free
+    // test-seam default).
+    this.recipeVisibility = recipeVisibility;
     this._getViewer = typeof getViewer === 'function' ? getViewer : null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
   }
@@ -98,11 +112,17 @@ export class AlchemyListingBuilder {
     const resolvedViewer = viewer ?? this._getViewer?.() ?? null;
     const isGM = resolvedViewer?.isGM === true;
 
+    // The reveal decision (item/Manual modes) reads the crafting actor + the
+    // component-source actors, so thread the filtered sources into both the chooser
+    // summaries and the active listing loop — otherwise the chooser `N known` count
+    // (revealed) would diverge from the panel for item/Manual modes.
+    const revealSources = this._filterActors(componentSourceActors);
+
     // The chooser summaries span every enabled alchemy system with recipes; they
     // are always safe (counts + system identity only).
     const systems = this._enabledAlchemySystems();
     const chooserSystems = systems.map((system) =>
-      this._systemSummary(system, craftingActor, isGM)
+      this._systemSummary(system, craftingActor, isGM, resolvedViewer, revealSources)
     );
 
     // No resolvable owner (non-owner viewer upstream) -> denied, empty payload.
@@ -139,9 +159,21 @@ export class AlchemyListingBuilder {
     let undiscoveredCount = 0;
     for (const recipe of recipes) {
       if (!this._isValidAlchemyRecipe(recipe)) continue;
-      if (this._isKnown(recipe, learnedMap, isGM)) {
+      if (
+        this._isRevealed(recipe, {
+          viewer: resolvedViewer,
+          isGM,
+          craftingActor,
+          componentSourceActors: revealSources,
+          learnedMap,
+        })
+      ) {
+        // A revealed recipe projects identically to a brew-discovered one: full
+        // name + signature summary + result, selectable and auto-fillable.
         known.push(this._projectLearnedRecipe(recipe, activeSystem, components));
       } else {
+        // Leak-safe: a non-revealed recipe is a count only — no name / signature /
+        // result reaches any client field.
         undiscoveredCount += 1;
       }
     }
@@ -154,7 +186,7 @@ export class AlchemyListingBuilder {
       systems: chooserSystems,
       recipes: known,
       undiscoveredCount,
-      components: this._projectOwnedComponents(components, sources),
+      components: this._projectOwnedComponents(components, sources, activeSystem),
       fizzleKeys: this._getFizzleKeys(craftingActor, activeSystem.id),
     };
   }
@@ -193,15 +225,24 @@ export class AlchemyListingBuilder {
   /**
    * A chooser card summary for one alchemy system: `{ id, name, img, description,
    * knownCount, totalCount }`. `totalCount` counts enabled, structurally-valid
-   * alchemy recipes (the system-validity gate); `knownCount` those the actor has
-   * learned (all of them for a GM). No undiscovered recipe identity leaks.
+   * alchemy recipes (the system-validity gate); `knownCount` those REVEALED to the
+   * viewer (the routed reveal decision — all of them for a GM), so it matches the
+   * panel for item/Manual modes. No undiscovered recipe identity leaks.
    */
-  _systemSummary(system, craftingActor, isGM) {
+  _systemSummary(system, craftingActor, isGM, viewer, componentSourceActors = []) {
     const learnedMap = this._getLearnedMap(craftingActor);
     const recipes = this._systemRecipes(system.id).filter((recipe) =>
       this._isValidAlchemyRecipe(recipe)
     );
-    const knownCount = recipes.filter((recipe) => this._isKnown(recipe, learnedMap, isGM)).length;
+    const knownCount = recipes.filter((recipe) =>
+      this._isRevealed(recipe, {
+        viewer,
+        isGM,
+        craftingActor,
+        componentSourceActors,
+        learnedMap,
+      })
+    ).length;
     return {
       id: system.id,
       name: stringOrEmpty(system.name),
@@ -227,9 +268,29 @@ export class AlchemyListingBuilder {
     );
   }
 
-  _isKnown(recipe, learnedMap, isGM) {
+  /**
+   * Whether a recipe is REVEALED to the viewer, routed through the injected
+   * `recipeVisibility` collaborator's reveal signal (`access.visible`), NEVER
+   * `craftable` (brewing is never gated by reveal). When no collaborator is wired
+   * (the Foundry-free test-seam default) it degrades to GM-sees-all / learned-only.
+   */
+  _isRevealed(
+    recipe,
+    { viewer, isGM, craftingActor, componentSourceActors = [], learnedMap } = {}
+  ) {
+    if (typeof this.recipeVisibility?.evaluateRecipeAccess === 'function') {
+      const access = this.recipeVisibility.evaluateRecipeAccess({
+        recipe,
+        viewer,
+        craftingActor,
+        componentSourceActors,
+      });
+      return access?.visible === true;
+    }
+    // Null-collaborator default.
     if (isGM) return true;
-    return Boolean(learnedMap?.[recipe?.id]);
+    const map = learnedMap ?? this._getLearnedMap(craftingActor);
+    return Boolean(map?.[recipe?.id]);
   }
 
   _getLearnedMap(actor) {
@@ -267,9 +328,11 @@ export class AlchemyListingBuilder {
 
   /**
    * Owned components in the active system with held quantity > 0, aggregated
-   * across the source actors. Projects `{ componentId, name, img, held }`.
+   * across the source actors. Projects `{ componentId, name, img, held, essences }`
+   * (the resolved per-unit essence icons + counts, `[]` when the system has no
+   * essences or the component carries none).
    */
-  _projectOwnedComponents(components, sources) {
+  _projectOwnedComponents(components, sources, system = null) {
     if (!Array.isArray(components) || components.length === 0) return [];
     const held = new Map();
     for (const actor of sources) {
@@ -289,6 +352,7 @@ export class AlchemyListingBuilder {
         name: stringOrEmpty(component.name),
         img: stringOrNull(component.img),
         held: owned,
+        essences: this._projectComponentEssences(component, system),
       });
     }
     return rows.sort((left, right) => left.name.localeCompare(right.name));
@@ -309,6 +373,7 @@ export class AlchemyListingBuilder {
     const signatureSummary = sets.map((set) => this._projectSet(set, recipe, system, components));
     const headline = signatureSummary[0]?.result ?? null;
     const concrete = this._concreteMultiset(sets, components);
+    const essenceRequirement = this._essenceRequirement(sets, system);
     // Carry the system-level alchemy check mode so the workbench can flag a
     // check-gated outcome ("a check gates this result") for simple/tiered brews.
     const checkMode = system?.alchemy?.checkMode || 'none';
@@ -320,9 +385,36 @@ export class AlchemyListingBuilder {
       signatureSummary,
       result: headline,
       concrete,
+      essenceRequirement,
       checkMode,
       checkGated: checkMode === 'simple' || checkMode === 'tiered',
     };
+  }
+
+  /**
+   * The essence requirement of an ESSENCE-ONLY recipe, as the same resolved
+   * `[{ id, name, icon, quantity }]` shape the signature summary uses (so the
+   * store can both MATCH against it and label the still-needed rows from one
+   * projection). Null unless: essences are enabled for the system, the recipe has
+   * exactly one ingredient set, that set carries a non-empty essence map, and it
+   * has NO ingredient groups.
+   *
+   * A set that MIXES ingredient groups with essences is deliberately left null:
+   * the store cannot verify the group half client-side, so it must fail safe to
+   * `untried` rather than emit a false `ready`.
+   *
+   * Callers must mirror the engine's `>=` semantics — `_matchAlchemySignature`
+   * satisfies an essence when the submitted total is at LEAST the required
+   * quantity, so surplus essences still match.
+   */
+  _essenceRequirement(sets, system) {
+    if (!this._essencesEnabled(system)) return null;
+    if (!Array.isArray(sets) || sets.length !== 1) return null;
+    const set = sets[0];
+    const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : [];
+    if (groups.length > 0) return null;
+    const resolved = this._resolveEssenceList(set?.essences, system);
+    return resolved.length > 0 ? resolved : null;
   }
 
   _projectSet(set, recipe, system, components) {
@@ -365,7 +457,35 @@ export class AlchemyListingBuilder {
   }
 
   _projectEssences(set, system) {
-    const raw = set?.essences && typeof set.essences === 'object' ? set.essences : {};
+    return this._resolveEssenceList(set?.essences, system);
+  }
+
+  /**
+   * Whether the system has essences enabled (canonical `features.essences`, with the
+   * legacy `enableEssences` fallback).
+   */
+  _essencesEnabled(system) {
+    return system?.features?.essences === true || system?.enableEssences === true;
+  }
+
+  /**
+   * A component's per-unit essences resolved against the system's essence
+   * definitions, as `[{ id, name, icon, quantity }]`. Empty when essences are
+   * disabled for the system or the component carries none — so the workbench shows
+   * essence icons + counts only where they are meaningful.
+   */
+  _projectComponentEssences(component, system) {
+    if (!this._essencesEnabled(system)) return [];
+    return this._resolveEssenceList(component?.essences, system);
+  }
+
+  /**
+   * Shared essence-map → display-list resolver. Maps `{ essenceId: quantity }`
+   * against the system's `essenceDefinitions`, dropping zero/invalid quantities and
+   * falling back to the raw id when a definition is missing.
+   */
+  _resolveEssenceList(rawMap, system) {
+    const raw = rawMap && typeof rawMap === 'object' ? rawMap : {};
     const defs = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
     const defById = new Map(defs.map((def) => [def.id, def]));
     const out = [];
@@ -422,6 +542,7 @@ export class AlchemyListingBuilder {
       name: component ? stringOrEmpty(component.name) : stringOrEmpty(group?.name),
       img: component ? stringOrNull(component.img) : null,
       quantity: Math.max(1, Number(first.quantity) || 1),
+      essences: component ? this._projectComponentEssences(component, system) : [],
     };
   }
 

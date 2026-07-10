@@ -324,6 +324,41 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, true);
   });
 
+  it('removeAll deletes every placed unit of a component (removes the key)', async () => {
+    const { store } = await loadedStore();
+    store.add('ashsalt');
+    store.add('ashsalt');
+    flushSync();
+    assert.equal(store.benchChips.find((c) => c.componentId === 'ashsalt').qty, 2);
+    store.removeAll('ashsalt');
+    flushSync();
+    assert.equal(store.benchEmpty, true, 'removeAll clears the whole stack');
+  });
+
+  it('componentSearch filters the owned-component inventory by name; hasOwnedComponents ignores the filter', async () => {
+    const { store } = await loadedStore();
+    assert.equal(store.hasOwnedComponents, true);
+    assert.equal(store.components.length, 3);
+    store.setComponentSearch('ash');
+    flushSync();
+    assert.deepEqual(store.components.map((c) => c.componentId), ['ashsalt']);
+    assert.equal(store.hasOwnedComponents, true, 'ownership is independent of the search filter');
+    assert.equal(store.componentSearch, 'ash');
+    store.setComponentSearch('');
+    flushSync();
+    assert.equal(store.components.length, 3, 'clearing the search restores the full list');
+  });
+
+  it('left-click add respects the owned availability cap', async () => {
+    const { store } = await loadedStore({
+      listing: baseListing({ components: [{ componentId: 'ashsalt', name: 'Ashsalt', img: null, held: 1 }] }),
+    });
+    store.add('ashsalt');
+    store.add('ashsalt'); // second add exceeds the held cap of 1 -> no-op
+    flushSync();
+    assert.equal(store.benchChips.find((c) => c.componentId === 'ashsalt').qty, 1, 'capped at owned availability');
+  });
+
   it('a dismissed interactive roll is returned quietly (bench preserved)', async () => {
     const harness = makeServices({
       submitAlchemyAttempt: async () => ({ success: false, cancelled: true }),
@@ -337,5 +372,189 @@ describe('alchemyStore', () => {
     flushSync();
     assert.equal(result.cancelled, true);
     assert.equal(store.benchEmpty, false, 'a cancelled roll leaves the bench intact');
+  });
+
+  // The aggregate essence readout is the ONLY progress signal an essence-authored
+  // recipe gets: such a recipe has no `concrete` multiset, so resolution fails safe
+  // to `untried` and never reports `ready`.
+  describe('benchEssences (aggregate essence readout)', () => {
+    const essenceListing = () =>
+      baseListing({
+        components: [
+          {
+            componentId: 'venomgland',
+            name: 'Venom Gland',
+            img: null,
+            held: 4,
+            essences: [{ id: 'toxic', name: 'Toxic', icon: 'fas fa-skull', quantity: 2 }],
+          },
+          {
+            componentId: 'springwater',
+            name: 'Spring Water',
+            img: null,
+            held: 4,
+            essences: [
+              { id: 'water', name: 'Water', icon: 'fas fa-droplet', quantity: 1 },
+              { id: 'toxic', name: 'Toxic', icon: 'fas fa-skull', quantity: 1 },
+            ],
+          },
+          { componentId: 'ashsalt', name: 'Ashsalt', img: null, held: 3, essences: [] },
+        ],
+      });
+
+    it('is empty for an empty bench', async () => {
+      const { store } = await loadedStore({ listing: essenceListing() });
+      assert.deepEqual(store.benchEssences, []);
+    });
+
+    it('multiplies per-unit essences by the placed quantity', async () => {
+      const { store } = await loadedStore({ listing: essenceListing() });
+      store.add('venomgland');
+      store.add('venomgland');
+      flushSync();
+      assert.deepEqual(
+        store.benchEssences.map((e) => [e.id, e.quantity]),
+        [['toxic', 4]],
+        'Venom Gland x2 at 2 Toxic per unit -> Toxic x4'
+      );
+    });
+
+    it('sums one essence across different components and sorts by name', async () => {
+      const { store } = await loadedStore({ listing: essenceListing() });
+      store.add('venomgland'); // Toxic 2
+      store.add('springwater'); // Toxic 1 + Water 1
+      flushSync();
+      assert.deepEqual(
+        store.benchEssences.map((e) => [e.id, e.quantity]),
+        [
+          ['toxic', 3],
+          ['water', 1],
+        ]
+      );
+      assert.equal(store.benchEssences[0].icon, 'fas fa-skull', 'carries the essence icon through');
+    });
+
+    it('omits components that carry no essences', async () => {
+      const { store } = await loadedStore({ listing: essenceListing() });
+      store.add('ashsalt');
+      flushSync();
+      assert.deepEqual(store.benchEssences, [], 'an essence-less component contributes nothing');
+    });
+
+    it('drops back out when the component leaves the bench', async () => {
+      const { store } = await loadedStore({ listing: essenceListing() });
+      store.add('venomgland');
+      flushSync();
+      assert.equal(store.benchEssences.length, 1);
+      store.removeAll('venomgland');
+      flushSync();
+      assert.deepEqual(store.benchEssences, []);
+    });
+  });
+
+  // Essence-only recipes resolve off essence TOTALS, mirroring the engine's `>=`
+  // rule (`_matchAlchemySignature`) so surplus essences still read as `ready`.
+  describe('essence-aware resolution', () => {
+    const REQUIREMENT = [
+      { id: 'toxic', name: 'Toxic', icon: 'fas fa-skull', quantity: 2 },
+      { id: 'water', name: 'Water', icon: 'fas fa-droplet', quantity: 1 },
+    ];
+
+    function essenceRecipe(overrides = {}) {
+      return {
+        id: 'bladevenom',
+        name: 'Blade Venom',
+        img: null,
+        concrete: null,
+        essenceRequirement: REQUIREMENT,
+        result: { componentId: 'bv', name: 'Blade Venom', img: null, quantity: 1 },
+        signatureSummary: [],
+        ...overrides,
+      };
+    }
+
+    function essenceStore(recipe = essenceRecipe()) {
+      return loadedStore({
+        listing: baseListing({
+          recipes: [recipe],
+          undiscoveredCount: 0,
+          components: [
+            {
+              componentId: 'venomgland',
+              name: 'Venom Gland',
+              img: null,
+              held: 4,
+              essences: [{ id: 'toxic', name: 'Toxic', icon: 'fas fa-skull', quantity: 2 }],
+            },
+            {
+              componentId: 'voidichor',
+              name: 'Void Ichor',
+              img: null,
+              held: 4,
+              essences: [{ id: 'water', name: 'Water', icon: 'fas fa-droplet', quantity: 1 }],
+            },
+          ],
+        }),
+      });
+    }
+
+    it('is `ready` when the bench essence totals meet the requirement exactly', async () => {
+      const { store } = await essenceStore();
+      store.add('venomgland'); // Toxic 2
+      store.add('voidichor'); // Water 1
+      flushSync();
+      assert.equal(store.mode, 'ready');
+      assert.equal(store.target.id, 'bladevenom');
+      assert.equal(store.brewEnabled, true);
+    });
+
+    it('is still `ready` with SURPLUS essences (engine matches with >=)', async () => {
+      const { store } = await essenceStore();
+      store.add('venomgland');
+      store.add('venomgland'); // Toxic 4 (surplus)
+      store.add('voidichor'); // Water 1
+      flushSync();
+      assert.equal(store.mode, 'ready', 'surplus essences must not fall back to untried');
+    });
+
+    it('is `untried` when the requirement is unmet and nothing is selected', async () => {
+      const { store } = await essenceStore();
+      store.add('venomgland'); // Toxic 2, no Water
+      flushSync();
+      assert.equal(store.mode, 'untried');
+      assert.equal(store.brewEnabled, true, 'an unmet bench can still be experimented with');
+    });
+
+    it('is `assembling` toward a SELECTED essence recipe, reporting the shortfall', async () => {
+      const { store } = await essenceStore();
+      store.selectRecipe('bladevenom');
+      flushSync();
+      store.add('venomgland'); // Toxic 2 of 2, Water 0 of 1
+      flushSync();
+      assert.equal(store.mode, 'assembling');
+      assert.deepEqual(
+        store.missing.map((row) => [row.componentId, row.need]),
+        [['water', 1]],
+        'only the unmet essence is still needed'
+      );
+    });
+
+    it('selecting an essence recipe does not auto-fill the bench', async () => {
+      const { store } = await essenceStore();
+      store.selectRecipe('bladevenom');
+      flushSync();
+      assert.equal(store.benchEmpty, true, 'no unique component solution -> never guess');
+      assert.equal(store.mode, 'empty');
+    });
+
+    it('never emits a false `ready` for a set mixing groups with essences', async () => {
+      // The builder projects `essenceRequirement: null` for such a set, so even a
+      // bench that satisfies the essence half must fail safe to `untried`.
+      const { store } = await essenceStore(essenceRecipe({ essenceRequirement: null }));
+      store.add('venomgland');
+      store.add('voidichor');
+      flushSync();
+      assert.equal(store.mode, 'untried');
+    });
   });
 });

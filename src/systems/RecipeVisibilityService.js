@@ -717,40 +717,102 @@ export class RecipeVisibilityService {
     return getFabricateFlag(actor, 'discoveryProgress', {}) || {};
   }
 
+  /**
+   * Evaluate visibility + craftability for a single recipe.
+   *
+   * Non-alchemy modes GATE: `visible` follows the resolved `visibilityMode`
+   * (`global` / `restricted` / `item` / `knowledge` / `teaser`), and `craftable`
+   * additionally requires knowledge/unlocked/access to pass — `reason` is one of
+   * `ok` / `visibility` / `knowledge` / `locked` / `teaser` / `teaser-discovered` /
+   * `missing-system`.
+   *
+   * Alchemy mode is REVEAL-not-gate: `visibilityMode` selects only which source
+   * REVEALS a recipe in the player's Known list, and brewing is NEVER gated by
+   * visibility, so a non-GM alchemy recipe is ALWAYS `craftable: true` (a matched
+   * ingredient signature is the sole brew gate). Reveal governs only `visible`, per
+   * mode for a non-GM: `global` reveals brew-discovered (`learnedRecipes`) recipes;
+   * `item` reveals a linked book/scroll held on the crafting actor or a component
+   * source (computed synchronously from live `actor.items`, so a dropped book
+   * un-reveals on the next build with no flag write); `knowledge` reveals a recipe
+   * learned via the Inventory learn path; `restricted` (surfaced as "Manual" for
+   * alchemy) reveals via the per-recipe access grant. Discovery-by-brew reveal is
+   * unioned across ALL modes, and `learnOnCraft` governs ONLY whether a matched
+   * brew writes that union — never whether anything is revealed. The alchemy reason
+   * taxonomy is `gm`, `alchemy-revealed`, and `alchemy-unrevealed`.
+   *
+   * @param {object} params
+   * @param {object} params.recipe
+   * @param {object} params.viewer - The viewing user (`isGM` short-circuits to full access).
+   * @param {object} [params.craftingActor]
+   * @param {object[]} [params.componentSourceActors]
+   * @returns {{ visible: boolean, craftable: boolean, reason: string, knowledge?: object }}
+   */
   evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors = [] }) {
     const system = this._getCraftingSystem(recipe);
     if (!system) {
       return { visible: false, craftable: false, reason: 'missing-system' };
     }
 
-    // Alchemy mode: recipes hidden from non-GM by default, but formula items
-    // can make unlearned recipes visible (with a Learn button) when the system
-    // also uses knowledge visibility with a linked recipe item.
+    // Alchemy mode: REVEAL-not-gate. `visibilityMode` selects which source(s)
+    // REVEAL a recipe in the player's Known list, but brewing is NEVER gated by
+    // visibility — a matched ingredient signature is the sole brew gate. So a
+    // non-GM alchemy recipe is ALWAYS `craftable: true`; reveal governs only
+    // `visible`. This synchronous branch reads live `actor.items` (no fromUuid /
+    // async), recomputed per build, so a dropped book un-reveals on the next build
+    // with no flag write.
     if (system?.resolutionMode === 'alchemy') {
       if (viewer?.isGM) {
-        return { visible: true, craftable: true, reason: 'ok', knowledge: null };
+        return { visible: true, craftable: true, reason: 'gm', knowledge: null };
       }
       const alchemyCfg = system?.alchemy || {};
-      if (alchemyCfg.learnOnCraft !== true) {
-        return { visible: false, craftable: false, reason: 'alchemy-hidden', knowledge: null };
-      }
+      const mode = this._getVisibilityMode(system);
       const learnedMap = this._getLearnedMap(craftingActor);
-      if (learnedMap?.[recipe.id]) {
-        return { visible: true, craftable: true, reason: 'alchemy-learned', knowledge: null };
-      }
-      // Check if the player has a formula item that could teach this recipe
-      if (this._hasRecipeItemReference(recipe)) {
-        const knowledge = this.evaluateKnowledgeAccess({
-          recipe,
-          viewer,
-          craftingActor,
-          componentSourceActors,
-        });
-        if (knowledge.hasMatchedItem) {
-          return { visible: true, craftable: false, reason: 'knowledge', knowledge };
+
+      // Discovery-by-brew reveal is unioned across ALL modes: a matched-signature
+      // brew writes `learnedRecipes` only when `learnOnCraft` is on, and any such
+      // learned recipe is revealed regardless of the mode's own reveal source.
+      const brewDiscovered = alchemyCfg.learnOnCraft === true && Boolean(learnedMap?.[recipe.id]);
+
+      let knowledge = null;
+      let revealedByMode = false;
+      switch (mode) {
+        case 'restricted': {
+          // Manual (alchemy's display name for `restricted`): a per-recipe access
+          // grant reveals the recipe to the granted viewer.
+          revealedByMode = this._isRecipeVisibleByAccessGrant(recipe, viewer);
+          break;
+        }
+        case 'item': {
+          // A linked book/scroll HELD on the crafting actor or a component source
+          // reveals the recipe (ephemeral — follows possession).
+          if (this._hasRecipeItemReference(recipe)) {
+            knowledge = this.evaluateKnowledgeAccess({
+              recipe,
+              viewer,
+              craftingActor,
+              componentSourceActors,
+              knowledgeMode: 'item',
+            });
+            revealedByMode = knowledge.hasMatchedItem;
+          }
+          break;
+        }
+        default: {
+          // `global` and `knowledge` both reveal from the SAME `learnedRecipes`
+          // read (one code path, not two) — they differ only in how it is populated
+          // (global: brew-discovery; knowledge: the Inventory learn path). Existing
+          // worlds seeded `knowledge` therefore keep their learned-only semantics.
+          revealedByMode = Boolean(learnedMap?.[recipe.id]);
         }
       }
-      return { visible: false, craftable: false, reason: 'alchemy-not-learned', knowledge: null };
+
+      const visible = revealedByMode || brewDiscovered;
+      return {
+        visible,
+        craftable: true,
+        reason: visible ? 'alchemy-revealed' : 'alchemy-unrevealed',
+        knowledge,
+      };
     }
 
     const mode = this._getVisibilityMode(system);

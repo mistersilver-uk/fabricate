@@ -208,7 +208,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 ### Semantics
 
 - Player submits ingredient combinations directly instead of selecting a visible recipe.
-- Recipes remain hidden by default for non-GM users (see `006` for `learnOnCraft` semantics).
+- Recipe visibility is **reveal-not-gate** (see `006`): the system's `visibilityMode` selects which source REVEALS a recipe in a non-GM's Known list (`item` = a held book/scroll, `knowledge` = learned, Manual/`restricted` = a per-recipe access grant, `global` = brew-discovery), with brew-discovery unioned across all modes; brewing is NEVER gated by visibility (a matched ingredient signature is the sole brew gate, so a non-GM alchemy recipe is always `craftable`). `learnOnCraft` governs only whether a matched brew records the brew-discovery reveal, never craftability.
 - An alchemy recipe always has EXACTLY ONE ingredient set and is never routed by ingredients.
 - Result-group selection and check-ness are driven by the SYSTEM-level `alchemy.checkMode` (`none` | `simple` | `tiered`), NOT a per-recipe `resultSelection.provider` (retired, issue 554; this supersedes the earlier "alchemy check optional" behaviour):
   - **None** — one ingredient set + one result group, no check; a matched brew always succeeds and produces that group.
@@ -258,13 +258,13 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 #### Workbench Status Model (five modes)
 
 - The bench drives a five-mode status model that governs the status pill, the Produces panel, and the Brew affordance: `empty`; `assembling` (the bench is a strict subset of a selected known recipe's signature); `ready` (the bench equals a known signature); `untried` (the bench matches no known recipe AND is not a remembered fizzle); `no-reaction` (the bench matches no known recipe AND IS a remembered fizzle).
-- The projected learned-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
+- The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
 - **Client mode is advisory; the engine is authoritative on brew.** The client fails safe to `untried` for any signature not reducible to a concrete plain-component multiset (single-option groups, no essence-only requirement; the single-ingredient-set condition is now guaranteed by the mode invariant) and NEVER emits a false `ready`/`assembling`.
 - **Brew-result banner status enum.** A resolved brew reports one of four banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
 A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).
 The same caveat applies to select-to-load auto-fill.
-- **Hidden dead-end rule.** Undiscovered recipes and never-tried dead-ends BOTH present as `untried`.
-The player projection exposes only learned recipes plus the **count** of undiscovered recipes; no status text, Produces panel, or styling leaks the existence, result, or signature of an undiscovered recipe.
+- **Hidden dead-end rule.** Non-revealed recipes and never-tried dead-ends BOTH present as `untried`.
+The player projection exposes only revealed recipes plus the **count** of non-revealed recipes; no status text, Produces panel, or styling leaks the existence, result, or signature of a non-revealed recipe.
 - **Per-character x system tried-dead-end memory.** `Actor.flags.fabricate.alchemyDeadEnds` is an append-only, deduped array of canonical `componentId:qty|...` keys per system, written on a fizzled brew only when `alchemy.showAttemptHistoryToPlayers === true`.
 It is the ONLY thing that flips `untried` -> `no-reaction`; it grants no visibility (a fizzle matches no enabled recipe) and is consumed solely by the client status model.
 
@@ -279,9 +279,9 @@ Canonical text uses "alchemy (crafting) system"; "discipline" is reserved for pl
 
 #### Discovered Recipes Panel
 
-- Panel is always visible, even when no recipes have been discovered yet.
-- Shows an encouraging empty state message (e.g., "No recipes discovered yet — experiment on the bench to discover recipes").
-- Once recipes are discovered, the empty state is replaced by the searchable list.
+- Panel is always visible, even when no recipes have been revealed yet.
+- Shows an encouraging empty state message (e.g., "No recipes revealed yet — learn or brew recipes to reveal them here").
+- Once recipes are revealed, the empty state is replaced by the searchable list.
 - Selecting a known recipe **auto-loads** its signature onto the bench (auto-fill is a selection side effect, not a separate per-recipe button), scoped to recipes reducible to a concrete plain-component multiset.
 - The "Craftable only" filter is DEFERRED this iteration.
 

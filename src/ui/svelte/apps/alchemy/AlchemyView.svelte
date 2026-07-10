@@ -95,6 +95,7 @@
         <Workbench
           benchChips={store?.benchChips ?? []}
           benchEmpty={store?.benchEmpty ?? true}
+          benchEssences={store?.benchEssences ?? []}
           {signatureText}
           mode={store?.mode ?? 'empty'}
           targetName={store?.target?.name ?? ''}
@@ -104,7 +105,9 @@
           brewInFlight={store?.brewInFlight ?? false}
           lastBrew={store?.lastBrew ?? null}
           onClear={() => store?.clear()}
+          onAdd={(id) => store?.add(id)}
           onRemoveOne={(id) => store?.removeOne(id)}
+          onRemoveAll={(id) => store?.removeAll(id)}
           onBrew={() => store?.brew()}
           onDrop={(id) => store?.add(id)}
         />
@@ -113,7 +116,10 @@
       <section class="alchemy-view-column alchemy-view-inventory">
         <ComponentInventoryColumn
           components={store?.components ?? []}
+          search={store?.componentSearch ?? ''}
+          hasComponents={store?.hasOwnedComponents ?? false}
           onAdd={(id) => store?.add(id)}
+          onSearch={(value) => store?.setComponentSearch(value)}
           {onDragStart}
         />
       </section>
