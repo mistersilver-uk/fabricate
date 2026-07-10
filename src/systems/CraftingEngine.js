@@ -2627,14 +2627,6 @@ export class CraftingEngine {
     return { resolvedEssences, essenceSources };
   }
 
-  _accumulateEssencesFromItems(items, recipe = null) {
-    return accumulateItemEssences(items, {
-      components: this._getSystemComponents(recipe),
-      systemId: recipe?.craftingSystemId,
-      multiplyByQuantity: true,
-    });
-  }
-
   _getSystemComponents(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return [];

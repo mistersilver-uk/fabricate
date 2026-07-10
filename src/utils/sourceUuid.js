@@ -1,7 +1,7 @@
 /**
  * @module sourceUuid
  */
-import { getFabricateFlag } from '../config/flags.js';
+import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
 
 /**
  * Resolve the compendium source UUID of a Foundry item document.
@@ -143,8 +143,25 @@ function itemSourceRefsIntersectComponent(itemRefs, component) {
  * @param {string|null|undefined} systemId
  * @returns {string|null} The claimed component id, or null when there is no claim.
  */
+// Systems already warned-about, so a per-item resolve loop emits at most one console
+// line per offending system id rather than one per candidate item.
+const _warnedUnsafeSystemIds = new Set();
+
+function warnUnsafeSystemIdOnce(systemId) {
+  const key = String(systemId);
+  if (_warnedUnsafeSystemIds.has(key)) return;
+  _warnedUnsafeSystemIds.add(key);
+  console.warn?.(
+    `Fabricate | crafting system id "${key}" is not a valid durable-flag map key (it contains a "." or other unsafe character), so its components resolve only by raw source references, not the per-system \`roles\` identity map. Recreate/re-import the system with a valid id (letters, digits, "_" or "-").`
+  );
+}
+
 function claimedRoleComponentId(item, systemId) {
-  if (systemId == null) return null;
+  // A `systemId` that is not a safe single dotted-path segment (absent, or containing
+  // a `.` that `expandObject` would have nested on write) can never index the `roles`
+  // map correctly, so it yields NO identity and the resolver degrades to raw refs —
+  // rather than silently reading past a nested key. See `isSafeFlagKeySegment`.
+  if (!isSafeFlagKeySegment(systemId)) return null;
   const roles = getFabricateFlag(item, 'roles', null);
   if (!roles || typeof roles !== 'object') return null;
   const perSystem = roles[systemId];
@@ -191,6 +208,18 @@ export function resolveComponentForItem(item, components, systemId) {
   if (!item || typeof item !== 'object') return null;
   const candidates = Array.isArray(components) ? components : [];
   if (candidates.length === 0) return null;
+
+  // An unsafe (e.g. dotted) systemId can never have been written as a `roles` map key —
+  // every stamp/repair/restamp site skips it — so there is no identity claim to honour.
+  // Treat it as the ordinary UNSTAMPED case: skip tier 1 and fall through to tiers 2/3.
+  // Do NOT refuse the resolution; that would strip the load-bearing raw-ref tier from a
+  // legacy world (imported with a dotted id before creation-time validation existed) and
+  // break its crafting entirely — strictly worse than the pre-#556 mis-attribution it
+  // would prevent. `claimedRoleComponentId` already returns null for an unsafe segment;
+  // warn once per system so a GM has a breadcrumb rather than a mute degrade.
+  if (systemId != null && !isSafeFlagKeySegment(systemId)) {
+    warnUnsafeSystemIdOnce(systemId);
+  }
 
   // Tier 1: durable per-system identity map.
   const roleId = claimedRoleComponentId(item, systemId);
