@@ -822,14 +822,16 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
   - A step with exactly one result group needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
 
-### Alchemy check settings sub-section (issue 554)
+### Alchemy check-mode selector (issue 554)
 
-- Under **Recipe Resolution** on the Crafting Settings page, shown only when `resolutionMode === "alchemy"`: a nested, indented `config-card` selector for `alchemy.checkMode` (`none` / `simple` / `tiered`), persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
+- At the **top of the Checks tab's Crafting sub-tab**, shown only when `resolutionMode === "alchemy"`: a native check-editor radio group (`manager-checks-type-options`) for `alchemy.checkMode` (`none` / `simple` / `tiered`), rendered ABOVE the per-mode editor and persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
+Selecting a mode swaps the editor below it live.
+- The selector is NOT rendered on the Crafting Settings page; that page keeps only the Recipe resolution, Recipe visibility, and (when salvage is on) Salvage resolution cards.
 
 ### Checks tab per-mode behaviour (issue 554)
 
-- alchemy + `simple` → the simple pass/fail editor; alchemy + `tiered` → the routed editor; BOTH cannot be disabled (the Active card shows the requiredHint, ungated by `checksEnabled`).
-- alchemy + `none` → a read-only "resolves without a check" panel (no editor, no Active card, a distinct "no check" hint — NOT the requiredHint).
+- alchemy + `simple` → the simple pass/fail editor rendered below the selector; alchemy + `tiered` → the routed editor below the selector; BOTH cannot be disabled (the Active card shows the requiredHint, ungated by `checksEnabled`).
+- alchemy + `none` → a read-only "resolves without a check" notice below the selector (no editor, no Active card, a distinct "no check" hint that points back to the selector above — NOT the requiredHint).
 - The Crafting checks help copy describes none/simple/tiered.
 
 ### Alchemy Recipe UI (GM Editor)

@@ -538,9 +538,9 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(managerSource.includes('onSetResolutionMode(nextMode)') || managerSource.includes('store.setResolutionMode?.(nextMode)'), 'system edit should delegate resolution changes to the admin store');
     assert.ok(rootSource.includes('store.setResolutionMode?.'), 'root should pass the resolution-mode callback through to the system-edit view');
     // Scope the resolution/salvage persistence-value assertions to the resolution
-    // mode options module: the alchemy check-mode selector on the Crafting Settings
-    // page legitimately carries a `value: 'tiered'` check-mode option that is
-    // unrelated to the retired legacy resolution/salvage `tiered` mode.
+    // mode options module: the alchemy check-mode selector at the top of the Checks
+    // tab's Crafting sub-tab legitimately carries a `value: 'tiered'` check-mode
+    // option that is unrelated to the retired legacy resolution/salvage `tiered` mode.
     assert.ok(resolutionModeOptionsSource.includes("value: 'routed'"), 'salvage resolution should offer the canonical routed persistence value');
     assert.ok(!resolutionModeOptionsSource.includes("value: 'mapped'"), 'resolution options should not offer the legacy mapped persistence value');
     assert.ok(!resolutionModeOptionsSource.includes("value: 'tiered'"), 'resolution options should not offer the legacy tiered persistence value');

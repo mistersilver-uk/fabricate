@@ -4943,6 +4943,7 @@
             {onUpdateSalvageCheckProgressive}
             {onUpdateGatheringCheckProgressive}
             {onUpdateGatheringCheckRouted}
+            onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
             onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}
           />
@@ -5115,7 +5116,6 @@
         onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
         onSetSalvageResolutionMode={(nextMode) => store.setSalvageResolutionMode?.(nextMode)}
         onSetVisibilityMode={(m) => store.setVisibilityMode?.(m)}
-        onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
       />
     {:else if currentView === 'access' && selectedSystem}
       <AccessTabView

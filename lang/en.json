@@ -3358,14 +3358,14 @@
             "OptionalHint": "Turn this check on to require a roll for the activity, or off to resolve it without one.",
             "RequiredHint": "The current resolution mode requires this check, so it cannot be turned off here.",
             "GatheringHint": "In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.",
-            "AlchemyNoneHint": "This alchemy system resolves without a crafting check. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author one."
+            "AlchemyNoneHint": "This alchemy system resolves without a crafting check. Choose Simple or Tiered at the top of the Crafting tab to author one."
           },
           "Crafting": {
             "PageTitle": "Crafting check",
             "PageLead": "A system has a single crafting check. Its shape is determined by the system's resolution mode and preserved when you switch modes.",
             "ConfigHint": "Roll, difficulty, and outcome settings for the crafting check will appear here.",
             "AlchemyNoneTitle": "Resolves without a check",
-            "AlchemyNoneLead": "This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author a crafting check.",
+            "AlchemyNoneLead": "This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered above to author a crafting check.",
             "HelpKicker": "Crafting checks",
             "HelpTitle": "About crafting checks",
             "HelpDesc": "The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.",

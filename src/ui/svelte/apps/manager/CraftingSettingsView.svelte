@@ -30,46 +30,13 @@
     selectedSystem = null,
     onSetResolutionMode = () => {},
     onSetSalvageResolutionMode = () => {},
-    onSetVisibilityMode = () => {},
-    onSetAlchemyCheckMode = () => {}
+    onSetVisibilityMode = () => {}
   } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-
-  // The alchemy check-mode sub-setting (shown only for alchemy systems), nested
-  // under Recipe Resolution: none (no check), simple (mandatory pass/fail; a
-  // reserved failure result set), or tiered (mandatory routed check, like
-  // routed-by-check). Drives whether the crafting check is mandatory and how a
-  // matched brew's result set is selected.
-  const alchemyCheckModeOptions = [
-    {
-      value: 'none',
-      icon: 'fas fa-circle-check',
-      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone',
-      fallback: 'No check',
-      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNoneDesc',
-      descFallback: 'A matched brew always succeeds and produces its single result set. No crafting check.'
-    },
-    {
-      value: 'simple',
-      icon: 'fas fa-dice-d20',
-      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple',
-      fallback: 'Simple check',
-      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimpleDesc',
-      descFallback: 'A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.'
-    },
-    {
-      value: 'tiered',
-      icon: 'fas fa-layer-group',
-      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered',
-      fallback: 'Tiered check',
-      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTieredDesc',
-      descFallback: 'A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.'
-    }
-  ];
 
   // The recipe-visibility radio-card options. `global | restricted | item |
   // knowledge` mirror the visibility matrix; icons/copy follow the prototype.
@@ -194,28 +161,6 @@
               variant="config-card"
               onChange={handleResolutionModeChange}
             />
-
-            {#if selectedSystem.resolutionMode === 'alchemy'}
-              <div class="crafting-settings-subsection" data-crafting-alchemy-checkmode-section>
-                <div class="crafting-settings-subsection-head">
-                  <i class="fas fa-flask" aria-hidden="true"></i>
-                  <h4 class="crafting-settings-subsection-title">{text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}</h4>
-                </div>
-                <p class="crafting-settings-subsection-intro">{text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeIntro', 'Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.')}</p>
-                <ResolutionModeCard
-                  cardId="manager-crafting-alchemy-checkmode"
-                  legendKey="FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading"
-                  legendFallback="Alchemy check"
-                  options={alchemyCheckModeOptions}
-                  selectedValue={selectedSystem.alchemy?.checkMode ?? 'none'}
-                  groupName="manager-crafting-alchemy-checkmode"
-                  dataAttr="data-crafting-alchemy-checkmode"
-                  optionDataAttr="data-crafting-alchemy-checkmode-option"
-                  variant="config-card"
-                  onChange={(mode) => onSetAlchemyCheckMode(mode)}
-                />
-              </div>
-            {/if}
           </section>
 
           <section class="crafting-settings-section" data-crafting-visibility-section>
@@ -333,45 +278,6 @@
     margin: 0;
     font-size: 0.78rem;
     line-height: 1.55;
-    color: var(--fab-text-muted);
-  }
-
-  /* Nested alchemy check-mode sub-setting, indented under Recipe resolution. */
-  .crafting-settings-subsection {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-    margin-top: var(--fab-space-3);
-    margin-left: var(--fab-space-4);
-    padding-left: var(--fab-space-4);
-    border-left: 2px solid var(--fab-mv2-border);
-    min-width: 0;
-  }
-
-  .crafting-settings-subsection-head {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-
-  .crafting-settings-subsection-head > i {
-    color: var(--fab-mv2-accent);
-    font-size: 0.8rem;
-  }
-
-  .crafting-settings-subsection-title {
-    margin: 0;
-    font-family: var(--font-primary);
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--fab-mv2-text);
-  }
-
-  .crafting-settings-subsection-intro {
-    margin: 0;
-    font-size: 0.76rem;
-    line-height: 1.5;
     color: var(--fab-text-muted);
   }
 

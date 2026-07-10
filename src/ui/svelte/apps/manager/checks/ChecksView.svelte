@@ -62,6 +62,7 @@
     onUpdateSalvageCheckProgressive = () => {},
     onUpdateGatheringCheckProgressive = () => {},
     onUpdateGatheringCheckRouted = () => {},
+    onSetAlchemyCheckMode = () => {},
     onTabChange = () => {},
     onToggleCheckActive = () => {}
   } = $props();
@@ -71,16 +72,51 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // The system-level alchemy check-mode selector (issue 554). For an alchemy
+  // system this renders at the TOP of the Crafting sub-tab, above the per-mode
+  // editor: none (no check → the read-only "resolves without a check" notice),
+  // simple (the pass/fail editor), or tiered (the routed outcome-tier editor).
+  // Selecting a mode persists live via `onSetAlchemyCheckMode` (spread + refresh
+  // in the store), swapping the editor below. Labels/copy reuse the shared
+  // SystemSettings.Alchemy.CheckMode* strings.
+  const ALCHEMY_CHECK_MODE_OPTIONS = [
+    {
+      value: 'none',
+      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone',
+      fallback: 'No check',
+      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNoneDesc',
+      descFallback:
+        'A matched brew always succeeds and produces its single result set. No crafting check.'
+    },
+    {
+      value: 'simple',
+      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple',
+      fallback: 'Simple check',
+      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimpleDesc',
+      descFallback:
+        'A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.'
+    },
+    {
+      value: 'tiered',
+      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered',
+      fallback: 'Tiered check',
+      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTieredDesc',
+      descFallback:
+        'A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.'
+    }
+  ];
+
   let activeTab = $state('crafting');
 
   // Only `routedByCheck` uses the tier-routing CraftingCheckEditor. `routedByIngredients`
   // authors its optional pass/fail check via the shared SimpleCraftingCheckEditor
   // (bound to `craftingCheck.simple`), alongside `simple`/`alchemy`.
-  // Alchemy's crafting-check editor is chosen by the system-level `alchemy.checkMode`:
-  // none → a read-only "resolves without a check" panel; simple → the pass/fail
-  // editor; tiered → the routed outcome-tier editor (identical to routedByCheck).
+  // Alchemy is handled by a dedicated first branch in the crafting render (a top-of-tab
+  // none/simple/tiered selector above the matching editor), so `craftingAlchemy` wins
+  // before `craftingRouted`/`craftingSimple` can match. Those two deriveds still include
+  // the alchemy cases so `validationSections` selects the right draft (routed for tiered,
+  // simple for simple) — do not tighten them without re-checking that.
   const craftingAlchemy = $derived(resolutionMode === 'alchemy');
-  const craftingNone = $derived(craftingAlchemy && alchemyCheckMode === 'none');
   const craftingRouted = $derived(
     resolutionMode === 'routedByCheck' || (craftingAlchemy && alchemyCheckMode === 'tiered')
   );
@@ -214,6 +250,57 @@
     >
       {#if activeTab === 'validation'}
         <ChecksValidationTab sections={validationSections} />
+      {:else if activeTab === 'crafting' && craftingAlchemy}
+        <div class="manager-checks-page" data-checks-panel="crafting">
+          <section class="manager-inspector-card">
+            <h3 class="manager-card-title">{text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}</h3>
+            <p class="manager-muted">{text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeIntro', 'Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.')}</p>
+            <div
+              class="manager-checks-type-options"
+              role="radiogroup"
+              data-crafting-alchemy-checkmode
+              aria-label={text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}
+            >
+              {#each ALCHEMY_CHECK_MODE_OPTIONS as option (option.value)}
+                <label
+                  class={`manager-resolution-option ${alchemyCheckMode === option.value ? 'is-active' : ''}`}
+                  data-crafting-alchemy-checkmode-option={option.value}
+                >
+                  <input
+                    type="radio"
+                    name="crafting-alchemy-checkmode"
+                    value={option.value}
+                    checked={alchemyCheckMode === option.value}
+                    onchange={() => onSetAlchemyCheckMode(option.value)}
+                  />
+                  <span class="manager-resolution-option-body">
+                    <span class="manager-resolution-option-name">{text(option.labelKey, option.fallback)}</span>
+                    <span class="manager-resolution-option-desc">{text(option.descKey, option.descFallback)}</span>
+                  </span>
+                </label>
+              {/each}
+            </div>
+          </section>
+
+          {#if alchemyCheckMode === 'tiered'}
+            <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+          {:else if alchemyCheckMode === 'simple'}
+            <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
+          {:else}
+            <section class="manager-inspector-card" data-alchemy-none-readonly>
+              <p class="manager-kicker">{pageKicker}</p>
+              <h2 class="manager-card-title">
+                {text('FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneTitle', 'Resolves without a check')}
+              </h2>
+              <p class="manager-muted">
+                {text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneLead',
+                  'This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered above to author a crafting check.'
+                )}
+              </p>
+            </section>
+          {/if}
+        </div>
       {:else if activeTab === 'crafting' && craftingRouted}
         <div data-checks-panel="crafting">
           <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
@@ -225,21 +312,6 @@
       {:else if activeTab === 'crafting' && craftingProgressive}
         <div data-checks-panel="crafting">
           <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckProgressive} />
-        </div>
-      {:else if activeTab === 'crafting' && craftingNone}
-        <div class="manager-checks-page" data-checks-panel="crafting" data-alchemy-none-readonly>
-          <section class="manager-inspector-card">
-            <p class="manager-kicker">{pageKicker}</p>
-            <h2 class="manager-card-title">
-              {text('FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneTitle', 'Resolves without a check')}
-            </h2>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneLead',
-                'This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author a crafting check.'
-              )}
-            </p>
-          </section>
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
         <div data-checks-panel="salvage">
