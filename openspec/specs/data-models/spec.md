@@ -1134,6 +1134,13 @@ It is still recorded as used (no `toolUsage` flag is written, because that flag 
 7. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
 8. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
 The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`.
+9. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching**.
+Durable-identity matching, defined here at first use against the component-identity resolver tiers, means: (a) the durable component-identity flag `flags.fabricate.roles[systemId].componentId`, OR (b) the legacy scalar `flags.fabricate.componentId`, OR (c) the item's own `uuid` or compendium source (`_stats.compendiumSource` / `flags.core.sourceId`).
+An item is NEVER selected for usage or destruction by a transitive `_stats.duplicateSource` reference or by name alone, either of which still satisfies the non-destructive **presence** gate (the wide shared tool matcher).
+An item that satisfies presence only via a transitive duplicate-source reference or by name is spared from usage/breakage and recorded as a skipped tool.
+When an actor owns both a durable-identity match and a presence-only match for the same tool, the durable-identity item is the one used or broken.
+Because destroying the wrong item is irreversible, this is the shipped behaviour ("is"): a world-template copy lacking both a compendium source and a durable flag is spared until repaired, rather than risking an irreversible wrong-item destroy.
+A locked-compendium copy carries its own compendium source, matches durable identity (c), and still breaks.
 
 ### Validation Matrix
 
