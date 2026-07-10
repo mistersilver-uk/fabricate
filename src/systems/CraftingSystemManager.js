@@ -2,7 +2,12 @@
  * Manages crafting systems and their item libraries
  */
 import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
-import { getFabricateFlag, setFabricateFlag, FABRICATE_FLAG_NAMESPACE } from '../config/flags.js';
+import {
+  getFabricateFlag,
+  setFabricateFlag,
+  FABRICATE_FLAG_NAMESPACE,
+  isSafeFlagKeySegment,
+} from '../config/flags.js';
 import {
   cleanupStalePreferences,
   isGatheringActorSelectableByUser,
@@ -22,7 +27,7 @@ import {
   getComponentSourceReferences,
   getRecipeItemSourceReferences,
   getItemIdentityReferences,
-  itemMatchesComponentSource,
+  resolveComponentForItem,
   matchRecipeItemDefinition,
 } from '../utils/sourceUuid.js';
 
@@ -59,6 +64,36 @@ export class CraftingSystemManager {
     if (!game.user?.isGM) {
       throw new Error(`GM permissions required: ${action}`);
     }
+  }
+
+  /**
+   * Reject a crafting-system id that cannot serve as a durable-flag map key. The
+   * component identity flag is `roles.<systemId>.componentId`; a `systemId`
+   * containing a `.` is nested by `expandObject` on write and silently missed by the
+   * `roles[systemId]` reader, degrading matching to the pre-#556 raw-ref path. Fail
+   * LOUDLY at the entry point (creation/import) rather than accepting a booby-trapped
+   * id. The id is NEVER rewritten — recipes, tools, and gathering config reference the
+   * system by id. `foundry.utils.randomID()` always satisfies the pattern.
+   * @private
+   */
+  _assertValidSystemId(id) {
+    if (!isSafeFlagKeySegment(id)) {
+      throw new Error(
+        `Invalid crafting system id "${id}": a system id must match ${'/^[A-Za-z0-9_-]+$/'} (no dots or spaces), because it is used as a durable-flag map key.`
+      );
+    }
+  }
+
+  /**
+   * The durable per-system component identity flag key `roles.<systemId>.componentId`,
+   * or `null` when `systemId` is not a safe dotted-path segment. A null result means a
+   * stamp/clear/repair site must NOT write (it would nest garbage under `roles`); the
+   * component still resolves through the raw-reference fall-through. Guards existing
+   * worlds that may already carry a dotted id from an earlier import.
+   * @private
+   */
+  _componentRoleFlagKey(systemId) {
+    return isSafeFlagKeySegment(systemId) ? `roles.${systemId}.componentId` : null;
   }
 
   _normalizeSystem(system = {}) {
@@ -1627,6 +1662,7 @@ export class CraftingSystemManager {
   async createSystem(data = {}) {
     this._assertGM('create crafting system');
     const system = this._normalizeSystem(data);
+    this._assertValidSystemId(system.id);
     this._assertUniqueComponentSourcesForSystem(system);
     this.systems.set(system.id, system);
     await this.save();
@@ -2648,6 +2684,58 @@ export class CraftingSystemManager {
   }
 
   /**
+   * Issue 556 one-shot auto-stamp: backfill the durable per-system component identity
+   * `flags.fabricate.roles[system.id].componentId` (and strip a clone's stale `_stats`)
+   * on every registered component's writable source Item — world items and unlocked-pack
+   * items. Locked packs and unresolvable sources are counted and skipped. Idempotent: a
+   * second run finds every source already stamped and performs zero writes. Sources only
+   * — owned copies are covered by future drags (the durable flag is inherited) and by the
+   * manual repair. Callers gate this on primary-GM + the one-shot setting version; it does
+   * no gating of its own beyond writability, so it is safe to unit-test directly.
+   *
+   * @returns {Promise<{scanned:number, stamped:number, stripped:number, skippedLocked:number, skippedMissing:number}>}
+   */
+  async autoStampComponentSources() {
+    const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
+    for (const system of this.getSystems()) {
+      // A dotted (unsafe) system id cannot serve as a `roles` map key; skip it rather
+      // than nesting garbage. Its components still resolve via the raw-ref fall-through.
+      const flagKey = this._componentRoleFlagKey(system.id);
+      if (!flagKey) continue;
+      for (const component of system.components || []) {
+        const uuid = component?.sourceItemUuid || component?.sourceUuid;
+        if (!uuid || !component?.id) continue;
+        summary.scanned += 1;
+        let source;
+        try {
+          source = typeof fromUuid === 'function' ? await fromUuid(uuid) : null;
+        } catch {
+          source = null;
+        }
+        if (!source || typeof source.setFlag !== 'function') {
+          summary.skippedMissing += 1;
+          continue;
+        }
+        if (source.pack) {
+          const pack = globalThis.game?.packs?.get?.(source.pack);
+          if (!pack || pack.locked) {
+            summary.skippedLocked += 1;
+            continue;
+          }
+        }
+        const { stamped, stripped } = await this._writeSourceIdentity(
+          source,
+          flagKey,
+          component.id
+        );
+        if (stamped) summary.stamped += 1;
+        if (stripped) summary.stripped += 1;
+      }
+    }
+    return summary;
+  }
+
+  /**
    * Resolve the existing definition a registered source maps to. A NON-clone source's
    * durable `recipeItemDefinitionId` flag is authoritative (it resolves to its
    * definition even if the recorded `sourceItemUuid` drifted); a CLONE's inherited flag
@@ -2730,8 +2818,7 @@ export class CraftingSystemManager {
     if (kind.bucket === 'recipeItems') {
       return matchRecipeItemDefinition(item, kind.definitions);
     }
-    const definition =
-      kind.definitions.find((def) => itemMatchesComponentSource(item, def)) || null;
+    const definition = resolveComponentForItem(item, kind.definitions, kind.systemId);
     return { definition, tier: null };
   }
 
@@ -2845,27 +2932,38 @@ export class CraftingSystemManager {
   async repairComponentSourceFlags({ includeCompendiums = true } = {}) {
     this._assertGM('repair item data');
 
-    const componentDefinitions = [];
     const recipeItemDefinitions = [];
     for (const system of this.getSystems()) {
-      for (const component of system.components || []) componentDefinitions.push(component);
       for (const def of system.recipeItemDefinitions || []) recipeItemDefinitions.push(def);
     }
 
-    const kinds = [
-      {
+    // Components resolve PER SYSTEM. Component ids are not globally unique (copy-import
+    // preserves them), and the durable identity is the per-system map key
+    // `roles.<systemId>.componentId`. A per-system kind means each system's pass reads
+    // and writes ONLY its own leaf, so a non-owning system's null-owner pass finds its
+    // leaf unset and no-ops — it can never clear another system's identity, regardless
+    // of getSystems() order (issue 556 Fix 2). Recipe items stay a single scalar aggregate.
+    const kinds = [];
+    for (const system of this.getSystems()) {
+      // A dotted (unsafe) system id cannot serve as a `roles` map key; skip its
+      // component repair so nothing is nested under a broken key (the components still
+      // resolve via raw refs). Fresh ids are validated at creation/import.
+      const flagKey = this._componentRoleFlagKey(system.id);
+      if (!flagKey) continue;
+      kinds.push({
         bucket: 'components',
-        flagKey: 'componentId',
-        definitions: componentDefinitions,
+        flagKey,
+        systemId: system.id,
+        definitions: system.components || [],
         refExtractor: (def) => getComponentSourceReferences(def),
-      },
-      {
-        bucket: 'recipeItems',
-        flagKey: 'recipeItemDefinitionId',
-        definitions: recipeItemDefinitions,
-        refExtractor: (def) => getRecipeItemSourceReferences(def),
-      },
-    ];
+      });
+    }
+    kinds.push({
+      bucket: 'recipeItems',
+      flagKey: 'recipeItemDefinitionId',
+      definitions: recipeItemDefinitions,
+      refExtractor: (def) => getRecipeItemSourceReferences(def),
+    });
 
     const summary = {
       scanned: 0,
@@ -2981,8 +3079,10 @@ export class CraftingSystemManager {
         nextFallbacks.every((ref) => (existing.fallbackItemIds || []).includes(ref));
 
       // Stamp the source (both skipped + updated) so a source that predates this
-      // flag — or was re-imported — always carries the transferable component id.
-      await this._stampSourceIdentity(source, 'componentId', existing.id);
+      // flag — or was re-imported — always carries the per-system durable component id.
+      // Skipped for a dotted (unsafe) system id, which cannot serve as a map key.
+      const existingRoleKey = this._componentRoleFlagKey(system.id);
+      if (existingRoleKey) await this._stampSourceIdentity(source, existingRoleKey, existing.id);
 
       if (unchanged) {
         return { item: existing, action: 'skipped', sourceFallbacks: nextSnapshot.sourceFallbacks };
@@ -3010,7 +3110,8 @@ export class CraftingSystemManager {
 
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
-    await this._stampSourceIdentity(source, 'componentId', item.id);
+    const addedRoleKey = this._componentRoleFlagKey(system.id);
+    if (addedRoleKey) await this._stampSourceIdentity(source, addedRoleKey, item.id);
     await this.save();
     return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
@@ -3076,10 +3177,13 @@ export class CraftingSystemManager {
     system.components[idx] = updatedItem;
     // Re-point the transferable flag: clear the old source (if it still points here)
     // and stamp the new source, so copies match the current source, not the old one.
-    if (previousSourceUuid && previousSourceUuid !== itemUuid) {
-      await this._clearSourceFlag(previousSourceUuid, 'componentId', itemId);
+    const replaceRoleKey = this._componentRoleFlagKey(system.id);
+    if (replaceRoleKey) {
+      if (previousSourceUuid && previousSourceUuid !== itemUuid) {
+        await this._clearSourceFlag(previousSourceUuid, replaceRoleKey, itemId);
+      }
+      await this._stampSourceIdentity(source, replaceRoleKey, itemId);
     }
-    await this._stampSourceIdentity(source, 'componentId', itemId);
     await this.save();
     return { item: updatedItem, sourceFallbacks: nextSnapshot.sourceFallbacks };
   }

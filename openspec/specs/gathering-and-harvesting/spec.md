@@ -1603,6 +1603,14 @@ There is no multi-step gathering state in this phase.
 - do not apply tool usage/breakage,
 - do not create result items.
 
+### Award Item Stacking
+
+A fresh award may stack onto an existing owned quantity item only through the list-aware Component Item Matching resolver named in the data-models spec, supplied the awarding system's resolved component set and system id.
+An award must never be folded into an owned item that resolves to a different component than the award source.
+The award source may be a resolved Foundry Item or a bare component; an Item's identity is resolved through the resolver, a bare component's identity is itself, and never a source Item's Foundry document `.id`.
+A candidate is skipped only when both the source and the candidate resolve to components and those components differ; if either does not resolve, stacking falls back to shared raw source references exactly as today.
+Residual: when neither side resolves (an un-stamped or cross-system world where claimed ids name nothing in the set), stacking uses raw source references, so a flagless unrelated stack sharing a `duplicateSource` can still stack — the intended load-bearing fallback.
+
 Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks.
 Timed backend completion/resolution, timed result creation, timed tool side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior.
 Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation.

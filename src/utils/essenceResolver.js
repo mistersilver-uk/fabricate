@@ -1,6 +1,6 @@
 import { getFabricateFlag } from '../config/flags.js';
 
-import { itemMatchesComponentSource } from './sourceUuid.js';
+import { resolveComponentForItem } from './sourceUuid.js';
 
 function normalizeEssences(essences = {}) {
   const normalized = {};
@@ -23,13 +23,14 @@ function hasEssences(essences) {
   return Object.keys(essences || {}).length > 0;
 }
 
-export function findMatchingComponent(item, components = []) {
+export function findMatchingComponent(item, components = [], systemId) {
   if (!item || !Array.isArray(components)) return null;
 
-  // Deterministic precedence: source references are authoritative; name is a
-  // compatibility fallback for components created before source refs existed.
-  const sourceMatch = components.find((component) => itemMatchesComponentSource(item, component));
-  if (sourceMatch) return sourceMatch;
+  // Deterministic precedence: the list-aware, system-scoped identity/source-ref
+  // resolver is authoritative; name is a compatibility fallback for components
+  // created before source refs existed (its closure is deferred to issue 557).
+  const resolved = resolveComponentForItem(item, components, systemId);
+  if (resolved) return resolved;
 
   return (
     components.find(
@@ -41,22 +42,22 @@ export function findMatchingComponent(item, components = []) {
   );
 }
 
-export function resolveItemEssences(item, components = []) {
+export function resolveItemEssences(item, components = [], systemId) {
   const flaggedEssences = normalizeEssences(getFabricateFlag(item, 'essences', {}));
   if (hasEssences(flaggedEssences)) return flaggedEssences;
 
-  const component = findMatchingComponent(item, components);
+  const component = findMatchingComponent(item, components, systemId);
   return normalizeEssences(component?.essences || {});
 }
 
 export function accumulateItemEssences(
   items = [],
-  { components = [], multiplyByQuantity = false } = {}
+  { components = [], systemId, multiplyByQuantity = false } = {}
 ) {
   const accumulated = {};
 
   for (const item of items || []) {
-    const essences = resolveItemEssences(item, components);
+    const essences = resolveItemEssences(item, components, systemId);
     const multiplier = multiplyByQuantity ? Math.max(1, Number(item?.system?.quantity) || 1) : 1;
 
     for (const [type, quantity] of Object.entries(essences)) {

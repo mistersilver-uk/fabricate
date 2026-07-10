@@ -55,3 +55,9 @@ When you import a system you choose how to handle an existing system with the sa
 - **Copy** imports the data as a new system with fresh identifiers, so it never collides with the original.
 
 Copy mode regenerates the system, realm, and environment identifiers while preserving Gathering Task, event, and modifier identifiers, so the environment-to-library links keep working in the copy.
+
+{: .note }
+> A crafting system's identifier may only contain letters, digits, hyphens, and underscores.
+> Fabricate generates a valid identifier for every system you create, so any system you authored in Fabricate and exported imports cleanly.
+> If you hand-edit an export file and give a system an identifier that contains a dot or a space, importing it in Skip or Overwrite mode fails with an error that names the offending identifier, because those modes keep the original identifier.
+> Either fix the identifier in the file, or import it in Copy mode, which assigns a fresh valid identifier.

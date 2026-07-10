@@ -215,7 +215,7 @@ export class InventoryListingBuilder {
       const actorImg = stringOrNull(actor?.img);
       const items = actor?.items ? [...actor.items] : [];
       for (const item of items) {
-        const component = findMatchingComponent(item, components);
+        const component = findMatchingComponent(item, components, system?.id);
         if (!component?.id) continue;
         const qty = itemStackQuantity(item);
         let entry = owned.get(component.id);

@@ -1,5 +1,28 @@
 export const FABRICATE_FLAG_NAMESPACE = 'fabricate';
 
+/**
+ * A durable-flag MAP KEY (a crafting-system id in `roles.<systemId>.componentId`,
+ * and later a `toolId` / `recipeItemDefinitionId`) is interpolated into a DOTTED
+ * flag path. Foundry's `setFlag` → `expandObject` splits on EVERY dot, so a segment
+ * that itself contains a `.` nests the key one level deeper on WRITE, while any
+ * reader indexing the map by that id (`roles[systemId]`) misses it on READ — the
+ * flag silently degrades to the pre-#556 raw-reference path. This pattern restricts
+ * such a segment to characters that cannot break the path. `foundry.utils.randomID()`
+ * always satisfies it; a hand-edited or imported system JSON may not.
+ */
+export const FABRICATE_FLAG_KEY_SEGMENT_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Whether a value is safe to interpolate as a single dotted-flag-path segment
+ * (see {@link FABRICATE_FLAG_KEY_SEGMENT_PATTERN}).
+ *
+ * @param {*} segment
+ * @returns {boolean}
+ */
+export function isSafeFlagKeySegment(segment) {
+  return typeof segment === 'string' && FABRICATE_FLAG_KEY_SEGMENT_PATTERN.test(segment);
+}
+
 function normalizeFlagKey(key) {
   const rawKey = String(key || '');
   if (!rawKey) return 'fabricate';

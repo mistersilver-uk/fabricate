@@ -7,7 +7,7 @@
  * references (`tool.componentId`), we want the drop to spawn a TOOL tile — the
  * same outcome as dragging the Tool row from the browser.
  *
- * The matching reuses the shared {@link itemMatchesComponentSource} +
+ * The matching reuses the shared {@link resolveComponentForItem} +
  * source-ref helpers (`src/utils/sourceUuid.js`) so the source-uuid chain is
  * resolved identically to crafting award/stacking logic — no duplicated matching.
  *
@@ -23,7 +23,7 @@
  * real Foundry edges in {@link InteractableManager#_resolutionDeps}.
  */
 
-import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
+import { resolveComponentForItem } from '../utils/sourceUuid.js';
 
 /**
  * @param {string} uuid  The dropped Item uuid.
@@ -91,14 +91,16 @@ function orderByPreferredSystem(systems, preferredSystemId) {
 function firstToolMatch(item, system) {
   const tools = Array.isArray(system?.tools) ? system.tools : [];
   const components = Array.isArray(system?.components) ? system.components : [];
+  // Resolve the dropped item to the single component it IS, once, list-aware and
+  // scoped by this system's id — so an item whose durable identity names a
+  // DIFFERENT component is never resolved to a Tool via an inherited, transitive
+  // `_stats.duplicateSource` (issue 559).
+  const resolved = resolveComponentForItem(item, components, system?.id);
+  if (!resolved?.id) return null;
   for (const tool of tools) {
     const componentId = tool?.componentId;
     if (!componentId) continue;
-    const component = components.find(
-      (candidate) => String(candidate?.id ?? '') === String(componentId)
-    );
-    if (!component) continue;
-    if (itemMatchesComponentSource(item, component)) {
+    if (String(componentId) === String(resolved.id)) {
       const toolId = String(tool?.id ?? '');
       if (toolId) return toolId;
     }

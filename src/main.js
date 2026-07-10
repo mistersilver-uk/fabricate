@@ -36,7 +36,11 @@ import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
-import { findStackableMatch } from './utils/sourceUuid.js';
+import {
+  createGatheringResultCreator,
+  resolveGatheringResultSource,
+  gatheringRunItemRef
+} from './gatheringResultCreation.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSceneAccess,
@@ -61,7 +65,7 @@ import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET } from './config/settings.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
@@ -207,55 +211,6 @@ function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression
   });
 }
 
-function createGatheringResultCreator(craftingSystemManager) {
-  return {
-    async plan({ actor, system, resultGroups = [] } = {}) {
-      return flattenGatheringResults(resultGroups)
-        .map(result => {
-          const source = resolveGatheringResultSource(result, system, craftingSystemManager);
-          return source ? gatheringRunItemRef(actor, source, result.quantity) : null;
-        })
-        .filter(Boolean);
-    },
-
-    async create({ actor, system, resultGroups = [] } = {}) {
-      const created = [];
-      for (const result of flattenGatheringResults(resultGroups)) {
-        const source = resolveGatheringResultSource(result, system, craftingSystemManager);
-        if (!source) continue;
-
-        const itemData = source.toObject?.() ?? {
-          name: source.name ?? 'Gathered Item',
-          img: source.img ?? 'icons/svg/item-bag.svg',
-          type: source.type ?? 'loot',
-          system: source.system ? globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system } : {}
-        };
-        itemData.system ??= {};
-        if (itemData.system.quantity !== undefined || result.quantity) {
-          itemData.system.quantity = Number(result.quantity || 1);
-        }
-        if (source.uuid) {
-          globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
-        }
-
-        // Stack onto an existing matching item (same source UUID chain) that uses
-        // a quantity field, rather than creating a duplicate document.
-        const existing = findStackableMatch(normalizeFoundryCollection(actor.items), source);
-        if (existing) {
-          const next = Number(existing.system?.quantity || 0) + Number(result.quantity || 1);
-          await existing.update({ 'system.quantity': next });
-          created.push(gatheringRunItemRef(actor, existing, result.quantity));
-          continue;
-        }
-
-        const [item] = await actor.createEmbeddedDocuments('Item', [itemData]);
-        if (item) created.push(gatheringRunItemRef(actor, item, result.quantity));
-      }
-      return created;
-    }
-  };
-}
-
 function createGatheringFailureFeedback() {
   return {
     async apply({ failureOutcome, actor, viewer, system, environment, task, outcome, checkResult } = {}) {
@@ -345,47 +300,6 @@ async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
       }
     }
   });
-}
-
-function flattenGatheringResults(resultGroups = []) {
-  return resultGroups.flatMap(group => Array.isArray(group?.results) ? group.results : []);
-}
-
-function resolveGatheringResultSource(result, system, craftingSystemManager) {
-  if (result?.itemUuid) return resolveUuidSync(result.itemUuid);
-  const componentId = result?.componentId || result?.systemItemId;
-  const component = (system?.components ?? []).find(entry => entry.id === componentId)
-    ?? craftingSystemManager?.getSystem?.(system?.id)?.components?.find(entry => entry.id === componentId)
-    ?? null;
-  if (!component) return null;
-  if (component.sourceUuid) return resolveUuidSync(component.sourceUuid) ?? component;
-  return component;
-}
-
-function resolveUuidSync(uuid) {
-  if (!uuid || typeof globalThis.fromUuidSync !== 'function') return null;
-  try {
-    return globalThis.fromUuidSync(uuid) ?? null;
-  } catch (_err) {
-    return null;
-  }
-}
-
-function normalizeFoundryCollection(collection) {
-  if (!collection) return [];
-  if (Array.isArray(collection)) return collection;
-  if (Array.isArray(collection.contents)) return collection.contents;
-  if (typeof collection.values === 'function') return Array.from(collection.values());
-  if (typeof collection[Symbol.iterator] === 'function') return Array.from(collection);
-  return [];
-}
-
-function gatheringRunItemRef(actor, item, quantity = 1) {
-  return {
-    actorUuid: actor?.uuid ?? null,
-    itemUuid: item?.uuid ?? item?.sourceUuid ?? null,
-    quantity: Number.isFinite(Number(quantity)) && Number(quantity) > 0 ? Number(quantity) : 1
-  };
 }
 
 function localizeGathering(key, data = {}) {
@@ -2181,6 +2095,7 @@ Hooks.once('ready', async () => {
   await fabricate.initialize();
   await processFabricateWorldTime();
   await runRecipeItemFlagAutoStamp();
+  await runComponentFlagAutoStamp();
 
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
@@ -2278,6 +2193,33 @@ async function runRecipeItemFlagAutoStamp() {
     await setSetting(SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION, RECIPE_ITEM_FLAG_STAMP_TARGET);
   } catch (error) {
     console.error('Fabricate | recipe-item durable-flag auto-stamp failed', error);
+  }
+}
+
+/**
+ * Issue 556 — one-shot, primary-GM-gated backfill that stamps the durable per-system
+ * `flags.fabricate.roles[system.id].componentId` (and strips a clone's stale
+ * `_stats.duplicateSource`) on every registered component's writable source Item. Keyed
+ * by the `COMPONENT_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
+ * Placed BEFORE the `updateItem` hook registers, so restamp writes cannot trigger a
+ * metadata-refresh storm. Sources only — owned copies inherit the flag on future drags
+ * and are otherwise covered by the manual "Repair item data" action. NOT a MigrationRunner
+ * entry: that runner reads/writes only settings-data payloads and cannot write Item flags.
+ */
+async function runComponentFlagAutoStamp() {
+  try {
+    // Primary-GM only, so exactly one client performs the write in a multi-GM world.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (Number(getSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION)) >= COMPONENT_FLAG_STAMP_TARGET) {
+      return;
+    }
+    const manager = fabricate?.getCraftingSystemManager?.();
+    if (!manager?.autoStampComponentSources) return;
+    const summary = await manager.autoStampComponentSources();
+    console.debug?.('Fabricate | component durable-flag auto-stamp complete', summary);
+    await setSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION, COMPONENT_FLAG_STAMP_TARGET);
+  } catch (error) {
+    console.error('Fabricate | component durable-flag auto-stamp failed', error);
   }
 }
 
@@ -2690,6 +2632,7 @@ globalThis.fabricate = {
 export const __test = {
   createGatheringToolAvailability,
   createGatheringToolBreakage,
+  createGatheringResultCreator,
   matchGatheringTools
 };
 

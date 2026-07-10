@@ -36,7 +36,7 @@ globalThis.fromUuid = async (uuid) => _registry.get(uuid) ?? null;
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
-const { matchRecipeItemDefinition, itemMatchesComponentSource } = await import('../src/utils/sourceUuid.js');
+const { matchRecipeItemDefinition, resolveComponentForItem } = await import('../src/utils/sourceUuid.js');
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -98,8 +98,10 @@ function recipeItemFlag(doc) {
   return doc.getFlag('fabricate', 'fabricate.recipeItemDefinitionId');
 }
 
-function componentFlag(doc) {
-  return doc.getFlag('fabricate', 'fabricate.componentId');
+// Components now carry a per-system durable identity map; every fixture here uses the
+// single system id 'sys', so read that per-system leaf.
+function componentFlag(doc, systemId = 'sys') {
+  return doc.getFlag('fabricate', `fabricate.roles.${systemId}.componentId`);
 }
 
 function makeRecipeManager() {
@@ -596,8 +598,8 @@ test('555 A2 — a compendium-imported component resolves owned copies dragged f
 
   const fromCompendium = makeDoc({ uuid: 'Actor.a.Item.a', compendiumSource: 'Compendium.mod.items.ore' });
   const fromWorldItem = makeDoc({ uuid: 'Actor.a.Item.b', compendiumSource: 'Compendium.mod.items.ore', duplicateSource: 'Item.ore' });
-  assert.equal(itemMatchesComponentSource(fromCompendium, component), true, 'the compendium-drag copy matches');
-  assert.equal(itemMatchesComponentSource(fromWorldItem, component), true, 'the world-item-drag copy matches');
+  assert.equal(resolveComponentForItem(fromCompendium, [component], 'sys'), component, 'the compendium-drag copy matches');
+  assert.equal(resolveComponentForItem(fromWorldItem, [component], 'sys'), component, 'the world-item-drag copy matches');
 });
 
 test('555 R3 — auto-stamp counts a definition whose source item no longer resolves as skippedMissing', async () => {

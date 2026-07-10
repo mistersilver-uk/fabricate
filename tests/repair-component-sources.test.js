@@ -3,10 +3,10 @@
  * action behind the settings-menu "Repair Component Sources" button.
  *
  *  1. A world item that IS a component source (matched by identity) is stripped of a
- *     transitive duplicateSource and stamped with flags.fabricate.componentId.
+ *     transitive duplicateSource and stamped with flags.fabricate.roles[sys].componentId.
  *  2. Matching is by IDENTITY (own uuid / compendium source), NOT duplicateSource —
  *     an item whose duplicateSource points at a component source is NOT mis-stamped.
- *  3. A stale componentId flag on a non-source item is cleared.
+ *  3. A stale roles[sys].componentId flag on a non-source item is cleared.
  *  4. An already-correct source item is a no-op.
  *  5. Locked packs are counted+skipped; unlocked packs are processed.
  */
@@ -43,9 +43,12 @@ function makeItem({
     name,
     pack,
     _stats: { duplicateSource, compendiumSource },
-    // getFabricateFlag/setFabricateFlag store at flags.fabricate['fabricate.componentId']
-    // via getProperty/dotted-key traversal — mirror that nesting here.
-    flags: componentFlag ? { fabricate: { fabricate: { componentId: componentFlag } } } : {},
+    // Components now carry a per-system durable identity map. getFabricateFlag/
+    // setFabricateFlag store at flags.fabricate['fabricate.roles.<sys>.componentId']
+    // via getProperty/dotted-key traversal — mirror that nesting here (single system sys1).
+    flags: componentFlag
+      ? { fabricate: { fabricate: { roles: { sys1: { componentId: componentFlag } } } } }
+      : {},
     updates: [],
     async update(patch) {
       this.updates.push(patch);
@@ -101,7 +104,7 @@ test('repair — strips a transitive duplicateSource and stamps the component id
   assert.equal(summary.stamped, 1);
   assert.equal(summary.stripped, 1);
   assert.equal(item._stats.duplicateSource, null, 'transitive duplicateSource cleared');
-  assert.equal(item.getFlag('fabricate', 'fabricate.componentId'), 'comp-embercap');
+  assert.equal(item.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), 'comp-embercap');
 });
 
 test('repair — does NOT mis-stamp an item whose duplicateSource merely points at a component source', async () => {
@@ -113,7 +116,7 @@ test('repair — does NOT mis-stamp an item whose duplicateSource merely points 
   const summary = await mgr.repairComponentSourceFlags();
 
   assert.equal(summary.stamped, 0, 'identity-based attribution ignores duplicateSource');
-  assert.equal(item.getFlag('fabricate', 'fabricate.componentId'), undefined);
+  assert.equal(item.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), undefined);
 });
 
 test('repair — clears a stale componentId flag on a non-source item', async () => {
@@ -123,7 +126,7 @@ test('repair — clears a stale componentId flag on a non-source item', async ()
   const summary = await mgr.repairComponentSourceFlags();
 
   assert.equal(summary.cleared, 1);
-  assert.equal(item.getFlag('fabricate', 'fabricate.componentId'), undefined);
+  assert.equal(item.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), undefined);
 });
 
 test('repair — an already-correct source item is a no-op', async () => {
@@ -153,7 +156,7 @@ test('repair — skips locked packs and processes unlocked packs', async () => {
 
   assert.equal(summary.skippedLocked, 1, 'the locked pack is skipped');
   assert.equal(summary.stamped, 1, 'the unlocked pack item is stamped');
-  assert.equal(packItem.getFlag('fabricate', 'fabricate.componentId'), 'comp-embercap');
+  assert.equal(packItem.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), 'comp-embercap');
 });
 
 test('repair — requires GM', async () => {

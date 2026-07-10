@@ -9,7 +9,7 @@ import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import {
   getItemSourceReferences,
   getComponentSourceReferences,
-  itemMatchesComponentSource,
+  itemResolvesToComponent,
 } from '../utils/sourceUuid.js';
 
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
@@ -1302,7 +1302,10 @@ export class CraftingEngine {
     // Accumulate essences from ALL submitted items (duplicates count multiple times)
     let submittedEssences = null;
     if (essencesEnabled) {
-      submittedEssences = accumulateItemEssences(submittedItems, { components });
+      submittedEssences = accumulateItemEssences(submittedItems, {
+        components,
+        systemId: system?.id,
+      });
     }
 
     for (const recipe of recipes) {
@@ -2604,7 +2607,7 @@ export class CraftingEngine {
     const components = this._getSystemComponents(recipe);
 
     for (const { item, quantity } of consumedItems) {
-      const itemEssences = resolveItemEssences(item, components);
+      const itemEssences = resolveItemEssences(item, components, recipe?.craftingSystemId);
       for (const [essenceId, perUnit] of Object.entries(itemEssences)) {
         const value = Number(perUnit);
         if (!Number.isFinite(value) || value <= 0) continue;
@@ -2622,13 +2625,6 @@ export class CraftingEngine {
     }
 
     return { resolvedEssences, essenceSources };
-  }
-
-  _accumulateEssencesFromItems(items, recipe = null) {
-    return accumulateItemEssences(items, {
-      components: this._getSystemComponents(recipe),
-      multiplyByQuantity: true,
-    });
   }
 
   _getSystemComponents(recipe) {
@@ -3053,18 +3049,23 @@ export class CraftingEngine {
 
   /**
    * Find items on actor that match a managed component.
-   * Matches against the component's full source-reference chain: live `sourceUuid`,
-   * canonical `sourceItemUuid`, and any recorded `fallbackItemIds`. Falls back to
-   * name matching only when the component has no source references.
+   * Resolves each owned item to the single component it IS through the shared,
+   * list-aware, system-scoped resolver (durable `roles[systemId].componentId` /
+   * legacy scalar / raw source-reference chain), keeping those that resolve to the
+   * target component. When none resolve, falls back to a case-SENSITIVE exact-name
+   * match — a compatibility path whose closure is deferred to issue 557.
    * @private
    */
-  _findComponentItems(actor, component, _system) {
+  _findComponentItems(actor, component, system) {
     const items = [...actor.items];
+    const components = Array.isArray(system?.components) ? system.components : [];
     if (component.sourceUuid || component.sourceItemUuid || component.fallbackItemIds?.length) {
-      const byUuid = items.filter((item) => itemMatchesComponentSource(item, component));
+      const byUuid = items.filter((item) =>
+        itemResolvesToComponent(item, component, components, system?.id)
+      );
       if (byUuid.length > 0) return byUuid;
     }
-    // Name fallback
+    // Name fallback (issue 557)
     const name = component.name;
     if (name) {
       return items.filter((item) => item.name === name);
