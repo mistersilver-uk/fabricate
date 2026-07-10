@@ -77,6 +77,12 @@ Pick a second managed component (the "broken" variant).
   The destroy, mark, or replace action always happens.
 - The attempt result includes a summary of what each tool did this attempt, so chat and log integrations can describe the breakage.
 
+{: .note }
+> Presence is matched broadly, but breakage and usage are not.
+> Only a copy Fabricate can identify as the tool by a durable link is consumed, marked as broken, or usage-counted.
+> A copy duplicated from another item in a world that has not been repaired, or one that merely shares the tool's name, still satisfies presence but is spared from breakage until you repair or re-issue it.
+> See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
+
 ## Learn more
 
 - [Tools]({% link tools.md %}).

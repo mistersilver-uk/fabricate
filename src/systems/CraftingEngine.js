@@ -1481,8 +1481,15 @@ export class CraftingEngine {
    * Validate that all required library Tools resolved for this recipe/step are
    * present (a matching, non-broken item) on the component source actors.
    *
-   * Returns the matched `{ tool, item }` pairs so the caller can apply
+   * Returns the matched `{ tool, item, breakable }` pairs so the caller can apply
    * usage/breakage on the success and failure-consumption paths.
+   *
+   * Durable-identity selection (issue 557): the item PREFERRED for each tool is one
+   * that matches by durable identity (the only kind that may be consumed or
+   * destroyed). A presence-only (wide) match is used solely to satisfy the presence
+   * gate and is returned with `breakable: false` so {@link _applyToolBreakage}
+   * spares it. When the manager exposes no identity matcher (legacy/test managers) a
+   * presence match is treated as breakable, preserving prior behaviour.
    *
    * Virtual-present injection (Phase 4): a tool whose `componentId` is in the
    * active canvas Tool's `presentTools` payload AND whose recipe crafting system
@@ -1498,7 +1505,7 @@ export class CraftingEngine {
    * @param {Recipe} recipe
    * @param {Array<object>} tools - resolved library Tool objects
    * @param {{ systemId?: string|null, componentIds?: string[] }|null} [presentTools] - virtual-present payload
-   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean}> }>}
+   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean, breakable?: boolean}> }>}
    */
   async _validateTools(actors, recipe, tools = [], presentTools = null) {
     const toolItems = [];
@@ -1575,9 +1582,17 @@ export class CraftingEngine {
    * `toolSpecific` (default) behaviour is unchanged: each tool's own mode decides and
    * a legacy `breakTools` force-break still applies on top.
    *
+   * Durable-identity gate (issue 557): an owned item is used OR broken only when it
+   * matches the tool by durable identity, re-checked authoritatively here via the
+   * identity matcher so a presence-only item can never reach `delete()`. A spared
+   * (non-breakable) item is left untouched and recorded as skipped evidence under
+   * `checkDriven`, mirroring the virtual-present skip. When the manager exposes no
+   * identity matcher (legacy/test managers) the selection `breakable` tag is honored,
+   * defaulting to breakable to preserve prior behaviour.
+   *
    * @private
    * @param {Recipe} recipe
-   * @param {Array<{tool: object, item: Item}>} toolItems
+   * @param {Array<{tool: object, item: Item, virtual?: boolean, breakable?: boolean}>} toolItems
    * @param {{ forceBreak?: boolean, authority?: string, reason?: string|null, triggerId?: string|null, checkId?: string|null }} [options]
    * @returns {Promise<Array<{ actorUuid: string|null, itemUuid: string|null, quantity: number, componentId: string|null, broken: boolean }>>}
    */
