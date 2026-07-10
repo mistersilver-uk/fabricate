@@ -214,6 +214,11 @@ The `ingredientSet` provider routes by `IngredientSet.resultGroupId` and the `ch
 ### Signature Resolution
 
 - Matching is based on satisfiable signatures from ingredient groups/options.
+- A submitted item's component identity is resolved through the shared, list-aware, system-scoped Component Item Matching resolver `resolveComponentForItem(item, components, systemId)` defined in the `data-models` spec, durable-flag-first.
+Signature matching MUST resolve each submission to at most one component through that resolver, not a raw source-reference intersection that ignores the durable `flags.fabricate.roles[systemId].componentId`.
+- A submitted item is attributed to exactly one component: when its `roles[systemId].componentId` (or the legacy scalar `componentId`) names a component in the system, it resolves exclusively to that component even if it carries a transitive `_stats.duplicateSource` pointing at a different component's source; when no claimed id names a known component, it resolves by the resolver's raw source-reference fall-through.
+- A single submission contributes at most one unit to a group even when it matches two or more of that group's components.
+- The raw source-reference fall-through remains load-bearing for unstamped (pre-durable-identity) items and MUST NOT be weakened.
 - A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
 - Submitted quantity is counted per submission (one submission = one unit), not by reading an item's stack `system.quantity`; the workbench is responsible for expanding a stack into one submission per unit, consistent with occurrence-based essence accumulation and submitted-ingredient consumption.
 - Signature overlap is invalid across all recipes in the system.
@@ -279,3 +284,5 @@ The `ingredientSet` provider routes by `IngredientSet.resultGroupId` and the `ch
 - Integration tests for alchemy no-signature failure behavior (failure message + ingredient consumption).
 - Integration tests for alchemy routing-mismatch misconfiguration behavior (error + no player-failure consumption).
 - Integration tests for alchemy uniqueness blocking semantics in save/import workflows.
+- A regression test asserts signature matching is durable-flag-first and exclusive: an item stamped `roles[systemId].componentId = B` but carrying `_stats.duplicateSource = A.uuid` (A a distinct component in the recipe's set whose source ref genuinely overlaps the item's raw refs) is counted toward B only, never toward A.
+- A regression test asserts one-unit-per-group counting: a single submission that matches two or more of a group's components contributes exactly one unit to that group, not one per matched component.
