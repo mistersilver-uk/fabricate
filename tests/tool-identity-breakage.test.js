@@ -169,13 +169,15 @@ function compendiumHammer() {
 // Crafting acceptance — real RecipeManager, real CraftingEngine
 // ===========================================================================
 
-async function craftingBreakage(items, tool = HAMMER_TOOL) {
+async function craftingBreakage(items, tool = HAMMER_TOOL, options = {}) {
   installSystem(hammerSystem());
   const engine = new CraftingEngine(new RecipeManager());
   const validation = await engine._validateTools([{ items }], RECIPE, [tool]);
   // A3: the presence gate must still succeed (spared !== "no longer matches").
   assert.equal(validation.valid, true, 'presence gate should still succeed');
-  const used = await engine._applyToolBreakage(RECIPE, validation.tools);
+  // `options` threads the breakage authority (default `toolSpecific`) to the production
+  // callers' third argument, so a `checkDriven` run can assert the skipped evidence.
+  const used = await engine._applyToolBreakage(RECIPE, validation.tools, options);
   return { validation, used };
 }
 
@@ -232,6 +234,25 @@ test('crafting: a durable limitedUses tool IS usage-incremented', async () => {
   assert.equal(tool.timesUsed, 1, 'a durable tool must be usage-incremented');
 });
 
+// ---------------------------------------------------------------------------
+// checkDriven skipped evidence (issue 568): the spec clause "a presence-only match
+// ... is spared ... and recorded as a skipped tool" emits `spared: true` evidence
+// ONLY under checkDriven authority (silent under the default toolSpecific). Cover
+// BOTH presence-only antecedents — transitive duplicate-source and name-only.
+// ---------------------------------------------------------------------------
+
+for (const makeDecoy of [duplicateSourceDecoy, nameDecoy]) {
+  test(`crafting checkDriven: a spared ${makeDecoy.name} is recorded as a skipped tool`, async () => {
+    const decoy = makeDecoy();
+    const { used } = await craftingBreakage([decoy], HAMMER_TOOL, { authority: 'checkDriven' });
+    const spared = used.filter((entry) => entry.spared === true);
+    assert.equal(spared.length, 1, 'exactly one spared/skipped entry');
+    assert.equal(spared[0].broken, false, 'a spared tool is never broken');
+    assert.equal(spared[0].authority, 'checkDriven', 'skipped evidence carries the authority');
+    assert.equal(decoy.deleted, false, 'a spared tool is never deleted');
+  });
+}
+
 // ===========================================================================
 // Gathering acceptance — real matchGatheringTools + real RecipeManager +
 // shared createToolBreakageRuntime
@@ -249,11 +270,18 @@ function gatheringRuntime(craftingSystemManager) {
   });
 }
 
-async function gatheringBreakage(items, tool = HAMMER_TOOL) {
+async function gatheringBreakage(
+  items,
+  tool = HAMMER_TOOL,
+  { authority = null, method = 'apply' } = {}
+) {
   installSystem(hammerSystem());
   const recipeManager = new RecipeManager();
   const craftingSystemManager = { recipeManager };
   const system = { id: 'sys-1' };
+  // `authority` opts the system into `checkDriven` so `resolveAuthority` returns it;
+  // `method` selects the runtime surface (`apply` by default, or `plan`) under test.
+  if (authority) system.toolBreakage = { authority };
   const task = { id: 'task-1', craftingSystemId: 'sys-1' };
   const actor = { uuid: 'Actor.a1', items };
   // A2/A3: presence is computed by the REAL matcher — confirm the tool is present.
@@ -266,7 +294,7 @@ async function gatheringBreakage(items, tool = HAMMER_TOOL) {
   });
   assert.equal(matched.missing.length, 0, 'gathering presence gate should still succeed');
   const runtime = gatheringRuntime(craftingSystemManager);
-  const evidence = await runtime.apply({ actor, system, task, tools: [tool] });
+  const evidence = await runtime[method]({ actor, system, task, tools: [tool] });
   return { matched, evidence };
 }
 
@@ -318,6 +346,37 @@ test('gathering: a durable limitedUses tool IS usage-incremented', async () => {
   assert.equal(tool.deleted, false, 'maxUses null never breaks');
   assert.equal(tool.timesUsed, 1, 'a durable tool must be usage-incremented');
 });
+
+// ---------------------------------------------------------------------------
+// checkDriven skipped evidence on the shared runtime (issue 568). `plan()` and
+// `apply()` each emit the spared entry independently — `apply()` `continue`s before
+// the pendingPlans lookup, so it is driven directly here (no prior plan()). Under
+// checkDriven the flag lives BOTH top-level and in nested `evidence`.
+// ---------------------------------------------------------------------------
+
+function assertSparedSkipped(entry, decoy) {
+  assert.equal(entry.spared, true, 'top-level spared flag');
+  assert.equal(entry.authority, 'checkDriven', 'top-level authority');
+  assert.equal(entry.broken, false, 'a spared tool is never broken');
+  assert.equal(entry.evidence.spared, true, 'nested evidence.spared flag');
+  assert.equal(entry.evidence.authority, 'checkDriven', 'nested evidence.authority');
+  assert.equal(decoy.deleted, false, 'a spared tool is never deleted');
+}
+
+for (const makeDecoy of [duplicateSourceDecoy, nameDecoy]) {
+  for (const method of ['plan', 'apply']) {
+    test(`gathering checkDriven ${method}(): a spared ${makeDecoy.name} is recorded as a skipped tool`, async () => {
+      const decoy = makeDecoy();
+      const { evidence } = await gatheringBreakage([decoy], HAMMER_TOOL, {
+        authority: 'checkDriven',
+        method,
+      });
+      const spared = evidence.filter((entry) => entry.spared === true);
+      assert.equal(spared.length, 1, 'exactly one spared/skipped entry');
+      assertSparedSkipped(spared[0], decoy);
+    });
+  }
+}
 
 // ===========================================================================
 // Fail-safe spare — resolveToolIdentityMatcher defaults to () => false
