@@ -228,7 +228,7 @@ The dead-end memory is distinct from run history: it is leak-safe (a fizzle matc
 When `recipe.transferEffects === true` and essences are enabled:
 
 1. Determine contributing essence IDs from resolved ingredients using the same item-flag-first, component-definition-fallback essence resolution used by craftability checks.
-2. For each contributing essence, resolve the essence source from `EssenceDefinition.sourceComponentId` when present, then from that component's `sourceItemUuid` or compatible source evidence when available.
+2. For each contributing essence, resolve the essence source from `EssenceDefinition.sourceComponentId` when present, then from that component's `originItemUuid` or compatible source evidence when available.
 3. If no source component is configured, use legacy `EssenceDefinition.sourceItemUuid` as compatibility input when it resolves directly to a Foundry item.
 4. Skip stale source components, missing source item UUIDs, and unresolved legacy source UUIDs without throwing.
 5. Transfer collected effects to created result items using the standard effect-transfer pipeline.

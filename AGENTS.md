@@ -313,6 +313,22 @@ The GM manager's `adminStore` subscribes and calls `travel.patch()` when a moved
 Token positions sync to every client, so each client derives the same live result — no socket/broadcast needed.
 Key files: `GatheringLocationService.js`, `src/main.js` (`senseSceneRegions` injection), `src/canvas/regionHitTest.js`, `foundryBridge.js`, `adminStore.js`, `GatheringView.svelte` / `src/ui/SvelteFabricateApp.svelte.js`.
 
+### The `sourceUuid` string names TWO unrelated persisted things
+
+A codemod on the literal string `sourceUuid` (or `sourceItemUuid` / `fallbackItemIds`) is **object-family-scoped, never global** — the same string names two unrelated persisted concepts with different schemas and different migration surfaces.
+
+1. **The registered-entry match reference** (issue 560 renamed it).
+Components, recipe-item definitions, and first-class tools each carry `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` (formerly `sourceUuid` / `sourceItemUuid` / `fallbackItemIds`) inside the `craftingSystems` **settings payload**.
+Because this lives in settings data, `MigrationRunner` can rename it as pure data (`migrateRenameSourceUuidFields`, `1.16.0`); the union matcher is `getItemMatchUuids(entry)` in `src/utils/sourceUuid.js`.
+The essence definition's OWN `sourceItemUuid` pointer is a THIRD, separate field family that was deliberately NOT renamed.
+
+2. **The `fabricate.interactable` RegionBehaviour `sourceUuid` `StringField`** (`interactableRegionFlags.js`).
+This is a real `documentTypes` DataModel schema field on a persisted RegionBehaviour, consumed across `src/canvas/**`; renaming it would corrupt saved region data and needs its OWN DataModel migration.
+It is unrelated to the registered-entry match ref and stays `sourceUuid`.
+
+The learned-recipe provenance record (`Actor.flags.fabricate.learnedRecipes[recipeId].sourceItemUuid`, written by `RecipeVisibilityService`) is a fourth, actor-flag family that is also NOT in the settings-payload rename scope.
+Classify every occurrence by the owning object before renaming.
+
 ## Markdown & Prose Conventions
 
 These rules apply to every agent (Claude and Codex) and to how all Markdown is authored.

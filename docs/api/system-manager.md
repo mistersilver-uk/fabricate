@@ -298,8 +298,8 @@ GM only.
 Returns a result object that indicates whether the item was newly created, updated, or already up to date, so callers can show appropriate notifications.
 
 The method resolves both the dropped item's live UUID and its canonical source UUID (via `_stats.compendiumSource`, with `flags.core.sourceId` as a legacy fallback) before deciding what to do.
-If the canonical source UUID no longer resolves, Fabricate stores the live dropped item UUID as the component's primary source and keeps the broken canonical UUID in `fallbackItemIds`.
-A component can claim a full source-reference chain through `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`.
+If the canonical source UUID no longer resolves, Fabricate stores the live dropped item UUID as the component's primary source and keeps the broken canonical UUID in `aliasItemUuids`.
+A component can claim a full source-reference chain through `registeredItemUuid`, `originItemUuid`, and `aliasItemUuids`.
 
 1. **Claimed source chain.**
    An existing component already claims either the dropped live UUID, the canonical source UUID, or a fallback UUID in the same chain.
@@ -426,7 +426,7 @@ GM only.
 
 **Returns:** `Promise<object>`
 
-If `updates` changes `sourceUuid`, `sourceItemUuid`, or `fallbackItemIds`, the manager enforces the same per-system uniqueness rule used by imports.
+If `updates` changes `registeredItemUuid`, `originItemUuid`, or `aliasItemUuids`, the manager enforces the same per-system uniqueness rule used by imports.
 An update that would make two components claim the same source-reference chain throws an `Error`.
 
 When `features.salvage` is enabled on the system, you can set the `salvage` sub-object here.

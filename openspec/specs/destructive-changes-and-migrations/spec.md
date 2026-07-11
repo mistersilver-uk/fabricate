@@ -83,7 +83,7 @@ When deleting a `RecipeItemDefinition` from a crafting system:
 
 If a recipe item's linked world/compendium source item is deleted:
 
-- Keep `RecipeItemDefinition.sourceItemUuid` unchanged.
+- Keep `RecipeItemDefinition.originItemUuid` unchanged.
 - Warn in the relevant admin/editor UI.
 - Runtime matching may still succeed via source UUID resolution (`_stats.compendiumSource`, legacy fallback `flags.core.sourceId`) on owned copies.
 
@@ -292,7 +292,7 @@ This is DISTINCT from a multi-STEP
 Issue 561 makes a Tool a first-class registered kind carrying its OWN source references plus a `name` + `img` display snapshot, so tool matching no longer routes through a managed component.
 The `1.15.0` settings-data migration (`migrateToolsToFirstClass.js`) reads and writes the `craftingSystems` payload as pure data.
 
-1. For each `system.tools[]` entry that holds a `componentId` but no own source references, copy the referenced component's `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` and its `name` / `img` snapshot onto the tool (`deriveToolSourceFromComponents`), so a world that matched a tool yesterday matches it today.
+1. For each `system.tools[]` entry that holds a `componentId` but no own source references, copy the referenced component's `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` (reading the pre-`1.16.0` `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` when a not-yet-renamed component is encountered) and its `name` / `img` snapshot onto the tool (`deriveToolSourceFromComponents`), so a world that matched a tool yesterday matches it today.
 `componentId` is PRESERVED as a non-load-bearing link for `onBreak.replaceWith` resolution and the UI's linked-component display; the pre-existing user-authored `label` is NEVER written.
 2. A tool already carrying its own source references, or one whose `componentId` no longer resolves, is left as-is (the dangling case degrades to presence-by-name / componentId display, exactly as a dangling component reference does today); the migration never throws.
 3. The same `deriveToolSourceFromComponents` derivation runs on every `_normalizeSystem` load, so a component-linked tool authored after the migration (for example by dropping a managed component) and a copy-imported tool acquire their source references and snapshot without a re-run.
@@ -302,6 +302,20 @@ A bulk-imported tool is not stamped by that one-shot (version-gated to run once 
 
 This migration was authored as `1.14.0` in the change plan and renumbered to `1.15.0` when issue 545's alchemy check-mode migration took the `1.14.0` slot first.
 
+### Source-UUID Field Rename Migration (`1.16.0`, per system, idempotent)
+
+Issue 560 renames the three source-reference fields borne by every registered-entry kind so their names say what they mean.
+The `1.16.0` settings-data migration (`migrateRenameSourceUuidFields.js`) reads and writes the `craftingSystems` payload as pure data, with no behaviour change: the identity and matching semantics are frozen, only the field names change.
+
+The rename mapping is `sourceUuid` → `registeredItemUuid`, `sourceItemUuid` → `originItemUuid`, and `fallbackItemIds` → `aliasItemUuids`.
+
+1. For every entry of each of the three stored entry-array kinds — `system.components[]`, `system.recipeItemDefinitions[]`, and `system.tools[]` — map each old key to its new key only when the old key is present and the new key is absent, then delete the old key.
+2. Idempotent: after a run no old keys remain, so a second run is a no-op; an entry already carrying only new names is untouched.
+3. Both-shape tolerant: an entry with only old names, only new names, or both (the new name wins and the old is dropped) all normalize correctly, and the migration never throws.
+4. A world that matched an item before the migration matches it identically after.
+
+The essence definition's own `sourceItemUuid` pointer and the `fabricate.interactable` RegionBehaviour `sourceUuid` DataModel field are DIFFERENT field families outside this migration's scope and are left unchanged.
+
 ### Recipe Item Library Migration (Pre-Release)
 
 The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUuid` values with system-owned recipe item definitions.
@@ -309,10 +323,10 @@ The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUui
 1. Group recipes by `craftingSystemId`.
 2. For each distinct legacy `linkedRecipeItemUuid` inside one crafting system:
    - create one generated `RecipeItemDefinition`,
-   - set `sourceItemUuid` to the legacy UUID,
+   - set `originItemUuid` to the legacy UUID,
    - derive `name`/`img` from the resolved source item when available, otherwise use deterministic fallback metadata.
 3. Rewrite each recipe to `recipeItemId` referencing the generated definition for that UUID.
-4. If a legacy UUID is unresolved, keep it as stale `sourceItemUuid` on the generated definition and emit a migration warning rather than dropping the reference.
+4. If a legacy UUID is unresolved, keep it as stale `originItemUuid` on the generated definition and emit a migration warning rather than dropping the reference.
 5. When multiple recipes in one system share the same legacy UUID, they must reuse the same generated `RecipeItemDefinition`.
 6. Remove `linkedRecipeItemUuid` from canonical migrated recipe output.
 

@@ -288,7 +288,7 @@ An absent, invalid, or wrong-shape value (including a stray `"simple"`) normaliz
 It is GM configuration and is not part of the player gathering listing payload.
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
-12. `RecipeItemDefinition.sourceItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
+12. `RecipeItemDefinition.originItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
 13. **`consumption.breakToolsOnFail` governs Tool usage/breakage on a failed craft or salvage.** It is present on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`.
 It defaults to `false` (tools are not broken on failure unless enabled).
 It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
@@ -532,10 +532,10 @@ RecipeItemDefinition = {
 
   // Union of source references, mirroring Component (issue 555). Match on the union;
   // recipe items spawn no output, so there is no "spawn from" field. Existing
-  // definitions carry only sourceItemUuid and are never recomputed.
-  sourceUuid: string | null,         // the registered live document uuid
-  sourceItemUuid: string,            // the canonical compendium/source uuid (identity-of-record: the durable flag)
-  fallbackItemIds: string[],         // default []; broken-canonical-source fallbacks
+  // definitions carry only originItemUuid and are never recomputed.
+  registeredItemUuid: string | null, // the registered live document uuid
+  originItemUuid: string,            // the canonical compendium/source uuid (identity-of-record: the durable flag)
+  aliasItemUuids: string[],          // default []; broken-canonical-source fallbacks
 
   // Canonical recipe↔book membership (issue 511, PR-B). Many-to-many: a recipe may
   // belong to several books, and a book may contain several recipes. This inverts the
@@ -588,11 +588,11 @@ RecipeItemDefinition = {
 
 ### Requirements
 
-1. `sourceItemUuid` points to the canonical world or compendium item template used for recipe-item matching.
+1. `originItemUuid` points to the canonical world or compendium item template used for recipe-item matching.
 2. New recipe item definitions are created from dropped or selected Foundry items; manual UUID entry is not part of the canonical UI flow.
-3. If the source template later becomes unresolved, the stored `sourceItemUuid` is retained and the definition becomes stale-but-readable.
-A recipe item records the same union of source references a component does — `sourceUuid` (the registered live document), `sourceItemUuid` (the canonical compendium/source uuid), and `fallbackItemIds` (issue 555) — so a compendium-imported book resolves owned copies dragged from either the compendium item or the imported world item.
-The durable `flags.fabricate.recipeItemDefinitionId` on the source Item is the identity-of-record; `sourceItemUuid` is a best-effort source pointer, is never recomputed for an existing definition, and `sourceUuid` defaults to it when absent.
+3. If the source template later becomes unresolved, the stored `originItemUuid` is retained and the definition becomes stale-but-readable.
+A recipe item records the same union of source references a component does — `registeredItemUuid` (the registered live document), `originItemUuid` (the canonical compendium/source uuid), and `aliasItemUuids` (issue 555) — so a compendium-imported book resolves owned copies dragged from either the compendium item or the imported world item.
+The durable `flags.fabricate.recipeItemDefinitionId` on the source Item is the identity-of-record; `originItemUuid` is a best-effort source pointer, is never recomputed for an existing definition, and `registeredItemUuid` defaults to it when absent.
 See **Recipe Item Identity → Registration Source Identity** for the clone-gate and stamping rules.
 4. `recipeIds[]` is the **canonical** recipe↔book membership (issue 511, PR-B): it is many-to-many, so a book may contain several recipes and a recipe may belong to several books.
 This is the canonical way to model shared formulas, books, schematics, or recipe scrolls.
@@ -658,7 +658,7 @@ Represent one curated item entry available to recipes and salvage operations.
     name: string,
     img: string,
     description?: string,
-    sourceItemUuid: string | null,
+    originItemUuid: string | null,
     tags: string[],
   essences: { [essenceId: string]: number },
   difficulty?: number, // only used in progressive mode
@@ -696,7 +696,7 @@ When the salvage check defines no outcome tiers, routing is impossible and the c
 8. `salvage.ingredientQuantity` must be a positive integer.
 9. If a linked source item updates its name, image, or description, managed components that match the item's live UUID, canonical source UUID, or fallback source references must refresh their stored `name`, `img`, and display-safe plain-text `description` from the linked item.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
-11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `sourceUuid` and `sourceItemUuid`, and preserve the broken canonical source UUID in `fallbackItemIds`.
+11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
 
 ## Recipe
@@ -809,7 +809,7 @@ The legacy `visibility` block is retained on read as the `access` read-forward s
 10. If `visibilityMode` is `item` or `knowledge`, the recipe should be a member of at least one recipe item definition (`RecipeItemDefinition.recipeIds`, the canonical membership since issue 511 PR-B) for player craftability.
 The legacy scalar `recipeItemId` requirements below still hold for un-migrated systems that resolve membership through the reverse-ref fallback.
 11. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
-12. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
+12. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition.originItemUuid` is stale or no longer resolves, validation must warn.
 13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `004`); it defaults to `null`.
 It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
 An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
@@ -836,12 +836,12 @@ Define matching between a recipe's system-managed recipe item definition and own
 
 - `RecipeItemDefinition.recipeIds[]` stores the canonical recipe↔book membership (issue 511, PR-B, many-to-many): each definition lists the recipe ids it contains, so a recipe may belong to several books.
 - The legacy scalar `Recipe.recipeItemId` (removed by the `1.13.0` migration) stored a single reference to a `CraftingSystem.recipeItemDefinitions[].id` entry; it survives only as an un-migrated read fallback.
-- `RecipeItemDefinition.sourceItemUuid` stores the canonical template reference to the recipe item.
+- `RecipeItemDefinition.originItemUuid` stores the canonical template reference to the recipe item.
 - The template may point to a world item or a compendium item.
 
 ### Match Rule
 
-A candidate owned item is matched through the shared four-tier matcher defined in the recipe-visibility spec (**Recipe Item Matching**): the durable `flags.fabricate.recipeItemDefinitionId` identity flag first (tier 1), then membership in the definition's union of source references (`sourceUuid` + `sourceItemUuid` + `fallbackItemIds`) by the candidate's own uuid (tier 2), compendium source (tier 3), or transitive `_stats.duplicateSource` (tier 4).
+A candidate owned item is matched through the shared four-tier matcher defined in the recipe-visibility spec (**Recipe Item Matching**): the durable `flags.fabricate.recipeItemDefinitionId` identity flag first (tier 1), then membership in the definition's union of source references (`registeredItemUuid` + `originItemUuid` + `aliasItemUuids`) by the candidate's own uuid (tier 2), compendium source (tier 3), or transitive `_stats.duplicateSource` (tier 4).
 The first tier that yields a match wins, with no fall-through.
 Foundry v12+ uses `_stats.compendiumSource`; Foundry v11 and earlier used `flags.core.sourceId`.
 Runtime implementations call the shared source UUID resolver and the shared matcher; they must not re-implement it.
@@ -862,7 +862,7 @@ This is unblocked, not closed, and is tracked as issue 570.
 
 ### Registration Source Identity
 
-At registration (both recipe items and components), a definition's `sourceItemUuid` is a best-effort source POINTER; the durable flag is the identity-OF-RECORD.
+At registration (both recipe items and components), a definition's `originItemUuid` is a best-effort source POINTER; the durable flag is the identity-OF-RECORD.
 A component's durable identity-of-record is `flags.fabricate.roles[systemId].componentId`, a per-system role map, while a recipe item still uses the single scalar `flags.fabricate.recipeItemDefinitionId`.
 The earlier framing of one symmetric durable flag across both kinds no longer holds and is corrected here to name this interim asymmetry.
 A legacy scalar `flags.fabricate.componentId` is still honored at match time as a claimed id until the one-shot component restamp runs.
@@ -875,8 +875,8 @@ So a registered duplicate becomes a NEW definition or component instead of overw
 - This clone-gate is a REGISTRATION and source-repair rule only.
 It must never reach the runtime matcher: an actor-owned drag copy also carries `_stats.duplicateSource`, but its `compendiumSource` is legitimate provenance there (tier 3).
 - Registration stamps the durable flag (overwriting any marker inherited from a duplicated original), strips a clone's stale `_stats.duplicateSource`, and clears a clone's stale `_stats.compendiumSource`.
-- Existing stored `sourceItemUuid` values are never recomputed.
-A recipe item records the same union of source references a component does (`sourceUuid` = the registered live document, `sourceItemUuid` = the canonical compendium/source uuid, `fallbackItemIds` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item.
+- Existing stored `originItemUuid` values are never recomputed.
+A recipe item records the same union of source references a component does (`registeredItemUuid` = the registered live document, `originItemUuid` = the canonical compendium/source uuid, `aliasItemUuids` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item.
 
 Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: the second registration is a non-clone whose `compendiumSource` still matches, so find-existing dedups.
 It is cleanly distinguishable from the duplicate case by the absence of `_stats.duplicateSource`.
@@ -893,7 +893,7 @@ Actor-owned copies use the ordinary runtime matchers — the four-tier recipe-it
 Components are reconciled PER SYSTEM: the repair resolves each item against one system's component set with that system's id, and writes or clears ONLY that system's `roles[systemId].componentId` map key, so a non-owning system's null-owner pass finds its own leaf unset and no-ops — it can never clear another system's identity regardless of `getSystems()` order.
 For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by a globally-unique, exact (case/whitespace-normalized) name match to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions anywhere is skipped as ambiguous.
 A flagged owned copy is authoritative and left untouched, and repair never triggers a learn.
-- Cross-system shared source (two systems each owning a definition with the same `sourceItemUuid`) keeps a single flag for RECIPE ITEMS only, as a transitional exception, because their identity remains a scalar for now: last writer wins, and the other system's copies fall to tier 4 (their bulk auto-learn refused by the confidence gate, while explicit learn and display still work).
+- Cross-system shared source (two systems each owning a definition with the same `originItemUuid`) keeps a single flag for RECIPE ITEMS only, as a transitional exception, because their identity remains a scalar for now: last writer wins, and the other system's copies fall to tier 4 (their bulk auto-learn refused by the confidence gate, while explicit learn and display still work).
 This is a documented, tested limitation — not a permanent difference; the recipe-item follow-up moves it onto `roles[systemId].recipeItemDefinitionId` and removes it.
 Components no longer have that limitation: the per-system `roles` map lets a source registered in several systems resolve to the correct component in EACH system.
 
@@ -1098,10 +1098,10 @@ are always by id into the per-system library.
 ```js
 Tool = {
   componentId: string | null,      // OPTIONAL managed-component link; null for an item-sourced tool
-  // Own source references (issue 561), identical field shape to a component.
-  sourceUuid: string | null,       // the registered live source document uuid
-  sourceItemUuid: string | null,   // the canonical/compendium source uuid
-  fallbackItemIds: string[],       // additional source references for matching
+  // Own source references (issue 561; renamed in issue 560), identical field shape to a component.
+  registeredItemUuid: string | null, // the registered live source document uuid
+  originItemUuid: string | null,     // the canonical/compendium source uuid
+  aliasItemUuids: string[],          // additional source references for matching
   // Registration/migration-time DISPLAY SNAPSHOT (name + img ONLY, never `label`).
   name: string | null,
   img: string | null,
@@ -1128,7 +1128,7 @@ Tool = {
 
 ### Requirements
 
-1. A Tool must carry EITHER a `componentId` (a managed-component link) OR its own source references (`sourceUuid` / `sourceItemUuid`); a Tool with NEITHER is invalid.
+1. A Tool must carry EITHER a `componentId` (a managed-component link) OR its own source references (`registeredItemUuid` / `originItemUuid`); a Tool with NEITHER is invalid.
 A first-class tool registered from an Item uuid carries its own source references plus a `name` + `img` display snapshot and `componentId: null`; a whetstone that is also a component, or a tool migrated from a legacy componentId-tool, keeps `componentId` populated (for `onBreak.replaceWith` resolution and the UI's linked-component display) but `componentId` is no longer the matching basis.
 A component-linked tool that carries no own source references derives them and its `name` + `img` snapshot from its linked component on every `_normalizeSystem` load (`deriveToolSourceFromComponents`), not only at migration time — so a tool authored by dropping a managed component, a copy-imported tool, and a post-migration authored tool all match owned items by source reference, continuous with the `1.15.0` migration and idempotent (an item-sourced or already-derived tool is left untouched, and the derivation never overwrites the tool's own snapshot or `label`).
 The `name` + `img` display snapshot is captured at registration/migration time and is NOT auto-refreshed when the GM renames the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
@@ -1658,7 +1658,7 @@ Requirements:
 3. The `flagBroken` action also appends a localized leading-space `(broken)` suffix (the literal `" (broken)"`) to the owned item's display name.
 The suffix is applied idempotently — never double-appended, and never appended to an item that was already `toolBroken`-flagged before the action fired.
 The suffix is display-only and is not auto-cleared by Fabricate; the flag (not the name) remains the authoritative presence-gate disqualifier (data-models req 7, gathering req 2).
-A managed component matched purely by name (no `sourceUuid`/fallback ids) stops matching its component once renamed, so a GM clearing the flag must also restore the original name to regain `damaged`-tier recognition.
+A managed component matched purely by name (no `registeredItemUuid`/alias ids) stops matching its component once renamed, so a GM clearing the flag must also restore the original name to regain `damaged`-tier recognition.
 
 ## Canvas Interactables
 
@@ -1917,8 +1917,8 @@ The following canonical field names must be used in all new writes:
 | ~~Recipe~~ `recipeItemId` | *(legacy)* | Removed by the 1.13.0 migration; membership inverted to `RecipeItemDefinition.recipeIds` |
 | EssenceDefinition | `sourceComponentId` | Managed component source reference |
 | EssenceDefinition | `sourceItemUuid` | Resolved or legacy template item evidence for effect transfer |
-| Component | `sourceItemUuid` | Template item reference |
-| RecipeItemDefinition | `sourceItemUuid` | Template item reference |
+| Component | `originItemUuid` | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560) |
+| RecipeItemDefinition | `originItemUuid` | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560) |
 | RecipeItemDefinition | `recipeIds` | Canonical recipe↔book membership (many-to-many); inverts the removed `Recipe.recipeItemId` |
 | RecipeItemDefinition | `caps` | Per-recipe-item use/learn caps (`caps.item`, `caps.learn`); canonical cap fields `whenSpent`, `limitLearning`, `learnsAllowed`, `learnScope` (legacy mirrors `destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) |
 | CraftingSystem | `itemTags` | Array of tag strings |
@@ -1941,11 +1941,11 @@ The following legacy aliases are accepted by constructors and normalization func
 | `ingredients` (flat array) | `ingredientGroups` | IngredientSet | Constructor wraps each ingredient into a single-option group |
 | `results` (flat array) | `resultGroups` | Recipe | Constructor wraps into a single result group |
 | `associatedSystemItemId` | `sourceComponentId` | EssenceDefinition | Normalization reads as fallback for the managed source component reference |
-| `associatedSystemItemId` | `sourceItemUuid` | Component | Constructor reads as fallback for `sourceItemUuid` |
+| `associatedSystemItemId` | `originItemUuid` | Component | Constructor reads as fallback for `originItemUuid` |
 | `tags` | `itemTags` | CraftingSystem | Normalization reads `tags` as fallback for `itemTags` |
 | `catalystItemUsage` / `catalystUses` (bare number) | `toolUsage.timesUsed` | Item flag | Runtime reads `toolUsage` first; when absent, falls back to `catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) so migrated `limitedUses` tools preserve in-flight usage. Legacy flag is never back-filled or cleared. |
-| `sourceUuid` | `sourceItemUuid` | Component | Normalization reads as fallback |
-| `linkedRecipeItemUuid` | `recipeItemId` | Recipe | Migration/import paths synthesize or resolve a `RecipeItemDefinition` by `sourceItemUuid` within the recipe's crafting system |
+| `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` (pre-`1.16.0`) | `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` | Component, RecipeItemDefinition, Tool | Issue 560 rename: normalization reads the old names new-name-first, old-name-tolerant, and emits the new names |
+| `linkedRecipeItemUuid` | `recipeItemId` | Recipe | Migration/import paths synthesize or resolve a `RecipeItemDefinition` by `originItemUuid` within the recipe's crafting system |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -1957,9 +1957,8 @@ These are transitional and will be removed in a future version once all dependen
 - `systemItemId` (emitted alongside `componentId` in Tool, Ingredient, Result)
 - `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
 - `results` (emitted alongside `resultGroups` in Recipe)
-- `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `sourceItemUuid` in Component)
+- `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `originItemUuid` in Component)
 - `tags` (emitted alongside `itemTags` in CraftingSystem normalization)
-- `sourceUuid` (emitted alongside `sourceItemUuid` in Component normalization)
 - UI convenience aliases (`enableTags`, `enableEssences`, `enableCategories`, `enableMultiStepRecipes`, `advancedOptionsEnabled`)
 
 These transitional aliases exist solely for UI code paths that have not yet been updated.
