@@ -30,11 +30,12 @@ One of "simple", "routedByIngredients", "routedByCheck", "progressive", or "alch
 
 ### getProvider(recipe)
 
-Returns the result-selection provider for an alchemy recipe.
+Returns a recipe's legacy `resultSelection.provider`, or `null` when it has none.
 
-**Returns:** `string`.
-One of "ingredientSet" or "check", or `null` for non-alchemy recipes.
-The routed crafting modes derive their routing basis from the system mode and carry no provider, so `getProvider()` is `null` for them.
+{: .note }
+> The per-recipe result-selection provider is retired.
+> Alchemy routing moved to the system-level alchemy check mode (`system.alchemy.checkMode`), and the routed crafting modes derive their routing basis from the system mode.
+> No live resolution mode carries a `resultSelection.provider`, so this returns `null` for current recipes.
 
 ### validateRecipe(recipe)
 
@@ -62,12 +63,13 @@ Hooks.once('fabricate.ready', () => {
 | `routedByIngredients` | 1+ ingredient sets, 1+ result groups, each `IngredientSet.resultGroupId` references a real result group. The crafting check is optional. |
 | `routedByCheck` | 1+ ingredient sets, 1+ result groups, result group names are unique (case-insensitive) and do not use reserved keywords. The routed crafting check roll formula is required at the system level, surfaced as a system blocker rather than a per-recipe error. |
 | Progressive | Exactly 1 ingredient set, exactly 1 result group, checks enabled, progressive config exists, all result difficulties >= 1 |
+| Alchemy | Exactly 1 ingredient set. Result groups follow the system's `alchemy.checkMode`: `none` needs one success group; `simple` needs a success group plus the reserved failure group (`role: 'failure'`), whose absence is tolerated; `tiered` needs 1+ groups with valid outcome-tier assignment. Both mandatory check modes require an authored roll formula at the system level, surfaced as an `alchemyCheckNoFormula` system blocker: `simple` requires `craftingCheck.simple.rollFormula` and `tiered` requires `craftingCheck.routed.rollFormula`. `none` needs no check. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The routing basis is a property of the mode, not a per-recipe provider.
 `routedByIngredients` routes by `IngredientSet.resultGroupId`, and `routedByCheck` routes by the system's routed crafting-check outcome.
-The unique-name and reserved-keyword rules apply under `routedByCheck` (and the alchemy `check` provider), which route by result group name.
+The unique-name and reserved-keyword rules apply under `routedByCheck` (and alchemy in `tiered` check mode), which route by result group name.
 Reserved keywords cover three families.
 The fail family is `fail`, `failed`, `failure`, `f`.
 The hazard family is `hazard`, `danger`, `complication`, `trap`, `oops`, and it also routes a check outcome to the failure path.
@@ -133,7 +135,8 @@ Hooks.once('fabricate.ready', () => {
 Determines which result groups to create based on the resolution mode and crafting check result.
 This dispatches on the system's resolution mode.
 `routedByIngredients` routes by the chosen ingredient set's `resultGroupId`, and `routedByCheck` routes by the crafting-check outcome.
-Alchemy still dispatches on `recipe.resultSelection.provider`.
+Alchemy dispatches on the system-level `alchemy.checkMode`.
+`none` and a passed `simple` check route to the success group, a failed `simple` check routes to the reserved `role: 'failure'` group (nothing when it is empty or absent), and `tiered` routes by the routed-check outcome exactly like `routedByCheck`.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -148,6 +151,9 @@ Alchemy still dispatches on `recipe.resultSelection.provider`.
 ### validateCheckResult(params)
 
 Validates that a crafting check result has the correct shape for the recipe's mode.
+`routedByCheck` requires a non-empty outcome to route by.
+Alchemy requires a non-empty outcome only when the system's `alchemy.checkMode` is `tiered`; `none` and `simple` always validate.
+Progressive requires a finite numeric value.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|

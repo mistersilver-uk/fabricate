@@ -126,17 +126,33 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
 | `enabled` | `boolean` | `false` | Whether the optional simple-mode crafting check is active. This toggle gates the simple pass/fail check in `simple` mode only. |
-| `simple.rollFormula` | `string` | `""` | Roll formula for the simple pass/fail check (`simple` and `alchemy` modes). The check is usable only when this is set. |
+| `simple.rollFormula` | `string` | `""` | Roll formula for the simple pass/fail check (`simple` mode, and `alchemy` when `alchemy.checkMode` is `"simple"`). The check is usable only when this is set. |
 | `simple.dc` | `number` | `15` | Static difficulty class for the simple check. Roll total must meet or exceed it (or strictly exceed it when `simple.thresholdMode` is `"exceed"`). |
 | `simple.dcMode` | `string` | `"static"` | `"static"` uses `simple.dc`. `"dynamic"` computes the DC from the macro at `simple.macroUuid`. |
 | `simple.macroUuid` | `string\|null` | `null` | UUID of the dynamic-DC macro, used only when `simple.dcMode` is `"dynamic"`. The macro computes the DC. It never resolves the check outcome. |
-| `routed.rollFormula` | `string` | `""` | Roll formula for the routed crafting check. Required in `routedByCheck` mode and optional in `routedByIngredients` mode. The check is usable only when this is set. |
+| `routed.rollFormula` | `string` | `""` | Roll formula for the routed crafting check. Required in `routedByCheck` mode and in `alchemy` when `alchemy.checkMode` is `"tiered"`, and optional in `routedByIngredients` mode. The check is usable only when this is set. |
 | `progressive.rollFormula` | `string` | `""` | Roll formula for the progressive check (`progressive` mode). The check is usable only when this is set. |
 | `consumption.consumeIngredientsOnFail` | `boolean` | `true` | Remove ingredients from inventory when the check fails. |
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools when the crafting check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The `alchemy` field is present only when `resolutionMode` is `"alchemy"`.
+It carries the alchemy check mode and the discovery/consumption options.
+
+`alchemy` shape:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Type | Default | Description |
+|:------|:-----|:--------|:------------|
+| `checkMode` | `string` | `"none"` | How a matched brew is resolved. `"none"` runs no check and always succeeds. `"simple"` runs a mandatory pass/fail check from `craftingCheck.simple` (pass produces the success group, fail produces the reserved `role: 'failure'` group). `"tiered"` runs a mandatory routed check from `craftingCheck.routed` and routes by outcome tier, exactly like `routedByCheck`. |
+| `learnOnCraft` | `boolean` | `false` | Mark a recipe as learned for the crafting character when a submission matches it. A match learns the recipe whether or not the check passed. |
+| `consumeOnFail` | `boolean` | `true` | Consume the submitted components on a no-match fizzle and on a matched Simple-check failure. |
+| `showAttemptHistoryToPlayers` | `boolean` | `true` | Remember a character's fizzled combinations so the workbench can mark them as a dead end rather than an untried mix. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -166,6 +182,23 @@ Hooks.once('fabricate.ready', async () => {
   await mgr.updateSystem('alchemy-system-id', {
     craftingCheck: {
       enabled: true,
+      simple: {
+        rollFormula: '1d20 + @abilities.int.mod',
+        dc: 15
+      }
+    }
+  });
+});
+```
+
+**Example: alchemy Simple check.** Give an alchemy system a mandatory pass/fail check so a matched brew rolls, and produces the reserved failure result group on a fail:
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  await mgr.updateSystem('alchemy-system-id', {
+    alchemy: { checkMode: 'simple' },
+    craftingCheck: {
       simple: {
         rollFormula: '1d20 + @abilities.int.mod',
         dc: 15

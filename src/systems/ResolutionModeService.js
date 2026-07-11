@@ -24,9 +24,10 @@ import {
  *    `ResultGroup` (by explicit tier assignment, then by name). The crafting
  *    check is REQUIRED.
  *
- * `resultSelection.provider` survives ONLY for alchemy, which keeps a genuine
- * per-recipe routing basis (`_resolveAlchemyResultGroups`). The routed crafting
- * modes ignore `resultSelection` entirely.
+ * `resultSelection.provider` is fully RETIRED: alchemy now routes on the
+ * SYSTEM-level `alchemy.checkMode` (`none` | `simple` | `tiered`) in
+ * `_resolveAlchemyResultGroups`, and the routed crafting modes derive their basis
+ * from the system mode. No live mode reads `resultSelection`.
  *
  * Legacy `mapped`/`tiered` are NOT live modes. They are accepted only as
  * one-time inputs to the 1.4.0 migration (`migrateLegacyResolutionModes`), and
@@ -78,8 +79,8 @@ export class ResolutionModeService {
   // ---------------------------------------------------------------------------
   // Routed name-normalization + reserved-keyword helpers. Shared with Recipe.js
   // via ../utils/routedOutcomeKeywords.js so runtime resolution and authoring-time
-  // validation use one source of truth. They apply to `routedByCheck` mode and the
-  // alchemy `check` provider (both key on the crafting-check outcome name).
+  // validation use one source of truth. They apply to `routedByCheck` mode and
+  // alchemy `tiered` check mode (both key on the crafting-check outcome).
   // ---------------------------------------------------------------------------
 
   _normalizeName(name) {
@@ -241,13 +242,15 @@ export class ResolutionModeService {
     }
 
     if (mode === 'alchemy') {
-      // Alchemy recipes cannot have explicit multi-step configuration
+      // Alchemy recipes always have EXACTLY one ingredient set and are never routed
+      // by ingredients. Result-group cardinality is per `alchemy.checkMode`; the
+      // retired per-recipe `resultSelection.provider` is no longer validated.
       const setsTop = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       const groupsTop = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
       if (requireComplete && setsTop.length === 0)
         errors.push('Alchemy recipe must have at least 1 ingredient set');
-      if (requireComplete && groupsTop.length === 0)
-        errors.push('Alchemy recipe must have at least 1 result group');
+      if (requireComplete && setsTop.length > 1)
+        errors.push('Alchemy recipe must have exactly 1 ingredient set');
       // No explicit steps allowed
       const explicitSteps =
         typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
@@ -255,17 +258,26 @@ export class ResolutionModeService {
         explicitSteps.length > 1 ||
         (explicitSteps.length === 1 && explicitSteps[0]?.id !== 'implicit-step');
       if (hasExplicitSteps) errors.push('Alchemy recipe must not have explicit steps');
-      const provider = this.getProvider(recipe);
-      if (!provider) {
-        // Missing provider is a completeness gap (drafting shell); waive it unless
-        // a complete recipe is required. An invalid provider VALUE still errors below.
-        if (requireComplete) errors.push('Alchemy recipe requires resultSelection.provider');
-      } else if (!['ingredientSet', 'check'].includes(provider)) {
-        errors.push('Invalid result selection provider: ' + provider);
+
+      const checkMode = system?.alchemy?.checkMode || 'none';
+      if (checkMode === 'tiered') {
+        // Tiered routes exactly like `routedByCheck`: at least one result group with
+        // reserved/duplicate group-name protection (name-uniqueness moved here from
+        // the model for Tiered only). Tier-assignment completeness is a system-level
+        // warning surfaced by `systemValidation`, not a per-recipe blocker.
+        if (requireComplete && groupsTop.length === 0)
+          errors.push('Alchemy recipe must have at least 1 result group');
+        this._validateRoutedGroupNames(groupsTop, { name: recipe.name, id: recipe.id }, errors);
+      } else {
+        // None / Simple: exactly one SUCCESS group. Simple additionally carries a
+        // reserved `role: 'failure'` group, but its ABSENCE is TOLERATED (a
+        // settings-only None→Simple flip runs no recipe migration).
+        const successGroups = groupsTop.filter((group) => group?.role !== 'failure');
+        if (requireComplete && successGroups.length === 0)
+          errors.push('Alchemy recipe must have at least 1 result group');
+        if (requireComplete && successGroups.length > 1)
+          errors.push('Alchemy recipe must have exactly 1 result group');
       }
-      // The `check` provider is structurally valid regardless of the system's
-      // check configuration; a usable routed crafting check is a system-level
-      // concern surfaced by `systemValidation`, not a per-recipe error.
     }
 
     return {
@@ -435,7 +447,7 @@ export class ResolutionModeService {
       return this._resolveProgressiveResultGroups({ checkResult, system, allGroups });
     }
     if (mode === 'alchemy') {
-      return this._resolveAlchemyResultGroups({ recipe, ingredientSet, checkResult, allGroups });
+      return this._resolveAlchemyResultGroups({ recipe, checkResult, allGroups });
     }
 
     return {
@@ -445,9 +457,9 @@ export class ResolutionModeService {
   }
 
   /**
-   * Route a normalized check `outcome` to a result group by NAME, shared by
-   * `routedByCheck` mode and the alchemy `check` provider (both key on the
-   * crafting-check outcome).
+   * Route a normalized check `outcome` to a result group by NAME, used by
+   * `routedByCheck` mode (and, via `_resolveRoutedByCheckResultGroups`, by alchemy
+   * `tiered` mode — both key on the crafting-check outcome).
    * Order: fail keyword → miss keyword → exact name match → misconfiguration.
    * @param {string|null} outcome raw outcome string (already coerced to string|null)
    * @param {Array} allGroups candidate result groups
@@ -576,24 +588,38 @@ export class ResolutionModeService {
   }
 
   /**
-   * Alchemy mode resolution: `ingredientSet` routes by mapping; `check` routes by
-   * the crafting-check outcome name (shared with routed via `_routeByOutcomeName`).
+   * Alchemy mode resolution, dispatched on the SYSTEM-level `alchemy.checkMode`
+   * (the retired per-recipe `resultSelection.provider` is gone):
+   *  - `none` / `simple`-PASS → the single success group (the first group whose
+   *    `role` is not `'failure'`);
+   *  - `simple`-FAIL → the reserved `role: 'failure'` group when present, else
+   *    NOTHING (a settings-only None→Simple flip runs no recipe migration, so the
+   *    failure group may be absent — produce nothing, never crash);
+   *  - `tiered` → identical to `routedByCheck`: route the routed-check outcome to a
+   *    result group via tier assignment (`checkOutcomeIds`).
+   *
+   * A simple check FAILURE is signalled by `checkResult.success === false`; the
+   * success path (and every listing-builder projection, which passes
+   * `checkResult: null`) resolves to the success group.
    * @returns {{groups: Array, meta: object}}
    */
-  _resolveAlchemyResultGroups({ recipe, ingredientSet, checkResult, allGroups }) {
-    const provider = this.getProvider(recipe);
-    if (provider === 'ingredientSet') {
-      const mappedId = ingredientSet?.resultGroupId || null;
-      if (mappedId) {
-        return { groups: allGroups.filter((g) => g.id === mappedId), meta: {} };
-      }
-      return { groups: allGroups.slice(0, 1), meta: {} };
+  _resolveAlchemyResultGroups({ recipe, checkResult, allGroups }) {
+    const system = this.getSystem(recipe);
+    const checkMode = system?.alchemy?.checkMode || 'none';
+    if (checkMode === 'tiered') {
+      return this._resolveRoutedByCheckResultGroups({ checkResult, system, allGroups });
     }
-    if (provider === 'check') {
-      const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);
-      return this._routeByOutcomeName(outcome, allGroups);
+    if (checkMode === 'simple' && checkResult?.success === false) {
+      const failureGroup = allGroups.find((group) => group?.role === 'failure');
+      return {
+        groups: failureGroup ? [failureGroup] : [],
+        meta: { disposition: 'fail' },
+      };
     }
-    return { groups: allGroups.slice(0, 1), meta: {} };
+    // None, or a passed Simple check: the single success group (never the reserved
+    // failure group).
+    const successGroups = allGroups.filter((group) => group?.role !== 'failure');
+    return { groups: successGroups.slice(0, 1), meta: {} };
   }
 
   /**
@@ -635,6 +661,15 @@ export class ResolutionModeService {
       // `routedByIngredients` routes by the chosen ingredient set, so it never
       // requires a check outcome.
       return !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
+    }
+    if (mode === 'alchemy') {
+      // Tiered alchemy routes exactly like `routedByCheck` (it needs a non-empty
+      // outcome to route by); None/Simple never route by outcome, so they pass.
+      const system = this.getSystem(recipe);
+      if (system?.alchemy?.checkMode === 'tiered') {
+        return !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
+      }
+      return true;
     }
     if (mode === 'progressive') {
       return Number.isFinite(Number(checkResult?.value));

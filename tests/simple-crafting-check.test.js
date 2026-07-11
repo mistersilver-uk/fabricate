@@ -48,12 +48,14 @@ function makeEngine({
   enabled = true,
   features = {},
   craftingCheck = {},
+  alchemy = null,
 } = {}) {
   const system = {
     id: 'sys-1',
     resolutionMode,
     features,
     craftingCheck: { enabled, simple, ...craftingCheck },
+    ...(alchemy ? { alchemy } : {}),
   };
   const systemManager = { getSystem: () => system };
   const resolutionService = { getMode: () => system.resolutionMode };
@@ -286,18 +288,59 @@ test('a non-matching forced-outcome trigger leaves the comparison in charge', as
   assert.equal(result.success, false, '13 < 15 and no forced outcome');
 });
 
-// ── Gating: simple vs alchemy vs disabled ───────────────────────────────────
+// ── Gating: alchemy checkMode (none / simple) ───────────────────────────────
+// Alchemy check-ness is driven by the SYSTEM-level alchemy.checkMode, NOT the
+// generic craftingCheck.enabled toggle.
 
-test('alchemy mode runs the simple check even when the enabled flag is off', async () => {
+test('alchemy checkMode=none never runs a check (auto-success), ignoring a stray formula + enabled', async () => {
+  const { engine } = makeEngine({
+    simple: defaultSimple({ dc: 15 }),
+    resolutionMode: 'alchemy',
+    enabled: true,
+    alchemy: { checkMode: 'none' },
+  });
+  stubThrowingRoll();
+  const result = await run(engine);
+  assert.equal(result.success, true, 'None mode always succeeds a matched brew');
+  assert.equal(result.data.dc, undefined, 'the simple check was not evaluated in None mode');
+});
+
+test('alchemy checkMode=simple runs the shared simple pass/fail check UNCONDITIONALLY (ungated by enabled)', async () => {
+  const { engine } = makeEngine({
+    simple: defaultSimple({ dc: 15 }),
+    resolutionMode: 'alchemy',
+    enabled: false, // checksEnabled is IGNORED for alchemy simple
+    alchemy: { checkMode: 'simple' },
+  });
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  const result = await run(engine);
+  assert.equal(result.success, true, '18 >= 15 passes');
+  assert.equal(result.data.dc, 15, 'the mandatory simple check ran for alchemy simple mode');
+});
+
+test('alchemy checkMode=simple with a rolled failure reports failure (not auto-success)', async () => {
   const { engine } = makeEngine({
     simple: defaultSimple({ dc: 15 }),
     resolutionMode: 'alchemy',
     enabled: false,
+    alchemy: { checkMode: 'simple' },
   });
-  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  stubRoll(10, [{ number: 1, faces: 20, total: 10 }]);
   const result = await run(engine);
-  assert.equal(result.success, true);
-  assert.equal(result.data.dc, 15, 'the simple check ran');
+  assert.equal(result.success, false, '10 < 15 fails');
+});
+
+test('alchemy checkMode=simple with NO roll formula is a misconfiguration (aborts before mutation)', async () => {
+  const { engine } = makeEngine({
+    simple: defaultSimple({ rollFormula: '' }),
+    resolutionMode: 'alchemy',
+    enabled: true,
+    alchemy: { checkMode: 'simple' },
+  });
+  stubThrowingRoll();
+  const result = await run(engine);
+  assert.equal(result.success, false);
+  assert.equal(result.misconfigured, true, 'a mandatory simple check with no formula is misconfigured');
 });
 
 test('simple mode with the check disabled does not run (no roll, auto-success)', async () => {

@@ -157,40 +157,35 @@ test('alchemy → simple drops the provider when clearing a 1×1 recipe', () => 
   assert.equal(result.recipe.resultSelection, null);
 });
 
-// --- Into alchemy: seeds the provider (pinned from a routed source) ----------
+// --- Into alchemy: NEVER seeds a provider (the provider is retired) ----------
+// Migrating into alchemy clears any stale resultSelection and collapses a
+// multi-ingredient-set recipe to its first set; the system-level alchemy.checkMode
+// is seeded separately (defaults to none).
 
-test('routedByIngredients → alchemy seeds provider=ingredientSet', () => {
+for (const from of ['routedByIngredients', 'routedByCheck', 'simple', 'progressive']) {
+  test(`${from} → alchemy seeds NO provider on a 1×1 recipe`, () => {
+    const result = migrateRecipeForModeChange(oneByOne(), from, 'alchemy', SYSTEM_NO_CHECK);
+    assert.notEqual(result.outcome, 'delete');
+    assert.equal(result.recipe.resultSelection ?? null, null, 'no provider is seeded for alchemy');
+  });
+}
+
+test('routedByCheck → alchemy clears a stale resultSelection (no provider retained)', () => {
   const result = migrateRecipeForModeChange(
-    oneByOne(),
-    'routedByIngredients',
+    oneByOne({ resultSelection: { provider: 'check' } }),
+    'routedByCheck',
     'alchemy',
     SYSTEM_NO_CHECK
   );
-  assert.equal(result.outcome, 'seeded');
-  assert.equal(result.recipe.resultSelection.provider, 'ingredientSet');
+  assert.equal(result.outcome, 'cleared');
+  assert.equal(result.recipe.resultSelection, null);
 });
 
-test('routedByCheck → alchemy seeds provider=check', () => {
-  const result = migrateRecipeForModeChange(oneByOne(), 'routedByCheck', 'alchemy', SYSTEM_NO_CHECK);
-  assert.equal(result.outcome, 'seeded');
-  assert.equal(result.recipe.resultSelection.provider, 'check');
-});
-
-test('simple → alchemy seeds ingredientSet without a usable simple check', () => {
-  const result = migrateRecipeForModeChange(oneByOne(), 'simple', 'alchemy', SYSTEM_NO_CHECK);
-  assert.equal(result.outcome, 'seeded');
-  assert.equal(result.recipe.resultSelection.provider, 'ingredientSet');
-});
-
-test('progressive → alchemy seeds check when the system has a usable simple check', () => {
-  const result = migrateRecipeForModeChange(
-    oneByOne(),
-    'progressive',
-    'alchemy',
-    SYSTEM_WITH_CHECK
-  );
-  assert.equal(result.outcome, 'seeded');
-  assert.equal(result.recipe.resultSelection.provider, 'check');
+test('simple → alchemy collapses a multi-ingredient-set recipe to its first set', () => {
+  const result = migrateRecipeForModeChange(multiGroup(), 'simple', 'alchemy', SYSTEM_NO_CHECK);
+  assert.notEqual(result.outcome, 'delete');
+  assert.equal(result.recipe.ingredientSets.length, 1, 'alchemy requires exactly one ingredient set');
+  assert.equal(result.recipe.ingredientSets[0].id, 's-1');
 });
 
 // --- Delete-only structural cases (into alchemy) ----------------------------
@@ -202,10 +197,10 @@ for (const from of ROUTED_MODES) {
     assert.equal(result.recipe, null);
   });
 
-  test(`${from} → alchemy carries a single-step recipe (seeded)`, () => {
+  test(`${from} → alchemy carries a single-step recipe without a provider`, () => {
     const result = migrateRecipeForModeChange(oneByOne(), from, 'alchemy', SYSTEM_NO_CHECK);
     assert.notEqual(result.outcome, 'delete');
-    assert.ok(result.recipe.resultSelection.provider);
+    assert.equal(result.recipe.resultSelection ?? null, null);
   });
 }
 
@@ -246,10 +241,10 @@ test('re-running an RI↔RC carry with no reconcile pending is idempotent in sha
   assert.deepEqual(second.recipe, first.recipe);
 });
 
-test('seeding an alchemy provider does not clobber an existing valid provider', () => {
+test('migrating into alchemy clears an existing resultSelection provider (retired)', () => {
   const recipe = oneByOne({ resultSelection: { provider: 'check' } });
   const result = migrateRecipeForModeChange(recipe, 'progressive', 'alchemy', SYSTEM_NO_CHECK);
-  assert.equal(result.recipe.resultSelection.provider, 'check');
+  assert.equal(result.recipe.resultSelection, null);
 });
 
 // --- classifyModeChange does not mutate -------------------------------------
@@ -258,7 +253,8 @@ test('classifyModeChange reports the outcome without mutating the input', () => 
   const recipe = oneByOne();
   const snapshot = JSON.stringify(recipe);
   const result = classifyModeChange(recipe, 'simple', 'alchemy', SYSTEM_NO_CHECK);
-  assert.equal(result.outcome, 'seeded');
+  // A 1×1 recipe with no resultSelection needs no reshaping into alchemy.
+  assert.equal(result.outcome, 'lossless');
   assert.equal(JSON.stringify(recipe), snapshot, 'input must be unchanged');
 });
 

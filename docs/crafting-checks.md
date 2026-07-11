@@ -10,8 +10,10 @@ Crafting checks let you gate recipe outcomes on a player roll.
 
 When a crafting system uses the Routed by check resolution mode, or the Progressive resolution mode, a check is required to determine which result the crafter receives.
 The check is configured at the system level on the **Crafting check** page in the Crafting Admin panel.
-The page's shape follows the system's resolution mode: simple, alchemy, and Routed by ingredients author a pass or fail check, Routed by check authors named outcome tiers, and progressive rolls for a numeric value.
-The pass or fail check is required in alchemy mode and optional in simple and Routed by ingredients modes.
+The page's shape follows the system's resolution mode: simple and Routed by ingredients author a pass or fail check, Routed by check authors named outcome tiers, and progressive rolls for a numeric value.
+Alchemy follows its own Alchemy check setting: No check has nothing to author, Simple check authors a pass or fail check, and Tiered check authors named outcome tiers.
+The pass or fail check is optional in simple and Routed by ingredients modes.
+In Alchemy mode a check is required whenever the Alchemy check is Simple or Tiered, and there is no check when it is No check.
 The outcome-tier check is required in Routed by check mode.
 Each attempt runs the check automatically, before any materials are consumed.
 

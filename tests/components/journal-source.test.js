@@ -28,11 +28,11 @@ function resolveLangKey(key) {
 }
 
 describe('FabricateAppRoot Journal wiring', () => {
-  it('renders JournalView on the journal tab and keeps the placeholder elsewhere', () => {
+  it('renders JournalView on the journal tab (every tab now routes to a real view)', () => {
     assert.ok(rootSource.includes("import JournalView from './journal/JournalView.svelte'"), 'imports JournalView');
     assert.ok(rootSource.includes("tab.id === 'journal'"), 'branches on the journal tab');
     assert.ok(rootSource.includes('<JournalView {services} />'), 'renders JournalView with services');
-    assert.ok(rootSource.includes('fabricate-app-placeholder'), 'other tabs keep the placeholder');
+    assert.ok(!rootSource.includes('fabricate-app-placeholder'), 'the coming-soon placeholder is gone now the alchemy tab is implemented');
   });
 
   it('feeds an active-run count badge from the shared store navCount', () => {

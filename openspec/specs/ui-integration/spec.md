@@ -289,6 +289,9 @@ It is no longer on the System Overview page, and it authors the flat `visibility
 
 - A single radio-card selector (the shared `ResolutionModeCard` primitive) offers exactly four mutually-exclusive options: `global`, `restricted`, `item`, and `knowledge`.
 Each option carries a label and description; exactly one mode is active for the whole system.
+- **Alchemy relabel (reveal-not-gate).** When `resolutionMode === "alchemy"` the card keys a `$derived` option set that renders the `restricted` option as "Manual (GM-granted access)" and rewords the item/knowledge/global descriptions from *gating* to *reveal* language (per `recipe-visibility`), because brewing is never gated by visibility.
+A non-alchemy system renders "Restricted" with gating language.
+The STORED enum value is unchanged in both (`restricted` stays `restricted` — no new enum value and no migration), so the Access tab (shown for `visibilityMode === "restricted"`) stays reachable to author the per-recipe grant.
 - Selecting an option live-applies it through `setVisibilityMode(mode)`, which persists `visibilityMode` and refreshes; the change is non-destructive (migrates no recipes) and there is no separate save action.
 - A `CraftingEffectPanel` beside the selector summarizes the active mode's effect (from the projected `craftingEffect(visibilityMode)` matrix): whether the Access tab, Books & Scrolls, limited-use, and learning-limits surfaces are shown.
 - Per-recipe-item use and learn caps are NOT authored here — each recipe item's caps live on its own Books & Scrolls item page (see Books & Scrolls Surface).
@@ -822,9 +825,26 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
   - A step with exactly one result group needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
 
+### Alchemy check-mode selector (issue 554)
+
+- At the **top of the Checks tab's Crafting sub-tab**, shown only when `resolutionMode === "alchemy"`: a native check-editor radio group (`manager-checks-type-options`) for `alchemy.checkMode` (`none` / `simple` / `tiered`), rendered ABOVE the per-mode editor and persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
+Selecting a mode swaps the editor below it live.
+- The selector is NOT rendered on the Crafting Settings page; that page keeps only the Recipe resolution, Recipe visibility, and (when salvage is on) Salvage resolution cards.
+
+### Checks tab per-mode behaviour (issue 554)
+
+- alchemy + `simple` → the simple pass/fail editor rendered below the selector; alchemy + `tiered` → the routed editor below the selector; BOTH cannot be disabled (the Active card shows the requiredHint, ungated by `checksEnabled`).
+- alchemy + `none` → a read-only "resolves without a check" notice below the selector (no editor, no Active card, a distinct "no check" hint that points back to the selector above — NOT the requiredHint).
+- The Crafting checks help copy describes none/simple/tiered.
+
 ### Alchemy Recipe UI (GM Editor)
 
-- Provides the `resultSelection.provider` selector (`ingredientSet` / `check`) — alchemy is the only mode that still routes via a per-recipe provider.
+- Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
+Ingredient-set vs result-group rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
+  - **None** → single ingredient set + single result set.
+  - **Simple** → a labeled "On success" result set + a reserved, static-labeled ("On a failed check", warning/danger accent), undeletable, empty-by-default failure result set (synthesized in the derived view, persisted on first edit; `Recipe.validate` tolerates its absence).
+No "add result set" beyond the two.
+  - **Tiered** → result groups with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
 - Save remains blocked until all collisions are resolved.
 
@@ -1058,42 +1078,60 @@ Each
 
 ### Alchemy Tab
 
+The player Alchemy tab is an IMPLEMENTED route (it replaced the earlier `{:else}` "Coming soon" placeholder in `FabricateAppRoot.svelte`).
+Its content mounts inside `.fabricate-app-content` — the shell's 84px nav rail is NOT part of this grid — so the content is a **three-column** layout `known . workbench . inventory` mirroring the Crafting/Gathering views.
+The sides are compressible (`minmax(230px,280px)` each) with a floored, growable centre (`minmax(340px,1fr)`) so the 340px workbench floor coexists with the 1024px minimum window; it stacks at the `@container (max-width:900px)` breakpoint with the **workbench leading** the stacked order.
+It uses `--fab-*` design tokens only (no hex — see the theme-colour contract).
+
+The additional component-sources bar (`ComponentSourcesBar`) renders in the shared top bar on the alchemy tab (`ActorSelectTopBar` `showSourcesBar` includes `activeTab === "alchemy"`), so a player can pull components from other actors; the discipline block (system name + Switch) sits ABOVE the "Known recipes" heading, stacked (name on its own line, Switch below).
+
+The a11y contract: the status pill is `aria-live="polite"`; the bench chip body is a focusable `role="button"` (Enter/Space add one; Shift+Enter removes one), the chip `−` (remove-one) and `×` (remove-all) are real focusable `<button>`s that `stopPropagation` so they never also add, and the palette `+` add is a real focusable `<button>` (drag is mouse-only, so the keyboard add is the required parity affordance); unavailable inventory rows carry the `disabled` attribute; the drop zone has an accessible name/role plus a non-color dragover cue (a thicker dashed border); chooser cards and "Switch discipline" are real buttons; on Switch, focus moves to the chooser heading; the ready-state `brewpulse` animation honors `prefers-reduced-motion`.
+
 #### Alchemy System Selector
 
-- Shown only when multiple alchemy-mode systems exist.
-- Auto-selects if exactly one alchemy system is available.
-- Persisted in client settings.
+- Shown only when multiple alchemy-mode systems exist; a chooser card per system carries `N known . M total` and an Enter action, and a "Switch discipline" button (shown only with more than one system) returns to the chooser and resets the per-selection workbench state.
+- `N known` counts REVEALED recipes (per `recipe-visibility`), threading `componentSourceActors` into the summary so it matches the panel for item/Manual modes, not learned-only.
+- Auto-enters if exactly one alchemy system is available.
+- Persisted in the `fabricate.lastAlchemySystem` client setting.
 
 #### Component Palette
 
 - Grid of all components in selected alchemy system owned by component source actor(s).
-- Shows: image, name, available quantity (inventory minus workbench count).
+- A name-search input filters the list, with a distinct filtered-empty "no matches" state separate from the onboarding "no components owned" state.
+- Shows: image, name, available quantity (inventory minus workbench count), and — when the system has essences enabled and the component carries essences — the component's essence icons + per-unit counts.
+- A visible per-row `fa-grip-*` drag handle (`aria-hidden`, inside the row button) signals draggability; drag stays mouse-only while the row's `+` add stays keyboard-reachable.
 - Zero-quantity components remain visible but visually distinguished.
 - Left-click: add one to workbench.
-- Right-click: remove one from workbench (only if component is in workbench).
 - Drag-drop from external sources remains supported.
 
 #### The Workbench
 
-- Session-scoped working set displayed as compact grid with quantity badges (e.g., "Iron Ore x3").
+- Session-scoped working set displayed as compact grid with quantity badges (e.g., "Iron Ore x3"); a placed component's essence icons + counts show on its chip.
 - Each unique component appears once; adding increments the badge count.
-- Supports: add from palette, remove (right-click or direct action), clear all, submit.
+- Chip interactions: the chip body adds one (left-click / Enter / Space); a right-click, Shift+Enter, or the focus/hover `−` control removes one; the `×` control removes all (delete the key).
+The `−` and `×` `stopPropagation` so they never also add.
+- Supports: add from palette, add/remove/remove-all on a chip, clear all, submit.
 - Submit triggers signature matching per existing Signature Resolution rules in `004`.
+- The Produces preview surfaces the result component's essence icons + counts when essences are enabled.
+- Drives the **five-mode status model** (`empty` / `assembling` / `ready` / `untried` / `no-reaction`, per `resolution-modes`) governing the status pill, Produces panel, and Brew button; client mode is advisory and fails safe to `untried` for any non-concrete signature (the engine is authoritative on brew).
+- A brew-in-flight busy/disabled guard on Brew prevents double-submit (mirrors CraftingView's `busy` guard).
 
 #### Discovered Recipes Panel
 
-- Always visible on the right side, with empty state when no recipes have been discovered.
-- Shows recipes from selected alchemy system where crafting actor has entry in `learnedRecipes`.
-- GM sees all recipes in panel (consistent with GM-sees-all rule).
+- Always visible on the left, with an onboarding zero-revealed empty state when nothing has been revealed and a distinct filtered "no matches" state when a search hides every revealed recipe.
+- Shows recipes the viewer has **REVEALED** (per `recipe-visibility` — learned-by-brew ∪ the mode's reveal source), not learned-only (GM sees all, consistent with GM-sees-all).
 - Searchable by recipe name.
-- "Craftable only" filter: shows only recipes whose requirements can be fully satisfied by palette quantities.
-- Auto-fill action per recipe: populates the workbench from the recipe's ingredient requirements (per Auto-Fill algorithm in `006`).
+- Selecting a revealed recipe **auto-loads** its signature onto the bench (a selection side effect, not a per-recipe button), scoped to recipes reducible to a concrete plain-component multiset.
+- The "Craftable only" filter is DEFERRED this iteration.
+- The non-revealed-recipe **count** (`valid − revealed`, never names/results/signatures) is shown in a footer.
 - Visibility and learning semantics defined in `006`.
 
-#### Active Runs and History
+#### Active Runs and History (cross-reference reconciliation)
 
-- Filtered to alchemy systems only.
-- The unified Journal screen (see *Journal App*) also surfaces these runs alongside crafting, gathering, and salvage runs; an alchemy run is redacted there for a viewer who has not discovered its recipe.
+- The alchemy tab does NOT host runs or history.
+Run monitoring remains a Journal concern (see *Journal App*); the tab's internal fizzle dead-end memory is not run history.
+- The unified Journal screen surfaces alchemy runs alongside crafting, gathering, and salvage runs; an alchemy run is redacted there for a viewer who has not discovered its recipe.
+- Forward-compat: the active station-tool chip stays in `ActorSelectTopBar` this iteration (the alchemy tab has no header/context bar yet); it migrates to an alchemy header bar if/when one is added.
 
 #### Excluded from Alchemy Tab
 
@@ -1105,7 +1143,9 @@ Each
 ### Alchemy Attempt Feedback
 
 - Must not leak hidden recipe metadata on invalid combinations or failed attempts.
-- No-signature attempts are shown as failed attempts with specific feedback and ingredient consumption.
+- An untried bench and a remembered-fizzle bench are distinguished ONLY by the per-character dead-end memory: an untried set reads `untried` (no confirmation that a reaction exists), and only a remembered fizzle reads `no-reaction`.
+A fizzle brew runs no check and shows no roll animation.
+- No-signature attempts are shown as failed attempts with specific feedback and ingredient consumption per `alchemy.consumeOnFail`.
 - If a matched attempt cannot route to a valid result group, show a misconfiguration error state (GM fix required) rather than a normal player-failure outcome.
 
 ### Learn Flow

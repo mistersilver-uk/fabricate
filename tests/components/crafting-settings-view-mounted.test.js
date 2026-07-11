@@ -134,6 +134,41 @@ describe('CraftingSettingsView (mounted)', () => {
     );
   });
 
+  it('alchemy: relabels the restricted option as "Manual (GM-granted access)" with reveal wording', async () => {
+    const root = await harness.mount({
+      selectedSystem: makeSystem({ resolutionMode: 'alchemy', visibilityMode: 'restricted' })
+    });
+    const restricted = root.querySelector('[data-crafting-visibility-mode-option="restricted"]');
+    assert.ok(restricted, 'the restricted option still exists (stored value unchanged)');
+    const label = restricted.querySelector('.manager-resolution-option-title, .manager-resolution-option-label')
+      ?.textContent ?? restricted.textContent;
+    assert.ok(label.includes('Manual'), 'the restricted option is labeled Manual for alchemy');
+    assert.ok(!label.includes('Restricted'), 'the non-alchemy "Restricted" label is not shown');
+
+    const html = root.querySelector('[data-crafting-visibility-mode]').innerHTML;
+    assert.ok(html.includes('reveal') || html.includes('Access tab'), 'reveal wording is used, not gating');
+  });
+
+  it('alchemy: selecting Manual still stores the `restricted` value (no enum change)', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      selectedSystem: makeSystem({ resolutionMode: 'alchemy', visibilityMode: 'knowledge' }),
+      onSetVisibilityMode: (mode) => calls.push(mode)
+    });
+    selectRadio(root, 'data-crafting-visibility-mode-option', 'restricted');
+    await flushRender();
+    assert.deepEqual(calls, ['restricted'], 'the stored enum value stays restricted (Access tab stays reachable)');
+  });
+
+  it('non-alchemy: keeps the "Restricted" label and gating language', async () => {
+    const root = await harness.mount({
+      selectedSystem: makeSystem({ resolutionMode: 'simple', visibilityMode: 'restricted' })
+    });
+    const restricted = root.querySelector('[data-crafting-visibility-mode-option="restricted"]');
+    assert.ok(restricted.textContent.includes('Restricted'), 'non-alchemy shows Restricted');
+    assert.ok(!restricted.textContent.includes('Manual'), 'non-alchemy does not show Manual');
+  });
+
   it('shows the salvage card only when the salvage feature is enabled', async () => {
     const withSalvage = await harness.mount({ selectedSystem: makeSystem({ features: { salvage: true } }) });
     assert.ok(withSalvage.querySelector('[data-crafting-salvage-resolution-mode]'), 'salvage card shown');

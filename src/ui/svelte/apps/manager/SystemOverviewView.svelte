@@ -72,6 +72,7 @@
     progressiveNoCheck: ['IssueProgressiveNoCheck', 'Progressive mode requires a configured progressive crafting check.'],
     progressiveNoDifficulty: ['IssueProgressiveNoDifficulty', 'Progressive mode requires at least one component with a difficulty of 1 or more.'],
     multiStepInAlchemy: ['IssueMultiStepInAlchemy', 'Multi-step recipes cannot be used while the system is in alchemy mode.'],
+    alchemyCheckNoFormula: ['IssueAlchemyCheckNoFormula', 'The alchemy check mode is Simple or Tiered but no crafting check roll formula is configured; no brew can resolve until one is set.'],
     alchemySignatureCollision: ['IssueAlchemySignatureCollision', 'Two recipes share an ingredient signature, so alchemy attempts are ambiguous.']
   };
 

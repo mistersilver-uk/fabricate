@@ -46,10 +46,18 @@ describe('FabricateAppRoot shell', () => {
     );
   });
 
-  it('shows a "Coming soon" hint in the remaining tab placeholder', () => {
+  it('routes the alchemy tab to AlchemyView (no more coming-soon placeholder)', () => {
     assert.ok(
-      rootSource.includes('FABRICATE.App.ComingSoon'),
-      'placeholder should localize a coming-soon hint'
+      rootSource.includes("import AlchemyView from './alchemy/AlchemyView.svelte'"),
+      'the shell should import AlchemyView'
+    );
+    assert.ok(
+      /\{:else if tab\.id === 'alchemy'\}[\s\S]*<AlchemyView \{services\} \/>/.test(rootSource),
+      'the alchemy tab should render AlchemyView'
+    );
+    assert.ok(
+      !rootSource.includes('FABRICATE.App.ComingSoon'),
+      'the coming-soon placeholder should be gone now every tab is implemented'
     );
   });
 

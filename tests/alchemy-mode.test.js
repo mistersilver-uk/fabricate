@@ -87,7 +87,7 @@ function buildAlchemySystem(overrides = {}) {
   return {
     id: 'alchemy-sys',
     resolutionMode: 'alchemy',
-    alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false },
+    alchemy: { checkMode: 'none', learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false },
     recipeVisibility: { listMode: 'global' },
     craftingCheck: { enabled: false, macroUuid: null, outcomes: [] },
     features: { multiStepRecipes: false },
@@ -163,9 +163,20 @@ test('CraftingSystemManager normalizes alchemy config with defaults', () => {
   // Pass legacy 'cauldron' key to test the fallback path (system.alchemy ?? system.cauldron)
   const system = manager._normalizeSystem({ resolutionMode: 'alchemy', cauldron: {} });
   assert.ok(system.alchemy, 'alchemy config should be set');
+  assert.equal(system.alchemy.checkMode, 'none', 'checkMode defaults to none');
   assert.equal(system.alchemy.learnOnCraft, false);
   assert.equal(system.alchemy.consumeOnFail, true);
   assert.equal(system.alchemy.showAttemptHistoryToPlayers, true);
+});
+
+test('CraftingSystemManager normalizes alchemy checkMode enum (none/simple/tiered; invalid → none)', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  for (const mode of ['none', 'simple', 'tiered']) {
+    const system = manager._normalizeSystem({ resolutionMode: 'alchemy', alchemy: { checkMode: mode } });
+    assert.equal(system.alchemy.checkMode, mode);
+  }
+  const bad = manager._normalizeSystem({ resolutionMode: 'alchemy', alchemy: { checkMode: 'bogus' } });
+  assert.equal(bad.alchemy.checkMode, 'none', 'an invalid checkMode coerces to none');
 });
 
 test('CraftingSystemManager respects explicit alchemy config values', () => {
@@ -251,27 +262,36 @@ test('CraftingSystemManager accepts legacy gatheringRegions/gatheringRegionSetti
 test('ResolutionModeService.validateRecipe: alchemy recipe with no ingredient sets is invalid', () => {
   const system = buildAlchemySystem();
   const service = buildResolutionService(system);
-  const recipe = buildRecipe('r1', [], [{ id: 'rg1', name: 'group1', results: [] }], {
-    resultSelection: { provider: 'ingredientSet' }
-  });
+  const recipe = buildRecipe('r1', [], [{ id: 'rg1', name: 'group1', results: [] }]);
   const result = service.validateRecipe(recipe);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(e => e.includes('ingredient set')));
 });
 
+test('ResolutionModeService.validateRecipe: alchemy recipe with more than one ingredient set is invalid', () => {
+  const system = buildAlchemySystem();
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')]), buildIngredientSet([buildIngredientGroup('c2')])],
+    [{ id: 'rg1', name: 'group1', results: [] }]
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /exactly 1 ingredient set/i.test(e)));
+});
+
 test('ResolutionModeService.validateRecipe: alchemy recipe with no result groups is invalid', () => {
   const system = buildAlchemySystem();
   const service = buildResolutionService(system);
-  const recipe = buildRecipe('r1', [buildIngredientSet([buildIngredientGroup('c1')])], [], {
-    resultSelection: { provider: 'ingredientSet' }
-  });
+  const recipe = buildRecipe('r1', [buildIngredientSet([buildIngredientGroup('c1')])], []);
   const result = service.validateRecipe(recipe);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(e => e.includes('result group')));
 });
 
-test('ResolutionModeService.validateRecipe: alchemy recipe with no provider is invalid', () => {
-  const system = buildAlchemySystem();
+test('ResolutionModeService.validateRecipe: None-mode recipe with one set + one group is valid (no provider)', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'none' } });
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
@@ -279,92 +299,66 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with no provider is i
     [{ id: 'rg1', name: 'group1', results: [] }]
   );
   const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('provider')));
-});
-
-test('ResolutionModeService.validateRecipe: alchemy recipe with invalid provider is invalid', () => {
-  const system = buildAlchemySystem();
-  const service = buildResolutionService(system);
-  const recipe = buildRecipe(
-    'r1',
-    [buildIngredientSet([buildIngredientGroup('c1')])],
-    [{ id: 'rg1', name: 'group1', results: [] }],
-    { resultSelection: { provider: 'unknownProvider' } }
-  );
-  const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('provider')));
-});
-
-// The legacy `macroOutcome` / `rollTableOutcome` providers were removed in 1.6.0
-// (issue 424); they are no longer valid provider VALUES under alchemy validation.
-for (const legacy of ['macroOutcome', 'rollTableOutcome']) {
-  test(`ResolutionModeService.validateRecipe: alchemy recipe with removed ${legacy} provider is invalid`, () => {
-    const system = buildAlchemySystem();
-    const service = buildResolutionService(system);
-    const recipe = buildRecipe(
-      'r1',
-      [buildIngredientSet([buildIngredientGroup('c1')])],
-      [{ id: 'rg1', name: 'group1', results: [] }],
-      { resultSelection: { provider: legacy } }
-    );
-    const result = service.validateRecipe(recipe);
-    assert.equal(result.valid, false);
-    assert.ok(
-      result.errors.some(e => /Invalid result selection provider/i.test(e)),
-      `expected invalid-provider error for ${legacy}, got: ${JSON.stringify(result.errors)}`
-    );
-  });
-}
-
-test('ResolutionModeService.validateRecipe: alchemy recipe with check provider is valid when checks enabled', () => {
-  const system = buildAlchemySystem({
-    craftingCheck: { enabled: true, macroUuid: null, outcomes: ['success', 'fail'] }
-  });
-  const service = buildResolutionService(system);
-  const recipe = buildRecipe(
-    'r1',
-    [buildIngredientSet([buildIngredientGroup('c1')])],
-    [{ id: 'rg1', name: 'group1', results: [] }],
-    { resultSelection: { provider: 'check' } }
-  );
-  const result = service.validateRecipe(recipe);
   assert.equal(result.valid, true, result.errors.join(', '));
   assert.equal(result.errors.length, 0);
 });
 
-test('ResolutionModeService.validateRecipe: alchemy recipe with check provider is valid even when checks are unconfigured', () => {
-  // A `check`-provider recipe is structurally valid regardless of the system's
-  // check configuration. Whether the system has a usable routed crafting check is
-  // a system-level concern surfaced by systemValidation, NOT a per-recipe error.
-  const system = buildAlchemySystem({
-    craftingCheck: { enabled: false, macroUuid: null, outcomes: [] }
-  });
+test('ResolutionModeService.validateRecipe: Simple-mode recipe with success + reserved failure group is valid', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
     [buildIngredientSet([buildIngredientGroup('c1')])],
-    [{ id: 'rg1', name: 'group1', results: [] }],
-    { resultSelection: { provider: 'check' } }
+    [
+      { id: 'rg1', name: 'On success', results: [] },
+      { id: 'rg-fail', name: 'On a failed check', role: 'failure', results: [] }
+    ]
   );
   const result = service.validateRecipe(recipe);
   assert.equal(result.valid, true, result.errors.join(', '));
-  assert.equal(result.errors.length, 0);
 });
 
-test('ResolutionModeService.validateRecipe: valid alchemy recipe with ingredientSet provider passes', () => {
-  const system = buildAlchemySystem();
+test('ResolutionModeService.validateRecipe: Simple-mode tolerates an absent failure group', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
     [buildIngredientSet([buildIngredientGroup('c1')])],
-    [{ id: 'rg1', name: 'group1', results: [] }],
-    { resultSelection: { provider: 'ingredientSet' } }
+    [{ id: 'rg1', name: 'On success', results: [] }]
   );
   const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, true);
-  assert.equal(result.errors.length, 0);
+  assert.equal(result.valid, true, result.errors.join(', '));
+});
+
+test('ResolutionModeService.validateRecipe: None/Simple reject more than one SUCCESS group', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'none' } });
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')])],
+    [
+      { id: 'rg1', name: 'group1', results: [] },
+      { id: 'rg2', name: 'group2', results: [] }
+    ]
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /exactly 1 result group/i.test(e)));
+});
+
+test('ResolutionModeService.validateRecipe: Tiered-mode recipe with multiple result groups is valid', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'tiered' } });
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')])],
+    [
+      { id: 'rg1', name: 'Fine', checkOutcomeIds: ['t1'], results: [] },
+      { id: 'rg2', name: 'Superb', checkOutcomeIds: ['t2'], results: [] }
+    ]
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, true, result.errors.join(', '));
 });
 
 test('ResolutionModeService.validateRecipe: alchemy recipe with explicit steps fails validation', () => {
@@ -376,8 +370,7 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with explicit steps f
     ...buildRecipe(
       'r1',
       [buildIngredientSet([buildIngredientGroup('c1')])],
-      [{ id: 'rg1', name: 'group1', results: [] }],
-      { resultSelection: { provider: 'ingredientSet' } }
+      [{ id: 'rg1', name: 'group1', results: [] }]
     ),
     getExecutionSteps: () => [explicitStep]
   };
@@ -390,87 +383,86 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with explicit steps f
 // ResolutionModeService: alchemy resolveResultGroups
 // ============================================================================
 
-test('resolveResultGroups: alchemy + ingredientSet provider returns mapped group', () => {
-  const system = buildAlchemySystem();
+test('resolveResultGroups: alchemy None returns the single success group', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'none' } });
   const service = buildResolutionService(system);
-  const allGroups = [
-    { id: 'rg1', name: 'Group1', results: [] },
-    { id: 'rg2', name: 'Group2', results: [] }
-  ];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'ingredientSet' } };
-  const ingredientSet = { resultGroupId: 'rg2' };
+  const allGroups = [{ id: 'rg1', name: 'Group1', results: [] }];
+  const recipe = { craftingSystemId: 'alchemy-sys' };
   const step = { resultGroups: allGroups };
 
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet });
-  assert.equal(result.groups.length, 1);
-  assert.equal(result.groups[0].id, 'rg2');
-});
-
-test('resolveResultGroups: alchemy + ingredientSet provider falls back to first group when no mapping', () => {
-  const system = buildAlchemySystem();
-  const service = buildResolutionService(system);
-  const allGroups = [
-    { id: 'rg1', name: 'Group1', results: [] },
-    { id: 'rg2', name: 'Group2', results: [] }
-  ];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'ingredientSet' } };
-  const step = { resultGroups: allGroups };
-
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet: {} });
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { success: true, outcome: null } });
   assert.equal(result.groups.length, 1);
   assert.equal(result.groups[0].id, 'rg1');
 });
 
-test('resolveResultGroups: alchemy + check provider returns matched group', () => {
-  const system = buildAlchemySystem();
+test('resolveResultGroups: alchemy Simple PASS returns the success group (not the failure group)', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
   const service = buildResolutionService(system);
   const allGroups = [
-    { id: 'rg1', name: 'success', results: [] },
-    { id: 'rg2', name: 'partial', results: [] }
+    { id: 'rg1', name: 'On success', results: [] },
+    { id: 'rg-fail', name: 'On a failed check', role: 'failure', results: [] }
   ];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'check' } };
+  const recipe = { craftingSystemId: 'alchemy-sys' };
   const step = { resultGroups: allGroups };
 
-  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'success' }, ingredientSet: {} });
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { success: true } });
   assert.equal(result.groups.length, 1);
   assert.equal(result.groups[0].id, 'rg1');
-  assert.equal(result.meta.disposition, 'success');
 });
 
-test('resolveResultGroups: alchemy + check returns empty groups on fail keyword', () => {
-  const system = buildAlchemySystem();
+test('resolveResultGroups: alchemy Simple FAIL returns the reserved failure group', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
   const service = buildResolutionService(system);
-  const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'check' } };
+  const allGroups = [
+    { id: 'rg1', name: 'On success', results: [] },
+    { id: 'rg-fail', name: 'On a failed check', role: 'failure', results: [] }
+  ];
+  const recipe = { craftingSystemId: 'alchemy-sys' };
   const step = { resultGroups: allGroups };
 
-  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'fail' }, ingredientSet: {} });
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { success: false } });
+  assert.equal(result.groups.length, 1);
+  assert.equal(result.groups[0].id, 'rg-fail');
+  assert.equal(result.meta.disposition, 'fail');
+});
+
+test('resolveResultGroups: alchemy Simple FAIL with no failure group produces nothing (tolerated)', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
+  const service = buildResolutionService(system);
+  const allGroups = [{ id: 'rg1', name: 'On success', results: [] }];
+  const recipe = { craftingSystemId: 'alchemy-sys' };
+  const step = { resultGroups: allGroups };
+
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { success: false } });
   assert.equal(result.groups.length, 0);
   assert.equal(result.meta.disposition, 'fail');
 });
 
-test('resolveResultGroups: alchemy + check returns empty groups on miss keyword', () => {
-  const system = buildAlchemySystem();
+test('resolveResultGroups: alchemy Tiered routes the outcome to its assigned tier group (checkOutcomeIds)', () => {
+  const system = buildAlchemySystem({
+    alchemy: { checkMode: 'tiered' },
+    craftingCheck: {
+      routed: {
+        type: 'relative',
+        relativeOutcomes: [
+          { id: 't-fine', name: 'Fine', success: true },
+          { id: 't-superb', name: 'Superb', success: true }
+        ]
+      }
+    }
+  });
   const service = buildResolutionService(system);
-  const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'check' } };
+  const allGroups = [
+    { id: 'rg1', name: 'Fine result', checkOutcomeIds: ['t-fine'], results: [] },
+    { id: 'rg2', name: 'Superb result', checkOutcomeIds: ['t-superb'], results: [] }
+  ];
+  const recipe = { craftingSystemId: 'alchemy-sys' };
   const step = { resultGroups: allGroups };
 
-  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'miss' }, ingredientSet: {} });
-  assert.equal(result.groups.length, 0);
-  assert.equal(result.meta.disposition, 'miss');
-});
-
-test('resolveResultGroups: alchemy + check returns misconfiguration on no match', () => {
-  const system = buildAlchemySystem();
-  const service = buildResolutionService(system);
-  const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'check' } };
-  const step = { resultGroups: allGroups };
-
-  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'nonexistent' }, ingredientSet: {} });
-  assert.equal(result.groups.length, 0);
-  assert.equal(result.meta.disposition, 'misconfiguration');
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'Superb' } });
+  assert.equal(result.groups.length, 1);
+  assert.equal(result.groups[0].id, 'rg2');
+  assert.equal(result.meta.disposition, 'success');
 });
 
 // ============================================================================
@@ -491,7 +483,10 @@ test('RecipeVisibilityService: GM sees all alchemy recipes', () => {
   assert.equal(result.craftable, true);
 });
 
-test('RecipeVisibilityService: non-GM sees no recipes in alchemy mode when learnOnCraft=false', () => {
+test('RecipeVisibilityService: reveal-not-gate — a non-revealed global-mode recipe is NOT revealed but is still craftable', () => {
+  // global mode reveals discovery-only; learnOnCraft off + not learned => not
+  // revealed. Reveal-not-gate: craftable stays true (matched signature is the sole
+  // brew gate).
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: false, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -503,10 +498,11 @@ test('RecipeVisibilityService: non-GM sees no recipes in alchemy mode when learn
     craftingActor: actor
   });
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'alchemy-hidden');
+  assert.equal(result.craftable, true, 'brewing is never gated by reveal state');
+  assert.equal(result.reason, 'alchemy-unrevealed');
 });
 
-test('RecipeVisibilityService: non-GM sees learned recipe when learnOnCraft=true', () => {
+test('RecipeVisibilityService: a brew-discovered (learned) global-mode recipe is revealed and craftable', () => {
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -520,10 +516,11 @@ test('RecipeVisibilityService: non-GM sees learned recipe when learnOnCraft=true
     craftingActor: actor
   });
   assert.equal(result.visible, true);
-  assert.equal(result.reason, 'alchemy-learned');
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'alchemy-revealed');
 });
 
-test('RecipeVisibilityService: non-GM does NOT see un-learned recipe when learnOnCraft=true', () => {
+test('RecipeVisibilityService: an un-learned global-mode recipe is not revealed but stays craftable (brew never gated)', () => {
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -535,7 +532,8 @@ test('RecipeVisibilityService: non-GM does NOT see un-learned recipe when learnO
     craftingActor: actor
   });
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'alchemy-not-learned');
+  assert.equal(result.craftable, true, 'brewing is never gated by reveal state');
+  assert.equal(result.reason, 'alchemy-unrevealed');
 });
 
 test('RecipeVisibilityService.learnRecipeOnCraft: adds recipe to actor learned map', async () => {

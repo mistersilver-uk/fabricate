@@ -43,7 +43,11 @@
   // The Inventory tab pulls owned components from the same component-source actors
   // as Crafting, so it surfaces the same source picker in the shared bar.
   const isInventory = $derived(activeTab === 'inventory');
-  const showSourcesBar = $derived(isCrafting || isInventory);
+  // The Alchemy workbench pulls owned components from the same component-source
+  // actors as Crafting (AlchemyView wires `services.craftingSources` and the store
+  // reads `selectedSourceIds`), so it too surfaces the shared source picker.
+  const isAlchemy = $derived(activeTab === 'alchemy');
+  const showSourcesBar = $derived(isCrafting || isInventory || isAlchemy);
 
   // The active station tool's display name, shown in a status chip in the
   // right-side context cluster when the GM granted activation of a Tool-station
@@ -298,8 +302,8 @@
         </span>
       {/if}
       {#if showSourcesBar}
-        <!-- The Crafting and Inventory tabs surface the component-source actor
-             picker (whose inventories the listing pulls from) in the right slot. -->
+        <!-- The Crafting, Inventory and Alchemy tabs surface the component-source
+             actor picker (whose inventories the listing pulls from) in the right slot. -->
         <ComponentSourcesBar {services} />
       {/if}
     </div>

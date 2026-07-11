@@ -274,6 +274,29 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['player-crafting-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
   },
+  // The player Alchemy workbench (issue 543) publishes three distinct frames — the
+  // discipline chooser, the three-column workbench, and the narrow stacked layout.
+  // `collect` emits one file per view id (first matching smoke label wins), so each
+  // frame is its own view. (The `player-alchemy-theme-*` frames are extra evidence
+  // and are intentionally NOT mapped here, like the `manager-theme-*` frames.)
+  {
+    id: 'player-alchemy',
+    label: 'Player alchemy workbench',
+    smokeLabels: ['player-alchemy-workbench'],
+    matches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  },
+  {
+    id: 'player-alchemy-chooser',
+    label: 'Player alchemy — discipline chooser',
+    smokeLabels: ['player-alchemy-chooser'],
+    matches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  },
+  {
+    id: 'player-alchemy-stacked',
+    label: 'Player alchemy — narrow window stacked columns',
+    smokeLabels: ['player-alchemy-stacked'],
+    matches: [/^src\/ui\/svelte\/apps\/alchemy\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
   {
     id: 'fabricate-journal',
     label: 'Player Journal tab',

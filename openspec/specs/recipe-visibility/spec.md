@@ -178,11 +178,12 @@ Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentS
    Otherwise drop entities marked `blocks: 'visibility'` for non-GM viewers before
    continuing.
 1. Collect recipes in `craftingSystem`.
-2. If `craftingSystem.resolutionMode === "alchemy"`:
+2. If `craftingSystem.resolutionMode === "alchemy"`, apply the **reveal-not-gate** model (see Alchemy Visibility and Learning):
    - GM sees all recipes.
-   - Non-GM handling:
-     - if `craftingSystem.alchemy.learnOnCraft !== true`: return no recipe listings.
-     - if `craftingSystem.alchemy.learnOnCraft === true`: return only enabled recipes learned by the actor.
+   - A non-GM sees a recipe when it is REVEALED, where reveal is `access.visible === true` from the alchemy branch of `evaluateRecipeAccess`, dispatched on the system's `visibilityMode`: `global` reveals discovery-only (`learnedRecipes`); `item` reveals a linked book/scroll held on the crafting actor or a component source; `knowledge` reveals a recipe learned via the Inventory learn path (`learnedRecipes`); `restricted`/Manual reveals via the per-recipe `access` grant.
+   - Discovery-by-brew reveal (`learnedRecipes`, written only when `alchemy.learnOnCraft === true`) is unioned across ALL modes.
+   - For existing worlds seeded `visibilityMode` (absent/invalid → `knowledge`, 1.12.0), `global` and `knowledge` both collapse to `learnedRecipes ∪ brew-discovery` from the same `learnedRecipes` read (no book/grant is needed for the discovery-only path), so behavior does not silently change.
+   - `visibilityMode` selects only the reveal source; brewing is NEVER gated by reveal (see Brew Never Gated by Visibility).
    - Skip non-alchemy list-mode branches below.
 3. If `listMode === "global"`:
    - GM sees all recipes.
@@ -239,13 +240,33 @@ Reject if knowledge access is denied.
 
 Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 
-1. Recipe lists are hidden from non-GM users by default.
-2. Learned visibility behavior:
-   - if `alchemy.learnOnCraft === true`, a recipe may become visible only after successful craft completion and learning.
-   - if `alchemy.learnOnCraft !== true`, recipes remain hidden to non-GM users.
-3. Learning is never granted by failed attempts.
-4. No-signature attempts are treated as failed attempts (not misconfiguration errors).
+Alchemy visibility is **reveal-not-gate**: `visibilityMode` selects which source(s) REVEAL a recipe in the player's Known list, but brewing is NEVER gated by visibility (a matched ingredient signature is the sole brew gate — see Brew Never Gated by Visibility).
+
+1. Per-mode reveal for a non-GM viewer (each returns the alchemy branch's `visible`; a GM has every recipe revealed):
+   - `global` — discovery-only (`learnedRecipes`).
+   - `item` — a linked book/scroll held on the crafting actor OR a component source (ephemeral; follows possession, computed synchronously from live `actor.items`, recomputed per build — a dropped book un-reveals on the next build with no flag write).
+   - `knowledge` — a recipe learned via the Inventory learn path (`learnedRecipes`).
+   - `restricted`/Manual — the per-recipe `access` grant admits the viewer (`_isRecipeVisibleByAccessGrant`).
+2. Discovery-by-brew reveal is unioned across ALL modes and is on a MATCHED SIGNATURE, decoupled from check success (issue 554):
+   - if `alchemy.learnOnCraft === true`, a matched-signature attempt writes `learnedRecipes` REGARDLESS of the check outcome — a passed OR failed Simple brew (and any matched Tiered brew) learns it; the recipe is then revealed under any mode.
+   - if `alchemy.learnOnCraft !== true`, a brew writes nothing to `learnedRecipes`; `learnOnCraft` governs ONLY the brew-discovery union, not whether anything is revealed (a book/grant/learn under item/knowledge/Manual still reveals independent of `learnOnCraft`).
+3. Learning is never granted by a NO-SIGNATURE fizzle (which still grants nothing — dead-end/`no-reaction` memory only).
+A matched-signature check FAILURE is a genuine discovery, not a fizzle.
+4. No-signature attempts are treated as failed attempts (fizzles, not misconfiguration errors).
 5. If a matched alchemy attempt cannot route to a valid result group, classify as crafting-system misconfiguration error (GM-fix required), not a player-failure outcome.
+This applies to **Tiered only** (None/Simple never route by name).
+6. The player listing projection (`AlchemyListingBuilder`) surfaces REVEALED recipes plus the non-revealed **count** only (`undiscoveredCount = valid − revealed`).
+A revealed recipe projects identically to a brew-discovered one (name + full signature summary + result), so both are selectable and auto-fillable.
+The count is derived behind the viewer-enforcing seam — the client never receives the non-revealed list to count locally, and no non-revealed name/signature/result reaches any client field.
+7. A fizzled attempt MAY record a per-character dead-end key at `Actor.flags.fabricate.alchemyDeadEnds`, gated by `alchemy.showAttemptHistoryToPlayers`.
+This affects only client-side status feedback (flipping `untried` -> `no-reaction`) and NEVER grants visibility — a fizzle matches no enabled recipe (rule 3 preserved).
+
+### Brew Never Gated by Visibility
+
+For `resolutionMode === "alchemy"`, `RecipeVisibilityService.evaluateRecipeAccess` / `guardCraftStart` returns `craftable: true` for a non-GM regardless of reveal state; the brew guard is gated ONLY by a matched ingredient signature.
+Reveal state governs only `visible` (the Known-list projection).
+This distinguishes alchemy from non-alchemy modes, whose Crafting Guard Algorithm re-runs visibility gating.
+The alchemy reason taxonomy is `gm` (GM), `alchemy-revealed`, and `alchemy-unrevealed`; the retired `alchemy-hidden` / `alchemy-not-learned` / `alchemy-learned` returns no longer occur.
 
 ## Discovered Recipe Browsing
 
@@ -253,17 +274,21 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 
 ### Listing
 
-- Show recipes from selected alchemy system where crafting actor has entry in `learnedRecipes`.
+- Show recipes from the selected alchemy system that the viewer has **revealed** (learned-by-brew ∪ the mode's reveal source — see Alchemy Visibility and Learning), not learned-only.
 - GM sees all recipes in panel (consistent with GM-sees-all rule).
 - Searchable by recipe name.
-- "Craftable only" filter: shows only recipes whose requirements can be fully satisfied by full inventory quantities (not inventory minus workbench, since auto-fill clears the workbench first).
+- The "Craftable only" filter is DEFERRED this iteration.
 
 ### Craftability Evaluation
 
 - A discovered recipe is craftable when >= 1 ingredient set can be fully satisfied by full inventory quantities.
 - Evaluate against full inventory, not inventory minus workbench, since auto-fill clears the workbench before populating it.
 
-### Auto-Fill
+### Auto-Fill (a select-to-load selection side effect)
+
+Selecting a discovered recipe auto-loads its signature onto the bench — auto-fill is a side effect of selection, not a separate per-recipe button.
+It is scoped to recipes reducible to a concrete plain-component multiset; a rich signature (alternatives/tags/essences/multiple sets) is shown but not auto-filled (the client fails safe to `untried`).
+The algorithm:
 
 1. Clear the workbench.
 2. For each ingredient group in first satisfiable ingredient set:
@@ -279,15 +304,15 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 
 ### Multi-Set Auto-Fill
 
-- If recipe has multiple ingredient sets, try each in order, use first fully satisfiable.
-- If none fully satisfiable, use set satisfying most groups and report remainder.
+- Multiple ingredient sets are not reducible to a concrete plain-component multiset, so a multi-set recipe is NOT auto-filled this iteration (the client fails safe to `untried`); it is still shown with its full signature summary and still brews via the engine.
+Richer client-side auto-fill for multi-set / alternatives / tags / essences is a deferred follow-up.
 
 ### Information Disclosure
 
-- Show recipe name and image for discovered recipes.
-- May show ingredient details (player has already crafted it).
+- Show recipe name and image for revealed recipes.
+- May show ingredient details (the recipe is revealed to the player).
 - May show result descriptions.
-- Undiscovered recipes must not appear for non-GM users.
+- Non-revealed recipes must not appear for non-GM users; only their count is surfaced (`undiscoveredCount = valid − revealed`), and no non-revealed name/signature/result reaches any client field.
 
 ## Knowledge Access Evaluation
 
@@ -568,7 +593,8 @@ If `recipeItemDefinition.sourceItemUuid` no longer resolves to a template:
 - Unit tests for limited-use exhaustion and deterministic matched-item selection.
 - Unit tests for learning with and without consume-on-learn.
 - Unit tests for restricted recipes with empty `allowedUserIds` confirming GM access and non-GM denial.
-- Unit tests for alchemy listing rules: hidden-by-default for non-GM, learned-only visibility when `learnOnCraft === true`, always-hidden when `learnOnCraft !== true`.
+- Unit tests for alchemy reveal-not-gate rules: per-mode reveal (global discovery-only, item held-book incl. component-source-only, knowledge learned, Manual/restricted access grant), discovery-by-brew unioned across modes, GM-sees-all through the routed decision, and `craftable: true` for a non-GM regardless of reveal.
+- Integration test that a matched-signature brew SUCCEEDS and PRODUCES for a non-revealed recipe under every mode, exercising the real `guardCraftStart` (brew never gated by visibility).
 - Unit tests for alchemy no-signature attempts: specific failure feedback, failed-attempt classification, and ingredient consumption behavior.
 - Unit tests for alchemy routing mismatches: misconfiguration classification and non-application of player-failure consumption.
 - Integration tests for full craft guard re-check on start, resume, and step execution.

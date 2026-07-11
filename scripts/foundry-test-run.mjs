@@ -247,6 +247,24 @@ async function openManagerRecipeEditor(page, recipeName) {
 }
 
 /**
+ * Capture the currently-open player Alchemy workbench under every Fabricate
+ * theme, then restore the default theme. `applyManagerTheme` stamps the theme
+ * attribute on the document element AND every `.fabricate` root — which includes
+ * the shared player app — so it re-themes the live workbench via its own CSS
+ * tokens, not a mock. Labels: `player-alchemy-theme-<themeId>` (full profile
+ * only). These are EXTRA evidence and are intentionally NOT mapped in
+ * VIEW_RECIPES, exactly like the `manager-theme-*` frames.
+ * @param {import('playwright').Page} page
+ */
+async function captureAlchemyThemes(page) {
+  for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
+    await applyManagerTheme(page, themeId);
+    await screenshot(page, `player-alchemy-theme-${themeId}`);
+  }
+  await applyManagerTheme(page, DEFAULT_FABRICATE_THEME);
+}
+
+/**
  * Safely parse a page pathname.
  * @param {string} rawUrl
  * @returns {string}
@@ -1612,6 +1630,216 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     mysticHerbComponentId: craftingSetup.componentMap['Mystic Herb'],
     crafterId
   });
+}
+
+/**
+ * Seed the player-facing Alchemy workbench coverage fixtures (issue #543).
+ *
+ * Creates TWO enabled `resolutionMode: 'alchemy'` crafting systems so the shared
+ * Fabricate app both surfaces the Alchemy tab (see `isAlchemyTabAvailable`: an
+ * enabled alchemy system owning at least one recipe) AND renders the discipline
+ * chooser (which only appears with more than one alchemy system):
+ *
+ *  - "Bubbling Cauldron" — reuses the EXISTING world items the crafter already
+ *    owns (Mystic Herb, Empty Vial, Dragon Scale, seeded in Phase B) as managed
+ *    components so the workbench inventory column shows owned, placeable
+ *    components, plus two product components. Two valid alchemy recipes with
+ *    DISTINCT ingredient signatures (Mystic Herb×2; Mystic Herb×1 + Empty Vial×1),
+ *    each with one result group and `resultSelection.provider: 'ingredientSet'`,
+ *    no steps.
+ *  - "Herbalist's Table" — a second alchemy system with its own component +
+ *    product and one valid recipe, enough to give the chooser a second card.
+ *
+ * Alchemy recipes are authored AFTER the owning system is switched to alchemy:
+ * `createRecipe` runs activation validation under the system's resolution mode
+ * (the alchemy rules require ingredient sets, result groups, the `ingredientSet`
+ * provider and no explicit steps) plus a per-system signature-uniqueness check,
+ * so an invalid shape or a colliding signature throws here instead of silently
+ * producing a disabled recipe. Every create/register is asserted.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{ systemId: string, componentMap: Record<string,string> }} craftingSetup
+ * @param {string} crafterId
+ * @returns {Promise<object>} Alchemy fixture ids (systems, recipes, product items, component maps).
+ */
+async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
+  return await page.evaluate(async ({ crafterId }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    const rm = game.fabricate.getRecipeManager();
+    const crafter = game.actors.get(crafterId);
+    if (!crafter) throw new Error(`Alchemy fixtures: crafter ${crafterId} not found`);
+
+    const rawItemTypes = game.documentTypes?.Item ?? game.system?.documentTypes?.Item ?? [];
+    const itemTypes = Array.from(rawItemTypes);
+    const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
+
+    // Existing world items the crafter already owns: reuse them as managed
+    // components so the workbench inventory column shows owned, placeable rows.
+    const worldByName = Object.fromEntries(game.items.contents.map((item) => [item.name, item]));
+    const requireWorldItem = (name) => {
+      const item = worldByName[name];
+      if (!item) throw new Error(`Alchemy fixtures: world item "${name}" not found`);
+      return item;
+    };
+
+    // Product / second-system world items. Alchemy result groups reference managed
+    // components, so the products (and the second system's ingredient) must be
+    // registered components too. Non-SVG raster core icons per the fixture rule.
+    const productSpecs = [
+      { name: 'Elixir of Vigor', img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
+      { name: 'Verdant Tonic', img: 'icons/consumables/potions/flask-corked-blue.webp' },
+      { name: 'Powdered Root', img: 'icons/consumables/plants/dried-herb-bundle-brown.webp' },
+      { name: 'Soothing Balm', img: 'icons/consumables/potions/bottle-round-corked-red.webp' }
+    ];
+    const createdProducts = await Item.createDocuments(
+      productSpecs.map((spec) => ({ name: spec.name, type: itemType, img: spec.img }))
+    );
+    const productByName = Object.fromEntries(createdProducts.map((item) => [item.name, item]));
+    const alchemyProductItemIds = createdProducts.map((item) => item.id);
+
+    const registerComponent = async (systemId, worldItem) => {
+      const result = await csm.addItemFromUuid(systemId, worldItem.uuid);
+      if (!result?.item?.id) {
+        throw new Error(`Alchemy fixtures: failed to register component "${worldItem.name}"`);
+      }
+      return result.item.id;
+    };
+
+    // ── System 1: Bubbling Cauldron (alchemy, reuses owned components) ───────
+    const cauldron = await csm.createSystem({
+      name: 'Bubbling Cauldron',
+      description: 'Issue #543: player alchemy workbench — combine herbs to discover brews.'
+    });
+    if (!cauldron?.id) throw new Error('Alchemy fixtures: Bubbling Cauldron create failed');
+    const cauldronId = cauldron.id;
+    await csm.updateSystem(cauldronId, {
+      resolutionMode: 'alchemy',
+      enabled: true,
+      // Simple check mode (#554): a mandatory pass/fail check + a reserved failure
+      // result set. Exercises the check-gated workbench + the failure-group authoring.
+      alchemy: {
+        learnOnCraft: true,
+        consumeOnFail: true,
+        showAttemptHistoryToPlayers: false,
+        checkMode: 'simple'
+      },
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 10 } }
+    });
+    const cauldronMap = {
+      'Mystic Herb': await registerComponent(cauldronId, requireWorldItem('Mystic Herb')),
+      'Empty Vial': await registerComponent(cauldronId, requireWorldItem('Empty Vial')),
+      'Dragon Scale': await registerComponent(cauldronId, requireWorldItem('Dragon Scale')),
+      'Elixir of Vigor': await registerComponent(cauldronId, productByName['Elixir of Vigor']),
+      'Verdant Tonic': await registerComponent(cauldronId, productByName['Verdant Tonic'])
+    };
+    const elixirRecipe = await rm.createRecipe({
+      name: 'Elixir of Vigor',
+      description: 'Alchemy: two mystic herbs reduce to a vigor elixir.',
+      craftingSystemId: cauldronId,
+      img: 'icons/consumables/potions/potion-tube-corked-red.webp',
+      ingredientSets: [{
+        name: 'Herbal base',
+        ingredientGroups: [{
+          name: 'Mystic Herb',
+          options: [{ quantity: 2, match: { type: 'component', componentId: cauldronMap['Mystic Herb'] } }]
+        }]
+      }],
+      resultGroups: [
+        {
+          name: 'Elixir',
+          results: [{ componentId: cauldronMap['Elixir of Vigor'], quantity: 1 }]
+        },
+        {
+          // Reserved failure result set (#554): produced on a failed Simple check.
+          role: 'failure',
+          name: '',
+          results: [{ componentId: cauldronMap['Dragon Scale'], quantity: 1 }]
+        }
+      ]
+    });
+    const tonicRecipe = await rm.createRecipe({
+      name: 'Verdant Tonic',
+      description: 'Alchemy: one mystic herb bottled in an empty vial makes a tonic.',
+      craftingSystemId: cauldronId,
+      img: 'icons/consumables/potions/flask-corked-blue.webp',
+      resultSelection: { provider: 'ingredientSet' },
+      ingredientSets: [{
+        name: 'Bottled brew',
+        ingredientGroups: [
+          {
+            name: 'Mystic Herb',
+            options: [{ quantity: 1, match: { type: 'component', componentId: cauldronMap['Mystic Herb'] } }]
+          },
+          {
+            name: 'Empty Vial',
+            options: [{ quantity: 1, match: { type: 'component', componentId: cauldronMap['Empty Vial'] } }]
+          }
+        ]
+      }],
+      resultGroups: [{
+        name: 'Tonic',
+        results: [{ componentId: cauldronMap['Verdant Tonic'], quantity: 1 }]
+      }]
+    });
+
+    // ── System 2: Herbalist's Table (second alchemy discipline) ─────────────
+    const herbalist = await csm.createSystem({
+      name: "Herbalist's Table",
+      description: "Issue #543: a second alchemy discipline so the workbench chooser offers a choice."
+    });
+    if (!herbalist?.id) throw new Error("Alchemy fixtures: Herbalist's Table create failed");
+    const herbalistId = herbalist.id;
+    await csm.updateSystem(herbalistId, {
+      resolutionMode: 'alchemy',
+      enabled: true,
+      alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false }
+    });
+    const herbalistMap = {
+      'Powdered Root': await registerComponent(herbalistId, productByName['Powdered Root']),
+      'Soothing Balm': await registerComponent(herbalistId, productByName['Soothing Balm'])
+    };
+    const balmRecipe = await rm.createRecipe({
+      name: 'Soothing Balm',
+      description: 'Alchemy: powdered root renders into a soothing balm.',
+      craftingSystemId: herbalistId,
+      img: 'icons/consumables/potions/bottle-round-corked-red.webp',
+      resultSelection: { provider: 'ingredientSet' },
+      ingredientSets: [{
+        name: 'Root base',
+        ingredientGroups: [{
+          name: 'Powdered Root',
+          options: [{ quantity: 1, match: { type: 'component', componentId: herbalistMap['Powdered Root'] } }]
+        }]
+      }],
+      resultGroups: [{
+        name: 'Balm',
+        results: [{ componentId: herbalistMap['Soothing Balm'], quantity: 1 }]
+      }]
+    });
+
+    // Every recipe must have been created enabled (createRecipe throws on an
+    // invalid alchemy shape; a disabled recipe would drop its system from the
+    // chooser since the listing filters `{ enabled: true }`).
+    const alchemyRecipes = [elixirRecipe, tonicRecipe, balmRecipe];
+    for (const recipe of alchemyRecipes) {
+      if (!recipe?.id) throw new Error('Alchemy fixtures: recipe create returned no id');
+      if (recipe.enabled !== true) {
+        throw new Error(
+          `Alchemy fixtures: recipe "${recipe.name}" was not created enabled ` +
+          `(invalid alchemy shape or signature collision)`
+        );
+      }
+    }
+
+    return {
+      alchemySystemIds: [cauldronId, herbalistId],
+      cauldronSystemId: cauldronId,
+      herbalistSystemId: herbalistId,
+      alchemyRecipeIds: alchemyRecipes.map((recipe) => recipe.id),
+      alchemyProductItemIds,
+      alchemyComponentMap: { [cauldronId]: cauldronMap, [herbalistId]: herbalistMap }
+    };
+  }, { crafterId });
 }
 
 /**
@@ -3584,6 +3812,37 @@ async function main() {
         process.stderr.write(`Seeding craft-execution fixtures failed: ${err.message}\n`);
       }
 
+      // Issue #543: seed the player Alchemy workbench coverage fixtures (two
+      // enabled alchemy systems + valid recipes) so the shared app surfaces the
+      // Alchemy tab and its discipline chooser in Phase E. Screenshot-profile only
+      // — rc/ci never opens the player app's alchemy captures. Reuses the same
+      // cleanup arrays as the execution fixtures so the systems/products/recipes
+      // are torn down at the end of the run.
+      let alchemyFixtures = null;
+      if (RUN_SCREENSHOT_PHASES) {
+        try {
+          process.stdout.write('  Seeding player alchemy workbench fixtures (#543)...\n');
+          alchemyFixtures = await seedSmokeAlchemyFixtures(page, craftingSetup, cleanup.crafterId);
+          cleanup.executionSystemIds = [
+            ...(cleanup.executionSystemIds || []),
+            ...alchemyFixtures.alchemySystemIds
+          ];
+          cleanup.executionItemIds = [
+            ...(cleanup.executionItemIds || []),
+            ...alchemyFixtures.alchemyProductItemIds
+          ];
+          cleanup.recipeIds = [...cleanup.recipeIds, ...alchemyFixtures.alchemyRecipeIds];
+          results.steps.push({ step: 'seed-alchemy-fixtures', passed: true });
+          process.stdout.write(
+            `  Seeded ${alchemyFixtures.alchemySystemIds.length} alchemy systems and ` +
+            `${alchemyFixtures.alchemyRecipeIds.length} recipes.\n`
+          );
+        } catch (err) {
+          results.steps.push({ step: 'seed-alchemy-fixtures', passed: false, error: err.message });
+          process.stderr.write(`Seeding alchemy fixtures failed: ${err.message}\n`);
+        }
+      }
+
       // Feature-gate negative test (toggle gathering off, assert button hides,
       // toggle back on). Belongs in `full` only — `rc` proves the positive
       // gathering path in Phase D2, which exercises the same feature flag from
@@ -5430,6 +5689,115 @@ async function main() {
         } catch (craftingTabError) {
           results.steps.push({ step: 'player-crafting', passed: false, error: String(craftingTabError?.message ?? craftingTabError) });
           process.stdout.write(`  Player Crafting tab capture skipped: ${craftingTabError?.message ?? craftingTabError}\n`);
+        }
+        }
+
+        // ── Player Alchemy tab evidence (issue #543) ──────────────────────────
+        // The Alchemy tab is conditional — shown only when an enabled alchemy
+        // system has recipes (seeded above under RUN_SCREENSHOT_PHASES). With TWO
+        // alchemy systems the discipline chooser renders first; enter one to reach
+        // the three-column workbench. Capture the chooser, the populated workbench,
+        // the narrow stacked layout, and each theme. Maps changes under
+        // src/ui/svelte/apps/alchemy/ to real screenshots (the 'player-alchemy*'
+        // VIEW_RECIPES entries). Gated to the full screenshot profile and guarded
+        // so a missing tab/control records a failed step rather than aborting the
+        // phase.
+        if (RUN_SCREENSHOT_PHASES) {
+        try {
+          if (await appShell.locator('.fabricate-app-nav-item:has-text("Alchemy")').count() === 0) {
+            throw new Error('Alchemy tab is not present (alchemy fixtures may not have seeded).');
+          }
+          // Restore the window to a normal width — the crafting-stacked capture
+          // above shrank it — before capturing the alchemy chooser/workbench.
+          await page.evaluate(() => {
+            const app = document.querySelector('#fabricate-app');
+            if (!app) return;
+            Object.assign(app.style, { minWidth: '', minHeight: '', width: '1100px', height: '760px', left: '40px', top: '40px' });
+          });
+          await page.waitForTimeout(300);
+
+          // The alchemy listing resolves its actor from the shared top-bar
+          // selection, and the no-actor state precedes the chooser in AlchemyView.
+          // Wait for the bar to finish selecting an actor so we land on the
+          // discipline chooser rather than the no-actor placeholder.
+          await appShell.locator('[data-actor-bar-state="ready"]')
+            .first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+
+          await appShell.locator('.fabricate-app-nav-item:has-text("Alchemy")').first().click();
+          await appShell.locator('.fabricate-app-nav-item.active:has-text("Alchemy")')
+            .first().waitFor({ state: 'visible', timeout: 10_000 });
+
+          // Let the view settle out of its loading state. With two seeded
+          // disciplines the chooser renders; if a discipline is already active
+          // (persisted selection), use the "Switch discipline" control to return
+          // to the chooser.
+          await appShell
+            .locator('#fabricate-app [data-alchemy-state]:not([data-alchemy-state="loading"]), #fabricate-app .alchemy-chooser')
+            .first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+          const alchemyChooser = appShell.locator('.alchemy-chooser').first();
+          if (!(await alchemyChooser.isVisible().catch(() => false))) {
+            const switchDiscipline = appShell.locator('[data-alchemy-switch]').first();
+            if (await switchDiscipline.count() > 0) {
+              await switchDiscipline.click().catch(() => {});
+            }
+          }
+          await alchemyChooser.waitFor({ state: 'visible', timeout: 12_000 });
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-alchemy-chooser');
+
+          // Enter a discipline (prefer the Bubbling Cauldron, whose components the
+          // crafter owns) → the three-column workbench.
+          const cauldronCard = appShell
+            .locator(`[data-alchemy-chooser-card="${alchemyFixtures?.cauldronSystemId ?? ''}"]`).first();
+          if (await cauldronCard.count() > 0) {
+            await cauldronCard.click();
+          } else {
+            await appShell.locator('[data-alchemy-chooser-card]').first().click();
+          }
+          await appShell.locator('[data-alchemy-state="workbench"]').first()
+            .waitFor({ state: 'visible', timeout: 10_000 });
+
+          // Populate the bench: place the first available owned component so the
+          // workbench frame shows chips + a signature rather than the empty bench.
+          const firstAvailableComponent = appShell
+            .locator('[data-alchemy-inventory-row]:not([disabled])').first();
+          if (await firstAvailableComponent.count() > 0) {
+            await firstAvailableComponent.click().catch(() => {});
+            await page.waitForTimeout(200);
+          }
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-alchemy-workbench');
+
+          // Narrow-window stacked evidence: shrink below the alchemy grid's 900px
+          // container-query breakpoint so the three columns reflow into a single
+          // vertical stack (workbench leading).
+          const alchemyStackedSize = await page.evaluate(() => {
+            const app = document.querySelector('#fabricate-app');
+            if (!app) return null;
+            Object.assign(app.style, { minWidth: '0px', minHeight: '0px', width: '780px', height: '760px', left: '20px', top: '20px' });
+            return { width: app.getBoundingClientRect().width, height: app.getBoundingClientRect().height };
+          });
+          await page.waitForTimeout(600);
+          await appShell.locator('[data-alchemy-state="workbench"]').first()
+            .waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'player-alchemy-stacked');
+
+          // Restore a normal width, then capture the workbench under every theme.
+          await page.evaluate(() => {
+            const app = document.querySelector('#fabricate-app');
+            if (!app) return;
+            Object.assign(app.style, { minWidth: '', minHeight: '', width: '1100px', height: '760px', left: '40px', top: '40px' });
+          });
+          await page.waitForTimeout(400);
+          await appShell.locator('[data-alchemy-state="workbench"]').first()
+            .waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+          await captureAlchemyThemes(page);
+
+          results.steps.push({ step: 'player-alchemy', passed: true, size: alchemyStackedSize });
+        } catch (alchemyTabError) {
+          results.steps.push({ step: 'player-alchemy', passed: false, error: String(alchemyTabError?.message ?? alchemyTabError) });
+          process.stdout.write(`  Player Alchemy tab capture skipped: ${alchemyTabError?.message ?? alchemyTabError}\n`);
         }
         }
 

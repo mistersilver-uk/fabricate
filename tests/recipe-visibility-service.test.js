@@ -1814,22 +1814,34 @@ test('AC8.5 - learned mode: canLearn derivation is true when recipe is visible v
 });
 
 // ---------------------------------------------------------------------------
-// AC9 — Alchemy mode with formula item learning
+// AC9 — Alchemy REVEAL-not-gate (issue 563)
+//
+// `visibilityMode` selects which source(s) REVEAL a recipe in the Known list;
+// brewing is NEVER gated by visibility. For a non-GM alchemy recipe the service
+// therefore returns `craftable: true` regardless of reveal state — reveal governs
+// only `visible`. Reason taxonomy: `gm` (GM), `alchemy-revealed`,
+// `alchemy-unrevealed`. Discovery-by-brew (`learnOnCraft` ⇒ learnedRecipes) is
+// unioned across all modes.
 // ---------------------------------------------------------------------------
 
-test('AC9.1 - alchemy mode: unlearned recipe with formula item is visible but not craftable', () => {
-  const system = buildMockSystem({
+function alchemyItemModeSystem() {
+  return buildMockSystem({
     resolutionMode: 'alchemy',
-    alchemy: { learnOnCraft: true },
-    recipeVisibility: {
-      listMode: 'knowledge',
-      knowledge: {
-        mode: 'learned',
-        item: { limitUses: false },
-        learn: { consumeOnLearn: true }
-      }
-    }
+    visibilityMode: 'item',
+    alchemy: { learnOnCraft: true }
   });
+}
+
+function alchemyKnowledgeModeSystem() {
+  return buildMockSystem({
+    resolutionMode: 'alchemy',
+    visibilityMode: 'knowledge',
+    alchemy: { learnOnCraft: true }
+  });
+}
+
+test('AC9.1 - item mode: a HELD linked book reveals the recipe (and it is craftable)', () => {
+  const system = alchemyItemModeSystem();
   const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
   const formulaItem = new FakeItem({ uuid: 'formula-uuid' });
   const craftingActor = new FakeActor({ id: 'actor-1', items: [formulaItem] });
@@ -1838,26 +1850,33 @@ test('AC9.1 - alchemy mode: unlearned recipe with formula item is visible but no
 
   const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
 
-  assert.equal(result.visible, true, 'recipe should be visible when player has formula item');
-  assert.equal(result.craftable, false, 'recipe should not be craftable until learned');
-  assert.equal(result.reason, 'knowledge');
-  assert.equal(result.knowledge.hasMatchedItem, true);
-  assert.equal(result.knowledge.hasLearned, false);
+  assert.equal(result.visible, true, 'a held book reveals the recipe in item mode');
+  assert.equal(result.craftable, true, 'brewing is never gated by reveal');
+  assert.equal(result.reason, 'alchemy-revealed');
 });
 
-test('AC9.2 - alchemy mode: unlearned recipe without formula item remains hidden', () => {
-  const system = buildMockSystem({
-    resolutionMode: 'alchemy',
-    alchemy: { learnOnCraft: true },
-    recipeVisibility: {
-      listMode: 'knowledge',
-      knowledge: {
-        mode: 'learned',
-        item: { limitUses: false },
-        learn: { consumeOnLearn: true }
-      }
-    }
+test('AC9.1b - item mode: a book on a COMPONENT SOURCE actor reveals the recipe', () => {
+  const system = alchemyItemModeSystem();
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const formulaItem = new FakeItem({ uuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [] });
+  const sourceActor = new FakeActor({ id: 'source-1', items: [formulaItem] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({
+    recipe,
+    viewer,
+    craftingActor,
+    componentSourceActors: [sourceActor]
   });
+
+  assert.equal(result.visible, true, 'a book on a component source reveals the recipe');
+  assert.equal(result.craftable, true);
+});
+
+test('AC9.2 - item mode: no linked book held is NOT revealed but stays craftable', () => {
+  const system = alchemyItemModeSystem();
   const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
   const craftingActor = new FakeActor({ id: 'actor-1', items: [] });
   const viewer = { isGM: false, id: 'user-1' };
@@ -1866,22 +1885,81 @@ test('AC9.2 - alchemy mode: unlearned recipe without formula item remains hidden
   const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
 
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'alchemy-not-learned');
+  assert.equal(result.craftable, true, 'brewing is never gated by reveal');
+  assert.equal(result.reason, 'alchemy-unrevealed');
 });
 
-test('AC9.3 - alchemy mode: learned recipe remains visible and craftable', () => {
+test('AC9.3 - knowledge mode: a LEARNED recipe is revealed; a held-but-unlearned book is NOT', () => {
+  const system = alchemyKnowledgeModeSystem();
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const learnedActor = new FakeActor({
+    id: 'actor-1',
+    items: [],
+    flagsArg: { fabricate: { learnedRecipes: { 'recipe-1': { learnedAt: 1 } } } }
+  });
+  const learned = service.evaluateRecipeAccess({ recipe, viewer, craftingActor: learnedActor });
+  assert.equal(learned.visible, true);
+  assert.equal(learned.craftable, true);
+  assert.equal(learned.reason, 'alchemy-revealed');
+
+  // Holding the book without learning it does NOT reveal in knowledge mode.
+  const heldActor = new FakeActor({ id: 'actor-2', items: [new FakeItem({ uuid: 'formula-uuid' })] });
+  const held = service.evaluateRecipeAccess({ recipe, viewer, craftingActor: heldActor });
+  assert.equal(held.visible, false, 'knowledge mode reveals only via learning');
+  assert.equal(held.craftable, true);
+});
+
+test('AC9.4 - Manual (restricted): a per-recipe access grant reveals; without a grant it is unrevealed but craftable', () => {
   const system = buildMockSystem({
     resolutionMode: 'alchemy',
-    alchemy: { learnOnCraft: true },
-    recipeVisibility: {
-      listMode: 'knowledge',
-      knowledge: {
-        mode: 'learned',
-        item: { limitUses: false },
-        learn: { consumeOnLearn: true }
-      }
-    }
+    visibilityMode: 'restricted',
+    alchemy: { learnOnCraft: true }
   });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const granted = buildMockRecipe({ id: 'recipe-1', access: { playerIds: ['user-1'], characterIds: [] } });
+  const grantedResult = service.evaluateRecipeAccess({
+    recipe: granted,
+    viewer,
+    craftingActor: new FakeActor({ id: 'actor-1' })
+  });
+  assert.equal(grantedResult.visible, true, 'an access grant reveals the recipe');
+  assert.equal(grantedResult.craftable, true);
+  assert.equal(grantedResult.reason, 'alchemy-revealed');
+
+  const ungranted = buildMockRecipe({ id: 'recipe-2', access: { playerIds: ['someone-else'], characterIds: [] } });
+  const ungrantedResult = service.evaluateRecipeAccess({
+    recipe: ungranted,
+    viewer,
+    craftingActor: new FakeActor({ id: 'actor-1' })
+  });
+  assert.equal(ungrantedResult.visible, false);
+  assert.equal(ungrantedResult.craftable, true, 'brewing is never gated by reveal');
+  assert.equal(ungrantedResult.reason, 'alchemy-unrevealed');
+});
+
+test('AC9.5 - GM sees every alchemy recipe revealed and craftable', () => {
+  const system = alchemyItemModeSystem();
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const gm = { isGM: true, id: 'gm-user' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({
+    recipe,
+    viewer: gm,
+    craftingActor: new FakeActor({ id: 'actor-1', items: [] })
+  });
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'gm');
+});
+
+test('AC9.6 - discovery-by-brew is unioned across modes: a learned recipe reveals even under item mode with no held book', () => {
+  const system = alchemyItemModeSystem();
   const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
   const craftingActor = new FakeActor({
     id: 'actor-1',
@@ -1892,56 +1970,8 @@ test('AC9.3 - alchemy mode: learned recipe remains visible and craftable', () =>
   const service = buildService({ system });
 
   const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
-
-  assert.equal(result.visible, true);
+  assert.equal(result.visible, true, 'a brew-discovered recipe reveals in any mode');
   assert.equal(result.craftable, true);
-  assert.equal(result.reason, 'alchemy-learned');
-});
-
-test('AC9.4 - alchemy mode: recipe without linkedRecipeItemUuid stays hidden when not learned', () => {
-  const system = buildMockSystem({
-    resolutionMode: 'alchemy',
-    alchemy: { learnOnCraft: true }
-  });
-  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: null });
-  const craftingActor = new FakeActor({ id: 'actor-1', items: [] });
-  const viewer = { isGM: false, id: 'user-1' };
-  const service = buildService({ system });
-
-  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
-
-  assert.equal(result.visible, false);
-  assert.equal(result.reason, 'alchemy-not-learned');
-});
-
-test('AC9.5 - alchemy mode: canLearn derivation is true for unlearned recipe with formula item', () => {
-  const system = buildMockSystem({
-    resolutionMode: 'alchemy',
-    alchemy: { learnOnCraft: true },
-    recipeVisibility: {
-      listMode: 'knowledge',
-      knowledge: {
-        mode: 'learned',
-        item: { limitUses: false },
-        learn: { consumeOnLearn: true }
-      }
-    }
-  });
-  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
-  const formulaItem = new FakeItem({ uuid: 'formula-uuid' });
-  const craftingActor = new FakeActor({ id: 'actor-1', items: [formulaItem] });
-  const viewer = { isGM: false, id: 'user-1' };
-  const service = buildService({ system });
-
-  const access = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
-
-  const canLearn = access.reason === 'knowledge' &&
-    !!access.knowledge &&
-    access.knowledge.hasLearned !== true &&
-    Array.isArray(access.knowledge.matchedItems) &&
-    access.knowledge.matchedItems.length > 0;
-
-  assert.equal(canLearn, true);
 });
 
 // ---------------------------------------------------------------------------

@@ -299,7 +299,11 @@ export class Recipe {
       }
       resultGroupIds.add(group.id);
       if (!Array.isArray(group.results) || group.results.length === 0) {
-        if (requireComplete) {
+        // The reserved alchemy Simple failure group (`role: 'failure'`) is
+        // empty-by-default and legitimately produces nothing on a failed check, so
+        // an empty one is NOT a completeness error (issue 554). Every other empty
+        // group still blocks craftability under requireComplete.
+        if (requireComplete && group.role !== 'failure') {
           errors.push(`${label} result group "${group.id}" must contain at least one result`);
         }
         continue;
@@ -320,14 +324,17 @@ export class Recipe {
   }
 
   /**
-   * Validate an alchemy `resultSelection` and its `ResultGroup` names.
+   * Validate a legacy `resultSelection` and its `ResultGroup` names.
    *
-   * `resultSelection.provider` survives ONLY for alchemy (the routed crafting
-   * modes derive their basis from the system mode and clear `resultSelection`), so
-   * a recipe with no `resultSelection` (simple/progressive/routed/legacy) is
-   * unaffected. The alchemy `check` provider routes by the crafting-check outcome.
+   * The per-recipe `resultSelection.provider` is RETIRED (issue 554): alchemy
+   * routing moved to the system-level `alchemy.checkMode`, and no live resolution
+   * mode reads a provider. This path is now inert for current data — the migration
+   * strips `resultSelection` from alchemy recipes, so `provider` is absent and the
+   * guard below early-returns. It is retained only so a legacy recipe still carrying
+   * a stray provider before migration round-trips without a spurious name error.
+   * Tiered alchemy's `ResultGroup.name` uniqueness now lives in the service layer.
    *
-   * Under the alchemy providers, `ResultGroup.name` must be unique under
+   * Under a legacy provider, `ResultGroup.name` must be unique under
    * trim+lowercase comparison and must not collide with a reserved routing
    * keyword (the fail/miss/hazard families in `routedOutcomeKeywords.js`). The
    * shared keyword set keeps this in lockstep with the runtime resolution path in
@@ -351,11 +358,11 @@ export class Recipe {
   ) {
     if (!requireComplete) return;
     const provider = resultSelection?.provider;
-    // Only an alchemy provider routes by ResultGroup.name; a recipe with no
-    // resultSelection (simple/progressive/routed/legacy) is unaffected.
+    // Only a legacy provider routes by ResultGroup.name; a recipe with no
+    // resultSelection (every current mode after issue 554) is unaffected.
     if (!['ingredientSet', 'check'].includes(provider)) return;
 
-    // Reserved + unique ResultGroup.name rules apply under the alchemy providers
+    // Reserved + unique ResultGroup.name rules apply under a legacy provider
     // (spec 004 §routedByCheck Validation), using the shared keyword set so the
     // model and ResolutionModeService never drift.
     const seenNames = new Set();
@@ -400,6 +407,7 @@ export class Recipe {
         resultGroups: (step.resultGroups || []).map((group) => ({
           id: group.id,
           name: group.name,
+          ...(group.role === 'failure' ? { role: 'failure' } : {}),
           checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
           results: (group.results || []).map((result) =>
             result.toJSON ? result.toJSON() : result
@@ -411,6 +419,7 @@ export class Recipe {
       resultGroups: this.resultGroups.map((group) => ({
         id: group.id,
         name: group.name,
+        ...(group.role === 'failure' ? { role: 'failure' } : {}),
         checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
         results: group.results.map((r) => r.toJSON()),
       })),
@@ -480,26 +489,42 @@ export class Recipe {
    * Derive the default Complex flag from raw construction data. Returns true when
    * any scope (recipe-level or any step) already holds more than one ingredient set
    * or more than one result group, so legacy multi-set recipes default to Complex.
+   *
+   * NEVER fires for an alchemy recipe (data-models spec): alchemy authoring is
+   * decoupled from the single `complex` flag and forces a single ingredient set. The
+   * model is mode-unaware, so alchemy is detected via its signature — a reserved
+   * `role: 'failure'` result group (Simple), which no other mode carries. A
+   * migration-seeded two-group Simple recipe therefore reads Complex=false, not true.
    * @param {object} data - Raw recipe construction data.
    * @returns {boolean}
    * @private
    */
   _deriveComplex(data = {}) {
+    const scopeHasFailureGroup = (scope) =>
+      (Array.isArray(scope?.resultGroups) ? scope.resultGroups : []).some(
+        (group) => group?.role === 'failure'
+      );
+    const steps = Array.isArray(data.steps) ? data.steps : [];
+    if (scopeHasFailureGroup(data) || steps.some((step) => scopeHasFailureGroup(step))) {
+      return false;
+    }
     const scopeIsComplex = (scope) => {
       const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
       const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
       return ingredientSets.length > 1 || resultGroups.length > 1;
     };
     if (scopeIsComplex(data)) return true;
-    const steps = Array.isArray(data.steps) ? data.steps : [];
     return steps.some((step) => scopeIsComplex(step));
   }
 
   _normalizeResultSelection(resultSelection) {
     if (!resultSelection || typeof resultSelection !== 'object') return null;
-    // `ingredientSet` and `check` are the canonical providers — now ALCHEMY-only
-    // (the routed crafting modes derive their basis from the system mode and carry
-    // no `resultSelection`). The legacy
+    // `ingredientSet` and `check` are the only providers still recognised here, but
+    // the per-recipe provider is RETIRED (issue 554): alchemy routing moved to the
+    // system-level `alchemy.checkMode` and the routed crafting modes derive their
+    // basis from the system mode, so no live mode carries a `resultSelection`. This
+    // normalizer survives only to round-trip a legacy provider until migration
+    // strips it. The legacy
     // `macroOutcome`/`rollTableOutcome` providers were removed in 1.6.0 (persisted
     // recipes were migrated onto `check` by `migrateRemoveResultSelectionProviders`).
     // The `macroUuid` those providers carried is now orphaned — nothing reads it —
@@ -516,6 +541,12 @@ export class Recipe {
       return data.resultGroups.map((group, idx) => ({
         id: group?.id || foundry.utils.randomID(),
         name: group?.name || `Result Group ${idx + 1}`,
+        // Reserved role discriminator for the alchemy Simple failure result group
+        // (`'failure'`; absent/other = success). Simple-only — the recipe editor +
+        // service layer forbid it on None/Tiered groups. Preserved verbatim so a
+        // settings-only mode flip round-trips it; the runtime reads it in
+        // `ResolutionModeService._resolveAlchemyResultGroups`.
+        ...(group?.role === 'failure' ? { role: 'failure' } : {}),
         // Routed check-mode routing: ids of the system's routed-check outcome
         // tiers that produce this group. Empty for ingredient-mode / non-routed.
         checkOutcomeIds: this._normalizeIdList(group?.checkOutcomeIds),

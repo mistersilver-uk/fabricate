@@ -32,19 +32,27 @@
   // generic `optional` flag: d100 is the fixed roll (read-only note, no toggle),
   // while progressive/routed are editable checks that expose an Active toggle.
   const gatheringD100 = $derived(activeTab === 'gathering' && activation?.mode === 'd100');
+  // Alchemy "No check" mode: the crafting check does not run at all. Distinct from a
+  // MANDATORY check — hide the toggle AND show a "no check" hint, not the requiredHint.
+  const craftingNone = $derived(activeTab === 'crafting' && activation?.none === true);
   const showActiveToggle = $derived(
-    activeTab === 'gathering' ? !gatheringD100 : activation?.optional === true
+    activeTab === 'gathering' ? !gatheringD100 : !craftingNone && activation?.optional === true
   );
   const requiredHint = $derived(
-    activeTab === 'gathering'
+    craftingNone
       ? text(
-          'FABRICATE.Admin.Manager.Checks.Active.GatheringHint',
-          'In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.'
+          'FABRICATE.Admin.Manager.Checks.Active.AlchemyNoneHint',
+          'This alchemy system resolves without a crafting check. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author one.'
         )
-      : text(
-          'FABRICATE.Admin.Manager.Checks.Active.RequiredHint',
-          'The current resolution mode requires this check, so it cannot be turned off here.'
-        )
+      : activeTab === 'gathering'
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Active.GatheringHint',
+            'In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Checks.Active.RequiredHint',
+            'The current resolution mode requires this check, so it cannot be turned off here.'
+          )
   );
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
@@ -56,7 +64,7 @@
       title: text('FABRICATE.Admin.Manager.Checks.Crafting.HelpTitle', 'About crafting checks'),
       desc: text(
         'FABRICATE.Admin.Manager.Checks.Crafting.HelpDesc',
-        'The crafting check is shaped by the system resolution mode: simple and alchemy author a pass/fail check, routed authors outcome tiers, and progressive requires a check.'
+        'The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.'
       ),
       docsHref: `${DOCS_BASE}/crafting-checks`,
       docsLabel: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs')

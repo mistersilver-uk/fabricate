@@ -83,7 +83,9 @@ For example, switching to Progressive mode without a progressive crafting check,
 Those gaps are reported in the System Overview instead, and they hide recipes from players until you fix them rather than deleting anything.
 See [System Overview](#system-overview).
 
-When the new mode is Alchemy, Fabricate also re-checks recipe ingredient signatures so any overlap that would make alchemy attempts ambiguous is surfaced rather than silently broken.
+When the new mode is Alchemy, a recipe that has more than one ingredient set is kept and collapsed to its first set, because an alchemy recipe has a single ingredient set.
+The system's Alchemy check starts at No check, and you can change it under Recipe resolution afterwards.
+Fabricate also re-checks recipe ingredient signatures so any overlap that would make alchemy attempts ambiguous is surfaced rather than silently broken.
 
 After the change, Fabricate shows a summary of how many recipes were migrated, and a separate warning listing any recipes it had to delete.
 
@@ -161,7 +163,7 @@ Alchemy mode is a special resolution mode where recipe names and ingredient list
 Macros and integrations can submit selected items to the alchemy engine.
 Fabricate matches the combination against known recipe signatures.
 Set the resolution mode of a system to Alchemy to enable this.
-See [Alchemy Mode]({% link recipes/alchemy.md %}) for current usage, configuration, signature matching, consume-on-fail, and learn-on-craft options.
+See [Alchemy Mode]({% link recipes/alchemy.md %}) for current usage, the Alchemy check setting, signature matching, consume-on-fail, and learn-on-craft options.
 
 ---
 

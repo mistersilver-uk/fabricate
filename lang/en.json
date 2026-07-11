@@ -868,6 +868,73 @@
           "StaminaPool": "Stamina: {current}/{max}",
           "StaminaPoolNone": "No stamina pool set"
         }
+      },
+      "Alchemy": {
+        "ChooseDiscipline": "Choose a discipline",
+        "ChooseDisciplineHint": "Select an alchemy discipline to work in.",
+        "SystemSummary": "{known} known · {total} total",
+        "EnterDiscipline": "Enter",
+        "EssenceTotal": "Essences",
+        "Loading": "Loading alchemy…",
+        "Error": "Something went wrong loading the workbench",
+        "NoActor": "Select a character to use the workbench",
+        "YourComponents": "Your components",
+        "TapToPlace": "Tap or drag onto the bench",
+        "SearchComponents": "Search components…",
+        "EmptyInventoryTitle": "No components",
+        "EmptyInventoryHint": "You own no components for this discipline yet.",
+        "NoComponentMatchesTitle": "No matches",
+        "NoComponentMatchesHint": "No owned components match your search.",
+        "AddComponent": "Add {name} to the bench",
+        "Available": "{available} of {held} available",
+        "Makes": "Makes {name} ×{qty}",
+        "KnownRecipes": "Known recipes",
+        "SwitchDiscipline": "Switch discipline",
+        "SearchKnown": "Search known recipes…",
+        "ZeroKnownTitle": "No recipes revealed yet",
+        "ZeroKnownHint": "Learn or brew recipes to reveal them here.",
+        "NoRecipeMatchesTitle": "No matches",
+        "NoRecipeMatchesHint": "No revealed recipes match your search.",
+        "Undiscovered": "{count} not yet revealed.",
+        "UndiscoveredHint": "Reveal more by brewing to discover them, or through books, scrolls, and GM grants.",
+        "Status": {
+          "Empty": "Place components on the bench to begin.",
+          "Assembling": "Assembling “{name}” — add the missing components.",
+          "Ready": "Known recipe — “{name}”. Ready to brew.",
+          "Untried": "You haven't tried this combination. Brew to find out what it does.",
+          "NoReaction": "No reaction. This exact set of ingredients makes nothing."
+        },
+        "BrewAction": {
+          "Ready": "Brew {name}",
+          "Experiment": "Experiment",
+          "ExperimentAnyway": "Experiment anyway",
+          "AddMissing": "Add missing components",
+          "Default": "Brew"
+        },
+        "Banner": {
+          "Discovered": "Discovered {name}!",
+          "Brewed": "Brewed successfully.",
+          "TieredTier": "Brewed successfully — the check outcome selected the result.",
+          "ProducedOnFailure": "The brew failed its check and yielded the failure result.",
+          "DiscoveredOnFailure": "Learned {name} — the brew failed and yielded the failure result.",
+          "Fizzled": "The mixture fizzles — no reaction."
+        },
+        "Workbench": "Workbench",
+        "Clear": "Clear",
+        "WorkbenchIntro": "Tap components from your inventory to place them here. Each recipe is defined by its exact set of ingredients.",
+        "DropZone": "Alchemy workbench — drop or tap components to add them",
+        "BenchEmptyTitle": "The bench is empty",
+        "BenchEmptyHint": "Tap components on the right to add them, or pick a known recipe to auto-load its ingredients.",
+        "RemoveComponent": "Remove {name} from the bench",
+        "RemoveOneComponent": "Remove one {name} from the bench",
+        "RemoveAllComponent": "Remove all {name} from the bench",
+        "ChipActions": "{name}. Activate to add one, Shift+activate or right-click to remove one, the × button to remove all.",
+        "Signature": "Signature",
+        "Produces": "Produces",
+        "UnknownReactionTitle": "Unknown outcome",
+        "UnknownReactionDesc": "You haven't tried this combination. Brew to find out what it does.",
+        "StillNeeded": "Still needed",
+        "MissingRow": "{name} ×{need}"
       }
     },
     "Settings": {
@@ -1298,6 +1365,7 @@
           "IssueProgressiveNoCheck": "Progressive mode requires a configured progressive crafting check.",
           "IssueProgressiveNoDifficulty": "Progressive mode requires at least one component with a difficulty of 1 or more.",
           "IssueMultiStepInAlchemy": "Multi-step recipes cannot be used while the system is in alchemy mode.",
+          "IssueAlchemyCheckNoFormula": "The alchemy check mode is Simple or Tiered but no crafting check roll formula is configured; no brew can resolve until one is set.",
           "IssueAlchemySignatureCollision": "Two recipes share an ingredient signature, so alchemy attempts are ambiguous."
         },
         "Nav": {
@@ -1336,17 +1404,23 @@
             "SalvageIntro": "Choose how a salvage attempt is turned into returned components.",
             "Subtitle": "Control how players get access to the recipes in this system.",
             "VisibilityHeading": "Recipe visibility",
-            "VisibilityIntro": "Pick how a recipe becomes available to a character. Exactly one mode is active for the whole system."
+            "VisibilityIntro": "Pick how a recipe becomes available to a character. Exactly one mode is active for the whole system.",
+            "VisibilityIntroAlchemy": "Pick how a recipe is revealed in a character’s Known recipes list. Any character can still brew any recipe by matching its ingredients."
           },
           "Visibility": {
             "Global": "Global",
             "GlobalDesc": "Every player and character sees all recipes. Nothing is gated.",
+            "GlobalAlchemyDesc": "Every recipe a character brews is revealed to them. Brewing is never gated.",
             "Item": "Item",
             "ItemDesc": "A character must have the item in their pack. Only mode where limited use appears in the Books & Scrolls editor.",
+            "ItemAlchemyDesc": "A recipe is revealed while a character holds its linked book or scroll. Brewing is never gated.",
             "Knowledge": "Knowledge",
             "KnowledgeDesc": "A character must learn the recipe from a scroll or book using the item. Only mode where learning limits appear in the Books & Scrolls editor.",
+            "KnowledgeAlchemyDesc": "A recipe is revealed once a character learns it from a book or scroll. Brewing is never gated.",
             "Restricted": "Restricted",
-            "RestrictedDesc": "Recipes can be made visible to specific characters or players."
+            "RestrictedDesc": "Recipes can be made visible to specific characters or players.",
+            "Manual": "Manual (GM-granted access)",
+            "ManualDesc": "You reveal recipes to specific characters or players in the Access tab. Any character can still brew any recipe by matching its ingredients."
           },
           "Effect": {
             "SummaryGlobal": "Every recipe is visible to all players.",
@@ -1580,6 +1654,8 @@
           "AddResultSet": "Add result set",
           "RemoveResultSet": "Remove result set",
           "ResultSetNamePlaceholder": "Result set name",
+          "AlchemyOnSuccess": "On success",
+          "AlchemyOnFailure": "On a failed check",
           "RoutingIngredientSets": "Produced by",
           "RoutingAddIngredientSet": "Add ingredient set",
           "RoutingSearchIngredientSets": "Search ingredient sets...",
@@ -3296,15 +3372,18 @@
             "Title": "Active",
             "OptionalHint": "Turn this check on to require a roll for the activity, or off to resolve it without one.",
             "RequiredHint": "The current resolution mode requires this check, so it cannot be turned off here.",
-            "GatheringHint": "In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here."
+            "GatheringHint": "In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.",
+            "AlchemyNoneHint": "This alchemy system resolves without a crafting check. Choose Simple or Tiered at the top of the Crafting tab to author one."
           },
           "Crafting": {
             "PageTitle": "Crafting check",
             "PageLead": "A system has a single crafting check. Its shape is determined by the system's resolution mode and preserved when you switch modes.",
             "ConfigHint": "Roll, difficulty, and outcome settings for the crafting check will appear here.",
+            "AlchemyNoneTitle": "Resolves without a check",
+            "AlchemyNoneLead": "This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered above to author a crafting check.",
             "HelpKicker": "Crafting checks",
             "HelpTitle": "About crafting checks",
-            "HelpDesc": "The crafting check is shaped by the system resolution mode: simple and alchemy author a pass/fail check, routed authors outcome tiers, and progressive requires a check.",
+            "HelpDesc": "The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.",
             "Docs": "Docs",
             "TypeTitle": "Check type",
             "TypeRelative": "Relative",
@@ -3774,7 +3853,15 @@
           "Hint": "Configure the learning and failure behavior used by alchemy attempts in this crafting system.",
           "LearnOnCraft": "Learn recipes after a successful attempt",
           "ConsumeOnFail": "Consume submitted ingredients on failed attempts",
-          "ShowAttemptHistoryToPlayers": "Show attempt history to players"
+          "ShowAttemptHistoryToPlayers": "Show attempt history to players",
+          "CheckModeHeading": "Alchemy check",
+          "CheckModeIntro": "Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.",
+          "CheckModeNone": "No check",
+          "CheckModeNoneDesc": "A matched brew always succeeds and produces its single result set. No crafting check.",
+          "CheckModeSimple": "Simple check",
+          "CheckModeSimpleDesc": "A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.",
+          "CheckModeTiered": "Tiered check",
+          "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check."
         },
         "OutcomeRouting": {
           "Title": "Outcome Routing",

@@ -234,6 +234,7 @@ CraftingSystem = {
 
   // Present only when resolutionMode === "alchemy".
   alchemy?: {
+    checkMode: "none" | "simple" | "tiered", // default "none" (issue 554)
     learnOnCraft: boolean, // default false
     consumeOnFail: boolean, // default true
     showAttemptHistoryToPlayers: boolean, // default true
@@ -277,7 +278,9 @@ Legacy persisted `features.itemTags` and `enableTags` values are compatibility i
 7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, or `"alchemy"`.
 8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
-   - `alchemy` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
+   - `alchemy` config must be present; missing values use defaults (`checkMode: "none"`, `learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
+   - `alchemy.checkMode` selects the check slot: `none` → no check; `simple` → the mandatory `craftingCheck.simple` pass/fail check; `tiered` → the mandatory `craftingCheck.routed` check.
+An invalid value normalizes to `none`.
 9. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
 9a.
 The per-system gathering economy block (`gatheringConfig.systems[systemId].economy`, defined in `gathering-and-harvesting`) carries a normalized `resolutionMode: "d100" | "progressive" | "routed"` (default `"d100"`).
@@ -723,7 +726,11 @@ Recipe = {
   transferEffects: boolean,
   toolIds: string[], // references library Tools that apply to all ingredient sets across all steps in this recipe
 
-  // Routed/alchemy result-group selection
+  // RETIRED result-group selection. `resultSelection.provider` is no longer a live
+  // routing basis for any mode: alchemy now routes on the system-level
+  // `CraftingSystem.alchemy.checkMode` (issue 554), and the routed crafting modes
+  // derive their basis from the system mode. The 1.14.0 migration strips this from
+  // every alchemy recipe; it survives only as an un-migrated read fallback.
   resultSelection?: {
     provider: "ingredientSet" | "check",
   },
@@ -777,15 +784,18 @@ Recipe = {
    `Recipe.validateStructure()` omits completeness (it waives the missing-ingredient-set / missing-result-group / missing-result errors) and is the persistence contract.
 2. An authoring *incomplete shell* — a recipe with valid identity (a name; default name "Unnamed Recipe" and default image apply when omitted) that is structurally consistent but missing its ingredient sets and/or result groups — MAY be persisted via the GM authoring path (create-then-edit and identity-only saves).
    Persistence gates only on structural validity (`validateStructure()`), never on completeness; structural-integrity errors (duplicate result-group/result IDs, invalid results, invalid step time/currency values, variable result-mapping and outcome-routing integrity) still block persistence.
-   Reserved/duplicate `ResultGroup.name` is a *completeness* rule (enforced only by the full `Recipe.validate()` / at activation, and only for the `alchemy` `resultSelection.provider`), NOT a structural/persistence blocker: `validateStructure()` waives it (`Recipe._validateRoutedResultSelection` returns early when `requireComplete` is false), so a routed-mode recipe carrying a stray leftover `resultSelection.provider` is never blocked on a name error.
+   Reserved/duplicate `ResultGroup.name` is a reference-integrity rule enforced at the service level for the routed modes and alchemy `tiered` check mode (see the next paragraph), NOT a structural/persistence blocker: `validateStructure()` waives the name checks, so an authoring incomplete shell — or a recipe carrying a stray leftover `resultSelection` — is never blocked on a name error.
+   Issue 554 retired the per-recipe `resultSelection.provider`, so `Recipe._validateRoutedResultSelection` no longer governs alchemy name-uniqueness.
    `routedByCheck` `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, a per-mode reference-integrity check that always applies), independent of this persistence gate.
    Incompleteness is *derived* from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
 3. Resolution-mode constraints are defined in `004-resolution-modes.md`.
-4. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `alchemy` (the only mode that routes via a per-recipe provider).
-   The routed crafting modes derive their routing basis from the system mode and carry no `resultSelection`: `routedByIngredients` routes by `IngredientSet.resultGroupId` and `routedByCheck` routes by `ResultGroup.name`/`checkOutcomeIds` against the system routed check.
-5. `resultSelection.provider` value constraints for alchemy (the provider enum is `ingredientSet | check`):
-   - `ingredientSet`: each `IngredientSet` must resolve deterministically to exactly one `ResultGroup` (via `IngredientSet.resultGroupId`, or implicitly when only one result group exists).
-   - `check`: the system crafting-check outcome routes to the `ResultGroup` of the same name.
+4. `resultSelection.provider` is RETIRED for alchemy (issue 554): alchemy routes on the SYSTEM-level `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`), not a per-recipe provider.
+   The 1.14.0 migration strips `resultSelection` from every alchemy recipe.
+   No live mode reads `resultSelection`: `routedByIngredients` routes by `IngredientSet.resultGroupId` and `routedByCheck` routes by `ResultGroup.name`/`checkOutcomeIds` against the system routed check, and alchemy routes per its `checkMode`.
+5. Alchemy result-group selection is per `CraftingSystem.alchemy.checkMode`:
+   - `none`: one ingredient set + one result group; a matched brew always produces that group (no check).
+   - `simple`: the success result group on a passed `craftingCheck.simple`, and the reserved `role: 'failure'` result group on a fail (produced only when non-empty).
+   - `tiered`: identical to `routedByCheck` — each success outcome tier routes to its assigned `ResultGroup` via `checkOutcomeIds`; a failed routed check fizzles.
 6. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
 7. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
@@ -950,7 +960,7 @@ IngredientSet = {
   essences: { [essenceId: string]: number },
   toolIds: string[], // references library Tools required for this ingredient set
 
-  // Routed/alchemy: used when resultSelection.provider === "ingredientSet"
+  // routedByIngredients: routes the satisfied ingredient set to this result group
   resultGroupId?: string,
 }
 ```
@@ -1194,9 +1204,20 @@ Group one or more results.
 ResultGroup = {
   id: string,
   name: string,
+  // Reserved role discriminator (issue 554). `'failure'` marks the alchemy Simple
+  // reserved failure result group; absent/other = a success group. Simple-only —
+  // forbidden on None/Tiered groups. The reserved failure group is undeletable in
+  // the editor and defaults to empty. Preserved verbatim by normalization so a
+  // settings-only mode flip round-trips it.
+  role?: "failure",
+  // Ids of the routed-check outcome tiers that produce this group (routedByCheck +
+  // alchemy tiered). Empty for non-tiered groups.
+  checkOutcomeIds?: string[],
   results: Result[],
 }
 ```
+
+`ResultGroup.name` reserved/duplicate integrity now applies at the service layer for the routed modes AND alchemy `tiered` only (`ResolutionModeService._validateRoutedGroupNames`); with `resultSelection.provider` retired, the model no longer validates alchemy names via `Recipe._validateRoutedResultSelection`, and `Recipe._deriveComplex` never governs alchemy authoring (the editor forces a single ingredient set).
 
 ## Result
 
@@ -1290,7 +1311,7 @@ CraftingRunStepState = {
   lastCheckResult?: {
     success: boolean,
     reason: string,   // user-friendly text returned by the macro explaining the result
-    outcome?: string, // routedByCheck mode / alchemy check provider
+    outcome?: string, // routedByCheck mode / alchemy tiered check mode
     value?: number,   // progressive mode
     data?: object,
   },
@@ -1321,7 +1342,7 @@ CraftingRunStepState = {
 2. `timeGate` is only valid when the corresponding recipe step has `timeRequirement`.
 3. `timeGate.availableAt` must be `> initiatedAt` when both are present.
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
-5. `lastCheckResult.outcome` is only valid in `routedByCheck` mode (and in alchemy when the provider is `check`); `lastCheckResult.value` is only valid in progressive mode.
+5. `lastCheckResult.outcome` is only valid in `routedByCheck` mode (and in alchemy when `checkMode` is `tiered`); `lastCheckResult.value` is only valid in progressive mode.
 6. `failureReason` is required when `status` is `failed`.
 
 ## Actor Flags
@@ -1380,6 +1401,24 @@ Requirements:
 1. `recipeId` must reference a valid recipe.
 2. `learnedAt` must be a valid timestamp.
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
+
+### Alchemy Dead-Ends Flag
+
+A sibling actor flag to `learnedRecipes`, holding the per-character workbench tried-dead-end memory.
+
+```js
+Actor.flags.fabricate.alchemyDeadEnds = {
+  [craftingSystemId: string]: string[],   // canonical `componentId:qty|...` signature keys
+}
+```
+
+Requirements:
+
+1. Each array is append-only and deduped — the canonical key of a submitted multiset is added once per (actor x system).
+2. A key is written only when the matched system's `alchemy.showAttemptHistoryToPlayers === true`, on a fizzled (no-match) brew.
+3. The signature key is the sorted `componentId:qty|...` join of the submitted plain-component multiset (the single shared canonical-key helper).
+4. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is doubly nested under `flags.fabricate.fabricate.alchemyDeadEnds` (the flag helpers prefix `fabricate.`), so it is never read via a raw `actor.flags.fabricate.alchemyDeadEnds` path.
+5. It affects only the client workbench status model (flipping `untried` -> `no-reaction`) and grants no recipe visibility (a fizzle matches no enabled recipe).
 
 ### Discovered Gathering Realms Flag
 

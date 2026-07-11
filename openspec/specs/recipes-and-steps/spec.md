@@ -207,6 +207,13 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 2. Failed attempts include no-signature failures and failed checks.
 3. Player history visibility is controlled by `alchemy.showAttemptHistoryToPlayers`.
 
+The `alchemy.showAttemptHistoryToPlayers` flag now governs two distinct concepts:
+
+- Its existing role gates player **visibility** of the always-recorded run/attempt history (default true).
+- Additionally, it gates **recording** of the per-character workbench dead-end memory (`Actor.flags.fabricate.alchemyDeadEnds`) — an append-only, deduped array of canonical `componentId:qty|...` signature keys per crafting system, written on a fizzled brew.
+
+The dead-end memory is distinct from run history: it is leak-safe (a fizzle matches no enabled recipe, so it grants no recipe visibility) and is consumed only by the workbench status model to flip an `untried` bench to `no-reaction`.
+
 ## Time and Currency Requirements
 
 - If the system-level requirement toggle is disabled, step-level values are ignored.
@@ -398,7 +405,7 @@ If recipe-level sets are absent, display the active step's sets or a step overvi
   - OR across ingredient sets
   - AND across groups within a set
   - OR within group options
-- Unit tests for routed resolution per mode (`routedByIngredients`, `routedByCheck`) and the alchemy providers (`ingredientSet`, `check`).
+- Unit tests for routed resolution per mode (`routedByIngredients`, `routedByCheck`) and the alchemy check-mode matrix (`none`, `simple` pass/fail incl. the reserved failure-group path, `tiered`).
 - Unit tests for time/currency gate checks.
 - Integration tests for end-to-end multistep crafting, resume, and completion.
 - Unit tests for alchemy no-signature handling (failure + ingredient consumption + history entry).

@@ -43,7 +43,14 @@
   // The shared ResolutionModeCard renders label + description per option; the
   // `icon` field rides along for parity with the design (and any future icon-aware
   // card variant) and is harmlessly ignored by the current primitive.
-  const visibilityModeOptions = [
+  //
+  // For a non-alchemy system these read as GATING (a recipe is hidden until the
+  // mode's condition is met). An alchemy system is REVEAL-not-gate: brewing is never
+  // gated by visibility, so the same modes only decide which recipes are REVEALED in
+  // the player's Known list, and `restricted` is displayed as "Manual (GM-granted
+  // access)". The STORED enum value is identical in both (`restricted` stays
+  // `restricted` — no migration); only the label/description differ.
+  const craftingVisibilityModeOptions = [
     {
       value: 'global',
       icon: 'fas fa-globe',
@@ -79,6 +86,64 @@
         'A character must learn the recipe from a scroll or book using the item. Only mode where learning limits appear in the Books & Scrolls editor.'
     }
   ];
+
+  // Alchemy relabel: reveal language, and `restricted` → "Manual (GM-granted
+  // access)". Stored value is unchanged (`restricted`).
+  const alchemyVisibilityModeOptions = [
+    {
+      value: 'global',
+      icon: 'fas fa-globe',
+      labelKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.Global',
+      fallback: 'Global',
+      descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.GlobalAlchemyDesc',
+      descFallback: 'Every recipe a character brews is revealed to them. Brewing is never gated.'
+    },
+    {
+      value: 'restricted',
+      icon: 'fas fa-user-lock',
+      labelKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.Manual',
+      fallback: 'Manual (GM-granted access)',
+      descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.ManualDesc',
+      descFallback:
+        'You reveal recipes to specific characters or players in the Access tab. Any character can still brew any recipe by matching its ingredients.'
+    },
+    {
+      value: 'item',
+      icon: 'fas fa-box-open',
+      labelKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.Item',
+      fallback: 'Item',
+      descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.ItemAlchemyDesc',
+      descFallback:
+        'A recipe is revealed while a character holds its linked book or scroll. Brewing is never gated.'
+    },
+    {
+      value: 'knowledge',
+      icon: 'fas fa-graduation-cap',
+      labelKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.Knowledge',
+      fallback: 'Knowledge',
+      descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.KnowledgeAlchemyDesc',
+      descFallback:
+        'A recipe is revealed once a character learns it from a book or scroll. Brewing is never gated.'
+    }
+  ];
+
+  const isAlchemy = $derived(selectedSystem?.resolutionMode === 'alchemy');
+  const visibilityModeOptions = $derived(
+    isAlchemy ? alchemyVisibilityModeOptions : craftingVisibilityModeOptions
+  );
+  // Alchemy is reveal-not-gate, so the intro must not say "becomes available"
+  // (implies gating). It picks which source REVEALS a recipe in the Known list.
+  const visibilityIntro = $derived(
+    isAlchemy
+      ? text(
+          'FABRICATE.Admin.Manager.Crafting.Settings.VisibilityIntroAlchemy',
+          'Pick how a recipe is revealed in a character’s Known recipes list. Any character can still brew any recipe by matching its ingredients.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Crafting.Settings.VisibilityIntro',
+          'Pick how a recipe becomes available to a character. Exactly one mode is active for the whole system.'
+        )
+  );
 
   // Per-mode fallback copy for the effect summary strip; keyed by visibility mode
   // and resolved through the projected `craftingEffect.summaryKey`.
@@ -168,7 +233,7 @@
               <i class="fas fa-eye" aria-hidden="true"></i>
               <h3 class="crafting-settings-section-title">{text('FABRICATE.Admin.Manager.Crafting.Settings.VisibilityHeading', 'Recipe visibility')}</h3>
             </div>
-            <p class="crafting-settings-section-intro">{text('FABRICATE.Admin.Manager.Crafting.Settings.VisibilityIntro', 'Pick how a recipe becomes available to a character. Exactly one mode is active for the whole system.')}</p>
+            <p class="crafting-settings-section-intro">{visibilityIntro}</p>
             <ResolutionModeCard
               cardId="manager-crafting-visibility-mode"
               legendKey="FABRICATE.Admin.Manager.Crafting.Settings.VisibilityHeading"

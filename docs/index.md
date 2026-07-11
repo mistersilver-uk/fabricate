@@ -14,7 +14,8 @@ A system-agnostic crafting and gathering module for Foundry Virtual Tabletop.
 Fabricate lets GMs define crafting systems with recipes, ingredients, tools, essences, gathering environments, tasks, and events.
 Crafting recipes can currently be authored and executed through the public API.
 An early GM recipe editor in the Crafting Admin panel can edit a recipe's identity and link a recipe item, with full recipe authoring still in progress.
-The player-facing Crafting and Alchemy tabs in the unified Fabricate window are planned UI surfaces.
+Players brew alchemy from the Alchemy Workbench tab in the unified Fabricate window.
+The player-facing Crafting tab in that window is a planned UI surface.
 
 ---
 

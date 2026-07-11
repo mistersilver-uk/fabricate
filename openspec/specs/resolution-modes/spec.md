@@ -13,17 +13,18 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   `007-destructive-changes-and-migrations.md`:
   recipes are migrated to fit the new mode wherever possible and a recipe is
   deleted only when a per-recipe *structural* constraint of the target mode cannot
-  be satisfied by seeding the alchemy provider or clearing the result selection.
+  be satisfied by clearing the result selection or collapsing a multi-set recipe.
   System-level gaps (a target mode that needs a check the system has not
   configured, an alchemy signature collision, ...) never delete a recipe; they are
   surfaced as system-validation issues that gate visibility, not deletion.
 - **Migratability matrix (normative).**
   The columns are the *target* mode and the rows the *source* mode.
   RI = `routedByIngredients`, RC = `routedByCheck`.
-  "seed" seeds the alchemy `resultSelection.provider` — `ingredientSet`/`check`
-  when the source is the matching routed mode, otherwise `check` when the system
-  has a usable crafting check, else `ingredientSet`
-  (alchemy is the only mode that still routes via a recipe-level provider);
+  Migrating *into* alchemy no longer seeds a per-recipe provider (retired, issue 554):
+  it clears any stale `resultSelection` and collapses a multi-INGREDIENT-SET recipe
+  to its first set (best-effort, single `console.warn`); the system-level
+  `alchemy.checkMode` is seeded separately (defaults to `none`, or via the
+  `hasCheckProvider`/`hasTieredShape` reduction on the startup migration).
   "clear" sets `resultSelection` to `null`;
   "carry" keeps the recipe verbatim;
   "reconcile" means the recipe survives but its stale routing is surfaced as a
@@ -32,16 +33,18 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
   | From \ To             | `simple`                     | `routedByIngredients`        | `routedByCheck`                          | `progressive`                | `alchemy`                                                           |
   |-----------------------|------------------------------|------------------------------|------------------------------------------|------------------------------|--------------------------------------------------------------------|
-  | `simple`              | —                            | clear                        | clear; reconcile                         | clear                        | seed                                                               |
-  | `routedByIngredients` | clear if 1×1 else **delete** | —                            | carry; reconcile                         | clear if 1×1 else **delete** | seed provider=`ingredientSet`, carry if single-step else **delete** |
-  | `routedByCheck`       | clear if 1×1 else **delete** | carry; reconcile             | —                                        | clear if 1×1 else **delete** | seed provider=`check`, carry if single-step else **delete**         |
-  | `progressive`         | clear                        | clear                        | clear; reconcile                         | —                            | seed                                                               |
-  | `alchemy`             | clear if 1×1 else **delete** | clear (drop provider), carry | clear (drop provider), carry; reconcile  | clear if 1×1 else **delete** | —                                                                  |
+  | `simple`              | —                            | clear                        | clear; reconcile                         | clear                        | clear; collapse multi-set                                          |
+  | `routedByIngredients` | clear if 1×1 else **delete** | —                            | carry; reconcile                         | clear if 1×1 else **delete** | clear; collapse multi-set; single-step else **delete**            |
+  | `routedByCheck`       | clear if 1×1 else **delete** | carry; reconcile             | —                                        | clear if 1×1 else **delete** | clear; collapse multi-set; single-step else **delete**            |
+  | `progressive`         | clear                        | clear                        | clear; reconcile                         | —                            | clear; collapse multi-set                                          |
+  | `alchemy`             | clear if 1×1 else **delete** | carry                        | carry; reconcile                         | clear if 1×1 else **delete** | —                                                                  |
 
   The only structural delete causes are: narrowing into `simple`/`progressive`
   (which require 1×1) from a recipe with more than one ingredient set or result
-  group, and moving a multi-step recipe into `alchemy` (which has no multi-step
+  group, and moving a multi-STEP recipe into `alchemy` (which has no multi-step
   support).
+Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
+  collapse to the first set, NOT a delete.
   `RI↔RC` never deletes (`carry`); it reconciles stale routing.
   Re-running a `carry` migration with no reconcile pending is a no-op (idempotent).
 - Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks always apply, per mode: `routedByIngredients` checks the invalid `resultGroupId` integrity, and `routedByCheck` checks the reserved/duplicate `ResultGroup.name`. (The routed modes carry no `resultSelection.provider`, so there is no provider value to validate.) (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `007-destructive-changes-and-migrations.md §Resolution-Model Migration`, which hard-migrates `mapped → routedByIngredients` and `tiered → routedByCheck`.)
@@ -54,7 +57,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 | `routedByIngredients` | one or more     | one or more                 | optional           | `IngredientSet.resultGroupId`       |
 | `routedByCheck`       | one or more     | one or more                 | required           | system routed-check outcome         |
 | `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
-| `alchemy`             | one or more     | one or more                 | provider-dependent | recipe `resultSelection.provider`   |
+| `alchemy`             | exactly 1       | per `checkMode` (see below) | none / required-when-simple / required-when-tiered | system `alchemy.checkMode`          |
 
 ## Player-Facing Mode Labels
 
@@ -205,15 +208,21 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 ### Semantics
 
 - Player submits ingredient combinations directly instead of selecting a visible recipe.
-- Recipes remain hidden by default for non-GM users (see `006` for `learnOnCraft` semantics).
-- Result-group selection uses recipe-level providers (`ingredientSet`, `check`); alchemy is the only mode that retains a per-recipe `resultSelection.provider`.
-The `ingredientSet` provider routes by `IngredientSet.resultGroupId` and the `check` provider routes by the crafting-check outcome name (the same routing contracts the `routedByIngredients`/`routedByCheck` modes apply at the mode level).
+- Recipe visibility is **reveal-not-gate** (see `006`): the system's `visibilityMode` selects which source REVEALS a recipe in a non-GM's Known list (`item` = a held book/scroll, `knowledge` = learned, Manual/`restricted` = a per-recipe access grant, `global` = brew-discovery), with brew-discovery unioned across all modes; brewing is NEVER gated by visibility (a matched ingredient signature is the sole brew gate, so a non-GM alchemy recipe is always `craftable`). `learnOnCraft` governs only whether a matched brew records the brew-discovery reveal, never craftability.
+- An alchemy recipe always has EXACTLY ONE ingredient set and is never routed by ingredients.
+- Result-group selection and check-ness are driven by the SYSTEM-level `alchemy.checkMode` (`none` | `simple` | `tiered`), NOT a per-recipe `resultSelection.provider` (retired, issue 554; this supersedes the earlier "alchemy check optional" behaviour):
+  - **None** — one ingredient set + one result group, no check; a matched brew always succeeds and produces that group.
+  - **Simple** — the mandatory shared `craftingCheck.simple` pass/fail check (cannot be disabled).
+Pass → the success result group; fail → the reserved `role: 'failure'` result group (produced only when non-empty; a matched fail is a genuine outcome, not a fizzle).
+The failure group's absence is tolerated (a settings-only None→Simple flip runs no recipe migration).
+  - **Tiered** — behaves EXACTLY like `routedByCheck`: the mandatory `craftingCheck.routed` check (cannot be disabled) routes each success outcome to its assigned `ResultGroup` via `checkOutcomeIds`; a failed routed check fizzles before result creation.
+Tiered has NO `role: 'failure'` group.
 - Multi-step recipes are not supported.
-- `consumeOnFail` defaults to true for failed attempts.
+- `consumeOnFail` defaults to true; a matched Simple fail consumes via `alchemy.consumeOnFail`, consistent with a no-match fizzle (NOT the crafting-check consumption policy).
 
 ### Signature Resolution
 
-- Matching is based on satisfiable signatures from ingredient groups/options.
+- Matching is based on satisfiable signatures from the single ingredient set's groups/options (the multi-group loop degenerates to one set).
 - A submitted item's component identity is resolved through the shared, list-aware, system-scoped Component Item Matching resolver `resolveComponentForItem(item, components, systemId)` defined in the `data-models` spec, durable-flag-first.
 Signature matching MUST resolve each submission to at most one component through that resolver, not a raw source-reference intersection that ignores the durable `flags.fabricate.roles[systemId].componentId`.
 - A submitted item is attributed to exactly one component: when its `roles[systemId].componentId` (or the legacy scalar `componentId`) names a component in the system, it resolves exclusively to that component even if it carries a transitive `_stats.duplicateSource` pointing at a different component's source; when no claimed id names a known component, it resolves by the resolver's raw source-reference fall-through.
@@ -222,12 +231,10 @@ Signature matching MUST resolve each submission to at most one component through
 - A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
 - Submitted quantity is counted per submission (one submission = one unit), not by reading an item's stack `system.quantity`; the workbench is responsible for expanding a stack into one submission per unit, consistent with occurrence-based essence accumulation and submitted-ingredient consumption.
 - Signature overlap is invalid across all recipes in the system.
-- No-signature-match is treated as a failed attempt:
-  - player sees a specific failure message,
-  - submitted ingredients are consumed.
-- If a signature matches but routed outcome/name cannot resolve to a valid `ResultGroup`, treat as crafting-system misconfiguration error:
-  - abort without applying player-failure consumption,
-  - return actionable diagnostics for GM correction.
+- No-signature-match (a fizzle) is treated as a failed attempt: the player sees a specific failure message and the submitted ingredients are consumed (per `alchemy.consumeOnFail`).
+Learning is never granted by a fizzle.
+- The matched-but-unroutable **misconfiguration** path (abort without applying player-failure consumption; return actionable GM diagnostics) applies to **Tiered only** (None/Simple do not route by name).
+The reserved-keyword "nothing" rule must not collide with Simple's producing failure group.
 
 ### Alchemy UI Interaction Model
 
@@ -248,36 +255,60 @@ Signature matching MUST resolve each submission to at most one component through
 - Submit triggers signature matching per existing Signature Resolution rules.
 - On submit, a quantity badge of N contributes N unit submissions (one per unit), so occurrence-based signature matching and consumption observe the displayed quantity.
 
+#### Workbench Status Model (five modes)
+
+- The bench drives a five-mode status model that governs the status pill, the Produces panel, and the Brew affordance: `empty`; `assembling` (the bench is a strict subset of a selected known recipe's signature); `ready` (the bench equals a known signature); `untried` (the bench matches no known recipe AND is not a remembered fizzle); `no-reaction` (the bench matches no known recipe AND IS a remembered fizzle).
+- The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
+- **Client mode is advisory; the engine is authoritative on brew.** The client fails safe to `untried` for any signature not reducible to a concrete plain-component multiset (single-option groups, no essence-only requirement; the single-ingredient-set condition is now guaranteed by the mode invariant) and NEVER emits a false `ready`/`assembling`.
+- **Brew-result banner status enum.** A resolved brew reports one of four banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
+A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).
+The same caveat applies to select-to-load auto-fill.
+- **Hidden dead-end rule.** Non-revealed recipes and never-tried dead-ends BOTH present as `untried`.
+The player projection exposes only revealed recipes plus the **count** of non-revealed recipes; no status text, Produces panel, or styling leaks the existence, result, or signature of a non-revealed recipe.
+- **Per-character x system tried-dead-end memory.** `Actor.flags.fabricate.alchemyDeadEnds` is an append-only, deduped array of canonical `componentId:qty|...` keys per system, written on a fizzled brew only when `alchemy.showAttemptHistoryToPlayers === true`.
+It is the ONLY thing that flips `untried` -> `no-reaction`; it grants no visibility (a fizzle matches no enabled recipe) and is consumed solely by the client status model.
+
 #### Alchemy System Selection
 
-- Required when multiple alchemy-mode systems exist.
-- Selector shows only `resolutionMode === "alchemy"` systems.
-- Determines which components appear in palette.
-- Auto-selects if exactly one alchemy system.
-- Persisted in client settings (like `lastCraftingActor` and `lastComponentSources`).
+- Required when multiple alchemy-mode (crafting) systems exist: a chooser presents one card per system (icon, name, `N known . M total`, blurb, Enter).
+- A "Switch" affordance returns to the chooser and resets the per-selection workbench state (bench, selection, last-brew, search); it is shown only when more than one alchemy system exists.
+- Selector shows only `resolutionMode === "alchemy"` systems and determines which components appear in the palette.
+- Auto-enters when exactly one alchemy system exists.
+- Persisted in the `fabricate.lastAlchemySystem` client setting (like `lastCraftingActor` and `lastComponentSources`).
+Canonical text uses "alchemy (crafting) system"; "discipline" is reserved for player-facing copy only.
 
 #### Discovered Recipes Panel
 
-- Panel is always visible, even when no recipes have been discovered yet.
-- Shows an encouraging empty state message (e.g., "No recipes discovered yet — experiment with ingredients to discover new recipes").
-- Once recipes are discovered, the empty state is replaced by the searchable list.
-- "Craftable only" filter and auto-fill action are defined in `003` and `006`.
+- Panel is always visible, even when no recipes have been revealed yet.
+- Shows an encouraging empty state message (e.g., "No recipes revealed yet — learn or brew recipes to reveal them here").
+- Once recipes are revealed, the empty state is replaced by the searchable list.
+- Selecting a known recipe **auto-loads** its signature onto the bench (auto-fill is a selection side effect, not a separate per-recipe button), scoped to recipes reducible to a concrete plain-component multiset.
+- The "Craftable only" filter is DEFERRED this iteration.
 
 #### Tab Feature Scope
 
-- Includes: palette, workbench, discovered recipes panel (always visible, with craftable-only filter and auto-fill), active runs, history.
+- Includes: component inventory, workbench, and the known-recipes list.
+- Recorded run/attempt **history stays a Journal concern** — the tab has NO history panel and NO active-runs surface.
+Its only local memory is the internal fizzle dead-end set (which is not run history).
 - Excludes: shopping list, recipe browsing, recents, favourites.
+- This is a deliberate narrowing from the earlier "active runs, history" scope.
 
 ### Validation
 
-- `features.multiStepRecipes` must be false.
-- All recipes must satisfy alchemy-wide signature uniqueness invariants.
-- Any signature collision blocks save/import operations system-wide until resolved.
+- `features.multiStepRecipes` must be false; an alchemy recipe must have no explicit steps.
+- Exactly one `IngredientSet` (alchemy is never routed by ingredients).
+- Result-group cardinality is per `alchemy.checkMode`:
+  - **None / Simple** — exactly one SUCCESS group (`role !== 'failure'`).
+Simple additionally tolerates the reserved `role: 'failure'` group, whose ABSENCE is permitted (a settings-only None→Simple flip runs no recipe migration).
+  - **Tiered** — at least one result group; reserved/duplicate `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, Tiered only), exactly like `routedByCheck`.
+- A Simple- or Tiered-check-mode system requires an authored crafting-check roll formula (`craftingCheck.simple` for Simple, `craftingCheck.routed` for Tiered): a missing formula is an unconditional system-level blocker (`alchemyCheckNoFormula`) surfaced by `systemValidation`, not a per-recipe error.
+The retired provider required/enum rules no longer apply (issue 554).
+- All recipes must satisfy alchemy-wide signature uniqueness invariants; any signature collision blocks save/import operations system-wide until resolved.
 
 ## Testing Requirements
 
 - Unit tests per mode for cardinality and routing validation.
-- Unit tests for mode-specific routed behavior (`routedByIngredients`, `routedByCheck`) and the alchemy providers (`ingredientSet`, `check`).
+- Unit tests for mode-specific routed behavior (`routedByIngredients`, `routedByCheck`) and the alchemy check-mode matrix (`none`, `simple` pass/fail incl. the reserved failure-group path, `tiered`).
 - Unit tests for reserved failure keyword handling and result-group name matching normalization.
 - Unit tests for progressive award modes (`partial`, `equal`, `exceed`).
 - Integration tests validating mode-specific behavior in full crafting flow.

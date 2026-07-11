@@ -1,8 +1,10 @@
+import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
 import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakageRuntime.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
@@ -385,6 +387,34 @@ export class CraftingEngine {
         return { success: false, cancelled: true, results: null, message: 'Crafting cancelled' };
       }
       if (!checkResult.success) {
+        // Matched Simple alchemy attempt: a failed check is a genuine outcome, not a
+        // fizzle. Consume per `alchemy.consumeOnFail`, produce the reserved failure
+        // result group (when non-empty), learn on match, and post a DISTINCT
+        // failure-result banner. Tiered alchemy failure fizzles via the generic path
+        // below (routedByCheck short-circuit, no failure group).
+        if (
+          options?.isAlchemyAttempt === true &&
+          this._getAlchemyCheckMode(executionRecipe) === 'simple'
+        ) {
+          const outcome = await this._resolveAlchemySimpleFailure({
+            craftingActor,
+            componentSourceActors,
+            recipe,
+            executionRecipe,
+            step,
+            stepIndex,
+            ingredientSet,
+            craftSelection,
+            currencySpends,
+            toolValidation,
+            checkResult,
+            options,
+            runManager,
+            run,
+          });
+          resolved = outcome.resolved;
+          return outcome.result;
+        }
         const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
         let consumedOnFail = [];
         let usedToolPairs = [];
@@ -537,24 +567,7 @@ export class CraftingEngine {
 
       // For alchemy attempts: also consume submitted items that weren't handled
       // by standard ingredient matching (e.g. items used only for essences).
-      if (options?.isAlchemyAttempt && Array.isArray(options?.alchemySubmittedItems)) {
-        const alreadyConsumedUuids = new Set(consumedItems.map((c) => c.item.uuid));
-        const essenceConsumeCounts = new Map();
-        for (const item of options.alchemySubmittedItems) {
-          if (item.uuid && !alreadyConsumedUuids.has(item.uuid)) {
-            essenceConsumeCounts.set(item.uuid, (essenceConsumeCounts.get(item.uuid) || 0) + 1);
-          }
-        }
-        for (const actor of componentSourceActors) {
-          for (const item of actor.items || []) {
-            const count = essenceConsumeCounts.get(item.uuid);
-            if (!count) continue;
-            const qty = Number(item.system?.quantity ?? 1);
-            await (count >= qty ? item.delete() : item.update({ 'system.quantity': qty - count }));
-            consumedItems.push({ item, quantity: count, ingredient: null });
-          }
-        }
-      }
+      await this._consumeAlchemyExtraItems(consumedItems, componentSourceActors, options);
 
       // Deduct the chosen currency spends after item consumption (the afford gate above
       // already confirmed every spend is affordable). A mid-loop spend failure is logged
@@ -1010,6 +1023,30 @@ export class CraftingEngine {
     };
 
     if (!checkResult.success) {
+      // Matched Simple alchemy attempt (timed twin): produce the reserved failure
+      // group + learn WITHOUT re-consuming (components were spent at START). Tiered
+      // alchemy failure still fizzles via `recordFailure` (routedByCheck).
+      if (
+        options?.isAlchemyAttempt === true &&
+        this._getAlchemyCheckMode(executionRecipe) === 'simple'
+      ) {
+        return this._finishAlchemySimpleFailure({
+          craftingActor,
+          componentSourceActors,
+          recipe,
+          executionRecipe,
+          step,
+          stepIndex,
+          ingredientSet,
+          consumedItems,
+          consumedRunRefs,
+          toolItems,
+          resolvedEssences,
+          checkResult,
+          runManager,
+          run,
+        });
+      }
       return recordFailure(checkResult.message || 'Crafting check failed');
     }
     if (
@@ -1105,6 +1142,11 @@ export class CraftingEngine {
         craftingActor,
         componentSourceActors,
       });
+      // Learn on match for a matured timed alchemy brew too (gated inside
+      // `learnRecipeOnCraft` on `alchemy.learnOnCraft === true`).
+      if (options?.isAlchemyAttempt === true) {
+        await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
+      }
     }
 
     await this._postCraftChatMessage({
@@ -1128,6 +1170,250 @@ export class CraftingEngine {
             : `Completed ${stepLabel} for ${recipe.name}`,
       },
     };
+  }
+
+  /**
+   * Shared tail for a matched Simple alchemy FAILURE (both the immediate `craft()`
+   * path and the timed `_finishTimedStep` twin): apply tool breakage (unless the
+   * caller already applied it and passed `usedTools`), produce the reserved
+   * `role: 'failure'` result group via the REAL `_createResultItems` (nothing when
+   * empty/absent), record the run as a failure, learn on match (gated inside
+   * `learnRecipeOnCraft`), post the distinct failure-result banner, and return the
+   * `produced-on-failure` result. Consumption differs per caller (immediate consumes
+   * per `alchemy.consumeOnFail`; timed already consumed at START), so it is done by
+   * the caller and passed in as `consumedItems`/`consumedRunRefs`.
+   * @private
+   */
+  async _produceAlchemyFailureResults({
+    craftingActor,
+    componentSourceActors,
+    recipe,
+    executionRecipe,
+    step,
+    stepIndex,
+    ingredientSet,
+    consumedItems,
+    consumedRunRefs,
+    toolItems,
+    usedTools = null,
+    resolvedEssences,
+    resultGroupId = null,
+    checkResult,
+    runManager,
+    run,
+  }) {
+    let appliedTools = usedTools;
+    if (appliedTools === null) {
+      try {
+        const breakDecision = this._resolveCraftingBreakageDecision(
+          this._getRecipeSystem(executionRecipe),
+          executionRecipe,
+          checkResult
+        );
+        appliedTools = await this._applyToolBreakage(executionRecipe, toolItems, {
+          forceBreak: breakDecision.forceBreak,
+          authority: breakDecision.authority,
+          reason: breakDecision.reason,
+          triggerId: breakDecision.triggerId,
+        });
+      } catch (breakageError) {
+        console.error(
+          'Fabricate | Error during alchemy failure-result tool breakage:',
+          breakageError
+        );
+        appliedTools = [];
+      }
+    }
+
+    // Route to + produce the reserved failure group (the failed checkResult routes
+    // `_resolveAlchemyResultGroups` there); empty/absent yields no items.
+    const { items: resultItems } = await this._createResultItems(
+      craftingActor,
+      executionRecipe,
+      step,
+      ingredientSet,
+      consumedItems,
+      toolItems,
+      checkResult,
+      resultGroupId,
+      resolvedEssences
+    );
+
+    if (runManager && run) {
+      await runManager.completeStepFailure(
+        craftingActor,
+        run,
+        stepIndex,
+        checkResult.message || 'Crafting check failed',
+        {
+          selectedIngredientSetId: ingredientSet?.id,
+          lastCheckResult: {
+            success: false,
+            reason: checkResult.message || 'Crafting check failed',
+            outcome: checkResult.outcome ?? undefined,
+            value: checkResult.value ?? undefined,
+            data: checkResult.data || {},
+          },
+          consumedIngredients: consumedRunRefs,
+          usedTools: appliedTools,
+        }
+      );
+    }
+
+    // Learn on MATCH regardless of pass/fail; `learnRecipeOnCraft` internally gates
+    // on `alchemy.learnOnCraft === true`. Mirror the success path's recipe-item use.
+    const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
+    if (visibilityService) {
+      await visibilityService.applyRecipeItemUseOnCraft({
+        recipe,
+        craftingActor,
+        componentSourceActors,
+      });
+      await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
+    }
+
+    await this._postCraftChatMessage({
+      success: false,
+      craftingActor,
+      recipe,
+      consumedIngredients: consumedItems,
+      tools: appliedTools,
+      createdResults: resultItems,
+      failureReason: checkResult.message || 'Crafting check failed',
+    });
+
+    return {
+      resolved: true,
+      result: {
+        success: false,
+        results: resultItems.length > 0 ? resultItems : null,
+        message: checkResult.message || 'FABRICATE.Alchemy.FailureResult',
+        disposition: 'produced-on-failure',
+      },
+    };
+  }
+
+  /**
+   * Timed twin of {@link _resolveAlchemySimpleFailure}: produce the reserved failure
+   * result group + learn for a matured timed Simple alchemy brew whose check FAILED.
+   * Components were already consumed at START, so this NEVER re-consumes — it defers
+   * to {@link _produceAlchemyFailureResults} for breakage/production/learn using the
+   * START snapshot (`resolvedEssences`). Returns `{ resolved, result }`.
+   * @private
+   */
+  async _finishAlchemySimpleFailure({
+    craftingActor,
+    componentSourceActors,
+    recipe,
+    executionRecipe,
+    step,
+    stepIndex,
+    ingredientSet,
+    consumedItems,
+    consumedRunRefs,
+    toolItems,
+    resolvedEssences,
+    checkResult,
+    runManager,
+    run,
+  }) {
+    return this._produceAlchemyFailureResults({
+      craftingActor,
+      componentSourceActors,
+      recipe,
+      executionRecipe,
+      step,
+      stepIndex,
+      ingredientSet,
+      consumedItems,
+      consumedRunRefs,
+      toolItems,
+      usedTools: null,
+      resolvedEssences,
+      resultGroupId: null,
+      checkResult,
+      runManager,
+      run,
+    });
+  }
+
+  /**
+   * Produce the reserved failure result group for a matched Simple alchemy attempt
+   * whose crafting check FAILED (the immediate, non-timed `craft()` path). Consumes
+   * per `alchemy.consumeOnFail` (NOT the generic `_getFailureConsumptionPolicy`),
+   * mirrors the essence/extra-submitted-item consumption, then defers to
+   * {@link _produceAlchemyFailureResults} for production/learn/banner.
+   * Returns `{ resolved, result }` for the caller.
+   * @private
+   */
+  async _resolveAlchemySimpleFailure({
+    craftingActor,
+    componentSourceActors,
+    recipe,
+    executionRecipe,
+    step,
+    stepIndex,
+    ingredientSet,
+    craftSelection,
+    currencySpends,
+    toolValidation,
+    checkResult,
+    options,
+    runManager,
+    run,
+  }) {
+    const system = this._getRecipeSystem(executionRecipe);
+    const consumeOnFail = system?.alchemy?.consumeOnFail !== false;
+
+    let consumedItems = [];
+    let usedTools = [];
+    try {
+      if (consumeOnFail) {
+        consumedItems = await this._consumeIngredients(craftSelection.plan);
+        await this._consumeAlchemyExtraItems(consumedItems, componentSourceActors, options);
+        await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+      }
+      const breakDecision = this._resolveCraftingBreakageDecision(
+        system,
+        executionRecipe,
+        checkResult
+      );
+      usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+        forceBreak: breakDecision.forceBreak,
+        authority: breakDecision.authority,
+        reason: breakDecision.reason,
+        triggerId: breakDecision.triggerId,
+      });
+    } catch (consumptionError) {
+      console.error(
+        'Fabricate | Error during alchemy failure-result consumption:',
+        consumptionError
+      );
+    }
+
+    const consumedRunRefs = consumedItems.map(({ item, quantity }) => ({
+      actorUuid: item.parent?.uuid || null,
+      itemUuid: item.uuid,
+      quantity,
+    }));
+
+    return this._produceAlchemyFailureResults({
+      craftingActor,
+      componentSourceActors,
+      recipe,
+      executionRecipe,
+      step,
+      stepIndex,
+      ingredientSet,
+      consumedItems,
+      consumedRunRefs,
+      toolItems: toolValidation.tools,
+      usedTools,
+      resultGroupId: options?.resultGroupId || null,
+      checkResult,
+      runManager,
+      run,
+    });
   }
 
   /**
@@ -1219,6 +1505,18 @@ export class CraftingEngine {
     const shouldConsume = alchemyCfg.consumeOnFail !== false;
 
     if (!matchResult.matched) {
+      // Fizzle: this concrete submitted multiset matches NO enabled recipe. Record
+      // a per-character x system dead-end key (gated by showAttemptHistoryToPlayers)
+      // so the workbench can flip this exact set from `untried` -> `no-reaction` on a
+      // re-brew. The fizzle branch runs NO check and returns `disposition:'no-match'`
+      // with no roll, so the UI must not show a roll animation on this path.
+      await this._recordAlchemyDeadEnd(
+        craftingActor,
+        systemId,
+        submittedItems,
+        components,
+        alchemyCfg
+      );
       if (shouldConsume) {
         await this._consumeSubmittedAlchemyItems(componentSourceActors, submittedItems);
       }
@@ -1288,23 +1586,9 @@ export class CraftingEngine {
     // resolver, never re-derived per group from raw source references. Do NOT loop
     // the resolver per candidate component: that would double-count a submission
     // matching several components of one group.
-    const resolvedComponentIds = submittedItems.map((item) => {
-      const resolved = resolveComponentForItem(item, components, systemId);
-      if (resolved) return resolved.id;
-      // Narrow LOCAL supplement for the one legacy field the shared resolver
-      // structurally cannot see: a bare top-level `item.sourceUuid`. It is a
-      // source-ref-only fall-through (it re-derives no identity/exclusivity rule),
-      // attributing the item to the first component whose source references
-      // include that bare uuid.
-      const bareSourceUuid = item?.sourceUuid;
-      if (bareSourceUuid) {
-        const byBare = components.find((comp) =>
-          getComponentSourceReferences(comp).includes(bareSourceUuid)
-        );
-        if (byBare) return byBare.id;
-      }
-      return null;
-    });
+    const resolvedComponentIds = submittedItems.map((item) =>
+      this._resolveSubmissionComponentId(item, components, systemId)
+    );
 
     // Count submissions whose resolved component id is one of the given component
     // IDs. Each submission resolved to exactly one component, so it contributes at
@@ -1389,6 +1673,35 @@ export class CraftingEngine {
   }
 
   /**
+   * For a matched alchemy attempt, consume any submitted items that standard
+   * ingredient matching did not already consume (e.g. items supplied only for
+   * essence requirements). Mutates `consumedItems` in place with `{ item, quantity,
+   * ingredient: null }` entries. Shared by the success path AND the Simple
+   * failure path so a matched fail consumes the same submitted multiset as a pass.
+   * No-op unless this is an alchemy attempt carrying `alchemySubmittedItems`.
+   * @private
+   */
+  async _consumeAlchemyExtraItems(consumedItems, componentSourceActors, options) {
+    if (!options?.isAlchemyAttempt || !Array.isArray(options?.alchemySubmittedItems)) return;
+    const alreadyConsumedUuids = new Set(consumedItems.map((c) => c.item.uuid));
+    const essenceConsumeCounts = new Map();
+    for (const item of options.alchemySubmittedItems) {
+      if (item.uuid && !alreadyConsumedUuids.has(item.uuid)) {
+        essenceConsumeCounts.set(item.uuid, (essenceConsumeCounts.get(item.uuid) || 0) + 1);
+      }
+    }
+    for (const actor of componentSourceActors) {
+      for (const item of actor.items || []) {
+        const count = essenceConsumeCounts.get(item.uuid);
+        if (!count) continue;
+        const qty = Number(item.system?.quantity ?? 1);
+        await (count >= qty ? item.delete() : item.update({ 'system.quantity': qty - count }));
+        consumedItems.push({ item, quantity: count, ingredient: null });
+      }
+    }
+  }
+
+  /**
    * Consume submitted alchemy items (no-match failure path).
    * Best-effort: removes items by UUID from component source actors.
    * @private
@@ -1413,6 +1726,73 @@ export class CraftingEngine {
         }
       }
     }
+  }
+
+  /**
+   * Resolve one submitted item to at most one component id, durable-flag-first via
+   * the shared, list-aware, system-scoped resolver {@link resolveComponentForItem},
+   * with a narrow LOCAL supplement for the one legacy field the shared resolver
+   * structurally cannot see: a bare top-level `item.sourceUuid` (a source-ref-only
+   * fall-through that re-derives no identity/exclusivity rule). Shared by
+   * {@link _matchAlchemySignature} and {@link _submittedComponentMultiset} so the
+   * dead-end key can never drift from the signature it was matched against.
+   * @private
+   */
+  _resolveSubmissionComponentId(item, components, systemId) {
+    const resolved = resolveComponentForItem(item, components, systemId);
+    if (resolved) return resolved.id;
+    const bareSourceUuid = item?.sourceUuid;
+    if (bareSourceUuid) {
+      const byBare = (Array.isArray(components) ? components : []).find((comp) =>
+        getComponentSourceReferences(comp).includes(bareSourceUuid)
+      );
+      if (byBare) return byBare.id;
+    }
+    return null;
+  }
+
+  /**
+   * Map submitted items to a plain-component multiset `{ componentId: units }`
+   * through the same {@link _resolveSubmissionComponentId} resolver
+   * {@link _matchAlchemySignature} uses (each submission contributes at most one
+   * unit). A submission that resolves to no component is skipped.
+   * @private
+   */
+  _submittedComponentMultiset(submittedItems, components, systemId) {
+    const multiset = {};
+    for (const item of Array.isArray(submittedItems) ? submittedItems : []) {
+      const componentId = this._resolveSubmissionComponentId(item, components, systemId);
+      if (!componentId) continue;
+      multiset[componentId] = (multiset[componentId] || 0) + 1;
+    }
+    return multiset;
+  }
+
+  /**
+   * Record a fizzled alchemy attempt's canonical signature key on the crafting
+   * actor, under a per-system append-only, deduped array
+   * (`alchemyDeadEnds[craftingSystemId] = [signatureKey]`). Written ONLY when the
+   * system's `showAttemptHistoryToPlayers` is true, via `getFabricateFlag` /
+   * `setFabricateFlag` (the effective stored path is doubly-nested under
+   * `flags.fabricate.fabricate.alchemyDeadEnds`). No-ops on an empty key, a
+   * duplicate key, or an actor without flag support.
+   * @private
+   */
+  async _recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, components, alchemyCfg) {
+    if (alchemyCfg?.showAttemptHistoryToPlayers !== true) return;
+    if (!systemId || typeof craftingActor?.setFlag !== 'function') return;
+    const key = canonicalSignatureKey(
+      this._submittedComponentMultiset(submittedItems, components, systemId)
+    );
+    if (!key) return;
+    const deadEnds = getFabricateFlag(craftingActor, 'alchemyDeadEnds', {});
+    const current = deadEnds && typeof deadEnds === 'object' ? deadEnds : {};
+    const forSystem = Array.isArray(current[systemId]) ? current[systemId] : [];
+    if (forSystem.includes(key)) return;
+    await setFabricateFlag(craftingActor, 'alchemyDeadEnds', {
+      ...current,
+      [systemId]: [...forSystem, key],
+    });
   }
 
   /**
@@ -2108,27 +2488,74 @@ export class CraftingEngine {
     }
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
+
+    // Alchemy: routing + check-ness are driven by the SYSTEM-level `alchemy.checkMode`
+    // (the retired per-recipe provider is gone), NOT the generic `checksEnabled`
+    // master toggle. Dispatch alchemy entirely here so the shared non-alchemy logic
+    // below never applies to it.
+    //  - `none`   → unconditional no-op success (ignore any stray simple.rollFormula
+    //               and checksEnabled): a matched brew always succeeds.
+    //  - `simple` → the mandatory pass/fail check, run whenever a formula exists
+    //               (ungated by checksEnabled); a MISSING formula is a
+    //               misconfiguration so craft() aborts with zero mutation.
+    //  - `tiered` → the mandatory routed check (identical to routedByCheck); a
+    //               missing routed formula is likewise a misconfiguration.
+    if (mode === 'alchemy') {
+      const alchemyCheckMode = system?.alchemy?.checkMode || 'none';
+      if (alchemyCheckMode === 'none') {
+        return { success: true, outcome: null, value: null, data: {} };
+      }
+      if (alchemyCheckMode === 'simple') {
+        if (!this._hasCheckFormula(system?.craftingCheck?.simple)) {
+          return {
+            success: false,
+            misconfigured: true,
+            outcome: null,
+            value: null,
+            data: {},
+            message: 'alchemy simple check mode requires a configured crafting check roll formula',
+          };
+        }
+        return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+      }
+      // tiered
+      if (!this._hasCheckFormula(system?.craftingCheck?.routed)) {
+        return {
+          success: false,
+          misconfigured: true,
+          outcome: null,
+          value: null,
+          data: {},
+          message:
+            'alchemy tiered check mode requires a configured routed crafting check roll formula',
+        };
+      }
+      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+    }
+
     const checkRequired = mode === 'progressive' || mode === 'routedByCheck';
     const features = system.features || {};
     const checksEnabled =
       features.craftingChecks === true || system?.craftingCheck?.enabled === true;
 
-    // Simple pass/fail check (Checks editor) for the simple, alchemy, AND
-    // routedByIngredients modes: used when a roll formula is configured. The
+    // Simple pass/fail check (Checks editor) for the simple AND routedByIngredients
+    // modes: used when a roll formula is configured. (Alchemy is dispatched
+    // separately above on `alchemy.checkMode` and never reaches here.) The
     // `craftingCheck.simple` slot is the shared optional pass/fail crafting-check
-    // slot (it backs all three modes), NOT a simple-mode-only slot. Optional in
-    // simple + routedByIngredients modes (routedByIngredients routes result groups
+    // slot (it backs both modes), NOT a simple-mode-only slot. Optional in simple
+    // (gated by the `checksEnabled` master toggle, so a configured formula only rolls
+    // while checks are enabled) and in routedByIngredients (which routes result groups
     // by ingredient set, so its check never gates routing — it stays an optional
-    // pass/fail layer that runs on an authored formula alone, with no
-    // `checksEnabled` requirement) and always-on in alchemy mode.
+    // pass/fail layer that runs on an authored formula alone, with no `checksEnabled`
+    // requirement).
     const simpleConfig = system?.craftingCheck?.simple;
     // With an EMPTY `simple.rollFormula` the simple pass/fail check is not usable,
     // so `useSimpleCheck` is false and (in optional simple / routedByIngredients
     // mode) the attempt proceeds with no check.
     const useSimpleCheck =
-      ['simple', 'alchemy', 'routedByIngredients'].includes(mode) &&
+      ['simple', 'routedByIngredients'].includes(mode) &&
       !!simpleConfig?.rollFormula &&
-      (mode === 'alchemy' || mode === 'routedByIngredients' || checksEnabled);
+      (mode === 'routedByIngredients' || checksEnabled);
 
     // Progressive check (Checks editor) for progressive mode: rolls a formula
     // whose total becomes the numeric `value` the progressive result-awarding
@@ -2217,17 +2644,19 @@ export class CraftingEngine {
 
   /**
    * Evaluate a pass/fail crafting check against an arbitrary check sub-config
-   * (the shared `simple` slot, which backs `simple`/`alchemy`/`routedByIngredients`): resolve the DC
+   * (the shared `simple` slot, which backs `simple`/`routedByIngredients` and the
+   * alchemy `simple` check mode): resolve the DC
    * (static default, recipe tier, or dynamic macro) via {@link _resolveSimpleCheckDc}
    * — parameterized over `config`, so a recipe `checkTierId` / dynamic-DC macro still
    * applies — then roll and compare (meet-or-exceed / exceed) via the shared
    * {@link runFormulaPassFail}. Forced-outcome triggers and interactive cancel are
    * honoured inside that runner.
    *
-   * Used by BOTH `simple`/`alchemy` mode and `routedByIngredients`, whose check is an
-   * optional pass/fail gate (that mode routes result groups by the chosen ingredient
-   * set, NOT by check outcome tiers — see {@link ResolutionModeService#resolveResultGroups}).
-   * Only `routedByCheck` uses the tier-routing {@link _runRoutedCheck}.
+   * Used by `simple` mode, `routedByIngredients` (whose check is an optional pass/fail
+   * gate — that mode routes result groups by the chosen ingredient set, NOT by check
+   * outcome tiers — see {@link ResolutionModeService#resolveResultGroups}), and the
+   * alchemy `simple` check mode (dispatched from {@link _runCraftingCheck}). Only
+   * `routedByCheck` and the alchemy `tiered` mode use the tier-routing {@link _runRoutedCheck}.
    *
    * @returns {Promise<{success: boolean, outcome: string, value: number|null, data: object, message: string|null}>}
    */
@@ -2396,9 +2825,10 @@ export class CraftingEngine {
 
   /**
    * Resolve the active crafting check's `checkBreakage` block for the system's
-   * resolution mode (issue 419). The simple/alchemy/routedByIngredients modes author
-   * on the shared simple check, routedByCheck on the routed check, progressive on the
-   * progressive check.
+   * resolution mode (issue 419). The simple/routedByIngredients modes author on the
+   * shared simple check, routedByCheck on the routed check, progressive on the
+   * progressive check. Alchemy authors per `alchemy.checkMode`: tiered on the routed
+   * check, none/simple on the shared simple check.
    * @private
    */
   _resolveCraftingCheckBreakage(system, recipe) {
@@ -2408,6 +2838,9 @@ export class CraftingEngine {
     const check = system?.craftingCheck || {};
     if (mode === 'routedByCheck') return check.routed?.checkBreakage ?? null;
     if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
+    if (mode === 'alchemy' && (system?.alchemy?.checkMode || 'none') === 'tiered') {
+      return check.routed?.checkBreakage ?? null;
+    }
     return check.simple?.checkBreakage ?? null;
   }
 
@@ -2479,6 +2912,26 @@ export class CraftingEngine {
   _getRecipeSystem(recipe) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     return systemManager?.getSystem(recipe?.craftingSystemId) ?? null;
+  }
+
+  /**
+   * True when a check sub-config carries an authored, non-empty roll formula — the
+   * single notion of a "usable" check (matches `ResolutionModeService._hasRollFormula`).
+   * @private
+   */
+  _hasCheckFormula(config) {
+    return typeof config?.rollFormula === 'string' && config.rollFormula.trim().length > 0;
+  }
+
+  /**
+   * The system-level alchemy check mode for a recipe (`none` | `simple` | `tiered`),
+   * defaulting to `none`. Non-alchemy systems return `null`.
+   * @private
+   */
+  _getAlchemyCheckMode(recipe) {
+    const system = this._getRecipeSystem(recipe);
+    if (system?.resolutionMode !== 'alchemy') return null;
+    return system?.alchemy?.checkMode || 'none';
   }
 
   /**

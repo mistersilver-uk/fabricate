@@ -9,6 +9,7 @@
 
 import { SETTING_KEYS } from '../config/settings.js';
 
+import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
@@ -288,6 +289,15 @@ const MIGRATIONS = [
       'definition as recipeIds[] (many-to-many) and strip recipe.recipeItemId / linkedRecipeItemUuid',
     migrate(data) {
       return migrateInvertRecipeItemLink(data);
+    },
+  },
+  {
+    version: '1.14.0',
+    label:
+      'Retire the per-recipe alchemy resultSelection.provider for the system-level ' +
+      'alchemy.checkMode (none/simple/tiered); strip resultSelection; collapse multi-ingredient-set alchemy recipes',
+    migrate(data) {
+      return migrateAlchemyCheckMode(data);
     },
   },
   // Future migrations added here in version order

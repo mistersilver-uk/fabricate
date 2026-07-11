@@ -13,7 +13,6 @@
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions
   } from '../../../../utils/routedOutcomeKeywords.js';
-  import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
@@ -345,9 +344,19 @@
     crafting: {
       mode: selectedSystem?.resolutionMode || 'simple',
       // The crafting check is optional in simple and routedByIngredients (it runs
-      // only when a roll formula is authored); routedByCheck and progressive REQUIRE
-      // it, so they are non-optional.
-      optional: ['simple', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
+      // only when a roll formula is authored and checks are enabled); routedByCheck
+      // and progressive REQUIRE it. Alchemy is driven by alchemy.checkMode: simple
+      // and tiered are MANDATORY (cannot be disabled → requiredHint), while none has
+      // NO check (the `none` flag suppresses the Active TOGGLE and shows a distinct
+      // "resolves without a check" hint in place of the requiredHint — the Active
+      // card itself stays as a read-only note).
+      optional:
+        (selectedSystem?.resolutionMode || 'simple') === 'alchemy'
+          ? false
+          : ['simple', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
+      none:
+        selectedSystem?.resolutionMode === 'alchemy' &&
+        (selectedSystem?.alchemy?.checkMode || 'none') === 'none',
       enabled: selectedSystem?.craftingCheck?.enabled === true
     },
     salvage: {
@@ -1051,17 +1060,33 @@
   );
   // Recipe-edit deriveds read the live draft (not the persisted record) so the
   // editor, inspector, and header chip all track unsaved staged edits.
-  const recipeComplex = $derived(recipeDraft?.complex === true);
+  // Alchemy check mode drives the alchemy recipe editor shape (decoupled from the
+  // single `complex` flag): none/simple → single ingredient set + single/labeled
+  // result sets; tiered → multi-group tier assignment (like routedByCheck).
+  const alchemyCheckMode = $derived(
+    selectedSystem?.resolutionMode === 'alchemy'
+      ? selectedSystem?.alchemy?.checkMode || 'none'
+      : null
+  );
+  // Alchemy ingredient sets are ALWAYS single (never Complex-routed); other modes
+  // read the recipe's own Complex flag. Result-group rendering is derived separately
+  // (checkMode for alchemy) so the two are no longer coupled through one flag.
+  const recipeComplex = $derived(
+    selectedSystem?.resolutionMode === 'alchemy' ? false : recipeDraft?.complex === true
+  );
+  // Alchemy Simple mode drives the Results tab's fixed two-slot editor (success +
+  // reserved failure result set).
+  const recipeAlchemySimple = $derived(alchemyCheckMode === 'simple');
   // The routing basis is a property of the system MODE for the routed crafting
-  // modes (routedByCheck → 'check', routedByIngredients → 'ingredientSet'), so the
-  // downstream results/validation consumers read a derived provider rather than a
-  // per-recipe field. Alchemy keeps its genuine per-recipe provider.
+  // modes (routedByCheck → 'check', routedByIngredients → 'ingredientSet'). Alchemy
+  // routes by the system-level check mode: tiered → 'check' (routed tier assignment),
+  // none/simple → null. The retired per-recipe provider is no longer read.
   const recipeRoutingProvider = $derived(
     (() => {
       const mode = selectedSystem?.resolutionMode || 'simple';
       if (mode === 'routedByCheck') return 'check';
       if (mode === 'routedByIngredients') return 'ingredientSet';
-      if (mode === 'alchemy') return recipeDraft?.resultSelection?.provider || null;
+      if (mode === 'alchemy') return alchemyCheckMode === 'tiered' ? 'check' : null;
       return null;
     })()
   );
@@ -2475,17 +2500,10 @@
       } else {
         Object.assign(patch, backfillScopeIds(recipeDraft));
       }
-      // ALCHEMY is the only mode that still routes via a recipe-level provider, so
-      // only alchemy seeds a default `resultSelection.provider` on entering Complex
-      // (Check when the system has a usable simple check formula, else Ingredient)
-      // so the alchemy routing basis is never left unselected. The routed crafting
-      // modes derive their basis from the system mode and carry no resultSelection.
-      if ((selectedSystem?.resolutionMode || 'simple') === 'alchemy') {
-        const existingProvider = recipeDraft.resultSelection?.provider;
-        if (existingProvider !== 'check' && existingProvider !== 'ingredientSet') {
-          patch.resultSelection = { provider: chooseSeedProvider(selectedSystem, 'alchemy') };
-        }
-      }
+      // Alchemy no longer routes via a recipe-level provider (retired for the
+      // system-level `alchemy.checkMode`), so entering Complex seeds nothing on an
+      // alchemy recipe — and the alchemy editor never exposes the Complex toggle
+      // anyway (its shape is derived from `alchemy.checkMode`).
       patchRecipeDraft(patch);
       return true;
     }
@@ -4903,6 +4921,7 @@
         <section class="manager-environment-editor-shell">
           <ChecksView
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+            alchemyCheckMode={selectedSystem?.alchemy?.checkMode || 'none'}
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
@@ -4924,6 +4943,7 @@
             {onUpdateSalvageCheckProgressive}
             {onUpdateGatheringCheckProgressive}
             {onUpdateGatheringCheckRouted}
+            onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
             onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}
           />
@@ -5064,6 +5084,7 @@
       <RecipeEditView
         recipe={recipeDraft}
         complex={recipeComplex}
+        alchemySimple={recipeAlchemySimple}
         progressive={recipeProgressive}
         saving={recipeEditSaving}
         saveFailed={recipeSaveFailed}
@@ -6840,6 +6861,7 @@
           multiStepEnabled={recipeMultiStepEnabled}
           complex={recipeComplex}
           multiSetAllowed={recipeMultiSetAllowed}
+          hideComplexToggle={selectedSystem?.resolutionMode === 'alchemy'}
           onSetComplexity={handleSetRecipeComplexity}
           onAddRecipeItem={handleAddRecipeItem}
           onSetRecipeItem={handleSetRecipeItem}

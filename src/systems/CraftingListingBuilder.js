@@ -66,11 +66,14 @@ const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
 
 /**
- * Modes whose crafting check is mandatory (the attempt fails without an authored
- * roll formula). The routedByCheck/progressive modes require a check; alchemy runs an
- * always-on check. Simple and routedByIngredients treat the check as optional.
+ * Non-alchemy modes whose crafting check is mandatory (the attempt fails without an
+ * authored roll formula): only routedByCheck and progressive. Simple and
+ * routedByIngredients treat the crafting check as an optional pass/fail layer backed
+ * by the shared `craftingCheck.simple` slot. Alchemy check-ness is NOT in this set —
+ * it is driven by the system-level `alchemy.checkMode` (simple/tiered mandatory,
+ * none has no check), handled separately in `_buildCheck`.
  */
-const MANDATORY_CHECK_MODES = new Set(['routedByCheck', 'progressive', 'alchemy']);
+const MANDATORY_CHECK_MODES = new Set(['routedByCheck', 'progressive']);
 
 function stringOrEmpty(value) {
   return typeof value === 'string' ? value : value == null ? '' : String(value);
@@ -395,12 +398,23 @@ export class CraftingListingBuilder {
    */
   _buildCheck(system, mode, craftingActor = null) {
     const checks = system?.craftingCheck ?? {};
+    // Alchemy selects its check slot from the SYSTEM-level `alchemy.checkMode`:
+    // none → no check card, simple → the pass/fail slot, tiered → the routed slot.
+    const alchemyCheckMode = mode === 'alchemy' ? system?.alchemy?.checkMode || 'none' : null;
     let config;
     switch (mode) {
       case 'simple':
-      case 'alchemy':
       case 'routedByIngredients': {
         config = checks.simple;
+        break;
+      }
+      case 'alchemy': {
+        config =
+          alchemyCheckMode === 'tiered'
+            ? checks.routed
+            : alchemyCheckMode === 'simple'
+              ? checks.simple
+              : null;
         break;
       }
       case 'routedByCheck': {
@@ -424,9 +438,14 @@ export class CraftingListingBuilder {
     // the mode requires a check to be configured. Otherwise a routed-by-ingredients
     // recipe with an authored simple pass/fail check + DC reads "Optional" even though it is
     // always rolled and can fail. Active when: the mode requires a check
-    // (routedByCheck / progressive / alchemy); routedByIngredients with an authored
-    // formula (no enabled toggle); or simple with a formula AND checks enabled.
-    const requiredByMode = MANDATORY_CHECK_MODES.has(mode);
+    // (routedByCheck / progressive); routedByIngredients with an authored
+    // formula (no enabled toggle); or simple/alchemy with a formula AND checks enabled.
+    // Alchemy check-ness is driven by `alchemy.checkMode` (simple/tiered are
+    // mandatory, independent of the `checksEnabled` toggle); other modes keep the
+    // MANDATORY_CHECK_MODES contract.
+    const requiredByMode =
+      MANDATORY_CHECK_MODES.has(mode) ||
+      (mode === 'alchemy' && (alchemyCheckMode === 'simple' || alchemyCheckMode === 'tiered'));
     const checksEnabled =
       system?.features?.craftingChecks === true || system?.craftingCheck?.enabled === true;
     const mandatory = requiredByMode
@@ -442,9 +461,12 @@ export class CraftingListingBuilder {
       rollFormula.length > 0 && craftingActor
         ? this._resolveCheckFormula(rollFormula, craftingActor)
         : null;
-    // A routedByCheck fixed check matches by value range, not DC, so it has no
-    // meaningful DC — null it so the player card hides its DC chip (its `hasDc` gate).
-    const routedFixed = mode === 'routedByCheck' && config.type === 'fixed';
+    // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
+    // range, not DC, so it has no meaningful DC — null it so the player card hides
+    // its DC chip (its `hasDc` gate).
+    const routedFixed =
+      (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
+      config.type === 'fixed';
     return {
       dc: routedFixed ? null : (config.dc ?? null),
       rollFormula: rollFormula.length > 0 ? rollFormula : null,

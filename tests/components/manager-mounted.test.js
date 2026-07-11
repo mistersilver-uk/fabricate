@@ -410,6 +410,15 @@ function createStore(calls = [], options = {}) {
       name: 'Alchemy',
       description: 'Potion and essence work',
       resolutionMode: options.alchemyResolutionMode || 'alchemy',
+      // System-level alchemy check mode (issue 554). Defaults to `simple` so the
+      // Checks tab renders the simple pass/fail editor for the default fixture;
+      // tests exercising None/Tiered pass their own `alchemyConfig`.
+      alchemy: options.alchemyConfig ?? {
+        checkMode: 'simple',
+        learnOnCraft: true,
+        consumeOnFail: true,
+        showAttemptHistoryToPlayers: false,
+      },
       craftingCheck: options.craftingCheck,
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
       salvageCraftingCheck: options.salvageCraftingCheck,
@@ -1114,6 +1123,10 @@ function createStore(calls = [], options = {}) {
     setVisibilityMode: (mode) => {
       calls.push(['setVisibilityMode', mode]);
       return options.setVisibilityModeResult ?? true;
+    },
+    setAlchemyCheckMode: (mode) => {
+      calls.push(['setAlchemyCheckMode', mode]);
+      return options.setAlchemyCheckModeResult ?? true;
     },
     setRecipeItemEnabled: (recipeItemId, enabled) => {
       calls.push(['setRecipeItemEnabled', recipeItemId, enabled]);
@@ -1960,6 +1973,111 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-checks-tab-button="salvage"]'),
       null,
       'no salvage tab button renders'
+    );
+  });
+
+  async function mountChecksWithAlchemyCheckMode(checkMode) {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { alchemyConfig: { checkMode } }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    return calls;
+  }
+
+  it('Checks: alchemy checkMode=none renders the check-mode selector at the top and the read-only "resolves without a check" notice below, no Active toggle (issue 554)', async () => {
+    await mountChecksWithAlchemyCheckMode('none');
+    // The none/simple/tiered selector renders at the top of the Crafting sub-tab.
+    const selector = target.querySelector(
+      '[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'
+    );
+    assert.ok(selector, 'the alchemy check-mode selector renders at the top of the Crafting tab');
+    const selectorOptions = Array.from(
+      selector.querySelectorAll('[data-crafting-alchemy-checkmode-option]')
+    ).map((option) => option.getAttribute('data-crafting-alchemy-checkmode-option'));
+    for (const mode of ['none', 'simple', 'tiered']) {
+      assert.ok(selectorOptions.includes(mode), `check-mode option "${mode}" is offered`);
+    }
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-alchemy-none-readonly]'),
+      'None mode renders the read-only crafting notice below the selector'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      null,
+      'no editor in None mode'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-active-toggle]'),
+      null,
+      'None mode does not offer an Active toggle'
+    );
+  });
+
+  it('Checks: alchemy checkMode=simple renders the selector above the simple editor and cannot be disabled (issue 554)', async () => {
+    await mountChecksWithAlchemyCheckMode('simple');
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'),
+      'the alchemy check-mode selector renders at the top of the Crafting tab'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      'Simple mode renders the simple pass/fail editor below the selector'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-active-toggle]'),
+      null,
+      'Simple mode is mandatory — no Active toggle'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-active-required]'),
+      'Simple mode shows the cannot-be-disabled required hint'
+    );
+  });
+
+  it('Checks: alchemy checkMode=tiered renders the selector above the routed editor and cannot be disabled (issue 554)', async () => {
+    await mountChecksWithAlchemyCheckMode('tiered');
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'),
+      'the alchemy check-mode selector renders at the top of the Crafting tab'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-crafting-check-editor]'),
+      'Tiered mode renders the routed outcome-tier editor below the selector'
+    );
+    assert.equal(
+      target.querySelector('[data-checks-active-toggle]'),
+      null,
+      'Tiered mode is mandatory — no Active toggle'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-active-required]'),
+      'Tiered mode shows the cannot-be-disabled required hint'
+    );
+  });
+
+  it('Checks: selecting a check-mode option persists live via setAlchemyCheckMode (issue 554)', async () => {
+    const calls = await mountChecksWithAlchemyCheckMode('none');
+    const tieredRadio = target.querySelector(
+      '[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode-option="tiered"] input'
+    );
+    assert.ok(tieredRadio, 'the tiered option radio renders');
+    tieredRadio.checked = true;
+    tieredRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [['setAlchemyCheckMode', 'tiered']],
+      'choosing a mode routes through the store setAlchemyCheckMode action'
     );
   });
 
@@ -3410,6 +3528,38 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target.querySelector('[data-crafting-settings-context] [data-crafting-effect]'),
       'the effect panel renders alongside the cards'
+    );
+  });
+
+  it('CraftingSettingsView no longer renders the alchemy check-mode sub-section — it moved to the Checks tab (issue 554)', () => {
+    // The alchemy check-mode selector relocated to the top of the Checks tab's
+    // Crafting sub-tab, so the Crafting Settings page must not render it even for
+    // an alchemy system.
+    mountCraftingSettingsView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'Alchemy System',
+        resolutionMode: 'alchemy',
+        visibilityMode: 'knowledge',
+        alchemy: { checkMode: 'none' },
+        features: {},
+        craftingEffect: { summaryKey: 'FABRICATE.Admin.Manager.Crafting.Effect.SummaryKnowledge' },
+      },
+    });
+    assert.equal(
+      target.querySelector('[data-crafting-alchemy-checkmode-section]'),
+      null,
+      'the settings page does not render the alchemy check-mode sub-section'
+    );
+    assert.equal(
+      target.querySelector('[data-crafting-alchemy-checkmode]'),
+      null,
+      'the settings page does not render the alchemy check-mode selector'
+    );
+    // The Recipe resolution card itself still renders on the settings page.
+    assert.ok(
+      target.querySelector('[data-crafting-resolution-section]'),
+      'the recipe resolution section still renders on the settings page'
     );
   });
 

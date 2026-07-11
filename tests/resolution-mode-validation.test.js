@@ -655,17 +655,17 @@ for (const mode of ['routedByIngredients', 'routedByCheck']) {
   });
 }
 
-test('alchemy mode — missing provider waived when incomplete, required under the strict default', () => {
+test('alchemy mode — completeness (sets/groups) waived when incomplete, required under the strict default', () => {
   const system = buildSystem({ resolutionMode: 'alchemy' });
   const service = buildService(system);
-  const recipe = buildRecipe([], { ingredientSets: [], resultGroups: [], resultSelection: null });
+  const recipe = buildRecipe([], { ingredientSets: [], resultGroups: [] });
 
   assert.equal(service.validateRecipe(recipe, { requireComplete: false }).valid, true);
   const strict = service.validateRecipe(recipe);
   assert.equal(strict.valid, false);
   assert.ok(
-    strict.errors.some((e) => /Alchemy recipe requires resultSelection\.provider/.test(e)),
-    `expected the alchemy missing-provider error, got: ${JSON.stringify(strict.errors)}`
+    strict.errors.some((e) => /at least 1 ingredient set/.test(e)),
+    `expected an alchemy completeness error, got: ${JSON.stringify(strict.errors)}`
   );
 });
 
@@ -714,7 +714,7 @@ test('alchemy mode — an implicit step carrying multiple sets/groups is NOT sub
   );
 });
 
-test('alchemy mode — multiple top-level sets and groups are valid (alchemy requires >=1, not exactly 1)', () => {
+test('alchemy mode — multiple top-level ingredient sets are INVALID (alchemy requires exactly 1 set)', () => {
   const system = buildSystem({ resolutionMode: 'alchemy' });
   const service = buildService(system);
   const recipe = buildRecipe([], {
@@ -722,17 +722,16 @@ test('alchemy mode — multiple top-level sets and groups are valid (alchemy req
       { id: 'set-1', ingredientGroups: [] },
       { id: 'set-2', ingredientGroups: [] },
     ],
-    resultGroups: [
-      { id: 'rg-1', results: [] },
-      { id: 'rg-2', results: [] },
-    ],
-    resultSelection: { provider: 'ingredientSet' },
+    resultGroups: [{ id: 'rg-1', results: [] }],
   });
 
   const result = service.validateRecipe(recipe);
 
-  assert.equal(result.valid, true, result.errors.join(', '));
-  assert.equal(result.errors.length, 0);
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /exactly 1 ingredient set/i.test(e)),
+    `expected the exactly-1-set error, got: ${JSON.stringify(result.errors)}`
+  );
 });
 
 test('alchemy mode — explicit (non-implicit) steps fail alchemy own check, not the step loop', () => {
@@ -759,20 +758,22 @@ test('alchemy mode — explicit (non-implicit) steps fail alchemy own check, not
   );
 });
 
-test('alchemy mode — an invalid provider VALUE errors even when requireComplete is false', () => {
+test('alchemy mode — a leftover resultSelection.provider is IGNORED (the provider is retired)', () => {
   const system = buildSystem({ resolutionMode: 'alchemy' });
   const service = buildService(system);
+  // A stray legacy provider value no longer produces any error — routing is driven
+  // by the system-level alchemy.checkMode, not the retired per-recipe provider.
   const recipe = buildRecipe([], {
     ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
     resultGroups: [{ id: 'rg-1', results: [] }],
     resultSelection: { provider: 'bogus' },
   });
 
-  const result = service.validateRecipe(recipe, { requireComplete: false });
+  const result = service.validateRecipe(recipe);
 
-  assert.equal(result.valid, false);
+  assert.equal(result.valid, true, result.errors.join(', '));
   assert.ok(
-    result.errors.some((e) => /Invalid result selection provider/.test(e)),
-    `expected the invalid-provider error, got: ${JSON.stringify(result.errors)}`
+    !result.errors.some((e) => /provider/i.test(e)),
+    `no provider error expected, got: ${JSON.stringify(result.errors)}`
   );
 });
