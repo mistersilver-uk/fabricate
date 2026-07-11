@@ -23,6 +23,7 @@ import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { SignatureValidator } from '../src/systems/SignatureValidator.js';
 import { getItemSourceReferences, getItemMatchUuids } from '../src/utils/sourceUuid.js';
+import { toAlchemyRecords } from './helpers/alchemySubmissionRecords.js';
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -279,7 +280,10 @@ function successAndFailureGroups() {
 }
 
 async function brew(engine, validator, inputs, options = {}) {
-  return engine.craftAlchemy(inputs.crafter, [inputs.actor], inputs.submitted, {
+  // The collector hands craftAlchemy pre-bucketed `{ item, componentId }` records
+  // (issue 572); build them through the production resolver, system-scoped.
+  const submitted = toAlchemyRecords(inputs.submitted, components(), 'sys-a');
+  return engine.craftAlchemy(inputs.crafter, [inputs.actor], submitted, {
     craftingSystemId: 'sys-a',
     signatureValidator: validator,
     ...options,

@@ -1413,7 +1413,12 @@ class Fabricate {
     const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
     const system = this.craftingSystemManager?.getSystem?.(craftingSystemId) ?? null;
     const components = Array.isArray(system?.components) ? system.components : [];
-    const submittedItems = resolveAlchemySubmissions(sources, components, submittedComponentIds);
+    const submittedItems = resolveAlchemySubmissions(
+      sources,
+      components,
+      submittedComponentIds,
+      craftingSystemId
+    );
     if (submittedItems.length === 0) {
       return { success: false, results: null, message: 'FABRICATE.App.Alchemy.NoIngredients', disposition: 'error' };
     }
