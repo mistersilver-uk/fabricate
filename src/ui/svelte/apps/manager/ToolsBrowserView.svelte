@@ -80,7 +80,7 @@
   // display snapshot and has componentId: null. A component-linked / whetstone tool reads its
   // display from the managed component. This distinction drives display + the source chip.
   function isItemSourcedTool(tool) {
-    return !tool?.componentId && !!(tool?.name || tool?.sourceItemUuid || tool?.sourceUuid);
+    return !tool?.componentId && !!(tool?.name || tool?.originItemUuid || tool?.registeredItemUuid);
   }
 
   function toolImage(tool) {

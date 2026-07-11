@@ -28,6 +28,7 @@ import { migrateRemoveResultSelectionProviders } from './migrateRemoveResultSele
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
+import { migrateRenameSourceUuidFields } from './migrateRenameSourceUuidFields.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
@@ -308,6 +309,16 @@ const MIGRATIONS = [
       'their own source references + name/img display snapshot (componentId preserved)',
     migrate(data) {
       return migrateToolsToFirstClass(data.systems);
+    },
+  },
+  {
+    version: '1.16.0',
+    label:
+      'Rename registered-entry source-uuid fields (sourceUuid→registeredItemUuid, ' +
+      'sourceItemUuid→originItemUuid, fallbackItemIds→aliasItemUuids) on components, ' +
+      'recipe-item definitions, and tools',
+    migrate(data) {
+      return migrateRenameSourceUuidFields(data.systems);
     },
   },
   // Future migrations added here in version order

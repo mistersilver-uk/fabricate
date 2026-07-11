@@ -15,7 +15,7 @@
    - An Enabled toggle → `onPatch({ enabled })`.
 
   Props:
-   - recipeItem: `{ id, sourceItemUuid, img, enabled, caps }` draft (read-only here).
+   - recipeItem: `{ id, originItemUuid, img, enabled, caps }` draft (read-only here).
    - linkedItem: `{ uuid, name, img, type }|null` resolved game-world item.
    - worldItems: `[{ uuid, name, img, type }]` candidate items for the picker.
    - onPatch(patch): emit a partial recipe-item patch (here `{ enabled }`).
@@ -45,7 +45,7 @@
   }
 
   const hasLink = $derived(Boolean(linkedItem?.uuid));
-  const uuid = $derived(String(linkedItem?.uuid || recipeItem?.sourceItemUuid || ''));
+  const uuid = $derived(String(linkedItem?.uuid || recipeItem?.originItemUuid || ''));
   const itemName = $derived(String(linkedItem?.name || ''));
   const itemImg = $derived(String(linkedItem?.img || recipeItem?.img || ''));
   const itemType = $derived(String(linkedItem?.type || ''));

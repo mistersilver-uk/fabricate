@@ -51,7 +51,7 @@
     const recipeCount = Array.isArray(recipeItem?.linkedRecipeIds)
       ? recipeItem.linkedRecipeIds.length
       : (Number.isFinite(recipeItem?.recipeCount) ? recipeItem.recipeCount : 0);
-    const hasItem = Boolean(linkedItem?.uuid || recipeItem?.sourceItemUuid);
+    const hasItem = Boolean(linkedItem?.uuid || recipeItem?.originItemUuid);
     const checks = [
       { id: 'itemLinked', ok: hasItem },
       { id: 'recipeLinked', ok: recipeCount > 0 }

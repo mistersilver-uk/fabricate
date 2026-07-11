@@ -8,9 +8,9 @@
  *                                               migrated legacy tool (no longer the matching basis)
  *   name / img:        string | null          - registration/migration display snapshot (issue 561);
  *                                               NOT `label`, and not auto-refreshed on rename
- *   sourceUuid /
- *   sourceItemUuid /
- *   fallbackItemIds:   string / string[]      - the tool's OWN source references (issue 561), the
+ *   registeredItemUuid /
+ *   originItemUuid /
+ *   aliasItemUuids:   string / string[]      - the tool's OWN source references (issue 561), the
  *                                               matching basis; a valid tool carries EITHER a
  *                                               componentId OR its own source references
  *   requirement:       null | {               - optional truthy-expression gate
@@ -38,7 +38,7 @@
  * owned item's display name. The append is idempotent: the suffix is never doubled, and it is
  * never appended to an item that was already toolBroken-flagged before the action fired. The
  * suffix is display-only. The toolBroken flag, not the name, remains the authoritative
- * presence-gate disqualifier. Note: a component matched purely by name (no sourceUuid/fallback
+ * presence-gate disqualifier. Note: a component matched purely by name (no registeredItemUuid/fallback
  * ids) stops matching its component once renamed, so a GM clearing the toolBroken flag must also
  * restore the original name to regain damaged-tier recognition.
  */
@@ -135,18 +135,20 @@ export class Tool {
     this.img = typeof data.img === 'string' && data.img ? data.img : null;
 
     /** @type {string|null} The tool's own registered source document uuid. */
-    this.sourceUuid =
-      typeof data.sourceUuid === 'string' && data.sourceUuid ? data.sourceUuid : null;
+    this.registeredItemUuid =
+      typeof data.registeredItemUuid === 'string' && data.registeredItemUuid
+        ? data.registeredItemUuid
+        : null;
 
     /** @type {string|null} The tool's own canonical/compendium source uuid. */
-    this.sourceItemUuid =
-      typeof data.sourceItemUuid === 'string' && data.sourceItemUuid ? data.sourceItemUuid : null;
+    this.originItemUuid =
+      typeof data.originItemUuid === 'string' && data.originItemUuid ? data.originItemUuid : null;
 
     /** @type {string[]} Additional source references for runtime matching. */
-    this.fallbackItemIds = Array.isArray(data.fallbackItemIds)
+    this.aliasItemUuids = Array.isArray(data.aliasItemUuids)
       ? [
           ...new Set(
-            data.fallbackItemIds
+            data.aliasItemUuids
               .filter((id) => typeof id === 'string')
               .map((id) => id.trim())
               .filter(Boolean)
@@ -175,9 +177,9 @@ export class Tool {
     const errors = [];
 
     // A first-class tool is valid with EITHER a managed-component link (`componentId`)
-    // OR its own source references (`sourceUuid`/`sourceItemUuid`); a tool with NEITHER
+    // OR its own source references (`registeredItemUuid`/`originItemUuid`); a tool with NEITHER
     // cannot be matched, so it is invalid (issue 561).
-    const hasSourceRefs = !!(this.sourceUuid || this.sourceItemUuid);
+    const hasSourceRefs = !!(this.registeredItemUuid || this.originItemUuid);
     if (!this.componentId && !hasSourceRefs) {
       errors.push('a tool requires either a componentId or its own source references');
     }
@@ -252,9 +254,9 @@ export class Tool {
       label: this.label,
       name: this.name,
       img: this.img,
-      sourceUuid: this.sourceUuid,
-      sourceItemUuid: this.sourceItemUuid,
-      fallbackItemIds: [...this.fallbackItemIds],
+      registeredItemUuid: this.registeredItemUuid,
+      originItemUuid: this.originItemUuid,
+      aliasItemUuids: [...this.aliasItemUuids],
       requirement: this.requirement ? { ...this.requirement } : null,
       breakage: { ...this.breakage },
       onBreak: { ...this.onBreak },
@@ -366,7 +368,7 @@ export class Tool {
    * " (broken)" suffix is appended to the item's display name. The append is idempotent: it is
    * skipped when the item was already broken-flagged before this call or when the name already
    * ends with the suffix. The suffix is display-only. The flag remains the authoritative
-   * presence-gate disqualifier. A component matched purely by name (no sourceUuid/fallback ids)
+   * presence-gate disqualifier. A component matched purely by name (no registeredItemUuid/fallback ids)
    * stops matching its component once renamed, so a GM clearing the flag must also restore the name.
    *
    * @param {object} params

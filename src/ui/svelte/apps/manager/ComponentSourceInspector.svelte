@@ -13,10 +13,10 @@
 
   // Source linkage is projected onto the component row by the admin store, so the
   // inspector reads it directly — no async item resolution like the recipe item.
-  const hasSourceUuid = $derived(Boolean(component?.hasSourceUuid));
+  const hasRegisteredItemUuid = $derived(Boolean(component?.hasRegisteredItemUuid));
   const sourceMissing = $derived(Boolean(component?.sourceMissing));
-  const sourceUuid = $derived(String(component?.sourceUuidDisplay || ''));
-  const sourceName = $derived(String(component?.name || '') || sourceUuid);
+  const registeredItemUuid = $derived(String(component?.registeredItemUuidDisplay || ''));
+  const sourceName = $derived(String(component?.name || '') || registeredItemUuid);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -42,17 +42,17 @@
   }
 
   function openSource() {
-    if (sourceUuid) onOpenSource(sourceUuid);
+    if (registeredItemUuid) onOpenSource(registeredItemUuid);
   }
 
   function copySourceUuid() {
-    if (sourceUuid) onCopySourceUuid(sourceUuid);
+    if (registeredItemUuid) onCopySourceUuid(registeredItemUuid);
   }
 </script>
 
 <section class="manager-inspector-card" data-component-edit-section="source">
   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item')}</h3>
-  {#if hasSourceUuid}
+  {#if hasRegisteredItemUuid}
     <!-- Drop-to-replace and right-click-to-unlink are enhancements; the visible
          Open/Unlink buttons inside provide the accessible path. -->
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -79,7 +79,7 @@
       {:else}
         <button type="button" class="manager-environment-scene-name" data-component-edit-action="open-source" onclick={(event) => { event.stopPropagation(); openSource(); }} title={text('FABRICATE.Admin.Manager.Component.SourceCard.Open', 'Open Source Item')}>{sourceName}</button>
       {/if}
-      <button type="button" class="manager-icon-button" data-component-edit-action="copy-source" aria-label={text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')} title={text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')} disabled={!sourceUuid} onclick={(event) => { event.stopPropagation(); copySourceUuid(); }}><i class="fas fa-copy" aria-hidden="true"></i></button>
+      <button type="button" class="manager-icon-button" data-component-edit-action="copy-source" aria-label={text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')} title={text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')} disabled={!registeredItemUuid} onclick={(event) => { event.stopPropagation(); copySourceUuid(); }}><i class="fas fa-copy" aria-hidden="true"></i></button>
       <button type="button" class="manager-icon-button is-danger" data-component-edit-action="unlink-source" aria-label={text('FABRICATE.Admin.Manager.Component.SourceCard.Unlink', 'Unlink Source Item')} title={text('FABRICATE.Admin.Manager.Component.SourceCard.Unlink', 'Unlink Source Item')} onclick={(event) => { event.stopPropagation(); unlinkSource(); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
     </div>
     {#if sourceMissing}

@@ -23,11 +23,9 @@ import {
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
-  getSourceUuid,
+  getCompendiumSourceUuid,
   getDuplicateSourceUuid,
-  getComponentSourceReferences,
-  getRecipeItemSourceReferences,
-  getToolSourceReferences,
+  getItemMatchUuids,
   getItemIdentityReferences,
   resolveComponentForItem,
   resolveToolForItem,
@@ -153,7 +151,7 @@ export class CraftingSystemManager {
         (itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null);
       const sourceComponent = sourceComponentId ? itemById.get(sourceComponentId) || null : null;
       const sourceItemUuid = sourceComponentId
-        ? sourceComponent?.sourceItemUuid || sourceComponent?.sourceUuid || null
+        ? sourceComponent?.originItemUuid || sourceComponent?.registeredItemUuid || null
         : this._looksLikeDocumentUuid(def.sourceItemUuid)
           ? def.sourceItemUuid
           : null;
@@ -313,15 +311,33 @@ export class CraftingSystemManager {
     // First-class tool source references + `name`/`img` display snapshot (issue 561).
     // Unknown-field stripping means these MUST be retained here (and in the draft-path
     // twin `_normalizeGatheringLibraryTool` in adminStore.js) or they are silently dropped.
-    const sourceItemUuid = normalizedTool.sourceItemUuid || normalizedTool.sourceUuid || null;
-    const sourceUuid = normalizedTool.sourceUuid || normalizedTool.sourceItemUuid || null;
+    // New-name-first, legacy-name-tolerant (issue 560): accept the renamed
+    // `registeredItemUuid`/`originItemUuid`/`aliasItemUuids` and the pre-#560
+    // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`, emitting the new names.
+    const originItemUuid =
+      normalizedTool.originItemUuid ||
+      normalizedTool.registeredItemUuid ||
+      normalizedTool.sourceItemUuid ||
+      normalizedTool.sourceUuid ||
+      null;
+    const registeredItemUuid =
+      normalizedTool.registeredItemUuid ||
+      normalizedTool.originItemUuid ||
+      normalizedTool.sourceUuid ||
+      normalizedTool.sourceItemUuid ||
+      null;
     const primaryRefs = new Set(
-      [sourceUuid, sourceItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
+      [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
     );
-    const fallbackItemIds = Array.isArray(normalizedTool.fallbackItemIds)
+    const rawAliasItemUuids = Array.isArray(normalizedTool.aliasItemUuids)
+      ? normalizedTool.aliasItemUuids
+      : Array.isArray(normalizedTool.fallbackItemIds)
+        ? normalizedTool.fallbackItemIds
+        : null;
+    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
       ? [
           ...new Set(
-            normalizedTool.fallbackItemIds
+            rawAliasItemUuids
               .filter((ref) => typeof ref === 'string')
               .map((ref) => ref.trim())
               .filter((ref) => ref && !primaryRefs.has(ref))
@@ -336,9 +352,9 @@ export class CraftingSystemManager {
       name:
         typeof normalizedTool.name === 'string' && normalizedTool.name ? normalizedTool.name : null,
       img: typeof normalizedTool.img === 'string' && normalizedTool.img ? normalizedTool.img : null,
-      sourceUuid,
-      sourceItemUuid,
-      fallbackItemIds,
+      registeredItemUuid,
+      originItemUuid,
+      aliasItemUuids,
       requirement: this._normalizeToolRequirement(normalizedTool.requirement),
       breakage: this._normalizeToolBreakage(normalizedTool.breakage),
       onBreak: this._normalizeToolOnBreak(normalizedTool.onBreak),
@@ -1136,19 +1152,42 @@ export class CraftingSystemManager {
       id = foundry.utils.randomID();
     }
 
-    const sourceItemUuid = String(entry.sourceItemUuid || entry.sourceUuid || '').trim() || null;
+    // New-name-first, legacy-name-tolerant (issue 560): accept the renamed
+    // `registeredItemUuid`/`originItemUuid`/`aliasItemUuids` and the pre-#560
+    // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`, emitting the new names, so a
+    // not-yet-1.16.0-migrated entry is never stripped on save.
+    const originItemUuid =
+      String(
+        entry.originItemUuid ||
+          entry.registeredItemUuid ||
+          entry.sourceItemUuid ||
+          entry.sourceUuid ||
+          ''
+      ).trim() || null;
     // Union source refs, mirroring `_normalizeComponent`: a recipe item claims its
-    // registered live document (`sourceUuid`), its canonical compendium/source
-    // (`sourceItemUuid`), and any `fallbackItemIds`, so a compendium-imported book
+    // registered live document (`registeredItemUuid`), its canonical compendium/source
+    // (`originItemUuid`), and any `aliasItemUuids`, so a compendium-imported book
     // resolves for owned copies dragged from EITHER the compendium item or the imported
-    // world item (issue 555). Existing definitions carry only `sourceItemUuid`; it is
-    // never recomputed, and `sourceUuid` defaults to it, so their matching is unchanged.
-    const sourceUuid = String(entry.sourceUuid || entry.sourceItemUuid || '').trim() || null;
-    const primaryRefs = new Set([sourceUuid, sourceItemUuid].filter(Boolean));
-    const fallbackItemIds = Array.isArray(entry.fallbackItemIds)
+    // world item (issue 555). Existing definitions carry only `originItemUuid`; it is
+    // never recomputed, and `registeredItemUuid` defaults to it, so their matching is unchanged.
+    const registeredItemUuid =
+      String(
+        entry.registeredItemUuid ||
+          entry.originItemUuid ||
+          entry.sourceUuid ||
+          entry.sourceItemUuid ||
+          ''
+      ).trim() || null;
+    const primaryRefs = new Set([registeredItemUuid, originItemUuid].filter(Boolean));
+    const rawAliasItemUuids = Array.isArray(entry.aliasItemUuids)
+      ? entry.aliasItemUuids
+      : Array.isArray(entry.fallbackItemIds)
+        ? entry.fallbackItemIds
+        : null;
+    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
       ? [
           ...new Set(
-            entry.fallbackItemIds
+            rawAliasItemUuids
               .filter((id) => typeof id === 'string')
               .map((id) => id.trim())
               .filter((id) => id && !primaryRefs.has(id))
@@ -1157,12 +1196,12 @@ export class CraftingSystemManager {
       : [];
     return {
       id,
-      name: String(entry.name || '').trim() || this._labelFromUuid(sourceItemUuid) || 'Recipe Item',
+      name: String(entry.name || '').trim() || this._labelFromUuid(originItemUuid) || 'Recipe Item',
       description: this._normalizeComponentDescription(entry.description),
       img: String(entry.img || '').trim() || 'icons/svg/item-bag.svg',
-      sourceItemUuid,
-      sourceUuid,
-      fallbackItemIds,
+      originItemUuid,
+      registeredItemUuid,
+      aliasItemUuids,
       // Per-recipe-item enable toggle (issue 511, PR-B). Defaults on; a disabled
       // definition still round-trips but the library UI can hide/skip it.
       enabled: entry.enabled !== false,
@@ -1314,9 +1353,9 @@ export class CraftingSystemManager {
       description: sourceResolved
         ? this._extractSourceDescription(source)
         : this._normalizeComponentDescription(fallbackItem?.description),
-      sourceUuid: resolvedSourceData.currentUuid,
-      sourceItemUuid: resolvedSourceData.canonicalUuid,
-      fallbackItemIds: resolvedSourceData.fallbackItemIds,
+      registeredItemUuid: resolvedSourceData.currentUuid,
+      originItemUuid: resolvedSourceData.canonicalUuid,
+      aliasItemUuids: resolvedSourceData.aliasItemUuids,
       sourceFallbacks: resolvedSourceData.sourceFallbacks,
       references: resolvedSourceData.references,
     };
@@ -1337,9 +1376,9 @@ export class CraftingSystemManager {
       description: source
         ? this._extractSourceDescription(source)
         : this._normalizeComponentDescription(fallbackDefinition?.description),
-      sourceUuid: sourceData.currentUuid,
-      sourceItemUuid: sourceData.canonicalUuid,
-      fallbackItemIds: sourceData.fallbackItemIds,
+      registeredItemUuid: sourceData.currentUuid,
+      originItemUuid: sourceData.canonicalUuid,
+      aliasItemUuids: sourceData.aliasItemUuids,
     };
   }
 
@@ -1357,9 +1396,9 @@ export class CraftingSystemManager {
     return {
       name: source?.name || fallbackName,
       img: source?.img || 'icons/svg/item-bag.svg',
-      sourceUuid: sourceData.currentUuid,
-      sourceItemUuid: sourceData.canonicalUuid,
-      fallbackItemIds: sourceData.fallbackItemIds,
+      registeredItemUuid: sourceData.currentUuid,
+      originItemUuid: sourceData.canonicalUuid,
+      aliasItemUuids: sourceData.aliasItemUuids,
     };
   }
 
@@ -1369,8 +1408,8 @@ export class CraftingSystemManager {
     nextSourceItemUuid,
     additionalFallbacks = []
   ) {
-    const fallbackSet = new Set(Array.isArray(item?.fallbackItemIds) ? item.fallbackItemIds : []);
-    for (const ref of [item?.sourceUuid, item?.sourceItemUuid]) {
+    const fallbackSet = new Set(Array.isArray(item?.aliasItemUuids) ? item.aliasItemUuids : []);
+    for (const ref of [item?.registeredItemUuid, item?.originItemUuid]) {
       if (ref) fallbackSet.add(ref);
     }
     for (const ref of Array.isArray(additionalFallbacks) ? additionalFallbacks : []) {
@@ -1383,15 +1422,33 @@ export class CraftingSystemManager {
 
   _normalizeComponent(item = {}, validEssenceIds = null) {
     const difficulty = Number(item.difficulty);
-    const sourceItemUuid = item.sourceItemUuid || item.sourceUuid || null;
-    const sourceUuid = item.sourceUuid || item.sourceItemUuid || null;
+    // New-name-first, legacy-name-tolerant (issue 560): the pre-#560 shape used
+    // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`; accept both and emit the new names
+    // so a not-yet-1.16.0-migrated component is never stripped on save.
+    const originItemUuid =
+      item.originItemUuid ||
+      item.registeredItemUuid ||
+      item.sourceItemUuid ||
+      item.sourceUuid ||
+      null;
+    const registeredItemUuid =
+      item.registeredItemUuid ||
+      item.originItemUuid ||
+      item.sourceUuid ||
+      item.sourceItemUuid ||
+      null;
     const primaryRefs = new Set(
-      [sourceUuid, sourceItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
+      [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
     );
-    const fallbackItemIds = Array.isArray(item.fallbackItemIds)
+    const rawAliasItemUuids = Array.isArray(item.aliasItemUuids)
+      ? item.aliasItemUuids
+      : Array.isArray(item.fallbackItemIds)
+        ? item.fallbackItemIds
+        : null;
+    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
       ? [
           ...new Set(
-            item.fallbackItemIds
+            rawAliasItemUuids
               .filter((id) => typeof id === 'string')
               .map((id) => id.trim())
               .filter((id) => id && !primaryRefs.has(id))
@@ -1403,10 +1460,10 @@ export class CraftingSystemManager {
       name: item.name || 'Unnamed Item',
       img: item.img || 'icons/svg/item-bag.svg',
       description: this._normalizeComponentDescription(item.description),
-      sourceItemUuid,
+      originItemUuid,
       // Transitional alias for current UI/engine references.
-      sourceUuid,
-      fallbackItemIds,
+      registeredItemUuid,
+      aliasItemUuids,
       tier: item.tier || null,
       tags: Array.isArray(item.tags) ? item.tags : [],
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
@@ -1653,19 +1710,19 @@ export class CraftingSystemManager {
     if (!search) return [...managedItems];
     const q = search.toLowerCase();
     return managedItems.filter((item) => {
-      const sourceUuid = item.sourceItemUuid || item.sourceUuid || '';
-      const sourceOrigin = sourceUuid.startsWith('Compendium.')
+      const registeredItemUuid = item.originItemUuid || item.registeredItemUuid || '';
+      const sourceOrigin = registeredItemUuid.startsWith('Compendium.')
         ? 'compendium'
-        : sourceUuid.startsWith('Item.')
+        : registeredItemUuid.startsWith('Item.')
           ? 'items directory'
-          : sourceUuid
+          : registeredItemUuid
             ? 'unknown'
             : '';
       return (
         item.name.toLowerCase().includes(q) ||
         (item.description || '').toLowerCase().includes(q) ||
-        (item.sourceUuid || '').toLowerCase().includes(q) ||
-        (item.sourceItemUuid || '').toLowerCase().includes(q) ||
+        (item.registeredItemUuid || '').toLowerCase().includes(q) ||
+        (item.originItemUuid || '').toLowerCase().includes(q) ||
         (Array.isArray(item.tags) &&
           item.tags.some((tag) =>
             String(tag || '')
@@ -1691,7 +1748,7 @@ export class CraftingSystemManager {
       const definitions = system.recipeItemDefinitions;
       const usedIds = new Set(definitions.map((def) => def.id));
       const bySource = new Map(
-        definitions.filter((def) => def.sourceItemUuid).map((def) => [def.sourceItemUuid, def])
+        definitions.filter((def) => def.originItemUuid).map((def) => [def.originItemUuid, def])
       );
 
       const recipes = this.recipeManager.getRecipes({ craftingSystemId: system.id });
@@ -1724,8 +1781,8 @@ export class CraftingSystemManager {
 
           usedIds.add(definition.id);
           definitions.push(definition);
-          if (definition.sourceItemUuid) {
-            bySource.set(definition.sourceItemUuid, definition);
+          if (definition.originItemUuid) {
+            bySource.set(definition.originItemUuid, definition);
           }
           systemsChanged = true;
         }
@@ -1776,13 +1833,13 @@ export class CraftingSystemManager {
         existing.name === snapshot.name &&
         existing.img === snapshot.img &&
         existing.description === snapshot.description &&
-        existing.sourceItemUuid === snapshot.sourceItemUuid;
+        existing.originItemUuid === snapshot.originItemUuid;
 
       // Stamp the durable identity flag (and strip a clone's stale `_stats`) on BOTH
       // the skipped and updated branches. This makes `skipped` a user-accessible
       // recovery path: re-registering an unchanged definition whose source predates
       // the flag still stamps and strips it (issue 555).
-      const previousSourceUuid = existing.sourceItemUuid;
+      const previousSourceUuid = existing.originItemUuid;
       await this._stampSourceIdentity(source, 'recipeItemDefinitionId', existing.id);
 
       if (unchanged) {
@@ -1792,12 +1849,12 @@ export class CraftingSystemManager {
       existing.name = snapshot.name;
       existing.img = snapshot.img;
       existing.description = snapshot.description;
-      existing.sourceItemUuid = snapshot.sourceItemUuid;
+      existing.originItemUuid = snapshot.originItemUuid;
 
       await this.save();
       // A source-uuid change is a re-point: clear the durable flag off the old source
       // document so it no longer claims this definition.
-      if (previousSourceUuid && previousSourceUuid !== snapshot.sourceItemUuid) {
+      if (previousSourceUuid && previousSourceUuid !== snapshot.originItemUuid) {
         await this._clearSourceFlag(previousSourceUuid, 'recipeItemDefinitionId', existing.id);
       }
       return { item: existing, action: 'updated' };
@@ -1877,9 +1934,9 @@ export class CraftingSystemManager {
 
     system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));
     const flagKey = this._toolRoleFlagKey(system.id);
-    const sourceUuid = tool.sourceItemUuid || tool.sourceUuid || null;
-    if (flagKey && sourceUuid) {
-      await this._clearSourceFlag(sourceUuid, flagKey, tool.id);
+    const registeredItemUuid = tool.originItemUuid || tool.registeredItemUuid || null;
+    if (flagKey && registeredItemUuid) {
+      await this._clearSourceFlag(registeredItemUuid, flagKey, tool.id);
     }
     await this.save();
     return { deleted: true };
@@ -1929,7 +1986,7 @@ export class CraftingSystemManager {
   }
 
   // Update a recipe item definition's per-item caps and enable state (issue 511).
-  // A definition's identity (name/img/sourceItemUuid) is managed by the recipe-item
+  // A definition's identity (name/img/originItemUuid) is managed by the recipe-item
   // linking flow and is not editable here. The patch's `item`/`learn` partials merge
   // over the current caps, then the whole block is re-normalized (uncapped defaults,
   // finite/positive clamps, legacy/new field sync) via `_normalizeRecipeItemCaps`.
@@ -2482,7 +2539,7 @@ export class CraftingSystemManager {
       if (!references.includes(ref)) references.push(ref);
     }
     const currentUuid = references[0] || null;
-    const canonicalUuid = (isClone ? null : getSourceUuid(source)) || currentUuid;
+    const canonicalUuid = (isClone ? null : getCompendiumSourceUuid(source)) || currentUuid;
     return { currentUuid, canonicalUuid, references, isClone };
   }
 
@@ -2496,24 +2553,24 @@ export class CraftingSystemManager {
    *   currentUuid: string|null,
    *   canonicalUuid: string|null,
    *   references: string[],
-   *   fallbackItemIds: string[],
+   *   aliasItemUuids: string[],
    *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>
    * }>}
    */
   async _resolveImportedComponentSourceData(itemUuid, source = null) {
     const sourceData = this._resolveImportedSourceData(itemUuid, source);
     const sourceFallbacks = [];
-    const fallbackItemIds = [];
+    const aliasItemUuids = [];
     // A clone was already stripped of its inherited compendium source by
     // `_resolveImportedSourceData`; never resurrect it through the broken-source
-    // fallback below (which reads the raw `getSourceUuid`).
+    // fallback below (which reads the raw `getCompendiumSourceUuid`).
     if (sourceData.isClone) {
-      return { ...sourceData, fallbackItemIds, sourceFallbacks };
+      return { ...sourceData, aliasItemUuids, sourceFallbacks };
     }
-    const recordedCanonicalUuid = getSourceUuid(source);
+    const recordedCanonicalUuid = getCompendiumSourceUuid(source);
     const currentUuid = sourceData.currentUuid;
     if (!recordedCanonicalUuid || !currentUuid || recordedCanonicalUuid === currentUuid) {
-      return { ...sourceData, fallbackItemIds, sourceFallbacks };
+      return { ...sourceData, aliasItemUuids, sourceFallbacks };
     }
 
     let canonicalSource;
@@ -2525,13 +2582,13 @@ export class CraftingSystemManager {
     }
 
     if (canonicalSource) {
-      return { ...sourceData, fallbackItemIds, sourceFallbacks };
+      return { ...sourceData, aliasItemUuids, sourceFallbacks };
     }
 
     if (!sourceData.references.includes(recordedCanonicalUuid)) {
       sourceData.references.push(recordedCanonicalUuid);
     }
-    fallbackItemIds.push(recordedCanonicalUuid);
+    aliasItemUuids.push(recordedCanonicalUuid);
     sourceFallbacks.push({
       itemName: source?.name || itemUuid?.split('.')?.pop() || 'Imported Item',
       brokenUuid: recordedCanonicalUuid,
@@ -2540,7 +2597,7 @@ export class CraftingSystemManager {
     return {
       ...sourceData,
       canonicalUuid: currentUuid,
-      fallbackItemIds,
+      aliasItemUuids,
       sourceFallbacks,
     };
   }
@@ -2559,14 +2616,14 @@ export class CraftingSystemManager {
     return (
       (system.components || []).find((item) => {
         if (excludeItemId && item.id === excludeItemId) return false;
-        return getComponentSourceReferences(item).some((ref) => claimedRefs.has(ref));
+        return getItemMatchUuids(item).some((ref) => claimedRefs.has(ref));
       }) || null
     );
   }
 
   // The recipes a book/scroll contains. Canonical source is the definition's
   // `recipeIds[]` (issue 511 many-to-many). Falls back to the legacy reverse ref
-  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → sourceItemUuid`) only for
+  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → originItemUuid`) only for
   // un-migrated definitions that carry no `recipeIds` yet.
   _getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition) {
     if (!definition || !this.recipeManager?.getRecipes) return [];
@@ -2591,13 +2648,13 @@ export class CraftingSystemManager {
     if (anyMigrated) return [];
 
     const definitionId = String(definition.id || '').trim();
-    const sourceItemUuid = String(definition.sourceItemUuid || '').trim();
+    const originItemUuid = String(definition.originItemUuid || '').trim();
     return recipes.filter((recipe) => {
       const recipeItemId = String(recipe?.recipeItemId || '').trim();
       const linkedRecipeItemUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
       return (
         recipeItemId === definitionId ||
-        (!recipeItemId && !!sourceItemUuid && linkedRecipeItemUuid === sourceItemUuid)
+        (!recipeItemId && !!originItemUuid && linkedRecipeItemUuid === originItemUuid)
       );
     });
   }
@@ -2631,12 +2688,12 @@ export class CraftingSystemManager {
     const legacyUuid = String(recipe.linkedRecipeItemUuid || '').trim();
     return definitions.filter((def) => {
       if (recipeItemId) return String(def.id) === recipeItemId;
-      return !!legacyUuid && String(def.sourceItemUuid || '') === legacyUuid;
+      return !!legacyUuid && String(def.originItemUuid || '') === legacyUuid;
     });
   }
 
   _assertUniqueComponentSources(system, item, excludeItemId = null) {
-    const claimedRefs = getComponentSourceReferences(item);
+    const claimedRefs = getItemMatchUuids(item);
     if (claimedRefs.length === 0) return;
     const conflict = this._findComponentBySourceReferences(system, claimedRefs, excludeItemId);
     if (!conflict) return;
@@ -2648,7 +2705,7 @@ export class CraftingSystemManager {
   _assertUniqueComponentSourcesForSystem(system) {
     const claims = new Map();
     for (const component of system.components || []) {
-      for (const ref of getComponentSourceReferences(component)) {
+      for (const ref of getItemMatchUuids(component)) {
         const existing = claims.get(ref);
         if (existing && existing.id !== component.id) {
           throw new Error(
@@ -2661,8 +2718,8 @@ export class CraftingSystemManager {
   }
 
   _sameSourceReferenceSet(left, right) {
-    const leftRefs = getComponentSourceReferences(left);
-    const rightRefs = getComponentSourceReferences(right);
+    const leftRefs = getItemMatchUuids(left);
+    const rightRefs = getItemMatchUuids(right);
     return leftRefs.length === rightRefs.length && leftRefs.every((ref) => rightRefs.includes(ref));
   }
 
@@ -2670,8 +2727,8 @@ export class CraftingSystemManager {
    * Add a crafting-system component from a Foundry item UUID.
    * Returns { item, action } where action is 'added', 'updated', or 'skipped'.
    *
-   * Imports preserve both the live document UUID (`sourceUuid`) and the canonical
-   * compendium/source UUID (`sourceItemUuid`) when Foundry exposes both.
+   * Imports preserve both the live document UUID (`registeredItemUuid`) and the canonical
+   * compendium/source UUID (`originItemUuid`) when Foundry exposes both.
    *
    * - 'skipped': an existing component already claims the incoming live UUID or canonical
    *              source UUID, and its metadata/source references are already current.
@@ -2768,11 +2825,11 @@ export class CraftingSystemManager {
    * source). KIND-GENERIC.
    * @private
    */
-  async _clearSourceFlag(sourceUuid, flagKey, id) {
-    if (!sourceUuid || !id) return;
+  async _clearSourceFlag(registeredItemUuid, flagKey, id) {
+    if (!registeredItemUuid || !id) return;
     let doc;
     try {
-      doc = await fromUuid(sourceUuid);
+      doc = await fromUuid(registeredItemUuid);
     } catch {
       doc = null;
     }
@@ -2801,7 +2858,7 @@ export class CraftingSystemManager {
     const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
     for (const system of this.getSystems()) {
       for (const def of system.recipeItemDefinitions || []) {
-        const uuid = def?.sourceItemUuid;
+        const uuid = def?.originItemUuid;
         if (!uuid || !def?.id) continue;
         summary.scanned += 1;
         let source;
@@ -2853,7 +2910,7 @@ export class CraftingSystemManager {
       const flagKey = this._componentRoleFlagKey(system.id);
       if (!flagKey) continue;
       for (const component of system.components || []) {
-        const uuid = component?.sourceItemUuid || component?.sourceUuid;
+        const uuid = component?.originItemUuid || component?.registeredItemUuid;
         if (!uuid || !component?.id) continue;
         summary.scanned += 1;
         let source;
@@ -2889,7 +2946,7 @@ export class CraftingSystemManager {
    * Issue 561 one-shot auto-stamp: backfill the durable per-system TOOL identity
    * `flags.fabricate.roles[system.id].toolId` on every registered tool's writable source
    * Item — a clone of {@link autoStampComponentSources}. Reads each tool's
-   * (migration-populated) `sourceItemUuid`/`sourceUuid`; a tool with no source refs (a
+   * (migration-populated) `originItemUuid`/`registeredItemUuid`; a tool with no source refs (a
    * legacy componentId-only tool whose migration could not resolve refs) is skipped. Dotted
    * (unsafe) system ids and locked/unresolvable sources are skipped. Idempotent, GM-safe.
    * ORDERING: this reads the tool source refs that the `1.15.0` settings-data migration
@@ -2903,7 +2960,7 @@ export class CraftingSystemManager {
       const flagKey = this._toolRoleFlagKey(system.id);
       if (!flagKey) continue;
       for (const tool of system.tools || []) {
-        const uuid = tool?.sourceItemUuid || tool?.sourceUuid;
+        const uuid = tool?.originItemUuid || tool?.registeredItemUuid;
         if (!uuid || !tool?.id) continue;
         summary.scanned += 1;
         let source;
@@ -2934,9 +2991,9 @@ export class CraftingSystemManager {
   /**
    * Resolve the existing definition a registered source maps to. A NON-clone source's
    * durable `recipeItemDefinitionId` flag is authoritative (it resolves to its
-   * definition even if the recorded `sourceItemUuid` drifted); a CLONE's inherited flag
+   * definition even if the recorded `originItemUuid` drifted); a CLONE's inherited flag
    * belongs to the ORIGINAL and is ignored (the clone-gate), so a duplicated source
-   * becomes its own definition (issue 555, flow 4b). Falls back to the `sourceItemUuid`
+   * becomes its own definition (issue 555, flow 4b). Falls back to the `originItemUuid`
    * lookup, which is already clone-gated via `_resolveImportedSourceData`.
    * @private
    */
@@ -2955,12 +3012,10 @@ export class CraftingSystemManager {
     // already clone-gated by `_resolveImportedSourceData` (a clone contributes only its
     // own uuid), so a duplicated source can never collide with the original here — the
     // 4b overwrite stays fixed even with union matching.
-    const claimed = new Set(getRecipeItemSourceReferences(snapshot));
+    const claimed = new Set(getItemMatchUuids(snapshot));
     if (claimed.size === 0) return null;
     return (
-      definitions.find((def) =>
-        getRecipeItemSourceReferences(def).some((ref) => claimed.has(ref))
-      ) || null
+      definitions.find((def) => getItemMatchUuids(def).some((ref) => claimed.has(ref))) || null
     );
   }
 
@@ -3158,7 +3213,7 @@ export class CraftingSystemManager {
         flagKey,
         systemId: system.id,
         definitions: system.components || [],
-        refExtractor: (def) => getComponentSourceReferences(def),
+        refExtractor: (def) => getItemMatchUuids(def),
       });
       // First-class Tools are ALSO a per-system kind (issue 561): each system's pass reads
       // and writes ONLY its own `roles.<systemId>.toolId` leaf. Item-sourced tools reconcile
@@ -3170,9 +3225,9 @@ export class CraftingSystemManager {
           flagKey: toolFlagKey,
           systemId: system.id,
           definitions: (system.tools || []).filter(
-            (tool) => tool && (tool.sourceItemUuid || tool.sourceUuid)
+            (tool) => tool && (tool.originItemUuid || tool.registeredItemUuid)
           ),
-          refExtractor: (def) => getToolSourceReferences(def),
+          refExtractor: (def) => getItemMatchUuids(def),
         });
       }
     }
@@ -3180,7 +3235,7 @@ export class CraftingSystemManager {
       bucket: 'recipeItems',
       flagKey: 'recipeItemDefinitionId',
       definitions: recipeItemDefinitions,
-      refExtractor: (def) => getRecipeItemSourceReferences(def),
+      refExtractor: (def) => getItemMatchUuids(def),
     });
 
     const summary = {
@@ -3284,18 +3339,18 @@ export class CraftingSystemManager {
     if (existing) {
       const nextFallbacks = this._buildFallbackSourceReferences(
         existing,
-        nextSnapshot.sourceUuid,
-        nextSnapshot.sourceItemUuid,
-        nextSnapshot.fallbackItemIds
+        nextSnapshot.registeredItemUuid,
+        nextSnapshot.originItemUuid,
+        nextSnapshot.aliasItemUuids
       );
       const unchanged =
-        existing.sourceUuid === nextSnapshot.sourceUuid &&
-        existing.sourceItemUuid === nextSnapshot.sourceItemUuid &&
+        existing.registeredItemUuid === nextSnapshot.registeredItemUuid &&
+        existing.originItemUuid === nextSnapshot.originItemUuid &&
         existing.name === nextSnapshot.name &&
         existing.img === nextSnapshot.img &&
         existing.description === nextSnapshot.description &&
-        nextFallbacks.length === (existing.fallbackItemIds || []).length &&
-        nextFallbacks.every((ref) => (existing.fallbackItemIds || []).includes(ref));
+        nextFallbacks.length === (existing.aliasItemUuids || []).length &&
+        nextFallbacks.every((ref) => (existing.aliasItemUuids || []).includes(ref));
 
       // Stamp the source (both skipped + updated) so a source that predates this
       // flag — or was re-imported — always carries the per-system durable component id.
@@ -3310,9 +3365,9 @@ export class CraftingSystemManager {
       existing.name = nextSnapshot.name;
       existing.img = nextSnapshot.img;
       existing.description = nextSnapshot.description;
-      existing.sourceUuid = nextSnapshot.sourceUuid;
-      existing.sourceItemUuid = nextSnapshot.sourceItemUuid;
-      existing.fallbackItemIds = nextFallbacks;
+      existing.registeredItemUuid = nextSnapshot.registeredItemUuid;
+      existing.originItemUuid = nextSnapshot.originItemUuid;
+      existing.aliasItemUuids = nextFallbacks;
 
       await this.save();
       return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
@@ -3368,7 +3423,7 @@ export class CraftingSystemManager {
     }
 
     const existing = system.components[idx];
-    const previousSourceUuid = existing.sourceItemUuid || existing.sourceUuid || null;
+    const previousSourceUuid = existing.originItemUuid || existing.registeredItemUuid || null;
     const nextSnapshot = await this._buildComponentSourceSnapshot(itemUuid, source, existing);
     const conflict = this._findComponentBySourceReferences(system, nextSnapshot.references, itemId);
     if (conflict) {
@@ -3382,11 +3437,11 @@ export class CraftingSystemManager {
       {
         ...existing,
         ...nextSnapshot,
-        fallbackItemIds: this._buildFallbackSourceReferences(
+        aliasItemUuids: this._buildFallbackSourceReferences(
           existing,
-          nextSnapshot.sourceUuid,
-          nextSnapshot.sourceItemUuid,
-          nextSnapshot.fallbackItemIds
+          nextSnapshot.registeredItemUuid,
+          nextSnapshot.originItemUuid,
+          nextSnapshot.aliasItemUuids
         ),
         id: itemId,
       },
@@ -3499,7 +3554,7 @@ export class CraftingSystemManager {
     for (const system of this.systems.values()) {
       const components = Array.isArray(system.components) ? system.components : [];
       for (const component of components) {
-        const matches = getComponentSourceReferences(component).some((ref) => itemRefs.has(ref));
+        const matches = getItemMatchUuids(component).some((ref) => itemRefs.has(ref));
         if (!matches) continue;
 
         let changed = false;
@@ -3559,7 +3614,7 @@ export class CraftingSystemManager {
     // Clear essence source-item links that pointed to the deleted component.
     const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({
       ...def,
-      sourceItemUuid: def.sourceItemUuid === itemId ? null : def.sourceItemUuid,
+      originItemUuid: def.originItemUuid === itemId ? null : def.originItemUuid,
       associatedSystemItemId:
         def.associatedSystemItemId === itemId ? null : def.associatedSystemItemId,
     }));

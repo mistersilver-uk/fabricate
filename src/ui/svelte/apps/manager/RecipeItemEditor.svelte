@@ -11,7 +11,7 @@
   sections recompute live from `recipeItem` + `visibilityMode` + `linkedRecipes`.
 
   Props:
-   - recipeItem: `{ id, sourceItemUuid, img, enabled, caps: { item, learn } }` draft.
+   - recipeItem: `{ id, originItemUuid, img, enabled, caps: { item, learn } }` draft.
    - linkedItem: `{ uuid, name, img, type, description? }|null` resolved game-world item.
    - linkedRecipes: `[{ id, name, category, img? }]` recipes linked to this item.
    - availableRecipes: `[{ id, name, category, img? }]` recipes that can be linked.
@@ -83,7 +83,7 @@
   );
 
   const recipeCount = $derived(Array.isArray(linkedRecipes) ? linkedRecipes.length : 0);
-  const hasItem = $derived(Boolean(linkedItem?.uuid || recipeItem?.sourceItemUuid));
+  const hasItem = $derived(Boolean(linkedItem?.uuid || recipeItem?.originItemUuid));
 
   const itemName = $derived(String(linkedItem?.name || '') || text('FABRICATE.Admin.Manager.RecipeItem.Overview.NamePlaceholder', 'Untitled recipe item'));
 

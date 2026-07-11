@@ -13,7 +13,7 @@ import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
  * @param {Item} item - A Foundry item document (or item-like object with flags/_stats)
  * @returns {string|null} The source UUID, or null if neither field is set
  */
-export function getSourceUuid(item) {
+export function getCompendiumSourceUuid(item) {
   if (!item) return null;
   // Foundry v12+ canonical field
   const compendiumSource =
@@ -31,10 +31,10 @@ export function getSourceUuid(item) {
  *
  * When a world Item is duplicated (for example dragged) into an actor, Foundry
  * records the origin world document UUID in `_stats.duplicateSource` — distinct
- * from the compendium-source chain read by {@link getSourceUuid} (in that case
- * `_stats.compendiumSource` is typically `null` and there is no
+ * from the compendium-source chain read by {@link getCompendiumSourceUuid} (in that
+ * case `_stats.compendiumSource` is typically `null` and there is no
  * `flags.core.sourceId`). This helper mirrors the dual-location pattern of
- * {@link getSourceUuid}, checking `_stats` then `system._stats`.
+ * {@link getCompendiumSourceUuid}, checking `_stats` then `system._stats`.
  *
  * @param {Item|object|null} item - A Foundry item document (or item-like object)
  * @returns {string|null} The world-duplicate source UUID, or null if unset
@@ -55,7 +55,7 @@ function pushUnique(target, value) {
  * Collect the UUIDs that may identify a Foundry item instance and its canonical source.
  *
  * Contributes three references: the item's live `uuid`, its compendium-source
- * UUID ({@link getSourceUuid}), and its world-duplicate source UUID
+ * UUID ({@link getCompendiumSourceUuid}), and its world-duplicate source UUID
  * ({@link getDuplicateSourceUuid}). The duplicate-source reference recognizes
  * items duplicated (for example dragged) from a component's source world item,
  * which carry the link only in `_stats.duplicateSource`.
@@ -67,7 +67,7 @@ export function getItemSourceReferences(item) {
   const refs = [];
   if (!item || typeof item !== 'object') return refs;
   pushUnique(refs, item.uuid);
-  pushUnique(refs, getSourceUuid(item));
+  pushUnique(refs, getCompendiumSourceUuid(item));
   pushUnique(refs, getDuplicateSourceUuid(item));
   return refs;
 }
@@ -77,7 +77,7 @@ export function getItemSourceReferences(item) {
  * compendium source — but NOT its world-duplicate source.
  *
  * Contributes two references: the item's live `uuid` and its compendium-source
- * UUID ({@link getSourceUuid}). Unlike {@link getItemSourceReferences}, this
+ * UUID ({@link getCompendiumSourceUuid}). Unlike {@link getItemSourceReferences}, this
  * deliberately omits `_stats.duplicateSource`, so a world Item cloned from
  * another world Item is treated as a distinct identity. Use this for component
  * *identity* decisions — import de-duplication and source-metadata propagation —
@@ -94,23 +94,29 @@ export function getItemIdentityReferences(item) {
   const refs = [];
   if (!item || typeof item !== 'object') return refs;
   pushUnique(refs, item.uuid);
-  pushUnique(refs, getSourceUuid(item));
+  pushUnique(refs, getCompendiumSourceUuid(item));
   return refs;
 }
 
 /**
- * Collect every UUID reference that a component can use for runtime matching.
+ * Collect every UUID reference a registered ENTRY can use for runtime matching.
  *
- * @param {object|null} component - Component-like object with source UUID fields
- * @returns {string[]} Unique UUID references across sourceUuid, sourceItemUuid, and fallbacks
+ * The argument is a registered-entry object — a component, a recipe-item
+ * definition, or a first-class tool — NOT a live Foundry Item document. All three
+ * kinds carry the same source-reference field shape, so the same union serves them
+ * all; use {@link getItemSourceReferences} / {@link getItemIdentityReferences} for a
+ * live Item document instead.
+ *
+ * @param {object|null} entry - Registered-entry object with source UUID fields
+ * @returns {string[]} Unique UUID references across registeredItemUuid, originItemUuid, and aliasItemUuids
  */
-export function getComponentSourceReferences(component) {
+export function getItemMatchUuids(entry) {
   const refs = [];
-  if (!component || typeof component !== 'object') return refs;
-  pushUnique(refs, component.sourceUuid);
-  pushUnique(refs, component.sourceItemUuid);
-  if (Array.isArray(component.fallbackItemIds)) {
-    for (const ref of component.fallbackItemIds) pushUnique(refs, ref);
+  if (!entry || typeof entry !== 'object') return refs;
+  pushUnique(refs, entry.registeredItemUuid);
+  pushUnique(refs, entry.originItemUuid);
+  if (Array.isArray(entry.aliasItemUuids)) {
+    for (const ref of entry.aliasItemUuids) pushUnique(refs, ref);
   }
   return refs;
 }
@@ -128,7 +134,7 @@ export function getComponentSourceReferences(component) {
  * @returns {boolean} True when the item's refs overlap the component's source refs.
  */
 function itemSourceRefsIntersectComponent(itemRefs, component) {
-  return getComponentSourceReferences(component).some((ref) => itemRefs.has(ref));
+  return getItemMatchUuids(component).some((ref) => itemRefs.has(ref));
 }
 
 // Systems already warned-about, so a per-item resolve loop emits at most one console
@@ -295,24 +301,13 @@ export function resolveComponentForItem(item, components, systemId) {
 
 // ---------------------------------------------------------------------------
 // First-class Tool identity (issue 561). A Tool carries its OWN source references
-// (identical field shape to a component), so its matching reuses
-// `getComponentSourceReferences` via the `getToolSourceReferences` alias below and a
-// PARALLEL resolver pair that shares the generalized `durableClaimedFromSet`
-// primitive with `{ roleKey: 'toolId', legacyScalarKey: null }` — tools never had a
-// legacy scalar flag. Kept parallel to (not folded into) the component functions
-// precisely because of that legacy-scalar asymmetry.
+// (identical field shape to a component), so its matching reuses the kind-agnostic
+// `getItemMatchUuids` union directly and a PARALLEL resolver pair that shares the
+// generalized `durableClaimedFromSet` primitive with
+// `{ roleKey: 'toolId', legacyScalarKey: null }` — tools never had a legacy scalar
+// flag. Kept parallel to (not folded into) the component functions precisely because
+// of that legacy-scalar asymmetry.
 // ---------------------------------------------------------------------------
-
-/**
- * Collect every UUID reference a first-class Tool can use for runtime matching — the
- * union of its `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`. A thin alias of
- * {@link getComponentSourceReferences} (identical field shape) so #560's later source-
- * uuid field rename lands in one place.
- *
- * @param {object|null} tool - Tool-like object with source UUID fields
- * @returns {string[]} Unique UUID references
- */
-export const getToolSourceReferences = getComponentSourceReferences;
 
 /**
  * Resolve which single first-class Tool an owned item IS, within ONE crafting system's
@@ -347,8 +342,7 @@ export function resolveToolForItem(item, tools, systemId) {
   const itemRefs = new Set(getItemSourceReferences(item));
   if (itemRefs.size === 0) return null;
   return (
-    candidates.find((tool) => getToolSourceReferences(tool).some((ref) => itemRefs.has(ref))) ||
-    null
+    candidates.find((tool) => getItemMatchUuids(tool).some((ref) => itemRefs.has(ref))) || null
   );
 }
 
@@ -409,9 +403,8 @@ export function itemIsToolByDurableIdentity(item, tool, tools, systemId) {
   const itemRefs = new Set(getItemIdentityReferences(item));
   if (itemRefs.size === 0) return false;
   const resolved =
-    candidates.find((candidate) =>
-      getToolSourceReferences(candidate).some((ref) => itemRefs.has(ref))
-    ) || null;
+    candidates.find((candidate) => getItemMatchUuids(candidate).some((ref) => itemRefs.has(ref))) ||
+    null;
   return resolved != null && resolved.id === tool.id;
 }
 
@@ -438,20 +431,6 @@ export function itemResolvesToComponent(item, component, components, systemId) {
 export const RECIPE_ITEM_MATCH_TIERS = ['identity', 'uuid', 'compendium', 'duplicate'];
 
 /**
- * Collect the UUID references a recipe-item definition can match against — the union
- * of its `sourceUuid` (the registered live document), `sourceItemUuid` (the canonical
- * compendium/source uuid), and any `fallbackItemIds`. Mirrors
- * {@link getComponentSourceReferences} so a recipe item claims the same breadth of
- * source refs a component does (match on everything; craft spawns from `sourceUuid`).
- *
- * @param {object|null} definition - Recipe-item definition with source UUID fields
- * @returns {string[]} Unique UUID references
- */
-export function getRecipeItemSourceReferences(definition) {
-  return getComponentSourceReferences(definition);
-}
-
-/**
  * Resolve which recipe-item definition an item IS, and by how durable a link.
  *
  * This is the single shared matcher for recipe items, mirroring
@@ -462,10 +441,10 @@ export function getRecipeItemSourceReferences(definition) {
  *   1. `identity`   — `flags.fabricate.recipeItemDefinitionId === def.id` (the
  *                     durable, transferable identity-of-record; survives Foundry's
  *                     transitive `_stats.duplicateSource` template chaining).
- *   2. `uuid`       — `item.uuid === def.sourceItemUuid` (the item IS the source).
- *   3. `compendium` — `getSourceUuid(item) === def.sourceItemUuid` (compendium
+ *   2. `uuid`       — `item.uuid === def.originItemUuid` (the item IS the source).
+ *   3. `compendium` — `getCompendiumSourceUuid(item) === def.originItemUuid` (compendium
  *                     provenance; a pack copy of the registered source).
- *   4. `duplicate`  — `getDuplicateSourceUuid(item) === def.sourceItemUuid` (a
+ *   4. `duplicate`  — `getDuplicateSourceUuid(item) === def.originItemUuid` (a
  *                     drag/duplicate copy of an un-migrated world-template source).
  *
  * There is no clone-gate here, and there must never be one. Foundry stamps
@@ -493,14 +472,14 @@ export function matchRecipeItemDefinition(item, definitions) {
 
   const flagValue = getFabricateFlag(item, 'recipeItemDefinitionId', null);
   const uuid = typeof item.uuid === 'string' ? item.uuid : null;
-  const compendium = getSourceUuid(item);
+  const compendium = getCompendiumSourceUuid(item);
   const duplicate = getDuplicateSourceUuid(item);
 
   // Tiers 2/3/4 test membership in the definition's UNION of source refs (its
-  // `sourceUuid` + `sourceItemUuid` + fallbacks), so a compendium-imported book
+  // `registeredItemUuid` + `originItemUuid` + aliases), so a compendium-imported book
   // resolves whether the owned copy was dragged from the compendium item or the
   // imported world item. Tier 1 (the durable flag) still wins outright.
-  const refSets = new Map(defs.map((def) => [def, new Set(getRecipeItemSourceReferences(def))]));
+  const refSets = new Map(defs.map((def) => [def, new Set(getItemMatchUuids(def))]));
   const predicates = {
     identity: (def) => flagValue != null && def?.id != null && String(def.id) === String(flagValue),
     uuid: (def) => uuid != null && refSets.get(def).has(uuid),
@@ -574,7 +553,7 @@ function resolveSourceComponentIdentity(source, components, systemId) {
  */
 export function findStackableMatch(items, source, components = [], systemId) {
   const sourceRefs = new Set(
-    [...getItemSourceReferences(source), ...getComponentSourceReferences(source)].filter(Boolean)
+    [...getItemSourceReferences(source), ...getItemMatchUuids(source)].filter(Boolean)
   );
   if (sourceRefs.size === 0) return null;
   const sourceComponent = resolveSourceComponentIdentity(source, components, systemId);

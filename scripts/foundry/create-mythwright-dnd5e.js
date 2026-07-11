@@ -441,6 +441,10 @@ const MythwrightDnd5eBootstrap = (() => {
       delete payload._stats.compendiumSource;
       if (Object.keys(payload._stats).length === 0) delete payload._stats;
     }
+    delete payload.registeredItemUuid;
+    delete payload.originItemUuid;
+    delete payload.aliasItemUuids;
+    // Also strip the pre-#560 field names in case a source Item carries the legacy shape.
     delete payload.sourceUuid;
     delete payload.sourceItemUuid;
     delete payload.fallbackItemIds;
@@ -879,10 +883,10 @@ const MythwrightDnd5eBootstrap = (() => {
 
   function componentFromItem(id, item, extra = {}) {
     const itemUuid = item.uuid || null;
-    const sourceUuid = extra.preserveSourceIdentity === false
+    const registeredItemUuid = extra.preserveSourceIdentity === false
       ? (itemUuid?.startsWith('Compendium.') ? null : itemUuid)
       : itemUuid;
-    const sourceItemUuid = extra.preserveSourceIdentity === false
+    const originItemUuid = extra.preserveSourceIdentity === false
       ? (itemUuid?.startsWith('Compendium.') ? null : itemUuid)
       : (itemSourceId(item) || itemUuid);
     const itemDescription = htmlToText(item.system?.description?.value || item.toObject?.()?.system?.description?.value || '');
@@ -891,9 +895,9 @@ const MythwrightDnd5eBootstrap = (() => {
       name: item.name,
       description: itemDescription,
       img: sanitizeIconPath(item.img || DEFAULT_ITEM_ICON, { allowExternal: true }),
-      sourceUuid,
-      sourceItemUuid,
-      fallbackItemIds: [],
+      registeredItemUuid,
+      originItemUuid,
+      aliasItemUuids: [],
       tags: extra.tags || [],
       difficulty: extra.difficulty || 1,
       salvage: extra.salvage || { enabled: false },

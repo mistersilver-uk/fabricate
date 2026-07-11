@@ -1,4 +1,4 @@
-import { getSourceUuid } from '../utils/sourceUuid.js';
+import { getCompendiumSourceUuid } from '../utils/sourceUuid.js';
 
 /**
  * Register the createItem hook for automatic fragment-based discovery.
@@ -28,14 +28,17 @@ export function registerFragmentDiscoveryHook(craftingSystemManager, visibilityS
       for (const fragment of system.teaserConfig.fragments || []) {
         if (!fragment.linkedItemUuid) continue;
 
-        let sourceUuid;
+        let compendiumSourceUuid;
         try {
-          sourceUuid = getSourceUuid(item);
+          compendiumSourceUuid = getCompendiumSourceUuid(item);
         } catch {
-          sourceUuid = null;
+          compendiumSourceUuid = null;
         }
 
-        if (item.uuid !== fragment.linkedItemUuid && sourceUuid !== fragment.linkedItemUuid)
+        if (
+          item.uuid !== fragment.linkedItemUuid &&
+          compendiumSourceUuid !== fragment.linkedItemUuid
+        )
           continue;
 
         await visibilityService.discoverFragment(actor, fragment.id, system);
