@@ -2221,7 +2221,7 @@ Hooks.once('ready', async () => {
   await processFabricateWorldTime();
   await runRecipeItemFlagAutoStamp();
   await runComponentFlagAutoStamp();
-  // MUST run after the MigrationRunner (which persists the 1.14.0 tool source-ref migration
+  // MUST run after the MigrationRunner (which persists the 1.15.0 tool source-ref migration
   // at init) and after the component stamp — it reads the migration-populated tool refs.
   await runToolFlagAutoStamp();
 
@@ -2355,7 +2355,7 @@ async function runComponentFlagAutoStamp() {
  * Issue 561 — one-shot, primary-GM-gated backfill that stamps the durable per-system
  * `flags.fabricate.roles[system.id].toolId` on every registered tool's writable source Item.
  * Keyed by the `TOOL_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
- * MUST run AFTER the `1.14.0` settings-data migration (`migrateToolsToFirstClass`) populates
+ * MUST run AFTER the `1.15.0` settings-data migration (`migrateToolsToFirstClass`) populates
  * each tool's source refs — the migration persists at init, this reads the live normalized
  * systems in the `ready` body — and BEFORE the `updateItem` hook registers. Sources only —
  * owned copies inherit the flag on future drags and are otherwise covered by the manual

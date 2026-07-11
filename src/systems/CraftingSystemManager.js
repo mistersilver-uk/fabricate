@@ -136,7 +136,7 @@ export class CraftingSystemManager {
     // First-class Tools (issue 561): a component-linked tool (`componentId` set, no own
     // source refs — e.g. authored by dropping a managed component, or an un-migrated legacy
     // entry) derives its source refs + snapshot from its linked component here so it matches
-    // owned items by SOURCE (not just by name), continuous with the 1.14.0 migration and
+    // owned items by SOURCE (not just by name), continuous with the 1.15.0 migration and
     // idempotent. Item-sourced tools (`componentId: null`) and already-derived tools are left
     // untouched. Runs after component normalization so `items` is the resolved component set.
     const normalizedTools = Array.isArray(system.tools)
@@ -2892,7 +2892,7 @@ export class CraftingSystemManager {
    * (migration-populated) `sourceItemUuid`/`sourceUuid`; a tool with no source refs (a
    * legacy componentId-only tool whose migration could not resolve refs) is skipped. Dotted
    * (unsafe) system ids and locked/unresolvable sources are skipped. Idempotent, GM-safe.
-   * ORDERING: this reads the tool source refs that the `1.14.0` settings-data migration
+   * ORDERING: this reads the tool source refs that the `1.15.0` settings-data migration
    * (`migrateToolsToFirstClass`) populates, so it MUST run after that migration persists.
    *
    * @returns {Promise<{scanned:number, stamped:number, stripped:number, skippedLocked:number, skippedMissing:number}>}

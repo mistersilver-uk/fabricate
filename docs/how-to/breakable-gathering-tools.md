@@ -20,11 +20,14 @@ Pick one of three breakage mechanics (limited uses, breakage chance, or dice exp
 
 1. **Define the tool component.** In the crafting system's Items tab, add the tool item as a managed component.
    If you plan to use the **Replace with** on-break action, also add the broken-tool variant as a separate managed component.
+   A managed component is only required for the **Replace with** action.
+   Otherwise you can skip this step and drop the Item directly onto the Tools page to create an item-sourced tool.
+   See [Authoring a Tool]({% link tools.md %}#authoring-a-tool).
 2. **Open the Tools page.** In Manager V2, with the crafting system selected, click the top-level **Tools** navigation entry (a sibling of Components, Essences, and the Gathering group).
    It is *not* nested under Gathering, because Tools belong to the system, not the gathering config.
    The page lists the system's library of reusable tools and opens an in-memory draft you can edit before saving.
 3. **Add a tool.** Click *Add tool*.
-   Pick the tool component from the picker (drag-drop from the Items directory or use the dropdown).
+   Pick the tool component from the picker (drag-drop from the Items directory or use the dropdown), or drop an Item to create an item-sourced tool.
    Optionally set a display label.
 4. **(Optional) Add a tool requirement.** Click *Add requirement* to require a condition on the character.
    The requirement is a Foundry expression.

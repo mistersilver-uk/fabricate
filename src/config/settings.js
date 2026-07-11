@@ -58,7 +58,7 @@ export const COMPONENT_FLAG_STAMP_TARGET = 1;
 
 // The target version for the one-shot tool flag auto-stamp (issue 561). When the stored
 // `TOOL_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once on `ready`
-// (AFTER the 1.14.0 settings-data migration populates tool source refs) and writes it back.
+// (AFTER the 1.15.0 settings-data migration populates tool source refs) and writes it back.
 export const TOOL_FLAG_STAMP_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({

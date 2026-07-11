@@ -148,20 +148,32 @@ A Tool entry stored under `system.tools` (the `craftingSystems` setting) has thi
 
 ```javascript
 {
-  id,           // string (library id, referenced by toolIds)
-  componentId,  // string (required managed component reference)
-  label,        // string (optional display label)
-  requirement,  // null | { formula } (a Foundry roll expression; required when set)
-  breakage,     // { mode: 'limitedUses', maxUses } |
-                // { mode: 'breakageChance', breakageChance } |
-                // { mode: 'diceExpression', formula, threshold }
-  onBreak       // { mode: 'destroy' } | { mode: 'flagBroken' } |
-                // { mode: 'replaceWith', replacementComponentId }
+  id,             // string (library id, referenced by toolIds)
+  componentId,    // string | null (optional managed-component link; null for an item-sourced tool)
+  name,           // string | null (display snapshot captured at registration/migration)
+  img,            // string | null (display snapshot image)
+  sourceUuid,     // string | null (the tool's own source item uuid)
+  sourceItemUuid, // string | null (the tool's own canonical/compendium source uuid)
+  fallbackItemIds,// string[] (additional source references for matching)
+  label,          // string (optional user-authored display label, distinct from the snapshot)
+  requirement,    // null | { formula } (a Foundry roll expression; required when set)
+  breakage,       // { mode: 'limitedUses', maxUses } |
+                  // { mode: 'breakageChance', breakageChance } |
+                  // { mode: 'diceExpression', formula, threshold } |
+                  // { mode: 'immune' }
+  onBreak         // { mode: 'destroy' } | { mode: 'flagBroken' } |
+                  // { mode: 'replaceWith', replacementComponentId }
 }
 ```
 
+A Tool is first-class as of issue 561: it carries its own source references (`sourceUuid` / `sourceItemUuid` / `fallbackItemIds`) and a `name` / `img` display snapshot, so it can be registered directly from an Item without importing that Item as a component.
+`componentId` is optional.
+It is `null` for an item-sourced tool and populated only for a tool that is also a managed component (a whetstone) or one migrated from a legacy component-linked tool.
+A valid Tool carries either a `componentId` or its own source references.
+
 Per-item usage for `limitedUses` tools is tracked under `Item.flags.fabricate.toolUsage = { timesUsed }`.
 The `flagBroken` on-break action sets `Item.flags.fabricate.toolBroken = true`.
+A tool's durable identity is stamped on its source Item as `Item.flags.fabricate.roles[systemId].toolId`, a sibling of the component role flag, so the same Item can be both a component and a tool.
 
 ---
 

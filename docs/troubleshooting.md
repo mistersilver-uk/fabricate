@@ -170,7 +170,7 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 4. If a broken tool should be removed instead of flagged, set its on-break action to **Destroy item** (or **Replace with...**).
    A tool that has been flagged as broken cannot be used again until a GM clears that broken state.
 5. If tools should break even on a failed check, open the system settings and enable the option to consume tools on failure (there are separate options for recipes and for salvage).
-6. If the tool is present but never breaks or tracks usage, and the owned copy was duplicated from another item or shares its name with another item, run **Repair Item Data** from the Fabricate module settings, or delete the copy and re-issue the tool from its source component.
+6. If the tool is present but never breaks or tracks usage, and the owned copy was duplicated from another item or shares its name with another item, run **Repair Item Data** from the Fabricate module settings, or delete the copy and re-issue the tool from its source item.
    This gives the item a durable identity link, after which it breaks and tracks usage normally.
 
 **See also:** [Tools]({% link tools.md %}) covers the system-owned Tool model, including the requirement gate, breakage modes, and on-break actions.

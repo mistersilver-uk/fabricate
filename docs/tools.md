@@ -40,7 +40,7 @@ This is the same behaviour gathering tasks use.
 ## The requirement gate
 
 Every applicable Tool must be **present** in the source actor's inventory and must **pass its optional requirement** before the activity can proceed.
-The owned item is recognised whether it is the Tool component's source world item or a copy duplicated from it.
+The owned item is recognised whether it is the Tool's own source world item or a copy duplicated from it.
 
 {: .note }
 > Presence is matched broadly, but breakage and usage are not.
@@ -48,7 +48,7 @@ The owned item is recognised whether it is the Tool component's source world ite
 > A loosely recognised copy still satisfies presence but is spared from breakage and usage until you repair or re-issue it.
 > This covers a copy duplicated from another item in a world that has not been repaired, or a copy that merely shares the Tool's name.
 > Sparing it is deliberate, so Fabricate never destroys the wrong item.
-> Run **Repair Item Data**, or re-issue the Tool from its source component, to restore breakage and usage tracking for such a copy.
+> Run **Repair Item Data**, or re-issue the Tool from its source item, to restore breakage and usage tracking for such a copy.
 > See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
 
 A Tool's optional requirement is a condition checked against the acting character that must pass.
@@ -127,16 +127,45 @@ When a Tool breaks, the on-break action you chose runs:
 ## Authoring a Tool
 
 Tools are authored in the Crafting System Manager (not constructed via the API).
-In Manager V2:
+Open the system's Tools page first.
+With a crafting system selected, click the top-level **Tools** entry in the Manager navigation.
+It sits alongside Components, Essences, and the Gathering group, and it is not nested under Gathering, because Tools belong to the system.
 
-1. **Add the component.** In the system's **Components** tab, add the Tool item as a managed component.
+There are two ways to create a Tool.
+
+### From an item (no component needed)
+
+You can make any Item a Tool directly, without first importing it as a crafting component.
+Drag an Item from the Items directory (or a compendium) onto the Tools page.
+On an empty Tools library you can drop the Item straight onto the empty-state panel.
+Fabricate creates a first-class Tool that shows the item's own name and image.
+The tool row is marked **Item source** so you can tell it apart from a component-linked Tool at a glance.
+
+Use this for equipment that is only ever a tool, such as a forge, a cauldron, or a pick, so it never clutters your Components list.
+
+### From a managed component
+
+You can also base a Tool on a crafting component you already manage, which is the right choice when the same item is both a tool and a crafting material (a whetstone that is also an ingredient).
+
+1. **Add the component.** In the system's **Components** tab, add the item as a managed component.
    If you plan to replace the Tool with a broken variant when it breaks, also add the broken-tool variant as a separate component.
-2. **Open the system's Tools page.** With a crafting system selected, click the top-level **Tools** entry in the Manager navigation (it sits alongside Components, Essences, and the Gathering group, and it is not nested under Gathering, because Tools belong to the system).
-   Click *Add tool*, pick the Tool component (drag-drop from the Items directory or use the dropdown), and optionally set a display label.
-3. **(Optional) Add a requirement**, a condition checked against the acting character (see [The requirement gate](#the-requirement-gate)).
-4. **Pick a breakage mode**: under the Tool-specific source, limited uses, a chance each use, or a dice roll; under the Check-driven source, simply Breakable or Immune (see [Breakage modes](#breakage-modes)).
-5. **Pick an on-break action**: destroy it, flag it as broken, or replace it with a broken variant (see [On-break actions](#on-break-actions)).
-6. **Save**, then reference the saved Tool from the recipes, steps, ingredient sets, gathering tasks, or salvage configurations that require it.
+2. On the Tools page, click *Add tool* and pick the component (drag-drop from the Items directory or use the dropdown).
+   The Tool shows the component's name and image, and its row is marked **Component**.
+
+### Finishing either kind
+
+After creating the Tool by either route, configure the rest of it and save:
+
+1. **(Optional) Set a display label** to override the name shown on the tool.
+2. **(Optional) Add a requirement**, a condition checked against the acting character (see [The requirement gate](#the-requirement-gate)).
+3. **Pick a breakage mode**: under the Tool-specific source, limited uses, a chance each use, or a dice roll; under the Check-driven source, simply Breakable or Immune (see [Breakage modes](#breakage-modes)).
+4. **Pick an on-break action**: destroy it, flag it as broken, or replace it with a broken variant (see [On-break actions](#on-break-actions)).
+5. **Save**, then reference the saved Tool from the recipes, steps, ingredient sets, gathering tasks, or salvage configurations that require it.
+
+{: .note }
+> An item-sourced Tool takes a snapshot of the item's name and image when you create it.
+> Renaming the source item later does not change what the Tool shows.
+> Re-create the Tool if you want it to pick up the new name.
 
 ## Failure behaviour
 

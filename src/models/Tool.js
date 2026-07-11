@@ -2,7 +2,17 @@
  * Represents a tool required to attempt a gathering task.
  *
  * Spec contract (002-data-models.md, gathering-and-harvesting):
- *   componentId:       string                 - required managed item reference
+ *   componentId:       string | null          - OPTIONAL managed-component link (issue 561);
+ *                                               null for a first-class tool registered from an
+ *                                               Item uuid, populated for a whetstone or a
+ *                                               migrated legacy tool (no longer the matching basis)
+ *   name / img:        string | null          - registration/migration display snapshot (issue 561);
+ *                                               NOT `label`, and not auto-refreshed on rename
+ *   sourceUuid /
+ *   sourceItemUuid /
+ *   fallbackItemIds:   string / string[]      - the tool's OWN source references (issue 561), the
+ *                                               matching basis; a valid tool carries EITHER a
+ *                                               componentId OR its own source references
  *   requirement:       null | {               - optional truthy-expression gate
  *     formula:         string                   // dice/roll expression
  *   }

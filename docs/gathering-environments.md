@@ -190,15 +190,15 @@ Each library tool carries:
 
 | Field | Description |
 |:------|:------------|
-| **Component** | The managed component the tool refers to (required) |
-| **Display label** | Optional. Falls back to the component name |
+| **Source** | The item the tool is. Either its own source item (an item-sourced tool) or a managed component (a component-linked tool). See [Tools]({% link tools.md %}) |
+| **Display label** | Optional. Falls back to the tool's item or component name |
 | **Tool requirement** | Optional formula checked against the character's roll data. See [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
 | **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), **Dice expression** (a formula compared against a threshold), or **Immune** (never breaks) |
 | **On-break action** | One of **Destroy item**, **Mark as broken**, or **Replace with item** (the replacement must differ from the original) |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-A tool is invalid if it has no component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
+A tool is invalid if it has neither a source item nor a component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
 The Save button stays disabled until every tool is valid.
 Hover it to see the first failing reason.
 
@@ -297,7 +297,7 @@ The task editor lets you set:
 | Failure outcome | Leave clear for Fabricate's default failure feedback, or set custom text or a macro |
 | Result groups | Add, rename, delete, and reorder groups |
 | Results | Add, edit, delete, and reorder component results, each with a component and a quantity |
-| Required tools | Reference the system's Tools library. The tools themselves (their component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
+| Required tools | Reference the system's Tools library. The tools themselves (their source item or component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -497,7 +497,7 @@ A library tool carries:
 
 | Field | Description |
 |:------|:------------|
-| Component | The managed component the tool is, taken from the system's component library (required) |
+| Source | The item the tool is. Either its own source item or a managed component from the system's component library. See [Tools]({% link tools.md %}) |
 | Requirement | Optional. A roll expression that must hold true for the character to use the tool |
 | Breakage mechanic | One of limited uses, breakage chance, a dice expression, or immune (never breaks) |
 | Maximum uses | For limited uses: a positive number, or blank for unlimited |
@@ -525,10 +525,10 @@ The outcome setting decides what a broken tool does to the gather.
 
 A missing or disabled library tool blocks the attempt, as does a tool the character does not own, a tool the character owns that is broken, and a failed tool requirement.
 
-A tool is recognised whether the character owns the tool component's source item directly or owns a copy dragged or duplicated from it.
-Fabricate matches the owned item against the tool's component, so dropping a copy of the source item onto the character still satisfies the requirement.
+A tool is recognised whether the character owns the tool's own source item directly or owns a copy dragged or duplicated from it.
+Fabricate matches the owned item against the tool's own source references, so dropping a copy of the source item onto the character still satisfies the requirement.
 
-In the player app, a tool whose component is missing from inventory shows as **Missing**.
+In the player app, a tool the character does not own shows as **Missing**.
 A tool the character holds but cannot use shows as **Broken**.
 This covers both an item the character owns that is already broken and an owned broken-variant component for that tool.
 The **Broken** state is for display only.

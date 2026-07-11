@@ -1,5 +1,5 @@
 /**
- * 1.14.0 — Convert legacy componentId-referencing library Tools into first-class tools
+ * 1.15.0 — Convert legacy componentId-referencing library Tools into first-class tools
  * carrying their OWN source references + display snapshot (issue 561; pure, idempotent,
  * version-gated).
  *
