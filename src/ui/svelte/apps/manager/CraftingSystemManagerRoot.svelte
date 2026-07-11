@@ -3628,7 +3628,7 @@
 
   function selectedEssenceSourceUuid() {
     if (!selectedEssenceForInspector?.associatedItem) return '';
-    return selectedEssenceForInspector.sourceItemUuid || selectedEssenceForInspector.associatedItem.sourceItemUuid || '';
+    return selectedEssenceForInspector.sourceItemUuid || selectedEssenceForInspector.associatedItem.originItemUuid || '';
   }
 
   function copySelectedEssenceSource() {
