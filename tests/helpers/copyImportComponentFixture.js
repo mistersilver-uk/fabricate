@@ -69,6 +69,10 @@ function catalyst(componentId) {
   };
 }
 
+function component(id, name, originItemUuid, essences = {}) {
+  return { id, name, originItemUuid, essences, aliasItemUuids: [] };
+}
+
 /**
  * Build a fresh export payload each call (no shared mutable state between tests).
  *
@@ -121,48 +125,12 @@ export function buildCopyImportComponentFixture() {
           catalysts: [catalyst('comp-catalyst')],
         },
       },
-      {
-        id: 'comp-herb',
-        name: 'Moonleaf',
-        originItemUuid: 'Compendium.world.items.Item.moonleaf',
-        essences: {},
-        aliasItemUuids: [],
-      },
-      {
-        id: 'comp-alt',
-        name: 'Copper Ore',
-        originItemUuid: 'Compendium.world.items.Item.copper-ore',
-        essences: {},
-        aliasItemUuids: [],
-      },
-      {
-        id: 'comp-salvage-out',
-        name: 'Iron Filings',
-        originItemUuid: 'Compendium.world.items.Item.iron-filings',
-        essences: {},
-        aliasItemUuids: [],
-      },
-      {
-        id: 'comp-drop',
-        name: 'Wild Root',
-        originItemUuid: 'Compendium.world.items.Item.wild-root',
-        essences: {},
-        aliasItemUuids: [],
-      },
-      {
-        id: 'comp-catalyst',
-        name: 'Flux',
-        originItemUuid: 'Compendium.world.items.Item.flux',
-        essences: {},
-        aliasItemUuids: [],
-      },
-      {
-        id: 'comp-whetstone',
-        name: 'Whetstone',
-        originItemUuid: 'Compendium.world.items.Item.whetstone',
-        essences: {},
-        aliasItemUuids: [],
-      },
+      component('comp-herb', 'Moonleaf', 'Compendium.world.items.Item.moonleaf'),
+      component('comp-alt', 'Copper Ore', 'Compendium.world.items.Item.copper-ore'),
+      component('comp-salvage-out', 'Iron Filings', 'Compendium.world.items.Item.iron-filings'),
+      component('comp-drop', 'Wild Root', 'Compendium.world.items.Item.wild-root'),
+      component('comp-catalyst', 'Flux', 'Compendium.world.items.Item.flux'),
+      component('comp-whetstone', 'Whetstone', 'Compendium.world.items.Item.whetstone'),
     ],
     // Site (f) key-aware NEGATIVE: a recipeIds[] entry equal to a (pre-regeneration)
     // component id, which MUST survive the copy transform byte-for-byte.
