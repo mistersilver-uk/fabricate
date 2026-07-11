@@ -61,7 +61,7 @@ This ensures consistent behaviour across Foundry versions.
 
 A candidate owned item is matched to a recipe item definition through one shared matcher (`matchRecipeItemDefinition`) that evaluates four tiers in strict precedence order (issue 555).
 The FIRST tier that yields a matching definition wins, and there is NO fall-through to a lower tier.
-Tiers 2–4 test membership in the definition's UNION of source references — its `sourceUuid` (the registered live document), its `sourceItemUuid` (the canonical compendium/source uuid), and any `fallbackItemIds`.
+Tiers 2–4 test membership in the definition's UNION of source references — its `registeredItemUuid` (the registered live document), its `originItemUuid` (the canonical compendium/source uuid), and any `aliasItemUuids`.
 
 1. `identity` — `getFabricateFlag(candidate, 'recipeItemDefinitionId') === recipeItemDefinition.id`.
 2. `uuid` — `candidate.uuid` is among the definition's source references.
@@ -81,14 +81,14 @@ The clone-gate is a REGISTRATION and source-repair rule only (see the data-model
 The `createItem` bulk on-drop auto-learn path (`mode: 'auto'`) must NOT auto-grant a recipe whose owned item matches a **registered** definition (one that carries an `id`) ONLY via tier 4 (the un-migrated `_stats.duplicateSource` fallback).
 A silent bulk grant of recipe knowledge is neither cheap nor reversible, so it demands a higher-confidence match.
 The refusal is scoped to registered definitions on purpose.
-A recipe linked solely by the legacy `linkedRecipeItemUuid` — an un-migrated book, or a standalone alchemy formula item — resolves through the id-less synthetic entry `_recipeItemMatchDefinitions` builds (`{ id: null, sourceItemUuid: legacyUuid }`), which has no source the auto-stamp can ever reach because `autoStampRecipeItemSources` iterates `system.recipeItemDefinitions` and an id-less entry is not one of them.
+A recipe linked solely by the legacy `linkedRecipeItemUuid` — an un-migrated book, or a standalone alchemy formula item — resolves through the id-less synthetic entry `_recipeItemMatchDefinitions` builds (`{ id: null, originItemUuid: legacyUuid }`), which has no source the auto-stamp can ever reach because `autoStampRecipeItemSources` iterates `system.recipeItemDefinitions` and an id-less entry is not one of them.
 Tier 4 is therefore the only signal such an item can ever produce, so refusing it would disable its on-drop learning **permanently** rather than only until the auto-stamp runs; the guard checks `definition.id` precisely so an id-less link still auto-learns.
 Explicit learn, the item-sheet picker (`mode: 'manual'`), and every display path still honour tier 4.
 This gate is paired with the mandatory primary-GM auto-stamp (see the data-models spec), which flags every registered book so real books resolve at tier 1 and keep auto-learning.
 
 > Authoring note (issue 511, PR-B): recipe↔book membership is authored **book-side** on the Books & Scrolls item Contents tab — each recipe item definition owns a `recipeIds[]` list of the recipes it contains.
 The recipe editor no longer writes a book link.
-When a definition's `sourceItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the reference.
+When a definition's `originItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the reference.
 The matching rules above are unchanged; UI rendering specifics defer to `ui-integration`.
 
 ## Visibility Mode (Canonical Strategy)
@@ -108,7 +108,7 @@ The player book affordances (Learn vs Craft) are classified from this flat mode 
 ## Recipe↔Book Membership
 
 The recipes a book/scroll contains are the canonical many-to-many membership `RecipeItemDefinition.recipeIds[]` (issue 511, PR-B) — a recipe may belong to several books, and each book carries its own caps.
-The runtime reads `recipeIds[]`; it falls back to the legacy scalar reverse ref (`recipe.recipeItemId`, or `recipe.linkedRecipeItemUuid` → a definition `sourceItemUuid`) **only** for a fully un-migrated system where no book carries `recipeIds` yet.
+The runtime reads `recipeIds[]`; it falls back to the legacy scalar reverse ref (`recipe.recipeItemId`, or `recipe.linkedRecipeItemUuid` → a definition `originItemUuid`) **only** for a fully un-migrated system where no book carries `recipeIds` yet.
 The `1.13.0` migration inverts each recipe's former book onto `recipeIds` and strips `recipe.recipeItemId` unconditionally; it strips `recipe.linkedRecipeItemUuid` only when that uuid itself resolved a book, preserving a `linkedRecipeItemUuid` that instead links a standalone alchemy formula item.
 
 ## Recipe-Item Cap Resolution
@@ -571,9 +571,9 @@ If `recipeItemId` points to no `RecipeItemDefinition` in the recipe's crafting s
 
 ### Recipe Item Source Template Missing
 
-If `recipeItemDefinition.sourceItemUuid` no longer resolves to a template:
+If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 
-- Keep the stored `sourceItemUuid`.
+- Keep the stored `originItemUuid`.
 - Warn in admin/editor UI.
 - Matching may still succeed via `resolveSourceUuid` on owned items.
 

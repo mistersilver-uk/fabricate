@@ -135,7 +135,7 @@ export class RecipeVisibilityService {
     }
     const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
     if (legacyUuid) {
-      const def = definitions.find((d) => String(d.sourceItemUuid || '') === legacyUuid);
+      const def = definitions.find((d) => String(d.originItemUuid || '') === legacyUuid);
       return def ? [def] : [];
     }
     return [];
@@ -152,7 +152,7 @@ export class RecipeVisibilityService {
   _getRecipeItemSourceUuids(recipe) {
     const uuids = new Set();
     for (const def of this._getRecipeItemDefinitions(recipe)) {
-      const src = String(def?.sourceItemUuid || '').trim();
+      const src = String(def?.originItemUuid || '').trim();
       if (src) uuids.add(src);
     }
     const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
@@ -162,7 +162,7 @@ export class RecipeVisibilityService {
 
   _getRecipeItemSourceUuid(recipe) {
     return (
-      this._getRecipeItemDefinition(recipe)?.sourceItemUuid || recipe?.linkedRecipeItemUuid || null
+      this._getRecipeItemDefinition(recipe)?.originItemUuid || recipe?.linkedRecipeItemUuid || null
     );
   }
 
@@ -183,8 +183,8 @@ export class RecipeVisibilityService {
     const defs = this._getRecipeItemDefinitions(recipe);
     const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
     if (!legacyUuid) return defs;
-    if (defs.some((def) => String(def?.sourceItemUuid || '').trim() === legacyUuid)) return defs;
-    return [...defs, { id: null, sourceItemUuid: legacyUuid }];
+    if (defs.some((def) => String(def?.originItemUuid || '').trim() === legacyUuid)) return defs;
+    return [...defs, { id: null, originItemUuid: legacyUuid }];
   }
 
   // Resolve which member book an item IS, AND by which tier, through the one shared

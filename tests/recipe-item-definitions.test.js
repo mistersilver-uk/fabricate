@@ -149,7 +149,7 @@ test('_normalizeRecipeItemDefinition seeds an uncapped caps block when none is a
   const def = manager._normalizeRecipeItemDefinition({
     id: 'recipe-item-1',
     name: 'Formula Book',
-    sourceItemUuid: 'Compendium.world.formulas.book-1',
+    originItemUuid: 'Compendium.world.formulas.book-1',
   });
 
   assert.deepEqual(def.caps, {
@@ -185,16 +185,16 @@ test('_normalizeRecipeItemDefinition round-trips enabled:false and defaults it t
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
   assert.equal(
-    manager._normalizeRecipeItemDefinition({ id: 'a', sourceItemUuid: 'u' }).enabled,
+    manager._normalizeRecipeItemDefinition({ id: 'a', originItemUuid: 'u' }).enabled,
     true
   );
   assert.equal(
-    manager._normalizeRecipeItemDefinition({ id: 'b', sourceItemUuid: 'u', enabled: false })
+    manager._normalizeRecipeItemDefinition({ id: 'b', originItemUuid: 'u', enabled: false })
       .enabled,
     false
   );
   assert.equal(
-    manager._normalizeRecipeItemDefinition({ id: 'c', sourceItemUuid: 'u', enabled: true }).enabled,
+    manager._normalizeRecipeItemDefinition({ id: 'c', originItemUuid: 'u', enabled: true }).enabled,
     true
   );
 });
@@ -309,7 +309,7 @@ test('updateRecipeItemDefinition accepts an enabled patch alongside caps', async
     manager._normalizeSystem({
       id: 'sys-1',
       name: 'Alchemy',
-      recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u' }],
+      recipeItemDefinitions: [{ id: 'book-1', originItemUuid: 'u' }],
     })
   );
 
@@ -333,7 +333,7 @@ test('_normalizeRecipeItemDefinition round-trips authored per-item caps', () => 
   const def = manager._normalizeRecipeItemDefinition({
     id: 'recipe-item-1',
     name: 'Formula Book',
-    sourceItemUuid: 'Compendium.world.formulas.book-1',
+    originItemUuid: 'Compendium.world.formulas.book-1',
     caps: {
       item: { limitUses: true, maxUses: 3, destroyWhenExhausted: true },
       learn: {
@@ -541,7 +541,7 @@ test('deleteRecipeItemDefinition removes the system recipe item and clears affec
           id: 'recipe-item-1',
           name: 'Formula Book',
           img: 'icons/svg/book.svg',
-          sourceItemUuid: 'Compendium.world.formulas.book-1',
+          originItemUuid: 'Compendium.world.formulas.book-1',
         },
       ],
     })
@@ -575,7 +575,7 @@ test('updateRecipeItemDefinition merges and normalizes a caps patch, persisting 
         {
           id: 'book-1',
           name: 'Formula Book',
-          sourceItemUuid: 'Compendium.world.formulas.book-1',
+          originItemUuid: 'Compendium.world.formulas.book-1',
         },
       ],
     })
@@ -601,7 +601,7 @@ test('updateRecipeItemDefinition defaults an invalid maxRecipes to 1 while the l
     manager._normalizeSystem({
       id: 'sys-1',
       name: 'Alchemy',
-      recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u' }],
+      recipeItemDefinitions: [{ id: 'book-1', originItemUuid: 'u' }],
     })
   );
 
@@ -631,7 +631,7 @@ test('RecipeVisibilityService matches recipeItemId through the system recipe ite
     recipeItemDefinitions: [
       {
         id: 'recipe-item-1',
-        sourceItemUuid: 'Compendium.world.formulas.book-1',
+        originItemUuid: 'Compendium.world.formulas.book-1',
       },
     ],
   };

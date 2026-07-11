@@ -138,7 +138,7 @@ function makeSystem({
 function makeComponent({
   id = 'comp-1',
   name = 'Test Component',
-  sourceUuid = null,
+  registeredItemUuid = null,
   salvageEnabled = true,
   ingredientQuantity = 1,
   toolIds = [],
@@ -147,7 +147,7 @@ function makeComponent({
   return {
     id,
     name,
-    sourceUuid,
+    registeredItemUuid,
     salvage: salvageEnabled ? {
       enabled: true,
       ingredientQuantity,
@@ -588,7 +588,7 @@ test('salvage() reduces component quantity when partially consumed', async () =>
 });
 
 test('salvage() creates result items on success', async () => {
-  const resultComp = { id: 'result-comp', name: 'Scrap Metal', sourceUuid: null };
+  const resultComp = { id: 'result-comp', name: 'Scrap Metal', registeredItemUuid: null };
   const resultGroup = { id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'result-comp', quantity: 3 }] };
 
   const fakeResolutionService = {
@@ -709,8 +709,8 @@ test('salvage() appends run to actor flags history and respects 50-entry limit',
 // ---------------------------------------------------------------------------
 
 test('salvage() simple mode creates result items with correct quantities from result group', async () => {
-  const resultComp1 = { id: 'scrap-iron', name: 'Scrap Iron', sourceUuid: null };
-  const resultComp2 = { id: 'scrap-wood', name: 'Scrap Wood', sourceUuid: null };
+  const resultComp1 = { id: 'scrap-iron', name: 'Scrap Iron', registeredItemUuid: null };
+  const resultComp2 = { id: 'scrap-wood', name: 'Scrap Wood', registeredItemUuid: null };
   const resultGroup = {
     id: 'rg-1', name: 'Salvage Pile',
     results: [
@@ -744,7 +744,7 @@ test('salvage() simple mode creates result items with correct quantities from re
 });
 
 test('salvage() simple mode uses only the first result group when component has multiple groups', async () => {
-  const resultComp = { id: 'scrap-iron', name: 'Scrap Iron', sourceUuid: null };
+  const resultComp = { id: 'scrap-iron', name: 'Scrap Iron', registeredItemUuid: null };
   const group1 = {
     id: 'rg-1', name: 'Group One',
     results: [{ id: 'r-1', componentId: 'scrap-iron', quantity: 1 }]
@@ -780,8 +780,8 @@ test('salvage() simple mode uses only the first result group when component has 
 // ---------------------------------------------------------------------------
 
 test('salvage() routed mode routes to correct result group based on check outcome', async () => {
-  const passComp = { id: 'gold-nugget', name: 'Gold Nugget', sourceUuid: null };
-  const failComp = { id: 'coal-dust', name: 'Coal Dust', sourceUuid: null };
+  const passComp = { id: 'gold-nugget', name: 'Gold Nugget', registeredItemUuid: null };
+  const failComp = { id: 'coal-dust', name: 'Coal Dust', registeredItemUuid: null };
   const passGroup = { id: 'rg-pass', name: 'Pass Results', results: [{ id: 'r-1', componentId: 'gold-nugget', quantity: 1 }] };
   const failGroup = { id: 'rg-fail', name: 'Fail Results', results: [{ id: 'r-2', componentId: 'coal-dust', quantity: 1 }] };
 
@@ -1076,8 +1076,8 @@ test('_resolveSalvageResultGroups progressive mode skips results with invalid di
 });
 
 test('salvage() progressive mode creates items matching awarded results', async () => {
-  const itemAComp = { id: 'item-a', name: 'Item A', sourceUuid: null, difficulty: 2 };
-  const itemBComp = { id: 'item-b', name: 'Item B', sourceUuid: null, difficulty: 5 };
+  const itemAComp = { id: 'item-a', name: 'Item A', registeredItemUuid: null, difficulty: 2 };
+  const itemBComp = { id: 'item-b', name: 'Item B', registeredItemUuid: null, difficulty: 5 };
   const resultGroup = {
     id: 'rg-1', name: 'Loot',
     results: [
@@ -1260,7 +1260,7 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
   // The system manager is provided via game.fabricate.getCraftingSystemManager.
   // We stub only _runSalvageCraftingCheck since it needs MacroExecutor.
 
-  const scrapComp = { id: 'scrap-metal', name: 'Scrap Metal', sourceUuid: null };
+  const scrapComp = { id: 'scrap-metal', name: 'Scrap Metal', registeredItemUuid: null };
   const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
   const tool = makeFakeTool('acid-vial');
 

@@ -14,7 +14,7 @@ const harness = createMountedComponentHarness({
 });
 
 function draft(overrides = {}) {
-  return { id: 'ri1', sourceItemUuid: '', linkedRecipeIds: [], caps: { item: {}, learn: {} }, ...overrides };
+  return { id: 'ri1', originItemUuid: '', linkedRecipeIds: [], caps: { item: {}, learn: {} }, ...overrides };
 }
 
 before(() => harness.setup());

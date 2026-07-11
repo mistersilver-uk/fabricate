@@ -9,7 +9,7 @@ import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceRes
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import {
-  getComponentSourceReferences,
+  getItemMatchUuids,
   itemResolvesToComponent,
   resolveComponentForItem,
 } from '../utils/sourceUuid.js';
@@ -1578,7 +1578,7 @@ export class CraftingEngine {
    * `flags.fabricate.roles[systemId].componentId` (or the legacy scalar) and inert
    * on a stale/foreign one — with a raw source-reference fall-through for
    * unstamped items. The one legacy field the shared resolver structurally cannot
-   * read is a bare top-level `item.sourceUuid` (not part of
+   * read is a bare top-level `item.registeredItemUuid` (not part of
    * {@link getItemSourceReferences}), so a narrow LOCAL supplement attributes such
    * an item by that field alone when the resolver returns null. Resolving once per
    * submission preserves the one-unit-per-group semantics by construction (an item
@@ -1748,7 +1748,7 @@ export class CraftingEngine {
    * Resolve one submitted item to at most one component id, durable-flag-first via
    * the shared, list-aware, system-scoped resolver {@link resolveComponentForItem},
    * with a narrow LOCAL supplement for the one legacy field the shared resolver
-   * structurally cannot see: a bare top-level `item.sourceUuid` (a source-ref-only
+   * structurally cannot see: a bare top-level `item.registeredItemUuid` (a source-ref-only
    * fall-through that re-derives no identity/exclusivity rule). Shared by
    * {@link _matchAlchemySignature} and {@link _submittedComponentMultiset} so the
    * dead-end key can never drift from the signature it was matched against.
@@ -1757,10 +1757,10 @@ export class CraftingEngine {
   _resolveSubmissionComponentId(item, components, systemId) {
     const resolved = resolveComponentForItem(item, components, systemId);
     if (resolved) return resolved.id;
-    const bareSourceUuid = item?.sourceUuid;
-    if (bareSourceUuid) {
+    const bareRegisteredItemUuid = item?.registeredItemUuid;
+    if (bareRegisteredItemUuid) {
       const byBare = (Array.isArray(components) ? components : []).find((comp) =>
-        getComponentSourceReferences(comp).includes(bareSourceUuid)
+        getItemMatchUuids(comp).includes(bareRegisteredItemUuid)
       );
       if (byBare) return byBare.id;
     }
@@ -2140,9 +2140,9 @@ export class CraftingEngine {
         (system?.components || []).find((entry) => entry.id === componentId) || null;
       if (!component || typeof actor?.createEmbeddedDocuments !== 'function') return;
       let source = component;
-      if (component.sourceUuid && typeof globalThis.fromUuidSync === 'function') {
+      if (component.registeredItemUuid && typeof globalThis.fromUuidSync === 'function') {
         try {
-          source = globalThis.fromUuidSync(component.sourceUuid) ?? component;
+          source = globalThis.fromUuidSync(component.registeredItemUuid) ?? component;
         } catch {
           source = component;
         }
@@ -2247,8 +2247,8 @@ export class CraftingEngine {
       const managedItems = system?.components || [];
       managedItem =
         managedItems.find((i) => i.id === (result.componentId || result.systemItemId)) || null;
-      if (managedItem?.sourceUuid) {
-        sourceItem = await fromUuid(managedItem.sourceUuid);
+      if (managedItem?.registeredItemUuid) {
+        sourceItem = await fromUuid(managedItem.registeredItemUuid);
       }
     }
 
@@ -2376,8 +2376,8 @@ export class CraftingEngine {
           ? system.items
           : [];
       const component = components.find((item) => item?.id === sourceComponentId) || null;
-      if (component?.sourceItemUuid || component?.sourceUuid) {
-        return component.sourceItemUuid || component.sourceUuid;
+      if (component?.originItemUuid || component?.registeredItemUuid) {
+        return component.originItemUuid || component.registeredItemUuid;
       }
       return null;
     }
@@ -3614,7 +3614,11 @@ export class CraftingEngine {
   _findComponentItems(actor, component, system) {
     const items = [...actor.items];
     const components = Array.isArray(system?.components) ? system.components : [];
-    if (component.sourceUuid || component.sourceItemUuid || component.fallbackItemIds?.length) {
+    if (
+      component.registeredItemUuid ||
+      component.originItemUuid ||
+      component.aliasItemUuids?.length
+    ) {
       const byUuid = items.filter((item) =>
         itemResolvesToComponent(item, component, components, system?.id)
       );

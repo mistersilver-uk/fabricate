@@ -49,7 +49,7 @@ const LINKED_RECIPES = [
 function draft(overrides = {}) {
   return {
     id: 'ri1',
-    sourceItemUuid: 'Item.abc',
+    originItemUuid: 'Item.abc',
     enabled: true,
     caps: {
       item: { limitUses: false, maxUses: 3, whenSpent: 'destroyed' },
@@ -141,7 +141,7 @@ describe('RecipeItemEditor (mounted)', () => {
 
   it('turns the validation badge danger when the linked item is missing', async () => {
     const root = await harness.mount({
-      recipeItem: draft({ sourceItemUuid: '' }),
+      recipeItem: draft({ originItemUuid: '' }),
       linkedItem: null,
       linkedRecipes: [],
       activeTab: 'overview',

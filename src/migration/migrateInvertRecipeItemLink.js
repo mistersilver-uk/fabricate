@@ -9,7 +9,7 @@
  *
  * For each recipe it resolves its book the SAME way the old runtime did — by
  * `recipeItemId` against a definition id, else by `linkedRecipeItemUuid` against a
- * definition's `sourceItemUuid` — and pushes the recipe id onto that definition's
+ * definition's `originItemUuid` (legacy `sourceItemUuid`) — and pushes the recipe id onto that definition's
  * `recipeIds` (deduped). Then it deletes `recipeItemId` / `linkedRecipeItemUuid`.
  *
  * Idempotent: after a run the recipes carry neither field, so a re-run finds nothing
@@ -45,7 +45,10 @@ export function migrateInvertRecipeItemLink(data = {}) {
       if (!Array.isArray(def.recipeIds)) def.recipeIds = [];
       const id = String(def.id || '').trim();
       if (id) byId.set(id, def);
-      const source = String(def.sourceItemUuid || '').trim();
+      // New-name-first, legacy-name-tolerant (issue 560): this 1.13.0 migration runs
+      // ahead of the 1.16.0 field rename, so it normally sees the legacy `sourceItemUuid`,
+      // but tolerating the renamed `originItemUuid` keeps it correct regardless of order.
+      const source = String(def.originItemUuid || def.sourceItemUuid || '').trim();
       if (source) bySource.set(source, def);
     }
     systemIndex.set(String(system.id || ''), { byId, bySource });

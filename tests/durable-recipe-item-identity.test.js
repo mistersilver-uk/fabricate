@@ -5,11 +5,11 @@
  *  - flow 4b: registering a duplicated (compendium-origin) book/component yields a NEW
  *    definition and leaves the original untouched;
  *  - flow 1 double-import dedups to one definition;
- *  - clone registration writes: own-uuid sourceItemUuid, overwritten flag, stripped
+ *  - clone registration writes: own-uuid originItemUuid, overwritten flag, stripped
  *    duplicateSource, cleared compendiumSource;
  *  - the skipped branch stamps+strips a pre-flag source;
- *  - union source refs (sourceUuid + sourceItemUuid + fallbacks) resolve both drag routes;
- *  - the normalizer + import-shaped round-trip preserve sourceUuid/fallbackItemIds;
+ *  - union source refs (registeredItemUuid + originItemUuid + fallbacks) resolve both drag routes;
+ *  - the normalizer + import-shaped round-trip preserve registeredItemUuid/aliasItemUuids;
  *  - R3 auto-stamp (idempotent, world + writable pack, skips locked);
  *  - R4 repair reconciles component + recipe-item sources and actor-owned copies, with the
  *    guardrailed name-assisted re-point + audit log;
@@ -158,8 +158,8 @@ function ownedRepairManager(definitions, ownedItems, { extraSystems = [] } = {})
 }
 
 const BOOK_SCROLL_DEFS = [
-  { id: 'def-book', name: 'Book', sourceItemUuid: 'Item.book' },
-  { id: 'def-scroll', name: 'Scroll', sourceItemUuid: 'Item.scroll' },
+  { id: 'def-book', name: 'Book', originItemUuid: 'Item.book' },
+  { id: 'def-scroll', name: 'Scroll', originItemUuid: 'Item.scroll' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ test('555 — flow 4b: registering a book duplicated from a compendium-origin bo
   assert.equal(bookDef.img, bookImg);
   assert.deepEqual(bookDef.recipeIds, ['r1', 'r2', 'r3', 'r4', 'r5']);
   // Clone keys on its OWN uuid, not the inherited compendium source.
-  assert.equal(second.item.sourceItemUuid, 'Item.scroll');
+  assert.equal(second.item.originItemUuid, 'Item.scroll');
 });
 
 test('555 — flow 4b: registering a component duplicated from a compendium-origin component yields a new component, original untouched', async () => {
@@ -217,7 +217,7 @@ test('555 — flow 4b: registering a component duplicated from a compendium-orig
   assert.equal(clone.action, 'added');
   assert.equal(system.components.length, 2, 'the clone is a separate component');
   assert.notEqual(clone.item.id, original.item.id);
-  assert.equal(clone.item.sourceUuid, 'Item.ore-copy');
+  assert.equal(clone.item.registeredItemUuid, 'Item.ore-copy');
 });
 
 // ---------------------------------------------------------------------------
@@ -287,34 +287,34 @@ test('555 — the skipped branch stamps and strips a pre-flag source (recovery p
 // Union source refs — both drag routes resolve; round-trip preserved
 // ---------------------------------------------------------------------------
 
-test('555 — a compendium-imported book records union source refs (sourceUuid + sourceItemUuid)', async () => {
+test('555 — a compendium-imported book records union source refs (registeredItemUuid + originItemUuid)', async () => {
   resetRegistry();
   register(makeDoc({ uuid: 'Compendium.mod.books.book' }));
   register(makeDoc({ uuid: 'Item.book', compendiumSource: 'Compendium.mod.books.book' }));
   const mgr = buildManager({ systems: [{ id: 'sys', name: 'S', recipeItemDefinitions: [] }] });
 
   const def = (await mgr.addRecipeItemFromUuid('sys', 'Item.book')).item;
-  assert.equal(def.sourceUuid, 'Item.book', 'sourceUuid is the registered live document');
-  assert.equal(def.sourceItemUuid, 'Compendium.mod.books.book', 'sourceItemUuid is the canonical compendium uuid');
+  assert.equal(def.registeredItemUuid, 'Item.book', 'registeredItemUuid is the registered live document');
+  assert.equal(def.originItemUuid, 'Compendium.mod.books.book', 'originItemUuid is the canonical compendium uuid');
 });
 
-test('555 — the normalizer preserves sourceUuid + fallbackItemIds across a save/load round-trip', () => {
+test('555 — the normalizer preserves registeredItemUuid + aliasItemUuids across a save/load round-trip', () => {
   const mgr = buildManager({ systems: [] });
   const normalized = mgr._normalizeRecipeItemDefinition({
     id: 'def1',
     name: 'Book',
-    sourceUuid: 'Item.book',
-    sourceItemUuid: 'Compendium.mod.books.book',
-    fallbackItemIds: ['Item.old', 'Item.book'], // duplicate of a primary is dropped
+    registeredItemUuid: 'Item.book',
+    originItemUuid: 'Compendium.mod.books.book',
+    aliasItemUuids: ['Item.old', 'Item.book'], // duplicate of a primary is dropped
   });
-  assert.equal(normalized.sourceUuid, 'Item.book');
-  assert.equal(normalized.sourceItemUuid, 'Compendium.mod.books.book');
-  assert.deepEqual(normalized.fallbackItemIds, ['Item.old']);
+  assert.equal(normalized.registeredItemUuid, 'Item.book');
+  assert.equal(normalized.originItemUuid, 'Compendium.mod.books.book');
+  assert.deepEqual(normalized.aliasItemUuids, ['Item.old']);
 
   // Re-normalizing the serialized shape (import round-trip) preserves the fields.
   const roundTripped = mgr._normalizeRecipeItemDefinition({ ...normalized });
-  assert.equal(roundTripped.sourceUuid, 'Item.book');
-  assert.deepEqual(roundTripped.fallbackItemIds, ['Item.old']);
+  assert.equal(roundTripped.registeredItemUuid, 'Item.book');
+  assert.deepEqual(roundTripped.aliasItemUuids, ['Item.old']);
 });
 
 // ---------------------------------------------------------------------------
@@ -333,9 +333,9 @@ test('555 R3 — auto-stamp flags world sources, is idempotent, and skips locked
         id: 'sys',
         name: 'S',
         recipeItemDefinitions: [
-          { id: 'd1', name: 'Book', sourceItemUuid: 'Item.book' },
-          { id: 'd2', name: 'Book2', sourceItemUuid: 'Compendium.world.pack.book2' },
-          { id: 'd3', name: 'Book3', sourceItemUuid: 'Compendium.mod.pack.book3' },
+          { id: 'd1', name: 'Book', originItemUuid: 'Item.book' },
+          { id: 'd2', name: 'Book2', originItemUuid: 'Compendium.world.pack.book2' },
+          { id: 'd3', name: 'Book3', originItemUuid: 'Compendium.mod.pack.book3' },
         ],
       },
     ],
@@ -375,8 +375,8 @@ test('555 R4 — one repair pass stamps a component source, a recipe-item source
       {
         id: 'sys',
         name: 'S',
-        components: [{ id: 'comp-ore', name: 'Ore', sourceUuid: 'Item.ore', sourceItemUuid: 'Item.ore' }],
-        recipeItemDefinitions: [{ id: 'def-book', name: 'Book', sourceItemUuid: 'Item.book' }],
+        components: [{ id: 'comp-ore', name: 'Ore', registeredItemUuid: 'Item.ore', originItemUuid: 'Item.ore' }],
+        recipeItemDefinitions: [{ id: 'def-book', name: 'Book', originItemUuid: 'Item.book' }],
       },
     ],
     items: [compSource, bookSource],
@@ -410,7 +410,7 @@ test('555 R4 — a world SOURCE clone is NOT identity-matched onto the original 
         id: 'sys',
         name: 'S',
         recipeItemDefinitions: [
-          { id: 'def-original', name: 'Original', sourceItemUuid: 'Compendium.mod.books.book' },
+          { id: 'def-original', name: 'Original', originItemUuid: 'Compendium.mod.books.book' },
         ],
       },
     ],
@@ -441,13 +441,13 @@ test('555 R4 name-assist — a name matching TWO definitions anywhere is skipped
   const ownedCopy = makeDoc({ uuid: 'Actor.a.Item.dup', name: 'Tome', duplicateSource: 'Item.book' });
   const mgr = ownedRepairManager(
     [
-      { id: 'def-book', name: 'Book', sourceItemUuid: 'Item.book' },
-      { id: 'def-tome-1', name: 'Tome', sourceItemUuid: 'Item.tome1' },
+      { id: 'def-book', name: 'Book', originItemUuid: 'Item.book' },
+      { id: 'def-tome-1', name: 'Tome', originItemUuid: 'Item.tome1' },
     ],
     [ownedCopy],
     {
       extraSystems: [
-        { id: 'sys2', name: 'S2', recipeItemDefinitions: [{ id: 'def-tome-2', name: 'Tome', sourceItemUuid: 'Item.tome2' }] },
+        { id: 'sys2', name: 'S2', recipeItemDefinitions: [{ id: 'def-tome-2', name: 'Tome', originItemUuid: 'Item.tome2' }] },
       ],
     }
   );
@@ -503,8 +503,8 @@ test('555 — _clearSourceFlag leaves a flag that belongs to a different definit
 
 test('555 — RecipeVisibilityService and InventoryListingBuilder resolve identically through the shared matcher', () => {
   const defs = [
-    { id: 'def-book', sourceUuid: 'Item.book', sourceItemUuid: 'Compendium.mod.book' },
-    { id: 'def-scroll', sourceUuid: 'Item.scroll', sourceItemUuid: 'Item.scroll' },
+    { id: 'def-book', registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book' },
+    { id: 'def-scroll', registeredItemUuid: 'Item.scroll', originItemUuid: 'Item.scroll' },
   ];
   const item = { uuid: 'Actor.a.Item.copy', _stats: { compendiumSource: 'Compendium.mod.book' }, getFlag: () => undefined };
   const shared = matchRecipeItemDefinition(item, defs).definition;
@@ -548,22 +548,22 @@ test('555 — a source shared by two systems carries ONE durable flag (last writ
 // component both-routes, deleted-source branches
 // ---------------------------------------------------------------------------
 
-test('555 — addRecipeItemFromUuid updated branch clears the flag on the OLD source when sourceItemUuid drifts', async () => {
+test('555 — addRecipeItemFromUuid updated branch clears the flag on the OLD source when originItemUuid drifts', async () => {
   resetRegistry();
-  // A non-clone source whose stored sourceItemUuid has drifted (the definition still
+  // A non-clone source whose stored originItemUuid has drifted (the definition still
   // points at an old world source) but which carries the durable flag, so find-existing
   // resolves it by flag and the updated branch re-points it.
   register(makeDoc({ uuid: 'Item.old-source', name: 'Book', flags: { fabricate: { fabricate: { recipeItemDefinitionId: 'def-1' } } } }));
   register(makeDoc({ uuid: 'Item.book', name: 'Book', flags: { fabricate: { fabricate: { recipeItemDefinitionId: 'def-1' } } } }));
   const mgr = buildManager({
     systems: [
-      { id: 'sys', name: 'S', recipeItemDefinitions: [{ id: 'def-1', name: 'Book', sourceUuid: 'Item.old-source', sourceItemUuid: 'Item.old-source' }] },
+      { id: 'sys', name: 'S', recipeItemDefinitions: [{ id: 'def-1', name: 'Book', registeredItemUuid: 'Item.old-source', originItemUuid: 'Item.old-source' }] },
     ],
   });
 
   const result = await mgr.addRecipeItemFromUuid('sys', 'Item.book');
   assert.equal(result.action, 'updated', 'the drifted source re-registers through the updated branch');
-  assert.equal(firstSystem(mgr).recipeItemDefinitions[0].sourceItemUuid, 'Item.book', 'the definition re-points to the new source');
+  assert.equal(firstSystem(mgr).recipeItemDefinitions[0].originItemUuid, 'Item.book', 'the definition re-points to the new source');
   assert.equal(recipeItemFlag(_registry.get('Item.old-source')), undefined, 'the OLD source flag is cleared on re-point');
   assert.equal(recipeItemFlag(_registry.get('Item.book')), 'def-1', 'the new source keeps the flag');
 });
@@ -579,7 +579,7 @@ test('555 R4 — an actor-owned copy carrying BOTH compendiumSource and duplicat
     duplicateSource: 'Item.book',
   });
   const mgr = ownedRepairManager(
-    [{ id: 'def-book', name: 'Book', sourceUuid: 'Item.book', sourceItemUuid: 'Compendium.mod.book' }],
+    [{ id: 'def-book', name: 'Book', registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book' }],
     [ownedCopy]
   );
 
@@ -605,7 +605,7 @@ test('555 A2 — a compendium-imported component resolves owned copies dragged f
 test('555 R3 — auto-stamp counts a definition whose source item no longer resolves as skippedMissing', async () => {
   resetRegistry(); // empty registry → fromUuid returns null for the deleted source
   const mgr = buildManager({
-    systems: [{ id: 'sys', name: 'S', recipeItemDefinitions: [{ id: 'd1', name: 'Gone', sourceItemUuid: 'Item.deleted' }] }],
+    systems: [{ id: 'sys', name: 'S', recipeItemDefinitions: [{ id: 'd1', name: 'Gone', originItemUuid: 'Item.deleted' }] }],
   });
   const summary = await mgr.autoStampRecipeItemSources();
   assert.equal(summary.skippedMissing, 1);

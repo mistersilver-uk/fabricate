@@ -120,7 +120,7 @@
       return !sourceTouched && hasStoredSourceEvidence() ? essence?.sourceState || 'stale' : 'none';
     }
     if (!selectedSource) return 'stale';
-    if (selectedSource.sourceItemUuid || selectedSource.sourceUuid) return 'linked';
+    if (selectedSource.originItemUuid || selectedSource.registeredItemUuid) return 'linked';
     return 'missing';
   }
 
@@ -261,7 +261,7 @@
               <div class="manager-essence-source-copy">
                 {#if selectedSource}
                   <strong>{selectedSource.name}</strong>
-                  <p class="manager-muted">{selectedSource.sourceItemUuid || text('FABRICATE.Admin.Manager.Essence.SourceNoUuid', 'This component has no source item UUID.')}</p>
+                  <p class="manager-muted">{selectedSource.originItemUuid || text('FABRICATE.Admin.Manager.Essence.SourceNoUuid', 'This component has no source item UUID.')}</p>
                 {:else if essence?.sourceName || essence?.sourceItemUuid || essence?.sourceComponentId}
                   <strong>{essence.sourceName || essence.sourceComponentId || essence.sourceItemUuid}</strong>
                   <p class="manager-muted">{text('FABRICATE.Admin.Manager.Essence.SourceEvidenceHint', 'Stored source evidence remains readable until you clear or repair it.')}</p>

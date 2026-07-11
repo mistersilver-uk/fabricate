@@ -22,7 +22,7 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { SignatureValidator } from '../src/systems/SignatureValidator.js';
-import { getItemSourceReferences, getComponentSourceReferences } from '../src/utils/sourceUuid.js';
+import { getItemSourceReferences, getItemMatchUuids } from '../src/utils/sourceUuid.js';
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -114,9 +114,9 @@ const SLUDGE_SRC = 'Compendium.src.Item.sludge';
 
 function components() {
   return [
-    { id: 'emberroot', name: 'Emberroot', sourceUuid: EMBER_SRC, sourceItemUuid: EMBER_SRC },
-    { id: 'potion', name: 'Potion of Vigor', img: 'icons/potion.webp', sourceUuid: POTION_SRC, sourceItemUuid: POTION_SRC },
-    { id: 'sludge', name: 'Toxic Sludge', img: 'icons/sludge.webp', sourceUuid: SLUDGE_SRC, sourceItemUuid: SLUDGE_SRC },
+    { id: 'emberroot', name: 'Emberroot', registeredItemUuid: EMBER_SRC, originItemUuid: EMBER_SRC },
+    { id: 'potion', name: 'Potion of Vigor', img: 'icons/potion.webp', registeredItemUuid: POTION_SRC, originItemUuid: POTION_SRC },
+    { id: 'sludge', name: 'Toxic Sludge', img: 'icons/sludge.webp', registeredItemUuid: SLUDGE_SRC, originItemUuid: SLUDGE_SRC },
   ];
 }
 
@@ -193,7 +193,7 @@ function makeMatcher(comps) {
     const compId = ingredient?.match?.componentId ?? ingredient?.componentId;
     const comp = byId.get(compId);
     if (!comp) return false;
-    const compRefs = new Set(getComponentSourceReferences(comp));
+    const compRefs = new Set(getItemMatchUuids(comp));
     for (const ref of getItemSourceReferences(item)) {
       if (compRefs.has(ref)) return true;
     }

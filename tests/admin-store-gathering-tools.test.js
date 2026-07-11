@@ -47,9 +47,15 @@ function normalizeToolShape(tool = {}) {
       formula: typeof t.requirement.formula === 'string' ? t.requirement.formula : ''
     };
   }
-  const sourceItemUuid = t.sourceItemUuid || t.sourceUuid || null;
-  const sourceUuid = t.sourceUuid || t.sourceItemUuid || null;
-  const primaryRefs = new Set([sourceUuid, sourceItemUuid].filter((ref) => typeof ref === 'string' && ref.trim()));
+  // New-name-first, legacy-name-tolerant (issue 560), mirroring the real _normalizeTool.
+  const originItemUuid = t.originItemUuid || t.registeredItemUuid || t.sourceItemUuid || t.sourceUuid || null;
+  const registeredItemUuid = t.registeredItemUuid || t.originItemUuid || t.sourceUuid || t.sourceItemUuid || null;
+  const primaryRefs = new Set([registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim()));
+  const rawAliasItemUuids = Array.isArray(t.aliasItemUuids)
+    ? t.aliasItemUuids
+    : Array.isArray(t.fallbackItemIds)
+      ? t.fallbackItemIds
+      : null;
   return {
     id,
     label: typeof t.label === 'string' ? t.label.trim() : '',
@@ -58,10 +64,10 @@ function normalizeToolShape(tool = {}) {
     // Issue 561 first-class tool source refs + display snapshot.
     name: typeof t.name === 'string' && t.name ? t.name : null,
     img: typeof t.img === 'string' && t.img ? t.img : null,
-    sourceUuid,
-    sourceItemUuid,
-    fallbackItemIds: Array.isArray(t.fallbackItemIds)
-      ? [...new Set(t.fallbackItemIds.filter((ref) => typeof ref === 'string').map((ref) => ref.trim()).filter((ref) => ref && !primaryRefs.has(ref)))]
+    registeredItemUuid,
+    originItemUuid,
+    aliasItemUuids: Array.isArray(rawAliasItemUuids)
+      ? [...new Set(rawAliasItemUuids.filter((ref) => typeof ref === 'string').map((ref) => ref.trim()).filter((ref) => ref && !primaryRefs.has(ref)))]
       : [],
     requirement,
     breakage,
@@ -170,13 +176,50 @@ describe('adminStore library tools (system-owned)', () => {
         componentId: null,
         name: null,
         img: null,
-        sourceUuid: null,
-        sourceItemUuid: null,
-        fallbackItemIds: [],
+        registeredItemUuid: null,
+        originItemUuid: null,
+        aliasItemUuids: [],
         requirement: null,
         breakage: { mode: 'limitedUses', maxUses: null },
         onBreak: { mode: 'destroy' }
       });
+    });
+
+    it('accepts LEGACY source fields and emits the renamed names (issue 560)', async () => {
+      const services = createMockServices({
+        systemTools: [{
+          id: 't1',
+          sourceUuid: 'Item.old-live',
+          sourceItemUuid: 'Compendium.old-origin',
+          fallbackItemIds: ['Item.old-alias']
+        }]
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const tool = get(store.viewState).selectedSystem.tools[0];
+      assert.equal(tool.registeredItemUuid, 'Item.old-live');
+      assert.equal(tool.originItemUuid, 'Compendium.old-origin');
+      assert.deepEqual(tool.aliasItemUuids, ['Item.old-alias']);
+      assert.ok(!('sourceUuid' in tool));
+      assert.ok(!('sourceItemUuid' in tool));
+      assert.ok(!('fallbackItemIds' in tool));
+    });
+
+    it('preserves NEW-named source fields without drop (issue 560)', async () => {
+      const services = createMockServices({
+        systemTools: [{
+          id: 't1',
+          registeredItemUuid: 'Item.new-live',
+          originItemUuid: 'Compendium.new-origin',
+          aliasItemUuids: ['Item.new-alias']
+        }]
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const tool = get(store.viewState).selectedSystem.tools[0];
+      assert.equal(tool.registeredItemUuid, 'Item.new-live');
+      assert.equal(tool.originItemUuid, 'Compendium.new-origin');
+      assert.deepEqual(tool.aliasItemUuids, ['Item.new-alias']);
     });
 
     it('coerces unknown breakage / on-break modes to defaults', async () => {

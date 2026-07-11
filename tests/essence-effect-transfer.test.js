@@ -162,7 +162,7 @@ test('effects transfer resolves sourceComponentId through the managed component 
   setupGame({
     essencesEnabled: true,
     components: [
-      { id: 'component-earth', sourceItemUuid: 'uuid-earth-source' }
+      { id: 'component-earth', originItemUuid: 'uuid-earth-source' }
     ],
     essenceDefinitions: [
       { id: 'essence-earth', sourceComponentId: 'component-earth', sourceItemUuid: 'legacy-component-earth' }

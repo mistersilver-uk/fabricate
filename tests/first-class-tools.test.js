@@ -73,7 +73,7 @@ test('A1 - addToolFromUuid registers a first-class tool (componentId null) match
   const { item: created } = await mgr.addToolFromUuid('sysA', 'Item.hammer-src');
   // First-class: its own source refs + snapshot and a null component link.
   assert.equal(created.componentId, null);
-  assert.equal(created.sourceItemUuid, 'Item.hammer-src');
+  assert.equal(created.originItemUuid, 'Item.hammer-src');
   assert.equal(created.name, 'Hammer');
   // The durable `roles[sys].toolId` is stamped on the source Item.
   assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), created.id);
@@ -164,15 +164,15 @@ test('A4 - migrateToolsToFirstClass copies component refs onto a legacy tool and
   const systems = [
     {
       id: 'sysA',
-      components: [{ id: 'comp-axe', name: 'Axe', img: 'icons/axe.webp', sourceItemUuid: 'Item.axe', fallbackItemIds: ['Item.axe-old'] }],
+      components: [{ id: 'comp-axe', name: 'Axe', img: 'icons/axe.webp', originItemUuid: 'Item.axe', aliasItemUuids: ['Item.axe-old'] }],
       tools: [{ id: 'tool-axe', componentId: 'comp-axe', label: 'Woodaxe' }],
     },
   ];
   migrateToolsToFirstClass(systems);
   const t = systems[0].tools[0];
   assert.equal(t.componentId, 'comp-axe', 'componentId is preserved');
-  assert.equal(t.sourceItemUuid, 'Item.axe');
-  assert.deepEqual(t.fallbackItemIds, ['Item.axe-old']);
+  assert.equal(t.originItemUuid, 'Item.axe');
+  assert.deepEqual(t.aliasItemUuids, ['Item.axe-old']);
   assert.equal(t.name, 'Axe');
   assert.equal(t.label, 'Woodaxe', 'the user-authored label is untouched');
 
@@ -205,7 +205,7 @@ test('_normalizeSystem derives a component-linked tool\'s source refs + snapshot
   const normalized = mgr._normalizeSystem({
     id: 'sysD',
     components: [
-      { id: 'comp-x', name: 'Chisel', img: 'icons/chisel.webp', sourceItemUuid: 'Item.chisel', fallbackItemIds: ['Item.chisel-old'] },
+      { id: 'comp-x', name: 'Chisel', img: 'icons/chisel.webp', originItemUuid: 'Item.chisel', aliasItemUuids: ['Item.chisel-old'] },
     ],
     tools: [{ id: 'tool-x', componentId: 'comp-x' }],
   });
@@ -214,9 +214,9 @@ test('_normalizeSystem derives a component-linked tool\'s source refs + snapshot
 
   const t = mgr.getSystem('sysD').tools[0];
   assert.equal(t.componentId, 'comp-x', 'the component link is preserved');
-  assert.equal(t.sourceItemUuid, 'Item.chisel', 'derived the component sourceItemUuid');
-  assert.equal(t.sourceUuid, 'Item.chisel');
-  assert.deepEqual(t.fallbackItemIds, ['Item.chisel-old']);
+  assert.equal(t.originItemUuid, 'Item.chisel', 'derived the component originItemUuid');
+  assert.equal(t.registeredItemUuid, 'Item.chisel');
+  assert.deepEqual(t.aliasItemUuids, ['Item.chisel-old']);
   assert.equal(t.name, 'Chisel', 'derived the component name snapshot');
   assert.equal(t.img, 'icons/chisel.webp');
 
@@ -244,9 +244,9 @@ test('A5 - autoStampToolSources stamps migration-populated tool refs, skips lock
   mgr.systems.set('sysA', {
     id: 'sysA',
     tools: [
-      tool('tool-world', { sourceItemUuid: 'Item.world-tool' }),
-      tool('tool-locked', { sourceItemUuid: 'Compendium.locked.pack.x' }),
-      tool('tool-missing', { sourceItemUuid: 'Item.deleted' }),
+      tool('tool-world', { originItemUuid: 'Item.world-tool' }),
+      tool('tool-locked', { originItemUuid: 'Compendium.locked.pack.x' }),
+      tool('tool-missing', { originItemUuid: 'Item.deleted' }),
     ],
   });
 
@@ -276,15 +276,15 @@ test('A5 - autoStampToolSources stamps migration-populated tool refs, skips lock
 
 test('A6 - a dotted systemId resolves a tool by raw refs and _toolRoleFlagKey is null (no write, no throw)', async () => {
   const mgr = buildManager();
-  const sourceUuid = 'Item.dotted-tool';
-  mgr.systems.set('my.system', { id: 'my.system', tools: [tool('tool-d', { sourceItemUuid: sourceUuid })] });
+  const registeredItemUuid = 'Item.dotted-tool';
+  mgr.systems.set('my.system', { id: 'my.system', tools: [tool('tool-d', { originItemUuid: registeredItemUuid })] });
   installManager(mgr);
 
   assert.equal(mgr._toolRoleFlagKey('my.system'), null, 'no durable flag key for a dotted id');
 
   const rm = new RecipeManager();
   const recipe = { id: 'r1', craftingSystemId: 'my.system' };
-  const owned = roleItem({ uuid: sourceUuid, name: 'Dotted' });
+  const owned = roleItem({ uuid: registeredItemUuid, name: 'Dotted' });
   // Resolves by raw source references, never throwing/refusing.
   assert.equal(rm.toolMatchesItem(recipe, mgr.getSystem('my.system').tools[0], owned), true);
 });
@@ -297,7 +297,7 @@ test('A7 - a name-only item satisfies presence but is NEVER selected for usage/b
   const mgr = buildManager();
   mgr.systems.set('sysA', {
     id: 'sysA',
-    tools: [tool('tool-axe', { sourceItemUuid: 'Item.axe-src', name: 'Axe' })],
+    tools: [tool('tool-axe', { originItemUuid: 'Item.axe-src', name: 'Axe' })],
   });
   installManager(mgr);
   const rm = new RecipeManager();
@@ -319,7 +319,7 @@ test('A7 - a name-only item satisfies presence but is NEVER selected for usage/b
 
 test('A8 - a dropped item-sourced Tool (no component) resolves through firstToolMatch', async () => {
   const { resolveItemUuidToTool } = await import('../src/canvas/interactableItemResolution.js');
-  const system = { id: 'sysA', components: [], tools: [tool('tool-chisel', { sourceItemUuid: 'Item.chisel' })] };
+  const system = { id: 'sysA', components: [], tools: [tool('tool-chisel', { originItemUuid: 'Item.chisel' })] };
   const dropped = { uuid: 'Item.chisel', _stats: {} };
   const match = resolveItemUuidToTool('Item.chisel', {
     resolveItem: (uuid) => (uuid === 'Item.chisel' ? dropped : null),
@@ -338,7 +338,7 @@ test('A9 - repairComponentSourceFlags stamps an owned tool copy via the TOOL res
     id: 'sysA',
     components: [],
     recipeItemDefinitions: [],
-    tools: [tool('tool-axe', { sourceItemUuid: 'Item.axe-src' })],
+    tools: [tool('tool-axe', { originItemUuid: 'Item.axe-src' })],
   });
   // An owned copy whose compendium source equals the tool's source ref (no durable flag yet).
   const ownedCopy = makeWorldItem({ uuid: 'Item.owned-axe', name: 'Axe', compendiumSource: 'Item.axe-src' });
@@ -390,14 +390,14 @@ test('migrateExportPayload upcasts a legacy componentId-only tool with derived r
   const payload = {
     schemaVersion: 2,
     system: {
-      components: [{ id: 'comp-saw', name: 'Saw', img: 'icons/saw.webp', sourceItemUuid: 'Item.saw' }],
+      components: [{ id: 'comp-saw', name: 'Saw', img: 'icons/saw.webp', originItemUuid: 'Item.saw' }],
       tools: [{ id: 'tool-saw', componentId: 'comp-saw' }],
     },
     recipes: [],
   };
   const migrated = migrateExportPayload(payload);
   const t = migrated.system.tools[0];
-  assert.equal(t.sourceItemUuid, 'Item.saw');
+  assert.equal(t.originItemUuid, 'Item.saw');
   assert.equal(t.name, 'Saw');
   assert.equal(t.componentId, 'comp-saw');
   // Idempotent.

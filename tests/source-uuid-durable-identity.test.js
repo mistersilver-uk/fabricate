@@ -16,19 +16,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import * as sourceUuid from '../src/utils/sourceUuid.js';
+import * as registeredItemUuid from '../src/utils/sourceUuid.js';
 import { tool, roleItem } from './helpers/componentIdentityFixtures.js';
 
 const SYSTEM_ID = 's1';
 // tX is the target; tY a sibling with an unrelated source, proving exclusivity.
 const TOOLS = [
-  tool('tX', { sourceUuid: 'Item.x-src', name: 'Widget' }),
-  tool('tY', { sourceUuid: 'Item.y-src', name: 'Gadget' }),
+  tool('tX', { registeredItemUuid: 'Item.x-src', name: 'Widget' }),
+  tool('tY', { registeredItemUuid: 'Item.y-src', name: 'Gadget' }),
 ];
 const [TX, TY] = TOOLS;
 
 function isTX(item) {
-  return sourceUuid.itemIsToolByDurableIdentity(item, TX, TOOLS, SYSTEM_ID);
+  return registeredItemUuid.itemIsToolByDurableIdentity(item, TX, TOOLS, SYSTEM_ID);
 }
 
 test('roles-map flag naming tX matches tX (durable tier 1)', () => {
@@ -48,7 +48,7 @@ test('a transitive duplicateSource is EXCLUDED (spared)', () => {
   assert.equal(isTX(decoy), false);
   // Vacuity contrast: the WIDE resolver DOES accept the duplicate source, so this proves the
   // predicate is genuinely narrower and not vacuously false.
-  assert.equal(sourceUuid.itemResolvesToTool(decoy, TX, TOOLS, SYSTEM_ID), true);
+  assert.equal(registeredItemUuid.itemResolvesToTool(decoy, TX, TOOLS, SYSTEM_ID), true);
 });
 
 test('a shared tool NAME alone is EXCLUDED (spared)', () => {
@@ -57,7 +57,7 @@ test('a shared tool NAME alone is EXCLUDED (spared)', () => {
 
 test('sibling-exclusivity: an item claiming tX does not match sibling tY', () => {
   const item = roleItem({ roles: { [SYSTEM_ID]: { toolId: 'tX' } } });
-  assert.equal(sourceUuid.itemIsToolByDurableIdentity(item, TY, TOOLS, SYSTEM_ID), false);
+  assert.equal(registeredItemUuid.itemIsToolByDurableIdentity(item, TY, TOOLS, SYSTEM_ID), false);
 });
 
 test('a legacy scalar componentId flag is NEVER a tool identity (tools have no legacy scalar)', () => {
@@ -68,6 +68,6 @@ test('a legacy scalar componentId flag is NEVER a tool identity (tools have no l
 
 test('null/empty inputs never match', () => {
   assert.equal(isTX(null), false);
-  assert.equal(sourceUuid.itemIsToolByDurableIdentity(roleItem({}), null, TOOLS, SYSTEM_ID), false);
+  assert.equal(registeredItemUuid.itemIsToolByDurableIdentity(roleItem({}), null, TOOLS, SYSTEM_ID), false);
   assert.equal(isTX(roleItem({})), false);
 });

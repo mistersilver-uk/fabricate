@@ -247,9 +247,9 @@ test('Tool.toJSON / fromJSON round-trip preserves shape including snapshot + sou
     label: 'GM Custom Axe',
     name: 'Woodsman Axe',
     img: 'icons/tools/axe.webp',
-    sourceUuid: 'Item.live-axe',
-    sourceItemUuid: 'Compendium.pack.axe',
-    fallbackItemIds: ['Item.old-axe'],
+    registeredItemUuid: 'Item.live-axe',
+    originItemUuid: 'Compendium.pack.axe',
+    aliasItemUuids: ['Item.old-axe'],
     requirement: { formula: '@flags.proficient' },
     breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 },
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe-broken' },
@@ -262,7 +262,7 @@ test('Tool.toJSON / fromJSON round-trip preserves shape including snapshot + sou
   assert.equal(round.label, 'GM Custom Axe');
   assert.equal(round.name, 'Woodsman Axe');
   assert.equal(round.img, 'icons/tools/axe.webp');
-  assert.equal(round.sourceItemUuid, 'Compendium.pack.axe');
+  assert.equal(round.originItemUuid, 'Compendium.pack.axe');
 });
 
 test('Tool.validate accepts a source-refs-only tool with componentId null (issue 561, R2-N2)', () => {
@@ -270,8 +270,8 @@ test('Tool.validate accepts a source-refs-only tool with componentId null (issue
   const itemSourced = new Tool({
     componentId: null,
     name: 'Chisel',
-    sourceUuid: 'Item.chisel',
-    sourceItemUuid: 'Item.chisel',
+    registeredItemUuid: 'Item.chisel',
+    originItemUuid: 'Item.chisel',
   }).validate();
   assert.equal(itemSourced.valid, true);
 
@@ -282,7 +282,7 @@ test('Tool.validate accepts a source-refs-only tool with componentId null (issue
   // The onBreak.replaceWith differ-check does not throw / mis-fire when componentId is null.
   const replaceOnItemSourced = new Tool({
     componentId: null,
-    sourceItemUuid: 'Item.hammer',
+    originItemUuid: 'Item.hammer',
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-broken' },
   }).validate();
   assert.equal(replaceOnItemSourced.valid, true);

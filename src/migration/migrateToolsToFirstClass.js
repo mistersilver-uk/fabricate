@@ -5,10 +5,11 @@
  *
  * Before #561 a `system.tools[]` entry only held a `componentId` pointing at a managed
  * component, and every tool matcher resolved that component before matching an owned item.
- * #561 makes a Tool a first-class registered kind with its own `sourceUuid` /
- * `sourceItemUuid` / `fallbackItemIds` + a `name`/`img` display snapshot. This migration
- * COPIES those fields from the referenced component onto each tool so a world that matched a
- * tool yesterday matches it today.
+ * #561 makes a Tool a first-class registered kind with its own `registeredItemUuid` /
+ * `originItemUuid` / `aliasItemUuids` + a `name`/`img` display snapshot (renamed from
+ * `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` in issue 560). This migration COPIES
+ * those fields from the referenced component onto each tool so a world that matched a tool
+ * yesterday matches it today.
  *
  * `MigrationRunner` reads/writes the `craftingSystems` payload as pure DATA — it has no Item
  * handle, so it CANNOT stamp the durable `roles[systemId].toolId` flag. That is the separate
@@ -54,8 +55,14 @@ export function migrateToolsToFirstClass(systems) {
  */
 export function deriveToolSourceFromComponents(tool, components) {
   if (!tool || typeof tool !== 'object') return false;
-  // Already first-class (carries its own source refs): nothing to derive.
-  if (tool.sourceUuid || tool.sourceItemUuid) return false;
+  // Already first-class (carries its own source refs): nothing to derive. New-name-first,
+  // legacy-name-tolerant (issue 560): this guard MUST recognize the renamed
+  // `registeredItemUuid`/`originItemUuid` as well as the pre-#560 `sourceUuid`/`sourceItemUuid`.
+  // If it only checked the old names, a NEW-named (post-#560) tool round-tripping through
+  // `migrateExportPayload` would fail the guard, re-derive from its linked component, and
+  // OVERWRITE its authored refs — silent corruption whenever a tool's own refs differ.
+  if (tool.registeredItemUuid || tool.originItemUuid || tool.sourceUuid || tool.sourceItemUuid)
+    return false;
   const componentId = typeof tool.componentId === 'string' ? tool.componentId.trim() : '';
   if (!componentId) return false;
   const list = Array.isArray(components) ? components : [];
@@ -63,15 +70,33 @@ export function deriveToolSourceFromComponents(tool, components) {
   // A dangling componentId is left as-is (degrades to presence-by-name / componentId display).
   if (!component) return false;
 
-  const sourceUuid = component.sourceUuid || component.sourceItemUuid || null;
-  const sourceItemUuid = component.sourceItemUuid || component.sourceUuid || null;
-  if (!sourceUuid && !sourceItemUuid) return false;
+  // Read the component's refs new-name-first, old-name-tolerant, so `1.15.0` still upcasts a
+  // not-yet-1.16.0-migrated (old-named) component in the same sequential runner pass.
+  const registeredItemUuid =
+    component.registeredItemUuid ||
+    component.originItemUuid ||
+    component.sourceUuid ||
+    component.sourceItemUuid ||
+    null;
+  const originItemUuid =
+    component.originItemUuid ||
+    component.registeredItemUuid ||
+    component.sourceItemUuid ||
+    component.sourceUuid ||
+    null;
+  if (!registeredItemUuid && !originItemUuid) return false;
 
-  tool.sourceUuid = sourceUuid;
-  tool.sourceItemUuid = sourceItemUuid;
-  tool.fallbackItemIds = Array.isArray(component.fallbackItemIds)
-    ? [...new Set(component.fallbackItemIds.filter((ref) => typeof ref === 'string' && ref.trim()))]
-    : [];
+  // Write the NEW names onto the tool (safe: `1.16.0` and the normalizers accept them).
+  tool.registeredItemUuid = registeredItemUuid;
+  tool.originItemUuid = originItemUuid;
+  const aliasSource = Array.isArray(component.aliasItemUuids)
+    ? component.aliasItemUuids
+    : Array.isArray(component.fallbackItemIds)
+      ? component.fallbackItemIds
+      : [];
+  tool.aliasItemUuids = [
+    ...new Set(aliasSource.filter((ref) => typeof ref === 'string' && ref.trim())),
+  ];
   // Display snapshot — name + img ONLY, never `label`, and NEVER overwrite a name/img the
   // tool already carries (a pre-existing snapshot is authored data; only fill when absent).
   if (!tool.name && typeof component.name === 'string' && component.name)

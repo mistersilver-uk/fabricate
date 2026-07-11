@@ -2,14 +2,14 @@
  * Tests for T-097: Runtime fallback item ID matching in RecipeManager.
  *
  * Validates that ingredientMatchesItem() and toolMatchesItem() honor
- * fallbackItemIds between the primary UUID check and name fallback.
+ * aliasItemUuids between the primary UUID check and name fallback.
  *
  * Tests:
  *   1. Primary UUID matches — existing behaviour unchanged
  *   2. Fallback ID matches when primary UUID fails (ingredient)
  *   3. Fallback ID checked for tools
- *   4. Name match still works as last resort (no sourceUuid, no fallbacks)
- *   5. Legacy UUID-only workflows unchanged (no fallbackItemIds field)
+ *   4. Name match still works as last resort (no registeredItemUuid, no fallbacks)
+ *   5. Legacy UUID-only workflows unchanged (no aliasItemUuids field)
  */
 
 import test from 'node:test';
@@ -46,8 +46,8 @@ const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 /**
  * Build a minimal managed component (system item).
  */
-function makeComponent({ id = 'comp1', name = 'Iron Ore', sourceUuid = null, fallbackItemIds = [] } = {}) {
-  return { id, name, sourceUuid, sourceItemUuid: sourceUuid, fallbackItemIds };
+function makeComponent({ id = 'comp1', name = 'Iron Ore', registeredItemUuid = null, aliasItemUuids = [] } = {}) {
+  return { id, name, registeredItemUuid, originItemUuid: registeredItemUuid, aliasItemUuids };
 }
 
 /**
@@ -118,8 +118,8 @@ function setupGameFabricate(component) {
 test('T-097: primary UUID matches — existing behaviour unchanged', () => {
   const component = makeComponent({
     id: 'comp1',
-    sourceUuid: 'Compendium.world.items.iron-ore',
-    fallbackItemIds: ['Compendium.world.items.old-iron-ore']
+    registeredItemUuid: 'Compendium.world.items.iron-ore',
+    aliasItemUuids: ['Compendium.world.items.old-iron-ore']
   });
   setupGameFabricate(component);
 
@@ -131,14 +131,14 @@ test('T-097: primary UUID matches — existing behaviour unchanged', () => {
   const item = makeItem({ uuid: 'Compendium.world.items.iron-ore', name: 'Iron Ore' });
 
   assert.ok(recipeManager.ingredientMatchesItem(recipe, ingredient, item),
-    'Should match via primary sourceUuid');
+    'Should match via primary registeredItemUuid');
 });
 
 test('T-097: fallback ID matches when primary UUID fails (ingredient)', () => {
   const component = makeComponent({
     id: 'comp1',
-    sourceUuid: 'Compendium.world.items.new-iron-ore', // different from item's uuid
-    fallbackItemIds: ['Compendium.world.items.old-iron-ore'] // matches item
+    registeredItemUuid: 'Compendium.world.items.new-iron-ore', // different from item's uuid
+    aliasItemUuids: ['Compendium.world.items.old-iron-ore'] // matches item
   });
   setupGameFabricate(component);
 
@@ -153,15 +153,15 @@ test('T-097: fallback ID matches when primary UUID fails (ingredient)', () => {
   });
 
   assert.ok(recipeManager.ingredientMatchesItem(recipe, ingredient, item),
-    'Should match via fallbackItemIds when primary UUID fails');
+    'Should match via aliasItemUuids when primary UUID fails');
 });
 
 test('T-097: fallback ID checked for tools', () => {
   const component = makeComponent({
     id: 'mortar',
     name: 'Mortar and Pestle',
-    sourceUuid: 'Compendium.world.tools.new-mortar',
-    fallbackItemIds: ['Compendium.world.tools.old-mortar']
+    registeredItemUuid: 'Compendium.world.tools.new-mortar',
+    aliasItemUuids: ['Compendium.world.tools.old-mortar']
   });
   setupGameFabricate(component);
 
@@ -177,15 +177,15 @@ test('T-097: fallback ID checked for tools', () => {
   });
 
   assert.ok(recipeManager.toolMatchesItem(recipe, tool, item),
-    'Should match tool via fallbackItemIds using compendium source');
+    'Should match tool via aliasItemUuids using compendium source');
 });
 
-test('T-097: name match still works as last resort (no sourceUuid, no fallbacks)', () => {
+test('T-097: name match still works as last resort (no registeredItemUuid, no fallbacks)', () => {
   const component = makeComponent({
     id: 'comp1',
     name: 'Iron Ore',
-    sourceUuid: null,
-    fallbackItemIds: []
+    registeredItemUuid: null,
+    aliasItemUuids: []
   });
   setupGameFabricate(component);
 
@@ -196,17 +196,17 @@ test('T-097: name match still works as last resort (no sourceUuid, no fallbacks)
   const item = makeItem({ uuid: 'Item.some-id', name: 'Iron Ore' });
 
   assert.ok(recipeManager.ingredientMatchesItem(recipe, ingredient, item),
-    'Should match via name when no sourceUuid and no fallbacks');
+    'Should match via name when no registeredItemUuid and no fallbacks');
 });
 
-test('T-097: legacy UUID-only workflows unchanged (no fallbackItemIds field)', () => {
-  // Component without fallbackItemIds field at all (legacy data shape)
+test('T-097: legacy UUID-only workflows unchanged (no aliasItemUuids field)', () => {
+  // Component without aliasItemUuids field at all (legacy data shape)
   const component = {
     id: 'comp1',
     name: 'Coal',
-    sourceUuid: 'Compendium.world.items.coal',
-    sourceItemUuid: 'Compendium.world.items.coal'
-    // no fallbackItemIds
+    registeredItemUuid: 'Compendium.world.items.coal',
+    originItemUuid: 'Compendium.world.items.coal'
+    // no aliasItemUuids
   };
   setupGameFabricate(component);
 

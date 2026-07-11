@@ -89,7 +89,7 @@ function buildSystem({
     recipeItemDefinitions: [
       {
         id: 'book',
-        sourceItemUuid: 'Compendium.world.items.book',
+        originItemUuid: 'Compendium.world.items.book',
         recipeIds: ['recipe-1', 'recipe-2'],
         caps: {
           item: { limitUses: false },
@@ -242,13 +242,13 @@ test('learnRecipeFromOwnedBook: gates on the OWNED book, not the recipe’s firs
     recipeItemDefinitions: [
       {
         id: 'book-b',
-        sourceItemUuid: 'Compendium.world.items.book-b',
+        originItemUuid: 'Compendium.world.items.book-b',
         recipeIds: ['recipe-1'],
         caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: ['p-expert'] } },
       },
       {
         id: 'book-a',
-        sourceItemUuid: 'Compendium.world.items.book-a',
+        originItemUuid: 'Compendium.world.items.book-a',
         recipeIds: ['recipe-1'],
         caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: [] } },
       },

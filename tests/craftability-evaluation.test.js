@@ -76,14 +76,14 @@ function makeItem(uuid, quantity = 1, extraFlags = {}) {
 }
 
 /**
- * Make a managed-component item: matched by componentId via sourceUuid.
+ * Make a managed-component item: matched by componentId via registeredItemUuid.
  */
-function makeComponentItem(uuid, sourceUuid, quantity = 1) {
+function makeComponentItem(uuid, registeredItemUuid, quantity = 1) {
   return {
     uuid,
     id: uuid,
     system: { quantity },
-    flags: { core: { sourceId: sourceUuid } },
+    flags: { core: { sourceId: registeredItemUuid } },
     getFlag: (_scope, _key) => undefined,
   };
 }
@@ -332,13 +332,13 @@ test('TC5: evaluateCraftability correctly aggregates items from multiple actors'
 // TC6: Managed-component matching (match.type === 'component' with componentId)
 // ---------------------------------------------------------------------------
 
-test('TC6: evaluateCraftability matches managed-component ingredients by sourceUuid', () => {
+test('TC6: evaluateCraftability matches managed-component ingredients by registeredItemUuid', () => {
   const systemId = 'sys-tc6';
   const compId = 'comp-iron-ingot';
-  const sourceUuid = 'Item.iron-ingot-source';
+  const registeredItemUuid = 'Item.iron-ingot-source';
 
-  // The actor item has the sourceId flag pointing to the component's sourceUuid
-  const actorItem = makeComponentItem('actor-item-uuid', sourceUuid, 2);
+  // The actor item has the sourceId flag pointing to the component's registeredItemUuid
+  const actorItem = makeComponentItem('actor-item-uuid', registeredItemUuid, 2);
 
   const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 1)])]);
   const recipe = new Recipe({
@@ -349,13 +349,13 @@ test('TC6: evaluateCraftability matches managed-component ingredients by sourceU
   });
 
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: compId, sourceUuid, name: 'Iron Ingot', img: 'icons/iron-ingot.webp' },
+    { id: compId, registeredItemUuid, name: 'Iron Ingot', img: 'icons/iron-ingot.webp' },
   ]);
 
   const actor = makeActor([actorItem]);
   const result = manager.evaluateCraftability([actor], recipe);
 
-  assert.equal(result.canCraft, true, 'managed-component ingredient should match by sourceUuid');
+  assert.equal(result.canCraft, true, 'managed-component ingredient should match by registeredItemUuid');
   assert.equal(result.ingredientStates.length, 1);
   const state = result.ingredientStates[0];
   assert.equal(state.satisfied, true);
@@ -368,7 +368,7 @@ test('TC6: evaluateCraftability matches managed-component ingredients by sourceU
 test('TC6b: a missing managed-component ingredient still exposes its component image', () => {
   const systemId = 'sys-tc6b';
   const compId = 'comp-mithril';
-  const sourceUuid = 'Item.mithril-source';
+  const registeredItemUuid = 'Item.mithril-source';
 
   const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 2)])]);
   const recipe = new Recipe({
@@ -379,7 +379,7 @@ test('TC6b: a missing managed-component ingredient still exposes its component i
   });
 
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: compId, sourceUuid, name: 'Mithril', img: 'icons/mithril.webp' },
+    { id: compId, registeredItemUuid, name: 'Mithril', img: 'icons/mithril.webp' },
   ]);
 
   // Actor has none of the component.
@@ -417,8 +417,8 @@ test('TC6c: an identically-named item satisfies a sourced component even when so
   const manager = makeRecipeManagerWithSystem(systemId, [
     {
       id: compId,
-      sourceUuid: 'Item.EmbercapSource',
-      sourceItemUuid: 'Item.EmbercapSource',
+      registeredItemUuid: 'Item.EmbercapSource',
+      originItemUuid: 'Item.EmbercapSource',
       name: 'Embercap Mushroom',
     },
   ]);
@@ -451,8 +451,8 @@ test('TC6d: the name fallback does NOT match a differently-named item', () => {
   const manager = makeRecipeManagerWithSystem(systemId, [
     {
       id: compId,
-      sourceUuid: 'Item.EmbercapSource',
-      sourceItemUuid: 'Item.EmbercapSource',
+      registeredItemUuid: 'Item.EmbercapSource',
+      originItemUuid: 'Item.EmbercapSource',
       name: 'Embercap Mushroom',
     },
   ]);
@@ -524,9 +524,9 @@ test('TC7b: evaluateCraftability succeeds when shared item covers both groups', 
 test('TC8: evaluateCraftability toolStates show available when tool present', () => {
   const systemId = 'sys-tc8';
   const compId = 'comp-mortar';
-  const sourceUuid = 'Item.mortar-source';
+  const registeredItemUuid = 'Item.mortar-source';
 
-  const actorItem = makeComponentItem('mortar-uuid', sourceUuid, 1);
+  const actorItem = makeComponentItem('mortar-uuid', registeredItemUuid, 1);
   const ingredientItem = makeItem('item-a', 1);
 
   // Recipe with one ingredient and one tool
@@ -534,7 +534,7 @@ test('TC8: evaluateCraftability toolStates show available when tool present', ()
 
   const manager = makeRecipeManagerWithSystem(
     systemId,
-    [{ id: compId, sourceUuid, name: 'Mortar', img: 'icons/mortar.webp' }],
+    [{ id: compId, registeredItemUuid, name: 'Mortar', img: 'icons/mortar.webp' }],
     [{ id: 'tool-mortar', componentId: compId, enabled: true }]
   );
 
@@ -564,14 +564,14 @@ test('TC8: evaluateCraftability toolStates show available when tool present', ()
 test('TC8d: a present-but-broken tool is unavailable and needs repair', () => {
   const systemId = 'sys-tc8d';
   const compId = 'comp-mortar-d';
-  const sourceUuid = 'Item.mortar-d-source';
+  const registeredItemUuid = 'Item.mortar-d-source';
 
   // A matching item that carries the fabricate toolBroken flag → damaged (repair).
   const brokenTool = {
     uuid: 'broken-mortar-uuid',
     id: 'broken-mortar-uuid',
     system: { quantity: 1 },
-    flags: { core: { sourceId: sourceUuid }, fabricate: { toolBroken: true } },
+    flags: { core: { sourceId: registeredItemUuid }, fabricate: { toolBroken: true } },
     getFlag: (scope, key) => (scope === 'fabricate' && key === 'toolBroken' ? true : undefined),
   };
   const ingredientItem = makeItem('item-a', 1);
@@ -579,7 +579,7 @@ test('TC8d: a present-but-broken tool is unavailable and needs repair', () => {
   const set = makeIngredientSet([makeGroupData([makeIngredientData('item-a', 1)])]);
   const manager = makeRecipeManagerWithSystem(
     systemId,
-    [{ id: compId, sourceUuid, name: 'Mortar D' }],
+    [{ id: compId, registeredItemUuid, name: 'Mortar D' }],
     [{ id: 'tool-mortar-d', componentId: compId, enabled: true }]
   );
   const recipe = new Recipe({
@@ -599,7 +599,7 @@ test('TC8d: a present-but-broken tool is unavailable and needs repair', () => {
 test('TC8b: evaluateCraftability toolStates show unavailable when tool missing', () => {
   const systemId = 'sys-tc8b';
   const compId = 'comp-mortar-b';
-  const sourceUuid = 'Item.mortar-b-source';
+  const registeredItemUuid = 'Item.mortar-b-source';
 
   // Actor has the ingredient but NOT the tool
   const ingredientItem = makeItem('item-a', 1);
@@ -608,7 +608,7 @@ test('TC8b: evaluateCraftability toolStates show unavailable when tool missing',
 
   const manager = makeRecipeManagerWithSystem(
     systemId,
-    [{ id: compId, sourceUuid, name: 'Mortar B' }],
+    [{ id: compId, registeredItemUuid, name: 'Mortar B' }],
     [{ id: 'tool-mortar-b', componentId: compId, enabled: true }]
   );
 
@@ -631,16 +631,16 @@ test('TC8b: evaluateCraftability toolStates show unavailable when tool missing',
 test('TC8c: evaluateCraftability supports iterable actor.items without Array.filter', () => {
   const systemId = 'sys-tc8c';
   const compId = 'comp-mortar-c';
-  const sourceUuid = 'Item.mortar-c-source';
+  const registeredItemUuid = 'Item.mortar-c-source';
 
-  const actorItem = makeComponentItem('mortar-c-uuid', sourceUuid, 1);
+  const actorItem = makeComponentItem('mortar-c-uuid', registeredItemUuid, 1);
   const ingredientItem = makeItem('item-a', 1);
 
   const set = makeIngredientSet([makeGroupData([makeIngredientData('item-a', 1)])]);
 
   const manager = makeRecipeManagerWithSystem(
     systemId,
-    [{ id: compId, sourceUuid, name: 'Mortar C' }],
+    [{ id: compId, registeredItemUuid, name: 'Mortar C' }],
     [{ id: 'tool-mortar-c', componentId: compId, enabled: true }]
   );
 
@@ -711,15 +711,15 @@ test('TC9a: evaluateCraftability counts essences from matched component definiti
     {
       id: 'red-herb',
       name: 'Red Herb',
-      sourceUuid: 'Compendium.test.red-herb',
-      sourceItemUuid: 'Compendium.test.red-herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
       essences: { [essenceId]: 1 },
     },
     {
       id: 'silverleaf',
       name: 'Silverleaf',
-      sourceUuid: 'Compendium.test.silverleaf',
-      sourceItemUuid: 'Compendium.test.silverleaf',
+      registeredItemUuid: 'Compendium.test.silverleaf',
+      originItemUuid: 'Compendium.test.silverleaf',
       essences: { [essenceId]: 1 },
     },
   ];
@@ -766,8 +766,8 @@ test('TC9b: evaluateCraftability multiplies component-defined essences by stack 
     {
       id: 'red-herb',
       name: 'Red Herb',
-      sourceUuid: 'Compendium.test.red-herb',
-      sourceItemUuid: 'Compendium.test.red-herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
       essences: { [essenceId]: 1 },
     },
   ];
@@ -801,8 +801,8 @@ test('TC9c: evaluateCraftability uses item-flag essences before component fallba
     {
       id: 'red-herb',
       name: 'Red Herb',
-      sourceUuid: 'Compendium.test.red-herb',
-      sourceItemUuid: 'Compendium.test.red-herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
       essences: { [essenceId]: 5 },
     },
   ];
@@ -906,8 +906,8 @@ test('TC10 (regression): evaluateCraftability is consistent when actor has all m
   ]);
 
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: compIdA, sourceUuid: sourceUuidA, name: 'Component A' },
-    { id: compIdB, sourceUuid: sourceUuidB, name: 'Component B' },
+    { id: compIdA, registeredItemUuid: sourceUuidA, name: 'Component A' },
+    { id: compIdB, registeredItemUuid: sourceUuidB, name: 'Component B' },
   ]);
 
   const recipe = new Recipe({
@@ -950,13 +950,13 @@ test('TC10b (regression): evaluateCraftability returns all states unsatisfied wh
   // Verifies the symmetric case: canCraft false must not have all states satisfied.
   const systemId = 'sys-tc10b';
   const compId = 'comp-tc10b';
-  const sourceUuid = 'Item.tc10b-source';
+  const registeredItemUuid = 'Item.tc10b-source';
 
   // Actor has NOTHING — managed component is absent
   const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 1)])]);
 
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: compId, sourceUuid, name: 'Component TC10B' },
+    { id: compId, registeredItemUuid, name: 'Component TC10B' },
   ]);
 
   const recipe = new Recipe({
@@ -1000,8 +1000,8 @@ test('evaluateShoppingRequirement unions all ingredient sets with the max need p
     ],
   });
   const manager = makeRecipeManagerWithSystem(systemId, [
-    { id: 'c-iron', sourceUuid: 'Item.iron', name: 'Iron', img: 'icons/iron.webp' },
-    { id: 'c-wood', sourceUuid: 'Item.wood', name: 'Wood', img: 'icons/wood.webp' },
+    { id: 'c-iron', registeredItemUuid: 'Item.iron', name: 'Iron', img: 'icons/iron.webp' },
+    { id: 'c-wood', registeredItemUuid: 'Item.wood', name: 'Wood', img: 'icons/wood.webp' },
   ]);
 
   // Owns nothing — the shopping requirement is the full union.

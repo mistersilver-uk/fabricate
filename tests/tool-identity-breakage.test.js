@@ -9,7 +9,7 @@
  *
  * Anti-vacuity (delta A1/A2): both surfaces drive the REAL `RecipeManager`
  * (`installSystem` + `new RecipeManager()`) over components carrying real
- * `sourceUuid`, so a decoy actually resolves through source refs and the durable
+ * `registeredItemUuid`, so a decoy actually resolves through source refs and the durable
  * gate is the only thing preventing `delete()`. No fake `componentId === item.id`
  * matcher and no `matchTools: () => ({ items })` stub is used here.
  */
@@ -59,9 +59,9 @@ const HAMMER_LIBRARY_TOOL = {
   id: 'tool-hammer',
   componentId: 'c-hammer',
   name: 'Hammer',
-  sourceUuid: HAMMER_SRC,
-  sourceItemUuid: HAMMER_SRC,
-  fallbackItemIds: [],
+  registeredItemUuid: HAMMER_SRC,
+  originItemUuid: HAMMER_SRC,
+  aliasItemUuids: [],
 };
 
 // Two managed components carrying real source refs; `c-hammer` is the tool's linked
@@ -72,8 +72,8 @@ function hammerSystem(id = 'sys-1') {
     features: {},
     tools: [{ ...HAMMER_LIBRARY_TOOL }],
     components: [
-      component('c-hammer', { sourceUuid: HAMMER_SRC, name: 'Hammer' }),
-      component('c-tongs', { sourceUuid: 'Item.tongs-src-uuid', name: 'Tongs' }),
+      component('c-hammer', { registeredItemUuid: HAMMER_SRC, name: 'Hammer' }),
+      component('c-tongs', { registeredItemUuid: 'Item.tongs-src-uuid', name: 'Tongs' }),
     ],
   };
 }
@@ -160,7 +160,7 @@ function durableFlagHammer() {
     name: 'Hammer',
   });
 }
-// Own compendium source equal to the component's sourceUuid (locked-compendium copy).
+// Own compendium source equal to the component's registeredItemUuid (locked-compendium copy).
 function compendiumHammer() {
   return ownedTool({ uuid: 'Item.pack-hammer', compendiumSource: HAMMER_SRC, name: 'Hammer' });
 }

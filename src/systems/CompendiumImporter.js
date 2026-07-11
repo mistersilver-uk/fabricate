@@ -54,7 +54,7 @@ export class CompendiumImporter {
    * @param {object} packData - Pack JSON (must have a `system` field; `recipes` is optional)
    * @param {object} [options]
    * @param {boolean} [options.overwriteExisting=false] - Overwrite system/recipes if they exist
-   * @param {boolean} [options.retainFallbackIds=true] - Keep existing fallbackItemIds on re-import
+   * @param {boolean} [options.retainFallbackIds=true] - Keep existing aliasItemUuids on re-import
    * @param {object} [options.additionalFallbackIds={}] - Map of componentId -> string[] extra fallbacks
    * @param {string[]} [options.targetPackIds=[]] - Limit source+name search to specific pack IDs
    * @returns {Promise<object>} Structured import summary
@@ -328,7 +328,7 @@ export class CompendiumImporter {
         ownerType: 'component',
         ownerId: entry.componentId,
         ownerName: entry.componentName,
-        referenceValue: entry.sourceItemUuid,
+        referenceValue: entry.originItemUuid,
         disposition: 'reported',
       });
     }
@@ -357,9 +357,9 @@ export class CompendiumImporter {
   }
 
   /**
-   * Remap component sourceItemUuids using deterministic precedence:
+   * Remap component originItemUuids using deterministic precedence:
    *   1. Exact UUID match (fromUuid succeeds) — retain as-is
-   *   2. Source+name match in world packs — remap, old UUID added to fallbacks
+   *   2. Source+name match in world packs — remap, old UUID added to aliasItemUuids
    *   3. Unresolved — keep as-is, mark in summary
    *
    * @private
@@ -382,21 +382,21 @@ export class CompendiumImporter {
 
     const remapped = [];
     for (const component of components) {
-      const { id: compId, name: compName, sourceItemUuid } = component;
+      const { id: compId, name: compName, originItemUuid } = component;
 
       // Collect fallback IDs: existing retained IDs + explicit additions + pack-provided fallbacks
       const mergedFallbacks = [];
 
       if (retainFallbackIds) {
         const existing = existingComponentsById.get(compId);
-        if (existing && Array.isArray(existing.fallbackItemIds)) {
-          mergedFallbacks.push(...existing.fallbackItemIds);
+        if (existing && Array.isArray(existing.aliasItemUuids)) {
+          mergedFallbacks.push(...existing.aliasItemUuids);
         }
       }
 
       // Pack-provided fallbacks
-      if (Array.isArray(component.fallbackItemIds)) {
-        for (const fid of component.fallbackItemIds) {
+      if (Array.isArray(component.aliasItemUuids)) {
+        for (const fid of component.aliasItemUuids) {
           if (!mergedFallbacks.includes(fid)) mergedFallbacks.push(fid);
         }
       }
@@ -409,24 +409,24 @@ export class CompendiumImporter {
         }
       }
 
-      if (!sourceItemUuid) {
-        remapped.push({ ...component, fallbackItemIds: mergedFallbacks });
+      if (!originItemUuid) {
+        remapped.push({ ...component, aliasItemUuids: mergedFallbacks });
         continue;
       }
 
       // Check exact UUID match
-      const exactDoc = await this._resolveUuidDocument(sourceItemUuid);
+      const exactDoc = await this._resolveUuidDocument(originItemUuid);
       if (exactDoc) {
         summary.components.remapped.push({
           componentId: compId,
           componentName: compName,
-          oldUuid: sourceItemUuid,
-          newUuid: sourceItemUuid,
+          oldUuid: originItemUuid,
+          newUuid: originItemUuid,
           method: 'exact',
         });
         remapped.push(
           this._withResolvedSourceMetadata(
-            { ...component, fallbackItemIds: mergedFallbacks },
+            { ...component, aliasItemUuids: mergedFallbacks },
             exactDoc
           )
         );
@@ -434,16 +434,16 @@ export class CompendiumImporter {
       }
 
       // Source+name match
-      const foundUuid = await this._findBySourceAndName(sourceItemUuid, compName, targetPackIds);
+      const foundUuid = await this._findBySourceAndName(originItemUuid, compName, targetPackIds);
       if (foundUuid) {
         // Old UUID becomes a fallback
-        if (!mergedFallbacks.includes(sourceItemUuid)) {
-          mergedFallbacks.push(sourceItemUuid);
+        if (!mergedFallbacks.includes(originItemUuid)) {
+          mergedFallbacks.push(originItemUuid);
         }
         summary.components.remapped.push({
           componentId: compId,
           componentName: compName,
-          oldUuid: sourceItemUuid,
+          oldUuid: originItemUuid,
           newUuid: foundUuid,
           method: 'sourceName',
         });
@@ -452,9 +452,9 @@ export class CompendiumImporter {
           this._withResolvedSourceMetadata(
             {
               ...component,
-              sourceItemUuid: foundUuid,
-              sourceUuid: foundUuid,
-              fallbackItemIds: mergedFallbacks,
+              originItemUuid: foundUuid,
+              registeredItemUuid: foundUuid,
+              aliasItemUuids: mergedFallbacks,
             },
             foundDoc
           )
@@ -466,7 +466,7 @@ export class CompendiumImporter {
       summary.components.unresolved.push({
         componentId: compId,
         componentName: compName,
-        sourceItemUuid,
+        originItemUuid,
       });
 
       if (mergedFallbacks.length > 0) {
@@ -477,7 +477,7 @@ export class CompendiumImporter {
         });
       }
 
-      remapped.push({ ...component, fallbackItemIds: mergedFallbacks });
+      remapped.push({ ...component, aliasItemUuids: mergedFallbacks });
     }
 
     return remapped;
@@ -536,14 +536,14 @@ export class CompendiumImporter {
    * Search world compendium packs for an item whose source UUID matches and whose
    * name matches the component name. Returns the target compendium UUID, or null.
    *
-   * @param {string} sourceUuid - The source UUID from the pack data
+   * @param {string} registeredItemUuid - The source UUID from the pack data
    * @param {string} name - Component name (case-insensitive match)
    * @param {string[]} targetPackIds - Optional filter to specific pack IDs
    * @returns {Promise<string|null>}
    * @private
    */
-  async _findBySourceAndName(sourceUuid, name, targetPackIds) {
-    if (!sourceUuid || !name) return null;
+  async _findBySourceAndName(registeredItemUuid, name, targetPackIds) {
+    if (!registeredItemUuid || !name) return null;
     const nameLower = name.trim().toLowerCase();
 
     const packs = game.packs ? [...game.packs] : [];
@@ -568,7 +568,7 @@ export class CompendiumImporter {
         if (entryName !== nameLower) continue;
 
         const entrySource = entry._stats?.compendiumSource || entry.flags?.core?.sourceId || null;
-        if (entrySource === sourceUuid) {
+        if (entrySource === registeredItemUuid) {
           return `Compendium.${pack.collection}.${entry._id}`;
         }
       }

@@ -85,7 +85,7 @@ class FakeItem {
 
 /**
  * Install a crafting system with name-matched managed components + tools.
- * `Hammer` is the STEP-2 tool component (no sourceUuid -> matched by name).
+ * `Hammer` is the STEP-2 tool component (no registeredItemUuid -> matched by name).
  */
 function installSystem() {
   const system = {

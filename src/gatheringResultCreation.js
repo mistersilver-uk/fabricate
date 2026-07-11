@@ -43,7 +43,7 @@ export function resolveGatheringResultSource(result, system, craftingSystemManag
       ?.components?.find((entry) => entry.id === componentId) ??
     null;
   if (!component) return null;
-  if (component.sourceUuid) return resolveUuidSync(component.sourceUuid) ?? component;
+  if (component.registeredItemUuid) return resolveUuidSync(component.registeredItemUuid) ?? component;
   return component;
 }
 
@@ -68,7 +68,7 @@ export function normalizeFoundryCollection(collection) {
 export function gatheringRunItemRef(actor, item, quantity = 1) {
   return {
     actorUuid: actor?.uuid ?? null,
-    itemUuid: item?.uuid ?? item?.sourceUuid ?? null,
+    itemUuid: item?.uuid ?? item?.registeredItemUuid ?? null,
     quantity: Number.isFinite(Number(quantity)) && Number(quantity) > 0 ? Number(quantity) : 1,
   };
 }

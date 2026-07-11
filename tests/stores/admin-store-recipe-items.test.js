@@ -119,9 +119,9 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
   function buildStore(capture = []) {
     const system = makeSystem({
       recipeItemDefinitions: [
-        { id: 'primer', name: 'Primer', img: 'primer.png', sourceItemUuid: 'Item.aaa', enabled: true, caps: { item: { limitUses: true, maxUses: 2 }, learn: { limitLearning: false } } },
-        { id: 'codex', name: '', img: '', sourceItemUuid: 'Item.bbb', enabled: false, caps: {} },
-        { id: 'gone', name: 'Torn Page', sourceItemUuid: 'Item.zzz', caps: {} }
+        { id: 'primer', name: 'Primer', img: 'primer.png', originItemUuid: 'Item.aaa', enabled: true, caps: { item: { limitUses: true, maxUses: 2 }, learn: { limitLearning: false } } },
+        { id: 'codex', name: '', img: '', originItemUuid: 'Item.bbb', enabled: false, caps: {} },
+        { id: 'gone', name: 'Torn Page', originItemUuid: 'Item.zzz', caps: {} }
       ]
     });
     const recipes = [
@@ -136,8 +136,8 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     // Migrated shape: membership lives on the books; a recipe may belong to SEVERAL.
     const system = makeSystem({
       recipeItemDefinitions: [
-        { id: 'book-a', name: 'Book A', sourceItemUuid: 'Item.aaa', recipeIds: ['r1', 'r2'], caps: {} },
-        { id: 'book-b', name: 'Book B', sourceItemUuid: 'Item.bbb', recipeIds: ['r2'], caps: {} }
+        { id: 'book-a', name: 'Book A', originItemUuid: 'Item.aaa', recipeIds: ['r1', 'r2'], caps: {} },
+        { id: 'book-b', name: 'Book B', originItemUuid: 'Item.bbb', recipeIds: ['r2'], caps: {} }
       ]
     });
     const recipes = [
@@ -160,9 +160,9 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     const capture = [];
     const system = makeSystem({
       recipeItemDefinitions: [
-        { id: 'book-a', name: 'A', sourceItemUuid: 'Item.aaa', recipeIds: ['r1'], caps: {} },
-        { id: 'book-b', name: 'B', sourceItemUuid: 'Item.bbb', recipeIds: [], caps: {} },
-        { id: 'book-c', name: 'C', sourceItemUuid: 'Item.ccc', recipeIds: ['r1', 'r2'], caps: {} }
+        { id: 'book-a', name: 'A', originItemUuid: 'Item.aaa', recipeIds: ['r1'], caps: {} },
+        { id: 'book-b', name: 'B', originItemUuid: 'Item.bbb', recipeIds: [], caps: {} },
+        { id: 'book-c', name: 'C', originItemUuid: 'Item.ccc', recipeIds: ['r1', 'r2'], caps: {} }
       ]
     });
     const store = createAdminStore(

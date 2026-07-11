@@ -50,8 +50,8 @@ function makeComponent(overrides = {}) {
   return {
     id: 'comp1',
     name: 'Iron Ore',
-    sourceItemUuid: 'Compendium.source.items.iron-ore',
-    fallbackItemIds: [],
+    originItemUuid: 'Compendium.source.items.iron-ore',
+    aliasItemUuids: [],
     ...overrides
   };
 }
@@ -159,10 +159,10 @@ test('T-097: exact UUID match retains UUID, method=exact', async () => {
   assert.equal(remap.method, 'exact', 'Method should be exact');
   assert.equal(remap.newUuid, 'Compendium.source.items.iron-ore', 'UUID should be retained');
 
-  // System component should have unchanged sourceItemUuid
+  // System component should have unchanged originItemUuid
   const createdSystem = createdSystems[0];
   const comp = createdSystem.components[0];
-  assert.equal(comp.sourceItemUuid, 'Compendium.source.items.iron-ore', 'sourceItemUuid unchanged on exact match');
+  assert.equal(comp.originItemUuid, 'Compendium.source.items.iron-ore', 'originItemUuid unchanged on exact match');
 });
 
 test('exact match snapshots live img/description onto an SRD-backed component that omitted them', async () => {
@@ -191,7 +191,7 @@ test('exact match snapshots live img/description onto an SRD-backed component th
     system: {
       id: 'test-system',
       name: 'Test System',
-      components: [makeComponent({ id: 'smiths', name: "Smith's Tools", sourceItemUuid: 'Compendium.dnd5e.items.Item.smiths' })]
+      components: [makeComponent({ id: 'smiths', name: "Smith's Tools", originItemUuid: 'Compendium.dnd5e.items.Item.smiths' })]
     }
   });
 
@@ -270,8 +270,8 @@ test('T-097: source+name match remaps UUID, old UUID added to fallbacks', async 
 
   // Old UUID should be in fallbacks
   const comp = createdSystems[0].components[0];
-  assert.ok(comp.fallbackItemIds.includes('Compendium.source.items.iron-ore'),
-    'Old UUID should be added to fallbackItemIds');
+  assert.ok(comp.aliasItemUuids.includes('Compendium.source.items.iron-ore'),
+    'Old UUID should be added to aliasItemUuids');
 
   // Reset
   globalThis.game = { ...globalThis.game, packs: [] };
@@ -292,7 +292,7 @@ test('T-097: unresolved component reported correctly', async () => {
 
   assert.equal(summary.components.unresolved.length, 1, 'One component unresolved');
   assert.equal(summary.components.unresolved[0].componentId, 'comp1');
-  assert.equal(summary.components.unresolved[0].sourceItemUuid, 'Compendium.source.items.iron-ore');
+  assert.equal(summary.components.unresolved[0].originItemUuid, 'Compendium.source.items.iron-ore');
 });
 
 test('T-097: fallback IDs retained on re-import when retainFallbackIds=true', async () => {
@@ -306,8 +306,8 @@ test('T-097: fallback IDs retained on re-import when retainFallbackIds=true', as
       {
         id: 'comp1',
         name: 'Iron Ore',
-        sourceUuid: 'Compendium.source.items.iron-ore',
-        fallbackItemIds: ['Item.existing-fallback-id']
+        registeredItemUuid: 'Compendium.source.items.iron-ore',
+        aliasItemUuids: ['Item.existing-fallback-id']
       }
     ]
   };
@@ -336,7 +336,7 @@ test('T-097: fallback IDs retained on re-import when retainFallbackIds=true', as
 
   const updatedSystem = updatedSystems[0] || createdSystems[0];
   const comp = updatedSystem.components[0];
-  assert.ok(comp.fallbackItemIds.includes('Item.existing-fallback-id'),
+  assert.ok(comp.aliasItemUuids.includes('Item.existing-fallback-id'),
     'Existing fallback ID should be retained on re-import');
 });
 
@@ -358,9 +358,9 @@ test('T-097: additional fallback IDs merged from options', async () => {
   });
 
   const comp = createdSystems[0].components[0];
-  assert.ok(comp.fallbackItemIds.includes('Item.manual-fallback-1'),
+  assert.ok(comp.aliasItemUuids.includes('Item.manual-fallback-1'),
     'Additional fallback 1 should be merged');
-  assert.ok(comp.fallbackItemIds.includes('Item.manual-fallback-2'),
+  assert.ok(comp.aliasItemUuids.includes('Item.manual-fallback-2'),
     'Additional fallback 2 should be merged');
 });
 

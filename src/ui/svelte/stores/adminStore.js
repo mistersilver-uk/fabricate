@@ -419,8 +419,8 @@ function _buildManagedItemOptions(managedItems = []) {
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg',
     description: _plainTextDescription(item.description),
-    ...(item.sourceItemUuid ? { sourceItemUuid: item.sourceItemUuid } : {}),
-    ...(item.sourceUuid ? { sourceUuid: item.sourceUuid } : {}),
+    ...(item.originItemUuid ? { originItemUuid: item.originItemUuid } : {}),
+    ...(item.registeredItemUuid ? { registeredItemUuid: item.registeredItemUuid } : {}),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty')
       ? { difficulty: item.difficulty }
       : {}),
@@ -832,15 +832,25 @@ function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID)
   // First-class tool source references + display snapshot (issue 561). This is the DRAFT-PATH
   // twin of `CraftingSystemManager._normalizeTool`; the fields MUST be retained here or the
   // draft strips them (the normalizer-strips-unknown-fields trap).
-  const sourceItemUuid = tool.sourceItemUuid || tool.sourceUuid || null;
-  const sourceUuid = tool.sourceUuid || tool.sourceItemUuid || null;
+  // New-name-first, legacy-name-tolerant (issue 560): accept the renamed
+  // `registeredItemUuid`/`originItemUuid`/`aliasItemUuids` and the pre-rename (issue 560)
+  // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`, emitting the new names.
+  const originItemUuid =
+    tool.originItemUuid || tool.registeredItemUuid || tool.sourceItemUuid || tool.sourceUuid || null;
+  const registeredItemUuid =
+    tool.registeredItemUuid || tool.originItemUuid || tool.sourceUuid || tool.sourceItemUuid || null;
   const primaryRefs = new Set(
-    [sourceUuid, sourceItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
+    [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
   );
-  const fallbackItemIds = Array.isArray(tool.fallbackItemIds)
+  const rawAliasItemUuids = Array.isArray(tool.aliasItemUuids)
+    ? tool.aliasItemUuids
+    : Array.isArray(tool.fallbackItemIds)
+      ? tool.fallbackItemIds
+      : null;
+  const aliasItemUuids = Array.isArray(rawAliasItemUuids)
     ? [
         ...new Set(
-          tool.fallbackItemIds
+          rawAliasItemUuids
             .filter((ref) => typeof ref === 'string')
             .map((ref) => ref.trim())
             .filter((ref) => ref && !primaryRefs.has(ref))
@@ -854,9 +864,9 @@ function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID)
     componentId,
     name: typeof tool.name === 'string' && tool.name ? tool.name : null,
     img: typeof tool.img === 'string' && tool.img ? tool.img : null,
-    sourceUuid,
-    sourceItemUuid,
-    fallbackItemIds,
+    registeredItemUuid,
+    originItemUuid,
+    aliasItemUuids,
     requirement: _normalizeToolRequirement(tool.requirement),
     breakage: _normalizeToolBreakage(tool.breakage),
     onBreak: _normalizeToolOnBreak(tool.onBreak),
@@ -1544,7 +1554,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       recipeItemId,
       recipeItemName: recipeItemDefinition?.name || '',
       recipeItemImg: recipeItemDefinition?.img || '',
-      recipeItemSourceUuid: recipeItemDefinition?.sourceItemUuid || '',
+      recipeItemSourceUuid: recipeItemDefinition?.originItemUuid || '',
       isSimple: display.isSimple,
       stepCount: display.stepCount,
       resultGroupCount: display.resultGroupCount,
@@ -1566,7 +1576,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
  * Mirrors _prepareContext item logic from RecipeManagerApp.
  */
 function _sourceUuidForItemCard(item) {
-  return item?.sourceItemUuid || item?.sourceUuid || '';
+  return item?.originItemUuid || item?.registeredItemUuid || '';
 }
 
 function _sourceOriginForUuid(uuid, sourceMissing = false) {
@@ -1662,17 +1672,17 @@ function _recipeItemDefinitionsContaining(definitions, recipe) {
 // resolved name/img/type, linked `recipes[]`, and `learnedByCount` are filled in
 // asynchronously by `_enrichRecipeItemLibrary` before the phase-2 publish.
 function _projectRecipeItemDefinitionSync(def) {
-  const sourceItemUuid = def?.sourceItemUuid || '';
+  const originItemUuid = def?.originItemUuid || '';
   return {
     id: def?.id || '',
-    sourceItemUuid,
+    originItemUuid,
     img: def?.img || '',
     description: def?.description || '',
     enabled: def?.enabled !== false,
     // Book membership (issue 511 many-to-many) — the recipe ids this book contains.
     recipeIds: Array.isArray(def?.recipeIds) ? def.recipeIds.map((id) => String(id)) : [],
     caps: _clonePlain(def?.caps || {}),
-    resolvedName: def?.name || _recipeItemLabelFromUuid(sourceItemUuid) || 'Recipe item',
+    resolvedName: def?.name || _recipeItemLabelFromUuid(originItemUuid) || 'Recipe item',
     resolvedImg: def?.img || 'icons/svg/item-bag.svg',
     derivedType: _recipeItemTypeFromRecipeCount(0),
     linkMissing: false,
@@ -1743,7 +1753,7 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
 
   const actorIndex = _buildLearnedRecipeActorIndex();
   const resolved = await Promise.all(
-    items.map((item) => _resolveRecipeItemSource(item.sourceItemUuid))
+    items.map((item) => _resolveRecipeItemSource(item.originItemUuid))
   );
 
   return items.map((item, index) => {
@@ -1786,9 +1796,9 @@ async function _buildItemCards(
   return Promise.all(
     items.map(async (item) => {
       const description = _plainTextDescription(item.description);
-      const sourceUuidDisplay = _sourceUuidForItemCard(item);
-      const sourceMissing = await _sourceMissingForUuid(sourceUuidDisplay);
-      const sourceOrigin = _sourceOriginForUuid(sourceUuidDisplay, sourceMissing);
+      const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
+      const sourceMissing = await _sourceMissingForUuid(registeredItemUuidDisplay);
+      const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
       return {
         ...item,
         img: item.img || 'icons/svg/item-bag.svg',
@@ -1803,8 +1813,8 @@ async function _buildItemCards(
               quantity,
             }))
           : [],
-        sourceUuidDisplay,
-        hasSourceUuid: Boolean(sourceUuidDisplay),
+        registeredItemUuidDisplay,
+        hasRegisteredItemUuid: Boolean(registeredItemUuidDisplay),
         sourceMissing,
         ...sourceOrigin,
         salvageSummary: _buildSalvageSummary(item, showSalvage),
@@ -1848,7 +1858,8 @@ function _essenceUsageItems(essenceId, managedItems) {
 function _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem }) {
   if (!sourceComponentId && !sourceItemUuid) return 'none';
   if (!associatedItem) return 'stale';
-  if (associatedItem.sourceItemUuid || associatedItem.sourceUuid || sourceItemUuid) return 'linked';
+  if (associatedItem.originItemUuid || associatedItem.registeredItemUuid || sourceItemUuid)
+    return 'linked';
   return 'missing';
 }
 
@@ -1859,13 +1870,13 @@ function _sourceFieldsForEssenceSelection(system, sourceComponentId, sourceItemU
     const associatedItem = managedItemById.get(sourceComponentId) || null;
     return {
       sourceComponentId,
-      sourceItemUuid: associatedItem?.sourceItemUuid || associatedItem?.sourceUuid || null,
+      sourceItemUuid: associatedItem?.originItemUuid || associatedItem?.registeredItemUuid || null,
       associatedSystemItemId: sourceComponentId,
     };
   }
   if (sourceItemUuid) {
     const associatedItem = managedItemOptions.find(
-      (item) => item.sourceItemUuid === sourceItemUuid || item.sourceUuid === sourceItemUuid
+      (item) => item.originItemUuid === sourceItemUuid || item.registeredItemUuid === sourceItemUuid
     );
     return {
       sourceComponentId: associatedItem?.id || null,
@@ -1889,7 +1900,7 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
       ? { id: sourceItem.id, name: sourceItem.name, img: sourceItem.img }
       : null;
     const sourceItemUuid =
-      def.sourceItemUuid || sourceItem?.sourceItemUuid || sourceItem?.sourceUuid || null;
+      def.sourceItemUuid || sourceItem?.originItemUuid || sourceItem?.registeredItemUuid || null;
     const componentUsageCount = _essenceUsageCount(def.id, managedItems);
     const componentUsageItems = _essenceUsageItems(def.id, managedItems);
     const sourceState = _essenceSourceState({
@@ -7240,7 +7251,7 @@ export function createAdminStore(services) {
   }
 
   // Persist the full recipe-item editor draft in a single call (issue 511, PR-B).
-  // The router owns the draft and passes the complete `{ enabled, sourceItemUuid,
+  // The router owns the draft and passes the complete `{ enabled, originItemUuid,
   // caps }` snapshot; the manager patch accepts these fields. Refreshes projections
   // (resolved name/img/type + derived recipes[]) on success.
   async function saveRecipeItem(recipeItemId, patch = {}) {

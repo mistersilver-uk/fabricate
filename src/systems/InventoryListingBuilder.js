@@ -426,7 +426,7 @@ export class InventoryListingBuilder {
     // Group the system's recipes by the book that contains them. Canonical read is
     // each definition's `recipeIds[]` (many-to-many — a recipe may appear under several
     // books). Falls back to the legacy reverse ref (`recipe.recipeItemId`, or
-    // `linkedRecipeItemUuid → definition sourceItemUuid`) only when no book carries
+    // `linkedRecipeItemUuid → definition originItemUuid`) only when no book carries
     // membership yet.
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
     const recipeList = Array.isArray(recipes) ? recipes : [];
@@ -453,7 +453,7 @@ export class InventoryListingBuilder {
       }
     } else {
       const defBySourceUuid = new Map(
-        definitions.filter((def) => def?.sourceItemUuid).map((def) => [def.sourceItemUuid, def.id])
+        definitions.filter((def) => def?.originItemUuid).map((def) => [def.originItemUuid, def.id])
       );
       for (const recipe of recipeList) {
         if (!eligible(recipe)) continue;

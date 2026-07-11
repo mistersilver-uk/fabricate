@@ -38,8 +38,8 @@ function cappedSystem(id = 'sys-1') {
       },
     },
     recipeItemDefinitions: [
-      { id: 'book-1', name: 'Book One', sourceItemUuid: 'Compendium.w.f.b1' },
-      { id: 'book-2', name: 'Book Two', sourceItemUuid: 'Compendium.w.f.b2' },
+      { id: 'book-1', name: 'Book One', originItemUuid: 'Compendium.w.f.b1' },
+      { id: 'book-2', name: 'Book Two', originItemUuid: 'Compendium.w.f.b2' },
     ],
   };
 }
@@ -75,7 +75,7 @@ test('an uncapped system seeds uncapped caps', () => {
     id: 'sys-u',
     name: 'Uncapped',
     recipeVisibility: { listMode: 'global', knowledge: { mode: 'item' } },
-    recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'Compendium.w.f.b1' }],
+    recipeItemDefinitions: [{ id: 'book-1', originItemUuid: 'Compendium.w.f.b1' }],
   };
   const out = migrateRecipeItemCapsPerItem({ systems: [system] });
 

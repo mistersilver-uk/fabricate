@@ -732,7 +732,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           const systemId = get(this._adminStore.selectedSystemId) || '';
           if (!systemId || !itemId) return;
           try {
-            await systemManager.updateItem(systemId, itemId, { sourceItemUuid: null });
+            await systemManager.updateItem(systemId, itemId, { originItemUuid: null });
             ui.notifications.info(localize('FABRICATE.Admin.Items.SourceUnlinked'));
             await this._adminStore.refresh();
           } catch (err) {

@@ -84,7 +84,7 @@ Provide GM action to import all items from a compendium into a crafting system.
 The action is a GM-only entry in the Foundry Compendium Directory context menu, offered on an Item compendium pack (the right-clicked pack is the compendium to import from) and hidden for non-GMs and for non-Item packs.
 Choosing it opens a target-system picker where the GM confirms which crafting system receives the items, so the import is a deliberate commit rather than a single-click action.
 The action reuses the existing bulk-import primitive and its de-duplication and update/skip reporting rather than reimplementing them.
-Items with the same UUID or sourceUuid are de-duplicated on import.
+Items with the same UUID or registeredItemUuid are de-duplicated on import.
 If an imported Item's recorded canonical source UUID no longer resolves,
 Fabricate falls back to the live dropped Item UUID.
 Single item and replace-source
@@ -760,7 +760,7 @@ The recipe item selector is **partially implemented** by a recipe-item link card
 Because recipe↔book membership is **many-to-many** (issue 511: `RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`), the card enumerates **every** book/scroll that teaches this recipe as a **list** rather than showing a single scalar link.
 Each list row previews that book's name/image/source status and offers Open item, Copy item UUID, and a per-book Unlink (also right-click) — Unlink removes the recipe from **that** book's membership only, leaving the recipe's other books intact.
 Below the list a compact drop zone links another book: dropping a Foundry Item links it via `addRecipeItemFromUuid` (which synthesizes or dedups a `RecipeItemDefinition`) and adds the recipe to its membership.
-Each row falls back to the legacy scalar `recipe.recipeItemId` only for a fully un-migrated system, and a row whose definition's `sourceItemUuid` no longer resolves shows a missing/stale state and retains the link.
+Each row falls back to the legacy scalar `recipe.recipeItemId` only for a fully un-migrated system, and a row whose definition's `originItemUuid` no longer resolves shows a missing/stale state and retains the link.
 The central `manager-main` holds the recipe identity card; the recipe-item card sits beside it in the shared inspector panel.
 Linking or unlinking applies immediately (through `setRecipeBookMembership`) and is independent of the identity Save draft, and unlinking does **not** delete the shared definition.
 The inspector panel is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and suppressed (full-width main) for `learned`.

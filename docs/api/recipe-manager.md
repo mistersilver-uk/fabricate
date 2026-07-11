@@ -158,7 +158,7 @@ Returns the component's `name` field if found.
 Falls back to the localised string `FABRICATE.Labels.UnknownComponent` ("Unknown Component") when the component does not exist or `componentId` is null.
 
 This is a synchronous method and does not fetch from Foundry's item database.
-Use `resolveComponentNameAsync` when the component has a `sourceUuid` and you need the linked item's name.
+Use `resolveComponentNameAsync` when the component has a `registeredItemUuid` and you need the linked item's name.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -176,7 +176,7 @@ console.log(name); // e.g. "Iron Ingot"
 ### resolveComponentNameAsync(recipe, componentId)
 
 Async variant of `resolveComponentName`.
-Attempts to resolve the component's `sourceUuid` via `fromUuid()` first and returns the linked item's name when found.
+Attempts to resolve the component's `registeredItemUuid` via `fromUuid()` first and returns the linked item's name when found.
 Falls back to the component's stored `name`, then to "Unknown Component" on broken references.
 
 | Parameter | Type | Description |

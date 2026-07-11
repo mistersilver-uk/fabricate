@@ -61,7 +61,7 @@
     if (typeof globalThis.fromUuid !== 'function') {
       const next = {};
       for (const def of defs) {
-        const uuid = String(def?.sourceItemUuid || '');
+        const uuid = String(def?.originItemUuid || '');
         if (!uuid) next[def.id] = { name: '', img: '', missing: true };
       }
       resolvedByDefId = next;
@@ -70,7 +70,7 @@
     let cancelled = false;
     Promise.all(
       defs.map(async (def) => {
-        const uuid = String(def?.sourceItemUuid || '');
+        const uuid = String(def?.originItemUuid || '');
         if (!uuid) return [def.id, { name: '', img: '', missing: true }];
         try {
           const doc = await Promise.resolve(globalThis.fromUuid(uuid));
@@ -87,7 +87,7 @@
   });
 
   function definitionName(def) {
-    return resolvedByDefId[def.id]?.name || def?.name || String(def?.sourceItemUuid || '');
+    return resolvedByDefId[def.id]?.name || def?.name || String(def?.originItemUuid || '');
   }
   function definitionImg(def) {
     return resolvedByDefId[def.id]?.img || def?.img || DEFAULT_RECIPE_IMAGE;
@@ -166,12 +166,12 @@
   }
 
   function openItem(def) {
-    const uuid = String(def?.sourceItemUuid || '');
+    const uuid = String(def?.originItemUuid || '');
     if (uuid) onOpenItem(uuid);
   }
 
   function copyItemUuid(def) {
-    const uuid = String(def?.sourceItemUuid || '');
+    const uuid = String(def?.originItemUuid || '');
     if (uuid) onCopyItemUuid(uuid);
   }
 </script>
@@ -201,7 +201,7 @@
             <img class="manager-environment-scene-thumb" src={definitionImg(def)} alt="" />
             <button type="button" class="manager-environment-scene-name" onclick={(event) => { event.stopPropagation(); openItem(def); }} title={text('FABRICATE.Admin.Manager.Recipe.OpenItem', 'Open item')}>{definitionName(def)}</button>
           {/if}
-          <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Recipe.CopyItemUuid', 'Copy item UUID')} title={text('FABRICATE.Admin.Manager.Recipe.CopyItemUuid', 'Copy item UUID')} disabled={!def?.sourceItemUuid} onclick={(event) => { event.stopPropagation(); copyItemUuid(def); }}><i class="fas fa-copy" aria-hidden="true"></i></button>
+          <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Recipe.CopyItemUuid', 'Copy item UUID')} title={text('FABRICATE.Admin.Manager.Recipe.CopyItemUuid', 'Copy item UUID')} disabled={!def?.originItemUuid} onclick={(event) => { event.stopPropagation(); copyItemUuid(def); }}><i class="fas fa-copy" aria-hidden="true"></i></button>
           <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')} title={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')} onclick={(event) => { event.stopPropagation(); unlinkDefinition(def); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
         </li>
       {/each}

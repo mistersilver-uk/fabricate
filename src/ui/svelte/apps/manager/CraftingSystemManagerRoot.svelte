@@ -1297,12 +1297,12 @@
   );
   const canSaveRecipeItemEdit = $derived(recipeItemEditDirty === true && recipeItemEditSaving !== true);
   // The linked linked world item for the editor's Overview preview: resolve from the
-  // DRAFT's sourceItemUuid (so a staged link change updates the preview) against the
+  // DRAFT's originItemUuid (so a staged link change updates the preview) against the
   // projected recipe item's resolved fields, then the world-item options.
   const recipeItemEditorLinkedItem = $derived.by(() => {
-    const uuid = String(recipeItemDraft?.sourceItemUuid || '');
+    const uuid = String(recipeItemDraft?.originItemUuid || '');
     if (!uuid) return null;
-    const persisted = (recipeItemDefinitions || []).find((def) => def.sourceItemUuid === uuid);
+    const persisted = (recipeItemDefinitions || []).find((def) => def.originItemUuid === uuid);
     if (persisted) {
       return {
         uuid,
@@ -2758,7 +2758,7 @@
     services?.onUnlinkSource?.(itemId);
   }
 
-  function openComponentSource(uuid = selectedComponent?.sourceUuidDisplay) {
+  function openComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
     if (!uuid) return;
     services?.onOpenSource?.(uuid);
   }
@@ -3523,7 +3523,7 @@
     try {
       const result = await store.saveRecipeItem?.(recipeItemDraft.id, {
         enabled: recipeItemDraft.enabled !== false,
-        sourceItemUuid: recipeItemDraft.sourceItemUuid ?? null,
+        originItemUuid: recipeItemDraft.originItemUuid ?? null,
         recipeIds: Array.isArray(recipeItemDraft.recipeIds) ? recipeItemDraft.recipeIds : [],
         caps: recipeItemDraft.caps || {},
       });
@@ -3558,11 +3558,11 @@
 
   // Link / unlink the linked world item behind the edited recipe item (staged).
   function linkRecipeItemSource(uuid) {
-    patchRecipeItemDraft({ sourceItemUuid: uuid || null });
+    patchRecipeItemDraft({ originItemUuid: uuid || null });
   }
 
   function unlinkRecipeItemSource() {
-    patchRecipeItemDraft({ sourceItemUuid: null });
+    patchRecipeItemDraft({ originItemUuid: null });
   }
 
   // Add / remove a recipe on the edited book. Membership lives on the book, so these
@@ -3621,14 +3621,14 @@
     return index >= 0 && index < environmentList.length - 1;
   }
 
-  function copyComponentSource(uuid = selectedComponent?.sourceUuidDisplay) {
+  function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
     if (!uuid) return;
     services?.onCopySourceUuid?.(uuid);
   }
 
   function selectedEssenceSourceUuid() {
     if (!selectedEssenceForInspector?.associatedItem) return '';
-    return selectedEssenceForInspector.sourceItemUuid || selectedEssenceForInspector.associatedItem.sourceItemUuid || '';
+    return selectedEssenceForInspector.sourceItemUuid || selectedEssenceForInspector.associatedItem.originItemUuid || '';
   }
 
   function copySelectedEssenceSource() {
@@ -6545,12 +6545,12 @@
 
           <section class="manager-inspector-card" data-component-section="source">
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Source', 'Source')}</h3>
-            {#if selectedComponent.hasSourceUuid}
+            {#if selectedComponent.hasRegisteredItemUuid}
               <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SourceHint', 'This component keeps a stored source ID for import matching and replacement.')}</p>
               {#if selectedComponent.sourceMissing}
                 <p class="environment-stale-warning" data-component-source-missing>{text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</p>
               {/if}
-              <button type="button" class="manager-button" data-component-action="copy-source" title={selectedComponent.sourceUuidDisplay} onclick={() => copyComponentSource(selectedComponent.sourceUuidDisplay)}>
+              <button type="button" class="manager-button" data-component-action="copy-source" title={selectedComponent.registeredItemUuidDisplay} onclick={() => copyComponentSource(selectedComponent.registeredItemUuidDisplay)}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')}</span>
               </button>

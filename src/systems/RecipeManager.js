@@ -1051,7 +1051,7 @@ export class RecipeManager {
         return true;
 
       // Source-UUID matching failed — fall back to an exact (case-insensitive) name
-      // match, even when the component carries a sourceUuid. Foundry's transitive
+      // match, even when the component carries a registeredItemUuid. Foundry's transitive
       // `_stats.duplicateSource` points at the ORIGINAL template rather than the
       // component's own source item, so an inventory copy of a component that was
       // built by copying another item as a template (a common GM workflow) has no
@@ -1199,7 +1199,7 @@ export class RecipeManager {
   }
 
   /**
-   * Resolve the display name for a managed component, resolving sourceUuid via fromUuid()
+   * Resolve the display name for a managed component, resolving registeredItemUuid via fromUuid()
    * when the component has one. Falls back gracefully on broken references.
    *
    * @param {Recipe} recipe
@@ -1212,9 +1212,9 @@ export class RecipeManager {
     const component = this._getComponent(recipe, componentId);
     if (!component)
       return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
-    if (component.sourceUuid && typeof fromUuid === 'function') {
+    if (component.registeredItemUuid && typeof fromUuid === 'function') {
       try {
-        const item = await fromUuid(component.sourceUuid);
+        const item = await fromUuid(component.registeredItemUuid);
         if (item?.name) return item.name;
       } catch {
         // Broken reference — fall through to component.name
@@ -1290,7 +1290,7 @@ export class RecipeManager {
     const systemManager = game?.fabricate?.getCraftingSystemManager?.();
     const recipeItemUuid = recipe?.recipeItemId
       ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)
-          ?.sourceItemUuid
+          ?.originItemUuid
       : null;
     const fallbackUuid = recipeItemUuid || recipe?.linkedRecipeItemUuid;
 

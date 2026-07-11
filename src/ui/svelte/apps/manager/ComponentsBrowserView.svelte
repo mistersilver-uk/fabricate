@@ -394,8 +394,8 @@
               </span>
             {/if}
             <span role="cell" class="manager-action-group manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}>
-              {#if item.hasSourceUuid}
-                <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Component.CopySourceNamed', 'Copy source UUID for {name}').replace('{name}', item.name)} title={item.sourceUuidDisplay} onclick={() => onCopySourceUuid(item.sourceUuidDisplay)}>
+              {#if item.hasRegisteredItemUuid}
+                <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Component.CopySourceNamed', 'Copy source UUID for {name}').replace('{name}', item.name)} title={item.registeredItemUuidDisplay} onclick={() => onCopySourceUuid(item.registeredItemUuidDisplay)}>
                   <i class="fas fa-copy" aria-hidden="true"></i>
                 </button>
               {/if}
