@@ -822,16 +822,41 @@ function _normalizeToolOnBreak(input) {
 
 function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID) {
   const id = String(tool.id || randomID());
+  // `label` is the user-authored display override — distinct from the `name`/`img` display
+  // snapshot and never written by snapshot capture/migration (issue 561, R2-2).
   const rawLabel = typeof tool.label === 'string' ? tool.label.trim() : '';
   const componentId =
     typeof tool.componentId === 'string' && tool.componentId.trim()
       ? tool.componentId.trim()
       : null;
+  // First-class tool source references + display snapshot (issue 561). This is the DRAFT-PATH
+  // twin of `CraftingSystemManager._normalizeTool`; the fields MUST be retained here or the
+  // draft strips them (the normalizer-strips-unknown-fields trap).
+  const sourceItemUuid = tool.sourceItemUuid || tool.sourceUuid || null;
+  const sourceUuid = tool.sourceUuid || tool.sourceItemUuid || null;
+  const primaryRefs = new Set(
+    [sourceUuid, sourceItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
+  );
+  const fallbackItemIds = Array.isArray(tool.fallbackItemIds)
+    ? [
+        ...new Set(
+          tool.fallbackItemIds
+            .filter((ref) => typeof ref === 'string')
+            .map((ref) => ref.trim())
+            .filter((ref) => ref && !primaryRefs.has(ref))
+        ),
+      ]
+    : [];
   return {
     id,
     label: rawLabel,
     enabled: tool.enabled !== false,
     componentId,
+    name: typeof tool.name === 'string' && tool.name ? tool.name : null,
+    img: typeof tool.img === 'string' && tool.img ? tool.img : null,
+    sourceUuid,
+    sourceItemUuid,
+    fallbackItemIds,
     requirement: _normalizeToolRequirement(tool.requirement),
     breakage: _normalizeToolBreakage(tool.breakage),
     onBreak: _normalizeToolOnBreak(tool.onBreak),
@@ -2336,6 +2361,47 @@ export function createAdminStore(services) {
     return success ? created : null;
   }
 
+  /**
+   * Register a first-class item-sourced Tool from a dropped Item uuid (issue 561, B1). Unlike
+   * `addToolToDraft({ componentId })` (which links a managed component), this creates a tool
+   * with `componentId: null` carrying its OWN source refs + `name`/`img` snapshot and stamps
+   * the durable `roles[systemId].toolId` on the source Item — no component import required.
+   * Persists directly through the manager (mirroring the persisted-tool delete path), then
+   * seeds the new tool into the draft + baseline so it renders immediately and is not dirty.
+   *
+   * @param {string} itemUuid
+   * @returns {Promise<boolean>}
+   */
+  async function addToolFromUuidToDraft(itemUuid) {
+    const uuid = String(itemUuid || '');
+    if (!uuid) return false;
+    const systemId = String(get(toolsDraftSystemId) || get(selectedSystemId) || '');
+    if (!systemId) return false;
+    const systemManager = services.getCraftingSystemManager?.();
+    if (typeof systemManager?.addToolFromUuid !== 'function') return false;
+    try {
+      const result = await systemManager.addToolFromUuid(systemId, uuid);
+      const created = result?.item
+        ? _normalizeGatheringLibraryTool(result.item, _randomID)
+        : null;
+      if (!created) return false;
+      const current = Array.isArray(get(toolsDraft)) ? get(toolsDraft) : [];
+      const baseline = Array.isArray(get(toolsDraftBaseline)) ? get(toolsDraftBaseline) : [];
+      toolsDraft.set([...current, _clonePlain(created)]);
+      toolsDraftBaseline.set([...baseline, _clonePlain(created)]);
+      toolsDraftSelectedToolId.set(created.id);
+      toolsDraftExpandedToolId.set(created.id);
+      _recomputeToolsDraftDirty();
+      _patchToolsDraftViewState();
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to add tool from item:', err);
+      services.notify?.error?.(err?.message || 'Failed to add tool from item');
+      return false;
+    }
+  }
+
   function updateToolInDraft(toolId, patch = {}) {
     if (!toolId || typeof patch !== 'object' || patch === null) return false;
     return updateToolsDraft((list) =>
@@ -2358,10 +2424,19 @@ export function createAdminStore(services) {
       toolsDraftSaving.set(true);
       _patchToolsDraftViewState();
       try {
-        const live = _systemTools(systemId);
-        const next = live.filter((tool) => String(tool.id) !== id);
-        const persisted = await _persistSystemTools(systemId, next);
-        if (persisted === null) return false;
+        // Prefer the manager's `deleteTool` so a first-class tool's durable
+        // `roles[systemId].toolId` leaf is cleared from its source Item (issue 561, D7) —
+        // a whetstone's sibling `componentId` leaf survives. Fall back to a whole-list
+        // persist for a manager that predates it (e.g. legacy test fixtures).
+        const systemManager = services.getCraftingSystemManager?.();
+        if (typeof systemManager?.deleteTool === 'function') {
+          await systemManager.deleteTool(systemId, id);
+        } else {
+          const live = _systemTools(systemId);
+          const next = live.filter((tool) => String(tool.id) !== id);
+          const persisted = await _persistSystemTools(systemId, next);
+          if (persisted === null) return false;
+        }
         toolsDraftBaseline.set(baseline.filter((tool) => String(tool.id) !== id));
       } finally {
         toolsDraftSaving.set(false);
@@ -7620,6 +7695,7 @@ export function createAdminStore(services) {
     enterToolsDraft,
     updateToolsDraft,
     addToolToDraft,
+    addToolFromUuidToDraft,
     updateToolInDraft,
     deleteToolFromDraft,
     selectDraftTool,
