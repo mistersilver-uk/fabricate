@@ -4,7 +4,11 @@ import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringTo
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { accumulateItemEssences } from '../utils/essenceResolver.js';
-import { itemIsComponentByDurableIdentity, itemResolvesToComponent } from '../utils/sourceUuid.js';
+import {
+  itemResolvesToComponent,
+  itemResolvesToTool,
+  itemIsToolByDurableIdentity,
+} from '../utils/sourceUuid.js';
 
 import { buildCurrencyAffordProbe } from './currencyAffordance.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -1065,65 +1069,53 @@ export class RecipeManager {
   }
 
   /**
-   * Check whether a concrete item satisfies a Tool's component reference.
-   *
-   * A Tool references a managed component by id; an item satisfies the tool when
-   * it matches that component's source reference chain (or, for sourceless
-   * components, by name). This is the primary generic component matcher reused by
-   * both recipe crafting and gathering tool validation.
+   * Check whether a concrete item satisfies a Tool's PRESENCE requirement — the wide,
+   * non-destructive gate (issue 561). A first-class Tool carries its OWN source references,
+   * so the owned item is resolved against the system's Tools library directly (durable
+   * `roles[systemId].toolId` first, then source-ref intersection) — NOT through a managed
+   * component. It falls back to an exact, case-insensitive match on the tool's snapshot name
+   * (the linked component's name for a migrated componentId-tool), so an un-restamped
+   * template copy still satisfies presence.
    *
    * @param {Recipe} recipe
-   * @param {{componentId?: string, systemItemId?: string}} tool
+   * @param {object} tool - A first-class library Tool
    * @param {Item} item
    * @returns {boolean}
    */
   toolMatchesItem(recipe, tool, item) {
-    const componentId = tool.componentId || tool.systemItemId;
-    if (!componentId) return false; // No componentId means the tool cannot be matched.
-    const managedItem = this._getComponent(recipe, componentId);
-    if (!managedItem) return false;
-    // Prefer a source-UUID (or component-id flag) match; fall back to an exact,
-    // case-insensitive name match — mirroring ingredientMatchesItem — so a
-    // template-copied tool item (whose transitive `_stats.duplicateSource` points at
-    // the original template rather than this component's source) still satisfies it.
-    if (
-      itemResolvesToComponent(
-        item,
-        managedItem,
-        this._getSystemComponents(recipe),
-        recipe?.craftingSystemId
-      )
-    )
-      return true;
-    return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
+    if (!tool) return false;
+    const tools = this._getSystemTools(recipe);
+    if (itemResolvesToTool(item, tool, tools, recipe?.craftingSystemId)) return true;
+    // Snapshot-name fallback (presence only, never destructive): the item-sourced tool's
+    // own snapshot name, or the linked component's name for a migrated componentId-tool.
+    const fallbackName =
+      tool.name || this._getComponent(recipe, tool.componentId || tool.systemItemId)?.name || '';
+    if (!fallbackName) return false;
+    return item?.name?.toLowerCase() === fallbackName.toLowerCase();
   }
 
   /**
-   * Whether an owned item may be selected for a Tool's **usage or breakage** — the
-   * narrow durable-identity gate (issue 557). Mirrors {@link toolMatchesItem} in
-   * resolving `tool.componentId || tool.systemItemId` to a managed component, but
-   * delegates to {@link itemIsComponentByDurableIdentity}, which accepts ONLY the
-   * durable-flag identity or the item's own uuid/compendium source — never a
+   * Whether an owned item may be selected for a Tool's **usage or breakage** — the narrow
+   * durable-identity gate (issue 561, superseding the component-scoped #557 gate). Delegates
+   * to {@link itemIsToolByDurableIdentity}, which accepts ONLY the tool's own durable
+   * identity (`roles[systemId].toolId`) or the item's own uuid/compendium source — never a
    * transitive `_stats.duplicateSource` reference and never a name fallback.
    *
-   * This is the destructive-path counterpart to the wide {@link toolMatchesItem}
-   * presence matcher (which is unchanged): an item that satisfies presence only by
-   * duplicate-source or name is NOT selected to be consumed or destroyed.
+   * This is the destructive-path counterpart to the wide {@link toolMatchesItem} presence
+   * matcher: an item that satisfies presence only by duplicate-source or name is NOT
+   * selected to be consumed or destroyed.
    *
    * @param {Recipe} recipe
-   * @param {{componentId?: string, systemItemId?: string}} tool
+   * @param {object} tool - A first-class library Tool
    * @param {Item} item
    * @returns {boolean}
    */
   toolMatchesItemByIdentity(recipe, tool, item) {
-    const componentId = tool?.componentId || tool?.systemItemId;
-    if (!componentId) return false; // No componentId means the tool cannot be matched.
-    const managedItem = this._getComponent(recipe, componentId);
-    if (!managedItem) return false;
-    return itemIsComponentByDurableIdentity(
+    if (!tool || tool.id == null) return false;
+    return itemIsToolByDurableIdentity(
       item,
-      managedItem,
-      this._getSystemComponents(recipe),
+      tool,
+      this._getSystemTools(recipe),
       recipe?.craftingSystemId
     );
   }
@@ -1334,6 +1326,20 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     return Array.isArray(system?.components) ? system.components : [];
+  }
+
+  /**
+   * Resolve the first-class Tools library for a recipe's crafting system (issue 561),
+   * mirroring {@link _getSystemComponents}. The single source of truth the tool matchers
+   * resolve owned items against.
+   * @private
+   */
+  _getSystemTools(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) return [];
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    return Array.isArray(system?.tools) ? system.tools : [];
   }
 
   /**

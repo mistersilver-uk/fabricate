@@ -12,10 +12,18 @@ import assert from 'node:assert/strict';
 
 import { resolveItemUuidToTool } from '../../src/canvas/interactableItemResolution.js';
 import { classifyInteractableDrop } from '../../src/canvas/interactableResolution.js';
+import { deriveToolSourceFromComponents } from '../../src/migration/migrateToolsToFirstClass.js';
 
-// A component carries source-uuid refs; a tool references it by componentId.
+// A first-class Tool (issue 561) carries its OWN source refs, derived from its linked
+// component via the SAME shared helper `_normalizeSystem` / the migration uses, so the
+// resolver matches a dropped item against the tool directly, not through a component.
 function systemWith({ id, tools, components }) {
-  return { id, tools, components };
+  const derivedTools = (tools || []).map((tool) => {
+    const clone = { ...tool };
+    deriveToolSourceFromComponents(clone, components || []);
+    return clone;
+  });
+  return { id, tools: derivedTools, components };
 }
 
 // World item with a uuid that a component claims as its source.
@@ -75,30 +83,33 @@ test('matches via the compendium source-uuid chain (resolveComponentForItem raw-
   assert.deepEqual(match, { systemId: 'sysB', toolId: 'tool-axe' });
 });
 
-test('A3 - #559: a dropped item whose durable identity names a DIFFERENT component is not resolved to a Tool via an inherited duplicateSource', () => {
-  // The system has the tool's component (comp-axe, source Item.axe-src) and an unrelated
-  // comp-other. The dropped item carries roles naming comp-other AND a duplicateSource
-  // resolving to comp-axe's source. On origin/main the flag-blind raw-ref fall-through
-  // matches comp-axe via duplicateSource and spawns the Woodaxe tile — the bug. After the
-  // fix the resolver reads roles, resolves comp-other, and the drop is left to Foundry.
+test('#559 / issue 561: a dropped item whose durable identity names a DIFFERENT tool is not mis-resolved via an inherited duplicateSource', () => {
+  // The system has tool-axe (source Item.axe-src) and an unrelated tool-other. The dropped
+  // item carries a durable `roles[sys].toolId` naming tool-other AND a duplicateSource
+  // overlapping tool-axe's source ref. A flag-blind raw-ref fall-through would match tool-axe
+  // via duplicateSource; the resolver instead honours the durable tool identity and resolves
+  // to tool-other, never the Woodaxe.
   const systems = [systemWith({
     id: 'sysA',
     components: [
       { id: 'comp-axe', sourceItemUuid: 'Item.axe-src' },
       { id: 'comp-other', sourceItemUuid: 'Item.other-src' }
     ],
-    tools: [{ id: 'tool-axe', componentId: 'comp-axe' }]
+    tools: [
+      { id: 'tool-axe', componentId: 'comp-axe' },
+      { id: 'tool-other', componentId: 'comp-other' }
+    ]
   })];
   const dropped = droppedItemWithComponentFlag({
     uuid: 'Item.dropped',
-    duplicateSource: 'Item.axe-src', // overlaps the tool component's source ref
-    roles: { sysA: { componentId: 'comp-other' } }
+    duplicateSource: 'Item.axe-src', // overlaps tool-axe's source ref
+    roles: { sysA: { toolId: 'tool-other' } }
   });
   const match = resolveItemUuidToTool('Item.dropped', {
     resolveItem: () => dropped,
     getSystems: () => systems
   });
-  assert.equal(match, null);
+  assert.deepEqual(match, { systemId: 'sysA', toolId: 'tool-other' }, 'durable tool identity wins over the duplicateSource overlap');
 });
 
 test('returns null when no tool component matches the item', () => {

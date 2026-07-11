@@ -1423,6 +1423,10 @@ function createStore(calls = [], options = {}) {
     deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args]),
     enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
     addToolToDraft: (...args) => calls.push(['addToolToDraft', ...args]),
+    addToolFromUuidToDraft: (...args) => {
+      calls.push(['addToolFromUuidToDraft', ...args]);
+      return true;
+    },
     updateToolInDraft: (toolId, patch = {}) => {
       calls.push(['updateToolInDraft', toolId, patch]);
       viewState.update((state) => ({
@@ -9048,7 +9052,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some((call) => call[0] === 'addToolToDraft' && call[1]?.componentId === 'c2'));
   });
 
-  it('imports an item dropped on the add-tool stub before creating the gathering tool', async () => {
+  it('creates a first-class item-sourced tool from a raw Item dropped on the add-tool stub (issue 561)', async () => {
     const calls = [];
     const importedDrops = [];
     target = document.createElement('div');
@@ -9071,6 +9075,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         }),
         services: {
           openCurrentAdmin: () => {},
+          // The rewired handler must NOT import the dropped Item as a component.
           importSingleManagedItemFromDrop: async (data) => {
             importedDrops.push(data);
             return { id: 'c2', name: 'Glass Vial' };
@@ -9097,8 +9102,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.deepEqual(importedDrops, [itemPayload]);
-    assert.ok(calls.some((call) => call[0] === 'addToolToDraft' && call[1]?.componentId === 'c2'));
+    // No component import (the removed authoring wart), and the drop routes to the
+    // first-class item-sourced tool registration with the Item uuid.
+    assert.deepEqual(importedDrops, []);
+    assert.ok(
+      calls.some(
+        (call) => call[0] === 'addToolFromUuidToDraft' && call[1] === 'Actor.hero.Item.glass-vial'
+      )
+    );
   });
 
   it('edits gathering tool requirements as a single expression without exposing provider selection', async () => {

@@ -23,7 +23,7 @@
  * real Foundry edges in {@link InteractableManager#_resolutionDeps}.
  */
 
-import { resolveComponentForItem } from '../utils/sourceUuid.js';
+import { resolveToolForItem } from '../utils/sourceUuid.js';
 
 /**
  * @param {string} uuid  The dropped Item uuid.
@@ -82,28 +82,23 @@ function orderByPreferredSystem(systems, preferredSystemId) {
 }
 
 /**
- * The id of the first Tool in `system` whose managed component matches `item`.
+ * The id of the first Tool in `system` the dropped `item` resolves to (issue 561).
+ *
+ * Now that a Tool is a first-class registered kind carrying its OWN source references, the
+ * dropped item is resolved DIRECTLY against the system's Tools library (durable
+ * `roles[systemId].toolId` first, then source-ref intersection, list-aware and scoped by
+ * this system's id) — so an item-sourced Tool that is NOT a component still resolves, and an
+ * item whose durable identity names a DIFFERENT tool is never mis-resolved via an inherited
+ * transitive `_stats.duplicateSource` (issue 559).
  *
  * @param {object} item   The resolved Foundry item.
- * @param {object} system A crafting system (`tools[]` + `components[]`).
+ * @param {object} system A crafting system (`tools[]`).
  * @returns {string|null}
  */
 function firstToolMatch(item, system) {
   const tools = Array.isArray(system?.tools) ? system.tools : [];
-  const components = Array.isArray(system?.components) ? system.components : [];
-  // Resolve the dropped item to the single component it IS, once, list-aware and
-  // scoped by this system's id — so an item whose durable identity names a
-  // DIFFERENT component is never resolved to a Tool via an inherited, transitive
-  // `_stats.duplicateSource` (issue 559).
-  const resolved = resolveComponentForItem(item, components, system?.id);
+  const resolved = resolveToolForItem(item, tools, system?.id);
   if (!resolved?.id) return null;
-  for (const tool of tools) {
-    const componentId = tool?.componentId;
-    if (!componentId) continue;
-    if (String(componentId) === String(resolved.id)) {
-      const toolId = String(tool?.id ?? '');
-      if (toolId) return toolId;
-    }
-  }
-  return null;
+  const toolId = String(resolved.id);
+  return toolId || null;
 }

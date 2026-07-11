@@ -383,6 +383,36 @@ Hooks.once('fabricate.ready', async () => {
 > The same deduplication logic applies.
 > See [Bulk compendium pack drop]({% link crafting-systems.md %}#bulk-compendium-pack-drop) for details.
 
+### addToolFromUuid(systemId, itemUuid)
+
+Registers a single Foundry Item document directly as a first-class [Tool]({% link tools.md %}) in the system's Tools library (issue 561).
+GM only.
+
+The Item does not need to be imported as a component first.
+The new tool carries its own source references and a name/image display snapshot captured from the Item, and `componentId` is `null`.
+The method stamps the durable tool identity flag (`flags.fabricate.roles[systemId].toolId`) on the source Item so future copies are recognised.
+An Item that is already a managed component can also be registered as a tool this way, in which case the Item carries both the component and tool role flags.
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `systemId` | `string` | System ID |
+| `itemUuid` | `string` | UUID of the Foundry item to register as a tool |
+
+**Returns:** `Promise<{ item: object, action: 'added' }>`
+
+**Throws:** `Error` if the system ID is not found, or if the UUID resolves to a non-Item document.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  const result = await mgr.addToolFromUuid(
+    'blacksmithing-system-id',
+    'Item.hammer123'
+  );
+  console.log(`Registered tool: ${result.item.name} (toolId: ${result.item.id})`);
+});
+```
+
 ### updateItem(systemId, itemId, updates)
 
 Updates a component's properties (tags, essences, difficulty, salvage).

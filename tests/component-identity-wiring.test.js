@@ -16,12 +16,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-function getProperty(object, path) {
-  if (!object || !path) return undefined;
-  return String(path)
-    .split('.')
-    .reduce((value, key) => (value == null ? undefined : value[key]), object);
-}
+import { getProperty, makeWorldItem } from './helpers/writeCapableItemFake.js';
 
 globalThis.foundry = {
   utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}`, getProperty },
@@ -36,38 +31,6 @@ const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
 const { component, componentSet, roleItem } = await import('./helpers/componentIdentityFixtures.js');
-
-// A world-item document with nested dotted-key flag support (mirrors getFabricateFlag's
-// double-nested storage `flags.fabricate.fabricate.<...>`).
-function makeWorldItem({ uuid, name = 'Item', duplicateSource = null, compendiumSource = null, pack = null }) {
-  return {
-    uuid,
-    name,
-    pack,
-    _stats: { duplicateSource, compendiumSource },
-    flags: {},
-    updates: [],
-    async update(patch) {
-      this.updates.push(patch);
-      if ('_stats.duplicateSource' in patch) this._stats.duplicateSource = patch['_stats.duplicateSource'];
-    },
-    getFlag(scope, key) {
-      return getProperty(this.flags?.[scope], key);
-    },
-    async setFlag(scope, key, value) {
-      const parts = key.split('.');
-      let node = (this.flags[scope] ??= {});
-      while (parts.length > 1) node = node[parts.shift()] ??= {};
-      node[parts[0]] = value;
-    },
-    async unsetFlag(scope, key) {
-      const parts = key.split('.');
-      let node = this.flags?.[scope];
-      while (node && parts.length > 1) node = node[parts.shift()];
-      if (node) delete node[parts[0]];
-    },
-  };
-}
 
 function buildManager(systemsById) {
   const mgr = new CraftingSystemManager({ getRecipes: () => [], deleteRecipe: async () => {}, updateRecipe: async () => {} });

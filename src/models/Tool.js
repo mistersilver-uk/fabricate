@@ -2,7 +2,17 @@
  * Represents a tool required to attempt a gathering task.
  *
  * Spec contract (002-data-models.md, gathering-and-harvesting):
- *   componentId:       string                 - required managed item reference
+ *   componentId:       string | null          - OPTIONAL managed-component link (issue 561);
+ *                                               null for a first-class tool registered from an
+ *                                               Item uuid, populated for a whetstone or a
+ *                                               migrated legacy tool (no longer the matching basis)
+ *   name / img:        string | null          - registration/migration display snapshot (issue 561);
+ *                                               NOT `label`, and not auto-refreshed on rename
+ *   sourceUuid /
+ *   sourceItemUuid /
+ *   fallbackItemIds:   string / string[]      - the tool's OWN source references (issue 561), the
+ *                                               matching basis; a valid tool carries EITHER a
+ *                                               componentId OR its own source references
  *   requirement:       null | {               - optional truthy-expression gate
  *     formula:         string                   // dice/roll expression
  *   }
@@ -96,9 +106,53 @@ function normalizeOnBreak(input) {
 
 export class Tool {
   constructor(data = {}) {
-    /** @type {string|null} Managed item reference inside a crafting system */
+    /**
+     * @type {string|null} OPTIONAL managed-component link (issue 561). A first-class
+     * tool registered from an Item uuid carries `componentId: null` and its own source
+     * references. A whetstone (also a component) or a tool migrated from a legacy
+     * componentId-tool keeps `componentId` populated for `onBreak.replaceWith` resolution
+     * and the UI's linked-component display, but it is no longer the matching basis.
+     */
     this.componentId =
       typeof data.componentId === 'string' && data.componentId ? data.componentId : null;
+
+    /**
+     * @type {string} OPTIONAL, pre-existing, USER-authored display label override. A
+     * distinct field — NOT part of the registration/migration display snapshot below,
+     * which is `name` + `img` only. Never written by snapshot capture, migration, or any
+     * refresh, so a GM's authored label is never clobbered.
+     */
+    this.label = typeof data.label === 'string' ? data.label : '';
+
+    /**
+     * @type {string|null} Display-snapshot name captured at registration/migration
+     * (issue 561). NOT auto-refreshed on source-Item rename (recipe-item parity). Used as
+     * the presence name-fallback string and the UI display source for an item-sourced tool.
+     */
+    this.name = typeof data.name === 'string' && data.name ? data.name : null;
+
+    /** @type {string|null} Display-snapshot image, captured with {@link Tool#name}. */
+    this.img = typeof data.img === 'string' && data.img ? data.img : null;
+
+    /** @type {string|null} The tool's own registered source document uuid. */
+    this.sourceUuid =
+      typeof data.sourceUuid === 'string' && data.sourceUuid ? data.sourceUuid : null;
+
+    /** @type {string|null} The tool's own canonical/compendium source uuid. */
+    this.sourceItemUuid =
+      typeof data.sourceItemUuid === 'string' && data.sourceItemUuid ? data.sourceItemUuid : null;
+
+    /** @type {string[]} Additional source references for runtime matching. */
+    this.fallbackItemIds = Array.isArray(data.fallbackItemIds)
+      ? [
+          ...new Set(
+            data.fallbackItemIds
+              .filter((id) => typeof id === 'string')
+              .map((id) => id.trim())
+              .filter(Boolean)
+          ),
+        ]
+      : [];
 
     /** @type {{formula: string}|null} Optional truthy-expression gate */
     this.requirement =
@@ -120,8 +174,12 @@ export class Tool {
   validate() {
     const errors = [];
 
-    if (!this.componentId) {
-      errors.push('componentId is required');
+    // A first-class tool is valid with EITHER a managed-component link (`componentId`)
+    // OR its own source references (`sourceUuid`/`sourceItemUuid`); a tool with NEITHER
+    // cannot be matched, so it is invalid (issue 561).
+    const hasSourceRefs = !!(this.sourceUuid || this.sourceItemUuid);
+    if (!this.componentId && !hasSourceRefs) {
+      errors.push('a tool requires either a componentId or its own source references');
     }
 
     if (this.requirement && !this.requirement.formula) {
@@ -175,7 +233,9 @@ export class Tool {
     } else if (this.onBreak.mode === 'replaceWith') {
       if (!this.onBreak.replacementComponentId) {
         errors.push('onBreak.replacementComponentId is required for replaceWith mode');
-      } else if (this.onBreak.replacementComponentId === this.componentId) {
+      } else if (this.componentId && this.onBreak.replacementComponentId === this.componentId) {
+        // Only meaningful when the tool HAS a componentId; a null-component (item-sourced)
+        // tool can never collide with its own component id, so the differ-check is skipped.
         errors.push('onBreak.replacementComponentId must differ from componentId');
       }
     }
@@ -189,6 +249,12 @@ export class Tool {
   toJSON() {
     return {
       componentId: this.componentId,
+      label: this.label,
+      name: this.name,
+      img: this.img,
+      sourceUuid: this.sourceUuid,
+      sourceItemUuid: this.sourceItemUuid,
+      fallbackItemIds: [...this.fallbackItemIds],
       requirement: this.requirement ? { ...this.requirement } : null,
       breakage: { ...this.breakage },
       onBreak: { ...this.onBreak },

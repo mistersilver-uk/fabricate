@@ -40,6 +40,10 @@ export const SETTING_KEYS = Object.freeze({
   // that writes `flags.fabricate.roles[systemId].componentId` on registered component
   // sources. Bumped past `COMPONENT_FLAG_STAMP_TARGET` once the pass has run.
   COMPONENT_FLAG_STAMP_VERSION: 'componentFlagStampVersion',
+  // Issue 561: version stamp for the one-shot primary-GM TOOL durable-flag backfill that
+  // writes `flags.fabricate.roles[systemId].toolId` on registered tool sources. Bumped past
+  // `TOOL_FLAG_STAMP_TARGET` once the pass has run.
+  TOOL_FLAG_STAMP_VERSION: 'toolFlagStampVersion',
 });
 
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
@@ -51,6 +55,11 @@ export const RECIPE_ITEM_FLAG_STAMP_TARGET = 1;
 // stored `COMPONENT_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill
 // once on `ready` and writes this value back.
 export const COMPONENT_FLAG_STAMP_TARGET = 1;
+
+// The target version for the one-shot tool flag auto-stamp (issue 561). When the stored
+// `TOOL_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once on `ready`
+// (AFTER the 1.15.0 settings-data migration populates tool source refs) and writes it back.
+export const TOOL_FLAG_STAMP_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.RECIPES]: {
@@ -207,6 +216,13 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION]: {
     name: 'Component Flag Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.TOOL_FLAG_STAMP_VERSION]: {
+    name: 'Tool Flag Stamp Version',
     scope: 'world',
     config: false,
     type: Number,

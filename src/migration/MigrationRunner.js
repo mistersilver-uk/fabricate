@@ -30,6 +30,7 @@ import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringH
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
+import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
 import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
@@ -298,6 +299,15 @@ const MIGRATIONS = [
       'alchemy.checkMode (none/simple/tiered); strip resultSelection; collapse multi-ingredient-set alchemy recipes',
     migrate(data) {
       return migrateAlchemyCheckMode(data);
+    },
+  },
+  {
+    version: '1.15.0',
+    label:
+      'Convert legacy componentId-referencing library Tools into first-class tools carrying ' +
+      'their own source references + name/img display snapshot (componentId preserved)',
+    migrate(data) {
+      return migrateToolsToFirstClass(data.systems);
     },
   },
   // Future migrations added here in version order

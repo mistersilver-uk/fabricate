@@ -25,6 +25,9 @@ Author the tool once in the crafting system's **Tools** library with the **Limit
 
 1. **Add the tool component.** In your crafting system's **Components** tab, add the tool item as a managed component.
    If you plan to replace the tool with a broken variant on break, also add that broken-tool variant as a separate component.
+   You only need a managed component when you use the **Replace with** action below.
+   For the other on-break actions you can skip this step and drop the Item straight onto the Tools page instead, creating an item-sourced tool.
+   See [Authoring a Tool]({% link tools.md %}#authoring-a-tool).
 2. **Open the Tools library** for the system and click *Add tool*.
    Pick the tool component and optionally set a display label.
 3. **Pick the Limited uses breakage mode** and set **Max uses** to the number of crafts the tool survives (for example 50).

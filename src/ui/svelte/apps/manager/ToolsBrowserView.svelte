@@ -76,23 +76,47 @@
     return managedItemMap.get(String(componentId)) || null;
   }
 
+  // A first-class item-sourced tool (issue 561) carries its OWN source refs + a name/img
+  // display snapshot and has componentId: null. A component-linked / whetstone tool reads its
+  // display from the managed component. This distinction drives display + the source chip.
+  function isItemSourcedTool(tool) {
+    return !tool?.componentId && !!(tool?.name || tool?.sourceItemUuid || tool?.sourceUuid);
+  }
+
   function toolImage(tool) {
-    return managedItem(tool?.componentId)?.img || 'icons/svg/item-bag.svg';
+    if (tool?.componentId) return managedItem(tool.componentId)?.img || 'icons/svg/item-bag.svg';
+    return tool?.img || 'icons/svg/item-bag.svg';
   }
 
   function toolPrimaryLabel(tool) {
     const label = String(tool?.label || '').trim();
     if (label) return label;
-    const componentName = managedItem(tool?.componentId)?.name;
-    if (componentName) return String(componentName);
+    if (tool?.componentId) {
+      const componentName = managedItem(tool.componentId)?.name;
+      if (componentName) return String(componentName);
+    }
+    if (tool?.name) return String(tool.name);
     return text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No tool name');
   }
 
   function toolSecondary(tool) {
-    const rarity = managedItem(tool?.componentId)?.rarity;
     const baseLabel = text('FABRICATE.Admin.Manager.Tools.SecondaryLabel', 'Tool');
+    if (isItemSourcedTool(tool)) {
+      return `${baseLabel} · ${text('FABRICATE.Admin.Manager.Tools.SourceItem', 'Item source')}`;
+    }
+    const rarity = managedItem(tool?.componentId)?.rarity;
     if (rarity) return `${baseLabel} · ${rarity}`;
     return `${baseLabel} · ${text('FABRICATE.Admin.Manager.Tools.SecondaryRarityFallback', 'Common')}`;
+  }
+
+  function sourceChipClass(tool) {
+    return isItemSourcedTool(tool) ? 'manager-chip is-positive' : 'manager-chip is-neutral';
+  }
+
+  function sourceChipLabel(tool) {
+    return isItemSourcedTool(tool)
+      ? text('FABRICATE.Admin.Manager.Tools.SourceItem', 'Item source')
+      : text('FABRICATE.Admin.Manager.Tools.SourceComponent', 'Component');
   }
 
   function requirementChipClass(tool) {
@@ -398,11 +422,13 @@
     </div>
 
     {#if tools.length === 0}
-      <div class="manager-empty is-compact manager-tools-empty">
+      <div class="manager-empty is-compact manager-tools-empty"
+        data-manager-tools-empty-drop
+        use:dragDrop={{ onDrop: handleAddToolDrop, activeClass: 'is-drop-active' }}>
         <div>
           <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
           <h3>{text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No tools yet')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.EmptyHint', 'Add a reusable tool that gathering tasks can require.')}</p>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.EmptyHintDrop', 'Add a reusable tool that gathering tasks can require, or drop an Item here to create one directly.')}</p>
           <button type="button" class="manager-button is-primary" onclick={() => onAddTool?.()}>
             <i class="fas fa-plus" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Tools.Add', 'Add tool')}</span>
@@ -446,6 +472,10 @@
                 </div>
               </div>
               <div class="manager-tools-row-summary">
+                <span class={sourceChipClass(tool)} data-manager-tool-source-kind={isItemSourcedTool(tool) ? 'item' : 'component'}>
+                  <i class={isItemSourcedTool(tool) ? 'fas fa-file-import' : 'fas fa-cube'} aria-hidden="true"></i>
+                  <span>{sourceChipLabel(tool)}</span>
+                </span>
                 <span class={requirementChipClass(tool)}>
                   <i class="fas fa-shield-halved" aria-hidden="true"></i>
                   <span>{requirementChipLabel(tool)}</span>
@@ -488,6 +518,14 @@
                             <span class="manager-system-name">{managedItem(tool.componentId)?.name || text('FABRICATE.Admin.Manager.Tools.OverviewComponentMissing', 'Not set')}</span>
                           </span>
                         </button>
+                      {:else if isItemSourcedTool(tool)}
+                        <div class="manager-gathering-task-identity manager-tool-item-source" data-manager-tool-item-source={tool.id}>
+                          <img class="manager-gathering-task-thumb" src={toolImage(tool)} alt="" />
+                          <span class="manager-system-copy">
+                            <span class="manager-system-name">{tool.name || text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No tool name')}</span>
+                            <span class="manager-system-description">{text('FABRICATE.Admin.Manager.Tools.SourceItem', 'Item source')}</span>
+                          </span>
+                        </div>
                       {:else}
                         <div class="manager-gathering-task-identity manager-drop-empty-component is-empty">
                           <span class="manager-inline-drop-zone" aria-hidden="true">
@@ -506,9 +544,11 @@
                     <span>{text('FABRICATE.Admin.Manager.Tools.LabelField', 'Display label')}</span>
                     <input type="text"
                       value={tool.label || ''}
-                      placeholder={managedItem(tool.componentId)?.name || ''}
+                      placeholder={managedItem(tool.componentId)?.name || tool.name || ''}
                       oninput={(event) => onUpdateTool?.(tool.id, { label: event.currentTarget.value })} />
-                    <span class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
+                    <span class="manager-muted">{isItemSourcedTool(tool)
+                      ? text('FABRICATE.Admin.Manager.Tools.LabelHintItem', 'Optional. Falls back to the source item name.')
+                      : text('FABRICATE.Admin.Manager.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
                   </label>
                 </div>
 

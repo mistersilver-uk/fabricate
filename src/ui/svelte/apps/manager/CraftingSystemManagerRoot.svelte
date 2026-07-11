@@ -3238,14 +3238,18 @@
 
   async function addToolFromDrop(data) {
     if (!data) return false;
+    // A managed-component drop still links the tool to that component (whetstone / component-
+    // linked tool).
     if (data.type === 'FabricateManagedComponent') {
       const componentId = data.componentId || data.id;
       if (!componentId) return false;
       return store.addToolToDraft?.({ componentId }) ?? false;
     }
-    const item = await services?.importSingleManagedItemFromDrop?.(data);
-    if (!item?.id) return false;
-    return store.addToolToDraft?.({ componentId: item.id }) ?? false;
+    // A raw Item drop creates a FIRST-CLASS item-sourced tool from the Item uuid (issue 561,
+    // B1) — no component import. The tool carries its own source refs + snapshot and a null
+    // componentId.
+    if (!data.uuid) return false;
+    return (await store.addToolFromUuidToDraft?.(data.uuid)) ?? false;
   }
 
   function gatheringConditionOptions(kind) {

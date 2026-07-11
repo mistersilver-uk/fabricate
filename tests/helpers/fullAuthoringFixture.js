@@ -67,8 +67,13 @@ export function buildFullAuthoringFixture() {
     tools: [
       {
         id: 'sys-tool-hammer',
+        // A first-class tool (issue 561) carrying its own source refs + snapshot, so the
+        // KEEP-mode round-trip is symmetric (the import-time upcast is a no-op).
         name: 'Smithing Hammer',
         componentId: 'comp-ore',
+        sourceUuid: 'Compendium.world.items.Item.iron-ore',
+        sourceItemUuid: 'Compendium.world.items.Item.iron-ore',
+        fallbackItemIds: [],
         breakage: { enabled: true, chance: 10 },
         onBreak: { action: 'consume', replacementComponentId: 'comp-ore' },
       },

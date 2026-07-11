@@ -287,6 +287,21 @@ This is DISTINCT from a multi-STEP
 4. Idempotent once no alchemy `resultSelection` remains and each alchemy system has a
    `checkMode` (re-run ⇒ no mutation, no duplicate warn, stable `checkMode`).
 
+### Tools First-Class Migration (`1.15.0`, per system, idempotent)
+
+Issue 561 makes a Tool a first-class registered kind carrying its OWN source references plus a `name` + `img` display snapshot, so tool matching no longer routes through a managed component.
+The `1.15.0` settings-data migration (`migrateToolsToFirstClass.js`) reads and writes the `craftingSystems` payload as pure data.
+
+1. For each `system.tools[]` entry that holds a `componentId` but no own source references, copy the referenced component's `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` and its `name` / `img` snapshot onto the tool (`deriveToolSourceFromComponents`), so a world that matched a tool yesterday matches it today.
+`componentId` is PRESERVED as a non-load-bearing link for `onBreak.replaceWith` resolution and the UI's linked-component display; the pre-existing user-authored `label` is NEVER written.
+2. A tool already carrying its own source references, or one whose `componentId` no longer resolves, is left as-is (the dangling case degrades to presence-by-name / componentId display, exactly as a dangling component reference does today); the migration never throws.
+3. The same `deriveToolSourceFromComponents` derivation runs on every `_normalizeSystem` load, so a component-linked tool authored after the migration (for example by dropping a managed component) and a copy-imported tool acquire their source references and snapshot without a re-run.
+4. Durable identity is a SEPARATE Item-flag concern.
+The migration cannot stamp `flags.fabricate.roles[systemId].toolId` (it has no Item handle), so the one-shot `ready`-body `autoStampToolSources` pass — gated by `TOOL_FLAG_STAMP_VERSION`, primary-GM only, NOT a `MigrationRunner` entry — stamps existing tools' source Items AFTER the migration has persisted the source references it reads.
+A bulk-imported tool is not stamped by that one-shot (version-gated to run once per world) and matches by raw source-reference intersection until a manual **Repair Item Data**, identical to imported components.
+
+This migration was authored as `1.14.0` in the change plan and renumbered to `1.15.0` when issue 545's alchemy check-mode migration took the `1.14.0` slot first.
+
 ### Recipe Item Library Migration (Pre-Release)
 
 The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUuid` values with system-owned recipe item definitions.

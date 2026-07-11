@@ -1335,7 +1335,8 @@ Tool usage/breakage semantics for terminal gathering attempts:
 - Gathering tasks do not draw Tools from component source actors; tool presence and terminal tool usage/breakage are both evaluated against the selected acting actor.
 - Terminal tool usage/breakage is applied only after the gathering outcome has resolved to `succeeded` or `failed`.
 - A virtual-present Tool injected by a canvas Tool station (`presentTools`, system-scoped) satisfies the gate without an owned item and is excluded from usage/breakage.
-- Tool **presence** uses the wide shared matcher, but terminal tool **usage/breakage** applies only to an owned item matching the required tool by **durable-identity matching** per `data-models` (durable flag, or the item's own uuid/compendium source — never a transitive `_stats.duplicateSource` reference and never name alone).
+- A required tool resolves to a first-class per-system library Tool carrying its OWN source references and durable `flags.fabricate.roles[systemId].toolId` identity (issue 561); tool matching resolves the owned item against the Tool's own identity, not through a managed component.
+- Tool **presence** uses the wide shared matcher (durable `roles[systemId].toolId`, the Tool's own source references, then its snapshot-name fallback), but terminal tool **usage/breakage** applies only to an owned item matching the required tool by **durable-identity matching** per `data-models` (the Tool's own `roles[systemId].toolId`, or the item's own uuid/compendium source — never a transitive `_stats.duplicateSource` reference and never name alone).
 A presence-only match is spared from usage/breakage and recorded as skipped, and where an actor owns both, the durable-identity item is the one used or broken.
 - Under `CraftingSystem.toolBreakage.authority === "checkDriven"`, the active gathering check's `checkBreakage` triggers decide whether **all required tools** break for the attempt via the single shared evaluator (`evaluateCheckBreakage`), reaching parity with crafting and salvage; each Tool's own `breakage.mode` is ignored except `immune`.
 This is orthogonal to the realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`), which still governs whether a broken tool fails the gather outcome and is applied independently.
@@ -1395,7 +1396,7 @@ The `successDespiteBreak` policy leaves the outcome untouched.
 Either way, tool destruction/flagging/replacement always commits.
 7. The terminal response includes a `usedTools` array describing each matched tool's breakage decision and on-break action.
 8. Legacy tasks without a `tools` field normalize to `tools: []` on load; no migration runner entry is required.
-9. Tool authoring is rejected when `componentId` is missing, when a `replaceWith` action uses the same id as the tool's component, or when mode-specific fields are absent or out of range (`maxUses` not a positive integer, `breakageChance` not an integer in `0..100`, `formula` empty, `threshold` non-finite).
+9. Tool authoring is rejected when the tool carries NEITHER a `componentId` NOR its own source references (issue 561), when a `replaceWith` action uses the same id as the tool's `componentId` (checked only when `componentId` is present), or when mode-specific fields are absent or out of range (`maxUses` not a positive integer, `breakageChance` not an integer in `0..100`, `formula` empty, `threshold` non-finite).
 
 ## Canvas Gathering-Task Interactables
 
