@@ -357,9 +357,9 @@ export class CompendiumImporter {
   }
 
   /**
-   * Remap component sourceItemUuids using deterministic precedence:
+   * Remap component originItemUuids using deterministic precedence:
    *   1. Exact UUID match (fromUuid succeeds) — retain as-is
-   *   2. Source+name match in world packs — remap, old UUID added to fallbacks
+   *   2. Source+name match in world packs — remap, old UUID added to aliasItemUuids
    *   3. Unresolved — keep as-is, mark in summary
    *
    * @private
