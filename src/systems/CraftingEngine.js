@@ -24,6 +24,22 @@ import {
 import { SignatureValidator } from './SignatureValidator.js';
 
 /**
+ * A human-readable reference for a Tool in a missing-tool diagnostic (issue 561). A tool
+ * with a managed-component link keeps the historical `componentId: X` form; an item-sourced
+ * tool (`componentId: null`) falls back to its user-authored `label`, then its display-
+ * snapshot `name`, then its `id`, so the message never reads `componentId: null`. Display
+ * read only — no snapshot is written.
+ *
+ * @param {object|null} tool
+ * @returns {string}
+ */
+function toolDisplayReference(tool) {
+  const componentId = tool?.componentId || tool?.systemItemId;
+  if (componentId) return `componentId: ${componentId}`;
+  return tool?.label || tool?.name || tool?.id || 'unknown';
+}
+
+/**
  * Handles the actual crafting process
  * Validates ingredients, consumes items, creates outputs
  */
@@ -1959,7 +1975,7 @@ export class CraftingEngine {
       } else {
         return {
           valid: false,
-          message: `Missing required tool (componentId: ${tool?.componentId || tool?.systemItemId})`,
+          message: `Missing required tool (${toolDisplayReference(tool)})`,
         };
       }
     }
@@ -3219,7 +3235,7 @@ export class CraftingEngine {
     }
 
     for (const tool of missing.tools || []) {
-      lines.push(`Tool (componentId: ${tool.componentId || tool.systemItemId}): missing`);
+      lines.push(`Tool (${toolDisplayReference(tool)}): missing`);
     }
 
     return lines.join('\n');

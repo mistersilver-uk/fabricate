@@ -145,18 +145,19 @@ function warnUnsafeSystemIdOnce(systemId) {
 }
 
 /**
- * Read the per-system durable component identity claimed by an item's
- * `flags.fabricate.roles[systemId].componentId`, applying the hygiene rule:
- * an absent `roles`, an absent or empty `roles[systemId]`, or a nullish
- * `componentId` is NO claim (returns null). Tested BEFORE any membership check so
- * `{}` or `{ componentId: null }` (a restamp interrupted midway) can never
- * spuriously match a component whose id is itself nullish.
+ * Read the per-system durable identity a given ROLE claims for an item via
+ * `flags.fabricate.roles[systemId][roleKey]` (`roleKey` is `'componentId'`,
+ * `'toolId'`, …), applying the hygiene rule: an absent `roles`, an absent or empty
+ * `roles[systemId]`, or a nullish leaf is NO claim (returns null). Tested BEFORE any
+ * membership check so `{}` or `{ [roleKey]: null }` (a restamp interrupted midway)
+ * can never spuriously match a definition whose id is itself nullish.
  *
  * @param {Item|object|null} item
  * @param {string|null|undefined} systemId
- * @returns {string|null} The claimed component id, or null when there is no claim.
+ * @param {string} roleKey - The role leaf under `roles[systemId]` (e.g. `componentId`, `toolId`).
+ * @returns {string|null} The claimed id, or null when there is no claim.
  */
-function claimedRoleComponentId(item, systemId) {
+function claimedRoleId(item, systemId, roleKey) {
   // A `systemId` that is not a safe single dotted-path segment (absent, or containing
   // a `.` that `expandObject` would have nested on write) can never index the `roles`
   // map correctly, so it yields NO identity and the resolver degrades to raw refs —
@@ -166,23 +167,60 @@ function claimedRoleComponentId(item, systemId) {
   if (!roles || typeof roles !== 'object') return null;
   const perSystem = roles[systemId];
   if (!perSystem || typeof perSystem !== 'object') return null;
-  const componentId = perSystem.componentId;
-  return componentId == null ? null : componentId;
+  const claimed = perSystem[roleKey];
+  return claimed == null ? null : claimed;
 }
 
 /**
- * The two durable-flag tiers of component identity, shared by
- * {@link resolveComponentForItem} and {@link itemIsComponentByDurableIdentity}
- * so the flag hygiene and fall-through order live in exactly one place. Evaluated
- * as tiers WITH fall-through (the FIRST tier that names a component in the set
- * wins; a claimed id naming nothing in this set is irrelevant, so evaluation
- * falls through):
+ * The durable-flag tiers of a registered kind's identity, GENERALIZED over the
+ * per-system role leaf (`roleKey`) and the optional legacy scalar flag
+ * (`legacyScalarKey`), so the flag hygiene and fall-through order live in exactly one
+ * place for every kind (components and first-class tools). Evaluated as tiers WITH fall-through (the FIRST tier that names
+ * a definition in the set wins; a claimed id naming nothing in this set is irrelevant,
+ * so evaluation falls through):
  *
- *   1. identity (roles) — `flags.fabricate.roles[systemId].componentId` names a
- *      component in `candidates` ⇒ that component, exclusively.
- *   2. identity (legacy) — else the legacy scalar `flags.fabricate.componentId`
- *      names a component in the set ⇒ that component, exclusively (honored until
- *      the one-shot restamp backfills the map).
+ *   1. identity (roles) — `flags.fabricate.roles[systemId][roleKey]` names a definition
+ *      in `candidates` ⇒ that definition, exclusively.
+ *   2. identity (legacy) — when `legacyScalarKey != null`, else the legacy scalar
+ *      `flags.fabricate.<legacyScalarKey>` names a definition in the set ⇒ that
+ *      definition, exclusively (honored until the one-shot restamp backfills the map).
+ *      Components pass `legacyScalarKey: 'componentId'`; TOOLS pass `null` — they NEVER
+ *      had a legacy scalar flag, and calling `getFabricateFlag(item, null)` would read
+ *      the whole `fabricate` namespace as a spurious id (`normalizeFlagKey(null)` returns
+ *      `'fabricate'`), so the tier is guarded out entirely for a null key.
+ *
+ * @param {Item|object|null} item
+ * @param {Array<object>} candidates - The candidate definition set of ONE system.
+ * @param {string|null|undefined} systemId
+ * @param {{ roleKey: string, legacyScalarKey: string|null }} keys
+ * @returns {object|null} The durably-claimed definition, or null when no flag names one.
+ */
+function durableClaimedFromSet(item, candidates, systemId, { roleKey, legacyScalarKey }) {
+  // Tier 1: durable per-system identity map.
+  const roleId = claimedRoleId(item, systemId, roleKey);
+  if (roleId != null) {
+    const byRole = candidates.find((def) => def && def.id === roleId);
+    if (byRole) return byRole;
+  }
+
+  // Tier 2: legacy scalar identity, honored until the restamp backfills the map.
+  // Guarded on `legacyScalarKey != null` — a kind with no legacy scalar (tools) must
+  // NEVER read `getFabricateFlag(item, null)`.
+  if (legacyScalarKey != null) {
+    const legacyId = getFabricateFlag(item, legacyScalarKey, null);
+    if (legacyId != null) {
+      const byLegacy = candidates.find((def) => def && def.id === legacyId);
+      if (byLegacy) return byLegacy;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The two durable-flag tiers of COMPONENT identity — `durableClaimedFromSet` with the
+ * component role leaf and its legacy scalar. Preserved as a named helper for
+ * {@link resolveComponentForItem}.
  *
  * @param {Item|object|null} item
  * @param {Array<object>} candidates - The candidate component set of ONE system.
@@ -190,21 +228,10 @@ function claimedRoleComponentId(item, systemId) {
  * @returns {object|null} The durably-claimed component, or null when no flag names one.
  */
 function durableClaimedComponent(item, candidates, systemId) {
-  // Tier 1: durable per-system identity map.
-  const roleId = claimedRoleComponentId(item, systemId);
-  if (roleId != null) {
-    const byRole = candidates.find((component) => component && component.id === roleId);
-    if (byRole) return byRole;
-  }
-
-  // Tier 2: legacy scalar identity, honored until the restamp backfills the map.
-  const legacyId = getFabricateFlag(item, 'componentId', null);
-  if (legacyId != null) {
-    const byLegacy = candidates.find((component) => component && component.id === legacyId);
-    if (byLegacy) return byLegacy;
-  }
-
-  return null;
+  return durableClaimedFromSet(item, candidates, systemId, {
+    roleKey: 'componentId',
+    legacyScalarKey: 'componentId',
+  });
 }
 
 /**
@@ -266,56 +293,126 @@ export function resolveComponentForItem(item, components, systemId) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// First-class Tool identity (issue 561). A Tool carries its OWN source references
+// (identical field shape to a component), so its matching reuses
+// `getComponentSourceReferences` via the `getToolSourceReferences` alias below and a
+// PARALLEL resolver pair that shares the generalized `durableClaimedFromSet`
+// primitive with `{ roleKey: 'toolId', legacyScalarKey: null }` — tools never had a
+// legacy scalar flag. Kept parallel to (not folded into) the component functions
+// precisely because of that legacy-scalar asymmetry.
+// ---------------------------------------------------------------------------
+
 /**
- * Whether an owned item IS the given `component` by **durable-identity matching** —
- * the NARROW gate for destructive/consumptive tool selection (issue 557). Unlike
- * {@link resolveComponentForItem}, whose fall-through tier accepts the transitive
- * `_stats.duplicateSource` reference and (in the caller) a name fallback, this
- * predicate only accepts:
+ * Collect every UUID reference a first-class Tool can use for runtime matching — the
+ * union of its `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`. A thin alias of
+ * {@link getComponentSourceReferences} (identical field shape) so #560's later source-
+ * uuid field rename lands in one place.
  *
- *   1-2. the durable-flag identity ({@link durableClaimedComponent}); OR
- *   3. the item's OWN identity references — its live `uuid` or its compendium
- *      source ({@link getItemIdentityReferences}, which EXCLUDES the transitive
- *      `_stats.duplicateSource`) — intersecting a component's source refs.
+ * @param {object|null} tool - Tool-like object with source UUID fields
+ * @returns {string[]} Unique UUID references
+ */
+export const getToolSourceReferences = getComponentSourceReferences;
+
+/**
+ * Resolve which single first-class Tool an owned item IS, within ONE crafting system's
+ * Tools set, scoped by that system's id — the Tool-kind analogue of
+ * {@link resolveComponentForItem}. Evaluated as tiers WITH fall-through:
  *
- * There is NO name fallback. Sibling-exclusivity mirrors the resolver: the item is
- * resolved to the single component it durably IS within `components`, and matches
- * only when that is the target — so an item durably claiming component X never
- * matches sibling Y even if a raw ref happens to overlap. A world-template copy
- * carrying neither a durable flag nor a compendium source (only a transitive
- * `_stats.duplicateSource`) resolves to NO component here, so it is spared from
- * usage/breakage while still satisfying the wider presence gate elsewhere.
+ *   1. durable identity — `flags.fabricate.roles[systemId].toolId` names a tool in the
+ *      set ⇒ that tool, exclusively (tools have NO legacy scalar tier).
+ *   3. fall-through — else the item's raw source references (`uuid`, compendium source,
+ *      transitive `_stats.duplicateSource`) intersect a tool's; the first such tool.
  *
- * @param {Item|object|null} item - Item-like object with `uuid`, source metadata, and `getFlag`.
- * @param {object|null} component - The component to test durable identity against.
- * @param {Array<object>|null} components - The candidate set the identity is scoped to.
+ * @param {Item|object|null} item
+ * @param {Array<object>|null} tools - The candidate Tool set of ONE system.
+ * @param {string|null|undefined} systemId
+ * @returns {object|null} The single tool the item IS, or null.
+ */
+export function resolveToolForItem(item, tools, systemId) {
+  if (!item || typeof item !== 'object') return null;
+  const candidates = Array.isArray(tools) ? tools : [];
+  if (candidates.length === 0) return null;
+
+  if (systemId != null && !isSafeFlagKeySegment(systemId)) {
+    warnUnsafeSystemIdOnce(systemId);
+  }
+
+  const durable = durableClaimedFromSet(item, candidates, systemId, {
+    roleKey: 'toolId',
+    legacyScalarKey: null,
+  });
+  if (durable) return durable;
+
+  const itemRefs = new Set(getItemSourceReferences(item));
+  if (itemRefs.size === 0) return null;
+  return (
+    candidates.find((tool) => getToolSourceReferences(tool).some((ref) => itemRefs.has(ref))) ||
+    null
+  );
+}
+
+/**
+ * Boolean companion to {@link resolveToolForItem}: whether the item resolves, within
+ * `tools` scoped by `systemId`, to the specific `tool`.
+ *
+ * @param {Item|object|null} item
+ * @param {object|null} tool
+ * @param {Array<object>|null} tools
  * @param {string|null|undefined} systemId
  * @returns {boolean}
  */
-export function itemIsComponentByDurableIdentity(item, component, components, systemId) {
+export function itemResolvesToTool(item, tool, tools, systemId) {
+  if (!tool || tool.id == null) return false;
+  const resolved = resolveToolForItem(item, tools, systemId);
+  return resolved != null && resolved.id === tool.id;
+}
+
+/**
+ * Whether an owned item IS the given first-class `tool` by **durable-identity
+ * matching** — the NARROW gate for destructive/consumptive tool selection (issue 561,
+ * superseding the component-scoped #557 gate). The narrow counterpart of
+ * {@link resolveToolForItem}, matching against the tool's OWN identity. Accepts ONLY:
+ *
+ *   1. the durable-flag identity `flags.fabricate.roles[systemId].toolId`; OR
+ *   3. the item's OWN identity references — its live `uuid` or its compendium source
+ *      ({@link getItemIdentityReferences}, which EXCLUDES the transitive
+ *      `_stats.duplicateSource`) — intersecting a tool's source refs.
+ *
+ * There is NO name fallback and no legacy scalar tier. Sibling-exclusivity mirrors the
+ * resolver. A world-template copy carrying neither a durable flag nor a compendium
+ * source (only a transitive `_stats.duplicateSource`) resolves to NO tool here, so it is
+ * spared from usage/breakage while still satisfying the wider presence gate elsewhere.
+ *
+ * @param {Item|object|null} item
+ * @param {object|null} tool - The tool to test durable identity against.
+ * @param {Array<object>|null} tools - The candidate set the identity is scoped to.
+ * @param {string|null|undefined} systemId
+ * @returns {boolean}
+ */
+export function itemIsToolByDurableIdentity(item, tool, tools, systemId) {
   if (!item || typeof item !== 'object') return false;
-  if (!component || component.id == null) return false;
-  const candidates = Array.isArray(components) ? components : [];
+  if (!tool || tool.id == null) return false;
+  const candidates = Array.isArray(tools) ? tools : [];
   if (candidates.length === 0) return false;
 
   if (systemId != null && !isSafeFlagKeySegment(systemId)) {
     warnUnsafeSystemIdOnce(systemId);
   }
 
-  // Tiers 1-2: durable-flag identity is exclusive — a claimed component is the ONLY
-  // one this item matches, so a claim naming a sibling fails closed without falling
-  // through to raw refs.
-  const durable = durableClaimedComponent(item, candidates, systemId);
-  if (durable) return durable.id === component.id;
+  const durable = durableClaimedFromSet(item, candidates, systemId, {
+    roleKey: 'toolId',
+    legacyScalarKey: null,
+  });
+  if (durable) return durable.id === tool.id;
 
-  // Tier 3 (narrowed): the item's OWN identity refs (uuid + compendium source, NOT
-  // duplicate source) intersect a component's. Resolve to the first such component
-  // and match only when it is the target, mirroring the resolver's exclusivity.
   const itemRefs = new Set(getItemIdentityReferences(item));
   if (itemRefs.size === 0) return false;
   const resolved =
-    candidates.find((candidate) => itemSourceRefsIntersectComponent(itemRefs, candidate)) || null;
-  return resolved != null && resolved.id === component.id;
+    candidates.find((candidate) =>
+      getToolSourceReferences(candidate).some((ref) => itemRefs.has(ref))
+    ) || null;
+  return resolved != null && resolved.id === tool.id;
 }
 
 /**

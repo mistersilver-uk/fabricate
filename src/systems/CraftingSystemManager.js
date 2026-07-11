@@ -14,6 +14,7 @@ import {
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeChange.js';
+import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
 import {
   TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
@@ -26,8 +27,10 @@ import {
   getDuplicateSourceUuid,
   getComponentSourceReferences,
   getRecipeItemSourceReferences,
+  getToolSourceReferences,
   getItemIdentityReferences,
   resolveComponentForItem,
+  resolveToolForItem,
   matchRecipeItemDefinition,
 } from '../utils/sourceUuid.js';
 
@@ -96,6 +99,19 @@ export class CraftingSystemManager {
     return isSafeFlagKeySegment(systemId) ? `roles.${systemId}.componentId` : null;
   }
 
+  /**
+   * The durable per-system TOOL identity flag key `roles.<systemId>.toolId` (issue 561),
+   * or `null` when `systemId` is not a safe dotted-path segment. An additive SIBLING of
+   * `roles.<systemId>.componentId`: a whetstone that is both a component and a tool carries
+   * both leaves, and clearing the tool leaf never touches the component leaf. A null result
+   * means a stamp/clear/repair site must NOT write; the tool still resolves through the
+   * raw-reference fall-through.
+   * @private
+   */
+  _toolRoleFlagKey(systemId) {
+    return isSafeFlagKeySegment(systemId) ? `roles.${systemId}.toolId` : null;
+  }
+
   _normalizeSystem(system = {}) {
     const systemId = system.id || foundry.utils.randomID();
     const features = this._normalizeFeatures(system);
@@ -116,6 +132,19 @@ export class CraftingSystemManager {
       : [];
     const itemIds = new Set(items.map((i) => i.id));
     const itemById = new Map(items.map((i) => [i.id, i]));
+
+    // First-class Tools (issue 561): a component-linked tool (`componentId` set, no own
+    // source refs — e.g. authored by dropping a managed component, or an un-migrated legacy
+    // entry) derives its source refs + snapshot from its linked component here so it matches
+    // owned items by SOURCE (not just by name), continuous with the 1.14.0 migration and
+    // idempotent. Item-sourced tools (`componentId: null`) and already-derived tools are left
+    // untouched. Runs after component normalization so `items` is the resolved component set.
+    const normalizedTools = Array.isArray(system.tools)
+      ? system.tools.map((t) => this._normalizeTool(t))
+      : [];
+    for (const normalizedTool of normalizedTools) {
+      deriveToolSourceFromComponents(normalizedTool, items);
+    }
 
     const resolvedEssenceDefinitions = essenceDefinitions.map((def) => {
       const sourceComponentId =
@@ -213,7 +242,7 @@ export class CraftingSystemManager {
       // (`getSystem(id).tools`) — the recipe tool gate, salvage, the canvas
       // interactable browser, item-drop resolution, and gathering composition —
       // reads a single source of truth. Mirrors how `components` is normalized.
-      tools: Array.isArray(system.tools) ? system.tools.map((t) => this._normalizeTool(t)) : [],
+      tools: normalizedTools,
       // System-owned character prerequisite library (issue 544). Reusable
       // pass/fail conditions (`{ id, name, icon, path, op, value }`) the GM
       // authors in System Settings and attaches to gate learning a recipe from a
@@ -273,16 +302,43 @@ export class CraftingSystemManager {
   _normalizeTool(tool = {}) {
     const normalizedTool = !tool || typeof tool !== 'object' ? {} : tool;
     const id = String(normalizedTool.id || foundry.utils.randomID());
+    // `label` is the PRE-EXISTING, user-authored display override — distinct from the
+    // `name`/`img` display snapshot below and NEVER written by snapshot capture,
+    // migration, or refresh (issue 561, R2-2). Preserved untouched here.
     const label = typeof normalizedTool.label === 'string' ? normalizedTool.label.trim() : '';
     const componentId =
       typeof normalizedTool.componentId === 'string' && normalizedTool.componentId.trim()
         ? normalizedTool.componentId.trim()
         : null;
+    // First-class tool source references + `name`/`img` display snapshot (issue 561).
+    // Unknown-field stripping means these MUST be retained here (and in the draft-path
+    // twin `_normalizeGatheringLibraryTool` in adminStore.js) or they are silently dropped.
+    const sourceItemUuid = normalizedTool.sourceItemUuid || normalizedTool.sourceUuid || null;
+    const sourceUuid = normalizedTool.sourceUuid || normalizedTool.sourceItemUuid || null;
+    const primaryRefs = new Set(
+      [sourceUuid, sourceItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
+    );
+    const fallbackItemIds = Array.isArray(normalizedTool.fallbackItemIds)
+      ? [
+          ...new Set(
+            normalizedTool.fallbackItemIds
+              .filter((ref) => typeof ref === 'string')
+              .map((ref) => ref.trim())
+              .filter((ref) => ref && !primaryRefs.has(ref))
+          ),
+        ]
+      : [];
     return {
       id,
       label,
       enabled: normalizedTool.enabled !== false,
       componentId,
+      name:
+        typeof normalizedTool.name === 'string' && normalizedTool.name ? normalizedTool.name : null,
+      img: typeof normalizedTool.img === 'string' && normalizedTool.img ? normalizedTool.img : null,
+      sourceUuid,
+      sourceItemUuid,
+      fallbackItemIds,
       requirement: this._normalizeToolRequirement(normalizedTool.requirement),
       breakage: this._normalizeToolBreakage(normalizedTool.breakage),
       onBreak: this._normalizeToolOnBreak(normalizedTool.onBreak),
@@ -1287,6 +1343,26 @@ export class CraftingSystemManager {
     };
   }
 
+  /**
+   * Build a first-class Tool's source snapshot from an Item uuid (issue 561): the same
+   * union of source refs a component/recipe-item records, plus the `name` + `img` display
+   * snapshot — but NEVER `label` (that is a distinct user-authored override). Mirrors
+   * {@link _buildRecipeItemSourceSnapshot}; the description is intentionally omitted (a tool
+   * snapshot is name/img only).
+   * @private
+   */
+  async _buildToolSourceSnapshot(itemUuid, source = null) {
+    const sourceData = await this._resolveImportedComponentSourceData(itemUuid, source);
+    const fallbackName = itemUuid?.split('.')?.pop() || 'Imported Tool';
+    return {
+      name: source?.name || fallbackName,
+      img: source?.img || 'icons/svg/item-bag.svg',
+      sourceUuid: sourceData.currentUuid,
+      sourceItemUuid: sourceData.canonicalUuid,
+      fallbackItemIds: sourceData.fallbackItemIds,
+    };
+  }
+
   _buildFallbackSourceReferences(
     item,
     nextSourceUuid,
@@ -1740,6 +1816,73 @@ export class CraftingSystemManager {
     await this._stampSourceIdentity(source, 'recipeItemDefinitionId', item.id);
     await this.save();
     return { item, action: 'added' };
+  }
+
+  /**
+   * Register a first-class Tool DIRECTLY from an Item uuid (issue 561), with NO component
+   * import required. Resolves the source Item, builds the tool source snapshot (own source
+   * refs + `name`/`img`), pushes a `componentId: null` first-class tool onto `system.tools`,
+   * and stamps the durable `roles[systemId].toolId` on the source Item exactly as
+   * {@link addItemFromUuid} / {@link addRecipeItemFromUuid} stamp their kinds. GM-gated,
+   * dotted-id-safe (a null flag key skips the write), and save-persisted.
+   *
+   * @param {string} systemId
+   * @param {string} itemUuid
+   * @returns {Promise<{ item: object, action: 'added' }>}
+   */
+  async addToolFromUuid(systemId, itemUuid) {
+    this._assertGM('add tool from uuid');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    let source;
+    try {
+      source = await fromUuid(itemUuid);
+    } catch {
+      source = null;
+    }
+
+    if (source && source.documentName && source.documentName !== 'Item') {
+      throw new Error(`Cannot add non-Item document (${source.documentName}) as a tool`);
+    }
+
+    const snapshot = await this._buildToolSourceSnapshot(itemUuid, source);
+    const tool = this._normalizeTool({ ...snapshot, componentId: null });
+    if (!Array.isArray(system.tools)) system.tools = [];
+    system.tools.push(tool);
+
+    const flagKey = this._toolRoleFlagKey(system.id);
+    if (flagKey) await this._stampSourceIdentity(source, flagKey, tool.id);
+    await this.save();
+    return { item: tool, action: 'added' };
+  }
+
+  /**
+   * Remove a Tool from `system.tools` and clear ONLY its durable `roles[systemId].toolId`
+   * leaf from the source Item (issue 561, D7). The per-role leaf clear preserves any sibling
+   * `roles[systemId].componentId` (the whetstone-coexistence guarantee) — it MUST NOT clear
+   * the whole `roles[systemId]` object. GM-gated, save-persisted.
+   *
+   * @param {string} systemId
+   * @param {string} toolId
+   * @returns {Promise<{ deleted: boolean }>}
+   */
+  async deleteTool(systemId, toolId) {
+    this._assertGM('delete tool');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+    const tools = Array.isArray(system.tools) ? system.tools : [];
+    const tool = tools.find((entry) => String(entry?.id) === String(toolId)) || null;
+    if (!tool) return { deleted: false };
+
+    system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));
+    const flagKey = this._toolRoleFlagKey(system.id);
+    const sourceUuid = tool.sourceItemUuid || tool.sourceUuid || null;
+    if (flagKey && sourceUuid) {
+      await this._clearSourceFlag(sourceUuid, flagKey, tool.id);
+    }
+    await this.save();
+    return { deleted: true };
   }
 
   async deleteRecipeItemDefinition(systemId, recipeItemId) {
@@ -2743,6 +2886,52 @@ export class CraftingSystemManager {
   }
 
   /**
+   * Issue 561 one-shot auto-stamp: backfill the durable per-system TOOL identity
+   * `flags.fabricate.roles[system.id].toolId` on every registered tool's writable source
+   * Item — a clone of {@link autoStampComponentSources}. Reads each tool's
+   * (migration-populated) `sourceItemUuid`/`sourceUuid`; a tool with no source refs (a
+   * legacy componentId-only tool whose migration could not resolve refs) is skipped. Dotted
+   * (unsafe) system ids and locked/unresolvable sources are skipped. Idempotent, GM-safe.
+   * ORDERING: this reads the tool source refs that the `1.14.0` settings-data migration
+   * (`migrateToolsToFirstClass`) populates, so it MUST run after that migration persists.
+   *
+   * @returns {Promise<{scanned:number, stamped:number, stripped:number, skippedLocked:number, skippedMissing:number}>}
+   */
+  async autoStampToolSources() {
+    const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
+    for (const system of this.getSystems()) {
+      const flagKey = this._toolRoleFlagKey(system.id);
+      if (!flagKey) continue;
+      for (const tool of system.tools || []) {
+        const uuid = tool?.sourceItemUuid || tool?.sourceUuid;
+        if (!uuid || !tool?.id) continue;
+        summary.scanned += 1;
+        let source;
+        try {
+          source = typeof fromUuid === 'function' ? await fromUuid(uuid) : null;
+        } catch {
+          source = null;
+        }
+        if (!source || typeof source.setFlag !== 'function') {
+          summary.skippedMissing += 1;
+          continue;
+        }
+        if (source.pack) {
+          const pack = globalThis.game?.packs?.get?.(source.pack);
+          if (!pack || pack.locked) {
+            summary.skippedLocked += 1;
+            continue;
+          }
+        }
+        const { stamped, stripped } = await this._writeSourceIdentity(source, flagKey, tool.id);
+        if (stamped) summary.stamped += 1;
+        if (stripped) summary.stripped += 1;
+      }
+    }
+    return summary;
+  }
+
+  /**
    * Resolve the existing definition a registered source maps to. A NON-clone source's
    * durable `recipeItemDefinitionId` flag is authoritative (it resolves to its
    * definition even if the recorded `sourceItemUuid` drifted); a CLONE's inherited flag
@@ -2824,6 +3013,13 @@ export class CraftingSystemManager {
   _resolveOwnedRepairOwner(item, kind) {
     if (kind.bucket === 'recipeItems') {
       return matchRecipeItemDefinition(item, kind.definitions);
+    }
+    // A first-class Tool carries its OWN identity, so it MUST resolve through the Tool
+    // resolver — routing the tools bucket through the component resolver would mis-resolve
+    // it via component legacy-scalar logic (issue 561, D-F(repair) / A9).
+    if (kind.bucket === 'tools') {
+      const definition = resolveToolForItem(item, kind.definitions, kind.systemId);
+      return { definition, tier: null };
     }
     const definition = resolveComponentForItem(item, kind.definitions, kind.systemId);
     return { definition, tier: null };
@@ -2964,6 +3160,21 @@ export class CraftingSystemManager {
         definitions: system.components || [],
         refExtractor: (def) => getComponentSourceReferences(def),
       });
+      // First-class Tools are ALSO a per-system kind (issue 561): each system's pass reads
+      // and writes ONLY its own `roles.<systemId>.toolId` leaf. Item-sourced tools reconcile
+      // via their own source references (owned copies through `resolveToolForItem`).
+      const toolFlagKey = this._toolRoleFlagKey(system.id);
+      if (toolFlagKey) {
+        kinds.push({
+          bucket: 'tools',
+          flagKey: toolFlagKey,
+          systemId: system.id,
+          definitions: (system.tools || []).filter(
+            (tool) => tool && (tool.sourceItemUuid || tool.sourceUuid)
+          ),
+          refExtractor: (def) => getToolSourceReferences(def),
+        });
+      }
     }
     kinds.push({
       bucket: 'recipeItems',
@@ -2983,6 +3194,7 @@ export class CraftingSystemManager {
       repointed: 0,
       skippedAmbiguous: 0,
       components: { stamped: 0, stripped: 0, cleared: 0 },
+      tools: { stamped: 0, stripped: 0, cleared: 0 },
       recipeItems: { stamped: 0, stripped: 0, cleared: 0 },
       repointLog: [],
     };

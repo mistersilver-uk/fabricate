@@ -12,6 +12,24 @@
 
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 
+import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
+
+/**
+ * Upcast every legacy componentId-only Tool in an export payload's system to a first-class
+ * tool carrying derived source refs + snapshot (issue 561, D10), mirroring the world-side
+ * `migrateToolsToFirstClass`. The `ready`-body tool-flag stamp is version-gated per world so
+ * it does not re-fire for a system imported AFTER it ran; an imported tool therefore matches
+ * by raw source references (resolver tier 3) until a manual "Repair item data" stamps it,
+ * exactly like imported components. Idempotent — a tool already carrying refs is untouched.
+ * @private
+ */
+function upcastLegacyTools(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || !Array.isArray(system.tools)) return;
+  const components = Array.isArray(system.components) ? system.components : [];
+  for (const tool of system.tools) deriveToolSourceFromComponents(tool, components);
+}
+
 /**
  * @param {*} payload - Parsed export JSON of any prior schema
  * @returns {object} Upcast payload at the current schema version
@@ -21,9 +39,13 @@ export function migrateExportPayload(payload) {
     return payload;
   }
 
-  // Already current — no-op (return a clone so callers never alias the input).
+  // Already current — no-op for the schema envelope, but still upcast legacy tools (a
+  // schema-2 export can predate #561's first-class tool fields). Clone so callers never
+  // alias the input.
   if (payload.schemaVersion === FABRICATE_EXPORT_SCHEMA_VERSION) {
-    return structuredClone(payload);
+    const current = structuredClone(payload);
+    upcastLegacyTools(current);
+    return current;
   }
 
   const migrated = structuredClone(payload);
@@ -51,6 +73,8 @@ export function migrateExportPayload(payload) {
       legacy && typeof legacy === 'object' && ('system' in legacy || 'shared' in legacy);
     migrated.gatheringConfig = looksLikeExportShape ? legacy : { system: {}, shared: {} };
   }
+
+  upcastLegacyTools(migrated);
 
   return migrated;
 }
