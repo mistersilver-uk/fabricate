@@ -856,7 +856,9 @@ The raw-reference fall-through is load-bearing for multi-system worlds, stale fl
 The invariant is that within a single system's component set at most one component bears a given id; component ids are NOT globally unique because a copy-imported system preserves its origin's component ids.
 The resolver is the single component matcher used across crafting ingredient and collection matching, recipe tool matching, essence resolution, the inventory used-by listing, owned-item repair, gathering award-stacking, alchemy signature matching, and canvas Item→Tool drop resolution.
 This closes the transitive-`_stats.duplicateSource` false positive on the source-reference path while preserving a system's recognition of its own component in multi-system worlds.
-Residual, time-boxed to close with issue 561: two copy-imported systems can share a component id, so a legacy-scalar-only item can still resolve to a same-numbered component in another system; the per-system `roles` map removes this for restamped items, and issue 561 relieves `componentId` of its cross-system Tool-reference duty so copy-import may then regenerate component ids and close the residual entirely.
+Residual, UNBLOCKED but not closed by issue 561 (tracked as issue 570): two copy-imported systems can share a component id, so a legacy-scalar-only item can still resolve to a same-numbered component in another system; the per-system `roles` map removes this for restamped items.
+Issue 561 REMOVES the blocker — a Tool no longer references a component for cross-system matching, it carries its own identity — so `prepareForImport('copy')` MAY now regenerate component ids; but until a follow-up flips regeneration on and remaps every within-payload component reference (recipe ingredients, the retained `tool.componentId` alias, `onBreak.replacementComponentId`, `essence.sourceComponentId`, salvage), the exporter still preserves ids, so the residual REMAINS OPEN.
+This is unblocked, not closed, and is tracked as issue 570.
 
 ### Registration Source Identity
 
@@ -864,7 +866,7 @@ At registration (both recipe items and components), a definition's `sourceItemUu
 A component's durable identity-of-record is `flags.fabricate.roles[systemId].componentId`, a per-system role map, while a recipe item still uses the single scalar `flags.fabricate.recipeItemDefinitionId`.
 The earlier framing of one symmetric durable flag across both kinds no longer holds and is corrected here to name this interim asymmetry.
 A legacy scalar `flags.fabricate.componentId` is still honored at match time as a claimed id until the one-shot component restamp runs.
-`flags.fabricate.roles` is the unified, final per-system role map and the single eventual home for all three durable identities; issue 556 populates `componentId`, issue 561 populates `toolId`, and the recipe-item follow-up populates `recipeItemDefinitionId` (retiring the scalar and its cross-system limitation below), each an additive sibling key.
+`flags.fabricate.roles` is the unified, final per-system role map and the single eventual home for all three durable identities; issue 556 populates `componentId`, issue 561 populates `toolId` (stamped by `addToolFromUuid` and the `autoStampToolSources` one-shot restamp), and the recipe-item follow-up populates `recipeItemDefinitionId` (retiring the scalar and its cross-system limitation below), each an additive sibling key.
 Registration stamps `roles[system.id].componentId` and clears only that per-system key on re-point or repair, never the whole flag.
 
 - A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
@@ -1095,7 +1097,15 @@ are always by id into the per-system library.
 
 ```js
 Tool = {
-  componentId: string,
+  componentId: string | null,      // OPTIONAL managed-component link; null for an item-sourced tool
+  // Own source references (issue 561), identical field shape to a component.
+  sourceUuid: string | null,       // the registered live source document uuid
+  sourceItemUuid: string | null,   // the canonical/compendium source uuid
+  fallbackItemIds: string[],       // additional source references for matching
+  // Registration/migration-time DISPLAY SNAPSHOT (name + img ONLY, never `label`).
+  name: string | null,
+  img: string | null,
+  label: string,                   // pre-existing, user-authored display override (distinct from the snapshot)
   requirement: null | {
     formula: string,
   },
@@ -1118,7 +1128,10 @@ Tool = {
 
 ### Requirements
 
-1. `componentId` is required.
+1. A Tool must carry EITHER a `componentId` (a managed-component link) OR its own source references (`sourceUuid` / `sourceItemUuid`); a Tool with NEITHER is invalid.
+A first-class tool registered from an Item uuid carries its own source references plus a `name` + `img` display snapshot and `componentId: null`; a whetstone that is also a component, or a tool migrated from a legacy componentId-tool, keeps `componentId` populated (for `onBreak.replaceWith` resolution and the UI's linked-component display) but `componentId` is no longer the matching basis.
+The `name` + `img` display snapshot is captured at registration/migration time and is NOT auto-refreshed when the GM renames the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
+The pre-existing user-authored `label` is a DISTINCT field and is NEVER written by snapshot capture, migration, or any refresh.
 2. Tools are **SYSTEM-OWNED**: the single canonical library lives on the crafting-system object as `system.tools` (persisted in the `craftingSystems` setting, populated by `CraftingSystemManager._normalizeSystem`).
 Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering.
 Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy.
@@ -1144,19 +1157,26 @@ It is still recorded as used (no `toolUsage` flag is written, because that flag 
 7. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
 8. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
 The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`.
-9. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching**.
-Durable-identity matching, defined here at first use against the component-identity resolver tiers, means: (a) the durable component-identity flag `flags.fabricate.roles[systemId].componentId`, OR (b) the legacy scalar `flags.fabricate.componentId`, OR (c) the item's own `uuid` or compendium source (`_stats.compendiumSource` / `flags.core.sourceId`).
+Canvas virtual-presence stays keyed by `componentId`: an item-sourced tool (`componentId: null`) does NOT participate in canvas virtual-presence in this change (re-keying virtual-presence onto `toolId` is tracked separately).
+9. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching** against the tool's OWN identity.
+Durable-identity matching means: (a) the durable per-system tool-identity flag `flags.fabricate.roles[systemId].toolId`, OR (b) the item's own `uuid` or compendium source (`_stats.compendiumSource` / `flags.core.sourceId`) intersecting the tool's source references.
+Tools have no legacy scalar identity tier.
 An item is NEVER selected for usage or destruction by a transitive `_stats.duplicateSource` reference or by name alone, either of which still satisfies the non-destructive **presence** gate (the wide shared tool matcher).
 An item that satisfies presence only via a transitive duplicate-source reference or by name is spared from usage/breakage and recorded as a skipped tool.
 When an actor owns both a durable-identity match and a presence-only match for the same tool, the durable-identity item is the one used or broken.
 Because destroying the wrong item is irreversible, this is the shipped behaviour ("is"): a world-template copy lacking both a compendium source and a durable flag is spared until repaired, rather than risking an irreversible wrong-item destroy.
-A locked-compendium copy carries its own compendium source, matches durable identity (c), and still breaks.
+A locked-compendium copy carries its own compendium source, matches durable identity (b), and still breaks.
+10. A Tool's durable identity is `flags.fabricate.roles[systemId].toolId`, stamped on its source Item at direct registration (`addToolFromUuid`) and by the one-shot `ready`-body restamp (`autoStampToolSources`, keyed by `TOOL_FLAG_STAMP_VERSION`), an additive SIBLING of `roles[systemId].componentId`.
+A whetstone that is both a component and a tool carries both leaves in one `roles[systemId]` object, and neither registration clobbers the other: deregistering or re-pointing a tool clears ONLY the `roles[systemId].toolId` leaf.
+A bulk-imported tool (via `createSystem`) matches by raw source references until a manual "Repair item data" stamps its owned copies, identical to imported components.
+11. Tool **presence** matching resolves the owned item against the system Tools library by the tool's own source references (durable `roles[systemId].toolId` first, then source-ref intersection including the transitive `_stats.duplicateSource`, then the tool's snapshot-name fallback), not through a managed component.
+Tool **usage/breakage** selection matches by durable-identity against the tool's OWN identity per requirement 9.
 
 ### Validation Matrix
 
 | Field                                  | Valid values                                       | Invalid values            |
 |----------------------------------------|----------------------------------------------------|---------------------------|
-| `componentId`                          | non-empty string                                   | empty or missing          |
+| `componentId`                          | optional when source references are present        | absent AND no source references |
 | `requirement.formula`                  | non-empty string                                   | empty                     |
 | `breakage.limitedUses.maxUses`         | null or positive integer                           | `0`, negative, fractional |
 | `breakage.breakageChance.breakageChance` | integer `0..100`                                 | non-integer, out of range |
