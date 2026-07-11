@@ -8,7 +8,7 @@
  * owned item whose live `uuid` (`Actor.x.Item.y`) DIFFERS from its component
  * source reference (`Item.*`, carried in `_stats.duplicateSource`). The engine
  * resolves a submission to a component only by source-reference intersection, so
- * the pre-fix thin `{ uuid, sourceUuid: item.uuid }` submission never intersected
+ * the pre-fix thin `{ uuid, registeredItemUuid: item.uuid }` submission never intersected
  * the component's source-ref chain: every brew fizzled and no dead-end key was
  * ever recorded. Existing suites masked this by making the owned uuid equal the
  * component source uuid; these do not.
@@ -66,8 +66,8 @@ class FakeActor {
 
 // A component sourced at a WORLD item uuid (Item.*), matched by an owned item that
 // only carries the link in `_stats.duplicateSource` — the realistic drag-copy case.
-function component(id, sourceUuid) {
-  return { id, name: `${id}-comp`, sourceUuid, sourceItemUuid: sourceUuid };
+function component(id, registeredItemUuid) {
+  return { id, name: `${id}-comp`, registeredItemUuid, originItemUuid: registeredItemUuid };
 }
 function ownedItem(uuid, duplicateSource, quantity) {
   // NB: distinct `name` so ONLY source-ref matching can resolve it to a component.

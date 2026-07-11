@@ -106,8 +106,8 @@ function buildIngredientSet(groups, essences = {}) {
   };
 }
 
-function buildComponent(id, sourceItemUuid = null) {
-  return { id, name: id, tags: [], sourceItemUuid, sourceUuid: sourceItemUuid };
+function buildComponent(id, originItemUuid = null) {
+  return { id, name: id, tags: [], originItemUuid, registeredItemUuid: originItemUuid };
 }
 
 function buildIngredientGroup(componentId) {
@@ -603,14 +603,14 @@ test('SignatureValidator.computeSignature returns groups for alchemy ingredient 
   assert.ok(sig[0].has('c1'));
 });
 
-test('CraftingEngine._matchAlchemySignature matches submitted items by canonical sourceItemUuid when live sourceUuid differs (no essences)', () => {
+test('CraftingEngine._matchAlchemySignature matches submitted items by canonical originItemUuid when live registeredItemUuid differs (no essences)', () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const components = [{
     id: 'c1',
     name: 'Iron Ore',
-    sourceUuid: 'Compendium.world.items.iron-ore-live',
-    sourceItemUuid: 'Compendium.source.items.iron-ore',
-    fallbackItemIds: []
+    registeredItemUuid: 'Compendium.world.items.iron-ore-live',
+    originItemUuid: 'Compendium.source.items.iron-ore',
+    aliasItemUuids: []
   }];
   const recipe = buildRecipe(
     'alchemy-recipe',
@@ -689,15 +689,15 @@ test('_matchAlchemySignature matches pure-essence recipe from component-defined 
     {
       id: 'red-herb',
       name: 'Red Herb',
-      sourceUuid: 'Compendium.test.red-herb',
-      sourceItemUuid: 'Compendium.test.red-herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
       essences: { [essenceId]: 1 }
     },
     {
       id: 'silverleaf',
       name: 'Silverleaf',
-      sourceUuid: 'Compendium.test.silverleaf',
-      sourceItemUuid: 'Compendium.test.silverleaf',
+      registeredItemUuid: 'Compendium.test.silverleaf',
+      originItemUuid: 'Compendium.test.silverleaf',
       essences: { [essenceId]: 1 }
     }
   ];
@@ -732,8 +732,8 @@ test('_matchAlchemySignature uses item-flag essences before component fallback',
   const components = [{
     id: 'red-herb',
     name: 'Red Herb',
-    sourceUuid: 'Compendium.test.red-herb',
-    sourceItemUuid: 'Compendium.test.red-herb',
+    registeredItemUuid: 'Compendium.test.red-herb',
+    originItemUuid: 'Compendium.test.red-herb',
     essences: { [essenceId]: 5 }
   }];
   const recipe = buildRecipe(
@@ -764,8 +764,8 @@ test('_matchAlchemySignature does not multiply component essences by stack quant
   const components = [{
     id: 'red-herb',
     name: 'Red Herb',
-    sourceUuid: 'Compendium.test.red-herb',
-    sourceItemUuid: 'Compendium.test.red-herb',
+    registeredItemUuid: 'Compendium.test.red-herb',
+    originItemUuid: 'Compendium.test.red-herb',
     essences: { [essenceId]: 1 }
   }];
   const recipe = buildRecipe(
@@ -903,8 +903,8 @@ test('_buildEssenceContext resolves component-defined essences for effect transf
     components: [{
       id: 'red-herb',
       name: 'Red Herb',
-      sourceUuid: 'Compendium.test.red-herb',
-      sourceItemUuid: 'Compendium.test.red-herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
       essences: { [essenceId]: 1 }
     }]
   });
@@ -977,10 +977,10 @@ function buildIngredientGroupQty(componentId, quantity) {
 
 // The workbench expands a stack into one submission per unit; mirror that here by
 // returning `count` discrete submissions that all resolve to the same source.
-function buildIngotSubmissions(sourceUuid, count) {
+function buildIngotSubmissions(registeredItemUuid, count) {
   return Array.from({ length: count }, () => ({
-    uuid: sourceUuid,
-    _stats: { compendiumSource: sourceUuid },
+    uuid: registeredItemUuid,
+    _stats: { compendiumSource: registeredItemUuid },
     system: { quantity: 1 },
     flags: {}
   }));
@@ -1055,8 +1055,8 @@ test('_matchAlchemySignature matches when submitted quantity exceeds the require
 });
 
 test('craftAlchemy reaches the no-match disposition (and consumes) when ingredient quantity is insufficient', async () => {
-  const sourceUuid = 'Item.iron-ingot';
-  const components = [buildComponent('iron', sourceUuid)];
+  const registeredItemUuid = 'Item.iron-ingot';
+  const components = [buildComponent('iron', registeredItemUuid)];
   const recipe = buildQuantityRecipe('iron', 5);
   const system = buildAlchemySystem({
     id: 'alchemy-sys',
@@ -1075,14 +1075,14 @@ test('craftAlchemy reaches the no-match disposition (and consumes) when ingredie
 
   const deleted = [];
   const actorItem = {
-    uuid: sourceUuid,
+    uuid: registeredItemUuid,
     system: { quantity: 1 },
     async delete() { deleted.push(this.uuid); },
     async update() {}
   };
   const sourceActor = { items: [actorItem] };
   // Submit only one of the five required ingots.
-  const submitted = buildIngotSubmissions(sourceUuid, 1);
+  const submitted = buildIngotSubmissions(registeredItemUuid, 1);
 
   const result = await engine.craftAlchemy({ id: 'pc' }, [sourceActor], submitted, {
     craftingSystemId: 'alchemy-sys',
@@ -1175,8 +1175,8 @@ test('_matchAlchemySignature attributes a submission to its durable componentId 
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const sys = 'alchemy-sys';
   // Two distinct components; A's source ref is Item.A, B's is Item.B.
-  const componentA = component('cA', { sourceUuid: 'Item.A', sourceItemUuid: 'Item.A' });
-  const componentB = component('cB', { sourceUuid: 'Item.B', sourceItemUuid: 'Item.B' });
+  const componentA = component('cA', { registeredItemUuid: 'Item.A', originItemUuid: 'Item.A' });
+  const componentB = component('cB', { registeredItemUuid: 'Item.B', originItemUuid: 'Item.B' });
   const components = [componentA, componentB];
   const validator = buildSignatureValidator(components);
 
@@ -1219,23 +1219,23 @@ test('_matchAlchemySignature attributes a submission to its durable componentId 
   );
 });
 
-test('_matchAlchemySignature resolves a submission carrying only a bare top-level sourceUuid (A2b, characterization)', () => {
+test('_matchAlchemySignature resolves a submission carrying only a bare top-level registeredItemUuid (A2b, characterization)', () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const components = [buildComponent('bare', 'Item.bare-source')];
   const validator = buildSignatureValidator(components);
 
-  // The item carries ONLY a bare top-level `sourceUuid` — no uuid, no
+  // The item carries ONLY a bare top-level `registeredItemUuid` — no uuid, no
   // _stats.compendiumSource, no duplicateSource — so `getItemSourceReferences`
-  // (and thus the shared resolver) sees nothing; only the LOCAL bare-sourceUuid
+  // (and thus the shared resolver) sees nothing; only the LOCAL bare-registeredItemUuid
   // supplement can attribute it.
   const result = engine._matchAlchemySignature(
-    [{ sourceUuid: 'Item.bare-source' }],
+    [{ registeredItemUuid: 'Item.bare-source' }],
     [buildComponentRecipe('bare-recipe', 'bare')],
     components,
     validator
   );
 
-  assert.equal(result.matched, true, 'bare top-level sourceUuid still resolves to its component');
+  assert.equal(result.matched, true, 'bare top-level registeredItemUuid still resolves to its component');
 });
 
 test('_matchAlchemySignature counts a submission matching several of a group\'s components as one unit (A2c)', () => {
@@ -1263,7 +1263,7 @@ test('_matchAlchemySignature counts a submission matching several of a group\'s 
 test('_matchAlchemySignature falls through a stale/foreign identity flag to the raw-ref tier (A2d)', () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const sys = 'alchemy-sys';
-  const components = [component('cC', { sourceUuid: 'Item.C', sourceItemUuid: 'Item.C' })];
+  const components = [component('cC', { registeredItemUuid: 'Item.C', originItemUuid: 'Item.C' })];
   const validator = buildSignatureValidator(components);
   // The roles flag names a component absent from this system's set (stale/foreign),
   // so it is inert; the raw refs overlap the real component C.
@@ -1291,8 +1291,8 @@ test('_matchAlchemySignature resolves a cross-group multi-overlap submission to 
   // refs overlap components in DIFFERENT groups resolves to the FIRST match in the
   // full set (order-dependent by design), not counted in both groups as the
   // pre-fix flag-blind intersection did.
-  const componentX = component('cX', { sourceUuid: 'Item.X', sourceItemUuid: 'Item.X' });
-  const componentY = component('cY', { sourceUuid: 'Item.Y', sourceItemUuid: 'Item.Y' });
+  const componentX = component('cX', { registeredItemUuid: 'Item.X', originItemUuid: 'Item.X' });
+  const componentY = component('cY', { registeredItemUuid: 'Item.Y', originItemUuid: 'Item.Y' });
   const components = [componentX, componentY];
   const validator = buildSignatureValidator(components);
   // Raw refs overlap both X and Y; cX is first in the set, so it resolves to cX.

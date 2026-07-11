@@ -17,7 +17,7 @@
  *
  * Phase 2 -- addItemsFromPack:
  *  11. Imports all Item documents from a mock pack
- *  12. Skips items already in the system (deduplication by sourceUuid)
+ *  12. Skips items already in the system (deduplication by registeredItemUuid)
  *  13. Returns correct { added, skipped, total } counts
  *  14. Throws for unknown systemId
  *  15. Throws for unknown packId
@@ -27,8 +27,8 @@
  *  17. addItemFromUuid -- new item returns { item, action: 'added' }
  *  18. addItemFromUuid -- exact match with differing metadata overwrites name/img and returns updated
  *  18b. addItemFromUuid -- exact match with same metadata returns skipped
- *  19. addItemFromUuid -- overwrites when dropped UUID is in existing item's fallbackItemIds
- *  20. addItemFromUuid -- fallbackItemIds accumulates without duplicates
+ *  19. addItemFromUuid -- overwrites when dropped UUID is in existing item's aliasItemUuids
+ *  20. addItemFromUuid -- aliasItemUuids accumulates without duplicates
  *  20b. addItemFromUuid -- source-chain overwrite with fromUuid returning null keeps existing metadata
  *  21. addItemsFromPack -- returns { added, updated, skipped, total }
  *  22. addItemFromUuid -- rejects non-Item document type
@@ -245,15 +245,15 @@ test('addItemsFromPack — imports all Item documents from a mock pack', async (
 
   const sys = mgr.getSystem('sys1');
   assert.equal(sys.components.length, 2);
-  assert.ok(sys.components.some(i => i.sourceUuid === 'Compendium.world.mypack.item-a'));
-  assert.ok(sys.components.some(i => i.sourceUuid === 'Compendium.world.mypack.item-b'));
+  assert.ok(sys.components.some(i => i.registeredItemUuid === 'Compendium.world.mypack.item-a'));
+  assert.ok(sys.components.some(i => i.registeredItemUuid === 'Compendium.world.mypack.item-b'));
 });
 
-test('addItemsFromPack — skips items already in the system by sourceUuid', async () => {
+test('addItemsFromPack — skips items already in the system by registeredItemUuid', async () => {
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
-    items: [{ id: 'existing-1', name: 'Iron Ore', sourceUuid: 'Compendium.world.mypack.item-a' }]
+    items: [{ id: 'existing-1', name: 'Iron Ore', registeredItemUuid: 'Compendium.world.mypack.item-a' }]
   }]);
 
   _mockPacks.set('world.mypack', {
@@ -279,8 +279,8 @@ test('addItemsFromPack — updates existing component when canonical source UUID
     items: [{
       id: 'existing-1',
       name: 'Iron Ore',
-      sourceUuid: 'Compendium.world.old-pack.item-a',
-      sourceItemUuid: 'Compendium.source.items.iron-ore'
+      registeredItemUuid: 'Compendium.world.old-pack.item-a',
+      originItemUuid: 'Compendium.source.items.iron-ore'
     }]
   }]);
 
@@ -312,9 +312,9 @@ test('addItemsFromPack — updates existing component when canonical source UUID
 
   const sys = mgr.getSystem('sys1');
   assert.equal(sys.components.length, 1, 'should not duplicate the component');
-  assert.equal(sys.components[0].sourceUuid, 'Compendium.world.new-pack.item-b');
-  assert.equal(sys.components[0].sourceItemUuid, 'Compendium.source.items.iron-ore');
-  assert.ok(sys.components[0].fallbackItemIds.includes('Compendium.world.old-pack.item-a'));
+  assert.equal(sys.components[0].registeredItemUuid, 'Compendium.world.new-pack.item-b');
+  assert.equal(sys.components[0].originItemUuid, 'Compendium.source.items.iron-ore');
+  assert.ok(sys.components[0].aliasItemUuids.includes('Compendium.world.old-pack.item-a'));
 
   globalThis.fromUuid = async () => null;
 });
@@ -324,8 +324,8 @@ test('addItemsFromPack — filters out non-Item documents and returns correct co
     id: 'sys1',
     name: 'System One',
     items: [
-      { id: 'e1', name: 'Existing A', sourceUuid: 'Compendium.world.mypack.item-a' },
-      { id: 'e2', name: 'Existing B', sourceUuid: 'Compendium.world.mypack.item-b' }
+      { id: 'e1', name: 'Existing A', registeredItemUuid: 'Compendium.world.mypack.item-a' },
+      { id: 'e2', name: 'Existing B', registeredItemUuid: 'Compendium.world.mypack.item-b' }
     ]
   }]);
 
@@ -373,7 +373,7 @@ test('addItemFromUuid — exact duplicate returns { item, action: "skipped" }', 
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
-    items: [{ id: 'comp-1', name: 'Iron Ore', sourceUuid: 'Compendium.world.pack.item-a' }]
+    items: [{ id: 'comp-1', name: 'Iron Ore', registeredItemUuid: 'Compendium.world.pack.item-a' }]
   }]);
 
   // fromUuid returns null by default — exact match should skip before resolving
@@ -402,8 +402,8 @@ test('addItemFromUuid — new item returns { item, action: "added" }', async () 
   assert.equal(result.item.name, 'Fresh Coal');
   assert.equal(result.item.img, 'coal.png');
   assert.equal(result.item.description, 'Fresh coal for the forge.');
-  assert.equal(result.item.sourceUuid, 'Compendium.world.pack.item-coal');
-  assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.coal');
+  assert.equal(result.item.registeredItemUuid, 'Compendium.world.pack.item-coal');
+  assert.equal(result.item.originItemUuid, 'Compendium.source.items.coal');
   assert.equal(mgr.getSystem('sys1').components.length, 1);
 
   globalThis.fromUuid = async () => null;
@@ -431,9 +431,9 @@ test('addItemFromUuid — keeps resolvable canonical source UUID', async () => {
   const result = await mgr.addItemFromUuid('sys1', 'Item.world-azuryt');
 
   assert.equal(result.action, 'added');
-  assert.equal(result.item.sourceUuid, 'Item.world-azuryt');
-  assert.equal(result.item.sourceItemUuid, 'Compendium.crafting.items.Item.azuryt');
-  assert.deepEqual(result.item.fallbackItemIds, []);
+  assert.equal(result.item.registeredItemUuid, 'Item.world-azuryt');
+  assert.equal(result.item.originItemUuid, 'Compendium.crafting.items.Item.azuryt');
+  assert.deepEqual(result.item.aliasItemUuids, []);
   assert.deepEqual(result.sourceFallbacks, []);
 
   globalThis.fromUuid = async () => null;
@@ -458,9 +458,9 @@ test('addItemFromUuid — falls back to live item UUID when canonical source is 
   const result = await mgr.addItemFromUuid('sys1', 'Item.world-azuryt');
 
   assert.equal(result.action, 'added');
-  assert.equal(result.item.sourceUuid, 'Item.world-azuryt');
-  assert.equal(result.item.sourceItemUuid, 'Item.world-azuryt');
-  assert.deepEqual(result.item.fallbackItemIds, ['Compendium.crafting.items.Item.missing-azuryt']);
+  assert.equal(result.item.registeredItemUuid, 'Item.world-azuryt');
+  assert.equal(result.item.originItemUuid, 'Item.world-azuryt');
+  assert.deepEqual(result.item.aliasItemUuids, ['Compendium.crafting.items.Item.missing-azuryt']);
   assert.deepEqual(result.sourceFallbacks, [{
     itemName: 'Azuryt',
     brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
@@ -479,7 +479,7 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
       name: 'Iron Ore',
       img: 'ore-old.png',
       description: 'Old description',
-      sourceUuid: 'Compendium.world.pack.item-a'
+      registeredItemUuid: 'Compendium.world.pack.item-a'
     }]
   }]);
 
@@ -499,7 +499,7 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   assert.equal(result.item.name, 'Updated Iron Ore');
   assert.equal(result.item.img, 'ore2.png');
   assert.equal(result.item.description, 'Smelts into sturdy ingots.');
-  assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.iron-ore');
+  assert.equal(result.item.originItemUuid, 'Compendium.source.items.iron-ore');
   // System should still have only one item
   assert.equal(mgr.getSystem('sys1').components.length, 1);
 
@@ -514,8 +514,8 @@ test('addItemFromUuid — updates existing component through broken canonical so
       id: 'comp-1',
       name: 'Old Azuryt',
       img: 'old.png',
-      sourceUuid: 'Compendium.crafting.items.Item.missing-azuryt',
-      sourceItemUuid: 'Compendium.crafting.items.Item.missing-azuryt'
+      registeredItemUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+      originItemUuid: 'Compendium.crafting.items.Item.missing-azuryt'
     }]
   }]);
 
@@ -537,9 +537,9 @@ test('addItemFromUuid — updates existing component through broken canonical so
   assert.equal(result.action, 'updated');
   assert.equal(result.item.id, 'comp-1');
   assert.equal(result.item.name, 'Azuryt');
-  assert.equal(result.item.sourceUuid, 'Item.world-azuryt');
-  assert.equal(result.item.sourceItemUuid, 'Item.world-azuryt');
-  assert.ok(result.item.fallbackItemIds.includes('Compendium.crafting.items.Item.missing-azuryt'));
+  assert.equal(result.item.registeredItemUuid, 'Item.world-azuryt');
+  assert.equal(result.item.originItemUuid, 'Item.world-azuryt');
+  assert.ok(result.item.aliasItemUuids.includes('Compendium.crafting.items.Item.missing-azuryt'));
   assert.equal(mgr.getSystem('sys1').components.length, 1);
   assert.equal(result.sourceFallbacks.length, 1);
 
@@ -550,7 +550,7 @@ test('addItemFromUuid — exact match with same metadata returns skipped', async
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
-    items: [{ id: 'comp-1', name: 'Iron Ore', img: 'ore.png', sourceUuid: 'Compendium.world.pack.item-a' }]
+    items: [{ id: 'comp-1', name: 'Iron Ore', img: 'ore.png', registeredItemUuid: 'Compendium.world.pack.item-a' }]
   }]);
 
   // fromUuid returns same name and img as existing item
@@ -570,15 +570,15 @@ test('addItemFromUuid — exact match with same metadata returns skipped', async
   globalThis.fromUuid = async () => null;
 });
 
-test('addItemFromUuid — overwrites when dropped UUID is in existing item\'s fallbackItemIds', async () => {
+test('addItemFromUuid — overwrites when dropped UUID is in existing item\'s aliasItemUuids', async () => {
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
     items: [{
       id: 'comp-1',
       name: 'Iron Ore',
-      sourceUuid: 'Item.world-123',
-      fallbackItemIds: ['Compendium.world.pack.item-a']
+      registeredItemUuid: 'Item.world-123',
+      aliasItemUuids: ['Compendium.world.pack.item-a']
     }]
   }]);
 
@@ -596,25 +596,25 @@ test('addItemFromUuid — overwrites when dropped UUID is in existing item\'s fa
   // Name and img updated
   assert.equal(result.item.name, 'Updated Iron Ore');
   assert.equal(result.item.img, 'ore-updated.png');
-  // sourceUuid updated to the dropped UUID
-  assert.equal(result.item.sourceUuid, 'Compendium.world.pack.item-a');
-  // Old sourceUuid pushed into fallbackItemIds
-  assert.ok(result.item.fallbackItemIds.includes('Item.world-123'));
+  // registeredItemUuid updated to the dropped UUID
+  assert.equal(result.item.registeredItemUuid, 'Compendium.world.pack.item-a');
+  // Old registeredItemUuid pushed into aliasItemUuids
+  assert.ok(result.item.aliasItemUuids.includes('Item.world-123'));
   // System still has only one item
   assert.equal(mgr.getSystem('sys1').components.length, 1);
 
   globalThis.fromUuid = async () => null;
 });
 
-test('addItemFromUuid — fallbackItemIds accumulates without duplicates', async () => {
+test('addItemFromUuid — aliasItemUuids accumulates without duplicates', async () => {
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
     items: [{
       id: 'comp-1',
       name: 'Iron Ore',
-      sourceUuid: 'Item.world-123',
-      fallbackItemIds: ['old-uuid-1', 'Compendium.world.pack.item-a']
+      registeredItemUuid: 'Item.world-123',
+      aliasItemUuids: ['old-uuid-1', 'Compendium.world.pack.item-a']
     }]
   }]);
 
@@ -627,14 +627,14 @@ test('addItemFromUuid — fallbackItemIds accumulates without duplicates', async
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-a');
 
   assert.equal(result.action, 'updated');
-  // 'old-uuid-1' was already in fallbackItemIds; 'Item.world-123' (old sourceUuid) should be added
-  // 'Compendium.world.pack.item-a' was already in fallbackItemIds so not duplicated
-  const fallbacks = result.item.fallbackItemIds;
+  // 'old-uuid-1' was already in aliasItemUuids; 'Item.world-123' (old registeredItemUuid) should be added
+  // 'Compendium.world.pack.item-a' was already in aliasItemUuids so not duplicated
+  const fallbacks = result.item.aliasItemUuids;
   assert.ok(fallbacks.includes('old-uuid-1'), 'old-uuid-1 should still be present');
-  assert.ok(fallbacks.includes('Item.world-123'), 'old sourceUuid should be added');
+  assert.ok(fallbacks.includes('Item.world-123'), 'old registeredItemUuid should be added');
   // No duplicates
   const unique = new Set(fallbacks);
-  assert.equal(unique.size, fallbacks.length, 'fallbackItemIds should have no duplicates');
+  assert.equal(unique.size, fallbacks.length, 'aliasItemUuids should have no duplicates');
 
   globalThis.fromUuid = async () => null;
 });
@@ -650,8 +650,8 @@ test('addItemFromUuid — source-chain overwrite with fromUuid returning null ke
       name: 'Old Iron Ore',
       img: 'old-ore.png',
       description: 'Existing source description.',
-      sourceUuid: 'Item.world-456',
-      fallbackItemIds: ['Compendium.world.pack.item-b']
+      registeredItemUuid: 'Item.world-456',
+      aliasItemUuids: ['Compendium.world.pack.item-b']
     }]
   }]);
 
@@ -666,13 +666,13 @@ test('addItemFromUuid — source-chain overwrite with fromUuid returning null ke
   assert.equal(result.item.name, 'Old Iron Ore', 'name should retain old value when source is null');
   assert.equal(result.item.img, 'old-ore.png', 'img should retain old value when source is null');
   assert.equal(result.item.description, 'Existing source description.');
-  // sourceUuid updated to the dropped UUID
-  assert.equal(result.item.sourceUuid, 'Compendium.world.pack.item-b');
-  // Old sourceUuid pushed into fallbackItemIds
-  assert.ok(result.item.fallbackItemIds.includes('Item.world-456'));
+  // registeredItemUuid updated to the dropped UUID
+  assert.equal(result.item.registeredItemUuid, 'Compendium.world.pack.item-b');
+  // Old registeredItemUuid pushed into aliasItemUuids
+  assert.ok(result.item.aliasItemUuids.includes('Item.world-456'));
 });
 
-test('replaceItemSource — updates source refs, description, and fallbackItemIds for a specific component', async () => {
+test('replaceItemSource — updates source refs, description, and aliasItemUuids for a specific component', async () => {
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
@@ -681,7 +681,7 @@ test('replaceItemSource — updates source refs, description, and fallbackItemId
       name: 'Old Herb',
       img: 'old-herb.png',
       description: 'Old herb description.',
-      sourceUuid: 'Item.old-herb'
+      registeredItemUuid: 'Item.old-herb'
     }]
   }]);
 
@@ -700,9 +700,9 @@ test('replaceItemSource — updates source refs, description, and fallbackItemId
   assert.equal(item.name, 'Sunleaf');
   assert.equal(item.img, 'sunleaf.png');
   assert.equal(item.description, 'Radiates warmth.');
-  assert.equal(item.sourceUuid, 'Compendium.world.pack.sunleaf');
-  assert.equal(item.sourceItemUuid, 'Compendium.source.items.sunleaf');
-  assert.ok(item.fallbackItemIds.includes('Item.old-herb'));
+  assert.equal(item.registeredItemUuid, 'Compendium.world.pack.sunleaf');
+  assert.equal(item.originItemUuid, 'Compendium.source.items.sunleaf');
+  assert.ok(item.aliasItemUuids.includes('Item.old-herb'));
   assert.deepEqual(result.sourceFallbacks, []);
 
   globalThis.fromUuid = async () => null;
@@ -717,7 +717,7 @@ test('replaceItemSource — falls back to live item UUID when canonical source i
       name: 'Old Herb',
       img: 'old-herb.png',
       description: 'Old herb description.',
-      sourceUuid: 'Item.old-herb'
+      registeredItemUuid: 'Item.old-herb'
     }]
   }]);
 
@@ -739,10 +739,10 @@ test('replaceItemSource — falls back to live item UUID when canonical source i
 
   assert.equal(item.id, 'comp-1');
   assert.equal(item.name, 'Sunleaf');
-  assert.equal(item.sourceUuid, 'Item.world-sunleaf');
-  assert.equal(item.sourceItemUuid, 'Item.world-sunleaf');
-  assert.ok(item.fallbackItemIds.includes('Item.old-herb'));
-  assert.ok(item.fallbackItemIds.includes('Compendium.source.items.missing-sunleaf'));
+  assert.equal(item.registeredItemUuid, 'Item.world-sunleaf');
+  assert.equal(item.originItemUuid, 'Item.world-sunleaf');
+  assert.ok(item.aliasItemUuids.includes('Item.old-herb'));
+  assert.ok(item.aliasItemUuids.includes('Compendium.source.items.missing-sunleaf'));
   assert.deepEqual(result.sourceFallbacks, [{
     itemName: 'Sunleaf',
     brokenUuid: 'Compendium.source.items.missing-sunleaf',
@@ -761,7 +761,7 @@ test('replaceItemSource — preserves existing metadata when fromUuid cannot res
       name: 'Old Herb',
       img: 'old-herb.png',
       description: 'Old herb description.',
-      sourceUuid: 'Item.old-herb'
+      registeredItemUuid: 'Item.old-herb'
     }]
   }]);
 
@@ -772,8 +772,8 @@ test('replaceItemSource — preserves existing metadata when fromUuid cannot res
   assert.equal(result.item.name, 'Old Herb');
   assert.equal(result.item.img, 'old-herb.png');
   assert.equal(result.item.description, 'Old herb description.');
-  assert.equal(result.item.sourceUuid, 'Compendium.world.pack.sunleaf');
-  assert.ok(result.item.fallbackItemIds.includes('Item.old-herb'));
+  assert.equal(result.item.registeredItemUuid, 'Compendium.world.pack.sunleaf');
+  assert.ok(result.item.aliasItemUuids.includes('Item.old-herb'));
 });
 
 test('addItemsFromPack — returns { added, updated, skipped, total } with updated field', async () => {
@@ -781,8 +781,8 @@ test('addItemsFromPack — returns { added, updated, skipped, total } with updat
     id: 'sys1',
     name: 'System One',
     items: [
-      // This item's sourceUuid exactly matches pack item-a — will be skipped
-      { id: 'comp-existing', name: 'Iron Ore', sourceUuid: 'Compendium.world.mypack2.item-a' }
+      // This item's registeredItemUuid exactly matches pack item-a — will be skipped
+      { id: 'comp-existing', name: 'Iron Ore', registeredItemUuid: 'Compendium.world.mypack2.item-a' }
     ]
   }]);
 
@@ -845,8 +845,8 @@ test('addItemsFromPack — aggregates broken canonical source fallbacks', async 
     brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
     fallbackUuid: 'Compendium.world.broken-sources.item-a'
   }]);
-  assert.equal(mgr.getSystem('sys1').components[0].sourceItemUuid, 'Compendium.world.broken-sources.item-a');
-  assert.equal(mgr.getSystem('sys1').components[1].sourceItemUuid, 'Compendium.crafting.items.Item.cytryn');
+  assert.equal(mgr.getSystem('sys1').components[0].originItemUuid, 'Compendium.world.broken-sources.item-a');
+  assert.equal(mgr.getSystem('sys1').components[1].originItemUuid, 'Compendium.crafting.items.Item.cytryn');
 
   globalThis.fromUuid = async () => null;
 });
@@ -874,7 +874,7 @@ test('addItemFromUuid — a world item cloned from another (duplicateSource) imp
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
-    items: [{ id: 'comp-moonsilver', name: 'Moonsilver Weed', sourceUuid: 'Item.Xjbuj7dbkzhOPrMC' }]
+    items: [{ id: 'comp-moonsilver', name: 'Moonsilver Weed', registeredItemUuid: 'Item.Xjbuj7dbkzhOPrMC' }]
   }]);
 
   globalThis.fromUuid = async (uuid) => {
@@ -893,7 +893,7 @@ test('addItemFromUuid — a world item cloned from another (duplicateSource) imp
 
   assert.equal(result.action, 'added');
   assert.equal(result.item.name, 'Talonvine');
-  assert.equal(result.item.sourceUuid, 'Item.y8qq6t1F9YwRh8HH');
+  assert.equal(result.item.registeredItemUuid, 'Item.y8qq6t1F9YwRh8HH');
   const sys = mgr.getSystem('sys1');
   assert.equal(sys.components.length, 2, 'clone must be a separate component, not merged with the original');
   assert.ok(sys.components.some(c => c.id === 'comp-moonsilver'));
@@ -909,8 +909,8 @@ test('refreshComponentMetadataForUpdatedItem — editing a clone does NOT rewrit
     id: 'sys1',
     name: 'System One',
     items: [
-      { id: 'comp-moonsilver', name: 'Moonsilver Weed', sourceUuid: 'Item.Xjbuj7dbkzhOPrMC' },
-      { id: 'comp-talonvine', name: 'Talonvine', sourceUuid: 'Item.y8qq6t1F9YwRh8HH' }
+      { id: 'comp-moonsilver', name: 'Moonsilver Weed', registeredItemUuid: 'Item.Xjbuj7dbkzhOPrMC' },
+      { id: 'comp-talonvine', name: 'Talonvine', registeredItemUuid: 'Item.y8qq6t1F9YwRh8HH' }
     ]
   }]);
   let saveCount = 0;
@@ -943,16 +943,16 @@ test('createItem — rejects a duplicate source reference already used by anothe
     items: [{
       id: 'comp-existing',
       name: 'Iron Ore',
-      sourceUuid: 'Compendium.world.pack.item-a',
-      sourceItemUuid: 'Compendium.source.items.iron-ore'
+      registeredItemUuid: 'Compendium.world.pack.item-a',
+      originItemUuid: 'Compendium.source.items.iron-ore'
     }]
   }]);
 
   await assert.rejects(
     () => mgr.createItem('sys1', {
       name: 'Duplicate Iron Ore',
-      sourceUuid: 'Compendium.world.other-pack.item-z',
-      sourceItemUuid: 'Compendium.source.items.iron-ore'
+      registeredItemUuid: 'Compendium.world.other-pack.item-z',
+      originItemUuid: 'Compendium.source.items.iron-ore'
     }),
     /already belongs/
   );
@@ -969,12 +969,12 @@ test('createSystem — rejects duplicate component source references in one payl
         {
           id: 'comp-a',
           name: 'Iron Ore',
-          sourceUuid: 'Compendium.world.pack.item-a'
+          registeredItemUuid: 'Compendium.world.pack.item-a'
         },
         {
           id: 'comp-b',
           name: 'Iron Ore Copy',
-          fallbackItemIds: ['Compendium.world.pack.item-a']
+          aliasItemUuids: ['Compendium.world.pack.item-a']
         }
       ]
     }),
@@ -990,12 +990,12 @@ test('updateSystem — rejects duplicate component source references in one payl
       {
         id: 'comp-a',
         name: 'Iron Ore',
-        sourceUuid: 'Compendium.world.pack.item-a'
+        registeredItemUuid: 'Compendium.world.pack.item-a'
       },
       {
         id: 'comp-b',
         name: 'Coal',
-        sourceUuid: 'Compendium.world.pack.item-b'
+        registeredItemUuid: 'Compendium.world.pack.item-b'
       }
     ]
   }]);
@@ -1006,12 +1006,12 @@ test('updateSystem — rejects duplicate component source references in one payl
         {
           id: 'comp-a',
           name: 'Iron Ore',
-          sourceUuid: 'Compendium.world.pack.item-a'
+          registeredItemUuid: 'Compendium.world.pack.item-a'
         },
         {
           id: 'comp-b',
           name: 'Iron Ore Copy',
-          sourceItemUuid: 'Compendium.world.pack.item-a'
+          originItemUuid: 'Compendium.world.pack.item-a'
         }
       ]
     }),
@@ -1032,8 +1032,8 @@ test('createSystem — allows multiple components without source references', as
   });
 
   assert.equal(system.components.length, 2);
-  assert.equal(system.components[0].sourceUuid, null);
-  assert.equal(system.components[1].sourceItemUuid, null);
+  assert.equal(system.components[0].registeredItemUuid, null);
+  assert.equal(system.components[1].originItemUuid, null);
 });
 
 test('updateItem — rejects changing a component to a source reference already used by another component', async () => {
@@ -1044,21 +1044,21 @@ test('updateItem — rejects changing a component to a source reference already 
       {
         id: 'comp-a',
         name: 'Iron Ore',
-        sourceUuid: 'Compendium.world.pack.item-a',
-        sourceItemUuid: 'Compendium.source.items.iron-ore'
+        registeredItemUuid: 'Compendium.world.pack.item-a',
+        originItemUuid: 'Compendium.source.items.iron-ore'
       },
       {
         id: 'comp-b',
         name: 'Coal',
-        sourceUuid: 'Compendium.world.pack.item-b',
-        sourceItemUuid: 'Compendium.source.items.coal'
+        registeredItemUuid: 'Compendium.world.pack.item-b',
+        originItemUuid: 'Compendium.source.items.coal'
       }
     ]
   }]);
 
   await assert.rejects(
     () => mgr.updateItem('sys1', 'comp-b', {
-      sourceItemUuid: 'Compendium.source.items.iron-ore'
+      originItemUuid: 'Compendium.source.items.iron-ore'
     }),
     /already belongs/
   );
@@ -1072,14 +1072,14 @@ test('replaceItemSource — rejects changing a component to a source reference a
       {
         id: 'comp-a',
         name: 'Iron Ore',
-        sourceUuid: 'Compendium.world.pack.item-a',
-        sourceItemUuid: 'Compendium.source.items.iron-ore'
+        registeredItemUuid: 'Compendium.world.pack.item-a',
+        originItemUuid: 'Compendium.source.items.iron-ore'
       },
       {
         id: 'comp-b',
         name: 'Coal',
-        sourceUuid: 'Compendium.world.pack.item-b',
-        sourceItemUuid: 'Compendium.source.items.coal'
+        registeredItemUuid: 'Compendium.world.pack.item-b',
+        originItemUuid: 'Compendium.source.items.coal'
       }
     ]
   }]);
@@ -1107,7 +1107,7 @@ test('refreshComponentMetadataForUpdatedItem — updates component image for dir
       id: 'comp-herb',
       name: 'Herb',
       img: 'icons/herb-old.webp',
-      sourceUuid: 'Item.herb'
+      registeredItemUuid: 'Item.herb'
     }]
   }]);
   let saveCount = 0;
@@ -1143,7 +1143,7 @@ test('refreshComponentMetadataForUpdatedItem — updates component name for dire
       id: 'comp-herb',
       name: 'Old Herb',
       img: 'icons/herb.webp',
-      sourceUuid: 'Item.herb'
+      registeredItemUuid: 'Item.herb'
     }]
   }]);
   let saveCount = 0;
@@ -1167,8 +1167,8 @@ test('refreshComponentMetadataForUpdatedItem — updates component image for can
       id: 'comp-ore',
       name: 'Iron Ore',
       img: 'icons/ore-old.webp',
-      sourceUuid: 'Item.world-copy',
-      sourceItemUuid: 'Compendium.source.items.iron-ore'
+      registeredItemUuid: 'Item.world-copy',
+      originItemUuid: 'Compendium.source.items.iron-ore'
     }]
   }]);
   let saveCount = 0;
@@ -1197,7 +1197,7 @@ test('refreshComponentMetadataForUpdatedItem — updates component description f
       name: 'Herb',
       img: 'icons/herb.webp',
       description: 'Old herb description.',
-      sourceUuid: 'Item.herb'
+      registeredItemUuid: 'Item.herb'
     }]
   }]);
   let saveCount = 0;
@@ -1226,8 +1226,8 @@ test('refreshComponentMetadataForUpdatedItem — clears component description fo
       name: 'Iron Ore',
       img: 'icons/ore.webp',
       description: 'Old ore description.',
-      sourceUuid: 'Item.world-copy',
-      sourceItemUuid: 'Compendium.source.items.iron-ore'
+      registeredItemUuid: 'Item.world-copy',
+      originItemUuid: 'Compendium.source.items.iron-ore'
     }]
   }]);
   let saveCount = 0;
@@ -1256,7 +1256,7 @@ test('refreshComponentMetadataForUpdatedItem — ignores updates without synced 
       id: 'comp-herb',
       name: 'Herb',
       img: 'icons/herb-old.webp',
-      sourceUuid: 'Item.herb'
+      registeredItemUuid: 'Item.herb'
     }]
   }]);
   let saveCount = 0;
@@ -1280,7 +1280,7 @@ test('refreshComponentMetadataForUpdatedItem — skips save when matched metadat
       id: 'comp-herb',
       name: 'Herb',
       img: 'icons/herb.webp',
-      sourceUuid: 'Item.herb'
+      registeredItemUuid: 'Item.herb'
     }]
   }]);
   let saveCount = 0;

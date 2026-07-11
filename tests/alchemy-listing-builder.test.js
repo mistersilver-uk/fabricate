@@ -31,7 +31,7 @@ const { canonicalSignatureKey } = await import('../src/utils/alchemySignatureKey
 // ---------------------------------------------------------------------------
 
 function component(id, name) {
-  return { id, name, img: `icons/${id}.webp`, sourceUuid: null };
+  return { id, name, img: `icons/${id}.webp`, registeredItemUuid: null };
 }
 
 function plainRecipe(id, name, systemId, sig, resultComponentId, resultQty = 1) {

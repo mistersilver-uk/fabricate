@@ -102,7 +102,7 @@ function buildRecipe({
 function buildSystem({
   id = 'system-1',
   dragDropEnabled = true,
-  sourceItemUuid = 'shared-source',
+  originItemUuid = 'shared-source',
   listMode = 'knowledge',
   knowledgeMode = 'learned'
 } = {}) {
@@ -116,7 +116,7 @@ function buildSystem({
         learn: { consumeOnLearn: false, dragDropEnabled }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid }]
   };
 }
 
@@ -208,7 +208,7 @@ describe('RecipeItemLearningHook', () => {
     const { actor, service } = createScenario({
       item,
       systems: {
-        'system-1': buildSystem({ sourceItemUuid: 'Actor.actor-1.Item.exact' })
+        'system-1': buildSystem({ originItemUuid: 'Actor.actor-1.Item.exact' })
       }
     });
 
@@ -258,7 +258,7 @@ describe('RecipeItemLearningHook', () => {
   it('remains silent when no recipe matches the created owned item', async () => {
     const { actor, item, service } = createScenario({
       systems: {
-        'system-1': buildSystem({ sourceItemUuid: 'different-source' })
+        'system-1': buildSystem({ originItemUuid: 'different-source' })
       }
     });
 
@@ -359,7 +359,7 @@ describe('RecipeItemLearningHook', () => {
     assert.equal(warnMessages.length, 0);
   });
 
-  function buildCappedSystem({ id = 'system-1', maxRecipes = 2, dragDropEnabled = true, sourceItemUuid = 'shared-source' } = {}) {
+  function buildCappedSystem({ id = 'system-1', maxRecipes = 2, dragDropEnabled = true, originItemUuid = 'shared-source' } = {}) {
     return {
       id,
       recipeVisibility: {
@@ -373,7 +373,7 @@ describe('RecipeItemLearningHook', () => {
       recipeItemDefinitions: [
         {
           id: 'book',
-          sourceItemUuid,
+          originItemUuid,
           caps: {
             item: { limitUses: false },
             learn: { consumeOnLearn: false, limitRecipes: true, maxRecipes }

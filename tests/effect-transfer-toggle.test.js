@@ -230,7 +230,7 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
       features: { effectTransfer: effectTransferValue },
       craftingCheck: { enabled: false },
       components: [
-        { id: 'item-a', name: 'Item A', img: 'icons/svg/item-bag.svg', sourceUuid: null }
+        { id: 'item-a', name: 'Item A', img: 'icons/svg/item-bag.svg', registeredItemUuid: null }
       ]
     })
   });

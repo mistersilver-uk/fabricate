@@ -49,7 +49,7 @@ function makeSystem(overrides = {}) {
     categories: ['Potions'],
     itemTags: ['ingredient'],
     components: [
-      { id: 'comp-1', name: 'Iron Ore', sourceItemUuid: 'Compendium.test.items.iron', essences: { earth: 1 } }
+      { id: 'comp-1', name: 'Iron Ore', originItemUuid: 'Compendium.test.items.iron', essences: { earth: 1 } }
     ],
     // Transitional aliases that should be stripped on export
     items: [{ id: 'comp-1' }],

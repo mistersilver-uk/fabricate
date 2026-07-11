@@ -1,5 +1,5 @@
 /**
- * Unit tests for getSourceUuid() helper (T-087)
+ * Unit tests for getCompendiumSourceUuid() helper (T-087)
  *
  * Covers:
  *   1. Returns _stats.compendiumSource when present (Foundry v12+)
@@ -18,12 +18,11 @@ if (typeof globalThis.foundry !== 'undefined') {
 }
 
 const {
-  getSourceUuid,
+  getCompendiumSourceUuid,
   getDuplicateSourceUuid,
   getItemSourceReferences,
   getItemIdentityReferences,
-  getComponentSourceReferences,
-  getRecipeItemSourceReferences,
+  getItemMatchUuids,
   resolveComponentForItem,
   itemResolvesToComponent,
   matchRecipeItemDefinition,
@@ -50,19 +49,19 @@ test('1 - returns _stats.compendiumSource when present (v12+ canonical field)', 
     _stats: { compendiumSource: 'Compendium.world.items.abc123' },
     flags: {}
   };
-  assert.equal(getSourceUuid(item), 'Compendium.world.items.abc123');
+  assert.equal(getCompendiumSourceUuid(item), 'Compendium.world.items.abc123');
 });
 
 test('2 - falls back to flags.core.sourceId when _stats.compendiumSource is absent', () => {
   const item = {
     flags: { core: { sourceId: 'Compendium.world.items.legacy' } }
   };
-  assert.equal(getSourceUuid(item), 'Compendium.world.items.legacy');
+  assert.equal(getCompendiumSourceUuid(item), 'Compendium.world.items.legacy');
 });
 
 test('3 - returns null when neither field is set', () => {
   const item = { flags: {}, _stats: {} };
-  assert.equal(getSourceUuid(item), null);
+  assert.equal(getCompendiumSourceUuid(item), null);
 });
 
 test('4 - prefers _stats.compendiumSource over flags.core.sourceId when both set', () => {
@@ -70,15 +69,15 @@ test('4 - prefers _stats.compendiumSource over flags.core.sourceId when both set
     _stats: { compendiumSource: 'Compendium.world.items.v12' },
     flags: { core: { sourceId: 'Compendium.world.items.legacy' } }
   };
-  assert.equal(getSourceUuid(item), 'Compendium.world.items.v12');
+  assert.equal(getCompendiumSourceUuid(item), 'Compendium.world.items.v12');
 });
 
 test('5 - returns null for null item', () => {
-  assert.equal(getSourceUuid(null), null);
+  assert.equal(getCompendiumSourceUuid(null), null);
 });
 
 test('6 - returns null for undefined item', () => {
-  assert.equal(getSourceUuid(undefined), null);
+  assert.equal(getCompendiumSourceUuid(undefined), null);
 });
 
 test('7 - reads system._stats.compendiumSource as secondary v12+ location', () => {
@@ -86,11 +85,11 @@ test('7 - reads system._stats.compendiumSource as secondary v12+ location', () =
     system: { _stats: { compendiumSource: 'Compendium.world.items.sys' } },
     flags: {}
   };
-  assert.equal(getSourceUuid(item), 'Compendium.world.items.sys');
+  assert.equal(getCompendiumSourceUuid(item), 'Compendium.world.items.sys');
 });
 
 test('8 - returns null when item has no flags and no _stats', () => {
-  assert.equal(getSourceUuid({}), null);
+  assert.equal(getCompendiumSourceUuid({}), null);
 });
 
 test('9 - getItemSourceReferences returns item uuid and canonical source without duplicates', () => {
@@ -105,28 +104,28 @@ test('9 - getItemSourceReferences returns item uuid and canonical source without
   ]);
 });
 
-test('10 - getComponentSourceReferences includes sourceUuid, sourceItemUuid, and unique fallbacks', () => {
+test('10 - getItemMatchUuids includes registeredItemUuid, originItemUuid, and unique fallbacks', () => {
   const component = {
-    sourceUuid: 'Compendium.world.items.iron-ore-live',
-    sourceItemUuid: 'Compendium.source.items.iron-ore',
-    fallbackItemIds: ['Compendium.world.items.iron-ore-live', 'Compendium.world.items.iron-ore-old']
+    registeredItemUuid: 'Compendium.world.items.iron-ore-live',
+    originItemUuid: 'Compendium.source.items.iron-ore',
+    aliasItemUuids: ['Compendium.world.items.iron-ore-live', 'Compendium.world.items.iron-ore-old']
   };
-  assert.deepEqual(getComponentSourceReferences(component), [
+  assert.deepEqual(getItemMatchUuids(component), [
     'Compendium.world.items.iron-ore-live',
     'Compendium.source.items.iron-ore',
     'Compendium.world.items.iron-ore-old'
   ]);
 });
 
-test('11 - resolveComponentForItem matches canonical sourceItemUuid when live uuid differs (raw-ref tier)', () => {
+test('11 - resolveComponentForItem matches canonical originItemUuid when live uuid differs (raw-ref tier)', () => {
   const item = {
     uuid: 'Item.actor-owned-2',
     _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
     flags: {}
   };
   const ironOre = component('comp-iron', {
-    sourceUuid: 'Compendium.world.items.iron-ore-live',
-    sourceItemUuid: 'Compendium.source.items.iron-ore'
+    registeredItemUuid: 'Compendium.world.items.iron-ore-live',
+    originItemUuid: 'Compendium.source.items.iron-ore'
   });
   assert.equal(resolveComponentForItem(item, [ironOre], 'sysA'), ironOre);
 });
@@ -146,13 +145,13 @@ test('14 - getDuplicateSourceUuid returns null when unset / null item', () => {
   assert.equal(getDuplicateSourceUuid(null), null);
 });
 
-test('15 - getSourceUuid stays null for a duplicate-source-only item (compendium contract separate)', () => {
+test('15 - getCompendiumSourceUuid stays null for a duplicate-source-only item (compendium contract separate)', () => {
   const item = {
     uuid: 'Item.actor-drag-copy',
     _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
     flags: {}
   };
-  assert.equal(getSourceUuid(item), null);
+  assert.equal(getCompendiumSourceUuid(item), null);
 });
 
 test('16 - getItemSourceReferences includes duplicateSource as a third reference', () => {
@@ -168,15 +167,15 @@ test('16 - getItemSourceReferences includes duplicateSource as a third reference
   ]);
 });
 
-test('17 - resolveComponentForItem matches a duplicate-source-only item via sourceItemUuid (raw-ref tier)', () => {
+test('17 - resolveComponentForItem matches a duplicate-source-only item via originItemUuid (raw-ref tier)', () => {
   const item = {
     uuid: 'Item.actor-drag-copy',
     _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
     flags: {}
   };
   const pick = component('comp-pick', {
-    sourceUuid: 'Compendium.world.items.pick-live',
-    sourceItemUuid: 'Item.world-pick'
+    registeredItemUuid: 'Compendium.world.items.pick-live',
+    originItemUuid: 'Item.world-pick'
   });
   assert.equal(resolveComponentForItem(item, [pick], 'sysA'), pick);
 });
@@ -191,8 +190,8 @@ test('18 - resolveComponentForItem does NOT produce identity from an irrelevant 
       scope === 'fabricate' && key === 'fabricate.mythwrightId' ? 'mw-pick' : undefined
   };
   const pick = component('comp-pick', {
-    sourceUuid: 'Compendium.world.items.pick-live',
-    sourceItemUuid: 'Item.world-pick'
+    registeredItemUuid: 'Compendium.world.items.pick-live',
+    originItemUuid: 'Item.world-pick'
   });
   // No roles, no legacy scalar, no overlapping raw refs ⇒ no match.
   assert.equal(resolveComponentForItem(item, [pick], 'sysA'), null);
@@ -234,8 +233,8 @@ test('22 - findStackableMatch: empty source refs never match (no false positives
 // documented 2-arg degrade (B7): resolver returns null on both sides ⇒ pure raw-ref.
 
 test('A2 - findStackableMatch does NOT fold an award into a candidate resolving to a DIFFERENT component (both source shapes)', () => {
-  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
-  const compB = component('comp-b', { sourceItemUuid: 'Item.b-src' });
+  const compA = component('comp-a', { originItemUuid: 'Item.a-src' });
+  const compB = component('comp-b', { originItemUuid: 'Item.b-src' });
   const components = [compA, compB];
   // The candidate resolves to compB (roles) but shares the award source's raw ref via a
   // transitive duplicateSource. On origin/main (raw-ref only) the award folds into it —
@@ -261,7 +260,7 @@ test('A2 - findStackableMatch does NOT fold an award into a candidate resolving 
 });
 
 test('B3 - findStackableMatch still stacks on a shared raw ref when identities agree or are absent (both source shapes)', () => {
-  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const compA = component('comp-a', { originItemUuid: 'Item.a-src' });
   const components = [compA];
   // Identity agreement: candidate resolves to compA and shares a raw ref.
   const agreeing = roleItem({
@@ -285,7 +284,7 @@ test('B3 - findStackableMatch still stacks on a shared raw ref when identities a
 });
 
 test('B4 - findStackableMatch does NOT stack a correct-identity candidate with zero ref overlap (a new document is created)', () => {
-  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const compA = component('comp-a', { originItemUuid: 'Item.a-src' });
   // Candidate resolves to compA (agreement) but shares NO raw ref with the source, so
   // the raw-ref positive signal is absent and nothing stacks.
   const candidate = roleItem({
@@ -320,7 +319,7 @@ test('24 - getItemIdentityReferences for a clone with no compendium source retur
   assert.deepEqual(getItemIdentityReferences(item), ['Item.talonvine']);
 });
 
-test('25 - getItemIdentityReferences still includes the compendium source (parity with getSourceUuid)', () => {
+test('25 - getItemIdentityReferences still includes the compendium source (parity with getCompendiumSourceUuid)', () => {
   const item = {
     uuid: 'Item.actor-owned-1',
     _stats: { compendiumSource: 'Compendium.world.items.iron-ore' },
@@ -351,8 +350,8 @@ test('27 - resolveComponentForItem matches on the legacy scalar flags.fabricate.
     componentId: 'comp-abc'
   });
   const abc = component('comp-abc', {
-    sourceUuid: 'Item.component-source',
-    sourceItemUuid: 'Item.component-source'
+    registeredItemUuid: 'Item.component-source',
+    originItemUuid: 'Item.component-source'
   });
   assert.equal(resolveComponentForItem(item, [abc], 'sysA'), abc);
 });
@@ -361,8 +360,8 @@ test('A1 - within-system exclusivity: a roles-flagged item whose duplicateSource
   // (Migrated from the vacuous committed test 28.) On origin/main the matcher reads
   // only the scalar and falls through to the raw-ref tier, which matches sibling Y via
   // the transitive duplicateSource — the bug. The resolver reads roles and returns X.
-  const compX = component('comp-x', { sourceItemUuid: 'Item.x-src' });
-  const compY = component('comp-y', { sourceItemUuid: 'Item.y-src' });
+  const compX = component('comp-x', { originItemUuid: 'Item.x-src' });
+  const compY = component('comp-y', { originItemUuid: 'Item.y-src' });
   const item = roleItem({
     uuid: 'Item.actor-templated',
     duplicateSource: 'Item.y-src', // overlaps sibling Y's source ref
@@ -375,7 +374,7 @@ test('A1 - within-system exclusivity: a roles-flagged item whose duplicateSource
 test('A0-map - roles map is the sole identity: refs decoupled from the flagged component still resolve to it', () => {
   // Identity carried SOLELY by roles; the item's raw refs do NOT overlap compA. On
   // origin/main the matcher cannot read roles and the decoupled refs miss ⇒ null.
-  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const compA = component('comp-a', { originItemUuid: 'Item.a-src' });
   const item = roleItem({
     uuid: 'Item.decoupled',
     compendiumSource: 'Item.unrelated',
@@ -387,8 +386,8 @@ test('A0-map - roles map is the sole identity: refs decoupled from the flagged c
 test('A4 - read-side cross-system: one source registered in two systems resolves to the right component in EACH (map load-bearing, no scalar)', () => {
   // roles names compA under sysA and compB under sysB; refs decoupled from both; NO
   // legacy scalar (post-restamp). Both halves fail on main (decoupled refs, no scalar).
-  const sysA = componentSet('sysA', [component('comp-a', { sourceItemUuid: 'Item.a-src' })]);
-  const sysB = componentSet('sysB', [component('comp-b', { sourceItemUuid: 'Item.b-src' })]);
+  const sysA = componentSet('sysA', [component('comp-a', { originItemUuid: 'Item.a-src' })]);
+  const sysB = componentSet('sysB', [component('comp-b', { originItemUuid: 'Item.b-src' })]);
   const item = roleItem({
     uuid: 'Item.shared-source',
     compendiumSource: 'Item.unrelated',
@@ -403,8 +402,8 @@ test('A6 - systemId keying defeats copy-import id-collision: same component id i
   // The item's roles names comp-5 ONLY under sysA; refs decoupled. It must resolve to
   // sysA's comp-5 and NOT sysB's. The sysB half additionally defeats any systemId-free
   // or union-over-roles-values resolver.
-  const sysA = componentSet('sysA', [component('comp-5', { sourceItemUuid: 'Item.a5-src' })]);
-  const sysB = componentSet('sysB', [component('comp-5', { sourceItemUuid: 'Item.b5-src' })]);
+  const sysA = componentSet('sysA', [component('comp-5', { originItemUuid: 'Item.a5-src' })]);
+  const sysB = componentSet('sysB', [component('comp-5', { originItemUuid: 'Item.b5-src' })]);
   const item = roleItem({
     uuid: 'Item.decoupled',
     compendiumSource: 'Item.unrelated',
@@ -417,7 +416,7 @@ test('A6 - systemId keying defeats copy-import id-collision: same component id i
 test('B2 - flag-irrelevant item still matches on raw refs (including via duplicateSource)', () => {
   // No roles, no scalar — a pre-#555 unstamped world. The raw-ref fall-through is
   // load-bearing and unchanged. Green both ways.
-  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const compA = component('comp-a', { originItemUuid: 'Item.a-src' });
   const item = { uuid: 'Item.owned', _stats: { duplicateSource: 'Item.a-src' }, flags: {} };
   assert.equal(resolveComponentForItem(item, [compA], 'sysA'), compA);
 });
@@ -425,7 +424,7 @@ test('B2 - flag-irrelevant item still matches on raw refs (including via duplica
 test('B5 - hygiene tier: an empty or nullish roles[sys] never yields identity, even against a nullish-id component', () => {
   // {} or { componentId: null } (a restamp interrupted midway) must be NO identity,
   // tested before the membership check. Guards the hygiene tier before #561 adds toolId.
-  const nullishIdComp = component(undefined, { sourceItemUuid: 'Item.other-src' });
+  const nullishIdComp = component(undefined, { originItemUuid: 'Item.other-src' });
   const emptyRoles = roleItem({ uuid: 'Item.mid-restamp', roles: { sysA: {} } });
   const nullComponentId = roleItem({
     uuid: 'Item.mid-restamp',
@@ -438,7 +437,7 @@ test('B5 - hygiene tier: an empty or nullish roles[sys] never yields identity, e
 test('B6 - scalar multi-system (anti-pairwise guard): item IS compA, legacy scalar = compB, refs overlap compA ⇒ resolves compA under sysA', () => {
   // Protects against re-introducing the pairwise fail-close (which would flip true→false
   // for a system whose scalar was overwritten by a later registration in another system).
-  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const compA = component('comp-a', { originItemUuid: 'Item.a-src' });
   const item = roleItem({
     uuid: 'Item.owned',
     compendiumSource: 'Item.a-src', // raw ref overlaps compA
@@ -449,7 +448,7 @@ test('B6 - scalar multi-system (anti-pairwise guard): item IS compA, legacy scal
 });
 
 test('B8 - three-system + stale-entry boundary: a claimed id absent from the set under test falls through; a dead-system roles entry is inert', () => {
-  const compA = component('comp-a', { sourceItemUuid: 'Item.a-src' });
+  const compA = component('comp-a', { originItemUuid: 'Item.a-src' });
   // The item's roles names comp-3, which lives only in a THIRD system, absent here; its
   // refs overlap compA ⇒ fall through to raw refs ⇒ compA.
   const thirdSystemClaim = roleItem({
@@ -469,8 +468,8 @@ test('B8 - three-system + stale-entry boundary: a claimed id absent from the set
 });
 
 test('A11b - an unsafe (dotted) systemId skips the roles tier and still resolves via raw refs (unstamped behaviour), while a safe systemId resolves via the map', () => {
-  const compRoles = component('comp-roles', { sourceItemUuid: 'Item.roles-src' });
-  const compDup = component('comp-dup', { sourceItemUuid: 'Item.dup-src' });
+  const compRoles = component('comp-roles', { originItemUuid: 'Item.roles-src' });
+  const compDup = component('comp-dup', { originItemUuid: 'Item.dup-src' });
   const components = [compRoles, compDup];
 
   // Safe systemId: the durable `roles` map resolves to compRoles via tier 1, exclusively.
@@ -495,19 +494,19 @@ test('A11b - an unsafe (dotted) systemId skips the roles tier and still resolves
 // matchRecipeItemDefinition — four-tier precedence, no fall-through, union refs
 // ---------------------------------------------------------------------------
 
-const BOOK_DEF = { id: 'def-book', sourceUuid: 'Item.book', sourceItemUuid: 'Compendium.mod.book', fallbackItemIds: [] };
+const BOOK_DEF = { id: 'def-book', registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book', aliasItemUuids: [] };
 
 test('29 - matchRecipeItemDefinition: tier 1 (durable flag) wins even when source uuids point elsewhere', () => {
   const item = itemWithRecipeItemFlag('def-book', { uuid: 'Item.unrelated', _stats: {} });
   assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'identity' });
 });
 
-test('30 - matchRecipeItemDefinition: tier 2 (own uuid) matches sourceUuid via the union', () => {
+test('30 - matchRecipeItemDefinition: tier 2 (own uuid) matches registeredItemUuid via the union', () => {
   const item = { uuid: 'Item.book', _stats: {}, getFlag: () => undefined };
   assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'uuid' });
 });
 
-test('31 - matchRecipeItemDefinition: tier 3 (compendium source) matches sourceItemUuid', () => {
+test('31 - matchRecipeItemDefinition: tier 3 (compendium source) matches originItemUuid', () => {
   const item = { uuid: 'Item.copy', _stats: { compendiumSource: 'Compendium.mod.book' }, getFlag: () => undefined };
   assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'compendium' });
 });
@@ -518,8 +517,8 @@ test('32 - matchRecipeItemDefinition: tier 4 (duplicate source) is the last reso
 });
 
 test('33 - matchRecipeItemDefinition: no fall-through — a flag match to one def never falls to a uuid match on another', () => {
-  const flagged = { id: 'def-flag', sourceItemUuid: 'Item.nowhere' };
-  const bySource = { id: 'def-src', sourceUuid: 'Item.book', sourceItemUuid: 'Item.book' };
+  const flagged = { id: 'def-flag', originItemUuid: 'Item.nowhere' };
+  const bySource = { id: 'def-src', registeredItemUuid: 'Item.book', originItemUuid: 'Item.book' };
   const item = itemWithRecipeItemFlag('def-flag', { uuid: 'Item.book', _stats: {} });
   // Tier 1 resolves def-flag; it must NOT fall through to the tier-2 uuid match on def-src.
   assert.deepEqual(matchRecipeItemDefinition(item, [flagged, bySource]), { definition: flagged, tier: 'identity' });
@@ -548,12 +547,28 @@ test('36 - matchRecipeItemDefinition: a non-matching durable flag does NOT match
 test('37 - matchRecipeItemDefinition: empty definitions, null item, and blank refs never match', () => {
   assert.deepEqual(matchRecipeItemDefinition({ uuid: 'Item.book', getFlag: () => undefined }, []), { definition: null, tier: null });
   assert.deepEqual(matchRecipeItemDefinition(null, [BOOK_DEF]), { definition: null, tier: null });
-  const blankDef = { id: 'blank', sourceItemUuid: '  ' };
+  const blankDef = { id: 'blank', originItemUuid: '  ' };
   const item = { uuid: '', _stats: {}, getFlag: () => undefined };
   assert.equal(itemMatchesRecipeItemSource(item, [blankDef]), false);
 });
 
-test('38 - getRecipeItemSourceReferences unions sourceUuid, sourceItemUuid, and fallbacks like the component helper', () => {
-  const def = { sourceUuid: 'Item.book', sourceItemUuid: 'Compendium.mod.book', fallbackItemIds: ['Item.old', 'Item.book'] };
-  assert.deepEqual(getRecipeItemSourceReferences(def), ['Item.book', 'Compendium.mod.book', 'Item.old']);
+test('38 - getItemMatchUuids unions registeredItemUuid, originItemUuid, and fallbacks like the component helper', () => {
+  const def = { registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book', aliasItemUuids: ['Item.old', 'Item.book'] };
+  assert.deepEqual(getItemMatchUuids(def), ['Item.book', 'Compendium.mod.book', 'Item.old']);
+});
+
+test('39 - issue 560 (asymmetric): a synthetic { id: null, originItemUuid } def matches an owned item via the NEW field name', () => {
+  // Mirrors RecipeVisibilityService._recipeItemMatchDefinitions: an un-migrated recipe
+  // carrying only a legacy linkedRecipeItemUuid produces a synthetic def whose ONLY
+  // source ref is the renamed `originItemUuid`. The owned copy (compendium provenance)
+  // must still resolve through it — proving the matcher reads the NEW field name.
+  const syntheticDef = { id: null, originItemUuid: 'Compendium.mod.book' };
+  const ownedCopy = {
+    uuid: 'Item.copy',
+    _stats: { compendiumSource: 'Compendium.mod.book' },
+    getFlag: () => undefined,
+  };
+  const result = matchRecipeItemDefinition(ownedCopy, [syntheticDef]);
+  assert.equal(result.definition, syntheticDef);
+  assert.equal(result.tier, 'compendium');
 });

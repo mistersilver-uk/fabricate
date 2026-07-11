@@ -1121,7 +1121,7 @@ describe('createAdminStore', () => {
             id: 'comp-1',
             name: 'Sunleaf',
             img: 'sunleaf.png',
-            sourceItemUuid: 'Compendium.fabricate.items.sunleaf',
+            originItemUuid: 'Compendium.fabricate.items.sunleaf',
           }),
         ];
       }
@@ -1141,6 +1141,49 @@ describe('createAdminStore', () => {
       assert.equal(newEssence.sourceComponentId, 'comp-1');
       assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
       assert.equal(newEssence.associatedSystemItemId, 'comp-1');
+    });
+
+    it('issue 560 (asymmetric): a NEW-name-only component resolves the essence source link, while the essence keeps its OWN sourceItemUuid', async () => {
+      // Post-migration data: the linked component carries ONLY the renamed
+      // registeredItemUuid/originItemUuid (no legacy sourceUuid/sourceItemUuid). The
+      // essence source resolution must read the component's NEW field names, while the
+      // essence definition's OWN output key stays `sourceItemUuid` (out of scope, kept).
+      let savedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({
+            id: 'comp-1',
+            name: 'Sunleaf',
+            img: 'sunleaf.png',
+            registeredItemUuid: 'Item.sunleaf-live',
+            originItemUuid: 'Compendium.fabricate.items.sunleaf',
+          }),
+        ];
+        // Prove there are NO legacy keys on the component projection.
+        assert.ok(!('sourceUuid' in sys.components[0]));
+        assert.ok(!('sourceItemUuid' in sys.components[0]));
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Radiance', 'Bright essence', 'fas fa-sun', 'comp-1');
+
+      const newEssence = savedEssences?.find((e) => e.name === 'Radiance');
+      assert.ok(newEssence, 'new essence should be persisted');
+      // The essence resolved its source through the component's NEW field name.
+      assert.equal(newEssence.sourceComponentId, 'comp-1');
+      // The essence's OWN output key stays `sourceItemUuid` (kept).
+      assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
+      assert.ok(!('originItemUuid' in newEssence));
     });
 
     it('addEssence rejects duplicate name', async () => {
@@ -1338,7 +1381,7 @@ describe('createAdminStore', () => {
           makeItem({
             id: 'new-component',
             name: 'New Component',
-            sourceItemUuid: 'Compendium.fabricate.items.new-component',
+            originItemUuid: 'Compendium.fabricate.items.new-component',
           }),
         ];
         sys.essenceDefinitions = [
@@ -5833,8 +5876,8 @@ describe('createAdminStore', () => {
             id: 'comp-1',
             name: 'Blazing Herb',
             description: ' Hot enough to scorch your fingers. ',
-            sourceUuid: 'Item.live-123',
-            sourceItemUuid: 'Compendium.source.items.blazing-herb',
+            registeredItemUuid: 'Item.live-123',
+            originItemUuid: 'Compendium.source.items.blazing-herb',
             tags: ['fire'],
             essences: { 'ess-fire': 2, 'ess-shadow': 1 },
             salvage: {
@@ -5857,8 +5900,8 @@ describe('createAdminStore', () => {
 
       assert.equal(card.description, 'Hot enough to scorch your fingers.');
       assert.equal(card.hasDescription, true);
-      assert.equal(card.sourceUuidDisplay, 'Compendium.source.items.blazing-herb');
-      assert.equal(card.hasSourceUuid, true);
+      assert.equal(card.registeredItemUuidDisplay, 'Compendium.source.items.blazing-herb');
+      assert.equal(card.hasRegisteredItemUuid, true);
       assert.equal(card.sourceOrigin, 'compendium');
       assert.equal(card.sourceOriginLabel, 'Compendium');
       assert.equal(card.sourceMissing, false);
@@ -6015,7 +6058,7 @@ describe('createAdminStore', () => {
             id: 'comp-1',
             name: 'Blazing Herb',
             img: 'blazing-herb.png',
-            sourceItemUuid: 'Compendium.fabricate.items.blazing-herb',
+            originItemUuid: 'Compendium.fabricate.items.blazing-herb',
             essences: { 'ess-fire': 2 },
           }),
           makeItem({

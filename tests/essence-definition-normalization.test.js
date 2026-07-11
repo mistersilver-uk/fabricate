@@ -117,7 +117,7 @@ test('_normalizeSystem - sourceItemUuid preserved when item exists in managedIte
       { name: 'Water', sourceItemUuid: 'managed-item-id' }
     ],
     managedItems: [
-      { id: 'managed-item-id', name: 'Water Vial', sourceItemUuid: 'Compendium.fabricate.items.water-vial' }
+      { id: 'managed-item-id', name: 'Water Vial', originItemUuid: 'Compendium.fabricate.items.water-vial' }
     ]
   });
   const essence = system.essenceDefinitions[0];
@@ -156,7 +156,7 @@ test('_normalizeSystem - v2 sourceComponentId survives with resolved sourceItemU
       }
     ],
     managedItems: [
-      { id: 'comp-1', name: 'Sunleaf', sourceItemUuid: 'Compendium.fabricate.items.sunleaf' }
+      { id: 'comp-1', name: 'Sunleaf', originItemUuid: 'Compendium.fabricate.items.sunleaf' }
     ]
   });
   const essence = system.essenceDefinitions[0];

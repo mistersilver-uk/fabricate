@@ -62,7 +62,7 @@ function installSystem({ id = 'sys-1', components = [], tools = [] } = {}) {
 }
 
 function toolComponent(id, name) {
-  // A name-matched managed component (no sourceUuid) matches by item name.
+  // A name-matched managed component (no registeredItemUuid) matches by item name.
   return { id, name };
 }
 
@@ -284,17 +284,17 @@ const HAMMER_TOOL = {
   id: 'tool-hammer',
   componentId: 'c-hammer',
   name: 'Hammer',
-  sourceUuid: 'Item.hammer-src',
-  sourceItemUuid: 'Item.hammer-src',
-  fallbackItemIds: []
+  registeredItemUuid: 'Item.hammer-src',
+  originItemUuid: 'Item.hammer-src',
+  aliasItemUuids: []
 };
 
 function identitySystem() {
   return installSystem({
     id: 'sys-1',
     components: [
-      component('c-hammer', { sourceUuid: 'Item.hammer-src', name: 'Hammer' }),
-      component('c-tongs', { sourceUuid: 'Item.tongs-src', name: 'Tongs' })
+      component('c-hammer', { registeredItemUuid: 'Item.hammer-src', name: 'Hammer' }),
+      component('c-tongs', { registeredItemUuid: 'Item.tongs-src', name: 'Tongs' })
     ],
     tools: [HAMMER_TOOL]
   });

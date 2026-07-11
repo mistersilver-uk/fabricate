@@ -1,30 +1,30 @@
 /**
  * Shared fixtures for the durable per-system component-identity resolver
  * (`resolveComponentForItem`) and its callers. Centralised so the repeated
- * component-object literal `{ id, sourceUuid, sourceItemUuid, fallbackItemIds }`
+ * component-object literal `{ id, registeredItemUuid, originItemUuid, aliasItemUuids }`
  * and the two-system set exist in exactly ONE place (SonarCloud counts `tests/**`
  * duplication like `src/`, and its Automatic Analysis ignores cpd.exclusions).
  */
 
 /**
- * Build a component-like object. `refs` supplies any of `sourceUuid`,
- * `sourceItemUuid`, `fallbackItemIds`, `essences`, `name` — all optional, so a
+ * Build a component-like object. `refs` supplies any of `registeredItemUuid`,
+ * `originItemUuid`, `aliasItemUuids`, `essences`, `name` — all optional, so a
  * fixture can DECOUPLE a component's raw source refs from an item's identity to
  * force the identity tier (or the raw-ref fall-through) under test.
  *
  * @param {string} id
- * @param {{sourceUuid?:string, sourceItemUuid?:string, fallbackItemIds?:string[], essences?:object, name?:string}} [refs]
+ * @param {{registeredItemUuid?:string, originItemUuid?:string, aliasItemUuids?:string[], essences?:object, name?:string}} [refs]
  * @returns {object}
  */
 export function component(id, refs = {}) {
   const {
-    sourceUuid = null,
-    sourceItemUuid = null,
-    fallbackItemIds = [],
+    registeredItemUuid = null,
+    originItemUuid = null,
+    aliasItemUuids = [],
     essences,
     name,
   } = refs;
-  const built = { id, sourceUuid, sourceItemUuid, fallbackItemIds };
+  const built = { id, registeredItemUuid, originItemUuid, aliasItemUuids };
   if (essences !== undefined) built.essences = essences;
   if (name !== undefined) built.name = name;
   return built;
@@ -44,18 +44,18 @@ export function componentSet(id, components) {
 
 /**
  * Build a first-class-Tool-like object (issue 561). A tool carries the SAME source-ref
- * field shape a component does — `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` — plus
+ * field shape a component does — `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` — plus
  * an optional `componentId` link and `name`/`img` display snapshot. All optional so a fixture
  * can decouple the tool's raw refs from an item's identity to force the durable tier or the
  * raw-ref fall-through under test.
  *
  * @param {string} id
- * @param {{sourceUuid?:string, sourceItemUuid?:string, fallbackItemIds?:string[], componentId?:string, name?:string}} [refs]
+ * @param {{registeredItemUuid?:string, originItemUuid?:string, aliasItemUuids?:string[], componentId?:string, name?:string}} [refs]
  * @returns {object}
  */
 export function tool(id, refs = {}) {
-  const { sourceUuid = null, sourceItemUuid = null, fallbackItemIds = [], componentId, name } = refs;
-  const built = { id, sourceUuid, sourceItemUuid, fallbackItemIds };
+  const { registeredItemUuid = null, originItemUuid = null, aliasItemUuids = [], componentId, name } = refs;
+  const built = { id, registeredItemUuid, originItemUuid, aliasItemUuids };
   if (componentId !== undefined) built.componentId = componentId;
   if (name !== undefined) built.name = name;
   return built;

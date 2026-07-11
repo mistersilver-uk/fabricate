@@ -41,9 +41,9 @@ test('_normalizeTool produces the canonical Tool shape with defaults for a spars
     componentId: null,
     name: null,
     img: null,
-    sourceUuid: null,
-    sourceItemUuid: null,
-    fallbackItemIds: [],
+    registeredItemUuid: null,
+    originItemUuid: null,
+    aliasItemUuids: [],
     requirement: null,
     breakage: { mode: 'limitedUses', maxUses: null },
     onBreak: { mode: 'destroy' }
@@ -153,9 +153,9 @@ test('_normalizeSystem populates a normalized tools array', () => {
     componentId: 'comp-axe',
     name: null,
     img: null,
-    sourceUuid: null,
-    sourceItemUuid: null,
-    fallbackItemIds: [],
+    registeredItemUuid: null,
+    originItemUuid: null,
+    aliasItemUuids: [],
     requirement: null,
     breakage: { mode: 'limitedUses', maxUses: 5 },
     onBreak: { mode: 'destroy' }
@@ -190,17 +190,17 @@ test('_normalizeTool preserves source refs + name/img snapshot and never clobber
     componentId: null,
     name: 'Iron Pickaxe',
     img: 'icons/tools/pick.webp',
-    sourceUuid: 'Item.live',
-    sourceItemUuid: 'Compendium.pack.canonical',
-    fallbackItemIds: ['Item.old', 'Item.old', '  ', 'Item.live'],
+    registeredItemUuid: 'Item.live',
+    originItemUuid: 'Compendium.pack.canonical',
+    aliasItemUuids: ['Item.old', 'Item.old', '  ', 'Item.live'],
   });
   // Source + snapshot fields survive the unknown-field strip.
   assert.equal(tool.name, 'Iron Pickaxe');
   assert.equal(tool.img, 'icons/tools/pick.webp');
-  assert.equal(tool.sourceUuid, 'Item.live');
-  assert.equal(tool.sourceItemUuid, 'Compendium.pack.canonical');
-  // fallbackItemIds de-dupes, trims, and drops the primary-ref overlap ('Item.live').
-  assert.deepEqual(tool.fallbackItemIds, ['Item.old']);
+  assert.equal(tool.registeredItemUuid, 'Item.live');
+  assert.equal(tool.originItemUuid, 'Compendium.pack.canonical');
+  // aliasItemUuids de-dupes, trims, and drops the primary-ref overlap ('Item.live').
+  assert.deepEqual(tool.aliasItemUuids, ['Item.old']);
   // The user-authored label is preserved verbatim — never overwritten by the snapshot.
   assert.equal(tool.label, 'GM Custom Label');
   // A first-class item-sourced tool has componentId: null.
@@ -348,4 +348,90 @@ test('_normalizeSimpleCraftingCheck carries a unified checkBreakage block and dr
   assert.equal(simple.checkBreakage.triggers.length, 1, 'the legacy crit is migrated into a trigger');
   assert.equal(simple.checkBreakage.triggers[0].outcome, 'failure');
   assert.equal(simple.checkBreakage.triggers[0].breakTools, true);
+});
+
+// ---------------------------------------------------------------------------
+// Issue 560 — normalizers accept BOTH the legacy source-uuid field names and the
+// renamed names, emitting the new names (no silent drop of the renamed fields).
+// ---------------------------------------------------------------------------
+
+test('_normalizeTool preserves the renamed source fields from a NEW-named input', () => {
+  const manager = makeManager();
+  const tool = manager._normalizeTool({
+    id: 't1',
+    registeredItemUuid: 'Item.new-live',
+    originItemUuid: 'Compendium.new-origin',
+    aliasItemUuids: ['Item.new-alias'],
+  });
+  assert.equal(tool.registeredItemUuid, 'Item.new-live');
+  assert.equal(tool.originItemUuid, 'Compendium.new-origin');
+  assert.deepEqual(tool.aliasItemUuids, ['Item.new-alias']);
+});
+
+test('_normalizeTool accepts LEGACY source fields and emits the new names', () => {
+  const manager = makeManager();
+  const tool = manager._normalizeTool({
+    id: 't1',
+    sourceUuid: 'Item.old-live',
+    sourceItemUuid: 'Compendium.old-origin',
+    fallbackItemIds: ['Item.old-alias'],
+  });
+  assert.equal(tool.registeredItemUuid, 'Item.old-live');
+  assert.equal(tool.originItemUuid, 'Compendium.old-origin');
+  assert.deepEqual(tool.aliasItemUuids, ['Item.old-alias']);
+  assert.ok(!('sourceUuid' in tool));
+  assert.ok(!('sourceItemUuid' in tool));
+  assert.ok(!('fallbackItemIds' in tool));
+});
+
+test('_normalizeComponent preserves renamed source fields from NEW-named and LEGACY input', () => {
+  const manager = makeManager();
+  const fromNew = manager._normalizeComponent({
+    id: 'c1',
+    registeredItemUuid: 'Item.new-live',
+    originItemUuid: 'Compendium.new-origin',
+    aliasItemUuids: ['Item.new-alias'],
+  });
+  assert.equal(fromNew.registeredItemUuid, 'Item.new-live');
+  assert.equal(fromNew.originItemUuid, 'Compendium.new-origin');
+  assert.deepEqual(fromNew.aliasItemUuids, ['Item.new-alias']);
+
+  const fromLegacy = manager._normalizeComponent({
+    id: 'c1',
+    sourceUuid: 'Item.old-live',
+    sourceItemUuid: 'Compendium.old-origin',
+    fallbackItemIds: ['Item.old-alias'],
+  });
+  assert.equal(fromLegacy.registeredItemUuid, 'Item.old-live');
+  assert.equal(fromLegacy.originItemUuid, 'Compendium.old-origin');
+  assert.deepEqual(fromLegacy.aliasItemUuids, ['Item.old-alias']);
+  assert.ok(!('sourceUuid' in fromLegacy));
+  assert.ok(!('sourceItemUuid' in fromLegacy));
+  assert.ok(!('fallbackItemIds' in fromLegacy));
+});
+
+test('_normalizeRecipeItemDefinition preserves renamed source fields from NEW-named and LEGACY input', () => {
+  const manager = makeManager();
+  const fromNew = manager._normalizeRecipeItemDefinition({
+    id: 'book',
+    registeredItemUuid: 'Item.new-live',
+    originItemUuid: 'Compendium.new-origin',
+    aliasItemUuids: ['Item.new-alias'],
+  });
+  assert.equal(fromNew.registeredItemUuid, 'Item.new-live');
+  assert.equal(fromNew.originItemUuid, 'Compendium.new-origin');
+  assert.deepEqual(fromNew.aliasItemUuids, ['Item.new-alias']);
+
+  const fromLegacy = manager._normalizeRecipeItemDefinition({
+    id: 'book',
+    sourceUuid: 'Item.old-live',
+    sourceItemUuid: 'Compendium.old-origin',
+    fallbackItemIds: ['Item.old-alias'],
+  });
+  assert.equal(fromLegacy.registeredItemUuid, 'Item.old-live');
+  assert.equal(fromLegacy.originItemUuid, 'Compendium.old-origin');
+  assert.deepEqual(fromLegacy.aliasItemUuids, ['Item.old-alias']);
+  assert.ok(!('sourceUuid' in fromLegacy));
+  assert.ok(!('sourceItemUuid' in fromLegacy));
+  assert.ok(!('fallbackItemIds' in fromLegacy));
 });

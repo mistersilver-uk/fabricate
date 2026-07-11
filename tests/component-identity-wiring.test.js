@@ -44,8 +44,8 @@ function buildManager(systemsById) {
 // duplicateSource overlaps dupComp's source ref. Both components live in one system's
 // set, with DISTINCT essences so attribution is observable.
 function conflictingIdentityFixture({ quantity } = {}) {
-  const rolesComp = component('comp-roles', { sourceItemUuid: 'Item.roles-src', essences: { fire: 2 } });
-  const dupComp = component('comp-dup', { sourceItemUuid: 'Item.dup-src', essences: { ice: 3 } });
+  const rolesComp = component('comp-roles', { originItemUuid: 'Item.roles-src', essences: { fire: 2 } });
+  const dupComp = component('comp-dup', { originItemUuid: 'Item.dup-src', essences: { ice: 3 } });
   const item = roleItem({
     uuid: 'Item.owned',
     duplicateSource: 'Item.dup-src', // raw-ref overlaps dupComp — main/unthreaded mis-bucket here
@@ -134,8 +134,8 @@ test('A9b - recipe-availability: _accumulateEssences threads recipe.craftingSyst
 // ---------------------------------------------------------------------------
 
 test('A10 - award: a fresh award is NOT folded into an owned stack that resolves to a DIFFERENT component via a transitive duplicateSource', async () => {
-  const awardComp = component('comp-award', { sourceItemUuid: 'Item.award-src' }); // no sourceUuid ⇒ bare-component source
-  const otherComp = component('comp-other', { sourceItemUuid: 'Item.other-src' });
+  const awardComp = component('comp-award', { originItemUuid: 'Item.award-src' }); // no registeredItemUuid ⇒ bare-component source
+  const otherComp = component('comp-other', { originItemUuid: 'Item.other-src' });
   const system = { id: 'sysA', components: [awardComp, otherComp] };
   const craftingSystemManager = { getSystem: (id) => (id === 'sysA' ? system : null) };
 
@@ -176,8 +176,8 @@ test('A10 - award: a fresh award is NOT folded into an owned stack that resolves
 // ---------------------------------------------------------------------------
 
 test('A5 - repair writes roles[sysB].componentId for a source owned by system B only, and a non-owning system A pass never clears it (order-independent)', async () => {
-  const compA = component('comp-a', { sourceUuid: 'Item.a-src', sourceItemUuid: 'Item.a-src' });
-  const compB = component('comp-b', { sourceUuid: 'Item.b-src', sourceItemUuid: 'Item.b-src' });
+  const compA = component('comp-a', { registeredItemUuid: 'Item.a-src', originItemUuid: 'Item.a-src' });
+  const compB = component('comp-b', { registeredItemUuid: 'Item.b-src', originItemUuid: 'Item.b-src' });
   const sysA = componentSet('sysA', [compA]);
   const sysB = componentSet('sysB', [compB]);
 
@@ -245,9 +245,9 @@ test('B9 - autoStampComponentSources writes roles[sys].componentId, skips missin
   _registry.set('Compendium.locked.pack.x', lockedSource);
 
   const sysA = componentSet('sysA', [
-    component('comp-world', { sourceItemUuid: 'Item.world-src' }),
-    component('comp-locked', { sourceItemUuid: 'Compendium.locked.pack.x' }),
-    component('comp-missing', { sourceItemUuid: 'Item.deleted' }),
+    component('comp-world', { originItemUuid: 'Item.world-src' }),
+    component('comp-locked', { originItemUuid: 'Compendium.locked.pack.x' }),
+    component('comp-missing', { originItemUuid: 'Item.deleted' }),
   ]);
   const mgr = buildManager({ sysA });
 

@@ -564,7 +564,7 @@ test('AC4.4 - applyRecipeItemUseOnCraft increments timesUsed and destroys item w
         learn: { consumeOnLearn: false }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'recipe-item-uuid' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'recipe-item-uuid' }]
   });
   const recipe = buildMockRecipe({ recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
   // Item with timesUsed: 1 (so incrementing to 2 hits maxUses)
@@ -705,7 +705,7 @@ test('AC6.1 - learnRecipe writes learnedAt and sourceItemUuid to actor flag', as
         learn: { consumeOnLearn: false }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'recipe-item-uuid' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'recipe-item-uuid' }]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
   const item = new FakeItem({ uuid: 'recipe-item-uuid' });
@@ -920,7 +920,7 @@ test('AC6.8 - learnRecipesFromOwnedItem anchors learning and deletion to the exa
         learn: { consumeOnLearn: true, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
   const firstCopy = new FakeItem({ uuid: 'Actor.actor-1.Item.copy-1', sourceId: 'Compendium.world.items.book' });
@@ -953,7 +953,7 @@ test('AC6.9 - learnRecipesFromOwnedItem learns multiple recipes and deletes once
         learn: { consumeOnLearn: true, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
   });
   const recipes = [
     buildMockRecipe({ id: 'recipe-a', name: 'Recipe A', recipeItemId: 'book', linkedRecipeItemUuid: null }),
@@ -990,7 +990,7 @@ test('AC6.10 - learnRecipesFromOwnedItem does not delete when every matched reci
         learn: { consumeOnLearn: true, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
   const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
@@ -1019,7 +1019,7 @@ test('AC6.10b - learnRecipesFromOwnedItem does not delete when learned-flag writ
         learn: { consumeOnLearn: true, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
   const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
@@ -1045,7 +1045,7 @@ test('AC6.11 - owned-item learning matches canonical recipeItemId definitions an
         learn: { consumeOnLearn: false, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
   const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', compendiumSource: 'Compendium.world.items.book' });
@@ -1091,7 +1091,7 @@ test('AC6.13 - owned-item learning splits auto and manual scopes by dragDropEnab
         learn: { consumeOnLearn: false, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'shared-source' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'shared-source' }]
   });
   const manualSystem = buildMockSystem({
     id: 'manual-system',
@@ -1103,7 +1103,7 @@ test('AC6.13 - owned-item learning splits auto and manual scopes by dragDropEnab
         learn: { consumeOnLearn: false, dragDropEnabled: false }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'shared-source' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'shared-source' }]
   });
   const recipes = [
     buildMockRecipe({ id: 'auto-recipe', craftingSystemId: 'auto-system', recipeItemId: 'book', linkedRecipeItemUuid: null }),
@@ -1127,7 +1127,7 @@ test('AC6.13 - owned-item learning splits auto and manual scopes by dragDropEnab
 // Issue 511 Phase 2 — recipe-item learn budget (capped books)
 // ---------------------------------------------------------------------------
 
-function buildCappedSystem({ id = 'system-1', maxRecipes = 2, destroyWhenSpent = false, dragDropEnabled = true, sourceItemUuid = 'Compendium.world.items.book' } = {}) {
+function buildCappedSystem({ id = 'system-1', maxRecipes = 2, destroyWhenSpent = false, dragDropEnabled = true, originItemUuid = 'Compendium.world.items.book' } = {}) {
   return buildMockSystem({
     id,
     recipeVisibility: {
@@ -1138,7 +1138,7 @@ function buildCappedSystem({ id = 'system-1', maxRecipes = 2, destroyWhenSpent =
         learn: { consumeOnLearn: true, dragDropEnabled, limitRecipes: true, maxRecipes, destroyWhenSpent }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid }]
   });
 }
 
@@ -1269,7 +1269,7 @@ test('511.P2.6 - consumeOnLearn is ignored for a capped book (item not consumed 
 });
 
 test('511.P2.7 - a capped drop does NOT auto-learn, but uncapped recipes in the same drop still auto-learn', async () => {
-  const cappedSystem = buildCappedSystem({ id: 'capped-system', maxRecipes: 2, sourceItemUuid: 'shared-source' });
+  const cappedSystem = buildCappedSystem({ id: 'capped-system', maxRecipes: 2, originItemUuid: 'shared-source' });
   const uncappedSystem = buildMockSystem({
     id: 'uncapped-system',
     recipeVisibility: {
@@ -1280,7 +1280,7 @@ test('511.P2.7 - a capped drop does NOT auto-learn, but uncapped recipes in the 
         learn: { consumeOnLearn: false, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'shared-source' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'shared-source' }]
   });
   const recipes = [
     buildCappedRecipe({ id: 'capped-recipe', craftingSystemId: 'capped-system' }),
@@ -1305,7 +1305,7 @@ test('511.P2.7 - a capped drop does NOT auto-learn, but uncapped recipes in the 
 });
 
 test('511.P2.8 - DN1: the learn budget accumulates across actors and survives an ownership change', async () => {
-  const system = buildCappedSystem({ maxRecipes: 2, sourceItemUuid: 'Compendium.world.items.book' });
+  const system = buildCappedSystem({ maxRecipes: 2, originItemUuid: 'Compendium.world.items.book' });
   const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];
   // One physical document — its learn-count flag travels with it across holders.
   const item = new FakeItem({ uuid: 'Item.book', sourceId: 'Compendium.world.items.book' });
@@ -1343,7 +1343,7 @@ test('511.P2.9 - regression: an uncapped drop still learns every matched recipe 
         learn: { consumeOnLearn: false, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
   });
   const recipes = [
     buildCappedRecipe({ id: 'r-a', name: 'A' }),
@@ -1363,8 +1363,8 @@ test('511.P2.9 - regression: an uncapped drop still learns every matched recipe 
 test('511.P2.10 - getLearnableRecipesFromItem uses the most permissive cap when two capped systems share one item', () => {
   // A single physical document shares ONE learn-count; when two capped systems
   // link it with different caps, the most-permissive cap governs the budget.
-  const systemA = buildCappedSystem({ id: 'sys-a', maxRecipes: 2, sourceItemUuid: 'shared-source' });
-  const systemB = buildCappedSystem({ id: 'sys-b', maxRecipes: 5, sourceItemUuid: 'shared-source' });
+  const systemA = buildCappedSystem({ id: 'sys-a', maxRecipes: 2, originItemUuid: 'shared-source' });
+  const systemB = buildCappedSystem({ id: 'sys-b', maxRecipes: 5, originItemUuid: 'shared-source' });
   const recipes = [
     buildCappedRecipe({ id: 'a-1', craftingSystemId: 'sys-a' }),
     buildCappedRecipe({ id: 'b-1', craftingSystemId: 'sys-b' })
@@ -1392,7 +1392,7 @@ test('511.P2.11 - a limitRecipes system with an invalid maxRecipes fails closed 
         learn: { consumeOnLearn: false, dragDropEnabled: true, limitRecipes: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
   });
   const recipe = buildCappedRecipe({ id: 'r-a' });
   const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
@@ -1417,12 +1417,12 @@ test('511.P2.PERITEM - two books in ONE system enforce independent per-item caps
     recipeItemDefinitions: [
       {
         id: 'scroll',
-        sourceItemUuid: 'src-scroll',
+        originItemUuid: 'src-scroll',
         caps: { item: { limitUses: false }, learn: { limitRecipes: true, maxRecipes: 1 } }
       },
       {
         id: 'tome',
-        sourceItemUuid: 'src-tome',
+        originItemUuid: 'src-tome',
         caps: { item: { limitUses: false }, learn: { limitRecipes: true, maxRecipes: 3 } }
       }
     ]
@@ -1454,7 +1454,7 @@ test('511.P2.FAILCLOSED - a recipe whose recipeItemId resolves to no definition 
   const system = buildMockSystem({
     id: 'system-1',
     recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned', learn: { dragDropEnabled: true } } },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'src-book' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'src-book' }]
   });
   const recipe = buildMockRecipe({ id: 'r-ghost', craftingSystemId: 'system-1', recipeItemId: 'does-not-exist', linkedRecipeItemUuid: null });
   const service = buildService({ system, recipes: [recipe] });
@@ -1466,7 +1466,7 @@ test('511.P2.FAILCLOSED - a recipe whose recipeItemId resolves to no definition 
 });
 
 test('511.P2.E2E - full flow: capped drop suppressed, pick K, refuse (K+1), destroy-when-spent', async () => {
-  const cappedSystem = buildCappedSystem({ id: 'capped-system', maxRecipes: 2, destroyWhenSpent: true, sourceItemUuid: 'shared-source' });
+  const cappedSystem = buildCappedSystem({ id: 'capped-system', maxRecipes: 2, destroyWhenSpent: true, originItemUuid: 'shared-source' });
   const uncappedSystem = buildMockSystem({
     id: 'uncapped-system',
     recipeVisibility: {
@@ -1477,7 +1477,7 @@ test('511.P2.E2E - full flow: capped drop suppressed, pick K, refuse (K+1), dest
         learn: { consumeOnLearn: false, dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'shared-source' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'shared-source' }]
   });
   const recipes = [
     buildCappedRecipe({ id: 'cap-a', name: 'Cap A', craftingSystemId: 'capped-system' }),
@@ -2016,7 +2016,7 @@ function buildUncappedLearnSystem({ consumeOnLearn = true, mode = 'learned' } = 
         learn: { consumeOnLearn, dragDropEnabled: true },
       },
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }],
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }],
   });
 }
 
@@ -2096,7 +2096,7 @@ test('511.INV.6 - learnRecipeFromOwnedBook matches a book duplicated from a worl
   const system = buildUncappedLearnSystem();
   const recipe = buildCappedRecipe({ id: 'r-a' });
   // The owned copy links to the template only via _stats.duplicateSource — its own
-  // uuid and compendium source do not match the definition's sourceItemUuid.
+  // uuid and compendium source do not match the definition's originItemUuid.
   const item = new FakeItem({ uuid: 'Actor.a1.Item.copy' });
   item._stats = { duplicateSource: 'Compendium.world.items.book' };
   const actor = new FakeActor({ id: 'a1', items: [item] });
@@ -2214,7 +2214,7 @@ test('MODE.item - only a matching owned item grants; a learned-only actor stays 
       listMode: 'knowledge',
       knowledge: { mode: 'itemOrLearned', item: { limitUses: false }, learn: { consumeOnLearn: false } }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'recipe-item-uuid' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'recipe-item-uuid' }]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
   const viewer = { isGM: false, id: 'user-1' };
@@ -2250,7 +2250,7 @@ test('MODE.knowledge - itemOrLearned semantics override a legacy learned-only kn
       listMode: 'knowledge',
       knowledge: { mode: 'learned', item: { limitUses: false }, learn: { consumeOnLearn: false } }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'recipe-item-uuid' }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'recipe-item-uuid' }]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
   const viewer = { isGM: false, id: 'user-1' };
@@ -2302,7 +2302,7 @@ function buildWhenSpentSystem(whenSpent, maxUses = 2) {
     recipeItemDefinitions: [
       {
         id: 'book',
-        sourceItemUuid: 'recipe-item-uuid',
+        originItemUuid: 'recipe-item-uuid',
         caps: { item: { limitUses: true, maxUses, whenSpent }, learn: {} }
       }
     ]
@@ -2367,7 +2367,7 @@ function buildLearnModeSystem({ learningMode, learnScope, learnsAllowed, prerequ
     recipeItemDefinitions: [
       {
         id: 'book',
-        sourceItemUuid: 'Compendium.world.items.book',
+        originItemUuid: 'Compendium.world.items.book',
         caps: {
           item: { limitUses: false },
           learn: { limitLearning: true, learnsAllowed, learnScope, learningMode, prerequisiteIds }
@@ -2466,13 +2466,13 @@ test('LEARN.scope=total - destroyWhenSpent is read from the SPECIFIC book learne
     recipeItemDefinitions: [
       {
         id: 'book-a',
-        sourceItemUuid: 'src-a',
+        originItemUuid: 'src-a',
         recipeIds: ['r1'],
         caps: { item: { limitUses: false }, learn: { limitLearning: true, learnScope: 'total', learnsAllowed: 1, destroyWhenSpent: true } },
       },
       {
         id: 'book-b',
-        sourceItemUuid: 'src-b',
+        originItemUuid: 'src-b',
         recipeIds: ['r1'],
         caps: { item: { limitUses: false }, learn: { limitLearning: true, learnScope: 'total', learnsAllowed: 1, destroyWhenSpent: false } },
       },
@@ -2550,13 +2550,13 @@ test('511.M2M - a recipe in two books is matched via either, with caps read per 
     recipeItemDefinitions: [
       {
         id: 'book-a',
-        sourceItemUuid: 'src-a',
+        originItemUuid: 'src-a',
         recipeIds: ['r1'],
         caps: { item: { limitUses: false }, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 1 } },
       },
       {
         id: 'book-b',
-        sourceItemUuid: 'src-b',
+        originItemUuid: 'src-b',
         recipeIds: ['r1'],
         caps: { item: { limitUses: false }, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 3 } },
       },
@@ -2612,11 +2612,11 @@ test('PREREQ - learning is refused until ALL required-knowledge recipes are lear
       knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } }
     },
     recipeItemDefinitions: [
-      { id: 'basic', sourceItemUuid: 'src-basic', caps: { item: { limitUses: false }, learn: {} } },
-      { id: 'basic2', sourceItemUuid: 'src-basic2', caps: { item: { limitUses: false }, learn: {} } },
+      { id: 'basic', originItemUuid: 'src-basic', caps: { item: { limitUses: false }, learn: {} } },
+      { id: 'basic2', originItemUuid: 'src-basic2', caps: { item: { limitUses: false }, learn: {} } },
       {
         id: 'advanced',
-        sourceItemUuid: 'src-adv',
+        originItemUuid: 'src-adv',
         caps: {
           item: { limitUses: false },
           learn: { limitLearning: true, prerequisiteIds: ['r-a', 'r-c'] }
@@ -2663,7 +2663,7 @@ test('PREREQ - with Limited learning OFF, neither Required Knowledge nor charact
     recipeItemDefinitions: [
       {
         id: 'advanced',
-        sourceItemUuid: 'src-adv',
+        originItemUuid: 'src-adv',
         caps: {
           item: { limitUses: false },
           // Both gates configured, but Limited learning is OFF → neither is enforced.
@@ -2690,10 +2690,10 @@ test('PREREQ - Required Knowledge blocks the drag-drop bulk learn path (issue 54
       knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } }
     },
     recipeItemDefinitions: [
-      { id: 'basic', sourceItemUuid: 'src-basic', caps: { item: { limitUses: false }, learn: {} } },
+      { id: 'basic', originItemUuid: 'src-basic', caps: { item: { limitUses: false }, learn: {} } },
       {
         id: 'advanced',
-        sourceItemUuid: 'src-adv',
+        originItemUuid: 'src-adv',
         // limitLearning on but no learnsAllowed → uncapped, so it bulk-learns on drop.
         caps: { item: { limitUses: false }, learn: { limitLearning: true, prerequisiteIds: ['r-a'] } }
       }
@@ -2732,7 +2732,7 @@ test('PREREQ - Required Knowledge blocks the craft-time auto-learn (issue 544)',
     recipeItemDefinitions: [
       {
         id: 'advanced',
-        sourceItemUuid: 'src-adv',
+        originItemUuid: 'src-adv',
         caps: { item: { limitUses: false }, learn: { limitLearning: true, prerequisiteIds: ['r-a'] } }
       }
     ]
@@ -2765,7 +2765,7 @@ test('PREREQ - a dangling Required Knowledge id (deleted recipe) fails open (iss
     recipeItemDefinitions: [
       {
         id: 'advanced',
-        sourceItemUuid: 'src-adv',
+        originItemUuid: 'src-adv',
         // 'ghost' resolves to no existing recipe.
         caps: { item: { limitUses: false }, learn: { limitLearning: true, prerequisiteIds: ['ghost'] } }
       }

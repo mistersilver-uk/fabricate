@@ -14,14 +14,14 @@ function fixture() {
       {
         id: 'sys-1',
         recipeItemDefinitions: [
-          { id: 'book-1', sourceItemUuid: 'Compendium.world.items.book-1' },
-          { id: 'book-2', sourceItemUuid: 'Compendium.world.items.book-2' },
+          { id: 'book-1', originItemUuid: 'Compendium.world.items.book-1' },
+          { id: 'book-2', originItemUuid: 'Compendium.world.items.book-2' },
         ],
       },
     ],
     recipes: [
       { id: 'r1', craftingSystemId: 'sys-1', recipeItemId: 'book-1' },
-      // Legacy uuid link (no recipeItemId) resolves via sourceItemUuid.
+      // Legacy uuid link (no recipeItemId) resolves via originItemUuid.
       { id: 'r2', craftingSystemId: 'sys-1', linkedRecipeItemUuid: 'Compendium.world.items.book-2' },
       // Unlinked recipe.
       { id: 'r3', craftingSystemId: 'sys-1' },
@@ -55,7 +55,7 @@ test('a recipe with BOTH a book recipeItemId AND a separate alchemy formula link
     systems: [
       {
         id: 'sys-1',
-        recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'Compendium.world.items.book-1' }],
+        recipeItemDefinitions: [{ id: 'book-1', originItemUuid: 'Compendium.world.items.book-1' }],
       },
     ],
     recipes: [
@@ -103,7 +103,7 @@ test('a recipe may already be a member of multiple books (dedup, no duplication)
     systems: [
       {
         id: 'sys-1',
-        recipeItemDefinitions: [{ id: 'book-1', sourceItemUuid: 'u1', recipeIds: ['r1'] }],
+        recipeItemDefinitions: [{ id: 'book-1', originItemUuid: 'u1', recipeIds: ['r1'] }],
       },
     ],
     recipes: [{ id: 'r1', craftingSystemId: 'sys-1', recipeItemId: 'book-1' }],

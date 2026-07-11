@@ -64,8 +64,8 @@ class FakeActor {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function component(id, sourceUuid) {
-  return { id, name: id, sourceItemUuid: sourceUuid, sourceUuid };
+function component(id, registeredItemUuid) {
+  return { id, name: id, originItemUuid: registeredItemUuid, registeredItemUuid };
 }
 
 function group(componentId, quantity = 1) {
@@ -92,8 +92,8 @@ function system(alchemyCfg, components) {
   };
 }
 
-function submissions(sourceUuid, count) {
-  return Array.from({ length: count }, () => ({ uuid: sourceUuid, name: sourceUuid, sourceUuid }));
+function submissions(registeredItemUuid, count) {
+  return Array.from({ length: count }, () => ({ uuid: registeredItemUuid, name: registeredItemUuid, registeredItemUuid }));
 }
 
 function setup(alchemyCfg, { recipes, components }) {

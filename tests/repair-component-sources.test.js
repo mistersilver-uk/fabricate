@@ -86,9 +86,9 @@ function buildManager(components, { items = [], packs = [] } = {}) {
 const EMBERCAP = {
   id: 'comp-embercap',
   name: 'Embercap Mushroom',
-  sourceUuid: 'Item.embercap-src',
-  sourceItemUuid: 'Item.embercap-src',
-  fallbackItemIds: [],
+  registeredItemUuid: 'Item.embercap-src',
+  originItemUuid: 'Item.embercap-src',
+  aliasItemUuids: [],
 };
 
 test('repair — strips a transitive duplicateSource and stamps the component id on a source item', async () => {

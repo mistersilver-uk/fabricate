@@ -40,12 +40,12 @@ globalThis.ui = {
 /**
  * Build a fake actor item that tracks delete() and update() calls.
  */
-function makeItem({ id, name = `Item ${id}`, quantity = 1, sourceUuid = null } = {}) {
+function makeItem({ id, name = `Item ${id}`, quantity = 1, registeredItemUuid = null } = {}) {
   return {
     id,
     uuid: `Item.${id}`,
     name,
-    sourceUuid,
+    registeredItemUuid,
     parent: null,
     system: { quantity },
     effects: [],
@@ -241,7 +241,7 @@ test('simple mode: successful craft consumes ingredient and creates result item'
   const system = makeSystem({
     id: 'sys-1',
     resolutionMode: 'simple',
-    managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }]
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }]
   });
   setupGame(system);
 
@@ -325,7 +325,7 @@ test('simple mode: exact quantity match deletes ingredient item', async () => {
   const system = makeSystem({
     id: 'sys-1',
     resolutionMode: 'simple',
-    managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }]
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }]
   });
   setupGame(system);
 
@@ -415,8 +415,8 @@ test('multi-step: craft() advances through two steps to completion', async () =>
     id: 'sys-1',
     resolutionMode: 'simple',
     managedItems: [
-      { id: 'comp-extract', sourceUuid: 'uuid:extract', difficulty: 1 },
-      { id: 'comp-ingot', sourceUuid: 'uuid:ingot', difficulty: 1 }
+      { id: 'comp-extract', registeredItemUuid: 'uuid:extract', difficulty: 1 },
+      { id: 'comp-ingot', registeredItemUuid: 'uuid:ingot', difficulty: 1 }
     ]
   });
   setupGame(system);
@@ -497,8 +497,8 @@ test('multi-step: a cancelled interactive continuation aborts the resume with ze
     id: 'sys-1',
     resolutionMode: 'simple',
     managedItems: [
-      { id: 'comp-extract', sourceUuid: 'uuid:extract', difficulty: 1 },
-      { id: 'comp-ingot', sourceUuid: 'uuid:ingot', difficulty: 1 }
+      { id: 'comp-extract', registeredItemUuid: 'uuid:extract', difficulty: 1 },
+      { id: 'comp-ingot', registeredItemUuid: 'uuid:ingot', difficulty: 1 }
     ]
   });
   setupGame(system);
@@ -630,8 +630,8 @@ function makeLegacyOutcomeRoutingSystem(id = 'sys-legacy-routing') {
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
-      { id: 'comp-great-potion', sourceUuid: 'uuid:great-potion', difficulty: 1 },
-      { id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }
+      { id: 'comp-great-potion', registeredItemUuid: 'uuid:great-potion', difficulty: 1 },
+      { id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }
     ]
   });
 }
@@ -775,9 +775,9 @@ function makeProgressiveSystem(id = 'sys-prog') {
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
-      { id: 'comp-a', sourceUuid: 'uuid:item-a', difficulty: 3 },
-      { id: 'comp-b', sourceUuid: 'uuid:item-b', difficulty: 5 },
-      { id: 'comp-c', sourceUuid: 'uuid:item-c', difficulty: 7 }
+      { id: 'comp-a', registeredItemUuid: 'uuid:item-a', difficulty: 3 },
+      { id: 'comp-b', registeredItemUuid: 'uuid:item-b', difficulty: 5 },
+      { id: 'comp-c', registeredItemUuid: 'uuid:item-c', difficulty: 7 }
     ]
   });
 }
@@ -950,7 +950,7 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
       progressive: null,
       consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
     },
-    managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }],
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }],
   });
   setupGame(system);
   globalThis.fromUuid = async () => makeSourceItem('Potion');
@@ -1022,7 +1022,7 @@ test('check-failure breakTools: a macro data.breakTools does NOT force-break the
       progressive: null,
       consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
     },
-    managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }],
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }],
   });
   setupGame(system);
   globalThis.fromUuid = async () => makeSourceItem('Potion');

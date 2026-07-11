@@ -376,7 +376,7 @@ test('_createSingleResult uses deterministic loot fallback type when managed sou
         id: 'comp-potion',
         name: 'Potion',
         img: 'icons/svg/potion.svg',
-        sourceUuid: 'uuid:missing-potion',
+        registeredItemUuid: 'uuid:missing-potion',
       },
     ],
   });
@@ -987,9 +987,9 @@ function buildProgressiveFixture() {
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
     },
     managedItems: [
-      { id: 'comp-a', sourceUuid: 'uuid:a', difficulty: 2 },
-      { id: 'comp-b', sourceUuid: 'uuid:b', difficulty: 3 },
-      { id: 'comp-c', sourceUuid: 'uuid:c', difficulty: 5 },
+      { id: 'comp-a', registeredItemUuid: 'uuid:a', difficulty: 2 },
+      { id: 'comp-b', registeredItemUuid: 'uuid:b', difficulty: 3 },
+      { id: 'comp-c', registeredItemUuid: 'uuid:c', difficulty: 5 },
     ],
   });
 

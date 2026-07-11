@@ -631,7 +631,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
           name: 'Spellbook',
           img: 'icons/book.webp',
           description: 'A tome of spells.',
-          sourceItemUuid: 'Item.book1',
+          originItemUuid: 'Item.book1',
           // Per-item caps (issue 511) — the canonical source the builder reads for the
           // book's use/learn limits + access badge.
           caps: caps ?? { item: {}, learn: {} },

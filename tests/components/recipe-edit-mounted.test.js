@@ -2967,12 +2967,12 @@ describe('RecipeItemInspector (mounted)', () => {
     };
     globalThis.fromUuid = async (uuid) => DOCS[uuid] || null;
     const DEFS = [
-      { id: 'ri-blue', name: 'Blue Def', img: 'icons/blue-def.webp', sourceItemUuid: 'Item.blue' },
+      { id: 'ri-blue', name: 'Blue Def', img: 'icons/blue-def.webp', originItemUuid: 'Item.blue' },
       {
         id: 'ri-green',
         name: 'Green Def',
         img: 'icons/green-def.webp',
-        sourceItemUuid: 'Item.green',
+        originItemUuid: 'Item.green',
       },
     ];
     const target = await inspectorHarness.mount(
@@ -3034,7 +3034,7 @@ describe('RecipeItemInspector (mounted)', () => {
             id: 'ri1',
             name: 'Old Item',
             img: 'icons/svg/item-bag.svg',
-            sourceItemUuid: 'Item.gone',
+            originItemUuid: 'Item.gone',
           },
         ],
       })
@@ -3057,8 +3057,8 @@ describe('RecipeItemInspector (mounted)', () => {
     globalThis.fromUuid = async () => null; // resolve to def name/img (missing → def fallback shown)
     const removed = [];
     const DEFS = [
-      { id: 'ri-a', name: 'Alpha Tome', img: 'icons/a.webp', sourceItemUuid: 'Item.a' },
-      { id: 'ri-b', name: 'Beta Scroll', img: 'icons/b.webp', sourceItemUuid: 'Item.b' },
+      { id: 'ri-a', name: 'Alpha Tome', img: 'icons/a.webp', originItemUuid: 'Item.a' },
+      { id: 'ri-b', name: 'Beta Scroll', img: 'icons/b.webp', originItemUuid: 'Item.b' },
     ];
     const target = await inspectorHarness.mount(
       inspectorProps({

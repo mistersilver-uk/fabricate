@@ -25,11 +25,11 @@ function makeSystem(overrides = {}) {
   };
 }
 
-function makeItem(uuid, parentActor = null, sourceUuid = null) {
+function makeItem(uuid, parentActor = null, registeredItemUuid = null) {
   return {
     uuid,
     parent: parentActor,
-    _sourceUuid: sourceUuid
+    _sourceUuid: registeredItemUuid
   };
 }
 
@@ -62,7 +62,7 @@ function makeCraftingSystemManager(systems) {
   return { getSystems: () => systems };
 }
 
-// Minimal sourceUuid mock — normally imported from utils
+// Minimal registeredItemUuid mock — normally imported from utils
 global._sourceUuidOverrides = {};
 
 // ─── Tests ────────────────────────────────────────────────────────────────

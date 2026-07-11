@@ -379,7 +379,7 @@ test('timed step transfers effects via the persisted resolvedEssences snapshot',
     craftingCheck: { enabled: false, consumption: {} },
     components: [
       { id: 'ember', name: 'Ember', essences: { fire: 1 } },
-      { id: 'fire-comp', name: 'Fire Comp', sourceUuid: 'Item.fire-src' },
+      { id: 'fire-comp', name: 'Fire Comp', registeredItemUuid: 'Item.fire-src' },
     ],
     essenceDefinitions: [{ id: 'fire', sourceComponentId: 'fire-comp' }],
   };
