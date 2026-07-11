@@ -110,6 +110,21 @@ export class CraftingSystemManager {
     return isSafeFlagKeySegment(systemId) ? `roles.${systemId}.toolId` : null;
   }
 
+  /**
+   * The durable per-system RECIPE-ITEM identity flag key `roles.<systemId>.recipeItemDefinitionId`
+   * (issue 567), or `null` when `systemId` is not a safe dotted-path segment. The third additive
+   * SIBLING under `roles.<systemId>` after `componentId` (#556) and `toolId` (#561): a book
+   * registered as a recipe-item definition in two systems carries a per-system leaf in EACH, and
+   * clearing one system's leaf never touches another's or the sibling component/tool leaves. A
+   * null result means a stamp/clear/repair site must NOT write; the recipe item still resolves
+   * through the legacy-scalar + raw-reference fall-through. Retires the #555 single scalar
+   * `flags.fabricate.recipeItemDefinitionId` and its cross-system "last writer wins" collision.
+   * @private
+   */
+  _recipeItemRoleFlagKey(systemId) {
+    return isSafeFlagKeySegment(systemId) ? `roles.${systemId}.recipeItemDefinitionId` : null;
+  }
+
   _normalizeSystem(system = {}) {
     const systemId = system.id || foundry.utils.randomID();
     const features = this._normalizeFeatures(system);
@@ -1826,6 +1841,12 @@ export class CraftingSystemManager {
       throw new Error(`Cannot add non-Item document (${source.documentName}) as a recipe item`);
     }
 
+    // The durable per-system recipe-item identity leaf `roles.<system.id>.recipeItemDefinitionId`
+    // (issue 567). A dotted/unsafe id yields null, so every stamp/clear below is skipped and the
+    // recipe item resolves through the legacy-scalar + raw-reference fall-through, exactly like a
+    // component under an unsafe id.
+    const roleFlagKey = this._recipeItemRoleFlagKey(system.id);
+
     const snapshot = await this._buildRecipeItemSourceSnapshot(itemUuid, source);
     const existing = this._findRecipeItemDefinitionForSource(system, snapshot, source);
     if (existing) {
@@ -1835,12 +1856,12 @@ export class CraftingSystemManager {
         existing.description === snapshot.description &&
         existing.originItemUuid === snapshot.originItemUuid;
 
-      // Stamp the durable identity flag (and strip a clone's stale `_stats`) on BOTH
+      // Stamp the durable identity leaf (and strip a clone's stale `_stats`) on BOTH
       // the skipped and updated branches. This makes `skipped` a user-accessible
       // recovery path: re-registering an unchanged definition whose source predates
       // the flag still stamps and strips it (issue 555).
       const previousSourceUuid = existing.originItemUuid;
-      await this._stampSourceIdentity(source, 'recipeItemDefinitionId', existing.id);
+      if (roleFlagKey) await this._stampSourceIdentity(source, roleFlagKey, existing.id);
 
       if (unchanged) {
         return { item: existing, action: 'skipped' };
@@ -1852,10 +1873,11 @@ export class CraftingSystemManager {
       existing.originItemUuid = snapshot.originItemUuid;
 
       await this.save();
-      // A source-uuid change is a re-point: clear the durable flag off the old source
-      // document so it no longer claims this definition.
-      if (previousSourceUuid && previousSourceUuid !== snapshot.originItemUuid) {
-        await this._clearSourceFlag(previousSourceUuid, 'recipeItemDefinitionId', existing.id);
+      // A source-uuid change is a re-point: clear ONLY the durable per-system leaf off the old
+      // source document so it no longer claims this definition — never the whole `roles` flag
+      // nor the whole `roles[systemId]` object (that would destroy sibling componentId/toolId).
+      if (roleFlagKey && previousSourceUuid && previousSourceUuid !== snapshot.originItemUuid) {
+        await this._clearSourceFlag(previousSourceUuid, roleFlagKey, existing.id);
       }
       return { item: existing, action: 'updated' };
     }
@@ -1870,7 +1892,7 @@ export class CraftingSystemManager {
     recipeItemDefinitions.push(item);
     system.recipeItemDefinitions = recipeItemDefinitions;
 
-    await this._stampSourceIdentity(source, 'recipeItemDefinitionId', item.id);
+    if (roleFlagKey) await this._stampSourceIdentity(source, roleFlagKey, item.id);
     await this.save();
     return { item, action: 'added' };
   }
@@ -2843,13 +2865,18 @@ export class CraftingSystemManager {
   }
 
   /**
-   * R3 one-shot auto-stamp (issue 555): stamp the durable `recipeItemDefinitionId` flag
-   * (and strip a clone's stale `_stats`) on every registered recipe-item definition's
-   * writable source Item — world items and unlocked-pack items. Locked packs and
-   * unresolvable sources are counted and skipped. Idempotent: a second run finds every
-   * source already stamped and performs zero writes. Sources only — owned copies are
-   * covered by future drags (the durable flag is inherited) and by the manual repair.
-   * Callers gate this on primary-GM + the one-shot setting version; it does no gating of
+   * One-shot auto-stamp (issue 555, repurposed by issue 567): backfill the durable per-system
+   * recipe-item identity `flags.fabricate.roles[system.id].recipeItemDefinitionId` (and strip a
+   * clone's stale `_stats`) on every registered recipe-item definition's writable source Item —
+   * world items and unlocked-pack items. A shared source registered as a definition in BOTH
+   * system A and system B is stamped once per owning system, so it carries both `roles.A` and
+   * `roles.B` leaves (the two-leaf outcome). Dotted (unsafe) system ids and locked packs /
+   * unresolvable sources are counted and skipped. Idempotent: a second run finds every source
+   * already stamped and performs zero writes. Sources only — owned copies are covered by future
+   * drags (the durable flag is inherited) and by the manual repair. The legacy scalar is NOT
+   * stripped; it remains the transitional read-only fallback tier for pre-upgrade owned copies.
+   * Callers gate this on primary-GM + the one-shot setting version (`RECIPE_ITEM_FLAG_STAMP_TARGET`
+   * bumped 1 → 2 so a world stamped at v1 re-runs once to backfill `roles`); it does no gating of
    * its own beyond writability, so it is safe to unit-test directly.
    *
    * @returns {Promise<{scanned:number, stamped:number, stripped:number, skippedLocked:number, skippedMissing:number}>}
@@ -2857,6 +2884,10 @@ export class CraftingSystemManager {
   async autoStampRecipeItemSources() {
     const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
     for (const system of this.getSystems()) {
+      // A dotted (unsafe) system id cannot serve as a `roles` map key; skip it rather than
+      // nesting garbage. Its recipe items still resolve via the legacy-scalar + raw-ref path.
+      const flagKey = this._recipeItemRoleFlagKey(system.id);
+      if (!flagKey) continue;
       for (const def of system.recipeItemDefinitions || []) {
         const uuid = def?.originItemUuid;
         if (!uuid || !def?.id) continue;
@@ -2878,11 +2909,7 @@ export class CraftingSystemManager {
             continue;
           }
         }
-        const { stamped, stripped } = await this._writeSourceIdentity(
-          source,
-          'recipeItemDefinitionId',
-          def.id
-        );
+        const { stamped, stripped } = await this._writeSourceIdentity(source, flagKey, def.id);
         if (stamped) summary.stamped += 1;
         if (stripped) summary.stripped += 1;
       }
@@ -2990,11 +3017,13 @@ export class CraftingSystemManager {
 
   /**
    * Resolve the existing definition a registered source maps to. A NON-clone source's
-   * durable `recipeItemDefinitionId` flag is authoritative (it resolves to its
-   * definition even if the recorded `originItemUuid` drifted); a CLONE's inherited flag
-   * belongs to the ORIGINAL and is ignored (the clone-gate), so a duplicated source
-   * becomes its own definition (issue 555, flow 4b). Falls back to the `originItemUuid`
-   * lookup, which is already clone-gated via `_resolveImportedSourceData`.
+   * durable identity flag is authoritative (it resolves to its definition even if the
+   * recorded `originItemUuid` drifted): the per-system `roles[system.id].recipeItemDefinitionId`
+   * leaf (issue 567) is read FIRST, then the legacy scalar `recipeItemDefinitionId` as a
+   * transitional fallback for a source stamped before the restamp backfilled the map. A
+   * CLONE's inherited flag belongs to the ORIGINAL and is ignored (the clone-gate), so a
+   * duplicated source becomes its own definition (issue 555, flow 4b). Falls back to the
+   * `originItemUuid` lookup, which is already clone-gated via `_resolveImportedSourceData`.
    * @private
    */
   _findRecipeItemDefinitionForSource(system, snapshot, source) {
@@ -3002,6 +3031,12 @@ export class CraftingSystemManager {
       ? system.recipeItemDefinitions
       : [];
     if (!getDuplicateSourceUuid(source)) {
+      const roleFlagKey = this._recipeItemRoleFlagKey(system.id);
+      const roleId = roleFlagKey ? getFabricateFlag(source, roleFlagKey, null) : null;
+      if (roleId) {
+        const byRole = definitions.find((def) => def.id === roleId);
+        if (byRole) return byRole;
+      }
       const flagId = getFabricateFlag(source, 'recipeItemDefinitionId', null);
       if (flagId) {
         const byFlag = definitions.find((def) => def.id === flagId);
@@ -3067,7 +3102,7 @@ export class CraftingSystemManager {
   // tier), or the component source matcher (`tier: null`).
   _resolveOwnedRepairOwner(item, kind) {
     if (kind.bucket === 'recipeItems') {
-      return matchRecipeItemDefinition(item, kind.definitions);
+      return matchRecipeItemDefinition(item, kind.definitions, kind.systemId);
     }
     // A first-class Tool carries its OWN identity, so it MUST resolve through the Tool
     // resolver — routing the tools bucket through the component resolver would mis-resolve
@@ -3190,17 +3225,13 @@ export class CraftingSystemManager {
   async repairComponentSourceFlags({ includeCompendiums = true } = {}) {
     this._assertGM('repair item data');
 
-    const recipeItemDefinitions = [];
-    for (const system of this.getSystems()) {
-      for (const def of system.recipeItemDefinitions || []) recipeItemDefinitions.push(def);
-    }
-
-    // Components resolve PER SYSTEM. Component ids are not globally unique (copy-import
-    // preserves them), and the durable identity is the per-system map key
-    // `roles.<systemId>.componentId`. A per-system kind means each system's pass reads
-    // and writes ONLY its own leaf, so a non-owning system's null-owner pass finds its
-    // leaf unset and no-ops — it can never clear another system's identity, regardless
-    // of getSystems() order (issue 556 Fix 2). Recipe items stay a single scalar aggregate.
+    // Components, tools, AND recipe items all resolve PER SYSTEM. Their definition ids are
+    // not globally unique (copy-import preserves component ids; recipe-item ids are generated
+    // against a per-system uniqueness set), and each durable identity is a per-system map key
+    // `roles.<systemId>.<role>`. A per-system kind means each system's pass reads and writes
+    // ONLY its own leaf, so a non-owning system's null-owner pass finds its leaf unset and
+    // no-ops — it can never clear another system's identity, regardless of getSystems() order
+    // (issue 556 Fix 2, extended to recipe items by issue 567).
     const kinds = [];
     for (const system of this.getSystems()) {
       // A dotted (unsafe) system id cannot serve as a `roles` map key; skip its
@@ -3230,13 +3261,22 @@ export class CraftingSystemManager {
           refExtractor: (def) => getItemMatchUuids(def),
         });
       }
+      // Recipe items are ALSO a per-system kind (issue 567): each system's pass reads and
+      // writes ONLY its own `roles.<systemId>.recipeItemDefinitionId` leaf, so a shared
+      // source registered in two systems keeps a durable claim in each and neither clobbers
+      // the other. A dotted/unsafe system id is skipped (its recipe items resolve via the
+      // legacy-scalar + raw-reference fall-through).
+      const recipeFlagKey = this._recipeItemRoleFlagKey(system.id);
+      if (recipeFlagKey) {
+        kinds.push({
+          bucket: 'recipeItems',
+          flagKey: recipeFlagKey,
+          systemId: system.id,
+          definitions: system.recipeItemDefinitions || [],
+          refExtractor: (def) => getItemMatchUuids(def),
+        });
+      }
     }
-    kinds.push({
-      bucket: 'recipeItems',
-      flagKey: 'recipeItemDefinitionId',
-      definitions: recipeItemDefinitions,
-      refExtractor: (def) => getItemMatchUuids(def),
-    });
 
     const summary = {
       scanned: 0,

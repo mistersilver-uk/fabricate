@@ -431,21 +431,35 @@ export function itemResolvesToComponent(item, component, components, systemId) {
 export const RECIPE_ITEM_MATCH_TIERS = ['identity', 'uuid', 'compendium', 'duplicate'];
 
 /**
- * Resolve which recipe-item definition an item IS, and by how durable a link.
+ * Resolve which recipe-item definition an item IS, and by how durable a link, within ONE
+ * crafting system's candidate set scoped by that system's id.
  *
  * This is the single shared matcher for recipe items, mirroring
- * {@link resolveComponentForItem}'s durable-identity-first, list-aware split. It evaluates four
- * tiers in strict precedence order — the FIRST tier that yields any matching
- * definition wins and there is NO fall-through to a lower tier:
+ * {@link resolveComponentForItem}'s durable-identity-first, list-aware split. It evaluates the
+ * `identity` tier first via {@link durableClaimedFromSet} (the per-system `roles` map, then
+ * the legacy scalar), and — only when no durable flag names a definition in the set — the
+ * source-reference tiers in strict precedence order (the FIRST source tier that yields any
+ * matching definition wins):
  *
- *   1. `identity`   — `flags.fabricate.recipeItemDefinitionId === def.id` (the
- *                     durable, transferable identity-of-record; survives Foundry's
- *                     transitive `_stats.duplicateSource` template chaining).
- *   2. `uuid`       — `item.uuid === def.originItemUuid` (the item IS the source).
- *   3. `compendium` — `getCompendiumSourceUuid(item) === def.originItemUuid` (compendium
- *                     provenance; a pack copy of the registered source).
- *   4. `duplicate`  — `getDuplicateSourceUuid(item) === def.originItemUuid` (a
- *                     drag/duplicate copy of an un-migrated world-template source).
+ *   1. `identity`   — `flags.fabricate.roles[systemId].recipeItemDefinitionId` names a
+ *                     definition in the set (durable, transferable identity-of-record, the
+ *                     third `roles` sibling after componentId #556 and toolId #561), then
+ *                     the legacy scalar `flags.fabricate.recipeItemDefinitionId` names one
+ *                     (a transitional read-only fallback honored until the one-shot restamp
+ *                     backfills the map). Both are LIST-AWARE: a claim naming nothing in
+ *                     THIS set is irrelevant and evaluation falls through.
+ *   2. `uuid`       — `item.uuid` is among the definition's union source refs (the item IS
+ *                     the source).
+ *   3. `compendium` — `getCompendiumSourceUuid(item)` is among them (compendium provenance;
+ *                     a pack copy of the registered source).
+ *   4. `duplicate`  — `getDuplicateSourceUuid(item)` is among them (a drag/duplicate copy
+ *                     of an un-migrated world-template source).
+ *
+ * `systemId` is threaded, not derivable: recipe-item definition ids are NOT globally
+ * unique (they are generated against a per-system uniqueness set), so identity is scoped
+ * per system exactly like components. A dotted/unsafe `systemId` yields no roles claim
+ * (`claimedRoleId` returns null via `isSafeFlagKeySegment`) and degrades to the legacy
+ * scalar + source-uuid tiers, warning once per offending system rather than throwing.
  *
  * There is no clone-gate here, and there must never be one. Foundry stamps
  * `_stats.duplicateSource` on EVERY non-compendium drag-drop, so every legitimate
@@ -461,33 +475,48 @@ export const RECIPE_ITEM_MATCH_TIERS = ['identity', 'uuid', 'compendium', 'dupli
  * into one gate reintroduces issue 555.
  *
  * @param {Item|object|null} item - Item-like object with `uuid`, source metadata, and `getFlag`
- * @param {Array<object>|null} definitions - Candidate recipe-item definitions
+ * @param {Array<object>|null} definitions - Candidate recipe-item definitions (ONE system)
+ * @param {string|null|undefined} systemId - That system's id.
  * @returns {{definition: object|null, tier: ('identity'|'uuid'|'compendium'|'duplicate'|null)}}
  */
-export function matchRecipeItemDefinition(item, definitions) {
+export function matchRecipeItemDefinition(item, definitions, systemId) {
   const empty = { definition: null, tier: null };
   if (!item || typeof item !== 'object') return empty;
   const defs = Array.isArray(definitions) ? definitions : [];
   if (defs.length === 0) return empty;
 
-  const flagValue = getFabricateFlag(item, 'recipeItemDefinitionId', null);
-  const uuid = typeof item.uuid === 'string' ? item.uuid : null;
-  const compendium = getCompendiumSourceUuid(item);
-  const duplicate = getDuplicateSourceUuid(item);
+  // A dotted/unsafe systemId can never have been written as a `roles` map key, so there is
+  // no identity claim to honour; degrade to the legacy scalar + source-uuid tiers and leave
+  // a single breadcrumb per offending system rather than a mute degrade or a throw.
+  if (systemId != null && !isSafeFlagKeySegment(systemId)) {
+    warnUnsafeSystemIdOnce(systemId);
+  }
+
+  // Tier 1 (identity): the durable per-system `roles` map, then the legacy scalar — both
+  // list-aware. Keeps the `identity` tier label so every existing tier consumer (e.g. the
+  // repair reliability check `tier !== 'duplicate'`) is unaffected.
+  const durable = durableClaimedFromSet(item, defs, systemId, {
+    roleKey: 'recipeItemDefinitionId',
+    legacyScalarKey: 'recipeItemDefinitionId',
+  });
+  if (durable) return { definition: durable, tier: 'identity' };
 
   // Tiers 2/3/4 test membership in the definition's UNION of source refs (its
   // `registeredItemUuid` + `originItemUuid` + aliases), so a compendium-imported book
   // resolves whether the owned copy was dragged from the compendium item or the
-  // imported world item. Tier 1 (the durable flag) still wins outright.
+  // imported world item. Unchanged from the pre-#567 fall-through.
+  const uuid = typeof item.uuid === 'string' ? item.uuid : null;
+  const compendium = getCompendiumSourceUuid(item);
+  const duplicate = getDuplicateSourceUuid(item);
   const refSets = new Map(defs.map((def) => [def, new Set(getItemMatchUuids(def))]));
   const predicates = {
-    identity: (def) => flagValue != null && def?.id != null && String(def.id) === String(flagValue),
     uuid: (def) => uuid != null && refSets.get(def).has(uuid),
     compendium: (def) => compendium != null && refSets.get(def).has(compendium),
     duplicate: (def) => duplicate != null && refSets.get(def).has(duplicate),
   };
 
   for (const tier of RECIPE_ITEM_MATCH_TIERS) {
+    if (tier === 'identity') continue;
     const definition = defs.find(predicates[tier]);
     if (definition) return { definition, tier };
   }
@@ -500,10 +529,11 @@ export function matchRecipeItemDefinition(item, definitions) {
  *
  * @param {Item|object|null} item
  * @param {Array<object>|null} definitions
+ * @param {string|null|undefined} systemId
  * @returns {boolean}
  */
-export function itemMatchesRecipeItemSource(item, definitions) {
-  return matchRecipeItemDefinition(item, definitions).definition != null;
+export function itemMatchesRecipeItemSource(item, definitions, systemId) {
+  return matchRecipeItemDefinition(item, definitions, systemId).definition != null;
 }
 
 /**
