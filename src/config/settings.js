@@ -32,9 +32,10 @@ export const SETTING_KEYS = Object.freeze({
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
   INTERACTION_PROMPT_POSITION: 'interactionPromptPosition',
-  // Issue 555: version stamp for the one-shot primary-GM recipe-item durable-flag
-  // backfill. Bumped past `RECIPE_ITEM_FLAG_STAMP_TARGET` once the pass has run so it
-  // never repeats.
+  // Issue 555 (repurposed by issue 567): version stamp for the one-shot primary-GM
+  // recipe-item durable-flag backfill. Bumped past `RECIPE_ITEM_FLAG_STAMP_TARGET` once the
+  // pass has run so it never repeats. Target 2 backfills the per-system
+  // `roles[systemId].recipeItemDefinitionId` leaf (v1 stamped the retired scalar).
   RECIPE_ITEM_FLAG_STAMP_VERSION: 'recipeItemFlagStampVersion',
   // Issue 556: version stamp for the one-shot primary-GM component durable-flag backfill
   // that writes `flags.fabricate.roles[systemId].componentId` on registered component
@@ -48,8 +49,10 @@ export const SETTING_KEYS = Object.freeze({
 
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
 // `RECIPE_ITEM_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once
-// on `ready` and writes this value back.
-export const RECIPE_ITEM_FLAG_STAMP_TARGET = 1;
+// on `ready` and writes this value back. Bumped 1 → 2 by issue 567: v1 stamped the retired
+// scalar `flags.fabricate.recipeItemDefinitionId`, v2 backfills the per-system
+// `roles[systemId].recipeItemDefinitionId` leaf, so a world stamped at v1 re-runs once.
+export const RECIPE_ITEM_FLAG_STAMP_TARGET = 2;
 
 // The target version for the one-shot component flag auto-stamp (issue 556). When the
 // stored `COMPONENT_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill

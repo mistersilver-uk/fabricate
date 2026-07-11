@@ -481,7 +481,7 @@ export class InventoryListingBuilder {
       const actorImg = stringOrNull(actor?.img);
       const items = actor?.items ? [...actor.items] : [];
       for (const item of items) {
-        const def = this._matchRecipeItemDefinition(item, definitions);
+        const def = this._matchRecipeItemDefinition(item, definitions, systemId);
         if (!def?.id) continue;
         const qty = itemStackQuantity(item);
         let entry = owned.get(def.id);
@@ -605,15 +605,17 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * Resolve the recipe-item definition an owned item matches, through the one shared
-   * four-tier matcher (`matchRecipeItemDefinition`) that the runtime
-   * `RecipeVisibilityService` also consumes — durable `recipeItemDefinitionId` flag
-   * first, then own uuid, then compendium source, then `_stats.duplicateSource`.
-   * Routing both consumers through the single matcher keeps them from drifting.
+   * Resolve the recipe-item definition an owned item matches, through the one shared,
+   * system-scoped matcher (`matchRecipeItemDefinition`) that the runtime
+   * `RecipeVisibilityService` also consumes — the durable per-system
+   * `roles[systemId].recipeItemDefinitionId` leaf (then the legacy scalar) first, then own
+   * uuid, then compendium source, then `_stats.duplicateSource`. `systemId` scopes the
+   * durable-identity tier (issue 567); the caller passes the current system's id. Routing
+   * both consumers through the single matcher keeps them from drifting.
    * @private
    */
-  _matchRecipeItemDefinition(item, definitions) {
-    return matchRecipeItemDefinition(item, definitions).definition;
+  _matchRecipeItemDefinition(item, definitions, systemId) {
+    return matchRecipeItemDefinition(item, definitions, systemId).definition;
   }
 
   /**

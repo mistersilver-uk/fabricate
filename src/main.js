@@ -2298,14 +2298,16 @@ Hooks.once('ready', async () => {
 });
 
 /**
- * Issue 555 R3 — one-shot, primary-GM-gated backfill that stamps the durable
- * `flags.fabricate.recipeItemDefinitionId` (and strips stale `_stats.duplicateSource`)
- * on every registered recipe-item definition's writable source Item. Keyed by the
- * `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
- * Sources only — owned copies inherit the flag on future drags and are otherwise
- * covered by the manual "Repair item data" action. This is NOT a MigrationRunner entry:
- * that runner reads and writes only settings-data payloads and has no Item handle, so it
- * cannot write Item flags.
+ * Issue 555 R3 (repurposed by issue 567) — one-shot, primary-GM-gated backfill that stamps
+ * the durable per-system recipe-item identity `flags.fabricate.roles[systemId].recipeItemDefinitionId`
+ * (and strips stale `_stats.duplicateSource`) on every registered recipe-item definition's
+ * writable source Item, per owning system, so a source registered in two systems lands both
+ * leaves. Keyed by the `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting (target bumped 1 → 2), so
+ * a world already stamped at v1 (the retired scalar) re-runs once to backfill the `roles` map;
+ * a fresh world runs once. Sources only — owned copies inherit the flag on future drags and are
+ * otherwise covered by the manual "Repair item data" action. This is NOT a MigrationRunner entry:
+ * that runner reads and writes only settings-data payloads and has no Item handle, so it cannot
+ * write Item flags.
  */
 async function runRecipeItemFlagAutoStamp() {
   try {

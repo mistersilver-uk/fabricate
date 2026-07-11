@@ -59,17 +59,18 @@ This ensures consistent behaviour across Foundry versions.
 
 ## Recipe Item Matching
 
-A candidate owned item is matched to a recipe item definition through one shared matcher (`matchRecipeItemDefinition`) that evaluates four tiers in strict precedence order (issue 555).
-The FIRST tier that yields a matching definition wins, and there is NO fall-through to a lower tier.
+A candidate owned item is matched to a recipe item definition through one shared, system-scoped matcher (`matchRecipeItemDefinition(item, definitions, systemId)`) that evaluates four tiers (issue 555, made per-system by issue 567), mirroring `resolveComponentForItem`.
+The durable identity tier (tier 1) is evaluated first and is LIST-AWARE (a claimed id naming nothing in the candidate set falls through); among the source-reference tiers 2–4 the FIRST that yields a matching definition wins, with NO fall-through to a lower source tier.
 Tiers 2–4 test membership in the definition's UNION of source references — its `registeredItemUuid` (the registered live document), its `originItemUuid` (the canonical compendium/source uuid), and any `aliasItemUuids`.
 
-1. `identity` — `getFabricateFlag(candidate, 'recipeItemDefinitionId') === recipeItemDefinition.id`.
+1. `identity` — the durable, system-scoped identity: `flags.fabricate.roles[systemId].recipeItemDefinitionId` names a definition in the set first, then the legacy scalar `flags.fabricate.recipeItemDefinitionId` names one — each matching exclusively and otherwise falling through.
 2. `uuid` — `candidate.uuid` is among the definition's source references.
 3. `compendium` — `resolveSourceUuid(candidate)` is among the definition's source references.
 4. `duplicate` — `resolveDuplicateSourceUuid(candidate)` (the transitive `_stats.duplicateSource`) is among the definition's source references.
 
-Tier 1 is the durable identity-of-record: `flags.fabricate.recipeItemDefinitionId` is a transferable marker, copied into every drag/duplicate copy, that survives Foundry's transitive `_stats.duplicateSource` template chaining, which source-uuid matching cannot.
-This mirrors the component `flags.fabricate.componentId` identity/matching split.
+Tier 1 is the durable identity-of-record: `flags.fabricate.roles[systemId].recipeItemDefinitionId` is the third per-system `roles` sibling after `componentId` (#556) and `toolId` (#561), a transferable marker copied into every drag/duplicate copy that survives Foundry's transitive `_stats.duplicateSource` template chaining, which source-uuid matching cannot.
+The legacy scalar `flags.fabricate.recipeItemDefinitionId` is a transitional read-only fallback tier honored until the one-shot restamp backfills the map.
+Definition ids are NOT globally unique (generated per system), so `systemId` scopes the identity tier exactly as it does for components; a dotted/unsafe id degrades to the legacy-scalar + source-uuid tiers (warning once) rather than throwing.
 Tiers 3 and 4 cover compendium-derived and world-duplicate copies; on Foundry v12+, `_stats.compendiumSource` carries the tier-3 value and on v11 `flags.core.sourceId` does, and the resolver handles both transparently.
 The tier-4 `_stats.duplicateSource` condition was matched at runtime before issue 555 but undocumented here; it is now part of the precedence.
 
@@ -515,8 +516,8 @@ Matching is otherwise based solely on the resolved recipe item definition identi
 
 #### Matching Rules
 
-A dropped item is matched to a recipe item definition through the shared four-tier matcher (`matchRecipeItemDefinition`) defined in **Recipe Item Matching** above: the durable `recipeItemDefinitionId` flag (tier 1) first, then membership in the definition's union of source references by the item's own uuid (tier 2), its compendium source (tier 3), or its transitive `_stats.duplicateSource` (tier 4).
-The first tier that yields a match wins, with no fall-through.
+A dropped item is matched to a recipe item definition through the shared, system-scoped four-tier matcher (`matchRecipeItemDefinition`) defined in **Recipe Item Matching** above: the durable identity tier (tier 1) — the per-system `roles[systemId].recipeItemDefinitionId` leaf, then the legacy scalar — first, then membership in the definition's union of source references by the item's own uuid (tier 2), its compendium source (tier 3), or its transitive `_stats.duplicateSource` (tier 4).
+The list-aware identity tier is evaluated first; among the source-reference tiers the first that yields a match wins, with no fall-through.
 `resolveSourceUuid` reads `_stats.compendiumSource` first (Foundry v12+), then falls back to `flags.core.sourceId` (Foundry v11 and earlier).
 
 The `createItem` bulk auto-learn path applies the tier-4 confidence gate above; explicit learn, the picker, and display do not.
