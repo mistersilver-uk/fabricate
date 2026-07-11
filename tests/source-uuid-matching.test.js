@@ -61,8 +61,26 @@ function makeIngredient(componentId, quantity = 1) {
   };
 }
 
+// Issue 561: a first-class Tool carries its OWN source refs (derived from its linked
+// component at migration/registration). Build the tool that the system exposes so the
+// matcher resolves the owned item against the tool's own refs, not through the component.
+function toolFromComponent(component) {
+  return {
+    id: `tool-${component.id}`,
+    componentId: component.id,
+    // No snapshot name here so the presence name-fallback resolves through the linked
+    // component's name (the migrated-tool behaviour), exactly as it did before.
+    name: null,
+    sourceUuid: component.sourceUuid || component.sourceItemUuid || null,
+    sourceItemUuid: component.sourceItemUuid || component.sourceUuid || null,
+    fallbackItemIds: Array.isArray(component.fallbackItemIds) ? component.fallbackItemIds : [],
+  };
+}
+
+// The `tool` argument passed to the matcher; it shares an id with the tool the system
+// exposes, so `resolveToolForItem` (which matches against `system.tools`) resolves to it.
 function makeTool(componentId) {
-  return { componentId, name: `tool-` };
+  return { id: `tool-${componentId}`, componentId, name: null };
 }
 
 function makeRecipe(overrides = {}) {
@@ -74,18 +92,21 @@ function makeRecipe(overrides = {}) {
   };
 }
 
-/** Build a fake system with one managed component */
+/** Build a fake system with one managed component and its first-class tool. */
 function makeSystem(componentId, sourceUuid, name = 'Test Item') {
+  const component = { id: componentId, sourceUuid, name };
   return {
     features: {},
-    components: [{ id: componentId, sourceUuid, name }]
+    components: [component],
+    tools: [toolFromComponent(component)]
   };
 }
 
 function makeSystemWithComponent(component) {
   return {
     features: {},
-    components: [component]
+    components: [component],
+    tools: [toolFromComponent(component)]
   };
 }
 

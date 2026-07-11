@@ -43,6 +43,37 @@ export function componentSet(id, components) {
 }
 
 /**
+ * Build a first-class-Tool-like object (issue 561). A tool carries the SAME source-ref
+ * field shape a component does — `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` — plus
+ * an optional `componentId` link and `name`/`img` display snapshot. All optional so a fixture
+ * can decouple the tool's raw refs from an item's identity to force the durable tier or the
+ * raw-ref fall-through under test.
+ *
+ * @param {string} id
+ * @param {{sourceUuid?:string, sourceItemUuid?:string, fallbackItemIds?:string[], componentId?:string, name?:string}} [refs]
+ * @returns {object}
+ */
+export function tool(id, refs = {}) {
+  const { sourceUuid = null, sourceItemUuid = null, fallbackItemIds = [], componentId, name } = refs;
+  const built = { id, sourceUuid, sourceItemUuid, fallbackItemIds };
+  if (componentId !== undefined) built.componentId = componentId;
+  if (name !== undefined) built.name = name;
+  return built;
+}
+
+/**
+ * A crafting-system-like Tools candidate set: `{ id, tools }`. The Tool-kind analogue of
+ * {@link componentSet}.
+ *
+ * @param {string} id
+ * @param {object[]} tools
+ * @returns {{id:string, tools:object[]}}
+ */
+export function toolSet(id, tools) {
+  return { id, tools };
+}
+
+/**
  * A `document.getFlag`-compatible reader over an explicit value bag, matching how
  * `getFabricateFlag(item, key)` calls `getFlag('fabricate', 'fabricate.<key>')`.
  * A value of `undefined` means "flag absent".

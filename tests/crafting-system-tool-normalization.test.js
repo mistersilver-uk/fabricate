@@ -39,6 +39,11 @@ test('_normalizeTool produces the canonical Tool shape with defaults for a spars
     label: '',
     enabled: true,
     componentId: null,
+    name: null,
+    img: null,
+    sourceUuid: null,
+    sourceItemUuid: null,
+    fallbackItemIds: [],
     requirement: null,
     breakage: { mode: 'limitedUses', maxUses: null },
     onBreak: { mode: 'destroy' }
@@ -146,6 +151,11 @@ test('_normalizeSystem populates a normalized tools array', () => {
     label: 'Axe',
     enabled: true,
     componentId: 'comp-axe',
+    name: null,
+    img: null,
+    sourceUuid: null,
+    sourceItemUuid: null,
+    fallbackItemIds: [],
     requirement: null,
     breakage: { mode: 'limitedUses', maxUses: 5 },
     onBreak: { mode: 'destroy' }
@@ -166,6 +176,39 @@ test('_normalizeSystem round-trips tools through normalization (re-normalize is 
   const once = manager._normalizeSystem({ id: 'sys1', tools: [{ id: 't1', label: ' Pick ', componentId: ' c1 ' }] });
   const twice = manager._normalizeSystem(once);
   assert.deepEqual(twice.tools, once.tools);
+});
+
+// ---------------------------------------------------------------------------
+// issue 561: first-class tool source refs + name/img snapshot preservation
+// ---------------------------------------------------------------------------
+
+test('_normalizeTool preserves source refs + name/img snapshot and never clobbers label (C3)', () => {
+  const manager = makeManager();
+  const tool = manager._normalizeTool({
+    id: 't1',
+    label: 'GM Custom Label',
+    componentId: null,
+    name: 'Iron Pickaxe',
+    img: 'icons/tools/pick.webp',
+    sourceUuid: 'Item.live',
+    sourceItemUuid: 'Compendium.pack.canonical',
+    fallbackItemIds: ['Item.old', 'Item.old', '  ', 'Item.live'],
+  });
+  // Source + snapshot fields survive the unknown-field strip.
+  assert.equal(tool.name, 'Iron Pickaxe');
+  assert.equal(tool.img, 'icons/tools/pick.webp');
+  assert.equal(tool.sourceUuid, 'Item.live');
+  assert.equal(tool.sourceItemUuid, 'Compendium.pack.canonical');
+  // fallbackItemIds de-dupes, trims, and drops the primary-ref overlap ('Item.live').
+  assert.deepEqual(tool.fallbackItemIds, ['Item.old']);
+  // The user-authored label is preserved verbatim — never overwritten by the snapshot.
+  assert.equal(tool.label, 'GM Custom Label');
+  // A first-class item-sourced tool has componentId: null.
+  assert.equal(tool.componentId, null);
+
+  // Round-trip is stable (re-normalizing the output yields the same shape).
+  const twice = manager._normalizeTool(tool);
+  assert.deepEqual(twice, tool);
 });
 
 // ---------------------------------------------------------------------------

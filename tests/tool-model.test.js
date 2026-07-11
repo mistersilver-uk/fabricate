@@ -239,9 +239,17 @@ test('Tool.validate - replaceWith requires replacementComponentId distinct from 
 // JSON round-trip
 // ---------------------------------------------------------------------------
 
-test('Tool.toJSON / fromJSON round-trip preserves shape', () => {
+test('Tool.toJSON / fromJSON round-trip preserves shape including snapshot + source refs + label', () => {
   const original = new Tool({
     componentId: 'comp-axe',
+    // Distinct user-authored label + the name/img display snapshot + own source refs
+    // (issue 561) — so a toJSON that DROPS any of them fails this round-trip (R2-N1).
+    label: 'GM Custom Axe',
+    name: 'Woodsman Axe',
+    img: 'icons/tools/axe.webp',
+    sourceUuid: 'Item.live-axe',
+    sourceItemUuid: 'Compendium.pack.axe',
+    fallbackItemIds: ['Item.old-axe'],
     requirement: { formula: '@flags.proficient' },
     breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 },
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe-broken' },
@@ -250,6 +258,34 @@ test('Tool.toJSON / fromJSON round-trip preserves shape', () => {
   const round = Tool.fromJSON(json);
 
   assert.deepEqual(round.toJSON(), json);
+  // The label + snapshot survive the round-trip unchanged.
+  assert.equal(round.label, 'GM Custom Axe');
+  assert.equal(round.name, 'Woodsman Axe');
+  assert.equal(round.img, 'icons/tools/axe.webp');
+  assert.equal(round.sourceItemUuid, 'Compendium.pack.axe');
+});
+
+test('Tool.validate accepts a source-refs-only tool with componentId null (issue 561, R2-N2)', () => {
+  // POSITIVE case: an un-relaxed validate() still requiring componentId would reject this.
+  const itemSourced = new Tool({
+    componentId: null,
+    name: 'Chisel',
+    sourceUuid: 'Item.chisel',
+    sourceItemUuid: 'Item.chisel',
+  }).validate();
+  assert.equal(itemSourced.valid, true);
+
+  // NEGATIVE case: neither a componentId nor any source ref is invalid.
+  const neither = new Tool({ componentId: null }).validate();
+  assert.equal(neither.valid, false);
+
+  // The onBreak.replaceWith differ-check does not throw / mis-fire when componentId is null.
+  const replaceOnItemSourced = new Tool({
+    componentId: null,
+    sourceItemUuid: 'Item.hammer',
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-broken' },
+  }).validate();
+  assert.equal(replaceOnItemSourced.valid, true);
 });
 
 test('Tool.fromJSON ignores unknown fields', () => {

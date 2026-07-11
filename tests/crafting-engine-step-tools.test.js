@@ -242,7 +242,7 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
   // spared). getFabricateFlag reads the doubly-nested `flags.fabricate.<key>` path.
   const hammer = new FakeItem('h1', {
     name: 'Hammer',
-    flags: { fabricate: { roles: { 'sys-1': { componentId: 'c-hammer' } }, toolUsage: { timesUsed: 0 } } },
+    flags: { fabricate: { roles: { 'sys-1': { toolId: 'tool-hammer' } }, toolUsage: { timesUsed: 0 } } },
     parent: actorRef
   });
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingot, hammer] };
@@ -296,10 +296,11 @@ test('(c) failure-path: a failed check breaks the step-tier tool when breakTools
   const recipe = twoStepRecipe();
   const actorRef = { uuid: 'Actor.a1' };
   const ingot = new FakeItem('i1', { name: 'Ingot', parent: actorRef });
-  // Durable roles identity so the failed-check breakage path can select it (#557).
+  // Durable roles identity so the failed-check breakage path can select it (issue 561:
+  // the tool's own `roles[sys].toolId`).
   const hammer = new FakeItem('h1', {
     name: 'Hammer',
-    flags: { fabricate: { roles: { 'sys-1': { componentId: 'c-hammer' } } } },
+    flags: { fabricate: { roles: { 'sys-1': { toolId: 'tool-hammer' } } } },
     parent: actorRef
   });
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingot, hammer] };

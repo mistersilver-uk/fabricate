@@ -47,11 +47,22 @@ function normalizeToolShape(tool = {}) {
       formula: typeof t.requirement.formula === 'string' ? t.requirement.formula : ''
     };
   }
+  const sourceItemUuid = t.sourceItemUuid || t.sourceUuid || null;
+  const sourceUuid = t.sourceUuid || t.sourceItemUuid || null;
+  const primaryRefs = new Set([sourceUuid, sourceItemUuid].filter((ref) => typeof ref === 'string' && ref.trim()));
   return {
     id,
     label: typeof t.label === 'string' ? t.label.trim() : '',
     enabled: t.enabled !== false,
     componentId: typeof t.componentId === 'string' && t.componentId.trim() ? t.componentId.trim() : null,
+    // Issue 561 first-class tool source refs + display snapshot.
+    name: typeof t.name === 'string' && t.name ? t.name : null,
+    img: typeof t.img === 'string' && t.img ? t.img : null,
+    sourceUuid,
+    sourceItemUuid,
+    fallbackItemIds: Array.isArray(t.fallbackItemIds)
+      ? [...new Set(t.fallbackItemIds.filter((ref) => typeof ref === 'string').map((ref) => ref.trim()).filter((ref) => ref && !primaryRefs.has(ref)))]
+      : [],
     requirement,
     breakage,
     onBreak
@@ -157,6 +168,11 @@ describe('adminStore library tools (system-owned)', () => {
         label: '',
         enabled: true,
         componentId: null,
+        name: null,
+        img: null,
+        sourceUuid: null,
+        sourceItemUuid: null,
+        fallbackItemIds: [],
         requirement: null,
         breakage: { mode: 'limitedUses', maxUses: null },
         onBreak: { mode: 'destroy' }

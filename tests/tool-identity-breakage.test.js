@@ -51,13 +51,26 @@ const { component, roleItem } = await import('./helpers/componentIdentityFixture
 
 const HAMMER_SRC = 'Item.hammer-src-uuid';
 
-// Two managed components carrying real source refs; `c-hammer` is the tool's
+// The first-class Tool (issue 561): it carries its OWN source refs, so both presence
+// (`resolveToolForItem`) and durable-identity breakage (`itemIsToolByDurableIdentity`)
+// resolve owned items against the tool itself, not through a component. The system exposes
+// it in `tools`; the breakage-config variants below share its id so they resolve to it.
+const HAMMER_LIBRARY_TOOL = {
+  id: 'tool-hammer',
+  componentId: 'c-hammer',
+  name: 'Hammer',
+  sourceUuid: HAMMER_SRC,
+  sourceItemUuid: HAMMER_SRC,
+  fallbackItemIds: [],
+};
+
+// Two managed components carrying real source refs; `c-hammer` is the tool's linked
 // component and `c-tongs` a sibling used to prove exclusivity is never violated.
 function hammerSystem(id = 'sys-1') {
   return {
     id,
     features: {},
-    tools: [],
+    tools: [{ ...HAMMER_LIBRARY_TOOL }],
     components: [
       component('c-hammer', { sourceUuid: HAMMER_SRC, name: 'Hammer' }),
       component('c-tongs', { sourceUuid: 'Item.tongs-src-uuid', name: 'Tongs' }),
@@ -109,7 +122,7 @@ function ownedTool(spec = {}) {
 
 // A destroy-on-break tool (breakageChance 100 always breaks; no usage flag written).
 const HAMMER_TOOL = {
-  componentId: 'c-hammer',
+  ...HAMMER_LIBRARY_TOOL,
   breakage: { mode: 'breakageChance', breakageChance: 100 },
   onBreak: { mode: 'destroy' },
 };
@@ -117,7 +130,7 @@ const HAMMER_TOOL = {
 // A limitedUses tool with an unbounded cap: it is USAGE-incremented on every attempt
 // but never breaks, isolating the usage gate from the breakage gate.
 const HAMMER_LIMITED_TOOL = {
-  componentId: 'c-hammer',
+  ...HAMMER_LIBRARY_TOOL,
   breakage: { mode: 'limitedUses', maxUses: null },
   onBreak: { mode: 'destroy' },
 };
@@ -139,11 +152,11 @@ function duplicateSourceDecoy() {
 function nameDecoy() {
   return ownedTool({ uuid: 'Item.decoy-name', name: 'Hammer' });
 }
-// Durable per-system roles flag naming c-hammer.
+// Durable per-system roles flag naming the tool (issue 561: `toolId`, not `componentId`).
 function durableFlagHammer() {
   return ownedTool({
     uuid: 'Item.real-hammer',
-    roles: { 'sys-1': { componentId: 'c-hammer' } },
+    roles: { 'sys-1': { toolId: 'tool-hammer' } },
     name: 'Hammer',
   });
 }

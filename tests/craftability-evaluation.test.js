@@ -152,12 +152,24 @@ function makeRecipeManager() {
  * Build a RecipeManager wired to a system that exposes named components.
  */
 function makeRecipeManagerWithSystem(systemId, components, tools = []) {
+  // Mirror production: `_normalizeSystem` derives a component-linked tool's own source refs
+  // (issue 561) from its component, so the tool matches owned items by source, not just name.
+  const derivedTools = tools.map((tool) => {
+    if (!tool?.componentId || tool.sourceUuid || tool.sourceItemUuid) return tool;
+    const component = components.find((c) => c.id === tool.componentId);
+    if (!component?.sourceUuid && !component?.sourceItemUuid) return tool;
+    return {
+      ...tool,
+      sourceUuid: component.sourceUuid || component.sourceItemUuid || null,
+      sourceItemUuid: component.sourceItemUuid || component.sourceUuid || null,
+    };
+  });
   const system = {
     id: systemId,
     features: { itemTags: false, essences: false },
     components,
     managedItems: components,
-    tools,
+    tools: derivedTools,
     essenceDefinitions: [],
   };
   globalThis.game = {
