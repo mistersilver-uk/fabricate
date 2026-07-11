@@ -12,20 +12,16 @@ import assert from 'node:assert/strict';
 
 import { resolveItemUuidToTool } from '../../src/canvas/interactableItemResolution.js';
 import { classifyInteractableDrop } from '../../src/canvas/interactableResolution.js';
+import { deriveToolSourceFromComponents } from '../../src/migration/migrateToolsToFirstClass.js';
 
 // A first-class Tool (issue 561) carries its OWN source refs, derived from its linked
-// component (mirroring `_normalizeSystem` / the 1.14.0 migration) so the resolver matches a
-// dropped item against the tool directly, not through a component.
+// component via the SAME shared helper `_normalizeSystem` / the migration uses, so the
+// resolver matches a dropped item against the tool directly, not through a component.
 function systemWith({ id, tools, components }) {
   const derivedTools = (tools || []).map((tool) => {
-    if (!tool?.componentId || tool.sourceUuid || tool.sourceItemUuid) return tool;
-    const component = (components || []).find((c) => c.id === tool.componentId);
-    if (!component?.sourceUuid && !component?.sourceItemUuid) return tool;
-    return {
-      ...tool,
-      sourceUuid: component.sourceUuid || component.sourceItemUuid || null,
-      sourceItemUuid: component.sourceItemUuid || component.sourceUuid || null,
-    };
+    const clone = { ...tool };
+    deriveToolSourceFromComponents(clone, components || []);
+    return clone;
   });
   return { id, tools: derivedTools, components };
 }

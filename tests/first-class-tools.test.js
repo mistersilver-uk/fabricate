@@ -192,6 +192,43 @@ test('A4 - migrateToolsToFirstClass copies component refs onto a legacy tool and
 });
 
 // ---------------------------------------------------------------------------
+// Production-path derive: _normalizeSystem derives a component-linked tool's own
+// source refs + snapshot from its component (the beyond-delta compatibility bridge).
+// This is the ONLY test that routes through the REAL _normalizeSystem call site — a
+// wrong impl that drops `deriveToolSourceFromComponents(normalizedTool, items)` ships
+// green without it (A4 pre-migrates; the craftability/canvas suites reuse the shared
+// helper directly, both bypassing the production call).
+// ---------------------------------------------------------------------------
+
+test('_normalizeSystem derives a component-linked tool\'s source refs + snapshot and it matches a source-only copy', () => {
+  const mgr = buildManager();
+  const normalized = mgr._normalizeSystem({
+    id: 'sysD',
+    components: [
+      { id: 'comp-x', name: 'Chisel', img: 'icons/chisel.webp', sourceItemUuid: 'Item.chisel', fallbackItemIds: ['Item.chisel-old'] },
+    ],
+    tools: [{ id: 'tool-x', componentId: 'comp-x' }],
+  });
+  mgr.systems.set('sysD', normalized);
+  installManager(mgr);
+
+  const t = mgr.getSystem('sysD').tools[0];
+  assert.equal(t.componentId, 'comp-x', 'the component link is preserved');
+  assert.equal(t.sourceItemUuid, 'Item.chisel', 'derived the component sourceItemUuid');
+  assert.equal(t.sourceUuid, 'Item.chisel');
+  assert.deepEqual(t.fallbackItemIds, ['Item.chisel-old']);
+  assert.equal(t.name, 'Chisel', 'derived the component name snapshot');
+  assert.equal(t.img, 'icons/chisel.webp');
+
+  // A source-only owned copy (no durable flag, no name equality) matches ONLY because
+  // the tool now carries the derived source ref — so this fails if the derive is dropped.
+  const rm = new RecipeManager();
+  const recipe = { id: 'r1', craftingSystemId: 'sysD' };
+  const sourceOnlyCopy = roleItem({ uuid: 'Item.copy', compendiumSource: 'Item.chisel', name: 'Renamed Chisel' });
+  assert.equal(rm.toolMatchesItem(recipe, t, sourceOnlyCopy), true);
+});
+
+// ---------------------------------------------------------------------------
 // A5 — autoStampToolSources writes roles[sys].toolId; ordering after migration
 // ---------------------------------------------------------------------------
 
@@ -305,7 +342,14 @@ test('A9 - repairComponentSourceFlags stamps an owned tool copy via the TOOL res
   });
   // An owned copy whose compendium source equals the tool's source ref (no durable flag yet).
   const ownedCopy = makeWorldItem({ uuid: 'Item.owned-axe', name: 'Axe', compendiumSource: 'Item.axe-src' });
-  const actor = { items: [ownedCopy] };
+  // Dispatch-isolation decoy: it carries a LEGACY scalar `flags.fabricate.componentId`
+  // equal to a tool id but NO matching source ref. The TOOL resolver has no legacy-scalar
+  // tier, so it resolves nothing and this item is never stamped. A wrong impl routing the
+  // tools bucket through `resolveComponentForItem` WOULD read the scalar, match `tool-axe`,
+  // and mis-stamp it — so the "stays undefined" assertion pins the dispatch.
+  const scalarDecoy = makeWorldItem({ uuid: 'Item.scalar-only', name: 'Unrelated' });
+  scalarDecoy.flags = { fabricate: { fabricate: { componentId: 'tool-axe' } } };
+  const actor = { items: [ownedCopy, scalarDecoy] };
   globalThis.game = {
     user: { isGM: true, id: 'gm-user' },
     users: { activeGM: { id: 'gm-user' } },
@@ -320,6 +364,11 @@ test('A9 - repairComponentSourceFlags stamps an owned tool copy via the TOOL res
     ownedCopy.getFlag('fabricate', 'fabricate.roles.sysA.toolId'),
     'tool-axe',
     'the owned tool copy is stamped with the resolved tool id (via resolveToolForItem, not the component resolver)'
+  );
+  assert.equal(
+    scalarDecoy.getFlag('fabricate', 'fabricate.roles.sysA.toolId'),
+    undefined,
+    'a legacy componentId scalar equal to a tool id is NOT a tool identity — the tool resolver never stamps it (component resolver would)'
   );
   assert.ok(summary.tools.stamped >= 1, 'the tools summary bucket records the stamp');
 

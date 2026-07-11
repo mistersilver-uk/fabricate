@@ -56,6 +56,7 @@ globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
+const { deriveToolSourceFromComponents } = await import('../src/migration/migrateToolsToFirstClass.js');
 
 // ---------------------------------------------------------------------------
 // Helper builders
@@ -153,16 +154,12 @@ function makeRecipeManager() {
  */
 function makeRecipeManagerWithSystem(systemId, components, tools = []) {
   // Mirror production: `_normalizeSystem` derives a component-linked tool's own source refs
-  // (issue 561) from its component, so the tool matches owned items by source, not just name.
+  // (issue 561) from its component via the SAME shared helper, so the tool matches owned
+  // items by source, not just name (routed through the real derive, not a re-implementation).
   const derivedTools = tools.map((tool) => {
-    if (!tool?.componentId || tool.sourceUuid || tool.sourceItemUuid) return tool;
-    const component = components.find((c) => c.id === tool.componentId);
-    if (!component?.sourceUuid && !component?.sourceItemUuid) return tool;
-    return {
-      ...tool,
-      sourceUuid: component.sourceUuid || component.sourceItemUuid || null,
-      sourceItemUuid: component.sourceItemUuid || component.sourceUuid || null,
-    };
+    const clone = { ...tool };
+    deriveToolSourceFromComponents(clone, components);
+    return clone;
   });
   const system = {
     id: systemId,
