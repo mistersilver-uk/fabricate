@@ -5,7 +5,8 @@ import { Tool } from '../models/Tool.js';
 import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakageRuntime.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
-import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
+import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
+import { accumulateSubmissionEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
@@ -72,6 +73,24 @@ export class CraftingEngine {
       actorInventoryCoinSpender: this.actorInventoryCoinSpender,
       actorPropertyCoinSpender: this.actorPropertyCoinSpender,
     };
+  }
+
+  /**
+   * The component resolver to inject through the craftability, selection, and
+   * essence-context paths for THIS craft (issue 578). Only an alchemy attempt
+   * supplies the tier-4-aware {@link resolveAlchemySubmissionComponent} — the same
+   * resolver the submission collector/palette bucketed with — so a purely-tier-4
+   * submission (bare top-level `registeredItemUuid`) resolves to the same component
+   * everywhere on the brew path. Every other craft (and every display caller) gets
+   * `undefined`, which each threaded callee defaults to the shared standard-craft
+   * resolvers — byte-for-byte unchanged, so standard crafting never gains tier 4.
+   *
+   * @private
+   * @param {object|null} options - The craft options bag.
+   * @returns {Function|undefined} The injected resolver, or undefined for standard crafting.
+   */
+  _alchemyComponentResolver(options) {
+    return options?.isAlchemyAttempt === true ? resolveAlchemySubmissionComponent : undefined;
   }
 
   /**
@@ -236,6 +255,7 @@ export class CraftingEngine {
             stepIndex,
             ingredientSetId,
             presentTools,
+            options,
             runManager,
             run,
             createdThisCall,
@@ -278,12 +298,18 @@ export class CraftingEngine {
 
       const executionRecipe = this._buildStepRecipeView(recipe, step);
 
+      // Alchemy attempts inject the tier-4-aware submission resolver through the
+      // craftability, selection, and essence-context paths (issue 578); standard
+      // crafting gets `undefined` → the shared resolvers, byte-for-byte unchanged.
+      const resolveComponent = this._alchemyComponentResolver(options);
+
       // Check if recipe step can be crafted. Thread the crafting actor so a currency
       // alternative is craftable exactly when this actor can afford it — display and
       // execution agree on the same currency-aware decision.
       const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, {
         presentTools,
         craftingActor,
+        resolveComponent,
       });
       if (!canCraftCheck.canCraft) {
         const missingMsg = this._formatMissingItems(canCraftCheck.missing, executionRecipe);
@@ -319,7 +345,8 @@ export class CraftingEngine {
         componentSourceActors,
         ingredientSet,
         executionRecipe,
-        craftingActor
+        craftingActor,
+        resolveComponent
       );
       const currencySpends = craftSelection.currencySpends || [];
 
@@ -619,7 +646,9 @@ export class CraftingEngine {
         consumedItems,
         toolValidation.tools,
         checkResult,
-        options?.resultGroupId || null
+        options?.resultGroupId || null,
+        null,
+        resolveComponent
       );
 
       if (
@@ -755,11 +784,19 @@ export class CraftingEngine {
     stepIndex,
     ingredientSetId,
     presentTools,
+    options,
     runManager,
     run,
     createdThisCall,
   }) {
     const executionRecipe = this._buildStepRecipeView(recipe, step);
+
+    // A timed alchemy attempt reaches canCraft/selection/essence-context here too
+    // (issue 578): inject the tier-4-aware submission resolver so a purely-tier-4
+    // submission STARTS (passes craftability, is consumed) and its component's
+    // essences are snapshotted for the FINISH effect transfer. Standard timed
+    // crafting gets `undefined` → the shared resolvers, byte-for-byte unchanged.
+    const resolveComponent = this._alchemyComponentResolver(options);
 
     // Remove the never-armed run on any pre-arm failure so no zombie lingers: a
     // run this call created is discarded (no history); a reused run is cancelled.
@@ -773,6 +810,7 @@ export class CraftingEngine {
     const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, {
       presentTools,
       craftingActor,
+      resolveComponent,
     });
     if (!canCraftCheck.canCraft) {
       return abort(
@@ -797,7 +835,8 @@ export class CraftingEngine {
       componentSourceActors,
       ingredientSet,
       executionRecipe,
-      craftingActor
+      craftingActor,
+      resolveComponent
     );
     const currencySpends = craftSelection.currencySpends || [];
 
@@ -838,7 +877,12 @@ export class CraftingEngine {
     // Snapshot for the FINISH resume: essence quantities are precomputed here
     // because the source items are deleted before the check runs; the consumed
     // summary carries only what chat / history / property-macro ingredientPool need.
-    const { resolvedEssences } = this._buildEssenceContext(consumedItems, executionRecipe);
+    const { resolvedEssences } = this._buildEssenceContext(
+      consumedItems,
+      executionRecipe,
+      null,
+      resolveComponent
+    );
     const consumedSummary = consumedItems.map(({ item, quantity, ingredient }) => ({
       itemUuid: item.uuid ?? null,
       actorUuid: item.parent?.uuid ?? null,
@@ -1409,6 +1453,19 @@ export class CraftingEngine {
       quantity,
     }));
 
+    // Build a tier-4-aware essence snapshot over the consumed items (issue 578) so the
+    // reserved Simple-failure result group's essence-sourced effect transfer /
+    // property-macro context credits a purely-tier-4 submission its component's
+    // essences — mirroring how the timed twin forwards the START snapshot. Absent the
+    // injected resolver (never — this path is always an alchemy attempt) this degrades
+    // to the shared standard-craft resolver.
+    const { resolvedEssences } = this._buildEssenceContext(
+      consumedItems,
+      executionRecipe,
+      null,
+      this._alchemyComponentResolver(options)
+    );
+
     return this._produceAlchemyFailureResults({
       craftingActor,
       componentSourceActors,
@@ -1421,6 +1478,7 @@ export class CraftingEngine {
       consumedRunRefs,
       toolItems: toolValidation.tools,
       usedTools,
+      resolvedEssences,
       resultGroupId: options?.resultGroupId || null,
       checkResult,
       runManager,
@@ -1592,10 +1650,6 @@ export class CraftingEngine {
     // double-count a submission matching several components of one group.
     const resolvedComponentIds = submittedItems.map((record) => record?.componentId ?? null);
 
-    // The bare owned items, for essence accumulation (which keys on each item's
-    // essence flags / component-defined essences, not the bucketed component id).
-    const submittedItemObjects = submittedItems.map((record) => record?.item);
-
     // Count submissions whose resolved component id is one of the given component
     // IDs. Each submission resolved to exactly one component, so it contributes at
     // most one unit toward a group even when several of the group's components
@@ -1612,10 +1666,15 @@ export class CraftingEngine {
     // Check whether the system supports essences
     const essencesEnabled = system?.features?.essences === true;
 
-    // Accumulate essences from ALL submitted items (duplicates count multiple times)
+    // Accumulate essences from the PRE-BUCKETED submission records (duplicates count
+    // multiple times). True bucket-once (issue 578): read the `componentId` each
+    // submission was bucketed to at the collector rather than re-resolving via the
+    // tier-4-blind `findMatchingComponent`, so essence attribution reads the exact
+    // same id group counting reads and a purely-tier-4 submission is credited its
+    // component's essences.
     let submittedEssences = null;
     if (essencesEnabled) {
-      submittedEssences = accumulateItemEssences(submittedItemObjects, {
+      submittedEssences = accumulateSubmissionEssences(submittedItems, {
         components,
         systemId: system?.id,
       });
@@ -1811,12 +1870,22 @@ export class CraftingEngine {
    * {@link craft} so consumption and the currency spend never diverge.
    *
    * @private
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only submission is selected as its
+   *   component's ingredient for consumption; defaults (undefined) to the shared
+   *   standard-craft resolver via {@link RecipeManager#ingredientMatchesItem}.
    * @returns {{ success: boolean, plan: Array, currencySpends: Array, missingGroups: Array }}
    */
-  _resolveCraftSelection(componentSourceActors, ingredientSet, recipe, craftingActor) {
+  _resolveCraftSelection(
+    componentSourceActors,
+    ingredientSet,
+    recipe,
+    craftingActor,
+    resolveComponent
+  ) {
     const availableItems = componentSourceActors.flatMap((actor) => [...actor.items]);
     const matcher = (ingredient, item) =>
-      this.recipeManager.ingredientMatchesItem(recipe, ingredient, item);
+      this.recipeManager.ingredientMatchesItem(recipe, ingredient, item, resolveComponent);
     if (typeof ingredientSet?.resolveIngredientSelection === 'function') {
       const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
       return ingredientSet.resolveIngredientSelection(availableItems, matcher, { affordCurrency });
@@ -2145,7 +2214,8 @@ export class CraftingEngine {
     toolItems,
     checkResult = null,
     selectedResultGroupId = null,
-    precomputedEssences = null
+    precomputedEssences = null,
+    resolveComponent
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -2178,7 +2248,7 @@ export class CraftingEngine {
             ...checkResult,
             resolutionMeta: resolved?.meta || {},
           },
-          { step, precomputedEssences }
+          { step, precomputedEssences, resolveComponent }
         );
 
         if (resultItem) {
@@ -2204,7 +2274,7 @@ export class CraftingEngine {
     toolItems,
     recipe,
     checkResult = null,
-    { step = null, precomputedEssences = null } = {}
+    { step = null, precomputedEssences = null, resolveComponent } = {}
   ) {
     // Get the source item
     let sourceItem;
@@ -2259,7 +2329,8 @@ export class CraftingEngine {
       toolItems,
       checkResult,
       step,
-      precomputedEssences
+      precomputedEssences,
+      resolveComponent
     );
     if (propertyUpdates && typeof propertyUpdates === 'object') {
       for (const [path, value] of Object.entries(propertyUpdates)) {
@@ -2275,7 +2346,13 @@ export class CraftingEngine {
       const systemManager = game.fabricate?.getCraftingSystemManager?.();
       const system = systemManager?.getSystem(recipe.craftingSystemId);
       if (system?.features?.effectTransfer === true) {
-        await this._transferEffects(createdItem, consumedItems, recipe, precomputedEssences);
+        await this._transferEffects(
+          createdItem,
+          consumedItems,
+          recipe,
+          precomputedEssences,
+          resolveComponent
+        );
       }
     }
 
@@ -2294,7 +2371,13 @@ export class CraftingEngine {
    * The old ingredient-level extractEffects / effectFilter path has been removed.
    * @private
    */
-  async _transferEffects(resultItem, consumedItems, recipe, precomputedEssences = null) {
+  async _transferEffects(
+    resultItem,
+    consumedItems,
+    recipe,
+    precomputedEssences = null,
+    resolveComponent
+  ) {
     // 1. Get the crafting system and verify essences are enabled
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe.craftingSystemId);
@@ -2305,7 +2388,8 @@ export class CraftingEngine {
     const { resolvedEssences } = this._buildEssenceContext(
       consumedItems,
       recipe,
-      precomputedEssences
+      precomputedEssences,
+      resolveComponent
     );
     const contributingEssenceIds = Object.keys(resolvedEssences);
     if (contributingEssenceIds.length === 0) return;
@@ -3055,7 +3139,8 @@ export class CraftingEngine {
     toolItems,
     checkResult = null,
     step = null,
-    precomputedEssences = null
+    precomputedEssences = null,
+    resolveComponent
   ) {
     if (!macroUuid) return null;
 
@@ -3067,7 +3152,12 @@ export class CraftingEngine {
     const enabled = features.propertyMacros === true;
     if (!enabled) return null;
 
-    const essenceContext = this._buildEssenceContext(consumedItems, recipe, precomputedEssences);
+    const essenceContext = this._buildEssenceContext(
+      consumedItems,
+      recipe,
+      precomputedEssences,
+      resolveComponent
+    );
     const context = {
       recipe: recipe?.toJSON?.() || recipe,
       craftingSystem,
@@ -3119,9 +3209,13 @@ export class CraftingEngine {
    *   quantities cannot be re-resolved and were snapshotted at START. When
    *   provided it is used verbatim (with no per-item `essenceSources`); otherwise
    *   essences are resolved live from the consumed items.
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only consumed item contributes its
+   *   component's essences to effect transfer / property-macro context; defaults
+   *   (undefined) to the shared standard-craft resolver via {@link resolveItemEssences}.
    * @private
    */
-  _buildEssenceContext(consumedItems, recipe = null, precomputedEssences = null) {
+  _buildEssenceContext(consumedItems, recipe = null, precomputedEssences = null, resolveComponent) {
     if (precomputedEssences && typeof precomputedEssences === 'object') {
       return { resolvedEssences: { ...precomputedEssences }, essenceSources: {} };
     }
@@ -3130,7 +3224,12 @@ export class CraftingEngine {
     const components = this._getSystemComponents(recipe);
 
     for (const { item, quantity } of consumedItems) {
-      const itemEssences = resolveItemEssences(item, components, recipe?.craftingSystemId);
+      const itemEssences = resolveItemEssences(
+        item,
+        components,
+        recipe?.craftingSystemId,
+        resolveComponent
+      );
       for (const [essenceId, perUnit] of Object.entries(itemEssences)) {
         const value = Number(perUnit);
         if (!Number.isFinite(value) || value <= 0) continue;
