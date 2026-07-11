@@ -146,7 +146,7 @@ function warnUnsafeSystemIdOnce(systemId) {
   if (_warnedUnsafeSystemIds.has(key)) return;
   _warnedUnsafeSystemIds.add(key);
   console.warn?.(
-    `Fabricate | crafting system id "${key}" is not a valid durable-flag map key (it contains a "." or other unsafe character), so its components resolve only by raw source references, not the per-system \`roles\` identity map. Recreate/re-import the system with a valid id (letters, digits, "_" or "-").`
+    `Fabricate | crafting system id "${key}" is not a valid durable-flag map key (it contains a "." or other unsafe character), so its durable identities (components, tools, and recipe items) resolve only by raw source references, not the per-system \`roles\` identity map. Recreate/re-import the system with a valid id (letters, digits, "_" or "-").`
   );
 }
 

@@ -3065,9 +3065,12 @@ export class CraftingSystemManager {
       .toLowerCase();
   }
 
-  // Resolve a definition by GLOBALLY-unique exact name across the whole definition set
-  // (all systems). Returns the single match, `'ambiguous'` when two or more definitions
-  // share the name anywhere, or `null` when none match.
+  // Resolve a definition by exact name, unique WITHIN the per-system definition set passed
+  // in (recipe-item repair is per-system since issue 567, so the caller only ever hands
+  // this ONE system's `kind.definitions`). Returns the single match, `'ambiguous'` when two
+  // or more of that system's definitions share the name, or `null` when none match. A source
+  // registered in two systems is reconciled independently in each, so name uniqueness is
+  // scoped to the system being reconciled, never global.
   _uniqueDefinitionByName(name, definitions) {
     const normalized = this._normalizeMatchName(name);
     if (!normalized) return null;
