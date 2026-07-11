@@ -187,26 +187,38 @@ export class RecipeVisibilityService {
     return [...defs, { id: null, originItemUuid: legacyUuid }];
   }
 
-  // Resolve which member book an item IS, AND by which tier, through the one shared
-  // four-tier matcher (durable flag → own uuid → compendium source → duplicate source).
+  // Resolve which member book an item IS, AND by which tier, through the one shared,
+  // system-scoped matcher (durable per-system `roles` leaf → legacy scalar → own uuid →
+  // compendium source → duplicate source). The recipe's `craftingSystemId` scopes the
+  // durable-identity tier (issue 567). An id-less legacy synthetic entry still matches only
+  // the source-uuid tiers regardless of systemId, so legacy/alchemy links keep resolving.
   _matchRecipeItemForRecipe(recipe, item) {
-    return matchRecipeItemDefinition(item, this._recipeItemMatchDefinitions(recipe));
+    return matchRecipeItemDefinition(
+      item,
+      this._recipeItemMatchDefinitions(recipe),
+      recipe?.craftingSystemId
+    );
   }
 
   _isMatchingRecipeItem(recipe, item) {
     if (!item) return false;
     // A recipe matches when the item IS any of its member books, by any tier.
-    return itemMatchesRecipeItemSource(item, this._recipeItemMatchDefinitions(recipe));
+    return itemMatchesRecipeItemSource(
+      item,
+      this._recipeItemMatchDefinitions(recipe),
+      recipe?.craftingSystemId
+    );
   }
 
   // The member book definition that a specific owned item IS, so the learn/use paths
   // read caps from the book actually being read. A SUPPLIED item that matches no
   // member definition resolves to null (uncapped) — only an ABSENT item falls back
-  // to the recipe's first member book (issue 555, R6b).
+  // to the recipe's first member book (issue 555, R6b). `craftingSystemId` scopes the
+  // durable-identity tier (issue 567).
   _matchDefinitionForItem(recipe, item) {
     const defs = this._getRecipeItemDefinitions(recipe);
     if (!item) return defs[0] || null;
-    return matchRecipeItemDefinition(item, defs).definition;
+    return matchRecipeItemDefinition(item, defs, recipe?.craftingSystemId).definition;
   }
 
   _isActorOwnedItem(ownedItem, actor) {
