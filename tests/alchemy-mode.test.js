@@ -42,6 +42,23 @@ const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilit
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
 const { getItemSourceReferences } = await import('../src/utils/sourceUuid.js');
 const { component, roleItem } = await import('./helpers/componentIdentityFixtures.js');
+const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js');
+
+// Bucketing moved to the collector (issue 572): `_matchAlchemySignature` now consumes
+// pre-bucketed `{ item, componentId }` records. This shim builds those records through
+// the SAME production resolver the collector/palette use (system-scoped by
+// `options.system?.id`), so these tests still exercise resolution + matching end to
+// end rather than hand-supplying bucket ids. The bracket-notation call keeps the shim
+// itself out of the call-site rewrite.
+function matchSig(engine, items, recipes, components, validator, options = {}) {
+  return engine['_matchAlchemySignature'](
+    toAlchemyRecords(items, components, options?.system?.id),
+    recipes,
+    components,
+    validator,
+    options
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Flag helpers (same pattern as recipe-visibility-service.test.js)
@@ -624,7 +641,7 @@ test('CraftingEngine._matchAlchemySignature matches submitted items by canonical
     getComponentsForSystem: () => components
   });
 
-  const result = engine._matchAlchemySignature([{
+  const result = matchSig(engine, [{
     uuid: 'Item.actor-owned-iron-ore',
     _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
     flags: {}
@@ -674,7 +691,7 @@ test('_matchAlchemySignature matches pure-essence recipe when submitted items sa
 
   // Submit same item twice → 1 essence × 2 = 2 total
   const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item, item], [recipe], [], validator, { system: essenceSystem }
   );
 
@@ -718,7 +735,7 @@ test('_matchAlchemySignature matches pure-essence recipe from component-defined 
   const silverleaf = buildSubmittedItem('Item.silverleaf', {});
   silverleaf._stats = { compendiumSource: 'Compendium.test.silverleaf' };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [redHerb, silverleaf], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -751,7 +768,7 @@ test('_matchAlchemySignature uses item-flag essences before component fallback',
   const redHerb = buildSubmittedItem('Item.red-herb', { [essenceId]: 1 });
   redHerb._stats = { compendiumSource: 'Compendium.test.red-herb' };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [redHerb], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -784,7 +801,7 @@ test('_matchAlchemySignature does not multiply component essences by stack quant
   redHerb._stats = { compendiumSource: 'Compendium.test.red-herb' };
   redHerb.system = { quantity: 5 };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [redHerb], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -808,7 +825,7 @@ test('_matchAlchemySignature rejects pure-essence recipe when essences are insuf
 
   // Only 2 essences submitted but 3 needed
   const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item, item], [recipe], [], validator, { system: essenceSystem }
   );
 
@@ -833,7 +850,7 @@ test('_matchAlchemySignature skips essence check when system has essences disabl
 
   const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
   // With essences disabled, the set has no groups and no recognized essences → skip
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item, item], [recipe], [], validator, { system: noEssenceSystem }
   );
 
@@ -860,7 +877,7 @@ test('_matchAlchemySignature matches mixed ingredient-group + essence recipe', (
   const item = buildSubmittedItem('Item.actor-crystal', { [essenceId]: 1 });
   item._stats = { compendiumSource: 'Compendium.source.items.crystal' };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -888,7 +905,7 @@ test('_matchAlchemySignature rejects mixed recipe when groups match but essences
   const item = buildSubmittedItem('Item.actor-crystal', { [essenceId]: 1 });
   item._stats = { compendiumSource: 'Compendium.source.items.crystal' };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -1005,7 +1022,7 @@ test('_matchAlchemySignature matches when submitted quantity equals the required
     getComponentsForSystem: () => components
   });
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     buildIngotSubmissions('Item.iron-ingot', 5), [recipe], components, validator
   );
 
@@ -1024,13 +1041,13 @@ test('_matchAlchemySignature does NOT match when submitted quantity is below the
   });
 
   // The headline defect: one ingot must NOT satisfy a five-ingot group.
-  const single = engine._matchAlchemySignature(
+  const single = matchSig(engine, 
     buildIngotSubmissions('Item.iron-ingot', 1), [recipe], components, validator
   );
   assert.equal(single.matched, false, 'one ingot must not satisfy a five-ingot group');
 
   // Boundary: one short of the requirement still fails.
-  const oneShort = engine._matchAlchemySignature(
+  const oneShort = matchSig(engine, 
     buildIngotSubmissions('Item.iron-ingot', 4), [recipe], components, validator
   );
   assert.equal(oneShort.matched, false, 'four ingots must not satisfy a five-ingot group');
@@ -1046,7 +1063,7 @@ test('_matchAlchemySignature matches when submitted quantity exceeds the require
     getComponentsForSystem: () => components
   });
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     buildIngotSubmissions('Item.iron-ingot', 6), [recipe], components, validator
   );
 
@@ -1082,7 +1099,11 @@ test('craftAlchemy reaches the no-match disposition (and consumes) when ingredie
   };
   const sourceActor = { items: [actorItem] };
   // Submit only one of the five required ingots.
-  const submitted = buildIngotSubmissions(registeredItemUuid, 1);
+  const submitted = toAlchemyRecords(
+    buildIngotSubmissions(registeredItemUuid, 1),
+    components,
+    'alchemy-sys'
+  );
 
   const result = await engine.craftAlchemy({ id: 'pc' }, [sourceActor], submitted, {
     craftingSystemId: 'alchemy-sys',
@@ -1196,14 +1217,14 @@ test('_matchAlchemySignature attributes a submission to its durable componentId 
     'non-vacuity: the submission raw refs must genuinely overlap component A'
   );
 
-  const matchesB = engine._matchAlchemySignature(
+  const matchesB = matchSig(engine, 
     [item],
     [buildComponentRecipe('needs-B', 'cB')],
     components,
     validator,
     { system: { id: sys } }
   );
-  const matchesA = engine._matchAlchemySignature(
+  const matchesA = matchSig(engine, 
     [item],
     [buildComponentRecipe('needs-A', 'cA')],
     components,
@@ -1228,7 +1249,7 @@ test('_matchAlchemySignature resolves a submission carrying only a bare top-leve
   // _stats.compendiumSource, no duplicateSource — so `getItemSourceReferences`
   // (and thus the shared resolver) sees nothing; only the LOCAL bare-registeredItemUuid
   // supplement can attribute it.
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [{ registeredItemUuid: 'Item.bare-source' }],
     [buildComponentRecipe('bare-recipe', 'bare')],
     components,
@@ -1249,7 +1270,7 @@ test('_matchAlchemySignature counts a submission matching several of a group\'s 
   // A single submission whose raw refs overlap BOTH components.
   const submission = { uuid: 'Item.c1', _stats: { compendiumSource: 'Item.c2' }, flags: {} };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [submission],
     [buildTagGroupRecipe('needs-two-metal', 'metal', 2)],
     components,
@@ -1274,7 +1295,7 @@ test('_matchAlchemySignature falls through a stale/foreign identity flag to the 
     name: 'Owned C',
   });
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item],
     [buildComponentRecipe('needs-C', 'cC')],
     components,
@@ -1298,13 +1319,13 @@ test('_matchAlchemySignature resolves a cross-group multi-overlap submission to 
   // Raw refs overlap both X and Y; cX is first in the set, so it resolves to cX.
   const submission = { uuid: 'Item.X', _stats: { compendiumSource: 'Item.Y' }, flags: {} };
 
-  const matchesX = engine._matchAlchemySignature(
+  const matchesX = matchSig(engine, 
     [submission],
     [buildComponentRecipe('needs-X', 'cX')],
     components,
     validator
   );
-  const matchesY = engine._matchAlchemySignature(
+  const matchesY = matchSig(engine, 
     [submission],
     [buildComponentRecipe('needs-Y', 'cY')],
     components,

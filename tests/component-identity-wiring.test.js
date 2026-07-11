@@ -31,6 +31,7 @@ const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
 const { component, componentSet, roleItem } = await import('./helpers/componentIdentityFixtures.js');
+const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js');
 
 function buildManager(systemsById) {
   const mgr = new CraftingSystemManager({ getRecipes: () => [], deleteRecipe: async () => {}, updateRecipe: async () => {} });
@@ -103,7 +104,13 @@ test('A9a - recipe-availability: _matchAlchemySignature threads options.system.i
   const recipe = { enabled: true, ingredientSets: [{ id: 'set-1', essences: { fire: 2 }, ingredientGroups: [] }] };
   const system = { id: 'sysA', features: { essences: true } };
 
-  const result = engine._matchAlchemySignature([item], [recipe], components, validator, { system });
+  const result = engine._matchAlchemySignature(
+    toAlchemyRecords([item], components, system.id),
+    [recipe],
+    components,
+    validator,
+    { system }
+  );
   assert.equal(result.matched, true, 'the roles component supplies the fire essence the set requires');
   assert.equal(result.ingredientSetId, 'set-1');
 });
