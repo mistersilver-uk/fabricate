@@ -517,7 +517,10 @@ export class RecipeManager {
       availableItems
     );
 
-    // Build essence states from the display set.
+    // Build essence states from the display set. This readout is display-only and is
+    // intentionally NOT threaded with the alchemy tier-4 resolver (issue 578): it is
+    // harmless because `missing.essences` below is forced empty whenever canCraft is
+    // true, and the alchemy workbench does not render this per-type essence-state list.
     const essenceStates = this._buildEssenceStates(
       recipe,
       displayIngredientSet,
@@ -1332,6 +1335,12 @@ export class RecipeManager {
   /**
    * Accumulate essences from all available items
    * @param {Item[]} items - Items to check
+   * @param {Recipe|null} [recipe] - Recipe whose system supplies the candidate
+   *   components and system id for essence resolution.
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only item contributes its component's
+   *   essences. Defaults (undefined) to the shared {@link findMatchingComponent} via
+   *   {@link accumulateItemEssences} used by standard crafting — byte-for-byte unchanged.
    * @returns {Object} - Accumulated essences { 'light': 3, 'fire': 2 }
    * @private
    */
