@@ -95,6 +95,150 @@ export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) 
 }
 
 /**
+ * Copy-mode: regenerate every component id and atomically remap every
+ * WITHIN-PAYLOAD reference to an old component id so nothing dangles (issue 570).
+ *
+ * This joins {@link rebindCopyContainerIds} in the copy transform once #561 made
+ * Tools first-class: `componentId` no longer carries a cross-system Tool-reference
+ * duty, so component ids MAY be regenerated on copy-import, closing #556's
+ * copy-import id-collision residual (two systems copy-imported from the same origin
+ * export no longer share a component id).
+ *
+ * The rewrite is KEY-AWARE: it only rewrites a value that (a) sits at one of the
+ * enumerated component-reference sites AND (b) equals an old component id. A value
+ * at a non-reference position (a `recipeIds[]` entry, an outcome/salvage-group id, a
+ * scene/macro UUID) is never touched even if it coincidentally equals a component id.
+ * The traversal mirrors `src/migration/migrateComponentId.js` (recurses ingredient
+ * `alternatives`, sweeps the flat `ingredients`/`results` aliases, and treats
+ * `catalysts[]` as component-ref-bearing at four sites).
+ *
+ * @param {{ system: object, recipes: object[], gatheringConfig: object }} prepared
+ * @param {{ generateId?: () => string }} [deps]
+ * @returns {object} the same `prepared` reference, mutated
+ */
+export function rebindCopyComponentIds(prepared, { generateId = localId } = {}) {
+  if (!prepared || typeof prepared !== 'object') return prepared;
+  const { system, recipes, gatheringConfig } = prepared;
+
+  // --- Old → new component-id map (built over system.components[].id only) ---
+  const idMap = new Map();
+  const components = Array.isArray(system?.components) ? system.components : [];
+  for (const component of components) {
+    if (component && typeof component === 'object' && component.id) {
+      idMap.set(component.id, generateId());
+    }
+  }
+  if (idMap.size === 0) return prepared;
+
+  // Rewrite the component ids themselves.
+  for (const component of components) {
+    if (component && typeof component === 'object' && component.id && idMap.has(component.id)) {
+      component.id = idMap.get(component.id);
+    }
+  }
+
+  const remap = (value) =>
+    typeof value === 'string' && idMap.has(value) ? idMap.get(value) : value;
+
+  // An ingredient/catalyst ref carries the component id via a `match` object OR the
+  // bare `componentId`/`systemItemId` fields, and recurses through `alternatives`.
+  const remapIngredientRef = (ref) => {
+    if (!ref || typeof ref !== 'object') return;
+    if (ref.match && typeof ref.match === 'object') {
+      if ('componentId' in ref.match) ref.match.componentId = remap(ref.match.componentId);
+      if ('systemItemId' in ref.match) ref.match.systemItemId = remap(ref.match.systemItemId);
+    }
+    if ('componentId' in ref) ref.componentId = remap(ref.componentId);
+    if ('systemItemId' in ref) ref.systemItemId = remap(ref.systemItemId);
+    for (const alt of arrayOf(ref.alternatives)) remapIngredientRef(alt);
+  };
+
+  const remapResultRef = (result) => {
+    if (!result || typeof result !== 'object') return;
+    if ('componentId' in result) result.componentId = remap(result.componentId);
+    if ('systemItemId' in result) result.systemItemId = remap(result.systemItemId);
+  };
+
+  const remapResultGroups = (resultGroups) => {
+    for (const group of arrayOf(resultGroups)) {
+      for (const result of arrayOf(group?.results)) remapResultRef(result);
+    }
+  };
+
+  const remapIngredientSet = (set) => {
+    if (!set || typeof set !== 'object') return;
+    for (const group of arrayOf(set.ingredientGroups)) {
+      for (const option of arrayOf(group?.options)) remapIngredientRef(option);
+    }
+    // Flat `ingredients[]` alias (IngredientSet.toJSON re-emits it).
+    for (const ingredient of arrayOf(set.ingredients)) remapIngredientRef(ingredient);
+    // Legacy catalysts (defensive; site H).
+    for (const catalyst of arrayOf(set.catalysts)) remapIngredientRef(catalyst);
+  };
+
+  // --- Recipes: top-level and per-step ingredient / result / catalyst refs ---
+  for (const recipe of arrayOf(recipes)) {
+    if (!recipe || typeof recipe !== 'object') continue;
+    for (const set of arrayOf(recipe.ingredientSets)) remapIngredientSet(set);
+    remapResultGroups(recipe.resultGroups);
+    // Flat `results[]` alias (Recipe.toJSON re-emits it).
+    for (const result of arrayOf(recipe.results)) remapResultRef(result);
+    for (const catalyst of arrayOf(recipe.catalysts)) remapIngredientRef(catalyst);
+    for (const step of arrayOf(recipe.steps)) {
+      if (!step || typeof step !== 'object') continue;
+      for (const set of arrayOf(step.ingredientSets)) remapIngredientSet(set);
+      remapResultGroups(step.resultGroups);
+      for (const catalyst of arrayOf(step.catalysts)) remapIngredientRef(catalyst);
+    }
+  }
+
+  // --- Component salvage result refs + legacy salvage catalysts (sites F, H) ---
+  for (const component of components) {
+    const salvage = component?.salvage;
+    if (salvage && typeof salvage === 'object') {
+      remapResultGroups(salvage.resultGroups);
+      for (const catalyst of arrayOf(salvage.catalysts)) remapIngredientRef(catalyst);
+    }
+  }
+
+  // --- Essence source component (site E; canonical + legacy alias) ---
+  for (const def of arrayOf(system?.essenceDefinitions)) {
+    if (!def || typeof def !== 'object') continue;
+    if ('sourceComponentId' in def) def.sourceComponentId = remap(def.sourceComponentId);
+    if ('associatedSystemItemId' in def)
+      def.associatedSystemItemId = remap(def.associatedSystemItemId);
+  }
+
+  // --- Tool `componentId` + `onBreak.replacementComponentId` (sites C, D) ---
+  const remapTool = (tool) => {
+    if (!tool || typeof tool !== 'object') return;
+    if ('componentId' in tool) tool.componentId = remap(tool.componentId);
+    if (
+      tool.onBreak &&
+      typeof tool.onBreak === 'object' &&
+      'replacementComponentId' in tool.onBreak
+    ) {
+      tool.onBreak.replacementComponentId = remap(tool.onBreak.replacementComponentId);
+    }
+  };
+  for (const tool of arrayOf(system?.tools)) remapTool(tool);
+
+  const slice = systemSlice(gatheringConfig);
+  for (const tool of arrayOf(slice.tools)) remapTool(tool);
+
+  // --- Gathering task/event drop-row component refs (site G) ---
+  for (const record of [...arrayOf(slice.tasks), ...arrayOf(slice.events)]) {
+    for (const row of arrayOf(record?.dropRows)) {
+      if (!row || typeof row !== 'object') continue;
+      if ('componentId' in row) row.componentId = remap(row.componentId);
+      if ('systemItemId' in row) row.systemItemId = remap(row.systemItemId);
+    }
+  }
+
+  return prepared;
+}
+
+/**
  * Resolve and classify every reference in the payload. Returns a deep clone with
  * remapped external values applied, plus the structured `unresolvedReferences[]`
  * collection.
@@ -295,10 +439,79 @@ function collectBrokenInternalReferences(payload, out) {
       }
     }
   }
-  for (const tool of arrayOf(slice.tools)) {
-    if (tool?.componentId && !componentIds.has(tool.componentId)) {
+
+  // Tool componentId + onBreak.replacementComponentId, across BOTH the crafting-system
+  // tools (`system.tools`) and the gathering-library tools (`gatheringConfig.system.tools`)
+  // — issue 570 D2 (the collector previously walked only the gathering slice's tools).
+  const reportToolComponentRefs = (tool) => {
+    if (!tool || typeof tool !== 'object') return;
+    if (tool.componentId && !componentIds.has(tool.componentId)) {
       push(REFERENCE_KINDS.COMPONENT_LINK, 'tool', tool, tool.componentId);
     }
+    const replacementComponentId = tool.onBreak?.replacementComponentId;
+    if (replacementComponentId && !componentIds.has(replacementComponentId)) {
+      push(REFERENCE_KINDS.COMPONENT_LINK, 'tool', tool, replacementComponentId);
+    }
+  };
+  for (const tool of arrayOf(system.tools)) reportToolComponentRefs(tool);
+  for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool);
+
+  // Recipe ingredient-option / result / catalyst component refs (issue 570 D2),
+  // including the recursive `alternatives[]` and the flat `ingredients`/`results`
+  // aliases, at both top level and per step.
+  const reportIngredientRef = (ref, owner) => {
+    if (!ref || typeof ref !== 'object') return;
+    const componentId =
+      (ref.match && typeof ref.match === 'object'
+        ? ref.match.componentId || ref.match.systemItemId
+        : null) ||
+      ref.componentId ||
+      ref.systemItemId ||
+      null;
+    if (componentId && !componentIds.has(componentId)) {
+      push(REFERENCE_KINDS.COMPONENT_LINK, 'recipe', owner, componentId);
+    }
+    for (const alt of arrayOf(ref.alternatives)) reportIngredientRef(alt, owner);
+  };
+  const reportResultRef = (result, owner) => {
+    const componentId = result?.componentId || result?.systemItemId || null;
+    if (componentId && !componentIds.has(componentId)) {
+      push(REFERENCE_KINDS.COMPONENT_LINK, 'recipe', owner, componentId);
+    }
+  };
+  const reportResultGroups = (resultGroups, owner) => {
+    for (const group of arrayOf(resultGroups)) {
+      for (const result of arrayOf(group?.results)) reportResultRef(result, owner);
+    }
+  };
+  const reportIngredientSet = (set, owner) => {
+    if (!set || typeof set !== 'object') return;
+    for (const group of arrayOf(set.ingredientGroups)) {
+      for (const option of arrayOf(group?.options)) reportIngredientRef(option, owner);
+    }
+    for (const ingredient of arrayOf(set.ingredients)) reportIngredientRef(ingredient, owner);
+    for (const catalyst of arrayOf(set.catalysts)) reportIngredientRef(catalyst, owner);
+  };
+  for (const recipe of arrayOf(payload.recipes)) {
+    if (!recipe || typeof recipe !== 'object') continue;
+    for (const set of arrayOf(recipe.ingredientSets)) reportIngredientSet(set, recipe);
+    reportResultGroups(recipe.resultGroups, recipe);
+    for (const result of arrayOf(recipe.results)) reportResultRef(result, recipe);
+    for (const catalyst of arrayOf(recipe.catalysts)) reportIngredientRef(catalyst, recipe);
+    for (const step of arrayOf(recipe.steps)) {
+      if (!step || typeof step !== 'object') continue;
+      for (const set of arrayOf(step.ingredientSets)) reportIngredientSet(set, recipe);
+      reportResultGroups(step.resultGroups, recipe);
+      for (const catalyst of arrayOf(step.catalysts)) reportIngredientRef(catalyst, recipe);
+    }
+  }
+
+  // Component salvage result refs + legacy salvage catalysts (issue 570 D2).
+  for (const component of arrayOf(system.components)) {
+    const salvage = component?.salvage;
+    if (!salvage || typeof salvage !== 'object') continue;
+    reportResultGroups(salvage.resultGroups, component);
+    for (const catalyst of arrayOf(salvage.catalysts)) reportIngredientRef(catalyst, component);
   }
 
   // Essence sourceComponentId → components (fall back to the legacy
