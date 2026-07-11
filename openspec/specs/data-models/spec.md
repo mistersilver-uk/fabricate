@@ -592,7 +592,7 @@ RecipeItemDefinition = {
 2. New recipe item definitions are created from dropped or selected Foundry items; manual UUID entry is not part of the canonical UI flow.
 3. If the source template later becomes unresolved, the stored `originItemUuid` is retained and the definition becomes stale-but-readable.
 A recipe item records the same union of source references a component does — `registeredItemUuid` (the registered live document), `originItemUuid` (the canonical compendium/source uuid), and `aliasItemUuids` (issue 555) — so a compendium-imported book resolves owned copies dragged from either the compendium item or the imported world item.
-The durable `flags.fabricate.recipeItemDefinitionId` on the source Item is the identity-of-record; `originItemUuid` is a best-effort source pointer, is never recomputed for an existing definition, and `registeredItemUuid` defaults to it when absent.
+The durable `flags.fabricate.roles[systemId].recipeItemDefinitionId` on the source Item is the identity-of-record; `originItemUuid` is a best-effort source pointer, is never recomputed for an existing definition, and `registeredItemUuid` defaults to it when absent.
 See **Recipe Item Identity → Registration Source Identity** for the clone-gate and stamping rules.
 4. `recipeIds[]` is the **canonical** recipe↔book membership (issue 511, PR-B): it is many-to-many, so a book may contain several recipes and a recipe may belong to several books.
 This is the canonical way to model shared formulas, books, schematics, or recipe scrolls.
@@ -841,8 +841,8 @@ Define matching between a recipe's system-managed recipe item definition and own
 
 ### Match Rule
 
-A candidate owned item is matched through the shared four-tier matcher defined in the recipe-visibility spec (**Recipe Item Matching**): the durable `flags.fabricate.recipeItemDefinitionId` identity flag first (tier 1), then membership in the definition's union of source references (`registeredItemUuid` + `originItemUuid` + `aliasItemUuids`) by the candidate's own uuid (tier 2), compendium source (tier 3), or transitive `_stats.duplicateSource` (tier 4).
-The first tier that yields a match wins, with no fall-through.
+A candidate owned item is matched through the shared, system-scoped four-tier matcher defined in the recipe-visibility spec (**Recipe Item Matching**): the durable identity tier first (tier 1) — the per-system `flags.fabricate.roles[systemId].recipeItemDefinitionId` leaf, then the legacy scalar `flags.fabricate.recipeItemDefinitionId` — then membership in the definition's union of source references (`registeredItemUuid` + `originItemUuid` + `aliasItemUuids`) by the candidate's own uuid (tier 2), compendium source (tier 3), or transitive `_stats.duplicateSource` (tier 4).
+The durable identity tier is list-aware (a claim naming nothing in the candidate set falls through); among the source-reference tiers the first that yields a match wins, with no fall-through.
 Foundry v12+ uses `_stats.compendiumSource`; Foundry v11 and earlier used `flags.core.sourceId`.
 Runtime implementations call the shared source UUID resolver and the shared matcher; they must not re-implement it.
 
@@ -863,11 +863,10 @@ The per-system `roles` map and the resolver's `systemId` scoping remain load-bea
 ### Registration Source Identity
 
 At registration (both recipe items and components), a definition's `originItemUuid` is a best-effort source POINTER; the durable flag is the identity-OF-RECORD.
-A component's durable identity-of-record is `flags.fabricate.roles[systemId].componentId`, a per-system role map, while a recipe item still uses the single scalar `flags.fabricate.recipeItemDefinitionId`.
-The earlier framing of one symmetric durable flag across both kinds no longer holds and is corrected here to name this interim asymmetry.
-A legacy scalar `flags.fabricate.componentId` is still honored at match time as a claimed id until the one-shot component restamp runs.
-`flags.fabricate.roles` is the unified, final per-system role map and the single eventual home for all three durable identities; issue 556 populates `componentId`, issue 561 populates `toolId` (stamped by `addToolFromUuid` and the `autoStampToolSources` one-shot restamp), and the recipe-item follow-up populates `recipeItemDefinitionId` (retiring the scalar and its cross-system limitation below), each an additive sibling key.
-Registration stamps `roles[system.id].componentId` and clears only that per-system key on re-point or repair, never the whole flag.
+Every kind's durable identity-of-record is a per-system leaf under `flags.fabricate.roles[systemId]`: a component's is `componentId`, a first-class tool's is `toolId`, and a recipe item's is `recipeItemDefinitionId`.
+`flags.fabricate.roles` is the unified, final per-system role map and the single home for all three durable identities; issue 556 populates `componentId`, issue 561 populates `toolId` (stamped by `addToolFromUuid` and the `autoStampToolSources` one-shot restamp), and issue 567 populates `recipeItemDefinitionId` (stamped by `addRecipeItemFromUuid` and the repurposed `autoStampRecipeItemSources` restamp), each an additive sibling key.
+A legacy scalar `flags.fabricate.componentId` (components) or `flags.fabricate.recipeItemDefinitionId` (recipe items) is still honored at match time as a claimed id — a transitional read-only fallback tier — until the one-shot restamp backfills the map; tools never had a legacy scalar.
+Registration stamps only the owning system's `roles[system.id]` leaf for the kind, and clears only that per-system leaf on re-point or repair, never the whole `roles` flag nor the whole `roles[systemId]` object (which would destroy the sibling leaves).
 
 - A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
 A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
@@ -883,19 +882,21 @@ It is cleanly distinguishable from the duplicate case by the absence of `_stats.
 
 ### Repair and Auto-Stamp
 
-- A primary-GM-gated (`game.users.activeGM?.id === game.user?.id`), idempotent, one-shot `ready`-body pass — keyed by the `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting — stamps `recipeItemDefinitionId` on every registered definition's writable source Item (world items and unlocked-pack items; locked packs skipped), and strips a clone's stale `_stats`.
+- A primary-GM-gated (`game.users.activeGM?.id === game.user?.id`), idempotent, one-shot `ready`-body pass — keyed by the `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting (target `2`) — backfills the per-system `roles[system.id].recipeItemDefinitionId` leaf on every registered definition's writable source Item, per owning system (a source registered in two systems lands both leaves), for world items and unlocked-pack items (locked packs skipped), and strips a clone's stale `_stats`.
+The target was bumped `1 → 2` (issue 567): a world already stamped at v1, which wrote the retired scalar, re-runs once to backfill the map; the legacy scalar is left in place as the transitional fallback tier.
 A separate one-shot, primary-GM-gated, `ready`-body restamp — keyed by the `COMPONENT_FLAG_STAMP_VERSION` world setting — backfills `roles[system.id].componentId` for every registered component's writable source Item; it mirrors the recipe-item auto-stamp and is likewise NOT a `MigrationRunner` entry.
 This removes the confirmed regression whereby a real registered book and an unregistered duplicate of it are byte-for-byte identical on the matcher's inputs (tier-4 only).
 It is NOT a `MigrationRunner` entry: that runner reads and writes only settings-data payloads and has no Item handle, so it cannot write Item flags.
 - A GM **Repair item data** maintenance action reconciles both kinds across world items, writable packs, and actor-owned items.
 World/pack SOURCE items use the same clone-gated identity (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
 Actor-owned copies use the ordinary runtime matchers — the four-tier recipe-item matcher, or the list-aware, system-scoped component resolver (no clone-gate).
-Components are reconciled PER SYSTEM: the repair resolves each item against one system's component set with that system's id, and writes or clears ONLY that system's `roles[systemId].componentId` map key, so a non-owning system's null-owner pass finds its own leaf unset and no-ops — it can never clear another system's identity regardless of `getSystems()` order.
-For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by a globally-unique, exact (case/whitespace-normalized) name match to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions anywhere is skipped as ambiguous.
+Components, tools, AND recipe items are reconciled PER SYSTEM: the repair resolves each item against one system's definition set with that system's id, and writes or clears ONLY that system's `roles[systemId]` leaf for the kind (`componentId` / `toolId` / `recipeItemDefinitionId`), so a non-owning system's null-owner pass finds its own leaf unset and no-ops — it can never clear another system's identity regardless of `getSystems()` order.
+For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by an exact (case/whitespace-normalized) name match, unique WITHIN the system being reconciled, to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions within that system is skipped as ambiguous.
+Because recipe-item repair is now per-system (issue 567), name uniqueness is scoped to the system, so a source registered in two systems is reconciled independently in each.
 A flagged owned copy is authoritative and left untouched, and repair never triggers a learn.
-- Cross-system shared source (two systems each owning a definition with the same `originItemUuid`) keeps a single flag for RECIPE ITEMS only, as a transitional exception, because their identity remains a scalar for now: last writer wins, and the other system's copies fall to tier 4 (their bulk auto-learn refused by the confidence gate, while explicit learn and display still work).
-This is a documented, tested limitation — not a permanent difference; the recipe-item follow-up moves it onto `roles[systemId].recipeItemDefinitionId` and removes it.
-Components no longer have that limitation: the per-system `roles` map lets a source registered in several systems resolve to the correct component in EACH system.
+- A cross-system shared source (two systems each owning a definition with the same `originItemUuid`) keeps a durable per-system claim in EACH system: registration, repair, and the restamp each write only that system's `roles[systemId].recipeItemDefinitionId` leaf, so both systems' owned copies resolve to the correct definition and neither clobbers the other.
+This is the same per-system model as components and tools; the earlier recipe-item "last writer wins" single-scalar limitation is retired (issue 567).
+The legacy scalar `flags.fabricate.recipeItemDefinitionId` remains a transitional read-only fallback tier for pre-upgrade owned copies until they are re-dragged or repaired.
 
 ### Match Context Contract
 

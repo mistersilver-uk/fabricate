@@ -35,7 +35,7 @@
  */
 
 import { getFabricateFlag } from '../config/flags.js';
-import { findMatchingComponent } from '../utils/essenceResolver.js';
+import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
 import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
 
 import { SignatureValidator } from './SignatureValidator.js';
@@ -338,7 +338,12 @@ export class AlchemyListingBuilder {
     for (const actor of sources) {
       const items = actor?.items ? [...actor.items] : [];
       for (const item of items) {
-        const component = findMatchingComponent(item, components);
+        // Bucket-once (issue 572): the SAME composed, system-scoped resolver the
+        // submission collector uses, threading `system?.id` so a durable
+        // `roles[systemId].componentId` item the player drags is attributed here to
+        // the same component the collector and engine credit — never a divergent
+        // duplicate-lineage component.
+        const component = resolveAlchemySubmissionComponent(item, components, system?.id);
         if (!component?.id) continue;
         held.set(component.id, (held.get(component.id) || 0) + itemStackQuantity(item));
       }

@@ -25,6 +25,7 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
 const { canonicalSignatureKey } = await import('../src/utils/alchemySignatureKey.js');
+const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js');
 
 // ---------------------------------------------------------------------------
 // FakeDocument flag store (doubly-nested, matching setFabricateFlag), per
@@ -96,6 +97,13 @@ function submissions(registeredItemUuid, count) {
   return Array.from({ length: count }, () => ({ uuid: registeredItemUuid, name: registeredItemUuid, registeredItemUuid }));
 }
 
+// The collector hands `craftAlchemy` pre-bucketed `{ item, componentId }` records
+// (issue 572); build them through the production resolver so these engine-drive
+// tests still exercise resolution + matching, not a hand-supplied bucket id.
+function records(components, registeredItemUuid, count) {
+  return toAlchemyRecords(submissions(registeredItemUuid, count), components, 'sys-a');
+}
+
 function setup(alchemyCfg, { recipes, components }) {
   const sys = system(alchemyCfg, components);
   game.fabricate.getCraftingSystemManager = () => ({ getSystem: (id) => (id === 'sys-a' ? sys : null) });
@@ -119,7 +127,7 @@ test('a fizzle records the canonical dead-end key per system when showAttemptHis
     { recipes: [recipe('firebomb', [group('ember', 2)])], components }
   );
   const actor = new FakeActor({});
-  const result = await engine.craftAlchemy(actor, [{ items: [] }], submissions('Item.ash', 2), {
+  const result = await engine.craftAlchemy(actor, [{ items: [] }], records(components, 'Item.ash', 2), {
     craftingSystemId: 'sys-a',
     signatureValidator: validator,
   });
@@ -136,7 +144,7 @@ test('NO dead-end is written when showAttemptHistoryToPlayers is off', async () 
     { recipes: [recipe('firebomb', [group('ember', 2)])], components }
   );
   const actor = new FakeActor({});
-  await engine.craftAlchemy(actor, [{ items: [] }], submissions('Item.ash', 2), {
+  await engine.craftAlchemy(actor, [{ items: [] }], records(components, 'Item.ash', 2), {
     craftingSystemId: 'sys-a',
     signatureValidator: validator,
   });
@@ -151,8 +159,8 @@ test('re-brewing the same fizzle does not duplicate the dead-end key (append-onl
   );
   const actor = new FakeActor({});
   const opts = { craftingSystemId: 'sys-a', signatureValidator: validator };
-  await engine.craftAlchemy(actor, [{ items: [] }], submissions('Item.ash', 2), opts);
-  await engine.craftAlchemy(actor, [{ items: [] }], submissions('Item.ash', 2), opts);
+  await engine.craftAlchemy(actor, [{ items: [] }], records(components, 'Item.ash', 2), opts);
+  await engine.craftAlchemy(actor, [{ items: [] }], records(components, 'Item.ash', 2), opts);
   assert.deepEqual(actor.getFlag('fabricate', 'fabricate.alchemyDeadEnds'), { 'sys-a': ['ash:2'] });
 });
 
@@ -163,7 +171,11 @@ test('DRIFT guard: the engine dead-end write uses the SAME canonical key the sto
     { recipes: [recipe('firebomb', [group('ember', 2)])], components }
   );
   const actor = new FakeActor({});
-  const submitted = [...submissions('Item.ash', 2), ...submissions('Item.quick', 1)];
+  const submitted = toAlchemyRecords(
+    [...submissions('Item.ash', 2), ...submissions('Item.quick', 1)],
+    components,
+    'sys-a'
+  );
   await engine.craftAlchemy(actor, [{ items: [] }], submitted, {
     craftingSystemId: 'sys-a',
     signatureValidator: validator,
@@ -191,7 +203,7 @@ test('a matched brew delegates to craft() as an alchemy attempt, honouring `inte
   };
 
   const actor = new FakeActor({});
-  const result = await engine.craftAlchemy(actor, [{ items: [] }], submissions('Item.ash', 1), {
+  const result = await engine.craftAlchemy(actor, [{ items: [] }], records(components, 'Item.ash', 1), {
     craftingSystemId: 'sys-a',
     signatureValidator: validator,
     interactive: true,

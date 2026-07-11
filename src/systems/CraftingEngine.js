@@ -8,11 +8,7 @@ import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
-import {
-  getItemMatchUuids,
-  itemResolvesToComponent,
-  resolveComponentForItem,
-} from '../utils/sourceUuid.js';
+import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { buildCraftingChatContent } from './CraftingChatCard.js';
@@ -1442,8 +1438,12 @@ export class CraftingEngine {
    *
    * @param {Actor} craftingActor - The actor that will receive crafted results.
    * @param {Actor[]} componentSourceActors - The actors whose inventories are checked for submitted items.
-   * @param {object[]} submittedItems - Items dragged in by the player. Each must include at minimum
-   *   `{ uuid, name }` so signature matching and consumption can identify them.
+   * @param {Array<{item: object, componentId: string}>} submittedItems - Pre-bucketed
+   *   submission records from {@link resolveAlchemySubmissions} (issue 572): each pairs the
+   *   REAL owned item (`{ uuid, name, ... }`, for essence accumulation and consumption)
+   *   with the `componentId` it was bucketed to ONCE by the shared alchemy resolver. The
+   *   engine CONSUMES `componentId` for signature matching and the dead-end multiset rather
+   *   than re-deriving component identity, so the palette, collector, and engine agree.
    * @param {object} options - Additional options.
    * @param {string} [options.craftingSystemId] - ID of the crafting system to match against.
    * @param {object} [options.signatureValidator] - Optional override for the {@link SignatureValidator}
@@ -1509,6 +1509,9 @@ export class CraftingEngine {
 
     const components = system.components || [];
     const recipes = systemRecipes;
+    // The bare owned items, for the uuid/essence-keyed paths (consumption and essence
+    // accumulation) that must key on the item, not its bucketed component id.
+    const submissionItems = submittedItems.map((record) => record.item);
     const matchResult = this._matchAlchemySignature(
       submittedItems,
       recipes,
@@ -1526,15 +1529,9 @@ export class CraftingEngine {
       // so the workbench can flip this exact set from `untried` -> `no-reaction` on a
       // re-brew. The fizzle branch runs NO check and returns `disposition:'no-match'`
       // with no roll, so the UI must not show a roll animation on this path.
-      await this._recordAlchemyDeadEnd(
-        craftingActor,
-        systemId,
-        submittedItems,
-        components,
-        alchemyCfg
-      );
+      await this._recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg);
       if (shouldConsume) {
-        await this._consumeSubmittedAlchemyItems(componentSourceActors, submittedItems);
+        await this._consumeSubmittedAlchemyItems(componentSourceActors, submissionItems);
       }
       return {
         success: false,
@@ -1550,7 +1547,7 @@ export class CraftingEngine {
     return this.craft(craftingActor, componentSourceActors, recipe, ingredientSetId, {
       ...options,
       isAlchemyAttempt: true,
-      alchemySubmittedItems: submittedItems,
+      alchemySubmittedItems: submissionItems,
     });
   }
 
@@ -1571,40 +1568,33 @@ export class CraftingEngine {
    * option's components share its source-reference chain. Essence requirements,
    * when the system supports essences, must also be met for a set to match.
    *
-   * Component identity is resolved durable-flag-first through the shared,
-   * list-aware, system-scoped resolver {@link resolveComponentForItem}: each
-   * submission resolves ONCE, against the FULL component set scoped by the system
-   * id, to the single component it IS — exclusive on a resolvable
-   * `flags.fabricate.roles[systemId].componentId` (or the legacy scalar) and inert
-   * on a stale/foreign one — with a raw source-reference fall-through for
-   * unstamped items. The one legacy field the shared resolver structurally cannot
-   * read is a bare top-level `item.registeredItemUuid` (not part of
-   * {@link getItemSourceReferences}), so a narrow LOCAL supplement attributes such
-   * an item by that field alone when the resolver returns null. Resolving once per
-   * submission preserves the one-unit-per-group semantics by construction (an item
-   * IS exactly one component, so it is counted at most once per group); a
-   * submission whose raw refs overlap components in DIFFERENT groups now resolves
-   * to a single component (the first match in the full set, order-dependent),
-   * rather than being counted in each — the intended "one item = one component"
-   * tightening over the pre-fix flag-blind intersection.
+   * Component identity is NOT resolved here (issue 572): each submission record
+   * arrives ALREADY bucketed to its `componentId` by the shared alchemy resolver
+   * {@link resolveAlchemySubmissionComponent} at the collector
+   * ({@link resolveAlchemySubmissions}) — the SAME resolver the workbench palette
+   * uses — so the palette, collector, and matcher can never disagree. This method
+   * CONSUMES `record.componentId` and never re-derives identity from raw source
+   * references. Because each record carries exactly one component id, the
+   * one-unit-per-group semantics hold by construction (a submission is counted at
+   * most once per group even when several of a group's components share its
+   * reference chain).
    *
    * Returns { matched: true, recipe, ingredientSetId } or { matched: false }.
+   * @param {Array<{item: object, componentId: string}>} submittedItems - Pre-bucketed records.
    * @private
    */
   _matchAlchemySignature(submittedItems, recipes, components, signatureValidator, options = {}) {
     const system = options?.system;
-    const systemId = system?.id;
 
-    // Resolve each submission ONCE to at most one component id, against the FULL
-    // system component set scoped by `systemId`. Component identity is a property
-    // of the item (an item IS one component), not of the group under test, so
-    // bucketing happens exactly once here — durable-flag-first via the shared
-    // resolver, never re-derived per group from raw source references. Do NOT loop
-    // the resolver per candidate component: that would double-count a submission
-    // matching several components of one group.
-    const resolvedComponentIds = submittedItems.map((item) =>
-      this._resolveSubmissionComponentId(item, components, systemId)
-    );
+    // Consume the component id each submission was bucketed to ONCE at the collector
+    // (issue 572), never re-deriving identity here. `null` for a submission that
+    // resolved to no component. Do NOT re-resolve per candidate component: that would
+    // double-count a submission matching several components of one group.
+    const resolvedComponentIds = submittedItems.map((record) => record?.componentId ?? null);
+
+    // The bare owned items, for essence accumulation (which keys on each item's
+    // essence flags / component-defined essences, not the bucketed component id).
+    const submittedItemObjects = submittedItems.map((record) => record?.item);
 
     // Count submissions whose resolved component id is one of the given component
     // IDs. Each submission resolved to exactly one component, so it contributes at
@@ -1625,7 +1615,7 @@ export class CraftingEngine {
     // Accumulate essences from ALL submitted items (duplicates count multiple times)
     let submittedEssences = null;
     if (essencesEnabled) {
-      submittedEssences = accumulateItemEssences(submittedItems, {
+      submittedEssences = accumulateItemEssences(submittedItemObjects, {
         components,
         systemId: system?.id,
       });
@@ -1745,39 +1735,19 @@ export class CraftingEngine {
   }
 
   /**
-   * Resolve one submitted item to at most one component id, durable-flag-first via
-   * the shared, list-aware, system-scoped resolver {@link resolveComponentForItem},
-   * with a narrow LOCAL supplement for the one legacy field the shared resolver
-   * structurally cannot see: a bare top-level `item.registeredItemUuid` (a source-ref-only
-   * fall-through that re-derives no identity/exclusivity rule). Shared by
-   * {@link _matchAlchemySignature} and {@link _submittedComponentMultiset} so the
-   * dead-end key can never drift from the signature it was matched against.
+   * Map submission records to a plain-component multiset `{ componentId: units }`
+   * from the SAME `componentId` each was bucketed to at the collector (issue 572),
+   * so the dead-end key can never drift from the signature {@link _matchAlchemySignature}
+   * matched against. Each record contributes at most one unit; a record with no
+   * component id is skipped.
+   *
+   * @param {Array<{item: object, componentId: string}>} submittedItems - Pre-bucketed records.
    * @private
    */
-  _resolveSubmissionComponentId(item, components, systemId) {
-    const resolved = resolveComponentForItem(item, components, systemId);
-    if (resolved) return resolved.id;
-    const bareRegisteredItemUuid = item?.registeredItemUuid;
-    if (bareRegisteredItemUuid) {
-      const byBare = (Array.isArray(components) ? components : []).find((comp) =>
-        getItemMatchUuids(comp).includes(bareRegisteredItemUuid)
-      );
-      if (byBare) return byBare.id;
-    }
-    return null;
-  }
-
-  /**
-   * Map submitted items to a plain-component multiset `{ componentId: units }`
-   * through the same {@link _resolveSubmissionComponentId} resolver
-   * {@link _matchAlchemySignature} uses (each submission contributes at most one
-   * unit). A submission that resolves to no component is skipped.
-   * @private
-   */
-  _submittedComponentMultiset(submittedItems, components, systemId) {
+  _submittedComponentMultiset(submittedItems) {
     const multiset = {};
-    for (const item of Array.isArray(submittedItems) ? submittedItems : []) {
-      const componentId = this._resolveSubmissionComponentId(item, components, systemId);
+    for (const record of Array.isArray(submittedItems) ? submittedItems : []) {
+      const componentId = record?.componentId;
       if (!componentId) continue;
       multiset[componentId] = (multiset[componentId] || 0) + 1;
     }
@@ -1794,12 +1764,10 @@ export class CraftingEngine {
    * duplicate key, or an actor without flag support.
    * @private
    */
-  async _recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, components, alchemyCfg) {
+  async _recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg) {
     if (alchemyCfg?.showAttemptHistoryToPlayers !== true) return;
     if (!systemId || typeof craftingActor?.setFlag !== 'function') return;
-    const key = canonicalSignatureKey(
-      this._submittedComponentMultiset(submittedItems, components, systemId)
-    );
+    const key = canonicalSignatureKey(this._submittedComponentMultiset(submittedItems));
     if (!key) return;
     const deadEnds = getFabricateFlag(craftingActor, 'alchemyDeadEnds', {});
     const current = deadEnds && typeof deadEnds === 'object' ? deadEnds : {};
