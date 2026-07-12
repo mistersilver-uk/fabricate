@@ -143,6 +143,22 @@ describe('decideWorldInteractableCleanup', () => {
     assert.equal(region.clearOwnershipFlag, false);
   });
 
+  it('FAILS CLOSED: a marker with a malformed reverse flag is never selected for deletion', () => {
+    // isInteractableVisual is true but the ref is incomplete (no linkedRegionUuid /
+    // linkedBehaviorId), so readLinkedVisualRef returns null and the doc is NOT ours.
+    const scene = {
+      id: 's1',
+      regions: [],
+      tiles: [{ id: 'malformed', flags: { fabricate: { isInteractableVisual: true } } }],
+      drawings: [
+        { id: 'partial', flags: { fabricate: { isInteractableVisual: true, linkedRegionUuid: 'Scene.s1.Region.r1' } } },
+      ],
+    };
+    const plan = decideWorldInteractableCleanup([scene]);
+    assert.deepEqual(plan.scenes, []);
+    assert.equal(planHasWork(plan), false);
+  });
+
   it('removes an ORPHANED marker (a Fabricate tile whose behaviour is already gone)', () => {
     const scene = {
       id: 's1',

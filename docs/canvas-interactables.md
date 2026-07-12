@@ -292,12 +292,19 @@ It scans every scene in your world and, after a confirmation dialog, removes:
 - Fabricate's own **tile** and **drawing** markers;
 - Fabricate's ownership flags on regions, and its reverse flags on relinked tokens.
 
-It never deletes any of your data.
+It keeps your regions, your tokens, and every non-Fabricate region behaviour.
 
 - Your **regions** are kept, even the ones Fabricate created.
   An empty leftover region is harmless, and you can delete it by hand.
 - Any **other region behaviour** on a region (lighting, a third-party module, and so on) is kept.
 - A **token marker** is your own token (for example a merchant NPC), so it is never deleted — only its Fabricate link flag is cleared.
+
+{: .warning }
+> **One exception: relinked tile or drawing markers.**
+> Cleanup deletes the tile and drawing markers that carry Fabricate's link, and that includes a **tile or drawing you drew yourself and then relinked** as an interactable's marker.
+> Tokens are treated differently (they are only unlinked, never deleted) because a token is clearly your own actor, but a hand-drawn tile or drawing is removed along with Fabricate's own markers.
+> If you drew a tile or drawing that carries independent meaning on the map (say a map annotation) and relinked it to an interactable, **unlink it from the interactable first** — use **Remove** on the interactable's config panel — before you run cleanup or uninstall.
+> After you unlink it, it is your own plain tile or drawing again and cleanup leaves it alone.
 
 When it finishes it tells you how many interactables and markers were removed.
 At that point you can disable or uninstall Fabricate with no leftover errors.

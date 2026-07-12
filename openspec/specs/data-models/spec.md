@@ -1795,8 +1795,11 @@ Requirements:
 It is a plain API method (no rendered UI control), runnable from a macro/console, GM-gated, no-throw, and confirmed via `DialogV2` with a summary (behaviours + markers + scenes).
 2. **Removes only what Fabricate owns.** The cleanup removes EXACTLY: every `fabricate.interactable` behaviour (`isInteractableRegionBehavior`, via `region.deleteEmbeddedDocuments('RegionBehavior', …)`), Fabricate's own **Tile/Drawing** markers (`isInteractableVisual` reverse flag, via `scene.deleteEmbeddedDocuments`), and clears the region-ownership stamp (`flags.fabricate.interactableRegion`).
 The pure decision `decideWorldInteractableCleanup` (scenes → id-keyed removal set + summary) and the thin edge `executeWorldInteractableCleanup` live in `src/canvas/regions/interactableCleanup.js`.
-3. **Never deletes user data.** The cleanup NEVER deletes a parent Region (even a Fabricate-created one — an empty leftover region is a harmless artefact, unlike single-interactable deletion which may delete a created region wholesale), NEVER removes a foreign behaviour, and NEVER deletes a **Token** marker.
+3. **Never deletes user data — with one documented asymmetry.** The cleanup NEVER deletes a parent Region (even a Fabricate-created one — an empty leftover region is a harmless artefact, unlike single-interactable deletion which may delete a created region wholesale), NEVER removes a foreign behaviour, and NEVER deletes a **Token** marker.
 A Token marker is an existing GM-owned token the GM relinked, so cleanup only CLEARS its reverse flag (`buildClearLinkedVisualFlags`) and leaves the token intact.
+The **asymmetry**: Tile/Drawing markers carrying the reverse flag ARE deleted — and because `relinkVisual` stamps the reverse flag onto ANY selected Tile/Drawing/Token, a Tile/Drawing the GM DREW THEMSELVES and then relinked as a marker is deleted too (only Tokens are exempted from deletion).
+This matches issue #535's explicit "delete tiles/drawings" scope; the GM must **unlink** such a hand-drawn marker (config panel "Remove") before cleanup/uninstall to keep it, and the docs state this caveat.
+Selection is fail-closed: a document without a well-formed reverse flag (`readLinkedVisualRef` → non-empty `linkedRegionUuid` + `linkedBehaviorId`) is never selected.
 Legacy/unflagged provenance is handled conservatively (behaviour removed, region kept), and an empty world is a no-op.
 
 ### Linked Visual reverse flags (holds no state; reflects env depletion + concealment)
