@@ -197,6 +197,11 @@ async function main() {
   const flags = new Set(args);
   const noZip = flags.has('--no-zip');
   const validateOnly = flags.has('--validate-only');
+  // --analyze: opt-in bundle visualizer. Forwarded to the vite build subprocess
+  // as ANALYZE=1 (cross-platform, no shell-specific env syntax); vite.config.js
+  // only wires the visualizer plugin when ANALYZE=1 is set, so the default build
+  // is byte-for-byte unaffected.
+  const analyze = flags.has('--analyze');
   let versionOptions;
   try {
     versionOptions = parseReleaseVersionOptions(args);
@@ -249,8 +254,12 @@ async function main() {
   await mkdir(distDir, { recursive: true });
 
   // 2. Run vite build
-  console.log('Running vite build...');
-  execSync('npx vite build', { cwd: ROOT, stdio: 'inherit' });
+  console.log(`Running vite build${analyze ? ' (bundle analyzer enabled)' : ''}...`);
+  execSync('npx vite build', {
+    cwd: ROOT,
+    stdio: 'inherit',
+    env: analyze ? { ...process.env, ANALYZE: '1' } : process.env,
+  });
 
   // 3. Copy static assets
   console.log('Copying static assets...');

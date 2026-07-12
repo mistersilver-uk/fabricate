@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { fabricateDevProxy } from './scripts/vite-foundry-proxy.js';
 
 /** Resolves the global CSS import to an empty module during production builds. */
@@ -24,6 +25,22 @@ export default defineConfig(({ command }) => {
   const plugins = [svelte()];
   if (command === 'serve') plugins.push(fabricateDevProxy());
   if (command === 'build') plugins.push(stripGlobalCss());
+
+  // Opt-in bundle-size visualizer (issue #146). Off by default so the normal
+  // `npm run build` output is byte-for-byte unaffected; enabled only when the
+  // `build:analyze` script sets ANALYZE=1. Emits a gitignored dist/stats.html
+  // treemap of per-module byte contributions.
+  if (command === 'build' && process.env.ANALYZE === '1') {
+    plugins.push(
+      visualizer({
+        filename: 'stats.html',
+        title: 'Fabricate bundle analysis',
+        template: 'treemap',
+        gzipSize: true,
+        brotliSize: true,
+      })
+    );
+  }
 
   if (command === 'serve') {
     return {
