@@ -292,11 +292,16 @@ export function routeInteractableActivateMessage(
   const normalized = validateActivatePayload(payload);
   if (!normalized) return false;
   if (typeof isActiveGM === 'function' && isActiveGM() !== true) return false;
-  // Impersonation guard: the requesting userId must be the authenticated sender.
-  if (senderId !== undefined && senderId !== null && normalized.userId !== String(senderId)) {
+  // Impersonation guard (FAIL-CLOSED): the requesting userId must equal the
+  // server-attested sender. An absent/blank senderId is treated as unauthenticated
+  // and rejected — matching the not-GM fail-closed handling on the behaviour/visual
+  // edges. Real Foundry always attaches the 2nd-arg senderId, so a legitimate
+  // request never trips this; a caller that omits it (e.g. a raw crafted emit) does.
+  const sender = senderId === undefined || senderId === null ? '' : String(senderId);
+  if (!sender || normalized.userId !== sender) {
     console.warn(
       'Fabricate | Refused an interactable activation request: payload userId does not match the authenticated sender',
-      { userId: normalized.userId, senderId: String(senderId) }
+      { userId: normalized.userId, senderId: sender }
     );
     return false;
   }
