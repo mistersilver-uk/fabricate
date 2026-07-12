@@ -5,11 +5,13 @@
  * `applyInteractableVisualDelete`). Each seam carries an OWNERSHIP guard so a
  * drifted/reused/crafted id or uuid can never mutate or delete a foreign document.
  *
- * The visual update/delete seams additionally require a mint-proof BIDIRECTIONAL
- * link: a reverse flag (mintable via a stamp-only socket write) does not by itself
- * authorize a core-data write or a delete — the linked `fabricate.interactable`
- * behaviour must forward-link back to the same document. Only the relink provenance
- * stamp (which writes no core data) is exempt.
+ * The visual update/delete seams additionally require a BIDIRECTIONAL link: a
+ * reverse flag (mintable via a stamp-only socket write) does not by itself authorize
+ * a core-data write or a delete — the linked `fabricate.interactable` behaviour must
+ * forward-link back to the same document. Only the relink provenance stamp (which
+ * writes no core data) is exempt. This is defense-in-depth that raises the escalation
+ * bar, not a full closure — the forward link is itself socket-writable, so complete
+ * closure needs socket sender authentication (tracked by issue 593).
  *
  * These drive the real functions through injected `globalThis.game` /
  * `globalThis.fromUuidSync` fakes (no live Foundry).

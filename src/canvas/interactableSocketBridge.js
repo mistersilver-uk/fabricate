@@ -189,8 +189,11 @@ export async function applyInteractableVisualUpdate({
   if (!doc?.update) return;
   // Ownership guard: permit the relink provenance STAMP (writes no core data), or a
   // core-data write only when the visual is GENUINELY bidirectionally linked to its
-  // behaviour (mint-proof — a reverse flag alone does not authorize a core write).
-  // Any other write to a foreign/minted document is refused.
+  // behaviour — a reverse flag alone does not authorize a core write. This is
+  // defense-in-depth (see visualLinkRoundTrips): it raises the escalation from one
+  // message to a multi-message forge but does not fully close it, because the
+  // forward link is itself socket-writable; full closure needs socket sender
+  // authentication (issue 593). Any other write to a foreign/minted document is refused.
   const behavior = resolveLinkedBehaviorForVisual(doc);
   if (!mayApplyInteractableVisualUpdate(doc, update, behavior)) {
     console.warn(
@@ -221,9 +224,10 @@ export async function applyInteractableVisualDelete({
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.delete) return;
   // Ownership guard: NEVER delete a document unless it is GENUINELY bidirectionally
-  // linked to its behaviour (mint-proof). A drifted/crafted uuid — or a minted
-  // reverse flag — could otherwise resolve to a foreign Tile/Drawing/Token and
-  // delete it outright.
+  // linked to its behaviour. A drifted/crafted uuid — or a minted reverse flag —
+  // could otherwise resolve to a foreign Tile/Drawing/Token and delete it outright.
+  // Defense-in-depth (see visualLinkRoundTrips): the forward link is itself
+  // socket-writable, so full closure of the escalation needs sender auth (issue 593).
   const behavior = resolveLinkedBehaviorForVisual(doc);
   if (!mayDeleteInteractableVisual(doc, behavior)) {
     console.warn(
