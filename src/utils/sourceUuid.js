@@ -416,11 +416,23 @@ export function itemIsToolByDurableIdentity(item, tool, tools, systemId) {
  * @param {object|null} component - The component to test identity against.
  * @param {Array<object>|null} components - The candidate set the identity is scoped to.
  * @param {string|null|undefined} systemId
+ * @param {(item: object, components: Array<object>|null, systemId: string|null|undefined) => object|null} [resolveComponent] -
+ *   The component resolver. Defaults to {@link resolveComponentForItem} (tiers 1-3),
+ *   preserving today's behavior for gathering/inventory/standard-crafting callers.
+ *   The alchemy craft path injects {@link resolveAlchemySubmissionComponent} (adding
+ *   the bare-`registeredItemUuid` tier) so ingredient matching recognizes the same
+ *   component the submission collector bucketed the item to.
  * @returns {boolean}
  */
-export function itemResolvesToComponent(item, component, components, systemId) {
+export function itemResolvesToComponent(
+  item,
+  component,
+  components,
+  systemId,
+  resolveComponent = resolveComponentForItem
+) {
   if (!component || component.id == null) return false;
-  const resolved = resolveComponentForItem(item, components, systemId);
+  const resolved = resolveComponent(item, components, systemId);
   return resolved != null && resolved.id === component.id;
 }
 

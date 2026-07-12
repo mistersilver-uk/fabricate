@@ -3,7 +3,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
-import { accumulateItemEssences } from '../utils/essenceResolver.js';
+import { accumulateItemEssences, findMatchingComponent } from '../utils/essenceResolver.js';
 import {
   itemResolvesToComponent,
   itemResolvesToTool,
@@ -382,6 +382,11 @@ export class RecipeManager {
    *   currency-alternative group. The display probe is bound to this actor so the
    *   craftability shown to a player agrees with what the engine spends. Defaults to
    *   `null`, which makes every currency option show as missing (no crash).
+   * @param {Function} [options.resolveComponent] - Optional component resolver injected
+   *   on the alchemy craft path (issue 578) so a tier-4-only submission satisfies the
+   *   ingredient and essence checks against the same component the collector bucketed it
+   *   to. Defaults (undefined) to the shared resolvers used by standard crafting and
+   *   every display caller — byte-for-byte unchanged.
    * @returns {{
    *   canCraft: boolean,
    *   satisfiableSet: IngredientSet|null,
@@ -394,7 +399,7 @@ export class RecipeManager {
   evaluateCraftability(
     componentSourceActors,
     recipe,
-    { presentTools = null, craftingActor = null } = {}
+    { presentTools = null, craftingActor = null, resolveComponent } = {}
   ) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
@@ -445,7 +450,8 @@ export class RecipeManager {
         typeof ingredientSet.resolveIngredientSelection === 'function'
           ? ingredientSet.resolveIngredientSelection(
               availableItems,
-              (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item),
+              (ingredient, item) =>
+                this.ingredientMatchesItem(recipe, ingredient, item, resolveComponent),
               { affordCurrency }
             )
           : {
@@ -464,7 +470,11 @@ export class RecipeManager {
       // Check essences for this set.
       let essencesMet = true;
       if (features.enableEssences && Object.keys(ingredientSet.essences || {}).length > 0) {
-        const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
+        const accumulatedEssences = this._accumulateEssences(
+          availableItems,
+          recipe,
+          resolveComponent
+        );
         for (const [essenceType, requiredQty] of Object.entries(ingredientSet.essences)) {
           if ((accumulatedEssences[essenceType] || 0) < requiredQty) {
             essencesMet = false;
@@ -507,7 +517,10 @@ export class RecipeManager {
       availableItems
     );
 
-    // Build essence states from the display set.
+    // Build essence states from the display set. This readout is display-only and is
+    // intentionally NOT threaded with the alchemy tier-4 resolver (issue 578): it is
+    // harmless because `missing.essences` below is forced empty whenever canCraft is
+    // true, and the alchemy workbench does not render this per-type essence-state list.
     const essenceStates = this._buildEssenceStates(
       recipe,
       displayIngredientSet,
@@ -899,9 +912,16 @@ export class RecipeManager {
    *   evaluateCraftability for the system-scoping semantics).
    * @param {object|null} [options.craftingActor] - actor whose currency funds a
    *   currency-alternative group (see evaluateCraftability). Defaults to `null`.
+   * @param {Function} [options.resolveComponent] - Optional component resolver injected
+   *   on the alchemy craft path (issue 578); defaults (undefined) to the standard-craft
+   *   resolvers (see evaluateCraftability).
    * @returns {{canCraft: boolean, satisfiableSet: IngredientSet|null, missing: Object}}
    */
-  canCraft(componentSourceActors, recipe, { presentTools = null, craftingActor = null } = {}) {
+  canCraft(
+    componentSourceActors,
+    recipe,
+    { presentTools = null, craftingActor = null, resolveComponent } = {}
+  ) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
       : componentSourceActors
@@ -919,6 +939,7 @@ export class RecipeManager {
     const { canCraft, satisfiableSet, missing } = this.evaluateCraftability(sourceActors, recipe, {
       presentTools,
       craftingActor,
+      resolveComponent,
     });
     return { canCraft, satisfiableSet, missing };
   }
@@ -1027,9 +1048,13 @@ export class RecipeManager {
    * @param {Recipe} recipe
    * @param {Ingredient} ingredient
    * @param {Item} item
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only submission resolves to the same
+   *   component the collector bucketed it to. Defaults (undefined) to the shared
+   *   {@link resolveComponentForItem} used by standard crafting — byte-for-byte unchanged.
    * @returns {boolean}
    */
-  ingredientMatchesItem(recipe, ingredient, item) {
+  ingredientMatchesItem(recipe, ingredient, item, resolveComponent) {
     const features = this._getSystemFeatures(recipe);
     // A component (or legacy systemItem) match resolves its id via the handler;
     // tags/currency/no-match return null and fall to the bare-field fallback,
@@ -1045,7 +1070,8 @@ export class RecipeManager {
           item,
           managedItem,
           this._getSystemComponents(recipe),
-          recipe?.craftingSystemId
+          recipe?.craftingSystemId,
+          resolveComponent
         )
       )
         return true;
@@ -1309,14 +1335,21 @@ export class RecipeManager {
   /**
    * Accumulate essences from all available items
    * @param {Item[]} items - Items to check
+   * @param {Recipe|null} [recipe] - Recipe whose system supplies the candidate
+   *   components and system id for essence resolution.
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only item contributes its component's
+   *   essences. Defaults to the shared {@link findMatchingComponent} via
+   *   {@link accumulateItemEssences} used by standard crafting — byte-for-byte unchanged.
    * @returns {Object} - Accumulated essences { 'light': 3, 'fire': 2 }
    * @private
    */
-  _accumulateEssences(items, recipe = null) {
+  _accumulateEssences(items, recipe = null, resolveComponent = findMatchingComponent) {
     return accumulateItemEssences(items, {
       components: this._getSystemComponents(recipe),
       systemId: recipe?.craftingSystemId,
       multiplyByQuantity: true,
+      resolveComponent,
     });
   }
 
