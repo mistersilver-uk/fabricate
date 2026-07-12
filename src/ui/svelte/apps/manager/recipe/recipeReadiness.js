@@ -406,18 +406,22 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
   if ((alchemy.checkMode || 'none') !== 'tiered') {
     const resultGroups = asArray(recipe?.resultGroups);
     const successGroups = resultGroups.filter((group) => group?.role !== 'failure');
-    // The empty case is already reported as `noResultGroup`; only flag a present
-    // result-set list that does not resolve to a single success group.
-    const invalid = resultGroups.length > 0 && successGroups.length !== 1;
-    if (invalid) {
-      issues.push({
-        id: 'alchemyResultSelection',
-        severity: 'critical',
-        blocks: 'enable',
-        target: 'results',
-      });
+    // The empty case is already spoken to by `hasResultGroup`/`noResultGroup`, so
+    // this check stays silent there (a vacuously-satisfied row next to the failing
+    // `hasResultGroup` row reads contradictory). It only speaks to a PRESENT result
+    // set that does not resolve to a single success group.
+    if (resultGroups.length > 0) {
+      const invalid = successGroups.length !== 1;
+      if (invalid) {
+        issues.push({
+          id: 'alchemyResultSelection',
+          severity: 'critical',
+          blocks: 'enable',
+          target: 'results',
+        });
+      }
+      checks.push({ id: 'alchemyResultSelection', satisfied: !invalid });
     }
-    checks.push({ id: 'alchemyResultSelection', satisfied: !invalid });
   }
 
   const conflicts = asArray(signatureConflicts);

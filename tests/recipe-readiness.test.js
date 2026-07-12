@@ -336,6 +336,45 @@ describe('evaluateRecipeReadiness alchemy enable blockers', () => {
     assert.equal(blocksEnable(issues), true);
   });
 
+  it('does not surface the result-selection blocker for a TIERED alchemy recipe with more than one result set', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([{ id: 'r1' }, { id: 'r2' }]),
+      { alchemy: { checkMode: 'tiered' } }
+    );
+    // Tiered routes by the crafting-check outcome, so result-set cardinality is
+    // unconstrained here — the cardinality rule (and its check row) is skipped.
+    assert.equal(issues.some(i => i.id === 'alchemyResultSelection'), false, 'tiered skips the cardinality rule');
+    assert.equal(check(checks, 'alchemyResultSelection'), undefined, 'no cardinality check row under tiered');
+  });
+
+  it('fires the result-selection blocker (without double-firing noResultGroup) when every alchemy result set is a failure set', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([{ id: 'r1', role: 'failure' }]),
+      { alchemy: { checkMode: 'simple' } }
+    );
+    const blocker = issues.find(i => i.id === 'alchemyResultSelection');
+    assert.ok(blocker, 'all-failure result sets leave no success set to resolve');
+    assert.equal(blocker.blocks, 'enable');
+    assert.equal(blocker.target, 'results');
+    assert.equal(check(checks, 'alchemyResultSelection').satisfied, false);
+    // A present (failure-only) result set still satisfies hasResultGroup, so
+    // noResultGroup must NOT double-fire — only the alchemy rule speaks here.
+    assert.equal(issues.some(i => i.id === 'noResultGroup'), false, 'noResultGroup does not double-fire');
+    assert.equal(check(checks, 'hasResultGroup').satisfied, true, 'a present result set satisfies hasResultGroup');
+  });
+
+  it('leaves the result-selection check silent for an alchemy recipe with no result sets at all', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([]),
+      { alchemy: { checkMode: 'simple' } }
+    );
+    // The empty case is spoken to by noResultGroup only; the alchemy cardinality row
+    // stays silent so it does not read as a satisfied row beside the failing one.
+    assert.equal(check(checks, 'alchemyResultSelection'), undefined, 'no vacuously-satisfied cardinality row');
+    assert.equal(issues.some(i => i.id === 'alchemyResultSelection'), false);
+    assert.ok(issues.some(i => i.id === 'noResultGroup'), 'the empty case stays a noResultGroup gap');
+  });
+
   it('ignores the reserved failure result set when counting alchemy success result sets', () => {
     const { checks, issues } = evaluateRecipeReadiness(
       alchemyRecipe([{ id: 'r1' }, { id: 'r2', role: 'failure' }]),

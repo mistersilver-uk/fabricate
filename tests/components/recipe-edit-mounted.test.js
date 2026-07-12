@@ -389,6 +389,65 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('disables the enable toggle when an OFF alchemy recipe carries an enable blocker (issue 549)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: {
+          id: 'r-alch',
+          name: 'Mana Potion',
+          enabled: false,
+          recipeItemId: '',
+          ingredientSets: [{ id: 's1' }],
+          resultGroups: [{ id: 'r1' }, { id: 'r2' }],
+        },
+        alchemy: { checkMode: 'simple' },
+      })
+    );
+    const toggle = target.querySelector('[data-recipe-field="enabled"]');
+    assert.ok(toggle, 'enable toggle renders');
+    assert.equal(toggle.disabled, true, 'enable is disabled while a blocker is present, not throwing on click');
+    editHarness.remount();
+  });
+
+  it('keeps the toggle usable for an already-ENABLED alchemy recipe with a blocker so it can be turned OFF (issue 549)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: {
+          id: 'r-alch',
+          name: 'Mana Potion',
+          enabled: true,
+          recipeItemId: '',
+          ingredientSets: [{ id: 's1' }],
+          resultGroups: [{ id: 'r1' }, { id: 'r2' }],
+        },
+        alchemy: { checkMode: 'simple' },
+      })
+    );
+    const toggle = target.querySelector('[data-recipe-field="enabled"]');
+    assert.equal(toggle.disabled, false, 'disabling stays free even while a blocker is present');
+    editHarness.remount();
+  });
+
+  it('re-enables the toggle once the alchemy blockers clear (issue 549)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: {
+          id: 'r-alch',
+          name: 'Mana Potion',
+          enabled: false,
+          recipeItemId: '',
+          ingredientSets: [{ id: 's1' }],
+          resultGroups: [{ id: 'r1' }],
+        },
+        alchemy: { checkMode: 'simple' },
+        signatureConflicts: [],
+      })
+    );
+    const toggle = target.querySelector('[data-recipe-field="enabled"]');
+    assert.equal(toggle.disabled, false, 'a ready alchemy recipe can be enabled');
+    editHarness.remount();
+  });
+
   it('swaps the visible tabpanel when a tab is clicked', async () => {
     const target = await editHarness.mount(identityProps({ toolsLibrary: TOOLS_LIBRARY }));
     // Overview hosts identity only (single-step); each requirement type has its own tab.
