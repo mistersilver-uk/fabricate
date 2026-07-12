@@ -29,7 +29,7 @@
 
 import { numberOrNull } from './coercion.js';
 import { resolveMarkerHidden } from './interactableRegionActivation.js';
-import { readInteractableBehaviorSystem } from './interactableRegionFlags.js';
+import { readInteractableBehaviorSystem, isInteractableVisual } from './interactableRegionFlags.js';
 
 /**
  * Read the depleted state for an environment's node for a task.
@@ -195,6 +195,20 @@ async function syncOneBehavior(
 
     const tile = resolveTile(system.linkedVisual.uuid, scene);
     if (!tile) return;
+
+    // Ownership guard: the resolved tile must be a Fabricate interactable visual
+    // (carries `flags.fabricate.isInteractableVisual`). Without this, a behaviour
+    // whose `linkedVisual.uuid` was relinked to — or drifted onto — a foreign tile
+    // would have its `hidden`/`texture.src`/`markerAvailableImg` silently rewritten
+    // on every scene load. This is the only mutation edge that fires with no user
+    // action, so refuse (and log) before touching a tile that isn't ours.
+    if (!isInteractableVisual(tile)) {
+      console.warn(
+        'Fabricate | Skipped marker sync: the linked tile is not a Fabricate interactable visual',
+        { uuid: system.linkedVisual.uuid }
+      );
+      return;
+    }
 
     const update = {};
 

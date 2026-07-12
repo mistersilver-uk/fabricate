@@ -11,7 +11,9 @@ import {
   isInteractableRegionBehavior,
   isUnconfiguredInteractable,
   buildLinkedVisualFlags,
-  readLinkedVisualRef
+  readLinkedVisualRef,
+  isInteractableVisual,
+  mayApplyInteractableVisualUpdate
 } from '../../../src/canvas/regions/interactableRegionFlags.js';
 import { parseInteractableSourceUuid } from '../../../src/canvas/interactableResolution.js';
 
@@ -453,5 +455,39 @@ test('readLinkedVisualRef rejects non-visual documents', () => {
   assert.equal(
     readLinkedVisualRef({ flags: { fabricate: { isInteractableVisual: true, linkedRegionUuid: 'r' } } }),
     null
+  );
+});
+
+test('isInteractableVisual is true only for a well-formed reverse-flag document', () => {
+  const { fabricate } = buildLinkedVisualFlags({ regionUuid: 'Scene.s.Region.r', behaviorId: 'b1' });
+  assert.equal(isInteractableVisual({ flags: { fabricate } }), true);
+  // Foreign / drifted documents.
+  assert.equal(isInteractableVisual(null), false);
+  assert.equal(isInteractableVisual({}), false);
+  assert.equal(isInteractableVisual({ flags: {} }), false);
+  assert.equal(isInteractableVisual({ flags: { fabricate: { isInteractableVisual: false } } }), false);
+  // Truthy marker but incomplete ref → not a valid visual.
+  assert.equal(isInteractableVisual({ flags: { fabricate: { isInteractableVisual: true } } }), false);
+});
+
+test('mayApplyInteractableVisualUpdate permits an owned doc or a provenance-stamp write', () => {
+  const { fabricate } = buildLinkedVisualFlags({ regionUuid: 'Scene.s.Region.r', behaviorId: 'b1' });
+  const ownedDoc = { flags: { fabricate } };
+  const foreignDoc = { flags: {} };
+
+  // An already-owned visual accepts any write.
+  assert.equal(mayApplyInteractableVisualUpdate(ownedDoc, { hidden: true }), true);
+  // A foreign document rejects a core-data write (hidden/texture).
+  assert.equal(mayApplyInteractableVisualUpdate(foreignDoc, { hidden: true }), false);
+  assert.equal(mayApplyInteractableVisualUpdate(foreignDoc, { texture: { src: 'x' } }), false);
+  // The relink stamp (writing the reverse flag onto a GM-selected doc) is allowed.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, { flags: { fabricate: { isInteractableVisual: true } } }),
+    true
+  );
+  // A clear write (isInteractableVisual: null) onto a foreign doc is NOT a stamp → rejected.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, { flags: { fabricate: { isInteractableVisual: null } } }),
+    false
   );
 });

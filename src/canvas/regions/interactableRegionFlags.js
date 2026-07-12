@@ -449,3 +449,36 @@ export function readLinkedVisualRef(doc) {
   if (!regionUuid || !behaviorId) return null;
   return { regionUuid, behaviorId };
 }
+
+/**
+ * Ownership predicate (visual side): is this Tile/Drawing/Token a Fabricate
+ * interactable visual? True iff it carries a well-formed reverse linked-visual
+ * flag block ({@link readLinkedVisualRef}). The mutation-edge counterpart to
+ * {@link isInteractableRegionBehavior} for the behaviour side — mutation seams
+ * consult it before writing to / deleting a resolved visual so ref drift or a
+ * crafted socket payload can never touch a foreign document.
+ *
+ * @param {object} doc  A Tile/Drawing/Token document (or plain object).
+ * @returns {boolean}
+ */
+export function isInteractableVisual(doc) {
+  return readLinkedVisualRef(doc) !== null;
+}
+
+/**
+ * Ownership guard for a linked-visual UPDATE write. A write is permitted when the
+ * resolved document is ALREADY a Fabricate interactable visual, OR when the write
+ * itself STAMPS the reverse provenance flag (`flags.fabricate.isInteractableVisual
+ * === true`). The stamp exception preserves the relink edge, which writes the
+ * reverse flag onto a GM-selected document that is not yet a Fabricate visual;
+ * that write only adds provenance (no `hidden`/`texture` change), so it is safe.
+ * Any other write to a non-Fabricate document is rejected.
+ *
+ * @param {object} doc  The resolved visual document.
+ * @param {object} [update]  The pending document update patch.
+ * @returns {boolean}
+ */
+export function mayApplyInteractableVisualUpdate(doc, update) {
+  if (isInteractableVisual(doc)) return true;
+  return update?.flags?.fabricate?.isInteractableVisual === true;
+}

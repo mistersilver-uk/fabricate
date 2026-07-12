@@ -24,6 +24,11 @@ import {
   routeInteractableActivationGranted,
   routeInteractableActivationDenied,
 } from './interactableSocket.js';
+import {
+  isInteractableRegionBehavior,
+  isInteractableVisual,
+  mayApplyInteractableVisualUpdate,
+} from './regions/interactableRegionFlags.js';
 import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
 
 /** Whether this client is the primary (active) GM. */
@@ -101,10 +106,20 @@ export async function applyInteractableBehaviorUpdate({
 } = {}) {
   const behavior = resolveRegionBehavior({ sceneId, regionId, behaviorId });
   if (!behavior?.update) return;
+  // Ownership guard: the resolved Region Behaviour must be a `fabricate.interactable`.
+  // Ref drift / uuid reuse / a crafted socket payload could otherwise mutate a
+  // foreign behaviour. Bail LOUDLY (not silently) so a rejected write is observable.
+  if (!isInteractableRegionBehavior(behavior)) {
+    console.warn(
+      'Fabricate | Refused an interactable behaviour update: the resolved Region Behaviour is not a fabricate.interactable',
+      { sceneId, regionId, behaviorId }
+    );
+    return;
+  }
   try {
     await behavior.update(update);
-  } catch {
-    // Defensive: a behaviour write must never throw into the socket handler.
+  } catch (error) {
+    console.warn('Fabricate | Interactable behaviour update failed', error);
   }
 }
 
@@ -150,10 +165,21 @@ export async function applyInteractableVisualUpdate({
 } = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.update) return;
+  // Ownership guard: only write to a document that is already a Fabricate
+  // interactable visual, OR when the write itself stamps the reverse provenance
+  // flag (the relink edge onto a GM-selected document). Any other write to a
+  // foreign document — resolved by a drifted/crafted uuid — is refused.
+  if (!mayApplyInteractableVisualUpdate(doc, update)) {
+    console.warn(
+      'Fabricate | Refused an interactable visual update: the resolved document is not a Fabricate interactable visual',
+      { sceneId, visualUuid, docId, documentName }
+    );
+    return;
+  }
   try {
     await doc.update(update);
-  } catch {
-    // Defensive: a missing/locked visual must not throw.
+  } catch (error) {
+    console.warn('Fabricate | Interactable visual update failed', error);
   }
 }
 
@@ -171,10 +197,20 @@ export async function applyInteractableVisualDelete({
 } = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.delete) return;
+  // Ownership guard: NEVER delete a document that is not a Fabricate interactable
+  // visual. A drifted/crafted uuid could otherwise resolve to a foreign
+  // Tile/Drawing/Token and delete it outright.
+  if (!isInteractableVisual(doc)) {
+    console.warn(
+      'Fabricate | Refused an interactable visual delete: the resolved document is not a Fabricate interactable visual',
+      { sceneId, visualUuid, docId, documentName }
+    );
+    return;
+  }
   try {
     await doc.delete();
-  } catch {
-    // Defensive: a missing/locked visual must not throw.
+  } catch (error) {
+    console.warn('Fabricate | Interactable visual delete failed', error);
   }
 }
 
