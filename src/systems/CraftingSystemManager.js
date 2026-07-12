@@ -459,8 +459,6 @@ export class CraftingSystemManager {
   }
 
   _normalizeCraftingCheck(check = {}) {
-    const mode =
-      check?.mode === 'tiered' || check?.mode === 'namedOutcomes' ? 'namedOutcomes' : 'passFail';
     const outcomes = Array.isArray(check?.outcomes) ? check.outcomes : [];
     const normalizedOutcomes = outcomes
       .map((o) =>
@@ -472,7 +470,13 @@ export class CraftingSystemManager {
 
     return {
       enabled: check?.enabled === true,
-      mode,
+      // `mode` has a single valid value, `passFail`. The former `tiered` / `namedOutcomes`
+      // branch (with its `['low', 'high']` default outcomes) referenced the removed tiered
+      // concept and was dead: no authoring surface writes those values and no runtime reads
+      // `craftingCheck.mode` — crafting resolution is driven entirely by the recipe/step
+      // resolution mode and the matching simple/routed/progressive sub-object. Any legacy
+      // persisted `tiered` / `namedOutcomes` value collapses to `passFail`.
+      mode: 'passFail',
       consumption: {
         consumeIngredientsOnFail: check?.consumption?.consumeIngredientsOnFail !== false,
         // Canonical key is `breakToolsOnFail` (1.7.0 rename of the legacy
@@ -483,12 +487,7 @@ export class CraftingSystemManager {
           true,
       },
       progressive: this._normalizeProgressiveCraftingCheck(check?.progressive),
-      outcomes:
-        normalizedOutcomes.length > 0
-          ? [...new Set(normalizedOutcomes)]
-          : mode === 'namedOutcomes'
-            ? ['low', 'high']
-            : ['fail', 'pass'],
+      outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
       routed: this._normalizeRoutedCraftingCheck(check?.routed),
       simple: this._normalizeSimpleCraftingCheck(check?.simple),
     };

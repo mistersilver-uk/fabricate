@@ -11,7 +11,11 @@ import {
   isInteractableRegionBehavior,
   isUnconfiguredInteractable,
   buildLinkedVisualFlags,
-  readLinkedVisualRef
+  readLinkedVisualRef,
+  isInteractableVisual,
+  mayApplyInteractableVisualUpdate,
+  mayDeleteInteractableVisual,
+  visualLinkRoundTrips
 } from '../../../src/canvas/regions/interactableRegionFlags.js';
 import { parseInteractableSourceUuid } from '../../../src/canvas/interactableResolution.js';
 
@@ -453,5 +457,130 @@ test('readLinkedVisualRef rejects non-visual documents', () => {
   assert.equal(
     readLinkedVisualRef({ flags: { fabricate: { isInteractableVisual: true, linkedRegionUuid: 'r' } } }),
     null
+  );
+});
+
+test('isInteractableVisual is true only for a well-formed reverse-flag document', () => {
+  const { fabricate } = buildLinkedVisualFlags({ regionUuid: 'Scene.s.Region.r', behaviorId: 'b1' });
+  assert.equal(isInteractableVisual({ flags: { fabricate } }), true);
+  // Foreign / drifted documents.
+  assert.equal(isInteractableVisual(null), false);
+  assert.equal(isInteractableVisual({}), false);
+  assert.equal(isInteractableVisual({ flags: {} }), false);
+  assert.equal(isInteractableVisual({ flags: { fabricate: { isInteractableVisual: false } } }), false);
+  // Truthy marker but incomplete ref → not a valid visual.
+  assert.equal(isInteractableVisual({ flags: { fabricate: { isInteractableVisual: true } } }), false);
+});
+
+const TILE_UUID = 'Scene.s.Tile.t';
+function ownedDocAndBehavior() {
+  const { fabricate } = buildLinkedVisualFlags({ regionUuid: 'Scene.s.Region.r', behaviorId: 'b1' });
+  const doc = { uuid: TILE_UUID, flags: { fabricate } };
+  const behavior = { type: 'fabricate.interactable', system: { linkedVisual: { uuid: TILE_UUID } } };
+  return { doc, behavior, fabricate };
+}
+
+test('visualLinkRoundTrips requires a well-formed reverse flag AND a matching forward link', () => {
+  const { doc, behavior } = ownedDocAndBehavior();
+  // Genuine bidirectional link → true.
+  assert.equal(visualLinkRoundTrips(doc, behavior), true);
+  // No reverse flag on the doc → false.
+  assert.equal(visualLinkRoundTrips({ uuid: TILE_UUID, flags: {} }, behavior), false);
+  // Linked "behaviour" is not a fabricate.interactable → false.
+  assert.equal(visualLinkRoundTrips(doc, { type: 'other', system: { linkedVisual: { uuid: TILE_UUID } } }), false);
+  // Behaviour does not resolve at all → false.
+  assert.equal(visualLinkRoundTrips(doc, null), false);
+  // Forward link points at a DIFFERENT document → false (the mint-then-mutate case).
+  assert.equal(
+    visualLinkRoundTrips(doc, { type: 'fabricate.interactable', system: { linkedVisual: { uuid: 'Scene.s.Tile.other' } } }),
+    false
+  );
+  // A doc without a resolvable uuid can never round-trip.
+  assert.equal(visualLinkRoundTrips({ flags: doc.flags }, behavior), false);
+});
+
+test('mayApplyInteractableVisualUpdate permits a genuine link or a provenance-stamp write', () => {
+  const { doc, behavior, fabricate } = ownedDocAndBehavior();
+  const foreignDoc = { flags: {} };
+
+  // A genuinely bidirectionally-linked visual accepts a core-data write.
+  assert.equal(mayApplyInteractableVisualUpdate(doc, { hidden: true }, behavior), true);
+  // The SAME doc + minted reverse flag but NO genuine behaviour → core write rejected.
+  assert.equal(mayApplyInteractableVisualUpdate(doc, { hidden: true }, null), false);
+  // A foreign document rejects a core-data write (hidden/texture).
+  assert.equal(mayApplyInteractableVisualUpdate(foreignDoc, { hidden: true }), false);
+  assert.equal(mayApplyInteractableVisualUpdate(foreignDoc, { texture: { src: 'x' } }), false);
+  // The relink stamp (writing the reverse flag onto a GM-selected doc) is allowed
+  // with NO behaviour resolved yet (the mint itself), minimal or complete ref block.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, { flags: { fabricate: { isInteractableVisual: true } } }),
+    true
+  );
+  assert.equal(mayApplyInteractableVisualUpdate(foreignDoc, { flags: { fabricate } }), true);
+  // A clear write (isInteractableVisual: null) onto a foreign doc is NOT a stamp → rejected.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, { flags: { fabricate: { isInteractableVisual: null } } }),
+    false
+  );
+});
+
+test('mayDeleteInteractableVisual requires a genuine bidirectional link (mint-proof)', () => {
+  const { doc, behavior } = ownedDocAndBehavior();
+  // Genuine link → delete authorized.
+  assert.equal(mayDeleteInteractableVisual(doc, behavior), true);
+  // Minted reverse flag, behaviour does not resolve → refused.
+  assert.equal(mayDeleteInteractableVisual(doc, null), false);
+  // Minted reverse flag, real behaviour but forward link mismatched → refused.
+  assert.equal(
+    mayDeleteInteractableVisual(doc, { type: 'fabricate.interactable', system: { linkedVisual: { uuid: 'Scene.s.Tile.other' } } }),
+    false
+  );
+  // A foreign doc (no reverse flag) → refused.
+  assert.equal(mayDeleteInteractableVisual({ uuid: TILE_UUID, flags: {} }, behavior), false);
+});
+
+test('mayApplyInteractableVisualUpdate rejects core-data smuggled alongside the stamp (strict allowlist)', () => {
+  const foreignDoc = { flags: {} };
+  // Nested smuggle: the stamp is present but so is core data → rejected.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      flags: { fabricate: { isInteractableVisual: true } },
+      hidden: true,
+      texture: { src: 'evil.webp' },
+      x: 0,
+      y: 0
+    }),
+    false
+  );
+  // Dot-notation smuggle: a flattened stamp key alongside a flattened core key → rejected.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      'flags.fabricate.isInteractableVisual': true,
+      hidden: true
+    }),
+    false
+  );
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      'flags.fabricate.isInteractableVisual': true,
+      'texture.src': 'evil.webp'
+    }),
+    false
+  );
+  // A foreign flag namespace alongside the stamp → rejected.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      flags: { fabricate: { isInteractableVisual: true }, core: { sheetClass: 'x' } }
+    }),
+    false
+  );
+  // A pure dot-notation stamp (no core data) is still a valid stamp → allowed.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      'flags.fabricate.isInteractableVisual': true,
+      'flags.fabricate.linkedRegionUuid': 'Scene.s.Region.r',
+      'flags.fabricate.linkedBehaviorId': 'b1'
+    }),
+    true
   );
 });
