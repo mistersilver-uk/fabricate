@@ -115,6 +115,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/CraftButton.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
+  'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',

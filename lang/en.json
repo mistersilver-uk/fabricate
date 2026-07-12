@@ -566,7 +566,15 @@
           "Missing": "Missing",
           "HaveOfNeed": "{have} of {need} in inventory",
           "Available": "Available",
-          "Unavailable": "Unavailable"
+          "Unavailable": "Unavailable",
+          "AlternativesTitle": "Alternatives",
+          "AlternativesHint": "Choose which component this craft will consume.",
+          "AlternativesBadge": "{count} alternatives",
+          "ChooseStackTitle": "Which {name} to use",
+          "ChooseOption": "Choose {name}",
+          "OptionSelected": "Selected",
+          "CurrencyCost": "{amount} {unit}",
+          "CurrencyUnaffordable": "Not enough {unit}"
         },
         "Shopping": {
           "Title": "Shopping list",

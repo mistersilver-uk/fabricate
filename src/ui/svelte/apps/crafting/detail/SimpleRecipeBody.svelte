@@ -14,14 +14,15 @@
     selectedSetId = null,
     craftability = null,
     rollResult = null,
-    onChoose = null
+    onChoose = null,
+    onChooseOption = null
   } = $props();
 </script>
 
 <div data-recipe-mode="simple">
   <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet results()}
-      <IoTable {craftability} result={recipe?.result} />
+      <IoTable {craftability} result={recipe?.result} {onChooseOption} />
     {/snippet}
   </RecipeBodyShell>
 </div>

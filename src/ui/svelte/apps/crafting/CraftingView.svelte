@@ -99,6 +99,9 @@
   function onChoose(setId) {
     store?.chooseIngredientSet(setId);
   }
+  function onChooseOption(groupId, choice) {
+    store?.chooseIngredientOption(groupId, choice);
+  }
   async function onCraft() {
     if (!selectedRecipe) return;
     // A fresh craft re-opens the run summary for this recipe.
@@ -194,6 +197,7 @@
           {rollResult}
           busy={craftInFlight}
           {onChoose}
+          {onChooseOption}
           {onCraft}
         />
       </section>

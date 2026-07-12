@@ -15,7 +15,8 @@
     selectedSetId = null,
     craftability = null,
     rollResult = null,
-    onChoose = null
+    onChoose = null,
+    onChooseOption = null
   } = $props();
 
   // The chosen ingredient set determines the output, so the "Produces" list must
@@ -44,7 +45,7 @@
       </p>
     {/snippet}
     {#snippet results()}
-      <IoTable {craftability} result={routedResult} />
+      <IoTable {craftability} result={routedResult} {onChooseOption} />
     {/snippet}
   </RecipeBodyShell>
 </div>

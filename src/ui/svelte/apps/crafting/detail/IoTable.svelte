@@ -10,11 +10,15 @@
   import { localize } from '../../../util/foundryBridge.js';
   import CraftingThumb from '../CraftingThumb.svelte';
   import QuantityTag from '../QuantityTag.svelte';
+  import IngredientOptionSelector from './IngredientOptionSelector.svelte';
 
-  let { craftability = null, result = null } = $props();
+  let { craftability = null, result = null, onChooseOption = null } = $props();
 
   const ingredients = $derived(
     Array.isArray(craftability?.ingredientStates) ? craftability.ingredientStates : []
+  );
+  const ingredientChoices = $derived(
+    Array.isArray(craftability?.ingredientChoices) ? craftability.ingredientChoices : []
   );
   const essences = $derived(
     Array.isArray(craftability?.essenceStates) ? craftability.essenceStates : []
@@ -49,6 +53,20 @@
             )}`}
           >
             <CraftingThumb src={state.img} alt="" size={48} />
+            {#if state.hasChoice}
+              <!-- Discoverability badge: this ingredient slot has selectable
+                   alternatives (see the Alternatives section below the grid). -->
+              <span
+                class="crafting-io-alt-badge"
+                data-io-alt-badge
+                title={localize('FABRICATE.App.Crafting.Io.AlternativesBadge', {
+                  count: state.choiceCount ?? 0
+                })}
+              >
+                <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                <span aria-hidden="true">×{state.choiceCount ?? 0}</span>
+              </span>
+            {/if}
             <span
               class="crafting-io-pip"
               class:is-sufficient={state.satisfied}
@@ -60,6 +78,7 @@
           </li>
         {/each}
       </ul>
+      <IngredientOptionSelector choices={ingredientChoices} onChoose={onChooseOption} />
     </div>
   {/if}
 
@@ -219,6 +238,30 @@
     background: var(--fab-danger);
     color: var(--fab-on-accent);
     border: 1px solid var(--fab-danger-border);
+  }
+
+  /* Bottom-left overlap badge signalling this slot has selectable alternatives. */
+  .crafting-io-alt-badge {
+    position: absolute;
+    bottom: -6px;
+    left: -6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px;
+    height: 16px;
+    border-radius: 999px;
+    border: 1px solid var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: var(--fab-shadow-sm);
+  }
+
+  .crafting-io-alt-badge i {
+    font-size: 9px;
   }
 
   .crafting-io-row {

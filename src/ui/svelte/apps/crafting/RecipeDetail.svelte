@@ -22,6 +22,7 @@
     rollResult = null,
     busy = false,
     onChoose = null,
+    onChooseOption = null,
     onCraft = null
   } = $props();
 
@@ -60,7 +61,7 @@
     <RecipeDetailHeader {recipe} />
     {#if !redacted}
       <div class="crafting-detail-body" data-crafting-detail-scroll>
-        <Body {recipe} {selectedSetId} {craftability} {rollResult} {onChoose} />
+        <Body {recipe} {selectedSetId} {craftability} {rollResult} {onChoose} {onChooseOption} />
       </div>
       <div class="crafting-detail-footer">
         <CraftButton
