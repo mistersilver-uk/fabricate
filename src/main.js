@@ -68,10 +68,12 @@ import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
+import { setFabricateFlag } from './config/flags.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
+import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import {
@@ -2354,6 +2356,11 @@ Hooks.once('ready', async () => {
   // MUST run after the MigrationRunner (which persists the 1.15.0 tool source-ref migration
   // at init) and after the component stamp — it reads the migration-populated tool refs.
   await runToolFlagAutoStamp();
+  // #540 Phase 2 (issue 600): re-stamp durable component identity onto owned actor items
+  // that currently resolve to a component by name only. Runs after the source-side component
+  // stamp so a fresh drag inherits the flag first, and reaches the copies already in
+  // inventories that predate it.
+  await runOwnedItemComponentIdentityRestamp();
 
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
@@ -2514,6 +2521,54 @@ async function runToolFlagAutoStamp() {
     await setSetting(SETTING_KEYS.TOOL_FLAG_STAMP_VERSION, TOOL_FLAG_STAMP_TARGET);
   } catch (error) {
     console.error('Fabricate | tool durable-flag auto-stamp failed', error);
+  }
+}
+
+/**
+ * Issue 600 (#540 Phase 2) — one-shot, active-GM-gated re-stamp that writes the durable
+ * per-system `flags.fabricate.roles[systemId].componentId` onto OWNED ACTOR items that
+ * currently resolve to a system component by NAME ONLY, so they stop depending on the
+ * deprecated name fallback (Phase 3 removal deferred to issue 601). The owned-copy analogue
+ * of {@link runComponentFlagAutoStamp} (which stamps registered component SOURCES): those
+ * cover future drags, this reaches the copies already in inventories. Keyed by the
+ * `OWNED_ITEM_COMPONENT_STAMP_VERSION` world setting so it runs exactly once per world.
+ *
+ * SCOPE DECISION: it scans the world's `game.actors` collection (fully hydrated at `ready`)
+ * and NOT unlinked synthetic-token actors (`scene.tokens` with `actorLink:false`). A LINKED
+ * token shares its world actor document, so `game.actors` already covers it; an unlinked
+ * token actor is an ephemeral, delta-based synthetic whose items are frequently transient
+ * NPC/monster overrides, and writing flags through the token-delta model is fragile — so it
+ * is deliberately excluded (conservative, "never touch a doc you can't safely resolve").
+ * Actors/scenes not hydrated at `ready` are likewise never force-loaded. Idempotent,
+ * merge-safe per role leaf, dotted-id safe, and no-throw-per-item (see the migration module).
+ *
+ * NOT a MigrationRunner entry: that runner reads/writes only settings-data payloads and has
+ * no Item handle, so it cannot write Item flags — identical to the source-side stamps.
+ */
+async function runOwnedItemComponentIdentityRestamp() {
+  try {
+    // Active-GM only, so exactly one client performs the inventory writes.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (
+      Number(getSetting(SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION)) >=
+      OWNED_ITEM_COMPONENT_STAMP_TARGET
+    ) {
+      return;
+    }
+    const manager = fabricate?.getCraftingSystemManager?.();
+    const systems = manager?.getSystems?.() ?? [];
+    const summary = await restampOwnedItemComponentIdentity({
+      actors: game.actors ?? [],
+      systems,
+      writeFlag: (item, flagKey, componentId) => setFabricateFlag(item, flagKey, componentId),
+    });
+    console.debug?.('Fabricate | owned-item component identity re-stamp complete', summary);
+    await setSetting(
+      SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION,
+      OWNED_ITEM_COMPONENT_STAMP_TARGET
+    );
+  } catch (error) {
+    console.error('Fabricate | owned-item component identity re-stamp failed', error);
   }
 }
 

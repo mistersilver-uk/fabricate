@@ -105,6 +105,28 @@ export function matchComponentByName(item, component, { caseSensitive = false, s
 }
 
 /**
+ * Find the first component in `components` whose name matches the owned `item` by NAME,
+ * WITHOUT emitting name-only telemetry — the pure list-aware primitive shared by
+ * {@link findComponentByName} and the issue-600 owned-item re-stamp migration
+ * (`planOwnedItemComponentRestamp`). The migration DETECTS name-only owned items so it can
+ * back-fill their durable identity; firing the deprecation warn-once during that detection
+ * pass would pollute the very issue-540 Phase 3 telemetry window that measures live runtime
+ * reliance on the fallback. Sharing this exact `namesMatch` comparison guarantees the
+ * migration selects precisely the items the runtime name-fallback would.
+ *
+ * @param {object|null} item - The owned item (reads `item.name`).
+ * @param {Array<object>|null} components - The candidate component set of ONE system.
+ * @param {{ caseSensitive?: boolean }} [options]
+ * @returns {object|null} The first name-matching component, or null.
+ */
+export function findComponentByNameSilently(item, components, { caseSensitive = false } = {}) {
+  const candidates = Array.isArray(components) ? components : [];
+  return (
+    candidates.find((component) => namesMatch(item?.name, component?.name, caseSensitive)) || null
+  );
+}
+
+/**
  * Find the first component in `components` whose name matches the owned `item` by NAME —
  * the list-aware form of {@link matchComponentByName} used by essence resolution /
  * inventory listing. Fires warn-once telemetry for the matched component only. Callers
@@ -116,9 +138,7 @@ export function matchComponentByName(item, component, { caseSensitive = false, s
  * @returns {object|null} The first name-matching component, or null.
  */
 export function findComponentByName(item, components, { caseSensitive = false, systemId } = {}) {
-  const candidates = Array.isArray(components) ? components : [];
-  const match =
-    candidates.find((component) => namesMatch(item?.name, component?.name, caseSensitive)) || null;
+  const match = findComponentByNameSilently(item, components, { caseSensitive });
   if (match) reportNameOnlyMatch({ item, component: match, systemId });
   return match;
 }

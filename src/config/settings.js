@@ -45,6 +45,11 @@ export const SETTING_KEYS = Object.freeze({
   // writes `flags.fabricate.roles[systemId].toolId` on registered tool sources. Bumped past
   // `TOOL_FLAG_STAMP_TARGET` once the pass has run.
   TOOL_FLAG_STAMP_VERSION: 'toolFlagStampVersion',
+  // Issue 600 (#540 Phase 2): version stamp for the one-shot active-GM re-stamp that writes
+  // `flags.fabricate.roles[systemId].componentId` onto OWNED ACTOR items that currently
+  // resolve to a component by name ONLY. Bumped past `OWNED_ITEM_COMPONENT_STAMP_TARGET`
+  // once the pass has run so it never repeats.
+  OWNED_ITEM_COMPONENT_STAMP_VERSION: 'ownedItemComponentStampVersion',
 });
 
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
@@ -63,6 +68,12 @@ export const COMPONENT_FLAG_STAMP_TARGET = 1;
 // `TOOL_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once on `ready`
 // (AFTER the 1.15.0 settings-data migration populates tool source refs) and writes it back.
 export const TOOL_FLAG_STAMP_TARGET = 1;
+
+// The target version for the one-shot owned-item component re-stamp (issue 600, #540 Phase
+// 2). When the stored `OWNED_ITEM_COMPONENT_STAMP_VERSION` is below this, the active GM runs
+// the name-fallback back-fill once on `ready` (AFTER the source-side component auto-stamp)
+// and writes this value back.
+export const OWNED_ITEM_COMPONENT_STAMP_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.RECIPES]: {
@@ -226,6 +237,13 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.TOOL_FLAG_STAMP_VERSION]: {
     name: 'Tool Flag Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION]: {
+    name: 'Owned Item Component Stamp Version',
     scope: 'world',
     config: false,
     type: Number,
