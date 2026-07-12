@@ -92,6 +92,7 @@ describe('UI PR screenshot evidence', () => {
       ['player-crafting', 'player-crafting-stacked']
     );
     assert.deepEqual(views[0].smokeLabels, [
+      'player-crafting-alternatives',
       'player-crafting-simple',
       'player-crafting-ingredient-routed',
       'player-crafting-routed-by-check',

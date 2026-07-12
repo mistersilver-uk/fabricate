@@ -260,7 +260,13 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'player-crafting',
     label: 'Player crafting tab',
+    // `player-crafting-alternatives` (issue 552, the IngredientOptionSelector
+    // "Alternatives" radiogroup) is listed first and also sorts alphabetically
+    // ahead of the other frames, so `collect` (which copies the first candidate
+    // after an alphabetical sort) prefers it — surfacing the per-slot option
+    // selector as the primary evidence for a change under crafting/.
     smokeLabels: [
+      'player-crafting-alternatives',
       'player-crafting-simple',
       'player-crafting-ingredient-routed',
       'player-crafting-routed-by-check',
