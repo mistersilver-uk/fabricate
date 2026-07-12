@@ -9,7 +9,7 @@ import {
   FABRICATE_EXPORT_SCHEMA_VERSION,
   assembleGatheringAuthoringBundle,
 } from './authoringExport.js';
-import { rebindCopyContainerIds } from './importReferenceResolver.js';
+import { rebindCopyContainerIds, rebindCopyComponentIds } from './importReferenceResolver.js';
 
 const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
 
@@ -192,6 +192,13 @@ export function prepareForImport(rawData, mode = 'keep') {
     // craftingSystemId + gatheringConfig system-key are rebound by the importer
     // once createSystem has generated the fresh system id.
     rebindCopyContainerIds(prepared);
+
+    // Regenerate every component id and atomically remap every within-payload
+    // component reference (issue 570). This closes #556's copy-import id-collision
+    // residual: two systems copy-imported from the same origin export no longer
+    // share a component id. Possible only after #561 relieved `componentId` of its
+    // cross-system Tool-reference duty.
+    rebindCopyComponentIds(prepared);
   }
 
   return prepared;
