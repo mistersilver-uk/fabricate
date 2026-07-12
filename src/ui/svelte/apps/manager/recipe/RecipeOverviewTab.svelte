@@ -28,6 +28,10 @@
     onNameInput = () => {},
     onDescriptionInput = () => {},
     onToggleEnabled = () => {},
+    // True when an enable-blocking validation issue is present while the recipe is
+    // OFF: the enable toggle is disabled so the GM cannot trigger the hard activation
+    // failure (issue 549). The Validation tab lists the reasons.
+    enableBlocked = false,
     onChooseImage = () => {},
     isMultiStep = false,
     checkTierOptions = [],
@@ -122,13 +126,16 @@
             class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
             data-recipe-field="enabled"
             aria-pressed={enabled}
-            disabled={saving}
+            disabled={saving || enableBlocked}
+            title={enableBlocked ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedTooltip', 'Resolve the issues on the Validation tab before enabling this recipe.') : undefined}
             onclick={onToggleEnabled}
           >
             <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
             <span class="manager-status-toggle-label">{enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
           </button>
-          <p class="manager-muted">{enabled
+          <p class="manager-muted">{enableBlocked
+            ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedHint', 'Resolve the issues on the Validation tab before enabling.')
+            : enabled
             ? text('FABRICATE.Admin.Manager.Recipe.EnabledHint', 'Available to players while on.')
             : text('FABRICATE.Admin.Manager.Recipe.DisabledHint', 'Hidden from players while off.')}</p>
         </div>

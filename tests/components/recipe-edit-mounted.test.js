@@ -35,6 +35,9 @@ const RAW_MODULES = [
   'src/models/match/matchTypes.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+  // The validation tab localizes a signature-collision blocker row via this pure
+  // leaf (issue 549).
+  'src/systems/recipeActivationMessages.js',
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
   ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -383,6 +386,65 @@ describe('RecipeEditView (mounted)', () => {
       null,
       'no steps card for a single-step recipe'
     );
+    editHarness.remount();
+  });
+
+  it('disables the enable toggle when an OFF alchemy recipe carries an enable blocker (issue 549)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: {
+          id: 'r-alch',
+          name: 'Mana Potion',
+          enabled: false,
+          recipeItemId: '',
+          ingredientSets: [{ id: 's1' }],
+          resultGroups: [{ id: 'r1' }, { id: 'r2' }],
+        },
+        alchemy: { checkMode: 'simple' },
+      })
+    );
+    const toggle = target.querySelector('[data-recipe-field="enabled"]');
+    assert.ok(toggle, 'enable toggle renders');
+    assert.equal(toggle.disabled, true, 'enable is disabled while a blocker is present, not throwing on click');
+    editHarness.remount();
+  });
+
+  it('keeps the toggle usable for an already-ENABLED alchemy recipe with a blocker so it can be turned OFF (issue 549)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: {
+          id: 'r-alch',
+          name: 'Mana Potion',
+          enabled: true,
+          recipeItemId: '',
+          ingredientSets: [{ id: 's1' }],
+          resultGroups: [{ id: 'r1' }, { id: 'r2' }],
+        },
+        alchemy: { checkMode: 'simple' },
+      })
+    );
+    const toggle = target.querySelector('[data-recipe-field="enabled"]');
+    assert.equal(toggle.disabled, false, 'disabling stays free even while a blocker is present');
+    editHarness.remount();
+  });
+
+  it('re-enables the toggle once the alchemy blockers clear (issue 549)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: {
+          id: 'r-alch',
+          name: 'Mana Potion',
+          enabled: false,
+          recipeItemId: '',
+          ingredientSets: [{ id: 's1' }],
+          resultGroups: [{ id: 'r1' }],
+        },
+        alchemy: { checkMode: 'simple' },
+        signatureConflicts: [],
+      })
+    );
+    const toggle = target.querySelector('[data-recipe-field="enabled"]');
+    assert.equal(toggle.disabled, false, 'a ready alchemy recipe can be enabled');
     editHarness.remount();
   });
 

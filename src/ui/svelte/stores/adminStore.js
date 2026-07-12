@@ -75,6 +75,7 @@ import { classifyModeChange } from '../../../migration/migrateRecipeForModeChang
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
+import { SignatureValidator } from '../../../systems/SignatureValidator.js';
 import { localizeRecipeActivationError } from '../../../systems/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 
@@ -3722,6 +3723,59 @@ export function createAdminStore(services) {
       components,
       environments: environmentsWithComposition,
     });
+  }
+
+  /**
+   * The cross-recipe ingredient-signature conflicts touching one recipe, for the
+   * recipe editor's Validation tab (issue 549). Runs the SAME `SignatureValidator`
+   * the enable path (`RecipeManager._validateSignatures`) and the system overview
+   * (`systemValidation`) use — no duplicated overlap logic — but scoped to the one
+   * recipe, and (when a live draft is supplied) against the DRAFT's ingredient sets
+   * so the tab predicts the collision before the GM saves. Returns coded, id-free
+   * `{ code, params, message }` conflicts (issue 550) the tab localizes.
+   *
+   * Only alchemy systems infer the recipe from submitted ingredients, so signature
+   * uniqueness is enforced there alone (mirrors `_validateSignatures`); every other
+   * mode returns `[]`.
+   *
+   * @param {string} recipeId The edited recipe's id.
+   * @param {object|null} [draftRecipe] The live recipe draft JSON, substituted for
+   *   the persisted recipe of the same id when present.
+   * @returns {{ code: string|null, params: object, message: string }[]}
+   */
+  function getRecipeSignatureConflicts(recipeId, draftRecipe = null) {
+    const systemManager = services.getCraftingSystemManager?.();
+    const recipeManager = services.getRecipeManager?.();
+    const sysId = get(selectedSystemId);
+    if (!systemManager || !recipeManager || !sysId || !recipeId) return [];
+
+    const system = systemManager.getSystem(sysId);
+    if (system?.resolutionMode !== 'alchemy') return [];
+
+    const persisted = recipeManager.getRecipes({ craftingSystemId: sysId }) || [];
+    const recipesJson = persisted.map((recipe) => {
+      if (draftRecipe && String(recipe?.id) === String(recipeId)) return draftRecipe;
+      return typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
+    });
+    const components = _getManagedItems(system);
+
+    const validator = new SignatureValidator({
+      getSystem: (id) => (id === sysId ? system : null),
+      getRecipesForSystem: (id) => (id === sysId ? recipesJson : []),
+      getComponentsForSystem: (id) => (id === sysId ? components : []),
+    });
+    const { conflicts } = validator.validateSystem(sysId);
+    return conflicts
+      .filter(
+        (conflict) =>
+          String(conflict.recipeA?.id) === String(recipeId) ||
+          String(conflict.recipeB?.id) === String(recipeId)
+      )
+      .map((conflict) => ({
+        code: conflict.code,
+        params: conflict.params,
+        message: conflict.message,
+      }));
   }
 
   function _classifyCompositionRecords({
@@ -7778,6 +7832,7 @@ export function createAdminStore(services) {
     duplicateRecipe,
     toggleRecipeEnabled,
     updateRecipe,
+    getRecipeSignatureConflicts,
     getPcRoster,
     saveRecipeAccess,
     addRecipeItemFromUuid,
