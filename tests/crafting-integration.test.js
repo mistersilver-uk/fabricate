@@ -1027,6 +1027,99 @@ test('routed check: a misconfiguration aborts BEFORE consuming ingredients (issu
   assert.equal(history[0].status, 'failed', 'the run is recorded as a step failure');
 });
 
+test('timed FINISH: an unrouted-tier misconfiguration fails the craft, never a false success (issue 85)', async () => {
+  // A timed routedByCheck step consumes at START, so a routing misconfiguration can
+  // only surface at FINISH (the check outcome is unknowable until the gate matures).
+  // Here the matured outcome "Mythic" resolves to an authored SUCCESS tier that no
+  // result group lists (a group declares checkOutcomeIds for a DIFFERENT tier), so
+  // resolution yields disposition:'unrouted-tier'. Before the fix the timed FINISH
+  // post-check only handled 'error'/'misconfiguration', so this fell through to
+  // completeStepSuccess with empty results — a false success with lost inputs. The
+  // shared _isMisconfigurationDisposition predicate now covers it in both paths.
+  const system = buildSystem({
+    id: 'sys-timed-unrouted',
+    resolutionMode: 'routedByCheck',
+    craftingCheck: {
+      enabled: true,
+      routed: {
+        type: 'relative',
+        rollExpression: '1d20',
+        relativeOutcomes: [
+          { id: 't-myth', name: 'Mythic', success: true, breakTools: false, dc: 10 },
+          { id: 't-std', name: 'Standard', success: true, breakTools: false, dc: 0 },
+        ],
+        fixedOutcomes: [],
+      },
+      progressive: null,
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+    },
+  });
+  setupGame(system);
+
+  const ingredientSet = buildIngredientSet('set-tu', [{ componentId: 'wood', quantity: 1 }]);
+  const step = {
+    id: 'step-tu',
+    name: 'Distil',
+    ingredientSets: [ingredientSet],
+    // Two groups; one is tier-routed to 'Standard' only, so the recipe opts into tier
+    // routing but no group lists the matured 'Mythic' tier → unrouted-tier.
+    resultGroups: [
+      { id: 'rg-alpha', name: 'Alpha', results: [{ id: 'r-a', componentId: 'potion-a', quantity: 1 }] },
+      {
+        id: 'rg-beta',
+        name: 'Beta',
+        checkOutcomeIds: ['t-std'],
+        results: [{ id: 'r-b', componentId: 'potion-b', quantity: 1 }],
+      },
+    ],
+    toolIds: [],
+    timeRequirement: { hours: 1 },
+  };
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-timed-unrouted',
+    ingredientSets: [ingredientSet],
+    steps: [step],
+  });
+
+  const wood = new FakeItem('wood', 'Wood', 2);
+  const craftingActor = new FakeActor('TimedBrewer');
+  const sourceActor = new FakeActor('TimedBrewer', [wood]);
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(
+    buildMockRecipeManager(true),
+    runManager,
+    buildResolutionService(system)
+  );
+  // The matured FINISH check resolves to the 'Mythic' success tier (no group lists it).
+  stubEngine(engine, { success: true, outcome: 'Mythic', value: null, data: {} }, null);
+
+  // START: arms the gate and consumes the input now.
+  const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(startResult.success, false, 'START returns "still in progress"');
+  assert.match(startResult.message, /in progress/i);
+  assert.equal(wood.system.quantity, 1, 'input is consumed at START (2 -> 1)');
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 1, 'one waiting run is armed');
+
+  // Advance world time past the gate so the next call reaches FINISH.
+  globalThis.game.time.worldTime = 100000;
+
+  // FINISH: the matured outcome is unroutable → must fail, never a false success.
+  const finishResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(finishResult.success, false, 'a timed unrouted-tier FINISH must NOT report success');
+  assert.equal(finishResult.results, null, 'no results are returned on the misconfiguration');
+  assert.equal(
+    finishResult.disposition,
+    'unrouted-tier',
+    'the actual disposition is surfaced, not a hardcoded string'
+  );
+  assert.equal(craftingActor._createdDocs.length, 0, 'no items are created');
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'the run is closed out');
+  const history = runManager.getRunHistory(craftingActor);
+  assert.equal(history.length, 1, 'the misconfigured timed craft records one run');
+  assert.equal(history[0].status, 'failed', 'the run is recorded as a failure, not a success');
+});
+
 // ===========================================================================
 // Group 4: Progressive mode integration (AC4)
 // ===========================================================================

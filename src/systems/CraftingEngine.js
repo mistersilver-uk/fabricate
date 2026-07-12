@@ -670,7 +670,7 @@ export class CraftingEngine {
             success: false,
             results: null,
             message,
-            disposition: 'misconfiguration',
+            disposition: preflightResolution.meta.disposition,
           };
         }
       }
@@ -1180,10 +1180,15 @@ export class CraftingEngine {
       resolvedEssences
     );
 
-    if (
-      resolutionMeta?.disposition === 'error' ||
-      resolutionMeta?.disposition === 'misconfiguration'
-    ) {
+    // Timed misconfiguration (issue 85). Unlike the immediate path, a timed step
+    // consumed its inputs at START, so a routing misconfiguration only surfaces here at
+    // FINISH (the check outcome is unknowable until the gate matures): it can only record
+    // a failure with NO refund, never a true zero-mutation abort. Route through the shared
+    // `_isMisconfigurationDisposition` predicate so this matches the immediate path and
+    // covers `unrouted-tier` too — a tier-routed recipe whose matured outcome resolves to
+    // an authored success tier no group lists would otherwise fall through to
+    // `completeStepSuccess` with empty results (a false success with lost inputs).
+    if (this._isMisconfigurationDisposition(resolutionMeta?.disposition)) {
       const message = resolutionMeta.error || 'Crafting resolution failed';
       await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
         selectedIngredientSetId: ingredientSet?.id,
@@ -1206,7 +1211,15 @@ export class CraftingEngine {
         createdResults: [],
         failureReason: message,
       });
-      return { resolved: true, result: { success: false, results: null, message } };
+      return {
+        resolved: true,
+        result: {
+          success: false,
+          results: null,
+          message,
+          disposition: resolutionMeta.disposition,
+        },
+      };
     }
 
     const completedRun = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {

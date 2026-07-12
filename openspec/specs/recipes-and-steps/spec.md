@@ -140,6 +140,14 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    assignment) yields a distinct **unrouted-tier** diagnostic rather than silently falling back
    to outcome-name matching;
    a recipe that uses no `checkOutcomeIds` assignment still falls back to name matching.
+   A matched attempt whose outcome resolves to NO valid result group — an unrouted tier
+   (above) or an unmatched success outcome name — is a crafting-system misconfiguration:
+   for an instant (non-timed) step the craft aborts BEFORE any consumption (a zero-mutation
+   abort — no ingredients, currency, or tools consumed or broken) and reports failure, never
+   a player success with zero items.
+   Timed exception: a time-gated step consumes at START (the check outcome is unknowable
+   until the gate matures), so the same misconfiguration detected at FINISH records a step
+   FAILURE with no refund and still reports failure — never a false success with zero items.
 
 ### Apply Effects
 

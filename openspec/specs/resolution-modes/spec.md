@@ -153,8 +153,9 @@ Resolution never aborts with a misconfiguration for an unmatched success outcome
   3. If the scope has exactly one result group, that single group is produced for any non-failure outcome (no mapping required).
   4. Otherwise, with multiple result groups, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
   5. If multiple result groups are present and no result-group name matches, execution aborts with a crafting-system misconfiguration error (not a player failure outcome).
-     The abort is a zero-mutation abort: it happens BEFORE any consumption, so no ingredients, currency, or tools are consumed or broken, and the craft reports failure (never a player success with zero items).
+     For an instant (non-timed) step this is a zero-mutation abort: it happens BEFORE any consumption, so no ingredients, currency, or tools are consumed or broken, and the craft reports failure (never a player success with zero items).
      A resolved-but-unassigned outcome tier (`unrouted-tier`) is treated identically.
+     Timed exception: a time-gated `routedByCheck` step consumes its inputs at START (the check outcome is unknowable until the gate matures), so a routing misconfiguration detected at FINISH cannot un-consume — it records a step FAILURE with no refund and still reports failure (never a false success with zero items), rather than a true zero-mutation abort.
 
 ### Validation
 
