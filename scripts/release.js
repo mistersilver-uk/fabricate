@@ -255,11 +255,13 @@ async function main() {
 
   // 2. Run vite build
   console.log(`Running vite build${analyze ? ' (bundle analyzer enabled)' : ''}...`);
-  execSync('npx vite build', {
-    cwd: ROOT,
-    stdio: 'inherit',
-    env: analyze ? { ...process.env, ANALYZE: '1' } : process.env,
-  });
+  // Opt the child vite build into the bundle analyzer via an inherited env var,
+  // set on process.env (which execSync inherits) so the build command below is
+  // left exactly as-is.
+  if (analyze) {
+    process.env.ANALYZE = '1';
+  }
+  execSync('npx vite build', { cwd: ROOT, stdio: 'inherit' });
 
   // 3. Copy static assets
   console.log('Copying static assets...');
