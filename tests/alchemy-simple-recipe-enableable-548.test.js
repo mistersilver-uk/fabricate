@@ -100,7 +100,7 @@ test('issue 548 (resolved by 554): a provider-less authored Simple alchemy recip
   const activation = service.validateRecipe(recipe, { requireComplete: true });
   assert.deepEqual(
     activation,
-    { valid: true, errors: [] },
+    { valid: true, errors: [], issues: [] },
     `authored provider-less Simple alchemy recipe must be enable-able, got: ${JSON.stringify(activation)}`
   );
   assert.ok(
@@ -128,7 +128,7 @@ test('issue 548: duplicating a provider-less Simple alchemy recipe yields an equ
   const activation = service.validateRecipe(copy, { requireComplete: true });
   assert.deepEqual(
     activation,
-    { valid: true, errors: [] },
+    { valid: true, errors: [], issues: [] },
     `the duplicate must be enable-able, got: ${JSON.stringify(activation)}`
   );
 });
@@ -149,7 +149,7 @@ test('issue 548 (554 retirement): a leftover resultSelection.provider does not g
   const activation = service.validateRecipe(recipe, { requireComplete: true });
   assert.deepEqual(
     activation,
-    { valid: true, errors: [] },
+    { valid: true, errors: [], issues: [] },
     `a stray provider must be inert, got: ${JSON.stringify(activation)}`
   );
 

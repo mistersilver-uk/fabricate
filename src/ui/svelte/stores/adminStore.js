@@ -76,7 +76,10 @@ import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js'
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
 import { SignatureValidator } from '../../../systems/SignatureValidator.js';
-import { localizeRecipeActivationError } from '../../../systems/recipeActivationMessages.js';
+import {
+  localizeRecipeActivationError,
+  localizeRecipePersistenceError,
+} from '../../../systems/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 
 // ---------------------------------------------------------------------------
@@ -7440,10 +7443,14 @@ export function createAdminStore(services) {
       return true;
     } catch (err) {
       console.error('Fabricate | Failed to toggle recipe enabled state:', err);
-      // An enable failure is surfaced as a localized, id-free toast (issue 550):
-      // RecipeActivationError carries coded issues the localizer maps to lang copy.
+      // An enable/save failure is surfaced as a localized, id-free toast:
+      // RecipeActivationError (enable, issue 550) or RecipePersistenceError (save,
+      // issue 595) each carry coded issues the localizer maps to lang copy.
       services.notify?.error?.(
-        localizeRecipeActivationError(err, services.localize) || err?.message || 'Failed to update recipe'
+        localizeRecipeActivationError(err, services.localize) ||
+          localizeRecipePersistenceError(err, services.localize) ||
+          err?.message ||
+          'Failed to update recipe'
       );
       return false;
     }
@@ -7511,10 +7518,14 @@ export function createAdminStore(services) {
       return true;
     } catch (err) {
       console.error('Fabricate | Failed to update recipe:', err);
-      // A save that flips a recipe to enabled can fail activation; localize it
-      // (issue 550) rather than surfacing the raw, id-leaking aggregate.
+      // A save that flips a recipe to enabled can fail activation (issue 550); an
+      // ordinary save can fail structural/reference validation (issue 595). Localize
+      // either rather than surfacing the raw, id-leaking aggregate.
       services.notify?.error?.(
-        localizeRecipeActivationError(err, services.localize) || err?.message || 'Failed to update recipe'
+        localizeRecipeActivationError(err, services.localize) ||
+          localizeRecipePersistenceError(err, services.localize) ||
+          err?.message ||
+          'Failed to update recipe'
       );
       return false;
     }

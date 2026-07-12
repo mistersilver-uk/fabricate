@@ -188,9 +188,16 @@ test('routedByIngredients — resultGroupId references non-existent group → in
   });
   const result = service.validateRecipe(buildRecipe([step]));
   assert.equal(result.valid, false);
+  // The reference-integrity failure is surfaced id-free (issue 595): it names the
+  // set by position and never echoes the missing group id or the internal
+  // `resultGroupId` field name.
   assert.ok(
-    result.errors.some((e) => /resultGroupId/i.test(e)),
-    `expected error about invalid resultGroupId, got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /result group/i.test(e)),
+    `expected error about a missing result group, got: ${JSON.stringify(result.errors)}`
+  );
+  assert.ok(
+    !result.errors.some((e) => e.includes('rg-does-not-exist')),
+    `must not leak the missing group id, got: ${JSON.stringify(result.errors)}`
   );
 });
 

@@ -1336,7 +1336,17 @@
         },
         "RecipeActivation": {
           "CannotEnable": "Cannot enable recipe \"{name}\": {errors}",
-          "IssueSignatureCollision": "Recipe \"{recipeA}\" (ingredient set {setA}) and recipe \"{recipeB}\" (ingredient set {setB}) can both be crafted from the same components ({components}), so alchemy cannot tell which one you are making."
+          "CannotSave": "This recipe could not be saved: {errors}",
+          "IssueSignatureCollision": "Recipe \"{recipeA}\" (ingredient set {setA}) and recipe \"{recipeB}\" (ingredient set {setB}) can both be crafted from the same components ({components}), so alchemy cannot tell which one you are making.",
+          "IssueStepIngredientSetCountExact": "Step \"{step}\" must have exactly 1 ingredient set in {mode} mode",
+          "IssueStepResultGroupCountExact": "Step \"{step}\" must have exactly 1 result group in {mode} mode",
+          "IssueStepIngredientSetCountMin": "Step \"{step}\" must have at least 1 ingredient set in {mode} mode",
+          "IssueStepResultGroupCountMin": "Step \"{step}\" must have at least 1 result group in {mode} mode",
+          "IssueStepRequiresOrderedResults": "Step \"{step}\" requires ordered results in progressive mode",
+          "IssueStepResultDifficulty": "Result {result} references component without valid difficulty",
+          "IssueIngredientSetInvalidResultGroup": "Ingredient set \"{set}\" maps to a result group that does not exist",
+          "IssueRoutedGroupNameReserved": "Result group name \"{groupName}\" conflicts with reserved routing keyword in step \"{step}\"",
+          "IssueRoutedGroupNameDuplicate": "Duplicate result group name \"{groupName}\" (case-insensitive) in step \"{step}\" — routed mode requires unique names"
         },
         "SystemOverview": {
           "Kicker": "System overview",

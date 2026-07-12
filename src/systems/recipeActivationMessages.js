@@ -28,6 +28,47 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
     'IssueSignatureCollision',
     'Recipe "{recipeA}" (ingredient set {setA}) and recipe "{recipeB}" (ingredient set {setB}) can both be crafted from the same components ({components}), so alchemy cannot tell which one you are making.',
   ],
+  // Structural / resolution-mode validation issues (issue 595). Each carries a
+  // human-readable STEP / INGREDIENT-SET / RESULT label — the author-given name
+  // when present, otherwise a 1-based POSITION — never an internal id. `{mode}` is
+  // the canonical resolution-mode token (not translated), matching the pre-fix
+  // English strings byte-for-byte for named entities.
+  stepIngredientSetCountExact: [
+    'IssueStepIngredientSetCountExact',
+    'Step "{step}" must have exactly 1 ingredient set in {mode} mode',
+  ],
+  stepResultGroupCountExact: [
+    'IssueStepResultGroupCountExact',
+    'Step "{step}" must have exactly 1 result group in {mode} mode',
+  ],
+  stepIngredientSetCountMin: [
+    'IssueStepIngredientSetCountMin',
+    'Step "{step}" must have at least 1 ingredient set in {mode} mode',
+  ],
+  stepResultGroupCountMin: [
+    'IssueStepResultGroupCountMin',
+    'Step "{step}" must have at least 1 result group in {mode} mode',
+  ],
+  stepRequiresOrderedResults: [
+    'IssueStepRequiresOrderedResults',
+    'Step "{step}" requires ordered results in progressive mode',
+  ],
+  stepResultDifficulty: [
+    'IssueStepResultDifficulty',
+    'Result {result} references component without valid difficulty',
+  ],
+  ingredientSetInvalidResultGroup: [
+    'IssueIngredientSetInvalidResultGroup',
+    'Ingredient set "{set}" maps to a result group that does not exist',
+  ],
+  routedGroupNameReserved: [
+    'IssueRoutedGroupNameReserved',
+    'Result group name "{groupName}" conflicts with reserved routing keyword in step "{step}"',
+  ],
+  routedGroupNameDuplicate: [
+    'IssueRoutedGroupNameDuplicate',
+    'Duplicate result group name "{groupName}" (case-insensitive) in step "{step}" — routed mode requires unique names',
+  ],
 });
 
 /**
@@ -43,6 +84,24 @@ function interpolate(template, params = {}) {
   return String(template).replaceAll(/\{(\w+)\}/g, (match, key) =>
     params?.[key] == null ? match : String(params[key])
   );
+}
+
+/**
+ * Build a coded, id-free structured issue for a registered activation/persistence
+ * `code` (issue 595). The headless English `message` is the code's built-in
+ * template interpolated with `params`, so it stays the single source of template
+ * truth (the UI localizes the same `code` + `params` through
+ * {@link localizeActivationIssue}). Callers pass only human-readable params
+ * (names or 1-based positions), never internal ids.
+ *
+ * @param {string} code - a key of {@link RECIPE_ACTIVATION_ISSUE_LABELS}
+ * @param {object} [params]
+ * @returns {{ code: string, params: object, message: string }}
+ */
+export function buildRecipeActivationIssue(code, params = {}) {
+  const meta = RECIPE_ACTIVATION_ISSUE_LABELS[code];
+  const template = meta ? meta[1] : '';
+  return { code, params, message: interpolate(template, params) };
 }
 
 /**
@@ -90,4 +149,32 @@ export function localizeRecipeActivationError(error, localizeFn) {
   const localized = localizeFn?.(key, params);
   if (localized && localized !== key) return localized;
   return interpolate('Cannot enable recipe "{name}": {errors}', params);
+}
+
+/**
+ * Build the localized, id-free toast string for a
+ * {@link module:systems/RecipePersistenceError.RecipePersistenceError} — a recipe
+ * SAVE (create/update) that failed structural/reference validation (issue 595).
+ * Reuses {@link localizeActivationIssue} per issue so a coded structural failure
+ * (e.g. an ingredient set mapping to a missing result group) surfaces localized,
+ * id-free copy. Returns `null` for any error that is not a persistence error (no
+ * `persistenceIssues`), so the caller can fall back to the error's own message.
+ *
+ * @param {unknown} error
+ * @param {(key: string, data?: object) => string} [localizeFn]
+ * @returns {string|null}
+ */
+export function localizeRecipePersistenceError(error, localizeFn) {
+  const issues = Array.isArray(error?.persistenceIssues) ? error.persistenceIssues : null;
+  if (!issues) return null;
+
+  const detail = issues
+    .map((issue) => localizeActivationIssue(issue, localizeFn))
+    .filter(Boolean)
+    .join(' ');
+  const params = { errors: detail };
+  const key = `${LANG_PREFIX}.CannotSave`;
+  const localized = localizeFn?.(key, params);
+  if (localized && localized !== key) return localized;
+  return interpolate('This recipe could not be saved: {errors}', params);
 }

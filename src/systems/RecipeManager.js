@@ -13,6 +13,7 @@ import {
 
 import { buildCurrencyAffordProbe } from './currencyAffordance.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
+import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
@@ -127,7 +128,10 @@ export class RecipeManager {
     });
 
     if (!validation.valid) {
-      throw new Error(`Invalid recipe: ${validation.errors.join(', ')}`);
+      // A structural/reference save failure carries coded, id-free issues so the UI
+      // can localize it (issue 595); the `.message` keeps the headless English
+      // aggregate for console/non-UI callers.
+      throw new RecipePersistenceError('create', recipe.name, validation.issues);
     }
 
     // A recipe may only be created active when fully valid. A drafting create (allowIncomplete) is
@@ -186,7 +190,10 @@ export class RecipeManager {
     });
 
     if (!validation.valid) {
-      throw new Error(`Invalid recipe update: ${validation.errors.join(', ')}`);
+      // See createRecipe: a coded, id-free persistence error the UI can localize
+      // (issue 595) — e.g. an ingredient set mapping to a missing result group on an
+      // ordinary save no longer leaks the set/group id into the toast.
+      throw new RecipePersistenceError('update', updatedRecipe.name, validation.issues);
     }
 
     // Only an explicit transition into the enabled state requires full validity. Edits to an
@@ -1693,18 +1700,31 @@ export class RecipeManager {
    */
   _validateRecipeForPersistence(recipe, { requireComplete = true } = {}) {
     const baseValidation = requireComplete ? recipe.validate() : recipe.validateStructure();
-    const errors = [...(baseValidation.errors || [])];
+    // Collect structured issues in the same order as the raw error strings (base,
+    // essence, tag, resolution mode). The base/essence/tag validators still emit
+    // plain English strings, so they ride as UNCODED issues (the localizer passes
+    // their message through). Resolution-mode failures now carry a stable `code` +
+    // id-free params so the UI can localize them (issue 595).
+    const issues = [];
+    const pushPlain = (list) => {
+      for (const message of list || []) issues.push({ code: null, params: {}, message });
+    };
+    pushPlain(baseValidation.errors);
+    pushPlain(this._validateEssenceReferences(recipe).errors);
+    pushPlain(this._validateTagPlaceholders(recipe).errors);
 
-    const systemValidation = this._validateEssenceReferences(recipe);
-    errors.push(...systemValidation.errors);
-    const tagValidation = this._validateTagPlaceholders(recipe);
-    errors.push(...tagValidation.errors);
     const modeValidation = this._validateResolutionMode(recipe, { requireComplete });
-    errors.push(...modeValidation.errors);
+    if (Array.isArray(modeValidation.issues)) {
+      issues.push(...modeValidation.issues);
+    } else {
+      pushPlain(modeValidation.errors);
+    }
 
+    const errors = issues.map((issue) => issue.message);
     return {
       valid: errors.length === 0,
       errors,
+      issues,
     };
   }
 
@@ -1722,10 +1742,10 @@ export class RecipeManager {
     const persistence = this._validateRecipeForPersistence(recipe, { requireComplete: true });
     const errors = [...persistence.errors];
     // Structured, coded issues run in parallel with the raw `errors` strings so a
-    // UI caller can localize them (issue 550). Pre-existing persistence strings
-    // have no code yet, so they ride along as uncoded issues (the localizer passes
-    // their already-English message through unchanged).
-    const issues = persistence.errors.map((message) => ({ code: null, params: {}, message }));
+    // UI caller can localize them (issue 550). Persistence now supplies its own
+    // structured issues — coded + id-free for resolution-mode failures (issue 595),
+    // uncoded (English passthrough) for the remaining base/essence/tag strings.
+    const issues = [...persistence.issues];
     const signatureValidation = this._validateSignatures(recipe);
     errors.push(...signatureValidation.errors);
     issues.push(...(signatureValidation.issues || []));
