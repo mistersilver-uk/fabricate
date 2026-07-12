@@ -5717,6 +5717,12 @@ async function main() {
           // two selectable rows. Defensive: a missing recipe/control records a
           // failed step rather than aborting the surrounding phase.
           try {
+            // The recipe list is paginated (12/page); filter to the multi-option
+            // recipe via the browser search so its row is in the DOM regardless of
+            // which page it would otherwise fall on.
+            const recipeSearch = appShell.locator('.crafting-browser-search input').first();
+            await recipeSearch.fill('Smoke Weave Filigree');
+            await page.waitForTimeout(350);
             const altRecipeRow = appShell
               .locator('[data-recipe-id]:has-text("Smoke Weave Filigree")')
               .first();
@@ -5738,6 +5744,9 @@ async function main() {
               await assertNoScreenshotOverlays(page);
               await screenshot(page, 'player-crafting-alternatives-switched');
             }
+            // Restore the unfiltered recipe list for the subsequent stacked frame.
+            await recipeSearch.fill('').catch(() => {});
+            await page.waitForTimeout(200);
             results.steps.push({ step: 'player-crafting-alternatives', passed: true });
           } catch (altError) {
             results.steps.push({
