@@ -115,13 +115,22 @@ CraftingSystem = {
     // dynamic-DC macro — and is retained.)
     enabled: boolean,
 
+    // Legacy discriminator with a SINGLE valid value, `passFail`. The former
+    // `tiered` / `namedOutcomes` values referenced the removed tiered concept and were
+    // dead — normalization collapses any legacy value to `passFail`. No runtime reads
+    // this field; crafting resolution is driven by the recipe/step resolution mode.
+    mode: "passFail",              // default "passFail"
+
     consumption: {
       consumeIngredientsOnFail: boolean, // default true
       breakToolsOnFail: boolean,         // default false; governs Tool usage/breakage on a failed craft (see note below)
     },
 
-    // Routed mode (the check provider may return one of these, optional)
-    outcomes?: string[],
+    // Legacy free outcome-name list; normalized to trimmed, lowercased, unique
+    // strings, defaulting to ["fail", "pass"] when absent. No runtime reads it
+    // (the removed macro/provider check source was its only consumer); routed
+    // outcome tiers live on routed.relativeOutcomes / routed.fixedOutcomes.
+    outcomes?: string[],           // default ["fail", "pass"]
 
     // Per-resolution-mode check sub-objects authored in the GM Checks tab; the
     // active one is selected by resolutionMode. (Shapes: SimpleCheck / RoutedCheck /
@@ -360,6 +369,19 @@ Caveat: a `dcMode: 'dynamic'` simple check moved into `routedByCheck` loses its 
 A dot would be nested by `expandObject` on write and silently missed by the `roles[systemId]` reader, degrading matching to the raw-reference path.
 `CraftingSystemManager` therefore rejects an unsafe id LOUDLY at the creation/import entry point and NEVER rewrites an id (recipes, tools, and gathering config reference the system by id); `foundry.utils.randomID()` always satisfies the pattern.
 A pre-existing world already carrying an unsafe (e.g. dotted) id is not thrown at match time: its components resolve only by raw source references, the per-system `roles` identity tier is inert for it, and it warns once — such a system should be recreated or re-imported with a valid id.
+
+29. **`craftingCheck.mode` has a single valid value, `passFail`.** It is a legacy discriminator that predates the resolution-mode model.
+Normalization emits `mode: "passFail"` unconditionally, defaulting to `passFail` and collapsing any other value — including the removed `tiered` and `namedOutcomes` tokens — to `passFail`.
+No runtime consumes `craftingCheck.mode`: crafting resolution is driven entirely by the recipe/step `resolutionMode` and the matching `craftingCheck.simple` / `routed` / `progressive` sub-object (see requirement 26 and `resolution-modes`), not by this field.
+The former `tiered` / `namedOutcomes` branch — which defaulted `outcomes` to `["low", "high"]` — was dead code and has been removed.
+This is distinct from `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`, requirement 8), whose `tiered` value IS a live check-slot selector and is unaffected.
+`craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
+
+30. **Built-in check contract — the authored roll formula IS the built-in check.** Fabricate's supported "built-in" check lets a GM author a plain dice expression (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively, with no macro and no game-system adapter — the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration (the "built-in check source" desired in the domain audit).
+A check is **usable** IFF its resolution mode carries an authored `rollFormula` (see the *Crafting Check Macro Contract* section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
+The historical `checkSource` discriminator (with its `"builtIn"` value) and the `builtIn: { ability, skill, dc, advantage }` game-system adapter sub-object are **NOT** part of the model: that adapter, together with the macro-as-check-source fields (`macroUuid`, `successMacroUuid`, `failureMacroUuid`), was removed in the 1.8.0 migration (`migrateRemoveLegacyCheckSources`).
+Normalization never emits `checkSource` or `builtIn`, and any persisted values are stripped on migration.
+The distinct `craftingCheck.simple.macroUuid` (the optional dynamic-DC macro) is a separate, retained feature and is not a check source.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
@@ -1829,7 +1851,8 @@ They are unrelated mechanisms.
 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 
-The crafting-check macro / built-in adapter path has been removed.
+The crafting-check macro / built-in game-system adapter path has been removed.
+The GM-authored roll formula is now Fabricate's built-in check: a plain dice expression the engine rolls and evaluates natively, giving GMs a low-complexity check without writing a macro or relying on a dnd5e/pf2e stat adapter (see requirement 30 in *Data Models*).
 A crafting check is now usable IFF its resolution mode has an authored roll formula (`craftingCheck.simple|routed|progressive.rollFormula`); the engine rolls that formula and evaluates the outcome itself.
 There is no macro-return contract — when a required check (progressive, or `routedByCheck` mode) has no authored roll formula the attempt fails loudly with zero mutation (the required-check guard), and an optional check (simple, alchemy, or `routedByIngredients`) with no formula is a no-op.
 The `routedByIngredients` optional pass/fail check reads `craftingCheck.simple.rollFormula` (the same shared slot as `simple`/`alchemy`), not `craftingCheck.routed`.
