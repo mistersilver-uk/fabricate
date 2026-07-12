@@ -13,7 +13,9 @@
   {#if icon}
     <i class={`fas ${icon}`} aria-hidden="true"></i>
   {/if}
-  <span class="crafting-qty-tag-label">{label}</span>
+  {#if label}
+    <span class="crafting-qty-tag-label">{label}</span>
+  {/if}
   <span class="crafting-qty-tag-value">{value}</span>
 </span>
 

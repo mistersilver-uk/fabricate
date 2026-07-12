@@ -205,8 +205,22 @@
     background: var(--fab-accent-soft);
   }
 
-  .crafting-alt-option.is-insufficient:not(.is-selected) {
+  /* Insufficient options stay selectable-but-flagged (issue 552 decision 1): a red
+     border reads "blocking" whether the row is selected or not, so a player who
+     picks an unaffordable component still sees the choice is short (the tile pip +
+     have/need chip also go red). The selected-and-insufficient variant keeps the
+     danger border while adopting a danger-tinted fill so it still reads as chosen. */
+  .crafting-alt-option.is-insufficient {
     border-color: var(--fab-danger-border);
+  }
+
+  .crafting-alt-option.is-insufficient.is-selected {
+    border-color: var(--fab-danger);
+    background: var(--fab-danger-soft);
+  }
+
+  .crafting-alt-option.is-insufficient .crafting-alt-name {
+    color: var(--fab-text-muted);
   }
 
   .crafting-alt-name {
@@ -223,5 +237,18 @@
     flex: 0 0 auto;
     font-size: 13px;
     color: var(--fab-accent);
+  }
+
+  /* Matches the sibling IO section headers (IoTable / IngredientSetSelector /
+     CraftingCheckCard / OutcomeTierTable). Svelte scopes CSS per component and this
+     class is not global, so the rule is redefined here to stay consistent with the
+     "Ingredients / Essences / Tools / Output" headers above the Alternatives block. */
+  .crafting-detail-section-title {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fab-text-muted);
   }
 </style>
