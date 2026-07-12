@@ -11,12 +11,19 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { buildCurrencyAffordProbe } from './currencyAffordance.js';
+import { RecipeActivationError } from './RecipeActivationError.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
 const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
+// Match-kind fallback icons for ingredient tiles whose match carries no managed
+// component id (issue 551). A tag match falls back to a generic item icon when
+// nothing in inventory currently satisfies it; a currency match — which never
+// resolves to an inventory item — always shows a coin icon.
+const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
+const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -131,7 +138,7 @@ export class RecipeManager {
         if (options.allowIncomplete) {
           recipe.enabled = false;
         } else {
-          throw new Error(`Cannot enable recipe "${recipe.name}": ${activation.errors.join(', ')}`);
+          throw new RecipeActivationError(recipe.name, activation.issues);
         }
       }
     }
@@ -187,9 +194,7 @@ export class RecipeManager {
     if (updatedRecipe.enabled === true && recipe.enabled !== true) {
       const activation = this._validateRecipeForActivation(updatedRecipe);
       if (!activation.valid) {
-        throw new Error(
-          `Cannot enable recipe "${updatedRecipe.name}": ${activation.errors.join(', ')}`
-        );
+        throw new RecipeActivationError(updatedRecipe.name, activation.issues);
       }
     }
 
@@ -735,6 +740,13 @@ export class RecipeManager {
       (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
     );
 
+    // resolveIngredientSelection appends exactly ONE entry to selectedIngredients
+    // per NON-missing group, in group order (an item- or currency-satisfied group
+    // pushes its chosen option; a missing group pushes to missingGroups instead).
+    // Track how many satisfied groups we have seen so each satisfied group can read
+    // its own chosen option by position.
+    let satisfiedGroupIndex = 0;
+
     return groups.map((group) => {
       const options = group.options || [];
 
@@ -754,7 +766,7 @@ export class RecipeManager {
         const description =
           this._resolveIngredientDescription(recipe, ingredient) ||
           options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
-        const visual = this._resolveIngredientVisual(recipe, ingredient);
+        const visual = this._resolveIngredientVisual(recipe, ingredient, availableItems);
         return {
           ...visual,
           description,
@@ -764,38 +776,41 @@ export class RecipeManager {
         };
       }
 
-      // This group is satisfied — find which option was selected.
-      // The selectedIngredients array holds the chosen option objects in group order.
-      // We match by position: selected options appear in the same order as groups
-      // (groups are iterated in order; selectedIngredients are appended in order).
-      //
-      // To avoid positional assumptions we instead compute have/need for each option
-      // using the availableItems (no remaining-quantity deduction here — we only need
-      // display values, and the group is already known to be satisfied).
-      const optionStates = options.map((ing) => {
-        const matchingItems = availableItems.filter((item) =>
-          this.ingredientMatchesItem(recipe, ing, item)
-        );
-        const totalQty = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
-        return {
-          ingredient: ing,
-          description: this._resolveIngredientDescription(recipe, ing) || '',
-          need: ing.quantity,
-          have: totalQty,
-          satisfied: totalQty >= ing.quantity,
-        };
-      });
+      // This group is satisfied — display the SAME option the engine will consume
+      // (issue 553), read straight from the selection rather than re-derived here.
+      // A previous version recomputed each option's have/need from availableItems
+      // with no remaining-quantity deduction and picked the first satisfied option;
+      // when one component can satisfy two groups, that could name/picture an option
+      // the craft does not spend (the engine deducts as it walks groups, so a later
+      // group falls through to a different option). Mirroring the engine's chosen
+      // option keeps the tile and the craft in agreement.
+      const chosenOption =
+        selection?.selectedIngredients?.[satisfiedGroupIndex] ?? options[0] ?? null;
+      satisfiedGroupIndex += 1;
 
-      const satisfiedOption = optionStates.find((s) => s.satisfied) || optionStates[0];
+      // The specific inventory item the engine will consume for this option, from the
+      // same consumption plan, so a shared tag/component tile shows the CONSUMED item
+      // rather than the first inventory item that merely matches (issue 553).
+      const consumedItem =
+        (selection?.plan || []).find((entry) => entry.ingredient === chosenOption)?.item || null;
+
+      const matchingItems = availableItems.filter((item) =>
+        this.ingredientMatchesItem(recipe, chosenOption, item)
+      );
+      const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
       const visual = this._resolveIngredientVisual(
         recipe,
-        satisfiedOption?.ingredient || options[0]
+        chosenOption,
+        availableItems,
+        consumedItem
       );
       return {
         ...visual,
-        description: optionStates.map((s) => s.description).join(' OR '),
-        need: satisfiedOption?.need || 1,
-        have: satisfiedOption?.have || 0,
+        description: options
+          .map((o) => this._resolveIngredientDescription(recipe, o) || '')
+          .join(' OR '),
+        need: Number(chosenOption?.quantity || 1),
+        have,
         satisfied: true,
       };
     });
@@ -823,16 +838,27 @@ export class RecipeManager {
   /**
    * Resolve the tile visuals (component id, display name, icon image) for an
    * ingredient, so the player detail can render an image grid. Component-typed
-   * matches resolve through the managed component library; anything else falls
-   * back to a null image (the UI thumbnail then shows its default) and the
-   * ingredient's own description as the name.
+   * matches resolve through the managed component library. Tag- and currency-typed
+   * matches carry no managed component id, so their image is resolved from a live
+   * inventory item that satisfies the match (issue 551): a tag tile shows the img
+   * of the first held item matching the tag, falling back to a generic tag icon
+   * when nothing in inventory matches; a currency tile always shows a coin icon (currency never
+   * resolves to an inventory item). Anything else falls back to a null image (the
+   * UI thumbnail then shows its default) and the ingredient's own description.
    *
    * @param {Recipe} recipe
    * @param {Ingredient|null} ingredient
+   * @param {Item[]} [availableItems] - live inventory used to resolve a tag tile's
+   *   image from a satisfying item; defaults to none.
+   * @param {Item|null} [consumedItem] - the specific inventory item the engine will
+   *   actually consume for this option (from the resolved consumption plan). When
+   *   supplied, a tag tile borrows THIS item's image so the tile matches the item
+   *   the craft spends, not merely the first inventory item that shares the tag
+   *   (issue 553). Falls back to the first tag-matching held item (issue 551).
    * @returns {{ componentId: string|null, name: string, img: string|null }}
    * @private
    */
-  _resolveIngredientVisual(recipe, ingredient) {
+  _resolveIngredientVisual(recipe, ingredient, availableItems = [], consumedItem = null) {
     const match = ingredient?.match || null;
     if (match?.type === 'component' && match.componentId) {
       return {
@@ -841,7 +867,21 @@ export class RecipeManager {
         img: this.resolveComponentImg(recipe, match.componentId),
       };
     }
-    return { componentId: null, name: ingredient?.getDescription?.() || '', img: null };
+
+    const name = ingredient?.getDescription?.() || '';
+
+    if (match?.type === 'tags') {
+      const matchingItem =
+        consumedItem ||
+        (availableItems || []).find((item) => this.ingredientMatchesItem(recipe, ingredient, item));
+      return { componentId: null, name, img: matchingItem?.img || FALLBACK_TAG_IMG };
+    }
+
+    if (match?.type === 'currency') {
+      return { componentId: null, name, img: FALLBACK_CURRENCY_IMG };
+    }
+
+    return { componentId: null, name, img: null };
   }
 
   /**
@@ -1465,18 +1505,27 @@ export class RecipeManager {
    * persistence checks plus signature uniqueness. A recipe may be persisted while invalid, but may
    * only be enabled when this passes.
    * @param {Recipe} recipe
-   * @returns {{valid: boolean, errors: string[]}}
+   * @returns {{valid: boolean, errors: string[], issues: {code: string|null, params: object, message: string}[]}}
+   *   `issues` mirrors `errors` with a stable `code` + params so the UI can
+   *   localize the enable failure (issue 550); `errors` stays the raw English list.
    * @private
    */
   _validateRecipeForActivation(recipe) {
     const persistence = this._validateRecipeForPersistence(recipe, { requireComplete: true });
     const errors = [...persistence.errors];
+    // Structured, coded issues run in parallel with the raw `errors` strings so a
+    // UI caller can localize them (issue 550). Pre-existing persistence strings
+    // have no code yet, so they ride along as uncoded issues (the localizer passes
+    // their already-English message through unchanged).
+    const issues = persistence.errors.map((message) => ({ code: null, params: {}, message }));
     const signatureValidation = this._validateSignatures(recipe);
     errors.push(...signatureValidation.errors);
+    issues.push(...(signatureValidation.issues || []));
 
     return {
       valid: errors.length === 0,
       errors,
+      issues,
     };
   }
 
@@ -1517,7 +1566,12 @@ export class RecipeManager {
     const validator = new SignatureValidator(csm);
     const result = validator.validateRecipe(recipe, systemId);
     const errors = result.conflicts.map((c) => c.message);
-    return { valid: errors.length === 0, errors };
+    const issues = result.conflicts.map((c) => ({
+      code: c.code,
+      params: c.params,
+      message: c.message,
+    }));
+    return { valid: errors.length === 0, errors, issues };
   }
 
   /**

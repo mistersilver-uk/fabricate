@@ -20,7 +20,11 @@
  * hook are the thin Foundry edges (wired in main.js); they delegate to these.
  */
 
-import { INTERACTABLE_BEHAVIOR_SUBTYPE, readLinkedVisualRef } from './interactableRegionFlags.js';
+import {
+  INTERACTABLE_BEHAVIOR_SUBTYPE,
+  readLinkedVisualRef,
+  isInteractableVisual,
+} from './interactableRegionFlags.js';
 
 /**
  * Register the Interactable config panel as the sheet for the
@@ -118,7 +122,7 @@ export function resolveInteractableConfigTarget(doc, { resolveRegion } = {}) {
  */
 export function shouldOfferInteractableConfigEntry(doc, { isGM } = {}) {
   if (isGM !== true) return false;
-  return readLinkedVisualRef(doc) !== null;
+  return isInteractableVisual(doc);
 }
 
 export { INTERACTABLE_BEHAVIOR_SUBTYPE } from './interactableRegionFlags.js';

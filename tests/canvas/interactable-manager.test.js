@@ -261,6 +261,10 @@ test('_spawnInteractableRegion creates a Region (with nested behaviour) + linked
     assert.equal(regionPayload.behaviors[0].system.interactableType, 'tool');
     assert.equal(regionPayload.behaviors[0].system.sourceUuid, 'Fabricate.sysA.tool.tool-1');
     assert.equal(regionPayload.shapes[0].type, 'rectangle');
+    // Issue 533: a Fabricate-CREATED region is stamped with the ownership flag so
+    // its later deletion may safely remove the whole region (a promoted user region
+    // never gets this flag, so its delete removes only Fabricate's behaviour).
+    assert.equal(regionPayload.flags.fabricate.interactableRegion, true);
 
     assert.equal(createdTiles.length, 1, 'one linked Tile created');
     // The linked Tile is CENTERED on its stored x/y (Foundry renders tiles
