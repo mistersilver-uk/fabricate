@@ -1,5 +1,6 @@
 import { getFabricateFlag } from '../config/flags.js';
 
+import { findComponentByName } from './componentNameMatch.js';
 import { itemHasComponentIdentityFlag, resolveComponentForItem } from './sourceUuid.js';
 
 function normalizeEssences(essences = {}) {
@@ -41,14 +42,8 @@ export function findMatchingComponent(item, components = [], systemId) {
   // path, removal tracked by issue 540).
   if (itemHasComponentIdentityFlag(item)) return null;
 
-  return (
-    components.find(
-      (component) =>
-        component?.name &&
-        item?.name &&
-        String(item.name).toLowerCase() === String(component.name).toLowerCase()
-    ) || null
-  );
+  // Case-INSENSITIVE name fallback via the shared helper (warn-once telemetry, issue 540).
+  return findComponentByName(item, components, { caseSensitive: false, systemId });
 }
 
 /**
