@@ -101,6 +101,11 @@ import {
 } from './canvas/regions/interactableRegionFlags.js';
 import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
 import {
+  decideWorldInteractableCleanup,
+  executeWorldInteractableCleanup,
+  planHasWork
+} from './canvas/regions/interactableCleanup.js';
+import {
   assignInteractableConfigSheet,
   resolveInteractableConfigTarget,
   shouldOfferInteractableConfigEntry
@@ -2180,6 +2185,82 @@ function bindFabricateGlobal() {
       overwriteExisting: options.overwriteExisting || false
     });
   };
+
+  // GM "prepare for uninstall" cleanup (issue 535). `fabricate.interactable` is a
+  // module-defined RegionBehavior sub-type; Foundry does NOT remove it when Fabricate
+  // is disabled/uninstalled, so it errors on every scene load (and, on Foundry
+  // < 14.360, cascade-invalidates the parent Region + Scene). This GM-invocable API
+  // strips ONLY what Fabricate owns — its `fabricate.interactable` behaviours + its own
+  // Tile/Drawing markers — and clears its region-ownership + Token reverse flags,
+  // NEVER deleting a parent Region, a foreign behaviour, or a GM's own Token marker.
+  // Exposed as a plain API method (no rendered UI control) so a GM can run it from a
+  // macro/console; see docs/canvas-interactables.md "Uninstalling Fabricate cleanly".
+  game.fabricate.cleanupInteractables = () => runInteractableWorldCleanup();
+}
+
+/**
+ * The GM-invocable uninstall-safe interactable cleanup edge. Gathers the world's
+ * scenes, computes the pure removal plan, confirms with the GM, applies it, and
+ * reports a summary. GM-gated and no-throw. Returns the applied counts, or `null`
+ * when it was not run (non-GM, nothing to do, or the GM cancelled).
+ *
+ * @returns {Promise<object|null>}
+ */
+async function runInteractableWorldCleanup() {
+  const t = (key, fallback, data) => {
+    const i18n = globalThis.game?.i18n;
+    if (data && typeof i18n?.format === 'function') {
+      const out = i18n.format(key, data);
+      if (out && out !== key) return out;
+    } else if (typeof i18n?.localize === 'function') {
+      const out = i18n.localize(key);
+      if (out && out !== key) return out;
+    }
+    return fallback;
+  };
+
+  if (globalThis.game?.user?.isGM !== true) {
+    globalThis.ui?.notifications?.warn?.(
+      t('FABRICATE.Canvas.Cleanup.NotGM', 'Only a GM can run Fabricate interactable cleanup.')
+    );
+    return null;
+  }
+
+  const scenes = [...(globalThis.game?.scenes ?? [])];
+  const plan = decideWorldInteractableCleanup(scenes);
+  if (!planHasWork(plan)) {
+    globalThis.ui?.notifications?.info?.(
+      t('FABRICATE.Canvas.Cleanup.NothingToDo', 'No Fabricate interactables found. Nothing to clean up.')
+    );
+    return plan.summary;
+  }
+
+  const { summary } = plan;
+  const confirmed = await globalThis.foundry?.applications?.api?.DialogV2?.confirm?.({
+    window: { title: t('FABRICATE.Canvas.Cleanup.Title', 'Remove Fabricate interactables') },
+    content: `<p>${t(
+      'FABRICATE.Canvas.Cleanup.Prompt',
+      'Remove {behaviors} Fabricate interactable(s) and {markers} marker(s) across {scenes} scene(s)? Your regions, tokens, and any other region behaviours are kept. Run this BEFORE disabling or uninstalling Fabricate.',
+      {
+        behaviors: summary.behaviorsRemoved,
+        markers: summary.visualsDeleted,
+        scenes: summary.scenesTouched
+      }
+    )}</p>`,
+    yes: { label: t('FABRICATE.Canvas.Cleanup.Confirm', 'Remove them') },
+    no: { label: t('FABRICATE.Canvas.Cleanup.Cancel', 'Cancel') }
+  });
+  if (confirmed !== true) return null;
+
+  const applied = await executeWorldInteractableCleanup(scenes, plan);
+  globalThis.ui?.notifications?.info?.(
+    t(
+      'FABRICATE.Canvas.Cleanup.Done',
+      'Removed {behaviors} Fabricate interactable(s) and {markers} marker(s). You can now safely disable or uninstall Fabricate.',
+      { behaviors: applied.behaviorsRemoved, markers: applied.visualsDeleted }
+    )
+  );
+  return applied;
 }
 
 // Hook into Foundry's initialization
