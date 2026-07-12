@@ -8,7 +8,13 @@ let compiler;
 let createCraftingStore;
 
 function makeServices(overrides = {}) {
-  const calls = { listCraftingForActor: [], craftRecipe: [], notify: [], toggleFavourite: [] };
+  const calls = {
+    listCraftingForActor: [],
+    craftRecipe: [],
+    notify: [],
+    toggleFavourite: [],
+    evaluateSelectedSet: [],
+  };
   // Stateful favourites fake so toggleFavourite round-trips like the real setting.
   let favourites = Array.isArray(overrides.favourites) ? [...overrides.favourites] : [];
   const services = {
@@ -24,6 +30,12 @@ function makeServices(overrides = {}) {
       }),
     notify: (message) => calls.notify.push(message),
     craftErrorMessage: () => 'Crafting failed.',
+    evaluateSelectedSet:
+      overrides.evaluateSelectedSet ??
+      ((opts) => {
+        calls.evaluateSelectedSet.push(opts);
+        return overrides.recomputedCraftability ?? null;
+      }),
     getRecipeManager: () => overrides.recipeManager ?? null,
     getCraftingSourceActors: () => overrides.sourceActors ?? [],
     getSelectedCraftingActorId: () => overrides.actorId ?? 'actor-1',
@@ -478,5 +490,110 @@ describe('craftingStore', () => {
     store.tickWorldTime();
     flushSync();
     assert.equal(store.worldTimeTick, 1);
+  });
+
+  // ── Issue 552: per-group ingredient option overrides ──────────────────────
+  function optionListing() {
+    return {
+      recipes: [
+        {
+          id: 'r1',
+          name: 'Potion',
+          ingredientSets: [{ id: 'r1-set', craftability: { canCraft: true, marker: 'baked' } }],
+          defaultSetId: 'r1-set',
+        },
+      ],
+    };
+  }
+
+  it('chooseIngredientOption recomputes selectedCraftability through evaluateSelectedSet', async () => {
+    const { services, calls } = makeServices({
+      listing: optionListing(),
+      actorId: 'hero',
+      sourceIds: ['a1'],
+      recomputedCraftability: { canCraft: false, marker: 'recomputed' },
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    assert.equal(store.selectedCraftability.marker, 'baked', 'no override → baked craftability');
+    assert.equal(calls.evaluateSelectedSet.length, 0, 'no recompute without an override');
+
+    store.chooseIngredientOption('g1', { optionIndex: 1 });
+    flushSync();
+
+    assert.equal(store.selectedCraftability.marker, 'recomputed', 'override → recomputed craftability');
+    assert.deepEqual(calls.evaluateSelectedSet.at(-1), {
+      recipeId: 'r1',
+      setId: 'r1-set',
+      optionOverrides: { g1: { optionIndex: 1, heldItemId: null } },
+      actorId: 'hero',
+      componentSourceActorIds: ['a1'],
+    });
+  });
+
+  it('selecting a recipe resets the option overrides back to the default', async () => {
+    const { services } = makeServices({
+      listing: optionListing(),
+      recomputedCraftability: { marker: 'recomputed' },
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    store.chooseIngredientOption('g1', { optionIndex: 1 });
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, { g1: { optionIndex: 1, heldItemId: null } });
+
+    store.select('r1');
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, {}, 'select() clears overrides');
+    assert.equal(store.selectedCraftability.marker, 'baked', 'back to the baked craftability');
+  });
+
+  it('chooseIngredientSet clears the option overrides (they are set-scoped)', async () => {
+    const { services } = makeServices({ listing: optionListing() });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    store.chooseIngredientOption('g1', { optionIndex: 1 });
+    flushSync();
+
+    store.chooseIngredientSet('r1-set');
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, {}, 'switching sets clears overrides');
+  });
+
+  it('threads the option overrides into the craft call', async () => {
+    const { services, calls } = makeServices({ listing: optionListing() });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    store.chooseIngredientOption('g1', { optionIndex: 2, heldItemId: 'held-x' });
+    flushSync();
+
+    await store.craft(store.selectedRecipe);
+    assert.deepEqual(calls.craftRecipe.at(-1).ingredientOptionOverrides, {
+      g1: { optionIndex: 2, heldItemId: 'held-x' },
+    });
+  });
+
+  it('chooseIngredientOption with a null optionIndex clears that group override', async () => {
+    const { services } = makeServices({
+      listing: optionListing(),
+      recomputedCraftability: { marker: 'recomputed' },
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    store.chooseIngredientOption('g1', { optionIndex: 1 });
+    flushSync();
+    assert.equal(store.selectedCraftability.marker, 'recomputed');
+
+    store.chooseIngredientOption('g1', { optionIndex: null });
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, {});
+    assert.equal(store.selectedCraftability.marker, 'baked', 'clearing the last override restores baked');
   });
 });

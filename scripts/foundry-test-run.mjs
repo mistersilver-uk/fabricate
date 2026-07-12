@@ -1192,6 +1192,11 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Bracket', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
       { name: 'Smoke Relic', img: 'icons/commodities/treasure/crown-gold-laurel-wreath.webp' },
       { name: 'Smoke Shard', img: 'icons/commodities/gems/gem-fragments-red.webp' },
+      // simple system — multi-option ingredient recipe (issue #552): two
+      // interchangeable coil components the crafter holds + the woven result.
+      { name: 'Smoke Copper Coil', img: 'icons/commodities/metal/wire-copper.webp' },
+      { name: 'Smoke Bronze Coil', img: 'icons/commodities/metal/wire-brass.webp' },
+      { name: 'Smoke Filigree', img: 'icons/commodities/metal/mail-chain-gold.webp' },
       // routedByIngredients system
       { name: 'Smoke Ingot A', img: 'icons/commodities/metal/ingot-engraved-silver.webp' },
       { name: 'Smoke Ingot B', img: 'icons/commodities/metal/ingot-gold.webp' },
@@ -1246,7 +1251,9 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     const simpleMap = await registerComponents(simpleSystemId, [
       'Smoke Plank', 'Smoke Crate', 'Smoke Mallet', 'Smoke Toy',
       'Smoke Chisel', 'Smoke Dowel', 'Smoke Anvil', 'Smoke Bracket',
-      'Smoke Relic', 'Smoke Shard'
+      'Smoke Relic', 'Smoke Shard',
+      // Multi-option ingredient recipe (issue #552) components.
+      'Smoke Copper Coil', 'Smoke Bronze Coil', 'Smoke Filigree'
     ]);
     const malletToolId = 'smoke-mallet-tool';
     const chiselToolId = 'smoke-chisel-tool';
@@ -1362,6 +1369,32 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       resultGroups: [{ name: 'Bracket', results: [{ componentId: simpleMap['Smoke Bracket'], quantity: 1 }] }]
     });
     await rm.updateRecipe(negativeToolRecipe.id, { toolIds: [anvilToolId] });
+
+    // Multi-option ingredient recipe (issue #552): a single ingredient group that
+    // offers TWO interchangeable components the crafter actually holds, so the
+    // player detail renders the IngredientOptionSelector "Alternatives"
+    // radiogroup with two satisfiable, selectable rows. Additive — no execution
+    // assert consumes it — so it never perturbs the #489 consumption pins.
+    const multiOptionRecipe = await rm.createRecipe({
+      name: 'Smoke Weave Filigree',
+      description: 'Simple-mode craft with one ingredient group offering two interchangeable coils (issue #552).',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/commodities/metal/mail-chain-gold.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          id: 'smoke-coil-choice',
+          name: 'Coil',
+          options: [
+            { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Copper Coil'] } },
+            { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Bronze Coil'] } }
+          ]
+        }]
+      }],
+      resultGroups: [{
+        name: 'Filigree',
+        results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }]
+      }]
+    });
 
     // ── 3. ROUTED-BY-INGREDIENTS system (multi-set → differing groups) ──────
     const ingredientRouterSystem = await csm.createSystem({
@@ -1511,6 +1544,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       ...invCopies('Smoke Mallet', 1),                // breakageChance tool
       ...invCopies('Smoke Chisel', 1),                // limitedUses tool (broken by crafting maxUses times)
       ...invCopies('Smoke Relic', 1),                 // salvageable component
+      ...invCopies('Smoke Copper Coil', 1),           // multi-option recipe alternative A (#552)
+      ...invCopies('Smoke Bronze Coil', 1),           // multi-option recipe alternative B (#552)
       ...invCopies('Smoke Ingot A', 1),               // routedByIngredients set A
       ...invCopies('Smoke Ingot B', 1),               // routedByIngredients set B (asserted NOT produced)
       ...invCopies('Smoke Bar', 1),                   // routedByCheck stock
@@ -1601,6 +1636,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       ],
       executionRecipeIds: [
         simpleRecipe.id, breakageRecipe.id, limitedUsesRecipe.id, negativeToolRecipe.id,
+        multiOptionRecipe.id,
         ingredientRoutedRecipe.id, checkRoutedRecipe.id, progressiveRecipe.id
       ],
       simple: {
@@ -5673,6 +5709,53 @@ async function main() {
           }
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'player-crafting-run-summary');
+
+          // Multi-option ingredient selector evidence (issue #552): select the
+          // seeded 'Smoke Weave Filigree' recipe, whose single ingredient group
+          // offers two interchangeable coils the crafter holds, so the detail
+          // renders the IngredientOptionSelector "Alternatives" radiogroup with
+          // two selectable rows. Defensive: a missing recipe/control records a
+          // failed step rather than aborting the surrounding phase.
+          try {
+            // The recipe list is paginated (12/page); filter to the multi-option
+            // recipe via the browser search so its row is in the DOM regardless of
+            // which page it would otherwise fall on.
+            const recipeSearch = appShell.locator('.crafting-browser-search input').first();
+            await recipeSearch.fill('Smoke Weave Filigree');
+            await page.waitForTimeout(350);
+            const altRecipeRow = appShell
+              .locator('[data-recipe-id]:has-text("Smoke Weave Filigree")')
+              .first();
+            await altRecipeRow.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await altRecipeRow.locator('.crafting-recipe-row-main').click({ timeout: 5_000 });
+            const altSection = appShell.locator('[data-recipe-section="alternatives"]').first();
+            await altSection.waitFor({ state: 'visible', timeout: 10_000 });
+            await appShell.locator('.crafting-alt-option').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-alternatives');
+
+            // Nice-to-have "switched" variant: click the second alternative so the
+            // selection tick moves, evidencing the player choosing the other option.
+            const altOptions = appShell.locator('.crafting-alt-option');
+            if (await altOptions.count() > 1) {
+              await altOptions.nth(1).click({ timeout: 5_000 }).catch(() => {});
+              await page.waitForTimeout(250);
+              await assertNoScreenshotOverlays(page);
+              await screenshot(page, 'player-crafting-alternatives-switched');
+            }
+            // Restore the unfiltered recipe list for the subsequent stacked frame.
+            await recipeSearch.fill('').catch(() => {});
+            await page.waitForTimeout(200);
+            results.steps.push({ step: 'player-crafting-alternatives', passed: true });
+          } catch (altError) {
+            results.steps.push({
+              step: 'player-crafting-alternatives',
+              passed: false,
+              error: String(altError?.message ?? altError)
+            });
+            process.stdout.write(`  Player Crafting alternatives capture skipped: ${altError?.message ?? altError}\n`);
+          }
 
           // Narrow-window stacked evidence: shrink below the grid's 900px stacking
           // breakpoint so the three columns reflow into a single vertical stack.

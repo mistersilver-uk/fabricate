@@ -393,11 +393,17 @@ export class RecipeManager {
    *   ingredient and essence checks against the same component the collector bucketed it
    *   to. Defaults (undefined) to the shared resolvers used by standard crafting and
    *   every display caller — byte-for-byte unchanged.
+   * @param {object|null} [options.optionOverrides] - Per-group player option overrides
+   *   (issue 552), keyed by `group.id` → `{ optionIndex, heldItemId? }`. Threaded to
+   *   `resolveIngredientSelection` so both this display path and the engine's
+   *   consumption resolve the SAME chosen option/stack. Null (the default) keeps the
+   *   first-satisfiable behaviour byte-for-byte unchanged.
    * @returns {{
    *   canCraft: boolean,
    *   satisfiableSet: IngredientSet|null,
    *   missing: { ingredients: Array, essences: Array, tools: Array },
-   *   ingredientStates: Array<{ description: string, need: number, have: number, satisfied: boolean }>,
+   *   ingredientStates: Array<{ groupId: string|null, description: string, need: number, have: number, satisfied: boolean, hasChoice: boolean, choiceCount: number }>,
+   *   ingredientChoices: Array<object>,
    *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean }>,
    *   toolStates: Array<{ name: string, img: string|null, available: boolean, virtual?: boolean }>
    * }}
@@ -405,7 +411,7 @@ export class RecipeManager {
   evaluateCraftability(
     componentSourceActors,
     recipe,
-    { presentTools = null, craftingActor = null, resolveComponent } = {}
+    { presentTools = null, craftingActor = null, resolveComponent, optionOverrides = null } = {}
   ) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
@@ -458,7 +464,7 @@ export class RecipeManager {
               availableItems,
               (ingredient, item) =>
                 this.ingredientMatchesItem(recipe, ingredient, item, resolveComponent),
-              { affordCurrency }
+              { affordCurrency, optionOverrides }
             )
           : {
               success: true,
@@ -523,6 +529,32 @@ export class RecipeManager {
       availableItems
     );
 
+    // Per-group player-facing option/stack choices (issue 552). Empty unless a group
+    // offers a real choice (multiple authored options, or a tag option matching more
+    // than one held stack), so the common single-option case renders no selector.
+    const ingredientChoices = this._buildIngredientChoices(
+      recipe,
+      displayIngredientSet,
+      displaySelection,
+      availableItems,
+      optionOverrides,
+      affordCurrency
+    );
+    // Tag each ingredient state with whether its group has a choice + how many
+    // alternatives, so the tile can show a discoverability badge next to it.
+    const choiceCountByGroup = new Map();
+    for (const choice of ingredientChoices) {
+      const count = choice.kind === 'option' ? choice.options.length : choice.stacks.length;
+      choiceCountByGroup.set(
+        choice.groupId,
+        Math.max(choiceCountByGroup.get(choice.groupId) ?? 0, count)
+      );
+    }
+    for (const state of ingredientStates) {
+      state.hasChoice = choiceCountByGroup.has(state.groupId);
+      state.choiceCount = choiceCountByGroup.get(state.groupId) ?? 0;
+    }
+
     // Build essence states from the display set. This readout is display-only and is
     // intentionally NOT threaded with the alchemy tier-4 resolver (issue 578): it is
     // harmless because `missing.essences` below is forced empty whenever canCraft is
@@ -562,6 +594,7 @@ export class RecipeManager {
         tools: missingTools,
       },
       ingredientStates,
+      ingredientChoices,
       essenceStates,
       toolStates,
     };
@@ -741,53 +774,35 @@ export class RecipeManager {
       (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
     );
 
-    // resolveIngredientSelection appends exactly ONE entry to selectedIngredients
-    // per NON-missing group, in group order (an item- or currency-satisfied group
-    // pushes its chosen option; a missing group pushes to missingGroups instead).
-    // Track how many satisfied groups we have seen so each satisfied group can read
-    // its own chosen option by position.
-    let satisfiedGroupIndex = 0;
+    // The option the engine chose per group (issue 553), so the tile always mirrors
+    // the option/stack the craft consumes.
+    const chosenByGroup = this._chosenOptionByGroup(ingredientSet, selection);
 
     return groups.map((group) => {
       const options = group.options || [];
-
-      // Check whether any option in this group is satisfied.
-      // We use the selectedIngredients from the selection to determine which option was chosen,
-      // then compute have/need from the actual available items using the same matcher.
-      //
-      // For missing groups, report the best-effort have/need from the missingGroups data.
       const isMissing = missingGroupIds.has(group.id);
+      const chosenOption = chosenByGroup.get(group?.id) ?? options[0] ?? null;
+      // Show ONLY the chosen option's description (issue 552) instead of OR-joining
+      // every option's name against a single unlabelled have/need pip — the tile now
+      // names the specific option the craft will consume.
+      const description =
+        this._resolveIngredientDescription(recipe, chosenOption) ||
+        options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
 
       if (isMissing) {
-        // Find this group's missing data.
         const missingEntry = (selection?.missingGroups || []).find(
           (mg) => mg?.group?.id === group.id
         );
-        const ingredient = missingEntry?.ingredient || options[0] || null;
-        const description =
-          this._resolveIngredientDescription(recipe, ingredient) ||
-          options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
-        const visual = this._resolveIngredientVisual(recipe, ingredient, availableItems);
+        const visual = this._resolveIngredientVisual(recipe, chosenOption, availableItems);
         return {
           ...visual,
+          groupId: group?.id ?? null,
           description,
-          need: Number(missingEntry?.need || ingredient?.quantity || 1),
+          need: Number(missingEntry?.need || chosenOption?.quantity || 1),
           have: Number(missingEntry?.have || 0),
           satisfied: false,
         };
       }
-
-      // This group is satisfied — display the SAME option the engine will consume
-      // (issue 553), read straight from the selection rather than re-derived here.
-      // A previous version recomputed each option's have/need from availableItems
-      // with no remaining-quantity deduction and picked the first satisfied option;
-      // when one component can satisfy two groups, that could name/picture an option
-      // the craft does not spend (the engine deducts as it walks groups, so a later
-      // group falls through to a different option). Mirroring the engine's chosen
-      // option keeps the tile and the craft in agreement.
-      const chosenOption =
-        selection?.selectedIngredients?.[satisfiedGroupIndex] ?? options[0] ?? null;
-      satisfiedGroupIndex += 1;
 
       // The specific inventory item the engine will consume for this option, from the
       // same consumption plan, so a shared tag/component tile shows the CONSUMED item
@@ -807,14 +822,195 @@ export class RecipeManager {
       );
       return {
         ...visual,
-        description: options
-          .map((o) => this._resolveIngredientDescription(recipe, o) || '')
-          .join(' OR '),
+        groupId: group?.id ?? null,
+        description,
         need: Number(chosenOption?.quantity || 1),
         have,
         satisfied: true,
       };
     });
+  }
+
+  /**
+   * Map each group id to the option the resolver chose for it. For a satisfied group
+   * that is the pushed `selectedIngredients` entry (item or currency); for a missing
+   * group it is the `missingGroups` representative option (the overridden or
+   * best-effort short option). resolveIngredientSelection appends exactly ONE entry
+   * to `selectedIngredients` per NON-missing group in group order, so satisfied
+   * groups read their option by running index.
+   * @private
+   * @returns {Map<string, Ingredient|null>}
+   */
+  _chosenOptionByGroup(ingredientSet, selection) {
+    const map = new Map();
+    const groups = Array.isArray(ingredientSet?.ingredientGroups)
+      ? ingredientSet.ingredientGroups
+      : [];
+    const missingIds = new Set(
+      (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
+    );
+    let satisfiedIndex = 0;
+    for (const group of groups) {
+      if (missingIds.has(group?.id)) {
+        const entry = (selection?.missingGroups || []).find((mg) => mg?.group?.id === group?.id);
+        map.set(group?.id, entry?.ingredient ?? group?.options?.[0] ?? null);
+      } else {
+        map.set(
+          group?.id,
+          selection?.selectedIngredients?.[satisfiedIndex] ?? group?.options?.[0] ?? null
+        );
+        satisfiedIndex += 1;
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Build the player-facing per-group option/stack choices (issue 552). Only groups
+   * that offer a real choice appear: a MULTI-option group emits an `option`
+   * radiogroup, and when the currently-chosen option is a tag matching MORE THAN ONE
+   * held stack it also emits a `stack` radiogroup so the player can pick which held
+   * item to consume. Single-option groups with no multi-stack tag emit nothing, so
+   * the common case shows no selector.
+   *
+   * Each `option` carries `{ optionIndex, name, img, need, have, satisfied,
+   * isCurrency, costLabel, affordable }` — an insufficient option is included
+   * (selectable but flagged `satisfied: false`), matching the resolver, which
+   * honours it and lets the craft block with the missing-materials message.
+   *
+   * @private
+   * @returns {Array<object>}
+   */
+  _buildIngredientChoices(
+    recipe,
+    ingredientSet,
+    selection,
+    availableItems,
+    optionOverrides,
+    affordCurrency
+  ) {
+    const groups = Array.isArray(ingredientSet?.ingredientGroups)
+      ? ingredientSet.ingredientGroups
+      : [];
+    if (groups.length === 0) return [];
+
+    const chosenByGroup = this._chosenOptionByGroup(ingredientSet, selection);
+    const choices = [];
+
+    for (const group of groups) {
+      const options = group.options || [];
+      if (options.length === 0) continue;
+      const groupName =
+        (typeof group.name === 'string' && group.name.trim()) ||
+        this._defaultGroupName(recipe, options);
+      const chosenOption = chosenByGroup.get(group?.id) ?? options[0] ?? null;
+      let selectedOptionIndex = options.indexOf(chosenOption);
+      if (selectedOptionIndex < 0) selectedOptionIndex = 0;
+
+      if (options.length > 1) {
+        choices.push({
+          kind: 'option',
+          groupId: group?.id ?? null,
+          groupName,
+          selectedOptionIndex,
+          options: options.map((option, idx) =>
+            this._buildOptionChoice(recipe, option, idx, availableItems, affordCurrency)
+          ),
+        });
+      }
+
+      // Tag-stack sub-choice for the currently-selected option only.
+      const selectedOption = options[selectedOptionIndex] ?? null;
+      const stacks = this._heldStacksForTagOption(recipe, selectedOption, availableItems);
+      if (stacks.length > 1) {
+        const consumedItem =
+          (selection?.plan || []).find((entry) => entry.ingredient === selectedOption)?.item ||
+          null;
+        const overrideHeldId = optionOverrides?.[group?.id]?.heldItemId ?? null;
+        const selectedHeldItemId =
+          overrideHeldId ?? (consumedItem?.uuid || consumedItem?.id) ?? stacks[0].itemId;
+        choices.push({
+          kind: 'stack',
+          groupId: group?.id ?? null,
+          groupName,
+          optionIndex: selectedOptionIndex,
+          selectedHeldItemId,
+          stacks,
+        });
+      }
+    }
+
+    return choices;
+  }
+
+  /** Fallback group label when a group has no authored name. @private */
+  _defaultGroupName(recipe, options) {
+    const first = options?.[0] ?? null;
+    return this._resolveIngredientDescription(recipe, first) || 'Alternatives';
+  }
+
+  /**
+   * Build one option descriptor for the choices model. `have` is the raw total held
+   * quantity matching the option across the full inventory (an isolated affordability
+   * indicator per alternative, independent of the shared remaining-quantity pool).
+   * @private
+   */
+  _buildOptionChoice(recipe, option, optionIndex, availableItems, affordCurrency) {
+    const visual = this._resolveIngredientVisual(recipe, option, availableItems);
+    const isCurrency = option?.match?.type === 'currency';
+    if (isCurrency) {
+      const handler = getMatchHandler(option.match);
+      const spend = handler.isComplete(option.match)
+        ? handler.getCurrencySpend(option.match)
+        : null;
+      const affordable = handler.affords(option.match, { affordCurrency });
+      return {
+        optionIndex,
+        name: visual.name || this._resolveIngredientDescription(recipe, option),
+        img: visual.img,
+        need: spend?.amount ?? 0,
+        have: 0,
+        satisfied: affordable,
+        isCurrency: true,
+        costLabel: spend ? `${spend.amount} ${spend.unit}` : '',
+        affordable,
+      };
+    }
+    const matchingItems = availableItems.filter((item) =>
+      this.ingredientMatchesItem(recipe, option, item)
+    );
+    const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
+    const need = Number(option?.quantity || 1);
+    return {
+      optionIndex,
+      name: visual.name || this._resolveIngredientDescription(recipe, option),
+      img: visual.img,
+      need,
+      have,
+      satisfied: have >= need,
+      isCurrency: false,
+      costLabel: '',
+      affordable: true,
+    };
+  }
+
+  /**
+   * The distinct held stacks a tag option matches, or `[]` when the option is not a
+   * tag option (component/currency/exact-item options resolve to a single item and
+   * offer no held-stack choice).
+   * @private
+   * @returns {Array<{ itemId: string, name: string, img: string|null, have: number }>}
+   */
+  _heldStacksForTagOption(recipe, option, availableItems) {
+    if (option?.match?.type !== 'tags') return [];
+    return (availableItems || [])
+      .filter((item) => this.ingredientMatchesItem(recipe, option, item))
+      .map((item) => ({
+        itemId: item.uuid || item.id,
+        name: item.name ?? '',
+        img: item.img ?? null,
+        have: Number(item.system?.quantity || 1),
+      }));
   }
 
   /**
@@ -956,12 +1152,15 @@ export class RecipeManager {
    * @param {Function} [options.resolveComponent] - Optional component resolver injected
    *   on the alchemy craft path (issue 578); defaults (undefined) to the standard-craft
    *   resolvers (see evaluateCraftability).
+   * @param {object|null} [options.optionOverrides] - Per-group player option overrides
+   *   (issue 552), keyed by group id, forwarded to the resolver so the craftability
+   *   decision honours the chosen option/stack (an insufficient choice blocks).
    * @returns {{canCraft: boolean, satisfiableSet: IngredientSet|null, missing: Object}}
    */
   canCraft(
     componentSourceActors,
     recipe,
-    { presentTools = null, craftingActor = null, resolveComponent } = {}
+    { presentTools = null, craftingActor = null, resolveComponent, optionOverrides = null } = {}
   ) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
@@ -981,6 +1180,7 @@ export class RecipeManager {
       presentTools,
       craftingActor,
       resolveComponent,
+      optionOverrides,
     });
     return { canCraft, satisfiableSet, missing };
   }
