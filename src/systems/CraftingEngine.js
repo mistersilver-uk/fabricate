@@ -1,4 +1,9 @@
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  FABRICATE_FLAG_NAMESPACE,
+  getFabricateFlag,
+  isSafeFlagKeySegment,
+  setFabricateFlag,
+} from '../config/flags.js';
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
@@ -38,6 +43,47 @@ function toolDisplayReference(tool) {
   const componentId = tool?.componentId || tool?.systemItemId;
   if (componentId) return `componentId: ${componentId}`;
   return tool?.label || tool?.name || tool?.id || 'unknown';
+}
+
+/**
+ * Stamp the durable per-system component identity on a crafted OUTPUT item's data,
+ * BEFORE creation, so the inventory matcher attributes it to its OWN component
+ * regardless of naming collisions or Foundry's transitive `_stats.duplicateSource`
+ * chain (issue 539). A crafted item built from `sourceItem.toObject()` inherits the
+ * source's `duplicateSource`, which — for a component whose source was itself
+ * duplicated from a SIBLING component's item — points at the sibling and mis-attributes
+ * the output through the raw-reference fall-through.
+ *
+ * The stamp keys the SAME location the canonical reader `resolveComponentForItem` reads
+ * FIRST for an owned item — its tier-1 durable-flag identity
+ * (`durableClaimedComponent` → `claimedRoleId` → `flags.fabricate.roles[systemId].componentId`
+ * in `src/utils/sourceUuid.js`) — so a freshly crafted item resolves to its own component
+ * by identity and never reaches the source-ref tier. Mirrors the source-side stamp
+ * {@link CraftingSystemManager#autoStampComponentSources} writes via
+ * `setFabricateFlag(source, 'roles.<systemId>.componentId', id)`: the roles map lives at
+ * the doubly-nested `flags.fabricate.fabricate.roles` path (`normalizeFlagKey` prefixes
+ * `fabricate.`, then `expandObject` nests it under the `fabricate` scope), so on a plain
+ * item-data object that same path is written directly.
+ *
+ * A dotted/unsafe `systemId` can never be a `roles` map key (every stamp/repair site skips
+ * it), so it is skipped here too and the item resolves via the raw-reference fall-through.
+ *
+ * @param {object} itemData - The plain item-data object about to be created.
+ * @param {string|null|undefined} systemId - The crafting system's id.
+ * @param {string|null|undefined} componentId - The result component's id.
+ */
+function stampCraftedComponentIdentity(itemData, systemId, componentId) {
+  if (!itemData || !componentId || !isSafeFlagKeySegment(systemId)) return;
+  // Build the doubly-nested `flags.fabricate.fabricate.roles[systemId]` container in
+  // place without depending on `foundry.utils.setProperty` (the source-side stamp goes
+  // through `setFlag`; here the item is unsaved data), preserving any sibling flags and
+  // any existing `roles` leaves for other systems.
+  const flags = (itemData.flags ||= {});
+  const namespace = (flags[FABRICATE_FLAG_NAMESPACE] ||= {});
+  const nested = (namespace[FABRICATE_FLAG_NAMESPACE] ||= {});
+  const roles = (nested.roles ||= {});
+  const perSystem = (roles[systemId] ||= {});
+  perSystem.componentId = componentId;
 }
 
 /**
@@ -2388,6 +2434,14 @@ export class CraftingEngine {
         foundry.utils.setProperty(itemData, path, value);
       }
     }
+
+    // Stamp the durable component identity on the crafted output so the inventory
+    // matcher attributes it to its OWN component and not a sibling reached through a
+    // transitive `_stats.duplicateSource` (issue 539). Keyed on the result's managed
+    // component id + the recipe's crafting system id; a result with no managed component
+    // (a bare `itemUuid` output) or an unsafe system id is left unstamped and resolves
+    // via the raw-reference fall-through.
+    stampCraftedComponentIdentity(itemData, recipe.craftingSystemId, managedItem?.id);
 
     // Create the item in crafting actor's inventory
     const [createdItem] = await craftingActor.createEmbeddedDocuments('Item', [itemData]);
