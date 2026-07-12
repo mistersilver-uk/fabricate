@@ -237,6 +237,10 @@ This alchemy-scoped resolution MUST NOT be pushed into the shared `findMatchingC
 - A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
 - Submitted quantity is counted per submission (one submission = one unit), not by reading an item's stack `system.quantity`; the workbench is responsible for expanding a stack into one submission per unit, consistent with occurrence-based essence accumulation and submitted-ingredient consumption.
 - Signature overlap is invalid across all recipes in the system.
+Two ingredient sets overlap only when they are genuinely ambiguous: a single plausible submission satisfies BOTH sets' group requirements at once.
+Formally, a pair conflicts iff some **transversal** of one set — one satisfying component chosen per group, the natural "one ingredient per requirement" craft — also satisfies every group of the other set (in either direction).
+Because matching is superset-tolerant and returns the first fully-matched set, this is exactly the condition under which one recipe would silently shadow another.
+Merely sharing a common base component (water, reagent, flask) is NOT overlap when the sets are otherwise distinguishable (e.g. `{Water},{Herb}` vs `{Water},{Mineral}`); overlap DOES include a set whose group requirements are a subset of another's (e.g. `{Water}` vs `{Water},{Herb}`, since every transversal of the larger set also satisfies the smaller), and two single-group sets sharing a component that satisfies both.
 - No-signature-match (a fizzle) is treated as a failed attempt: the player sees a specific failure message and the submitted ingredients are consumed (per `alchemy.consumeOnFail`).
 Learning is never granted by a fizzle.
 - The matched-but-unroutable **misconfiguration** path (abort without applying player-failure consumption; return actionable GM diagnostics) applies to **Tiered only** (None/Simple do not route by name).

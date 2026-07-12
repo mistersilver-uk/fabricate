@@ -404,6 +404,177 @@ test('multiple ingredient sets per recipe: conflict detected across sets', () =>
 });
 
 // ---------------------------------------------------------------------------
+// 17. Shared-base multi-group recipes are NOT a collision (issue 547)
+//
+// Two distinct alchemy recipes that merely share a common base component but
+// differ in a distinguishing group must both be enablable. Neither recipe's
+// group requirements are a subset of the other's, so no single minimal
+// submission satisfies both, and there is no genuine ambiguity.
+// ---------------------------------------------------------------------------
+
+test('shared-base multi-group recipes sharing one base component → no conflict (issue 547)', () => {
+  const components = [
+    makeComponent('comp-water'),
+    makeComponent('comp-herb'),
+    makeComponent('comp-mineral'),
+  ];
+
+  // Healing Potion: group1 {Water}, group2 {Herb}
+  const healing = makeRecipe('r-healing', 'Healing Potion', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-herb' })]),
+    ]),
+  ]);
+
+  // Mana Potion: group1 {Water}, group2 {Mineral}
+  const mana = makeRecipe('r-mana', 'Mana Potion', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-mineral' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [healing, mana], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    true,
+    `Recipes sharing only a base component must not collide; got: ${JSON.stringify(result.conflicts)}`
+  );
+  assert.equal(result.conflicts.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 18. Subset group requirements ARE a collision (issue 547)
+//
+// A set whose group requirements are a subset of another set's is genuine
+// ambiguity: every submission satisfying the larger set also satisfies the
+// smaller one (runtime matching is superset-tolerant), so the smaller recipe
+// can never be reached distinctly. Must still be rejected.
+// ---------------------------------------------------------------------------
+
+test('subset group requirements → conflict (issue 547)', () => {
+  const components = [makeComponent('comp-water'), makeComponent('comp-herb')];
+
+  // Set X: single group {Water}
+  const recipeX = makeRecipe('r-x', 'Plain Water Brew', [
+    makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-water' })])]),
+  ]);
+
+  // Set Y: groups {Water}, {Herb} — X's requirement is a subset of Y's
+  const recipeY = makeRecipe('r-y', 'Herbal Water Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-herb' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeX, recipeY], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(result.valid, false, 'Subset group requirements must be rejected');
+  assert.ok(result.conflicts.length > 0);
+});
+
+// ---------------------------------------------------------------------------
+// 19. Multi-group joint satisfiability across option-alternatives (issue 547)
+//
+// When one set's group is a subset (in component-id terms) of the covering
+// set's corresponding group for EVERY covering group, every submission that
+// satisfies the dependent set also satisfies the covering set → collision.
+// ---------------------------------------------------------------------------
+
+test('multi-group joint satisfiability: dependent groups subset covering groups → conflict', () => {
+  const components = [
+    makeComponent('comp-water'),
+    makeComponent('comp-herb'),
+    makeComponent('comp-mineral'),
+  ];
+
+  // Dependent: {Water}, {Herb}
+  const dependent = makeRecipe('r-dep', 'Dependent Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-herb' })]),
+    ]),
+  ]);
+
+  // Covering: {Water}, {Herb OR Mineral} — the dependent's Herb group is a
+  // subset of the covering's {Herb, Mineral} group, so satisfying the
+  // dependent (Water + Herb) always satisfies the covering too.
+  const covering = makeRecipe('r-cov', 'Covering Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([
+        makeIngredient('component', { componentId: 'comp-herb' }),
+        makeIngredient('component', { componentId: 'comp-mineral' }),
+      ]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [dependent, covering], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(result.valid, false, 'Dependent-subsumed-by-covering must be rejected');
+  assert.ok(result.conflicts.length > 0);
+});
+
+// ---------------------------------------------------------------------------
+// 20. Distinguishing option-alternatives are NOT a collision (issue 547)
+//
+// Two sets sharing a base group but whose second groups are disjoint option
+// sets have no joint minimal submission → no collision.
+// ---------------------------------------------------------------------------
+
+test('shared base with disjoint option-alternative second groups → no conflict', () => {
+  const components = [
+    makeComponent('comp-water'),
+    makeComponent('comp-herb'),
+    makeComponent('comp-root'),
+    makeComponent('comp-mineral'),
+    makeComponent('comp-crystal'),
+  ];
+
+  // {Water}, {Herb OR Root}
+  const recipeA = makeRecipe('r-a', 'Recipe A', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([
+        makeIngredient('component', { componentId: 'comp-herb' }),
+        makeIngredient('component', { componentId: 'comp-root' }),
+      ]),
+    ]),
+  ]);
+
+  // {Water}, {Mineral OR Crystal}
+  const recipeB = makeRecipe('r-b', 'Recipe B', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([
+        makeIngredient('component', { componentId: 'comp-mineral' }),
+        makeIngredient('component', { componentId: 'comp-crystal' }),
+      ]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeA, recipeB], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    true,
+    `Disjoint distinguishing groups must not collide; got: ${JSON.stringify(result.conflicts)}`
+  );
+  assert.equal(result.conflicts.length, 0);
+});
+
+// ---------------------------------------------------------------------------
 // 16. conflict message format includes recipe names
 // ---------------------------------------------------------------------------
 

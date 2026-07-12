@@ -66,12 +66,33 @@ export class SignatureValidator {
   }
 
   /**
-   * Check whether two signatures overlap (i.e., share at least one component ID
-   * across the union of all groups in both signatures).
+   * Check whether two signatures overlap — i.e. whether they are genuinely
+   * ambiguous because a single plausible submission satisfies BOTH sets'
+   * group requirements at once.
    *
-   * Conservative approach: if any component can appear in both signatures,
-   * the signatures overlap. This avoids false negatives at the cost of potential
-   * false positives for complex multi-group recipes with disjoint group assignments.
+   * The runtime signature matcher (`CraftingEngine._matchAlchemySignature`)
+   * requires **every** group of a set to be satisfied and is superset-tolerant
+   * (`>= required`, no leftover guard; extras are consumed as essence
+   * contributors). It returns the FIRST set that fully matches. So a pair is only
+   * ambiguous when a submission a player would plausibly make to craft one set
+   * ALSO fully satisfies the other — then the runtime silently shadows one.
+   *
+   * The plausible submissions for a set are its **transversals**: pick one
+   * satisfying component per group (the natural "one ingredient per requirement"
+   * craft). Merely sharing a base component is NOT enough — Healing
+   * `{Water},{Herb}` and Mana `{Water},{Mineral}` share Water, but no transversal
+   * of one (`Water+Herb` / `Water+Mineral`) satisfies the other, so they are
+   * distinguishable and must both be enablable. By contrast a set whose group
+   * requirements are a subset of another's IS ambiguous: every transversal of the
+   * larger set also satisfies the smaller one, so the smaller recipe can never be
+   * reached distinctly (superset-tolerance). Two single-group sets sharing a
+   * component that satisfies both (e.g. a `mithril` tagged both `rare` and
+   * `metal`) are likewise ambiguous: the one-item `{mithril}` submission matches
+   * both.
+   *
+   * Two signatures therefore overlap iff some transversal of A satisfies all of
+   * B's groups, or some transversal of B satisfies all of A's groups. See
+   * {@link _someTransversalSatisfies}.
    *
    * @param {Set<string>[]} sigA
    * @param {Set<string>[]} sigB
@@ -80,26 +101,61 @@ export class SignatureValidator {
   signaturesOverlap(sigA, sigB) {
     if (sigA.length === 0 || sigB.length === 0) return false;
 
-    // Compute the union of all components in each signature
-    const allA = new Set();
-    for (const groupSet of sigA) {
-      for (const id of groupSet) {
-        allA.add(id);
-      }
-    }
+    // A set carrying a group that no component can satisfy is unsatisfiable: it
+    // can never match a submission at runtime, so it cannot be the source of any
+    // ambiguity and never conflicts with another set.
+    if (sigA.some((group) => group.size === 0)) return false;
+    if (sigB.some((group) => group.size === 0)) return false;
 
-    const allB = new Set();
-    for (const groupSet of sigB) {
-      for (const id of groupSet) {
-        allB.add(id);
-      }
-    }
+    return this._someTransversalSatisfies(sigA, sigB) || this._someTransversalSatisfies(sigB, sigA);
+  }
 
-    // Overlap if the intersection of all-A and all-B is non-empty
-    for (const id of allA) {
-      if (allB.has(id)) return true;
+  /**
+   * Whether some transversal of `fromGroups` (one component chosen per group)
+   * satisfies every group of `toGroups` (each `toGroups` group contains at least
+   * one chosen component).
+   *
+   * Each `fromGroups` group contributes exactly one component, and a chosen
+   * component's only relevance to `toGroups` is which `toGroups` groups contain
+   * it — its **coverage mask**. Components of a `fromGroups` group with identical
+   * coverage are interchangeable, so we reduce each group to its distinct coverage
+   * masks and DP over the reachable set of covered-`toGroups` masks. Feasible iff
+   * the fully-covered mask is reachable.
+   *
+   * @param {Set<string>[]} fromGroups - the transversal source signature's groups
+   * @param {Set<string>[]} toGroups - the signature whose groups must all be covered
+   * @returns {boolean}
+   * @private
+   */
+  _someTransversalSatisfies(fromGroups, toGroups) {
+    const fullMask = (1 << toGroups.length) - 1;
+
+    // Coverage mask of a component id: which toGroups contain it.
+    const coverageOf = (id) => {
+      let mask = 0;
+      for (const [i, group] of toGroups.entries()) {
+        if (group.has(id)) mask |= 1 << i;
+      }
+      return mask;
+    };
+
+    let reachable = new Set([0]);
+    for (const group of fromGroups) {
+      const distinctMasks = new Set();
+      for (const id of group) {
+        distinctMasks.add(coverageOf(id));
+      }
+      const next = new Set();
+      for (const covered of reachable) {
+        for (const mask of distinctMasks) {
+          const combined = covered | mask;
+          if (combined === fullMask) return true;
+          next.add(combined);
+        }
+      }
+      reachable = next;
     }
-    return false;
+    return reachable.has(fullMask);
   }
 
   /**
