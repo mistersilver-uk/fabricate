@@ -320,48 +320,87 @@ export function emitInteractableBehaviorWrite(behavior) {
  * channel the event coordinator uses), so this module owns these branches without
  * registering a second listener. No-ops for other actions.
  *
+ * SENDER AUTHENTICATION (issue 593): Foundry's server attaches a TRUSTED,
+ * non-forgeable sender user id as the SECOND callback argument of every custom
+ * module socket broadcast (`dist/server/sockets.mjs handleCustomSocket` emits
+ * `this.user.id` from the authenticated session), NOT from the client payload.
+ * main.js threads it in as `deps.senderId` + `deps.isSenderGM(id)`. The privileged
+ * edges are gated on the sender being a GM: VISUAL_UPDATE / VISUAL_DELETE are
+ * fully GM-only; a non-GM BEHAVIOR_UPDATE is restricted to `system.node` writes;
+ * ACTIVATE asserts the requesting user IS the sender; GRANTED/DENIED accept only a
+ * GM sender.
+ *
  * @param {object} payload
+ * @param {object} [deps]
+ * @param {string} [deps.senderId]  The server-attested socket sender's user id.
+ * @param {(userId: string) => boolean} [deps.isSenderGM]  Resolve whether an id is a GM.
  */
 export function handleInteractableSocketMessage(payload, deps = {}) {
   const action = payload?.action;
+  const senderId = deps.senderId ?? null;
+  const senderIsGM =
+    typeof deps.isSenderGM === 'function' && senderId !== null
+      ? deps.isSenderGM(senderId) === true
+      : false;
 
   // Region-first behaviour write (e.g. GM config panel → active GM `{ system: { state } }`).
+  // A GM sender may write any field; a non-GM sender is restricted to the scoped
+  // node pool by the router's `system.node`-only allowlist.
   if (action === INTERACTABLE_BEHAVIOR_UPDATE) {
     void routeInteractableBehaviorMessage(payload, {
       isActiveGM,
+      senderIsGM,
       applyUpdate: applyInteractableBehaviorUpdate,
     });
     return;
   }
 
-  // Linked-visual write, e.g. the relink reverse-flag write (active GM applies;
-  // local apply for the emitting GM is handled by the writer, so the inbound
-  // branch is GM-gated).
+  // Linked-visual write, e.g. the relink reverse-flag write. GM-only: the active GM
+  // applies, but ONLY when the server-attested sender is also a GM. A non-GM sender
+  // can mint no reverse flag and repoint no linked visual.
   if (action === INTERACTABLE_VISUAL_UPDATE) {
-    if (isActiveGM()) void applyInteractableVisualUpdate(payload);
+    if (isActiveGM()) {
+      if (!senderIsGM) {
+        console.warn('Fabricate | Refused an interactable visual update from a non-GM sender', {
+          senderId,
+        });
+        return;
+      }
+      void applyInteractableVisualUpdate(payload);
+    }
     return;
   }
   if (action === INTERACTABLE_VISUAL_DELETE) {
-    if (isActiveGM()) void applyInteractableVisualDelete(payload);
+    if (isActiveGM()) {
+      if (!senderIsGM) {
+        console.warn('Fabricate | Refused an interactable visual delete from a non-GM sender', {
+          senderId,
+        });
+        return;
+      }
+      void applyInteractableVisualDelete(payload);
+    }
     return;
   }
 
   // Activation request → active GM validates + grants. The validate/grant body is
-  // injected (filled in by Phase 1c); the dispatch + active-GM gate live here.
+  // injected; the dispatch + active-GM gate live here. The router asserts the
+  // requesting `userId` matches the authenticated sender (anti-impersonation).
   if (action === INTERACTABLE_ACTIVATE) {
     if (typeof deps.validateAndGrant === 'function') {
       void routeInteractableActivateMessage(payload, {
         isActiveGM,
+        senderId,
         validateAndGrant: deps.validateAndGrant,
       });
     }
     return;
   }
 
-  // Activation granted → the targeted local user opens the session. The open body
-  // is injected (Phase 1c).
+  // Activation granted → the targeted local user opens the session. GM→player, so
+  // accept only a GM sender (low severity, for completeness).
   if (action === INTERACTABLE_ACTIVATION_GRANTED) {
-    if (typeof deps.openGrant === 'function') {
+    if (senderIsGM && typeof deps.openGrant === 'function') {
       void routeInteractableActivationGranted(payload, {
         isLocalUser: (userId) => globalThis.game?.user?.id === userId,
         openGrant: deps.openGrant,
@@ -370,9 +409,13 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
     return;
   }
 
-  // Activation denied → the targeted local user is told WHY (localized). The
-  // notify body is injected by main.js.
-  if (action === INTERACTABLE_ACTIVATION_DENIED && typeof deps.notifyDenied === 'function') {
+  // Activation denied → the targeted local user is told WHY (localized). GM→player,
+  // so accept only a GM sender.
+  if (
+    action === INTERACTABLE_ACTIVATION_DENIED &&
+    senderIsGM &&
+    typeof deps.notifyDenied === 'function'
+  ) {
     void routeInteractableActivationDenied(payload, {
       isLocalUser: (userId) => globalThis.game?.user?.id === userId,
       notifyDenied: deps.notifyDenied,

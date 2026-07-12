@@ -607,3 +607,40 @@ export function mayApplyInteractableVisualUpdate(doc, update, behavior) {
 export function mayDeleteInteractableVisual(doc, behavior) {
   return visualLinkRoundTrips(doc, behavior);
 }
+
+// The ONLY behaviour-update leaf paths a NON-GM socket sender may write: the
+// interactable's own scoped node pool (`system.node.*`) — the legitimate issue-302
+// player scoped-pool decrement, which runs on the gathering player's client and
+// emits an `INTERACTABLE_BEHAVIOR_UPDATE`. A non-GM must NEVER reach
+// `system.linkedVisual` (forward-link forge), `system.state`, `presentation`,
+// enable/lock/marker config, or anything else on the behaviour.
+const NON_GM_BEHAVIOR_UPDATE_ROOT = 'system.node';
+
+/**
+ * Ownership guard for a NON-GM socket sender's behaviour update (sender-auth layer,
+ * issue 593). A GM sender may write any behaviour field; a non-GM sender's `update`
+ * must touch ONLY the interactable's own scoped node pool. A strict, fail-closed
+ * allowlist mirroring {@link mayApplyInteractableVisualUpdate}'s stamp-only pattern:
+ * flatten the patch to leaf paths (handling BOTH nested objects AND dot-notation
+ * keys, and any mix), require at least one leaf, and reject unless EVERY leaf path
+ * is `system.node` itself or a `system.node.*` subpath. A single foreign leaf —
+ * `system.linkedVisual.uuid`, `system.state.enabled`, `presentation.hidden`, a
+ * dot-notation-smuggled key, etc. — rejects the whole write.
+ *
+ * @param {object} [update]  The pending behaviour-document update patch.
+ * @returns {boolean}
+ */
+export function mayApplyNonGmBehaviorUpdate(update) {
+  if (!update || typeof update !== 'object' || Array.isArray(update)) return false;
+  const entries = flattenUpdatePaths(update);
+  if (entries.length === 0) return false;
+  for (const [path] of entries) {
+    if (
+      path !== NON_GM_BEHAVIOR_UPDATE_ROOT &&
+      !path.startsWith(`${NON_GM_BEHAVIOR_UPDATE_ROOT}.`)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}

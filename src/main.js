@@ -2369,7 +2369,12 @@ Hooks.once('ready', async () => {
   // calls.
   InteractableManager.instance.register();
 
-  game.socket?.on(EVENT_SCENE_SOCKET, (payload) => {
+  game.socket?.on(EVENT_SCENE_SOCKET, (payload, senderId) => {
+    // `senderId` is Foundry's server-attested sender user id (the trusted 2nd
+    // callback arg of a custom module socket broadcast — set from the authenticated
+    // session in `dist/server/sockets.mjs handleCustomSocket`, NOT from the client
+    // payload). The interactable handler authenticates privileged edges against it
+    // (issue 593); payload `userId` fields are client-supplied and spoofable.
     // Defensive: the event router shares the `module.fabricate` channel with the
     // canvas Interactable round-trip. Guard it so a throw on an event payload can
     // never prevent a non-event Interactable payload from reaching
@@ -2391,6 +2396,8 @@ Hooks.once('ready', async () => {
     // validates activation; only the targeted user opens a granted session. The
     // validate/grant + open bodies are the manager's region-first activation seams.
     handleInteractableSocketMessage(payload, {
+      senderId,
+      isSenderGM: (id) => game.users?.get(id)?.isGM === true,
       validateAndGrant: (request) => InteractableManager.instance.validateAndGrant(request),
       openGrant: (grant) => InteractableManager.instance.openGrant(grant),
       notifyDenied: (reason) => InteractableManager.instance.notifyActivationDenied(reason)
