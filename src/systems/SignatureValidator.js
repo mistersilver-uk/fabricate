@@ -66,40 +66,171 @@ export class SignatureValidator {
   }
 
   /**
-   * Check whether two signatures overlap (i.e., share at least one component ID
-   * across the union of all groups in both signatures).
+   * Compute the per-group option contributions for an ingredient set, preserving
+   * each option's required **quantity** (which {@link computeSignature}
+   * discards).
    *
-   * Conservative approach: if any component can appear in both signatures,
-   * the signatures overlap. This avoids false negatives at the cost of potential
-   * false positives for complex multi-group recipes with disjoint group assignments.
+   * Each group becomes an array of options `{ ids, capacity }`, where `ids` is
+   * the set of component IDs that can satisfy the option and `capacity` is the
+   * maximum number of DISTINCT components a natural craft can supply for that
+   * option — `min(quantity, ids.size)`. This matters because the runtime
+   * satisfies a `quantity: N` option by counting N matching submissions, and
+   * those N units can be N *distinct* components (a `quantity: 2` "metal"-tag
+   * option is naturally crafted as iron + gold), each of which contributes its
+   * own coverage toward another set's groups.
    *
-   * @param {Set<string>[]} sigA
-   * @param {Set<string>[]} sigB
+   * Options that expand to no component (e.g. currency) are dropped.
+   *
+   * @param {object} ingredientSet - IngredientSet with `ingredientGroups`
+   * @param {object[]} systemComponents
+   * @returns {{ ids: Set<string>, capacity: number }[][]}
+   */
+  computeGroupOptions(ingredientSet, systemComponents) {
+    return (ingredientSet.ingredientGroups || []).map((group) =>
+      (group.options || [])
+        .map((option) => {
+          const ids = this.expandIngredientToComponentIds(option, systemComponents);
+          const quantity = Math.max(1, Number(option?.quantity) || 1);
+          return { ids, capacity: Math.min(quantity, ids.size) };
+        })
+        .filter((option) => option.ids.size > 0)
+    );
+  }
+
+  /**
+   * Check whether two ingredient sets overlap — i.e. whether they are genuinely
+   * ambiguous because a single plausible submission satisfies BOTH sets'
+   * group requirements at once.
+   *
+   * The runtime signature matcher (`CraftingEngine._matchAlchemySignature`)
+   * requires **every** group of a set to be satisfied and is superset-tolerant
+   * (`>= required`, no leftover guard; extras are consumed as essence
+   * contributors). It returns the FIRST set that fully matches. So a pair is only
+   * ambiguous when a submission a player would plausibly make to craft one set
+   * ALSO fully satisfies the other — then the runtime silently shadows one.
+   *
+   * The plausible submissions for a set are its **transversals**: for each group,
+   * pick one satisfying option and supply exactly its required quantity of units
+   * (the natural "the ingredients each requirement calls for" craft), choosing
+   * WHICH components those units are to maximise the chance of also matching the
+   * other set. A `quantity: N` option can therefore contribute up to N distinct
+   * components. Merely sharing a base component is NOT enough — Healing
+   * `{Water},{Herb}` and Mana `{Water},{Mineral}` share Water, but no transversal
+   * of one (`Water+Herb` / `Water+Mineral`) satisfies the other, so they are
+   * distinguishable and must both be enablable. By contrast a set whose group
+   * requirements are a subset of another's IS ambiguous; two single-group sets
+   * sharing a component that satisfies both (e.g. a `mithril` tagged both `rare`
+   * and `metal`) are ambiguous via the one-item `{mithril}` submission; and a set
+   * with a `quantity: 2` "metal" group crafted as iron + gold is ambiguous with a
+   * `{iron},{gold}` set, because that same two-item craft matches both.
+   *
+   * @param {object} entryA - `{ signature: Set<string>[], groupOptions }`
+   * @param {object} entryB - `{ signature: Set<string>[], groupOptions }`
    * @returns {boolean}
    */
-  signaturesOverlap(sigA, sigB) {
+  signaturesOverlap(entryA, entryB) {
+    const sigA = entryA.signature;
+    const sigB = entryB.signature;
     if (sigA.length === 0 || sigB.length === 0) return false;
 
-    // Compute the union of all components in each signature
-    const allA = new Set();
-    for (const groupSet of sigA) {
-      for (const id of groupSet) {
-        allA.add(id);
-      }
-    }
+    // A set carrying a group that no component can satisfy is unsatisfiable: it
+    // can never match a submission at runtime, so it cannot be the source of any
+    // ambiguity and never conflicts with another set.
+    if (sigA.some((group) => group.size === 0)) return false;
+    if (sigB.some((group) => group.size === 0)) return false;
 
-    const allB = new Set();
-    for (const groupSet of sigB) {
-      for (const id of groupSet) {
-        allB.add(id);
-      }
-    }
+    return (
+      this._someTransversalSatisfies(entryA.groupOptions, sigB) ||
+      this._someTransversalSatisfies(entryB.groupOptions, sigA)
+    );
+  }
 
-    // Overlap if the intersection of all-A and all-B is non-empty
-    for (const id of allA) {
-      if (allB.has(id)) return true;
+  /**
+   * Whether some transversal of `fromGroupOptions` (one option chosen per group,
+   * supplying up to its `capacity` distinct components) satisfies every group of
+   * `toSignature` (each `toSignature` group contains at least one supplied
+   * component).
+   *
+   * A supplied component's only relevance to `toSignature` is which of its groups
+   * contain the component — its **coverage mask**. So each chosen option
+   * contributes the union of up to `capacity` distinct component coverage masks;
+   * we enumerate the achievable per-group masks and DP over the reachable set of
+   * covered-`toSignature` masks. Feasible iff the fully-covered mask is reachable.
+   *
+   * @param {{ ids: Set<string>, capacity: number }[][]} fromGroupOptions
+   * @param {Set<string>[]} toSignature - the groups that must all be covered
+   * @returns {boolean}
+   * @private
+   */
+  _someTransversalSatisfies(fromGroupOptions, toSignature) {
+    const fullMask = (1 << toSignature.length) - 1;
+
+    // Coverage mask of a component id: which toSignature groups contain it.
+    const coverageOf = (id) => {
+      let mask = 0;
+      for (const [i, group] of toSignature.entries()) {
+        if (group.has(id)) mask |= 1 << i;
+      }
+      return mask;
+    };
+
+    let reachable = new Set([0]);
+    for (const options of fromGroupOptions) {
+      // The distinct masks this whole group can contribute: for each of its
+      // options, every union of up to `capacity` distinct component masks.
+      const groupMasks = new Set();
+      for (const option of options) {
+        for (const mask of this._optionCoverageMasks(option, coverageOf)) {
+          groupMasks.add(mask);
+        }
+      }
+      const next = new Set();
+      for (const covered of reachable) {
+        for (const mask of groupMasks) {
+          const combined = covered | mask;
+          if (combined === fullMask) return true;
+          next.add(combined);
+        }
+      }
+      reachable = next;
     }
-    return false;
+    return reachable.has(fullMask);
+  }
+
+  /**
+   * All coverage masks an option can contribute: every union of between 1 and
+   * `capacity` DISTINCT component coverage masks drawn from the option. A
+   * `capacity: 1` option contributes each component's mask singly; a
+   * `capacity: 2` option additionally contributes the pairwise unions, and so on.
+   *
+   * @param {{ ids: Set<string>, capacity: number }} option
+   * @param {(id: string) => number} coverageOf
+   * @returns {Set<number>}
+   * @private
+   */
+  _optionCoverageMasks(option, coverageOf) {
+    const distinct = new Set();
+    for (const id of option.ids) {
+      distinct.add(coverageOf(id));
+    }
+    // BFS over unions of ≤ capacity distinct masks. `reachable` accumulates every
+    // union achievable so far; each round unions one more distinct mask in.
+    const achievable = new Set(distinct);
+    let frontier = new Set(distinct);
+    for (let picks = 2; picks <= option.capacity && frontier.size > 0; picks++) {
+      const nextFrontier = new Set();
+      for (const partial of frontier) {
+        for (const mask of distinct) {
+          const combined = partial | mask;
+          if (!achievable.has(combined)) {
+            achievable.add(combined);
+            nextFrontier.add(combined);
+          }
+        }
+      }
+      frontier = nextFrontier;
+    }
+    return achievable;
   }
 
   /**
@@ -125,6 +256,7 @@ export class SignatureValidator {
           setId: set.id,
           setName: set.name || set.id,
           signature: this.computeSignature(set, components),
+          groupOptions: this.computeGroupOptions(set, components),
         });
       }
     }
@@ -138,7 +270,7 @@ export class SignatureValidator {
         // Skip comparing a set with itself (can happen with same recipe ID + same set ID)
         if (a.recipe.id === b.recipe.id && a.setId === b.setId) continue;
 
-        if (this.signaturesOverlap(a.signature, b.signature)) {
+        if (this.signaturesOverlap(a, b)) {
           conflicts.push({
             recipeA: a.recipe,
             ingredientSetA: a.setId,
