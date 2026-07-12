@@ -570,7 +570,7 @@ export class AlchemyListingBuilder {
       const option = options[0];
       if (option?.match && option.match.type !== 'component') return null;
       const componentId = this._optionComponentId(option);
-      if (!componentId || !components.some((candidate) => candidate.id === componentId))
+      if (!componentId || components.every((candidate) => !(candidate.id === componentId)))
         return null;
       const quantity = Math.max(1, Number(option?.quantity) || 1);
       multiset[componentId] = (multiset[componentId] || 0) + quantity;

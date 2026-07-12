@@ -63,9 +63,9 @@ export class GatheringStaminaService {
     // `max` is the rolled value; an optional GM `maxOverride` layers over it.
     const rolledMax = numberOrNullStrict(stamina.max);
     const maxOverride = numberOrNullStrict(stamina.maxOverride);
-    const max = maxOverride == null ? rolledMax : maxOverride; // effective cap
+    const max = maxOverride ?? rolledMax; // effective cap
     const storedCurrent = numberOrNullStrict(stamina.current);
-    const current = storedCurrent == null ? (max == null ? null : max) : storedCurrent;
+    const current = storedCurrent ?? max;
     return {
       current,
       max,
@@ -217,7 +217,7 @@ export class GatheringStaminaService {
         : maxOverride === null || maxOverride === ''
           ? null
           : nonNegativeNumber(maxOverride, 0);
-    const effectiveMax = override == null ? rolledMax : override;
+    const effectiveMax = override ?? rolledMax;
     let currentValue = nonNegativeNumber(current, previous.current ?? 0);
     if (Number.isFinite(Number(effectiveMax)))
       currentValue = Math.min(currentValue, Number(effectiveMax));
@@ -226,11 +226,11 @@ export class GatheringStaminaService {
       regenerationMode: regenerationMode || previous.regenerationMode || 'manual',
       current: currentValue,
       max: rolledMax,
-      ...(override == null ? {} : { maxOverride: override }),
+      ...(!(override == null) && { maxOverride: override }),
       // Preserve the regen anchor so a manual GM set does not reset the clock.
-      ...(previous.lastRegenWorldTime === undefined
-        ? {}
-        : { lastRegenWorldTime: previous.lastRegenWorldTime }),
+      ...(!(previous.lastRegenWorldTime === undefined) && {
+        lastRegenWorldTime: previous.lastRegenWorldTime,
+      }),
     };
     state.stamina = { ...state.stamina, [key]: next };
     state.history = [
@@ -266,10 +266,10 @@ export class GatheringStaminaService {
       regenerationMode: previous.regenerationMode || effective.regenerationMode || 'manual',
       current: clamped,
       max: numberOrNullStrict(previous.max),
-      ...(previousOverride == null ? {} : { maxOverride: previousOverride }),
-      ...(previous.lastRegenWorldTime === undefined
-        ? {}
-        : { lastRegenWorldTime: previous.lastRegenWorldTime }),
+      ...(!(previousOverride == null) && { maxOverride: previousOverride }),
+      ...(!(previous.lastRegenWorldTime === undefined) && {
+        lastRegenWorldTime: previous.lastRegenWorldTime,
+      }),
     };
     state.stamina = { ...state.stamina, [key]: entry };
     state.history = [

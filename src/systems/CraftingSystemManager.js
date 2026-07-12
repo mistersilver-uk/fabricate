@@ -80,7 +80,7 @@ export class CraftingSystemManager {
   _assertValidSystemId(id) {
     if (!isSafeFlagKeySegment(id)) {
       throw new Error(
-        `Invalid crafting system id "${id}": a system id must match ${'/^[A-Za-z0-9_-]+$/'} (no dots or spaces), because it is used as a durable-flag map key.`
+        `Invalid crafting system id "${id}": a system id must match /^[A-Za-z0-9_-]+$/ (no dots or spaces), because it is used as a durable-flag map key.`
       );
     }
   }
@@ -1526,15 +1526,18 @@ export class CraftingSystemManager {
       resultGroups: Array.isArray(salvage.resultGroups)
         ? salvage.resultGroups.map((g) => this._normalizeSalvageResultGroup(g)).filter(Boolean)
         : [],
-      ...(salvage.outcomeRouting && typeof salvage.outcomeRouting === 'object'
-        ? { outcomeRouting: { ...salvage.outcomeRouting } }
-        : {}),
-      ...(salvage.timeRequirement && typeof salvage.timeRequirement === 'object'
-        ? { timeRequirement: this._normalizeTimeRequirement(salvage.timeRequirement) }
-        : {}),
-      ...(salvage.currencyRequirement && typeof salvage.currencyRequirement === 'object'
-        ? { currencyRequirement: this._normalizeCurrencyRequirement(salvage.currencyRequirement) }
-        : {}),
+      ...(salvage.outcomeRouting &&
+        typeof salvage.outcomeRouting === 'object' && {
+          outcomeRouting: { ...salvage.outcomeRouting },
+        }),
+      ...(salvage.timeRequirement &&
+        typeof salvage.timeRequirement === 'object' && {
+          timeRequirement: this._normalizeTimeRequirement(salvage.timeRequirement),
+        }),
+      ...(salvage.currencyRequirement &&
+        typeof salvage.currencyRequirement === 'object' && {
+          currencyRequirement: this._normalizeCurrencyRequirement(salvage.currencyRequirement),
+        }),
     };
   }
 

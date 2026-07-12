@@ -163,7 +163,7 @@ function getByPath(object, path) {
   if (typeof foundryGetter === 'function') return foundryGetter(object, path);
   return String(path)
     .split('.')
-    .reduce((value, key) => (value == null ? undefined : value[key]), object);
+    .reduce((value, key) => value?.[key], object);
 }
 
 function buildUnitMap(units) {

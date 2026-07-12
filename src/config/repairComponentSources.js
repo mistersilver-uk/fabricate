@@ -16,7 +16,7 @@
 const NAMESPACE = 'fabricate';
 const REPAIR_MENU_KEY = 'repairComponentSources';
 
-function localize(key, data) {
+function localize(key, data = null) {
   const i18n = globalThis.game?.i18n;
   if (data) return i18n?.format?.(key, data) ?? key;
   return i18n?.localize?.(key) ?? key;

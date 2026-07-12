@@ -244,7 +244,7 @@ export class GatheringNodeService {
     const map = new Map();
     if (Array.isArray(tasks)) {
       for (const task of tasks) {
-        if (task?.id && task?.nodes) map.set(String(task.id), task.nodes);
+        if (task?.id && task.nodes) map.set(String(task.id), task.nodes);
       }
     }
     return map;

@@ -377,23 +377,25 @@ export class GatheringRichStateService {
       eventLimit: rules.eventLimit,
       eventPolicy: rules.eventPolicy,
     };
-    Object.defineProperty(composed, '__libraryCharacterModifiers', {
-      value: libraryCharacterModifiers,
-      enumerable: false,
-      configurable: true,
-      writable: true,
-    });
-    Object.defineProperty(composed, '__libraryTools', {
-      value: libraryTools,
-      enumerable: false,
-      configurable: true,
-      writable: true,
-    });
-    Object.defineProperty(composed, '__systemId', {
-      value: systemId,
-      enumerable: false,
-      configurable: true,
-      writable: true,
+    Object.defineProperties(composed, {
+      __libraryCharacterModifiers: {
+        value: libraryCharacterModifiers,
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      },
+      __libraryTools: {
+        value: libraryTools,
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      },
+      __systemId: {
+        value: systemId,
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      },
     });
     return composed;
   }

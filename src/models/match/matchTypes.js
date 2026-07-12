@@ -56,16 +56,12 @@ const componentHandler = {
     };
   },
 
-  isComplete(match) {
-    // Use the shared ID extraction so the legacy `systemItem`/`systemItemId`
-    // alias is treated as complete even before normalisation folds it to
-    // `componentId`.
-    return !!componentHandler.getComponentId(match);
-  },
+  // Use the shared ID extraction so the legacy `systemItem`/`systemItemId`
+  // alias is treated as complete even before normalisation folds it to
+  // `componentId`.
+  isComplete: (match) => !!componentHandler.getComponentId(match),
 
-  validate() {
-    return [];
-  },
+  validate: () => [],
 
   signature(match) {
     // Read through getComponentId so a raw `{ type: 'systemItem', systemItemId }`
@@ -79,28 +75,18 @@ const componentHandler = {
     return id ? new Set([id]) : new Set();
   },
 
-  matchesItem() {
-    // Component matching stays in `ingredientMatchesItem` upstream (managed
-    // component source/name resolution), so the handler never matches here.
-    return false;
-  },
+  // Component matching stays in `ingredientMatchesItem` upstream (managed
+  // component source/name resolution), so the handler never matches here.
+  matchesItem: () => false,
 
-  getComponentId(match) {
-    return match?.componentId || match?.systemItemId || null;
-  },
+  getComponentId: (match) => match?.componentId || match?.systemItemId || null,
 
-  describe(match, { quantity = 1 } = {}) {
-    return `${quantity}x component`;
-  },
+  describe: (match, { quantity = 1 } = {}) => `${quantity}x component`,
 
-  affords() {
-    // A component option is satisfied by inventory items, never by currency.
-    return false;
-  },
+  // A component option is satisfied by inventory items, never by currency.
+  affords: () => false,
 
-  getCurrencySpend() {
-    return null;
-  },
+  getCurrencySpend: () => null,
 };
 
 /** @type {MatchHandler} */
@@ -123,9 +109,8 @@ const tagsHandler = {
     };
   },
 
-  isComplete(match) {
-    return match?.type === 'tags' && Array.isArray(match.tags) && match.tags.length > 0;
-  },
+  isComplete: (match) =>
+    match?.type === 'tags' && Array.isArray(match.tags) && match.tags.length > 0,
 
   validate(match, { requireComplete = true } = {}) {
     if (requireComplete && (!Array.isArray(match?.tags) || match.tags.length === 0)) {
@@ -168,9 +153,7 @@ const tagsHandler = {
     return matched;
   },
 
-  getComponentId() {
-    return null;
-  },
+  getComponentId: () => null,
 
   describe(match, { quantity = 1 } = {}) {
     const tags = Array.isArray(match?.tags) ? match.tags : [];
@@ -178,14 +161,10 @@ const tagsHandler = {
     return `${quantity}x ${joined}`;
   },
 
-  affords() {
-    // A tag option is satisfied by inventory items, never by currency.
-    return false;
-  },
+  // A tag option is satisfied by inventory items, never by currency.
+  affords: () => false,
 
-  getCurrencySpend() {
-    return null;
-  },
+  getCurrencySpend: () => null,
 };
 
 /** @type {MatchHandler} */
@@ -209,9 +188,7 @@ const currencyHandler = {
     };
   },
 
-  isComplete(match) {
-    return match?.type === 'currency' && !!match.unit && Number(match.amount) > 0;
-  },
+  isComplete: (match) => match?.type === 'currency' && !!match.unit && Number(match.amount) > 0,
 
   validate(match, { requireComplete = true } = {}) {
     if (requireComplete && !currencyHandler.isComplete(match)) {
@@ -227,22 +204,16 @@ const currencyHandler = {
     return `currency:${unit}:${amount}`;
   },
 
-  expandToComponentIds() {
-    // A currency alternative is not a managed component, so it contributes no
-    // component ids and is ignored by alchemy signature overlap detection.
-    return new Set();
-  },
+  // A currency alternative is not a managed component, so it contributes no
+  // component ids and is ignored by alchemy signature overlap detection.
+  expandToComponentIds: () => new Set(),
 
-  matchesItem() {
-    // A currency alternative matches no inventory item — it is satisfied by
-    // affording its cost, handled out-of-band during ingredient selection and
-    // spent by the currency-affordance layer, not by item matching here.
-    return false;
-  },
+  // A currency alternative matches no inventory item — it is satisfied by
+  // affording its cost, handled out-of-band during ingredient selection and
+  // spent by the currency-affordance layer, not by item matching here.
+  matchesItem: () => false,
 
-  getComponentId() {
-    return null;
-  },
+  getComponentId: () => null,
 
   describe(match) {
     // A currency alternative carries its cost on the match (`amount`/`unit`), not
@@ -259,9 +230,8 @@ const currencyHandler = {
    * affordability; with no probe (the default, back-compat for `canBeCraftedWith`)
    * currency is NEVER affordable, so an item plan is byte-for-byte unchanged.
    */
-  affords(match, { affordCurrency } = {}) {
-    return typeof affordCurrency === 'function' ? !!affordCurrency(match) : false;
-  },
+  affords: (match, { affordCurrency } = {}) =>
+    typeof affordCurrency === 'function' ? !!affordCurrency(match) : false,
 
   /**
    * The `{ unit, amount }` spend this currency option requires, or null when the
@@ -284,36 +254,16 @@ const unknownHandler = {
   // A null/unrecognized match is NOT terminal: `_matchesIngredient` falls through
   // to the bare-field `ingredient.tag` block and the `alternatives` recursion.
   isTerminalInventoryMatch: false,
-  normalize() {
-    return null;
-  },
-  isComplete() {
-    return false;
-  },
-  validate() {
-    return [];
-  },
-  signature() {
-    return null;
-  },
-  expandToComponentIds() {
-    return new Set();
-  },
-  matchesItem() {
-    return false;
-  },
-  getComponentId() {
-    return null;
-  },
-  describe() {
-    return '';
-  },
-  affords() {
-    return false;
-  },
-  getCurrencySpend() {
-    return null;
-  },
+  normalize: () => null,
+  isComplete: () => false,
+  validate: () => [],
+  signature: () => null,
+  expandToComponentIds: () => new Set(),
+  matchesItem: () => false,
+  getComponentId: () => null,
+  describe: () => '',
+  affords: () => false,
+  getCurrencySpend: () => null,
 };
 
 /**

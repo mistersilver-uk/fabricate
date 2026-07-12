@@ -482,8 +482,8 @@ export class RunJournalBuilder {
     let img = stringOrNull(result?.img);
     if ((!name || !img) && itemUuid) {
       const doc = this._getResultItem(itemUuid);
-      name = name || stringOrNull(doc?.name);
-      img = img || stringOrNull(doc?.img);
+      name ||= stringOrNull(doc?.name);
+      img ||= stringOrNull(doc?.img);
     }
     return {
       componentId: stringOrNull(result?.componentId),

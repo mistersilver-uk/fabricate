@@ -131,6 +131,78 @@ export default [
       'unicorn/no-await-expression-member': 'off',
       'unicorn/prefer-set-has': 'off',
       'unicorn/consistent-function-scoping': 'off',
+
+      // --- Curated unicorn (v67): disable rules that would rewrite deliberate
+      //     patterns, restructure control flow, or change semantics -----------
+      // The `_`-prefix convention for "private" members is intentional and
+      // pervasive; converting to true `#` fields breaks test/sibling access and
+      // changes instance enumeration/serialisation (models persist to Foundry flags).
+      'unicorn/prefer-private-class-fields': 'off',
+      // Renaming predicates/booleans (including exported functions) is high-churn,
+      // and the autofix only rewrites in-file references — risking cross-module breakage.
+      'unicorn/consistent-boolean-name': 'off',
+      // Flags common `for (const … of Object.entries(…))` / chained-iterable headers;
+      // non-autofixable stylistic churn against an idiomatic pattern used throughout.
+      'unicorn/no-unreadable-for-of-expression': 'off',
+      // Would force extracting nested loops into functions purely to avoid
+      // `break`/`continue`; a behaviour-restructuring refactor, not a fix.
+      'unicorn/no-break-in-nested-loop': 'off',
+      // Mechanical class-member reordering with no correctness value.
+      'unicorn/consistent-class-member-order': 'off',
+      // The `key in obj` operator is used deliberately for plain-object map
+      // membership; auto-swapping to `Object.hasOwn` changes prototype-chain semantics.
+      'unicorn/no-computed-property-existence-check': 'off',
+      // `[...iterator]` is clearer than `Iterator#toArray()` here; stylistic,
+      // non-autofixable, and `toArray()` is not universally available at runtime.
+      'unicorn/prefer-iterator-to-array': 'off',
+      // Stylistic ternary reshaping the plugin declines to autofix; hand-rewrites
+      // risk changing meaning for low value.
+      'unicorn/prefer-minimal-ternary': 'off',
+      // Declaration-ordering churn with no correctness value.
+      'unicorn/no-declarations-before-early-exit': 'off',
+      // `Number.isSafeInteger()` narrows the accepted range vs `Number.isInteger()`;
+      // swapping would change validation semantics.
+      'unicorn/prefer-number-is-safe-integer': 'off',
+      // `Number()` differs from `Number.parseInt/parseFloat` on trailing
+      // non-numeric characters; swapping would change parsing semantics.
+      'unicorn/prefer-number-coercion': 'off',
+      // Rewriting recursion into loops is a behaviour-restructuring refactor the
+      // plugin cannot verify equivalent; keep the readable recursive form.
+      'unicorn/no-useless-recursion': 'off',
+      // Replacement values here are trusted numeric context values, not
+      // user-authored patterns; the `$&`/`$1` special-pattern risk does not apply.
+      'unicorn/no-unsafe-string-replacement': 'off',
+      // `!(x > 0)` is deliberately NaN-safe (true for NaN) in numeric early-exit
+      // guards; the opposite comparison `x <= 0` is false for NaN — not equivalent.
+      'unicorn/no-negated-comparison': 'off',
+      // A `.catch(() => fallback)` returning a fallback value is an idiomatic,
+      // readable pattern; forcing `try`/`await` only adds nesting.
+      'unicorn/prefer-await': 'off',
+      // Call-nesting depth is a subjective style limit; extracting temporaries
+      // purely to satisfy it adds noise without clarifying the expression.
+      'unicorn/max-nested-calls': 'off',
+      // `globalThis`-qualified Foundry globals (`Hooks`, `game`, `canvas`, …) are a
+      // deliberate defensive access: an unguarded bare reference throws a
+      // `ReferenceError` when the global is absent (e.g. a default param evaluated
+      // under the `node --test` harness, which has no Foundry globals), whereas the
+      // `globalThis.`-qualified form evaluates to `undefined`.
+      'unicorn/no-unnecessary-global-this': 'off',
+      // The plugin declines to autofix these (multi-line branches); an explicit
+      // if/else reads better than a long ternary here.
+      'unicorn/prefer-ternary': 'off',
+      // Adjacent guards over a discriminant (mode/type) are intentionally flat;
+      // chaining them into else-if restructures large blocks for no behaviour gain.
+      'unicorn/prefer-else-if': 'off',
+      // Explicit class/base references in static methods are clearer here, and
+      // swapping to `this`/`super` changes subclass-dispatch semantics for classes
+      // not designed for it (including Foundry `RegionBehaviorType` extension).
+      'unicorn/class-reference-in-static-methods': 'off',
+      // The comparator sorts strings by codepoint (`<`/`>`); the plugin's "simple"
+      // alternative (`localeCompare`) changes ordering and would alter generated
+      // signature keys (persisted data).
+      'unicorn/prefer-simple-sort-comparator': 'off',
+      // A deliberate module-scoped fallback sequence counter for id generation.
+      'unicorn/no-top-level-assignment-in-function': 'off',
       // Source files are camelCase (foundryBridge.js), PascalCase (Recipe.js,
       // CraftingEngine.js), and kebab-case (test/spec files) by design.
       'unicorn/filename-case': [

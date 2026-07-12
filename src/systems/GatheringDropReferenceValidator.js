@@ -107,7 +107,7 @@ export async function validateGatheringDropReferences({
   for (const [taskIndex, task] of normalizeTasks(tasks).entries()) {
     const rows = normalizeRows(task);
     const label = `${prefix}Task "${taskLabel(task, taskIndex)}"`;
-    if (requireAtLeastOneEnabled && !rows.some((row) => row?.enabled !== false)) {
+    if (requireAtLeastOneEnabled && rows.every((row) => !(row?.enabled !== false))) {
       errors.push(`${label} requires at least one drop row`);
     }
     for (const [rowIndex, row] of rows.entries()) {
@@ -160,7 +160,7 @@ export function validateGatheringDropReferencesSync({
   for (const [taskIndex, task] of normalizeTasks(tasks).entries()) {
     const rows = normalizeRows(task);
     const label = `${prefix}Task "${taskLabel(task, taskIndex)}"`;
-    if (requireAtLeastOneEnabled && !rows.some((row) => row?.enabled !== false)) {
+    if (requireAtLeastOneEnabled && rows.every((row) => !(row?.enabled !== false))) {
       errors.push(`${label} requires at least one drop row`);
     }
     for (const [rowIndex, row] of rows.entries()) {

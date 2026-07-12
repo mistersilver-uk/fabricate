@@ -407,7 +407,7 @@ export class Recipe {
         resultGroups: (step.resultGroups || []).map((group) => ({
           id: group.id,
           name: group.name,
-          ...(group.role === 'failure' ? { role: 'failure' } : {}),
+          ...(group.role === 'failure' && { role: 'failure' }),
           checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
           results: (group.results || []).map((result) =>
             result.toJSON ? result.toJSON() : result
@@ -419,7 +419,7 @@ export class Recipe {
       resultGroups: this.resultGroups.map((group) => ({
         id: group.id,
         name: group.name,
-        ...(group.role === 'failure' ? { role: 'failure' } : {}),
+        ...(group.role === 'failure' && { role: 'failure' }),
         checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
         results: group.results.map((r) => r.toJSON()),
       })),
@@ -546,7 +546,7 @@ export class Recipe {
         // service layer forbid it on None/Tiered groups. Preserved verbatim so a
         // settings-only mode flip round-trips it; the runtime reads it in
         // `ResolutionModeService._resolveAlchemyResultGroups`.
-        ...(group?.role === 'failure' ? { role: 'failure' } : {}),
+        ...(group?.role === 'failure' && { role: 'failure' }),
         // Routed check-mode routing: ids of the system's routed-check outcome
         // tiers that produce this group. Empty for ingredient-mode / non-routed.
         checkOutcomeIds: this._normalizeIdList(group?.checkOutcomeIds),

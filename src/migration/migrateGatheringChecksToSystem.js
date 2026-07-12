@@ -90,9 +90,9 @@ export function migrateGatheringChecksToSystem(systems, gatheringConfig) {
       ...existing,
       enabled: true,
       progressive: {
-        ...(existing?.progressive && typeof existing.progressive === 'object'
-          ? existing.progressive
-          : {}),
+        ...(existing?.progressive &&
+          typeof existing.progressive === 'object' &&
+          existing.progressive),
         rollFormula: defining.check.formula,
         awardMode,
       },

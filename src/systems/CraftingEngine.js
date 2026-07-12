@@ -3345,7 +3345,7 @@ export class CraftingEngine {
         if (!Number.isFinite(value) || value <= 0) continue;
         const total = value * (Number(quantity) || 1);
         resolvedEssences[essenceId] = (resolvedEssences[essenceId] || 0) + total;
-        essenceSources[essenceId] = essenceSources[essenceId] || [];
+        essenceSources[essenceId] ||= [];
         essenceSources[essenceId].push({
           itemId: item.id,
           itemName: item.name,
