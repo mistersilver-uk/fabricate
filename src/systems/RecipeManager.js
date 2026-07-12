@@ -22,7 +22,7 @@ const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
 // nothing in inventory currently satisfies it; a currency match — which never
 // resolves to an inventory item — always shows a coin icon.
 const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
-const FALLBACK_CURRENCY_IMG = 'icons/commodities/currency/coin-embossed-crown-gold.webp';
+const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -833,8 +833,8 @@ export class RecipeManager {
    * matches resolve through the managed component library. Tag- and currency-typed
    * matches carry no managed component id, so their image is resolved from a live
    * inventory item that satisfies the match (issue 551): a tag tile shows the img
-   * of a currently-held candidate, falling back to a generic tag icon when nothing
-   * in inventory matches; a currency tile always shows a coin icon (currency never
+   * of the first held item matching the tag, falling back to a generic tag icon
+   * when nothing in inventory matches; a currency tile always shows a coin icon (currency never
    * resolves to an inventory item). Anything else falls back to a null image (the
    * UI thumbnail then shows its default) and the ingredient's own description.
    *

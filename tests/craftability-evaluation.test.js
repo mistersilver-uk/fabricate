@@ -1081,7 +1081,7 @@ test('issue 551: a satisfied tag-matched tile shows the held item image, and swi
   );
 });
 
-test('issue 551: a short-stocked tag group shows the closest-to-satisfied held item image', () => {
+test('issue 551: a short-stocked tag group shows the first matching held item image', () => {
   const systemId = 'sys-551-missing';
   const set = makeIngredientSet([makeGroupData([makeTagIngredientData(['metal'], 3)])]);
   const recipe = new Recipe({
@@ -1104,7 +1104,7 @@ test('issue 551: a short-stocked tag group shows the closest-to-satisfied held i
   assert.equal(
     result.ingredientStates[0].img,
     'icons/metal.webp',
-    'missing tag tile resolves the closest-to-satisfied held item image'
+    'missing tag tile resolves the first matching held item image'
   );
 });
 
@@ -1143,7 +1143,7 @@ test('issue 551: a currency-matched tile shows a coin icon instead of a blank', 
   const result = manager.evaluateCraftability([makeActor([])], recipe);
   assert.equal(
     result.ingredientStates[0].img,
-    'icons/commodities/currency/coin-embossed-crown-gold.webp',
+    'icons/svg/coins.svg',
     'currency tile resolves a coin icon'
   );
   assert.notEqual(result.ingredientStates[0].img, null);
