@@ -1317,6 +1317,10 @@
             "Currency": "Enables the currency configuration for this system."
           }
         },
+        "RecipeActivation": {
+          "CannotEnable": "Cannot enable recipe \"{name}\": {errors}",
+          "IssueSignatureCollision": "Recipe \"{recipeA}\" (ingredient set {setA}) and recipe \"{recipeB}\" (ingredient set {setB}) can both be crafted from the same components ({components}), so alchemy cannot tell which one you are making."
+        },
         "SystemOverview": {
           "Kicker": "System overview",
           "Title": "System overview",

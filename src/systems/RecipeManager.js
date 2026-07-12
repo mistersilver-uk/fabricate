@@ -11,6 +11,7 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { buildCurrencyAffordProbe } from './currencyAffordance.js';
+import { RecipeActivationError } from './RecipeActivationError.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
@@ -137,7 +138,7 @@ export class RecipeManager {
         if (options.allowIncomplete) {
           recipe.enabled = false;
         } else {
-          throw new Error(`Cannot enable recipe "${recipe.name}": ${activation.errors.join(', ')}`);
+          throw new RecipeActivationError(recipe.name, activation.issues);
         }
       }
     }
@@ -193,9 +194,7 @@ export class RecipeManager {
     if (updatedRecipe.enabled === true && recipe.enabled !== true) {
       const activation = this._validateRecipeForActivation(updatedRecipe);
       if (!activation.valid) {
-        throw new Error(
-          `Cannot enable recipe "${updatedRecipe.name}": ${activation.errors.join(', ')}`
-        );
+        throw new RecipeActivationError(updatedRecipe.name, activation.issues);
       }
     }
 
@@ -1506,18 +1505,27 @@ export class RecipeManager {
    * persistence checks plus signature uniqueness. A recipe may be persisted while invalid, but may
    * only be enabled when this passes.
    * @param {Recipe} recipe
-   * @returns {{valid: boolean, errors: string[]}}
+   * @returns {{valid: boolean, errors: string[], issues: {code: string|null, params: object, message: string}[]}}
+   *   `issues` mirrors `errors` with a stable `code` + params so the UI can
+   *   localize the enable failure (issue 550); `errors` stays the raw English list.
    * @private
    */
   _validateRecipeForActivation(recipe) {
     const persistence = this._validateRecipeForPersistence(recipe, { requireComplete: true });
     const errors = [...persistence.errors];
+    // Structured, coded issues run in parallel with the raw `errors` strings so a
+    // UI caller can localize them (issue 550). Pre-existing persistence strings
+    // have no code yet, so they ride along as uncoded issues (the localizer passes
+    // their already-English message through unchanged).
+    const issues = persistence.errors.map((message) => ({ code: null, params: {}, message }));
     const signatureValidation = this._validateSignatures(recipe);
     errors.push(...signatureValidation.errors);
+    issues.push(...(signatureValidation.issues || []));
 
     return {
       valid: errors.length === 0,
       errors,
+      issues,
     };
   }
 
@@ -1558,7 +1566,12 @@ export class RecipeManager {
     const validator = new SignatureValidator(csm);
     const result = validator.validateRecipe(recipe, systemId);
     const errors = result.conflicts.map((c) => c.message);
-    return { valid: errors.length === 0, errors };
+    const issues = result.conflicts.map((c) => ({
+      code: c.code,
+      params: c.params,
+      message: c.message,
+    }));
+    return { valid: errors.length === 0, errors, issues };
   }
 
   /**

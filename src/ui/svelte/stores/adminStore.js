@@ -75,6 +75,7 @@ import { classifyModeChange } from '../../../migration/migrateRecipeForModeChang
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
+import { localizeRecipeActivationError } from '../../../systems/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 
 // ---------------------------------------------------------------------------
@@ -7385,7 +7386,11 @@ export function createAdminStore(services) {
       return true;
     } catch (err) {
       console.error('Fabricate | Failed to toggle recipe enabled state:', err);
-      services.notify?.error?.(err?.message || 'Failed to update recipe');
+      // An enable failure is surfaced as a localized, id-free toast (issue 550):
+      // RecipeActivationError carries coded issues the localizer maps to lang copy.
+      services.notify?.error?.(
+        localizeRecipeActivationError(err, services.localize) || err?.message || 'Failed to update recipe'
+      );
       return false;
     }
   }
@@ -7452,7 +7457,11 @@ export function createAdminStore(services) {
       return true;
     } catch (err) {
       console.error('Fabricate | Failed to update recipe:', err);
-      services.notify?.error?.(err?.message || 'Failed to update recipe');
+      // A save that flips a recipe to enabled can fail activation; localize it
+      // (issue 550) rather than surfacing the raw, id-leaking aggregate.
+      services.notify?.error?.(
+        localizeRecipeActivationError(err, services.localize) || err?.message || 'Failed to update recipe'
+      );
       return false;
     }
   }

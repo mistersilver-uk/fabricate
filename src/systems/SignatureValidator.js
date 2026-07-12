@@ -234,6 +234,36 @@ export class SignatureValidator {
   }
 
   /**
+   * The managed-component NAMES shared by two overlapping signatures — the
+   * components a player could submit that satisfy both sets, and therefore the
+   * concrete reason the runtime cannot tell the recipes apart. Used to describe a
+   * conflict to the user without leaking ids (issue 550). A component that expands
+   * to an id with no managed name is dropped rather than falling back to its id,
+   * so no raw id can ever reach the user through this label. Result is sorted for
+   * a deterministic message.
+   *
+   * @param {object} entryA - `{ signature: Set<string>[] }`
+   * @param {object} entryB - `{ signature: Set<string>[] }`
+   * @param {object[]} systemComponents
+   * @returns {string[]}
+   * @private
+   */
+  _overlapComponentNames(entryA, entryB, systemComponents) {
+    const idsA = new Set();
+    for (const group of entryA.signature) for (const id of group) idsA.add(id);
+    const shared = new Set();
+    for (const group of entryB.signature) for (const id of group) if (idsA.has(id)) shared.add(id);
+
+    const nameById = new Map(
+      (systemComponents || []).map((component) => [component?.id, component?.name])
+    );
+    return [...shared]
+      .map((id) => nameById.get(id))
+      .filter((name) => typeof name === 'string' && name.length > 0)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  /**
    * Validate all recipes in a crafting system for ingredient signature conflicts.
    *
    * @param {string} systemId
@@ -247,14 +277,20 @@ export class SignatureValidator {
     const components = this._csm.getComponentsForSystem(systemId) || [];
     const conflicts = [];
 
-    // Collect all (recipe, ingredientSet, signature) entries
+    // Collect all (recipe, ingredientSet, signature) entries. Track each set's
+    // 1-based POSITION within its recipe so a conflict can be reported by
+    // position (issue 550) — never by the raw Foundry set id, which is opaque to
+    // the user and cannot be mapped back to anything in the editor. A set's
+    // author-given `name` (when present) is safe to show; an absent name falls
+    // back to the position, NOT the id.
     const entries = [];
     for (const recipe of recipes) {
-      for (const set of recipe.ingredientSets || []) {
+      for (const [index, set] of (recipe.ingredientSets || []).entries()) {
         entries.push({
           recipe: { id: recipe.id, name: recipe.name },
           setId: set.id,
-          setName: set.name || set.id,
+          setPosition: index + 1,
+          setName: set.name || null,
           signature: this.computeSignature(set, components),
           groupOptions: this.computeGroupOptions(set, components),
         });
@@ -271,12 +307,32 @@ export class SignatureValidator {
         if (a.recipe.id === b.recipe.id && a.setId === b.setId) continue;
 
         if (this.signaturesOverlap(a, b)) {
+          const componentNames = this._overlapComponentNames(a, b, components);
+          const setA = a.setName || String(a.setPosition);
+          const setB = b.setName || String(b.setPosition);
+          const componentsLabel = componentNames.join(', ');
           conflicts.push({
             recipeA: a.recipe,
             ingredientSetA: a.setId,
             recipeB: b.recipe,
             ingredientSetB: b.setId,
-            message: `Overlapping signatures between "${a.recipe.name}" (set ${a.setName}) and "${b.recipe.name}" (set ${b.setName})`,
+            // Stable code + human-readable params so the UI can localize the
+            // conflict (issue 550), mirroring the `systemValidation` issue-code
+            // pattern. `setA`/`setB` are author names or 1-based positions;
+            // `components` are managed-component NAMES — never raw ids.
+            code: 'signatureCollision',
+            params: {
+              recipeA: a.recipe.name,
+              recipeB: b.recipe.name,
+              setA,
+              setB,
+              components: componentsLabel,
+            },
+            // Default English for headless/console callers. Keeps the recipe
+            // names and the "Overlapping signatures" phrase (no set id).
+            message: componentsLabel
+              ? `Overlapping signatures between "${a.recipe.name}" and "${b.recipe.name}" (shared components: ${componentsLabel})`
+              : `Overlapping signatures between "${a.recipe.name}" and "${b.recipe.name}"`,
           });
         }
       }
