@@ -249,6 +249,74 @@ A gathering-task shortcut has no supply of its own, so supply is managed on the 
 
 ---
 
+## Uninstalling Fabricate cleanly
+
+Canvas interactables are stored as a **custom region behaviour** that only Fabricate knows how to read.
+This is standard for a Foundry module, but it has one consequence you should know about before you remove Fabricate.
+
+### The caveat
+
+A canvas interactable lives on the map as a `fabricate.interactable` region behaviour.
+That behaviour type is defined by Fabricate, so when Fabricate is **disabled or uninstalled** Foundry no longer knows how to load it.
+
+Foundry does **not** remove a module's custom region behaviours when that module is disabled.
+It leaves them on your scenes as an unrecognised type.
+
+The effect depends on your Foundry version.
+
+- On **Foundry 14.360 and later** the unrecognised behaviour is quarantined: your scene and region data are kept intact, and Foundry only logs a console message.
+  Re-enabling Fabricate restores the interactable exactly as it was.
+- On **Foundry versions before 14.360** (all of v13 and the earliest v14 builds) the unrecognised behaviour can invalidate its parent region and the whole scene until Fabricate is re-enabled.
+
+This is core Foundry behaviour for module-defined sub-types, not a Fabricate bug.
+Fabricate cannot change how Foundry handles another module's leftover documents, but it gives you a clean way to remove its own before you uninstall.
+
+{: .note }
+> If you are on a Foundry version before 14.360, update to 14.360 or later before removing Fabricate.
+> On the fixed versions your scene data is always recoverable by re-enabling Fabricate, running the cleanup below, and only then uninstalling.
+
+### Running the cleanup
+
+Fabricate exposes a GM-only cleanup you run **before** you disable or uninstall it.
+It removes only what Fabricate owns and asks you to confirm first.
+
+Run it from a GM macro (or the browser console) while Fabricate is still enabled:
+
+```js
+game.fabricate.cleanupInteractables();
+```
+
+It scans every scene in your world and, after a confirmation dialog, removes:
+
+- every `fabricate.interactable` region behaviour, so no unrecognised behaviour is left to error on load;
+- Fabricate's own **tile** and **drawing** markers;
+- Fabricate's ownership flags on regions, and its reverse flags on relinked tokens.
+
+It keeps your regions, your tokens, and every non-Fabricate region behaviour.
+
+- Your **regions** are kept, even the ones Fabricate created.
+  An empty leftover region is harmless, and you can delete it by hand.
+- Any **other region behaviour** on a region (lighting, a third-party module, and so on) is kept.
+- A **token marker** is your own token (for example a merchant NPC), so it is never deleted — only its Fabricate link flag is cleared.
+
+{: .warning }
+> **One exception: relinked tile or drawing markers.**
+> Cleanup deletes the tile and drawing markers that carry Fabricate's link, and that includes a **tile or drawing you drew yourself and then relinked** as an interactable's marker.
+> Tokens are treated differently (they are only unlinked, never deleted) because a token is clearly your own actor, but a hand-drawn tile or drawing is removed along with Fabricate's own markers.
+> If you drew a tile or drawing that carries independent meaning on the map (say a map annotation) and relinked it to an interactable, **unlink it from the interactable first** — use **Remove** on the interactable's config panel — before you run cleanup or uninstall.
+> After you unlink it, it is your own plain tile or drawing again and cleanup leaves it alone.
+
+When it finishes it tells you how many interactables and markers were removed.
+At that point you can disable or uninstall Fabricate with no leftover errors.
+
+### If you already uninstalled
+
+If Fabricate is already gone and a scene is logging `"fabricate.interactable" is not a valid type`, re-enable Fabricate.
+On Foundry 14.360 and later your interactables reconstruct from the preserved data.
+Run `game.fabricate.cleanupInteractables()` to strip them, then uninstall.
+
+---
+
 ## See Also
 
 - [Tools]({% link tools.md %}) is the system-owned Tool model that backs Tool stations.

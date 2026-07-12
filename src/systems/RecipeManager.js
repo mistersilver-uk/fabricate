@@ -3,6 +3,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
+import { matchComponentByName } from '../utils/componentNameMatch.js';
 import { accumulateItemEssences, findMatchingComponent } from '../utils/essenceResolver.js';
 import {
   itemResolvesToComponent,
@@ -1122,10 +1123,12 @@ export class RecipeManager {
       // component's own source item, so an inventory copy of a component that was
       // built by copying another item as a template (a common GM workflow) has no
       // ref back to the component's source and would otherwise never match despite
-      // being the right, identically-named component.
-      const byName = managedItem.name
-        ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
-        : false;
+      // being the right, identically-named component. Shared, telemetry-bearing helper
+      // (issue 540); case-INSENSITIVE, exactly as before.
+      const byName = matchComponentByName(item, managedItem, {
+        caseSensitive: false,
+        systemId: recipe?.craftingSystemId,
+      });
       if (!byName) return false;
     } else if (!this._matchesIngredient(ingredient, item, features)) {
       return false;
@@ -1154,10 +1157,15 @@ export class RecipeManager {
     if (itemResolvesToTool(item, tool, tools, recipe?.craftingSystemId)) return true;
     // Snapshot-name fallback (presence only, never destructive): the item-sourced tool's
     // own snapshot name, or the linked component's name for a migrated componentId-tool.
+    // Shared, telemetry-bearing helper (issue 540); case-INSENSITIVE, exactly as before.
     const fallbackName =
       tool.name || this._getComponent(recipe, tool.componentId || tool.systemItemId)?.name || '';
     if (!fallbackName) return false;
-    return item?.name?.toLowerCase() === fallbackName.toLowerCase();
+    return matchComponentByName(
+      item,
+      { name: fallbackName, id: tool.id },
+      { caseSensitive: false, systemId: recipe?.craftingSystemId }
+    );
   }
 
   /**

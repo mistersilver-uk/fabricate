@@ -224,6 +224,15 @@
         "PromoteFailed": "Could not promote the region. Try again.",
         "PromoteSuccess": "Region promoted to a Fabricate interactable."
       },
+      "Cleanup": {
+        "Title": "Remove Fabricate interactables",
+        "NotGM": "Only a GM can run Fabricate interactable cleanup.",
+        "NothingToDo": "No Fabricate interactables found. Nothing to clean up.",
+        "Prompt": "Remove {behaviors} Fabricate interactable(s) and {markers} marker(s) across {scenes} scene(s)? Your regions, tokens, and any other region behaviours are kept. Run this BEFORE disabling or uninstalling Fabricate.",
+        "Confirm": "Remove them",
+        "Cancel": "Cancel",
+        "Done": "Removed {behaviors} Fabricate interactable(s) and {markers} marker(s). You can now safely disable or uninstall Fabricate."
+      },
       "Browser": {
         "Title": "Interactable browser",
         "Hint": "Drag an entry onto the canvas, or use Place on current scene.",

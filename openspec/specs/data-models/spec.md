@@ -1782,6 +1782,26 @@ The confirm copy states which will happen (whole region vs only the Fabricate in
 3. **Safe legacy default.** A region created before this flag existed carries no ownership stamp, so its provenance is unknown; unknown provenance is treated as **promoted (do-not-destroy)** — the conservative choice that can never destroy user data.
 The cost is that a legacy Fabricate-created region may be left behind as an empty Region after its interactable is removed; that is a harmless leftover the GM can delete by hand, never data loss.
 
+### Uninstall-safe world cleanup (issue 535)
+
+`fabricate.interactable` is a **module-defined RegionBehavior sub-type** (declared in `module.json`'s `documentTypes.RegionBehavior.interactable`, auto-namespaced, registered at runtime on `CONFIG.RegionBehavior`).
+When Fabricate is **disabled or uninstalled** Foundry can no longer construct the sub-type, so every such behaviour becomes an unregistered-sub-type document that logs `"fabricate.interactable" is not a valid type` on every load of its scene, with no core UI to remove it (foundryvtt#11234).
+On Foundry **< 14.360** the invalid behaviour cascade-invalidates its parent Region and the whole Scene; on **≥ 14.360** it is quarantined (raw source preserved) and only logged.
+This is documented core behaviour for module sub-types — Foundry does NOT remove them on disable — not a Fabricate registration bug.
+
+Requirements:
+
+1. **GM-invocable cleanup.** Fabricate MUST expose a GM-invocable, uninstall-safe cleanup — `game.fabricate.cleanupInteractables()` — that a GM runs BEFORE disabling/uninstalling.
+It is a plain API method (no rendered UI control), runnable from a macro/console, GM-gated, no-throw, and confirmed via `DialogV2` with a summary (behaviours + markers + scenes).
+2. **Removes only what Fabricate owns.** The cleanup removes EXACTLY: every `fabricate.interactable` behaviour (`isInteractableRegionBehavior`, via `region.deleteEmbeddedDocuments('RegionBehavior', …)`), Fabricate's own **Tile/Drawing** markers (`isInteractableVisual` reverse flag, via `scene.deleteEmbeddedDocuments`), and clears the region-ownership stamp (`flags.fabricate.interactableRegion`).
+The pure decision `decideWorldInteractableCleanup` (scenes → id-keyed removal set + summary) and the thin edge `executeWorldInteractableCleanup` live in `src/canvas/regions/interactableCleanup.js`.
+3. **Never deletes user data — with one documented asymmetry.** The cleanup NEVER deletes a parent Region (even a Fabricate-created one — an empty leftover region is a harmless artefact, unlike single-interactable deletion which may delete a created region wholesale), NEVER removes a foreign behaviour, and NEVER deletes a **Token** marker.
+A Token marker is an existing GM-owned token the GM relinked, so cleanup only CLEARS its reverse flag (`buildClearLinkedVisualFlags`) and leaves the token intact.
+The **asymmetry**: Tile/Drawing markers carrying the reverse flag ARE deleted — and because `relinkVisual` stamps the reverse flag onto ANY selected Tile/Drawing/Token, a Tile/Drawing the GM DREW THEMSELVES and then relinked as a marker is deleted too (only Tokens are exempted from deletion).
+This matches issue #535's explicit "delete tiles/drawings" scope; the GM must **unlink** such a hand-drawn marker (config panel "Remove") before cleanup/uninstall to keep it, and the docs state this caveat.
+Selection is fail-closed: a document without a well-formed reverse flag (`readLinkedVisualRef` → non-empty `linkedRegionUuid` + `linkedBehaviorId`) is never selected.
+Legacy/unflagged provenance is handled conservatively (behaviour removed, region kept), and an empty world is a no-op.
+
 ### Linked Visual reverse flags (holds no state; reflects env depletion + concealment)
 
 The linked visual (Tile / Drawing / Token) carries only a reverse pointer back at its owning Region + Behaviour; it holds NO authoritative interactable state of its own (no node pool, no eligibility):
