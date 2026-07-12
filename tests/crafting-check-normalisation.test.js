@@ -46,6 +46,38 @@ test('_normalizeCraftingCheck drops the deprecated check-source fields', () => {
   assert.equal(result.enabled, false);
 });
 
+test('_normalizeCraftingCheck normalizes mode to the single valid value passFail', () => {
+  const mgr = makeManager();
+  // `passFail` is the only valid `craftingCheck.mode`; anything else — including the
+  // removed `tiered` / `namedOutcomes` values and garbage — collapses to `passFail`.
+  assert.equal(mgr._normalizeCraftingCheck({}).mode, 'passFail');
+  assert.equal(mgr._normalizeCraftingCheck({ mode: 'passFail' }).mode, 'passFail');
+  assert.equal(mgr._normalizeCraftingCheck({ mode: 'tiered' }).mode, 'passFail');
+  assert.equal(mgr._normalizeCraftingCheck({ mode: 'namedOutcomes' }).mode, 'passFail');
+  assert.equal(mgr._normalizeCraftingCheck({ mode: 'bogus' }).mode, 'passFail');
+});
+
+test('_normalizeCraftingCheck defaults outcomes to [fail, pass] regardless of mode', () => {
+  const mgr = makeManager();
+  // The dead `tiered` / `namedOutcomes` default of `['low', 'high']` is gone: an absent
+  // outcomes list always defaults to `['fail', 'pass']`, even when a legacy `tiered` mode
+  // is supplied.
+  assert.deepEqual(mgr._normalizeCraftingCheck({}).outcomes, ['fail', 'pass']);
+  assert.deepEqual(mgr._normalizeCraftingCheck({ mode: 'tiered' }).outcomes, ['fail', 'pass']);
+  assert.deepEqual(
+    mgr._normalizeCraftingCheck({ mode: 'namedOutcomes', outcomes: [] }).outcomes,
+    ['fail', 'pass']
+  );
+});
+
+test('_normalizeCraftingCheck preserves authored outcomes trimmed, lowercased, and deduped', () => {
+  const mgr = makeManager();
+  const result = mgr._normalizeCraftingCheck({
+    outcomes: [' Critical ', 'success', 'SUCCESS', 'failure', ''],
+  });
+  assert.deepEqual(result.outcomes, ['critical', 'success', 'failure']);
+});
+
 test('_normalizeCraftingCheck enabled reflects only the enabled flag', () => {
   const mgr = makeManager();
   assert.equal(mgr._normalizeCraftingCheck({ enabled: true }).enabled, true);
