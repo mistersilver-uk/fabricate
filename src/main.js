@@ -1307,7 +1307,7 @@ class Fabricate {
    *   mutation (no ingredients, currency, or tools consumed, no run created).
    * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
    */
-  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, componentSourceActorIds = null, interactive = false } = {}) {
+  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, componentSourceActorIds = null, interactive = false } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
@@ -1322,8 +1322,52 @@ class Fabricate {
     return await this.craft(craftingActor, recipeId, {
       componentSourceActors: sources,
       ingredientSetId,
+      // Per-group player option overrides (issue 552); null keeps default resolution.
+      ingredientOptionOverrides,
       interactive,
     });
+  }
+
+  /**
+   * Re-evaluate the craftability of ONE ingredient set with in-session per-group
+   * option overrides applied (issue 552). Backs the crafting store's
+   * `selectedCraftability` recompute when the player picks a non-default option, so
+   * the ingredient tiles reflect the chosen option/stack through the SAME
+   * `RecipeManager.evaluateCraftability` → `resolveIngredientSelection` seam the
+   * engine consumes. Synchronous (the store reads it from a `$derived`).
+   *
+   * @param {object} options
+   * @param {string|null} [options.recipeId]
+   * @param {string|null} [options.setId] The ingredient set to re-evaluate.
+   * @param {object|null} [options.optionOverrides] `{ [groupId]: {optionIndex, heldItemId?} }`.
+   * @param {string|null} [options.actorId] Crafting actor id (defaults to persisted).
+   * @param {string[]|null} [options.componentSourceActorIds]
+   * @returns {object|null} Fresh single-set craftability, or null when unresolvable.
+   */
+  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, actorId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    const recipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!recipe) return null;
+    const set = Array.isArray(recipe.ingredientSets)
+      ? recipe.ingredientSets.find((candidate) => String(candidate?.id) === String(setId))
+      : null;
+    if (!set) return null;
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    const sources = componentSourceActors.length > 0
+      ? componentSourceActors
+      : (craftingActor ? [craftingActor] : []);
+    if (sources.length === 0) return null;
+    // Narrow the evaluation to the one selected set (mirrors CraftingListingBuilder's
+    // per-set copy): keeps the recipe's data fields + the IngredientSet instance
+    // methods while scoping craftability to this set.
+    const singleSetRecipe = { ...recipe, ingredientSets: [set] };
+    return this.recipeManager.evaluateCraftability(sources, singleSetRecipe, {
+      craftingActor,
+      optionOverrides,
+    }) ?? null;
   }
 
   /**

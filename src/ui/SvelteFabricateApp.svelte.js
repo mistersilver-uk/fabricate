@@ -207,6 +207,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       learnRecipeFromInventory: (opts = {}) =>
         game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
       craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      // Fresh per-set craftability for an in-session ingredient-option override
+      // (issue 552). Synchronous so the store's `selectedCraftability` $derived can
+      // read it without an async round-trip; returns null when the facade is absent.
+      evaluateSelectedSet: (opts = {}) => game?.fabricate?.evaluateSelectedSet?.(opts) ?? null,
       // Player Alchemy tab seams — the leak-safe workbench listing + brew submit +
       // the persisted active-discipline getter/setter. Foundry-free store consumes
       // these wrappers only.

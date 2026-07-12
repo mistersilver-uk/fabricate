@@ -63,6 +63,11 @@ Each step can define:
 - A recipe/step is craftable when at least one `IngredientSet` is satisfied (OR across sets).
 - Within an `IngredientSet`, all `ingredientGroups` must be satisfied (AND across groups).
 - Within an `IngredientGroup`, any one option in `options` satisfies the group (OR within group).
+- By default a group resolves to the first item-satisfiable option in author order (then the first affordable currency option); items strictly beat currency.
+- A player MAY override which option a multi-option group consumes, and — for a tag option matching more than one held stack — which specific held item, via `IngredientSet.resolveIngredientSelection`'s `optionOverrides` argument (keyed by `group.id` → `{ optionIndex, heldItemId? }`).
+An override is honoured whether satisfiable or not: a satisfiable option wins; an insufficient option reports that option's have/need and blocks the craft with the missing-materials message (it is never silently redirected to a different option).
+An explicit override MAY select a currency alternative over an available item option (routing to `currencySpends` when affordable); with no override the default items-first resolution is byte-for-byte unchanged.
+The same override threads through both the display (`RecipeManager.evaluateCraftability`) and the engine consumption (`CraftingEngine`), so the ingredient tiles always reflect the option/stack the craft consumes.
 - AND-across-ingredient-sets is not supported.
 - OR groups are always enabled and are not feature-toggled.
 - Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are always supported, including simple recipes, when their tag IDs exist in the crafting system's `itemTags` list.

@@ -17,7 +17,9 @@
  * @param {object} deps
  * @param {object} deps.services Injected services bag exposing
  *   `listCraftingForActor({ rememberedActorId, componentSourceActorIds })`,
- *   `craftRecipe({ actorId, recipeId, ingredientSetId, componentSourceActorIds })`,
+ *   `craftRecipe({ actorId, recipeId, ingredientSetId, ingredientOptionOverrides, componentSourceActorIds })`,
+ *   `evaluateSelectedSet({ recipeId, setId, optionOverrides, actorId, componentSourceActorIds })`
+ *   (fresh per-set craftability for an in-session option override — issue 552),
  *   `notify(message)`, `craftErrorMessage()` (localized generic craft-failure
  *   text for a thrown craft), `getRecipeManager()`, `getCraftingSourceActors()`,
  *   `getSelectedCraftingActorId()`, `getCraftingComponentSourceIds()`, and the
@@ -48,6 +50,11 @@ export function createCraftingStore({ services } = {}) {
   let page = $state(0);
   let pageSize = $state(DEFAULT_PAGE_SIZE);
   let selectedIngredientSetId = $state(null);
+  // Per-group option overrides for the selected set (issue 552), keyed by group id:
+  // `{ [groupId]: { optionIndex, heldItemId } }`. Empty means the default
+  // first-satisfiable resolution (single-option groups and non-interacting players
+  // see no change). Reset whenever the recipe or ingredient set changes.
+  let selectedIngredientOptions = $state({});
   let shoppingEntries = $state([]);
   let craftInFlight = $state(false);
   // Per-recipe last craft outcome, keyed by recipe id. A plain object reassigned
@@ -161,7 +168,27 @@ export function createCraftingStore({ services } = {}) {
     return sets.find((set) => set?.id === targetId) ?? sets[0];
   });
 
-  const selectedCraftability = $derived(selectedSet?.craftability ?? null);
+  // Craftability for the selected set. With no per-group override this is the baked
+  // listing value (single evaluate at listing-build time). When the player overrides
+  // an option, the baked value is stale (ingredient display state is precomputed and
+  // NOT reactive to an in-session choice), so re-evaluate the ONE selected set through
+  // the same RecipeManager.evaluateCraftability → resolveIngredientSelection seam the
+  // engine consumes, keeping the tiles == the consumed plan (issue 553 guarantee). No
+  // full listing reload per toggle; no selection computed in the UI.
+  const selectedCraftability = $derived.by(() => {
+    const set = selectedSet;
+    const baked = set?.craftability ?? null;
+    const overrides = selectedIngredientOptions;
+    if (!set?.id || !overrides || Object.keys(overrides).length === 0) return baked;
+    const recomputed = services?.evaluateSelectedSet?.({
+      recipeId: selectedRecipe?.id ?? null,
+      setId: set.id,
+      optionOverrides: overrides,
+      actorId: currentActorId(),
+      componentSourceActorIds: currentSourceIds(),
+    });
+    return recomputed ?? baked;
+  });
 
   const shoppingAggregate = $derived.by(() => {
     const recipeManager = services?.getRecipeManager?.() ?? null;
@@ -197,10 +224,11 @@ export function createCraftingStore({ services } = {}) {
     }
   }
 
-  /** Select a recipe by id, resetting the chosen ingredient set to its default. */
+  /** Select a recipe by id, resetting the chosen ingredient set + option overrides. */
   function select(recipeId) {
     selectedRecipeId = recipeId ?? null;
     selectedIngredientSetId = null;
+    selectedIngredientOptions = {};
   }
 
   /** Update the search query and jump back to the first page. */
@@ -253,6 +281,32 @@ export function createCraftingStore({ services } = {}) {
 
   function chooseIngredientSet(setId) {
     selectedIngredientSetId = setId ?? null;
+    // Option overrides are keyed by group id (unique per set), so switching sets
+    // clears them — the new set's groups start at their first-satisfiable default.
+    selectedIngredientOptions = {};
+  }
+
+  /**
+   * Choose a specific option (and, for a tag option matching multiple held stacks,
+   * a specific held item) for one ingredient group (issue 552). Passing a nullish
+   * `optionIndex` clears the group's override (back to the default resolution). The
+   * whole map is reassigned so the `selectedCraftability` derive recomputes.
+   *
+   * @param {string} groupId
+   * @param {{ optionIndex: number|null, heldItemId?: string|null }} [choice]
+   */
+  function chooseIngredientOption(groupId, choice = {}) {
+    if (!groupId) return;
+    const next = { ...selectedIngredientOptions };
+    if (choice == null || choice.optionIndex == null) {
+      delete next[groupId];
+    } else {
+      next[groupId] = {
+        optionIndex: choice.optionIndex,
+        heldItemId: choice.heldItemId ?? null,
+      };
+    }
+    selectedIngredientOptions = next;
   }
 
   /** Add (or bump) a recipe in the shopping list. */
@@ -318,6 +372,9 @@ export function createCraftingStore({ services } = {}) {
         actorId: currentActorId(),
         recipeId,
         ingredientSetId: selectedIngredientSetId ?? recipe?.defaultSetId ?? null,
+        // Per-group option overrides (issue 552) so the engine consumes the same
+        // option/stack the tiles show. Empty map keeps the default resolution.
+        ingredientOptionOverrides: selectedIngredientOptions,
         componentSourceActorIds: currentSourceIds(),
         // UI-triggered craft: prompt an interactive roll dialog + post the roll to
         // chat (Dice So Nice). Automation/macros omit this and stay silent.
@@ -381,6 +438,9 @@ export function createCraftingStore({ services } = {}) {
     },
     get selectedIngredientSetId() {
       return selectedIngredientSetId;
+    },
+    get selectedIngredientOptions() {
+      return selectedIngredientOptions;
     },
     get shoppingEntries() {
       return shoppingEntries;
@@ -447,6 +507,7 @@ export function createCraftingStore({ services } = {}) {
     setPage,
     setPageSize,
     chooseIngredientSet,
+    chooseIngredientOption,
     addToShoppingList,
     decrementShoppingList,
     removeFromShoppingList,

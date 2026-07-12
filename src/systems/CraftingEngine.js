@@ -168,6 +168,13 @@ export class CraftingEngine {
    * @param {Recipe} recipe - The recipe to use
    * @param {string} ingredientSetId - Which ingredient set to use (optional, uses first satisfiable if not provided)
    * @param {Object} options - Additional options
+   * @param {object|null} [options.ingredientOptionOverrides] Per-group player option
+   *   overrides (issue 552), keyed by `group.id` → `{ optionIndex, heldItemId? }`.
+   *   Threaded to the craftability gate and the single selection source so the
+   *   consumed plan matches what the player chose in the UI (and an insufficient
+   *   choice blocks with the missing-materials message). For a time-gated step the
+   *   override is applied at START, so the consumed-item snapshot the FINISH resume
+   *   replays already encodes the chosen option/stack.
    * @param {boolean} [options.interactive] When true, the crafting check prompts the
    *   player with the confirm-roll dialog (optional situational modifier) and posts
    *   the roll to chat so Dice So Nice animates it. Defaults to false so automation
@@ -191,6 +198,14 @@ export class CraftingEngine {
     // per-system id, so a tool from system A must not satisfy a system-B recipe.
     const presentTools =
       options?.presentTools && !Array.isArray(options.presentTools) ? options.presentTools : null;
+    // Per-group player option overrides (issue 552): a `{ [groupId]: {optionIndex,
+    // heldItemId?} }` map from the crafting UI. Threaded to BOTH the craftability
+    // gate and the single selection source so the display and the consumed plan
+    // resolve the same chosen option/stack.
+    const ingredientOptionOverrides =
+      options?.ingredientOptionOverrides && typeof options.ingredientOptionOverrides === 'object'
+        ? options.ingredientOptionOverrides
+        : null;
     // Validate inputs
     if (!craftingActor) {
       return {
@@ -322,6 +337,7 @@ export class CraftingEngine {
             step,
             stepIndex,
             ingredientSetId,
+            ingredientOptionOverrides,
             presentTools,
             options,
             runManager,
@@ -378,6 +394,7 @@ export class CraftingEngine {
         presentTools,
         craftingActor,
         resolveComponent,
+        optionOverrides: ingredientOptionOverrides,
       });
       if (!canCraftCheck.canCraft) {
         const missingMsg = this._formatMissingItems(canCraftCheck.missing, executionRecipe);
@@ -414,7 +431,8 @@ export class CraftingEngine {
         ingredientSet,
         executionRecipe,
         craftingActor,
-        resolveComponent
+        resolveComponent,
+        ingredientOptionOverrides
       );
       const currencySpends = craftSelection.currencySpends || [];
 
@@ -868,6 +886,7 @@ export class CraftingEngine {
     step,
     stepIndex,
     ingredientSetId,
+    ingredientOptionOverrides = null,
     presentTools,
     options,
     runManager,
@@ -896,6 +915,7 @@ export class CraftingEngine {
       presentTools,
       craftingActor,
       resolveComponent,
+      optionOverrides: ingredientOptionOverrides,
     });
     if (!canCraftCheck.canCraft) {
       return abort(
@@ -921,7 +941,8 @@ export class CraftingEngine {
       ingredientSet,
       executionRecipe,
       craftingActor,
-      resolveComponent
+      resolveComponent,
+      ingredientOptionOverrides
     );
     const currencySpends = craftSelection.currencySpends || [];
 
@@ -1972,6 +1993,8 @@ export class CraftingEngine {
    *   alchemy craft path (issue 578) so a tier-4-only submission is selected as its
    *   component's ingredient for consumption; defaults (undefined) to the shared
    *   standard-craft resolver via {@link RecipeManager#ingredientMatchesItem}.
+   * @param {object|null} [optionOverrides] - Per-group player option overrides
+   *   (issue 552) forwarded to the resolver so consumption matches the chosen option.
    * @returns {{ success: boolean, plan: Array, currencySpends: Array, missingGroups: Array }}
    */
   _resolveCraftSelection(
@@ -1979,14 +2002,18 @@ export class CraftingEngine {
     ingredientSet,
     recipe,
     craftingActor,
-    resolveComponent
+    resolveComponent,
+    optionOverrides = null
   ) {
     const availableItems = componentSourceActors.flatMap((actor) => [...actor.items]);
     const matcher = (ingredient, item) =>
       this.recipeManager.ingredientMatchesItem(recipe, ingredient, item, resolveComponent);
     if (typeof ingredientSet?.resolveIngredientSelection === 'function') {
       const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
-      return ingredientSet.resolveIngredientSelection(availableItems, matcher, { affordCurrency });
+      return ingredientSet.resolveIngredientSelection(availableItems, matcher, {
+        affordCurrency,
+        optionOverrides,
+      });
     }
     // Back-compat: an ingredient set exposing only matchIngredients (older duck-typed
     // shapes) yields an item-only plan with no currency spends.
