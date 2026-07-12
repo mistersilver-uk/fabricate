@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
 const { RecipeActivationError } = await import('../src/systems/RecipeActivationError.js');
 const { localizeRecipeActivationError, localizeActivationIssue, RECIPE_ACTIVATION_ISSUE_LABELS } =
-  await import('../src/systems/recipeActivationMessages.js');
+  await import('../src/utils/recipeActivationMessages.js');
 
 // A Foundry-shaped random id (16 alphanumerics). The reporter saw two of these
 // leak into the toast ("set aZrvhxMlMBWxYFam" / "set ZskumdJApJlvdmvw").

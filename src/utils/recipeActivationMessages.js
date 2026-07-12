@@ -69,6 +69,63 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
     'IssueRoutedGroupNameDuplicate',
     'Duplicate result group name "{groupName}" (case-insensitive) in step "{step}" — routed mode requires unique names',
   ],
+  // Base structural-integrity issues from the recipe MODEL (issue 595). These fire
+  // on an ordinary save (most are NOT requireComplete-gated) and previously leaked a
+  // step / ingredient-set / result-group / result / mapping id. `{location}` is a
+  // pre-composed, id-free context phrase (`Recipe` or `Step "<name-or-position>"`);
+  // `{group}` / `{result}` / `{set}` / `{step}` are name-or-1-based-position labels.
+  stepMissingIngredientSet: [
+    'IssueStepMissingIngredientSet',
+    'Step "{step}" must include at least one ingredient set',
+  ],
+  stepMissingResultGroup: [
+    'IssueStepMissingResultGroup',
+    'Step "{step}" must include at least one result group',
+  ],
+  timeRequirementInvalid: [
+    'IssueTimeRequirementInvalid',
+    '{location} has invalid time requirement value for "{unit}"',
+  ],
+  ingredientSetInvalid: ['IssueIngredientSetInvalid', 'Ingredient set "{set}": {detail}'],
+  ingredientSetInvalidResultMapping: [
+    'IssueIngredientSetInvalidResultMapping',
+    'Ingredient set "{set}" references a result mapping that does not exist',
+  ],
+  outcomeRoutingInvalidResultGroup: [
+    'IssueOutcomeRoutingInvalidResultGroup',
+    'Outcome routing "{outcome}" references a result group that does not exist',
+  ],
+  resultGroupDuplicate: [
+    'IssueResultGroupDuplicate',
+    '{location} has a duplicate result group "{group}"',
+  ],
+  resultGroupEmpty: [
+    'IssueResultGroupEmpty',
+    '{location} result group "{group}" must contain at least one result',
+  ],
+  resultDuplicate: ['IssueResultDuplicate', '{location} has a duplicate result "{result}"'],
+  resultInvalid: ['IssueResultInvalid', '{location} result "{result}": {detail}'],
+  // Essence-reference issues from RecipeManager (issue 595). The set is named by
+  // name-or-position; the essence is named from the system's essence definitions
+  // when resolvable, else a name-free phrasing is used — never the raw essence id.
+  ingredientSetUnknownEssence: [
+    'IssueIngredientSetUnknownEssence',
+    'Ingredient set "{set}" references an essence that is not defined in this system',
+  ],
+  ingredientSetEssenceQuantityNamed: [
+    'IssueIngredientSetEssenceQuantityNamed',
+    'Ingredient set "{set}" has an invalid quantity for essence "{essence}"',
+  ],
+  ingredientSetEssenceQuantity: [
+    'IssueIngredientSetEssenceQuantity',
+    'Ingredient set "{set}" has an invalid essence quantity',
+  ],
+  // Tag-placeholder issue from RecipeManager (issue 595). The group is named by
+  // name-or-position; the tag is an authored tag name, not an id.
+  ingredientGroupUnknownTag: [
+    'IssueIngredientGroupUnknownTag',
+    'Ingredient group "{group}" references unknown tag "{tag}"',
+  ],
 });
 
 /**

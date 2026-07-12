@@ -37,7 +37,7 @@ const RAW_MODULES = [
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
   // The validation tab localizes a signature-collision blocker row via this pure
   // leaf (issue 549).
-  'src/systems/recipeActivationMessages.js',
+  'src/utils/recipeActivationMessages.js',
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
   ...SEARCHABLE_POPOVER_RAW_MODULES,

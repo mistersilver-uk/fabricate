@@ -1,4 +1,5 @@
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
+import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import {
   matchResultGroupsByName,
   normalizeRoutedName,
@@ -8,8 +9,6 @@ import {
   routedOutcomeTierNames,
   routedSuccessTierOptions,
 } from '../utils/routedOutcomeKeywords.js';
-
-import { buildRecipeActivationIssue } from './recipeActivationMessages.js';
 
 /**
  * Handles mode-specific validation and result resolution logic.

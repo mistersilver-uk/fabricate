@@ -150,7 +150,7 @@ describe('RecipeManager incomplete recipe shells', () => {
           },
           { allowIncomplete: true }
         ),
-      /duplicate result group ID/
+      /duplicate result group/
     );
   });
 
@@ -379,7 +379,7 @@ describe('Recipe validate() vs validateStructure()', () => {
     });
     const result = recipe.validateStructure();
     assert.equal(result.valid, false);
-    assert.ok(result.errors.some((e) => /duplicate result group ID/.test(e)));
+    assert.ok(result.errors.some((e) => /duplicate result group/.test(e)));
   });
 
   it('validate() and validateStructure() agree (both valid) for a complete recipe', () => {

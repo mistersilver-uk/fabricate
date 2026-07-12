@@ -79,7 +79,7 @@ import { SignatureValidator } from '../../../systems/SignatureValidator.js';
 import {
   localizeRecipeActivationError,
   localizeRecipePersistenceError,
-} from '../../../systems/recipeActivationMessages.js';
+} from '../../../utils/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 
 // ---------------------------------------------------------------------------
@@ -7384,7 +7384,11 @@ export function createAdminStore(services) {
       return created?.id ? { id: created.id } : null;
     } catch (err) {
       console.error('Fabricate | Failed to create recipe:', err);
-      services.notify?.error?.(err?.message || 'Failed to create recipe');
+      services.notify?.error?.(
+        localizeRecipePersistenceError(err, services.localize) ||
+          err?.message ||
+          'Failed to create recipe'
+      );
       return null;
     }
   }
@@ -7427,7 +7431,11 @@ export function createAdminStore(services) {
       return true;
     } catch (err) {
       console.error('Fabricate | Failed to duplicate recipe:', err);
-      services.notify?.error?.(err?.message || 'Failed to duplicate recipe');
+      services.notify?.error?.(
+        localizeRecipePersistenceError(err, services.localize) ||
+          err?.message ||
+          'Failed to duplicate recipe'
+      );
       return false;
     }
   }
@@ -7492,7 +7500,11 @@ export function createAdminStore(services) {
       return true;
     } catch (err) {
       console.error('Fabricate | Failed to save recipe access:', err);
-      services.notify?.error?.(err?.message || 'Failed to update recipe access');
+      services.notify?.error?.(
+        localizeRecipePersistenceError(err, services.localize) ||
+          err?.message ||
+          'Failed to update recipe access'
+      );
       return false;
     }
   }

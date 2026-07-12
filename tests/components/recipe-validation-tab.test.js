@@ -18,7 +18,7 @@ const harness = createMountedComponentHarness({
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
-    'src/systems/recipeActivationMessages.js'
+    'src/utils/recipeActivationMessages.js'
   ],
   compiledModules: ['src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'],
   componentPath: 'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'

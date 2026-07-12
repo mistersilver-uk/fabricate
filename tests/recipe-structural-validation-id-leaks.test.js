@@ -46,9 +46,8 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { RecipePersistenceError } = await import('../src/systems/RecipePersistenceError.js');
-const { localizeActivationIssue, localizeRecipePersistenceError } = await import(
-  '../src/systems/recipeActivationMessages.js'
-);
+const { localizeActivationIssue, localizeRecipePersistenceError } =
+  await import('../src/utils/recipeActivationMessages.js');
 
 // A Foundry-shaped id every UNNAMED step/set below carries, so a leak is detectable.
 const STEP_ID = 'aZrvhxMlMBWxYFam';
@@ -135,7 +134,10 @@ test('routedByIngredients — an UNNAMED set mapping to a missing group is coded
 
   assert.equal(result.valid, false);
   const coded = result.issues.find((issue) => issue.code === 'ingredientSetInvalidResultGroup');
-  assert.ok(coded, `expected the coded reference-integrity issue, got: ${JSON.stringify(result.issues)}`);
+  assert.ok(
+    coded,
+    `expected the coded reference-integrity issue, got: ${JSON.stringify(result.issues)}`
+  );
   assert.equal(coded.params.set, '1', 'the unnamed set reports its 1-based position');
   assert.match(coded.message, /result group/i);
   // Neither the set id nor the dangling group id may appear anywhere the user sees.
@@ -192,7 +194,10 @@ test('RecipeManager.updateRecipe — a save-time invalid result-group reference 
   const manager = makeRoutedManager();
 
   // A persisted shell first (born disabled, allowIncomplete waives completeness).
-  const shell = await manager.createRecipe({ craftingSystemId: 'sys-1' }, { allowIncomplete: true });
+  const shell = await manager.createRecipe(
+    { craftingSystemId: 'sys-1' },
+    { allowIncomplete: true }
+  );
 
   // An ordinary SAVE (not an enable) whose only fault is a set pointing at a group
   // that does not exist — the pre-fix path threw a plain Error leaking both ids.
@@ -215,7 +220,10 @@ test('RecipeManager.updateRecipe — a save-time invalid result-group reference 
   const coded = thrown.persistenceIssues.find(
     (issue) => issue.code === 'ingredientSetInvalidResultGroup'
   );
-  assert.ok(coded, `expected the coded reference issue, got: ${JSON.stringify(thrown.persistenceIssues)}`);
+  assert.ok(
+    coded,
+    `expected the coded reference issue, got: ${JSON.stringify(thrown.persistenceIssues)}`
+  );
   assert.match(thrown.message, /Invalid recipe update/, 'headless prefix preserved');
   assert.doesNotMatch(thrown.message, FOUNDRY_ID_RE, `save error leaked an id: ${thrown.message}`);
   assert.ok(!thrown.message.includes(SET_ID) && !thrown.message.includes(GHOST_GROUP_ID));
@@ -233,4 +241,169 @@ test('localizeRecipePersistenceError returns null for a plain (non-persistence) 
     localizeRecipePersistenceError(new Error('boom'), (k) => k),
     null
   );
+});
+
+// --- Base MODEL structural strings (issue 595 review): these ride the same save
+// path + RecipePersistenceError toast as the resolution-mode strings, so they must
+// be id-free too. Each drives the RecipeManager save path and asserts the localized
+// toast leaks no 16-char id (and no raw essence id).
+
+const echo = (key) => key; // Foundry echoes an absent key → built-in fallback used
+
+function makeManagerWithSystem(system) {
+  const csm = { getSystem: (id) => (id === system.id ? system : null) };
+  game.fabricate.getCraftingSystemManager = () => csm;
+  game.fabricate.getResolutionModeService = () => new ResolutionModeService(csm);
+  const manager = new RecipeManager();
+  manager.initialized = true;
+  return manager;
+}
+
+async function persistenceErrorFromCreate(manager, data) {
+  let thrown = null;
+  await assert.rejects(
+    () => manager.createRecipe({ enabled: false, ...data }, { allowIncomplete: true }),
+    (err) => {
+      thrown = err;
+      return err instanceof RecipePersistenceError;
+    }
+  );
+  return thrown;
+}
+
+test('save path — duplicate result-group ids are reported by position, not the leaked id', async () => {
+  settingsStore.clear();
+  const manager = makeManagerWithSystem({ id: 'sys-1', resolutionMode: 'simple', features: {} });
+  const DUP = 'DupGroupIdAAAA01'; // 16-char Foundry-shaped id shared by both groups
+
+  const thrown = await persistenceErrorFromCreate(manager, {
+    craftingSystemId: 'sys-1',
+    resultGroups: [
+      { id: DUP, results: [] },
+      { id: DUP, results: [] },
+    ],
+  });
+
+  const coded = thrown.persistenceIssues.find((issue) => issue.code === 'resultGroupDuplicate');
+  assert.ok(
+    coded,
+    `expected a coded duplicate-group issue, got: ${JSON.stringify(thrown.persistenceIssues)}`
+  );
+  // The group label is the author/auto NAME (the model auto-names groups) or a
+  // 1-based position — never the id.
+  assert.doesNotMatch(String(coded.params.group), FOUNDRY_ID_RE, 'group label must not be an id');
+  assert.ok(!String(coded.params.group).includes(DUP));
+  const toast = localizeRecipePersistenceError(thrown, echo);
+  assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
+  assert.ok(!toast.includes(DUP), `toast leaked the group id: ${toast}`);
+  assert.match(toast, /duplicate result group/);
+});
+
+test('save path — outcome routing to a deleted group is id-free (drops the dangling group id)', async () => {
+  settingsStore.clear();
+  const manager = makeManagerWithSystem({ id: 'sys-1', resolutionMode: 'simple', features: {} });
+  const GHOST = 'GhOsTgRoUp123456';
+
+  const thrown = await persistenceErrorFromCreate(manager, {
+    craftingSystemId: 'sys-1',
+    resultGroups: [{ id: 'rg-real', results: [] }],
+    outcomeRouting: { success: GHOST },
+  });
+
+  const coded = thrown.persistenceIssues.find(
+    (issue) => issue.code === 'outcomeRoutingInvalidResultGroup'
+  );
+  assert.ok(
+    coded,
+    `expected a coded outcome-routing issue, got: ${JSON.stringify(thrown.persistenceIssues)}`
+  );
+  const toast = localizeRecipePersistenceError(thrown, echo);
+  assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
+  assert.ok(!toast.includes(GHOST));
+  assert.match(toast, /result group/i);
+});
+
+test('save path — an unknown essence reference leaks neither the set id nor the raw essence id', async () => {
+  settingsStore.clear();
+  const manager = makeManagerWithSystem({
+    id: 'sys-1',
+    resolutionMode: 'simple',
+    features: { essences: true },
+    essenceDefinitions: [{ id: 'ess-fire', name: 'Fire' }],
+  });
+  const UNKNOWN = 'UnknownEssId1234'; // 16-char raw essence id absent from definitions
+
+  const thrown = await persistenceErrorFromCreate(manager, {
+    craftingSystemId: 'sys-1',
+    ingredientSets: [{ id: 'SetIdAAAAAAAAA01', essences: { [UNKNOWN]: 2 } }],
+  });
+
+  const coded = thrown.persistenceIssues.find(
+    (issue) => issue.code === 'ingredientSetUnknownEssence'
+  );
+  assert.ok(
+    coded,
+    `expected a coded unknown-essence issue, got: ${JSON.stringify(thrown.persistenceIssues)}`
+  );
+  assert.equal(coded.params.set, '1', 'the unnamed set reports its 1-based position');
+  const toast = localizeRecipePersistenceError(thrown, echo);
+  assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
+  assert.ok(!toast.includes(UNKNOWN), `toast leaked the essence id: ${toast}`);
+  assert.ok(!toast.includes('SetIdAAAAAAAAA01'));
+});
+
+test('save path — an unknown tag placeholder names the group by position, never the group id', async () => {
+  settingsStore.clear();
+  const manager = makeManagerWithSystem({
+    id: 'sys-1',
+    resolutionMode: 'simple',
+    features: {},
+    itemTags: [],
+    tags: [],
+  });
+  const GROUP_ID = 'GroupIdAAAAAAA01';
+
+  const thrown = await persistenceErrorFromCreate(manager, {
+    craftingSystemId: 'sys-1',
+    ingredientSets: [
+      {
+        id: 'SetIdAAAAAAAAA01',
+        ingredientGroups: [
+          { id: GROUP_ID, options: [{ match: { type: 'tags', tags: ['ghosttag'] } }] },
+        ],
+      },
+    ],
+  });
+
+  const coded = thrown.persistenceIssues.find(
+    (issue) => issue.code === 'ingredientGroupUnknownTag'
+  );
+  assert.ok(
+    coded,
+    `expected a coded unknown-tag issue, got: ${JSON.stringify(thrown.persistenceIssues)}`
+  );
+  const toast = localizeRecipePersistenceError(thrown, echo);
+  assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
+  assert.ok(!toast.includes(GROUP_ID), `toast leaked the group id: ${toast}`);
+  assert.match(toast, /ghosttag/, 'the authored tag name is preserved');
+});
+
+test('save path — a bad quantity for a KNOWN essence names the essence, never its id', async () => {
+  settingsStore.clear();
+  const manager = makeManagerWithSystem({
+    id: 'sys-1',
+    resolutionMode: 'simple',
+    features: { essences: true },
+    essenceDefinitions: [{ id: 'ess-fire', name: 'Fire' }],
+  });
+
+  const thrown = await persistenceErrorFromCreate(manager, {
+    craftingSystemId: 'sys-1',
+    ingredientSets: [{ id: 'SetIdAAAAAAAAA01', essences: { 'ess-fire': 0 } }],
+  });
+
+  const toast = localizeRecipePersistenceError(thrown, echo);
+  assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
+  assert.ok(!toast.includes('ess-fire'), `toast leaked the essence id: ${toast}`);
+  assert.match(toast, /Fire/, 'the resolved essence name is shown');
 });

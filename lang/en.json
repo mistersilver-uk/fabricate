@@ -1346,7 +1346,21 @@
           "IssueStepResultDifficulty": "Result {result} references component without valid difficulty",
           "IssueIngredientSetInvalidResultGroup": "Ingredient set \"{set}\" maps to a result group that does not exist",
           "IssueRoutedGroupNameReserved": "Result group name \"{groupName}\" conflicts with reserved routing keyword in step \"{step}\"",
-          "IssueRoutedGroupNameDuplicate": "Duplicate result group name \"{groupName}\" (case-insensitive) in step \"{step}\" — routed mode requires unique names"
+          "IssueRoutedGroupNameDuplicate": "Duplicate result group name \"{groupName}\" (case-insensitive) in step \"{step}\" — routed mode requires unique names",
+          "IssueStepMissingIngredientSet": "Step \"{step}\" must include at least one ingredient set",
+          "IssueStepMissingResultGroup": "Step \"{step}\" must include at least one result group",
+          "IssueTimeRequirementInvalid": "{location} has invalid time requirement value for \"{unit}\"",
+          "IssueIngredientSetInvalid": "Ingredient set \"{set}\": {detail}",
+          "IssueIngredientSetInvalidResultMapping": "Ingredient set \"{set}\" references a result mapping that does not exist",
+          "IssueOutcomeRoutingInvalidResultGroup": "Outcome routing \"{outcome}\" references a result group that does not exist",
+          "IssueResultGroupDuplicate": "{location} has a duplicate result group \"{group}\"",
+          "IssueResultGroupEmpty": "{location} result group \"{group}\" must contain at least one result",
+          "IssueResultDuplicate": "{location} has a duplicate result \"{result}\"",
+          "IssueResultInvalid": "{location} result \"{result}\": {detail}",
+          "IssueIngredientSetUnknownEssence": "Ingredient set \"{set}\" references an essence that is not defined in this system",
+          "IssueIngredientSetEssenceQuantityNamed": "Ingredient set \"{set}\" has an invalid quantity for essence \"{essence}\"",
+          "IssueIngredientSetEssenceQuantity": "Ingredient set \"{set}\" has an invalid essence quantity",
+          "IssueIngredientGroupUnknownTag": "Ingredient group \"{group}\" references unknown tag \"{tag}\""
         },
         "SystemOverview": {
           "Kicker": "System overview",

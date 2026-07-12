@@ -5,6 +5,7 @@ import { getIngredientComponentId, getMatchHandler } from '../models/match/match
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
 import { accumulateItemEssences, findMatchingComponent } from '../utils/essenceResolver.js';
+import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import {
   itemResolvesToComponent,
   itemResolvesToTool,
@@ -1709,16 +1710,19 @@ export class RecipeManager {
     const pushPlain = (list) => {
       for (const message of list || []) issues.push({ code: null, params: {}, message });
     };
-    pushPlain(baseValidation.errors);
-    pushPlain(this._validateEssenceReferences(recipe).errors);
-    pushPlain(this._validateTagPlaceholders(recipe).errors);
-
-    const modeValidation = this._validateResolutionMode(recipe, { requireComplete });
-    if (Array.isArray(modeValidation.issues)) {
-      issues.push(...modeValidation.issues);
-    } else {
-      pushPlain(modeValidation.errors);
-    }
+    // A sub-validator that supplies structured `issues` (coded + id-free, issue 595)
+    // contributes them directly; a legacy string-only validator rides as UNCODED
+    // issues (English passthrough). Every recipe-save validator here — base
+    // (Recipe.validate/validateStructure), essence references, tag placeholders, and
+    // resolution mode — now supplies coded, id-free issues.
+    const pushValidation = (validation) => {
+      if (Array.isArray(validation?.issues)) issues.push(...validation.issues);
+      else pushPlain(validation?.errors);
+    };
+    pushValidation(baseValidation);
+    pushValidation(this._validateEssenceReferences(recipe));
+    pushValidation(this._validateTagPlaceholders(recipe));
+    pushValidation(this._validateResolutionMode(recipe, { requireComplete }));
 
     const errors = issues.map((issue) => issue.message);
     return {
@@ -1853,46 +1857,61 @@ export class RecipeManager {
    * @private
    */
   _validateEssenceReferences(recipe) {
-    const errors = [];
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const features = system.features || {};
     const essencesEnabled = features.essences === true || system.enableEssences === true;
     if (!essencesEnabled) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
     const validEssenceIds = new Set(definitions.map((def) => def.id));
+    // Resolve an essence's display NAME from the system's definitions (issue 595) so
+    // a message never surfaces the raw essence id. An UNKNOWN essence has no
+    // definition and therefore no name, so its message omits it entirely.
+    const essenceNames = new Map(
+      definitions
+        .filter((def) => typeof def?.name === 'string' && def.name.trim())
+        .map((def) => [def.id, def.name.trim()])
+    );
 
-    for (const set of recipe.ingredientSets || []) {
+    const issues = [];
+    for (const [setIndex, set] of (recipe.ingredientSets || []).entries()) {
+      const setLabel =
+        typeof set?.name === 'string' && set.name.trim() ? set.name.trim() : String(setIndex + 1);
       for (const [essenceId, qty] of Object.entries(set.essences || {})) {
         if (!validEssenceIds.has(essenceId)) {
-          errors.push(
-            `Ingredient set "${set.name || set.id}" references unknown essence "${essenceId}"`
-          );
+          issues.push(buildRecipeActivationIssue('ingredientSetUnknownEssence', { set: setLabel }));
         }
         const num = Number(qty);
         if (!Number.isFinite(num) || num <= 0) {
-          errors.push(
-            `Ingredient set "${set.name || set.id}" has invalid quantity for essence "${essenceId}"`
+          const essenceName = essenceNames.get(essenceId);
+          issues.push(
+            essenceName
+              ? buildRecipeActivationIssue('ingredientSetEssenceQuantityNamed', {
+                  set: setLabel,
+                  essence: essenceName,
+                })
+              : buildRecipeActivationIssue('ingredientSetEssenceQuantity', { set: setLabel })
           );
         }
       }
     }
 
     return {
-      valid: errors.length === 0,
-      errors,
+      valid: issues.length === 0,
+      errors: issues.map((issue) => issue.message),
+      issues,
     };
   }
 
@@ -1905,16 +1924,15 @@ export class RecipeManager {
   }
 
   _validateTagPlaceholders(recipe) {
-    const errors = [];
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const validTags = new Set(
@@ -1924,6 +1942,7 @@ export class RecipeManager {
       ].filter(Boolean)
     );
 
+    const issues = [];
     const steps =
       typeof recipe.getExecutionSteps === 'function'
         ? recipe.getExecutionSteps()
@@ -1935,7 +1954,12 @@ export class RecipeManager {
             ? ingredientSet.ingredientGroups
             : (ingredientSet.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
 
-        for (const group of groups) {
+        for (const [groupIndex, group] of groups.entries()) {
+          // Name the group by author-name or 1-based position, never its id (595).
+          const groupLabel =
+            typeof group?.name === 'string' && group.name.trim()
+              ? group.name.trim()
+              : String(groupIndex + 1);
           for (const option of group.options || []) {
             const match = option.match || null;
             if (getMatchHandler(match).type !== 'tags') continue;
@@ -1945,8 +1969,11 @@ export class RecipeManager {
               const normalized = String(tagId || '').trim();
               if (!normalized) continue;
               if (validTags.has(normalized)) continue;
-              errors.push(
-                `Ingredient group "${group.name || group.id}" references unknown tag "${normalized}"`
+              issues.push(
+                buildRecipeActivationIssue('ingredientGroupUnknownTag', {
+                  group: groupLabel,
+                  tag: normalized,
+                })
               );
             }
           }
@@ -1955,8 +1982,9 @@ export class RecipeManager {
     }
 
     return {
-      valid: errors.length === 0,
-      errors,
+      valid: issues.length === 0,
+      errors: issues.map((issue) => issue.message),
+      issues,
     };
   }
 

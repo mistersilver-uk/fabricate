@@ -84,20 +84,27 @@ export class IngredientSet {
       errors.push('Ingredient set must have at least one ingredient group or essence requirement');
     }
 
-    // Validate ingredient groups/options
-    for (const group of this.ingredientGroups) {
+    // Validate ingredient groups/options. Name the group by author-name or 1-based
+    // position (never its internal id) so this detail — surfaced through the recipe's
+    // `ingredientSetInvalid` issue — cannot leak an id on save (issue 595).
+    for (const [groupIndex, group] of this.ingredientGroups.entries()) {
       const groupValidation = group.validate({ requireComplete });
       if (!groupValidation.valid) {
-        errors.push(
-          `Ingredient group "${group.name || group.id}": ${groupValidation.errors.join(', ')}`
-        );
+        const groupLabel =
+          typeof group.name === 'string' && group.name.trim()
+            ? group.name.trim()
+            : String(groupIndex + 1);
+        errors.push(`Ingredient group "${groupLabel}": ${groupValidation.errors.join(', ')}`);
       }
     }
 
-    // Validate essence requirements
-    for (const [essenceType, quantity] of Object.entries(this.essences)) {
+    // Validate essence requirements. The set is mode/system-unaware here, so it
+    // cannot resolve an essence NAME; a bad quantity is reported name-free rather
+    // than echoing the raw essence id (issue 595). RecipeManager's essence-reference
+    // validator surfaces the same failure with a resolved essence name when it can.
+    for (const quantity of Object.values(this.essences)) {
       if (typeof quantity !== 'number' || quantity <= 0) {
-        errors.push(`Essence "${essenceType}" must have a positive quantity`);
+        errors.push('An essence requirement must have a positive quantity');
       }
     }
 

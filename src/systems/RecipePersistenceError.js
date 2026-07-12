@@ -10,7 +10,7 @@
  * `err.message`, and for the tests that pin the `Invalid recipe` / `Invalid recipe
  * update` prefixes) but ALSO carries the structured, coded `persistenceIssues` so
  * the UI layer can render a localized, id-free toast via
- * {@link module:systems/recipeActivationMessages.localizeRecipePersistenceError}.
+ * {@link module:utils/recipeActivationMessages.localizeRecipePersistenceError}.
  *
  * @typedef {{ code: string|null, params?: object, message: string }} PersistenceIssue
  */

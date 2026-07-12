@@ -1,3 +1,4 @@
+import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 
@@ -177,44 +178,53 @@ export class Recipe {
    * @private
    */
   _validate({ requireComplete = true } = {}) {
-    const errors = [];
+    // Structured, coded issues (issue 595): each carries a stable `code` + id-free
+    // params (step/set/result-group/result label as name-or-1-based-position, and a
+    // pre-composed `location` context phrase — `Recipe` or `Step "<label>"`), so the
+    // UI can localize every structural failure id-free. `errors` is derived from the
+    // issue messages; NAMED entities keep the pre-fix English wording. UNCODED plain
+    // strings (those that never carried an id) pass through as `{ code: null }`.
+    const issues = [];
+    const plain = (message) => {
+      issues.push({ code: null, params: {}, message });
+    };
 
     // Basic validation
-    if (!this.name) errors.push('Recipe must have a name');
+    if (!this.name) plain('Recipe must have a name');
 
     // Ingredient set validation
     const hasSteps = this.steps.length > 0;
     if (requireComplete && !hasSteps && this.ingredientSets.length === 0) {
-      errors.push('Recipe must have at least one ingredient set (or use explicit steps)');
+      plain('Recipe must have at least one ingredient set (or use explicit steps)');
     }
 
     if (hasSteps) {
-      for (const step of this.steps) {
+      for (const [stepIndex, step] of this.steps.entries()) {
+        const stepLabel = this._entityLabel(step, stepIndex);
         if (
           requireComplete &&
           (!Array.isArray(step.ingredientSets) || step.ingredientSets.length === 0)
         ) {
-          errors.push(`Step "${step.name || step.id}" must include at least one ingredient set`);
+          issues.push(buildRecipeActivationIssue('stepMissingIngredientSet', { step: stepLabel }));
         }
         if (
           requireComplete &&
           (!Array.isArray(step.resultGroups) || step.resultGroups.length === 0)
         ) {
-          errors.push(`Step "${step.name || step.id}" must include at least one result group`);
+          issues.push(buildRecipeActivationIssue('stepMissingResultGroup', { step: stepLabel }));
         }
-        this._validateTimeRequirement(
-          step.timeRequirement,
-          `Step "${step.name || step.id}"`,
-          errors
-        );
+        this._validateTimeRequirement(step.timeRequirement, `Step "${stepLabel}"`, issues);
       }
     } else {
-      this._validateTimeRequirement(this.timeRequirement, 'Recipe', errors);
-      for (const ingredientSet of this.ingredientSets) {
+      this._validateTimeRequirement(this.timeRequirement, 'Recipe', issues);
+      for (const [setIndex, ingredientSet] of this.ingredientSets.entries()) {
         const setValidation = ingredientSet.validate({ requireComplete });
         if (!setValidation.valid) {
-          errors.push(
-            `Ingredient set "${ingredientSet.name || ingredientSet.id}": ${setValidation.errors.join(', ')}`
+          issues.push(
+            buildRecipeActivationIssue('ingredientSetInvalid', {
+              set: this._entityLabel(ingredientSet, setIndex),
+              detail: setValidation.errors.join(', '),
+            })
           );
         }
       }
@@ -223,31 +233,31 @@ export class Recipe {
     // Result validation. Explicit multi-step recipes own their outputs on each step;
     // implicit recipes still use the top-level result groups.
     if (requireComplete && !hasSteps && this.resultGroups.length === 0) {
-      errors.push('Recipe must have at least one result group');
+      plain('Recipe must have at least one result group');
     }
 
     const resultContainers = hasSteps
-      ? this.steps.map((step) => ({
-          label: `Step "${step.name || step.id}"`,
+      ? this.steps.map((step, stepIndex) => ({
+          location: `Step "${this._entityLabel(step, stepIndex)}"`,
           resultGroups: Array.isArray(step.resultGroups) ? step.resultGroups : [],
           resultSelection: step.resultSelection || this.resultSelection,
         }))
       : [
           {
-            label: 'Recipe',
+            location: 'Recipe',
             resultGroups: this.resultGroups,
             resultSelection: this.resultSelection,
           },
         ];
 
     for (const container of resultContainers) {
-      this._validateResultGroups(container.resultGroups, container.label, errors, {
+      this._validateResultGroups(container.resultGroups, container.location, issues, {
         requireComplete,
       });
       this._validateRoutedResultSelection(
         container.resultSelection,
         container.resultGroups,
-        errors,
+        issues,
         { requireComplete }
       );
     }
@@ -260,14 +270,17 @@ export class Recipe {
       ? new Set(this.steps.flatMap((step) => (step.resultGroups || []).map((group) => group.id)))
       : resultGroupIds;
 
-    // Variable recipe validation
+    // Variable recipe validation. Name the SOURCE set by name-or-position and
+    // describe the target as a missing mapping — never echo the dangling id (595).
     if (this.isVariable) {
-      for (const ingredientSet of this.ingredientSets) {
+      for (const [setIndex, ingredientSet] of this.ingredientSets.entries()) {
         for (const mappingId of ingredientSet.resultMapping) {
           const valid = resultGroupIds.has(mappingId) || resultIds.has(mappingId);
           if (!valid) {
-            errors.push(
-              `Ingredient set "${ingredientSet.name || ingredientSet.id}" references invalid result mapping ID: ${mappingId}`
+            issues.push(
+              buildRecipeActivationIssue('ingredientSetInvalidResultMapping', {
+                set: this._entityLabel(ingredientSet, setIndex),
+              })
             );
           }
         }
@@ -277,25 +290,43 @@ export class Recipe {
     if (this.outcomeRouting && typeof this.outcomeRouting === 'object') {
       for (const [outcome, resultGroupId] of Object.entries(this.outcomeRouting)) {
         if (resultGroupId && !routableResultGroupIds.has(resultGroupId)) {
-          errors.push(
-            `Outcome routing "${outcome}" references invalid result group ID: ${resultGroupId}`
-          );
+          // `outcome` is an authored routing keyword, not an id; the dangling group
+          // id is dropped rather than echoed.
+          issues.push(buildRecipeActivationIssue('outcomeRoutingInvalidResultGroup', { outcome }));
         }
       }
     }
 
     return {
-      valid: errors.length === 0,
-      errors,
+      valid: issues.length === 0,
+      errors: issues.map((issue) => issue.message),
+      issues,
     };
   }
 
-  _validateResultGroups(resultGroups, label, errors, { requireComplete = true } = {}) {
+  /**
+   * A human-readable label for a step / ingredient set / result group / result —
+   * the author-given `name` when present, otherwise a 1-based POSITION (issue 595).
+   * Never the entity's internal id, so a validation message cannot leak one.
+   * @param {{name?: string}} entity
+   * @param {number} index 0-based index of the entity in its collection
+   * @returns {string}
+   * @private
+   */
+  _entityLabel(entity, index) {
+    const name = typeof entity?.name === 'string' ? entity.name.trim() : '';
+    return name || String(index + 1);
+  }
+
+  _validateResultGroups(resultGroups, location, issues, { requireComplete = true } = {}) {
     const resultGroupIds = new Set();
     const resultIds = new Set();
-    for (const group of resultGroups) {
+    for (const [groupIndex, group] of resultGroups.entries()) {
+      const groupLabel = this._entityLabel(group, groupIndex);
       if (resultGroupIds.has(group.id)) {
-        errors.push(`${label} has duplicate result group ID: ${group.id}`);
+        issues.push(
+          buildRecipeActivationIssue('resultGroupDuplicate', { location, group: groupLabel })
+        );
       }
       resultGroupIds.add(group.id);
       if (!Array.isArray(group.results) || group.results.length === 0) {
@@ -304,20 +335,31 @@ export class Recipe {
         // an empty one is NOT a completeness error (issue 554). Every other empty
         // group still blocks craftability under requireComplete.
         if (requireComplete && group.role !== 'failure') {
-          errors.push(`${label} result group "${group.id}" must contain at least one result`);
+          issues.push(
+            buildRecipeActivationIssue('resultGroupEmpty', { location, group: groupLabel })
+          );
         }
         continue;
       }
 
-      for (const result of group.results) {
+      for (const [resultIndex, result] of group.results.entries()) {
+        const resultLabel = this._entityLabel(result, resultIndex);
         if (resultIds.has(result.id)) {
-          errors.push(`${label} has duplicate result ID: ${result.id}`);
+          issues.push(
+            buildRecipeActivationIssue('resultDuplicate', { location, result: resultLabel })
+          );
         }
         resultIds.add(result.id);
 
         const resultValidation = result.validate();
         if (!resultValidation.valid) {
-          errors.push(`${label} result "${result.id}": ${resultValidation.errors.join(', ')}`);
+          issues.push(
+            buildRecipeActivationIssue('resultInvalid', {
+              location,
+              result: resultLabel,
+              detail: resultValidation.errors.join(', '),
+            })
+          );
         }
       }
     }
@@ -342,7 +384,7 @@ export class Recipe {
    *
    * @param {{provider?: string}} resultSelection
    * @param {Array<{id?: string, name?: string}>} resultGroups
-   * @param {string[]} errors push-target for validation messages
+   * @param {Array<{code: string|null, params: object, message: string}>} issues push-target
    * @param {{requireComplete?: boolean}} [options] When `requireComplete` is false
    *   (structural-only validation / the persistence gate) the name check is waived.
    *   The model is mode-unaware, so a routed-mode recipe carrying a STRAY leftover
@@ -353,7 +395,7 @@ export class Recipe {
   _validateRoutedResultSelection(
     resultSelection,
     resultGroups,
-    errors,
+    issues,
     { requireComplete = true } = {}
   ) {
     if (!requireComplete) return;
@@ -364,19 +406,26 @@ export class Recipe {
 
     // Reserved + unique ResultGroup.name rules apply under a legacy provider
     // (spec 004 §routedByCheck Validation), using the shared keyword set so the
-    // model and ResolutionModeService never drift.
+    // model and ResolutionModeService never drift. These key on the authored group
+    // NAME, so they carry no id — pushed as uncoded issues (id-free passthrough).
     const seenNames = new Set();
     for (const group of resultGroups || []) {
       const normalized = normalizeRoutedName(group?.name);
       if (!normalized) continue;
       if (seenNames.has(normalized)) {
-        errors.push(
-          `Duplicate result group name "${group.name}" (case-insensitive) — routed mode requires unique names`
-        );
+        issues.push({
+          code: null,
+          params: {},
+          message: `Duplicate result group name "${group.name}" (case-insensitive) — routed mode requires unique names`,
+        });
       }
       seenNames.add(normalized);
       if (isReservedRoutedName(normalized)) {
-        errors.push(`Result group name "${group.name}" conflicts with reserved routing keyword`);
+        issues.push({
+          code: null,
+          params: {},
+          message: `Result group name "${group.name}" conflicts with reserved routing keyword`,
+        });
       }
     }
   }
@@ -638,12 +687,13 @@ export class Recipe {
    * @param {string[]} errors - Accumulator the caller owns.
    * @private
    */
-  _validateTimeRequirement(timeRequirement, label, errors) {
+  _validateTimeRequirement(timeRequirement, location, issues) {
     if (!timeRequirement) return;
     for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
       const value = Number(timeRequirement?.[unit] || 0);
       if (!Number.isFinite(value) || value < 0) {
-        errors.push(`${label} has invalid time requirement value for "${unit}"`);
+        // `location` is a pre-composed, id-free context phrase (issue 595).
+        issues.push(buildRecipeActivationIssue('timeRequirementInvalid', { location, unit }));
       }
     }
   }
