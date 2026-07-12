@@ -362,6 +362,144 @@ test('CraftingRunManager: discardRun removes from active WITHOUT archiving to hi
   assert.equal(await manager.discardRun(actor, 'no-such-id'), null, 'unknown id returns null');
 });
 
+// --- Spec 002 (Data Models) "CraftingRun Requirements" invariants ---------
+// Rule 4: `finishedAt` is required for terminal statuses (`succeeded`, `failed`,
+//   `cancelled`) and must be absent for non-terminal statuses (`inProgress`,
+//   `waitingTime`).
+// Rule 2: `currentStepIndex` must be `null` for terminal statuses.
+// `completeRun` is the sole funnel through which every terminal transition
+// passes, so these guards pin all three terminal paths against it.
+//
+// NOTE ON "absent": the model represents an unfinished run as `finishedAt:
+// undefined` (an own key with an undefined value), not a missing key. The
+// normative meaning of "absent" here is "carries no finish timestamp", so these
+// tests assert `=== undefined`, NOT key-absence. Asserting the key were missing
+// would wrongly fail against the model's own `createRun` shape.
+const TERMINAL_PATHS = {
+  succeeded: (manager, actor, run) => manager.completeStepSuccess(actor, run, 0, {}),
+  failed: (manager, actor, run) => manager.completeStepFailure(actor, run, 0, 'check failed'),
+  cancelled: (manager, actor, run) => manager.cancelRun(actor, run.id),
+};
+
+test('CraftingRunManager: finishedAt is present, finite, and captures the completion world-time on every terminal transition (spec 002 rule 4)', async () => {
+  for (const [expectedStatus, finish] of Object.entries(TERMINAL_PATHS)) {
+    // Distinct create vs finish world-times: a finishedAt equal to the finish
+    // time (not the start time) proves it is written AT the terminal transition,
+    // so this fails if finishedAt were set prematurely at createRun.
+    setupGlobals(1000);
+    const manager = new CraftingRunManager();
+    const actor = new FakeActor(`Terminal-${expectedStatus}`);
+
+    const run = await manager.createRun(actor, singleStepRecipe(expectedStatus), [actor], 'user-1');
+    assert.equal(run.finishedAt, undefined, 'finishedAt is absent while the run is in progress');
+    assert.equal(run.startedAt, 1000, 'startedAt captures the creation world-time');
+
+    const finishTime = 4321;
+    globalThis.game.time.worldTime = finishTime;
+    const finished = await finish(manager, actor, run);
+
+    assert.equal(finished.status, expectedStatus, 'the run reached the expected terminal status');
+    assert.notEqual(finished.finishedAt, undefined, `${expectedStatus} run has a finishedAt`);
+    assert.ok(Number.isFinite(finished.finishedAt), 'finishedAt is a finite number');
+    assert.equal(
+      finished.finishedAt,
+      finishTime,
+      'finishedAt captures the completion world-time, not the start time'
+    );
+
+    // The archived history copy must preserve finishedAt so downstream duration /
+    // finish-time ordering never reads undefined off a terminal run.
+    const archived = manager.getRun(actor, run.id);
+    assert.equal(archived.status, expectedStatus, 'the archived run is the terminal run');
+    assert.equal(archived.finishedAt, finishTime, 'the history entry preserves finishedAt');
+  }
+});
+
+test('CraftingRunManager: finishedAt is absent on createRun and stays absent across non-terminal transitions (spec 002 rule 4)', async () => {
+  setupGlobals(1000);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('NonTerminal');
+
+  const twoStepTimed = {
+    id: 'recipe-nt',
+    craftingSystemId: 'system-nt',
+    getExecutionSteps: () => [
+      { id: 'nt-1', name: 'First', timeRequirement: { hours: 1 } },
+      { id: 'nt-2', name: 'Second' },
+    ],
+  };
+
+  // createRun -> inProgress
+  const run = await manager.createRun(actor, twoStepTimed, [actor], 'user-1');
+  assert.equal(run.status, 'inProgress');
+  assert.equal(run.finishedAt, undefined, 'no finishedAt at creation (non-terminal)');
+
+  // markStepWaitingForTime -> waitingTime (the other non-terminal status)
+  await manager.markStepWaitingForTime(actor, run, 0, { hours: 1 });
+  assert.equal(run.status, 'waitingTime');
+  assert.equal(run.finishedAt, undefined, 'no finishedAt while blocked on elapsed time');
+
+  // resume + intermediate step success -> inProgress on the next step
+  globalThis.game.time.worldTime = 1000 + 3600;
+  await manager.markStepInProgress(actor, run, 0);
+  const intermediate = await manager.completeStepSuccess(actor, run, 0, {});
+  assert.equal(intermediate.status, 'inProgress', 'a non-final step keeps the run in progress');
+  assert.equal(intermediate.currentStepIndex, 1, 'the run advanced to the next step');
+  assert.equal(
+    intermediate.finishedAt,
+    undefined,
+    'no finishedAt after an intermediate (non-terminal) step succeeds'
+  );
+});
+
+test('CraftingRunManager: currentStepIndex is null for terminal statuses and non-null while active (spec 002 rule 2)', async () => {
+  for (const [expectedStatus, finish] of Object.entries(TERMINAL_PATHS)) {
+    setupGlobals(1000);
+    const manager = new CraftingRunManager();
+    const actor = new FakeActor(`Idx-${expectedStatus}`);
+
+    const run = await manager.createRun(
+      actor,
+      singleStepRecipe(`idx-${expectedStatus}`),
+      [actor],
+      'user-1'
+    );
+    assert.equal(run.currentStepIndex, 0, 'an active run points at its current step (non-null)');
+
+    const finished = await finish(manager, actor, run);
+    assert.equal(finished.status, expectedStatus);
+    assert.equal(
+      finished.currentStepIndex,
+      null,
+      `${expectedStatus} run clears currentStepIndex to null`
+    );
+  }
+});
+
+test('CraftingRunManager: a terminal run finishing at world time 0 records finishedAt=0 (present, not absent) (spec 002 rule 4)', async () => {
+  // Precision guard: world time 0 is a valid, PRESENT finish timestamp. A naive
+  // truthy check (`if (finishedAt)`) would misread 0 as absent and mis-order
+  // history by finish time, so pin that 0 is distinct from undefined.
+  setupGlobals(0);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('ZeroTime');
+
+  const run = await manager.createRun(actor, singleStepRecipe('zero'), [actor], 'user-1');
+  const finished = await manager.cancelRun(actor, run.id);
+
+  assert.equal(finished.status, 'cancelled');
+  assert.equal(finished.finishedAt, 0, 'finishedAt is the numeric timestamp 0');
+  assert.notEqual(
+    finished.finishedAt,
+    undefined,
+    'zero is present, distinct from an absent finishedAt'
+  );
+  assert.ok(
+    Number.isFinite(finished.finishedAt),
+    'finishedAt is a finite number even at world time 0'
+  );
+});
+
 test('CraftingRunManager: pruneInstantaneousActiveRuns removes single-step no-time runs, keeps the rest', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();
