@@ -24,6 +24,12 @@ import {
   routeInteractableActivationGranted,
   routeInteractableActivationDenied,
 } from './interactableSocket.js';
+import {
+  isInteractableRegionBehavior,
+  mayApplyInteractableVisualUpdate,
+  mayDeleteInteractableVisual,
+  readLinkedVisualRef,
+} from './regions/interactableRegionFlags.js';
 import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
 
 /** Whether this client is the primary (active) GM. */
@@ -101,10 +107,20 @@ export async function applyInteractableBehaviorUpdate({
 } = {}) {
   const behavior = resolveRegionBehavior({ sceneId, regionId, behaviorId });
   if (!behavior?.update) return;
+  // Ownership guard: the resolved Region Behaviour must be a `fabricate.interactable`.
+  // Ref drift / uuid reuse / a crafted socket payload could otherwise mutate a
+  // foreign behaviour. Bail LOUDLY (not silently) so a rejected write is observable.
+  if (!isInteractableRegionBehavior(behavior)) {
+    console.warn(
+      'Fabricate | Refused an interactable behaviour update: the resolved Region Behaviour is not a fabricate.interactable',
+      { sceneId, regionId, behaviorId }
+    );
+    return;
+  }
   try {
     await behavior.update(update);
-  } catch {
-    // Defensive: a behaviour write must never throw into the socket handler.
+  } catch (error) {
+    console.warn('Fabricate | Interactable behaviour update failed', error);
   }
 }
 
@@ -134,6 +150,27 @@ function resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName } = {
 }
 
 /**
+ * Resolve the `fabricate.interactable` behaviour a visual claims to be linked to,
+ * from the visual's reverse flag ref (`linkedRegionUuid` + `linkedBehaviorId`). The
+ * Foundry edge for {@link visualLinkRoundTrips}: `fromUuidSync(regionUuid)` → the
+ * Region → `behaviors.get(behaviorId)`. Returns null when the visual carries no
+ * reverse flag or the behaviour cannot be resolved. No-throw.
+ *
+ * @param {object} doc  The resolved visual document.
+ * @returns {object|null}
+ */
+function resolveLinkedBehaviorForVisual(doc) {
+  const ref = readLinkedVisualRef(doc);
+  if (!ref) return null;
+  try {
+    const region = globalThis.fromUuidSync?.(String(ref.regionUuid));
+    return region?.behaviors?.get?.(String(ref.behaviorId)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Apply a linked-visual update (the active-GM edge for writing a linked
  * Tile/Drawing/Token, e.g. the relink reverse-flag write). No-throw, no-op when
  * the visual is missing.
@@ -150,10 +187,22 @@ export async function applyInteractableVisualUpdate({
 } = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.update) return;
+  // Ownership guard: permit the relink provenance STAMP (writes no core data), or a
+  // core-data write only when the visual is GENUINELY bidirectionally linked to its
+  // behaviour (mint-proof — a reverse flag alone does not authorize a core write).
+  // Any other write to a foreign/minted document is refused.
+  const behavior = resolveLinkedBehaviorForVisual(doc);
+  if (!mayApplyInteractableVisualUpdate(doc, update, behavior)) {
+    console.warn(
+      'Fabricate | Refused an interactable visual update: the resolved document is not a Fabricate interactable visual',
+      { sceneId, visualUuid, docId, documentName }
+    );
+    return;
+  }
   try {
     await doc.update(update);
-  } catch {
-    // Defensive: a missing/locked visual must not throw.
+  } catch (error) {
+    console.warn('Fabricate | Interactable visual update failed', error);
   }
 }
 
@@ -171,10 +220,22 @@ export async function applyInteractableVisualDelete({
 } = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.delete) return;
+  // Ownership guard: NEVER delete a document unless it is GENUINELY bidirectionally
+  // linked to its behaviour (mint-proof). A drifted/crafted uuid — or a minted
+  // reverse flag — could otherwise resolve to a foreign Tile/Drawing/Token and
+  // delete it outright.
+  const behavior = resolveLinkedBehaviorForVisual(doc);
+  if (!mayDeleteInteractableVisual(doc, behavior)) {
+    console.warn(
+      'Fabricate | Refused an interactable visual delete: the resolved document is not a Fabricate interactable visual',
+      { sceneId, visualUuid, docId, documentName }
+    );
+    return;
+  }
   try {
     await doc.delete();
-  } catch {
-    // Defensive: a missing/locked visual must not throw.
+  } catch (error) {
+    console.warn('Fabricate | Interactable visual delete failed', error);
   }
 }
 

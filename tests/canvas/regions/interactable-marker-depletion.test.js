@@ -105,10 +105,14 @@ describe('syncInteractableMarkers (edge)', () => {
   let scenes;
 
   function makeTile(src = 'icons/available.webp', flags = {}, hidden = false) {
+    // A genuine linked marker always carries the reverse linked-visual flag
+    // (buildLinkedVisualFlags at creation/relink); inject it so the ownership
+    // guard treats these fixtures as Fabricate visuals.
+    const fabricate = { isInteractableVisual: true, linkedRegionUuid: 'Scene.s1.Region.r1', linkedBehaviorId: 'b1', ...(flags.fabricate || {}) };
     return {
       uuid: TILE_UUID,
       texture: { src },
-      flags,
+      flags: { ...flags, fabricate },
       hidden,
       update(update) {
         updates.push(update);
@@ -193,6 +197,18 @@ describe('syncInteractableMarkers (edge)', () => {
     scenes = makeScenes(gatheringSystem());
     await assert.doesNotReject(syncInteractableMarkers({ scenes, ...deps({ applyTileImage: undefined }) }));
   });
+
+  it('foreign tile (no isInteractableVisual reverse flag) → no write (ownership guard)', async () => {
+    // The behaviour's linkedVisual.uuid resolves to a tile that is NOT a Fabricate
+    // interactable visual (ref drift / relinked to a foreign tile). Marker sync must
+    // never flip its hidden/texture or stamp markerAvailableImg. Depleted env would
+    // otherwise force a swap + stash — assert nothing is written.
+    tileDoc = makeTile();
+    tileDoc.flags = {}; // strip the reverse flag → a foreign tile
+    scenes = makeScenes(gatheringSystem());
+    await syncInteractableMarkers({ scenes, ...deps() });
+    assert.equal(updates.length, 0, 'no mutation is written to a non-Fabricate tile');
+  });
 });
 
 describe('syncInteractableMarkers — tile.hidden reconcile (Lock-vs-Disable visibility)', () => {
@@ -200,10 +216,11 @@ describe('syncInteractableMarkers — tile.hidden reconcile (Lock-vs-Disable vis
   let updates;
 
   function makeTile(src = 'icons/available.webp', flags = {}, hidden = false) {
+    const fabricate = { isInteractableVisual: true, linkedRegionUuid: 'Scene.s1.Region.r1', linkedBehaviorId: 'b1', ...(flags.fabricate || {}) };
     return {
       uuid: TILE_UUID,
       texture: { src },
-      flags,
+      flags: { ...flags, fabricate },
       hidden,
       update(update) {
         updates.push(update);
