@@ -211,6 +211,10 @@ See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 - A Foundry `game.settings.register` **`scope: 'client'`** setting persists in that browser/device's `localStorage`, so it is **per device, not per user account** — the same user opening the world on a second machine sees the client default, and it never follows the account.
 `scope: 'user'` is the cross-device per-user account scope, and `scope: 'world'` is shared for the world.
 Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `PROGRESSIVE_RESULT_ORDER`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user" — a preference that must follow the account needs `scope: 'user'`.
+- Foundry custom module/system sockets carry a **server-attested sender user id** as the **2nd callback argument** (`game.socket.on('module.fabricate', (payload, senderId) => …)`).
+The server sets it from the authenticated session in `dist/server/sockets.mjs handleCustomSocket` (`this.user.id`), so it is non-forgeable; a payload `userId` field is client-supplied and spoofable.
+Authenticate socket senders via the 2nd arg (e.g. gate privileged edges on `game.users.get(senderId)?.isGM`), never via the payload — `socketlib` merely wraps this same mechanism and adds no stronger guarantee (so it is not needed for sender auth).
+The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `main.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
