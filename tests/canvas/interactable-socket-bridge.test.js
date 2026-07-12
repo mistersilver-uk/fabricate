@@ -135,6 +135,33 @@ describe('applyInteractableVisualUpdate ownership guard', () => {
     assert.equal(warnings.length, 1);
   });
 
+  it('refuses a payload that SMUGGLES core data alongside the provenance stamp (foreign doc, no write)', async () => {
+    // The single-message exploit: a stamp is present so the naive check would allow
+    // it, but the same payload also carries hidden/texture/geometry against a foreign
+    // tile. The strict allowlist must reject the whole write.
+    const foreign = makeVisual({});
+    installVisual(foreign);
+    await applyInteractableVisualUpdate({
+      sceneId: SCENE_ID,
+      visualUuid: VISUAL_UUID,
+      update: { flags: { fabricate: { isInteractableVisual: true } }, hidden: true, texture: { src: 'evil.webp' }, x: 0, y: 0 },
+    });
+    assert.equal(foreign.updates.length, 0, 'the smuggled core-data write is refused');
+    assert.equal(warnings.length, 1);
+  });
+
+  it('refuses a DOT-NOTATION smuggle (flattened stamp key + flattened core key) against a foreign doc', async () => {
+    const foreign = makeVisual({});
+    installVisual(foreign);
+    await applyInteractableVisualUpdate({
+      sceneId: SCENE_ID,
+      visualUuid: VISUAL_UUID,
+      update: { 'flags.fabricate.isInteractableVisual': true, hidden: true },
+    });
+    assert.equal(foreign.updates.length, 0, 'the dot-notation smuggle is refused');
+    assert.equal(warnings.length, 1);
+  });
+
   it('still permits the relink provenance STAMP onto a not-yet-owned document', async () => {
     // The relink edge writes the reverse flag onto a GM-selected tile that is not
     // yet a Fabricate visual; that write must not be blocked by the guard.

@@ -465,14 +465,81 @@ export function isInteractableVisual(doc) {
   return readLinkedVisualRef(doc) !== null;
 }
 
+// The EXACT set of leaf paths the relink provenance stamp is allowed to write to a
+// document that is not yet a Fabricate visual. This mirrors `buildLinkedVisualFlags`
+// (`{ fabricate: { isInteractableVisual, linkedRegionUuid, linkedBehaviorId } }`).
+// Any other leaf path in the update — `hidden`, `texture.src`, `x`, `y`, a foreign
+// flag namespace, etc. — takes the write OUT of the stamp-only allowlist.
+const INTERACTABLE_VISUAL_STAMP_PATHS = Object.freeze([
+  'flags.fabricate.isInteractableVisual',
+  'flags.fabricate.linkedRegionUuid',
+  'flags.fabricate.linkedBehaviorId',
+]);
+
+/**
+ * Flatten a Foundry update patch to `[dottedPath, leafValue]` pairs. Handles BOTH
+ * nested objects (`{ flags: { fabricate: { ... } } }`) AND dot-notation keys
+ * (`{ 'flags.fabricate.isInteractableVisual': true }`) — and any mix — by joining
+ * every key with `.` as it descends, so a smuggled flattened key can never
+ * masquerade as a different path than it writes. Arrays and non-plain values are
+ * treated as opaque leaves. PURE.
+ *
+ * @param {object} obj
+ * @param {string} [prefix]
+ * @returns {Array<[string, *]>}
+ */
+function flattenUpdatePaths(obj, prefix = '') {
+  const out = [];
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+  for (const [key, value] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const nested = flattenUpdatePaths(value, path);
+      // An empty-object value writes nothing meaningful, but keep it as a leaf so a
+      // stray `{ hidden: {} }` still counts as a non-allowlisted path (fail closed).
+      if (nested.length === 0) out.push([path, value]);
+      else out.push(...nested);
+    } else {
+      out.push([path, value]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Is this update EXACTLY the relink provenance stamp and nothing else? A strict
+ * allowlist (fail-closed): the stamp MUST be present (`isInteractableVisual === true`)
+ * and EVERY written leaf path must be one of {@link INTERACTABLE_VISUAL_STAMP_PATHS}.
+ * A single foreign key — nested or dot-notation-smuggled — rejects the whole write.
+ *
+ * @param {object} [update]
+ * @returns {boolean}
+ */
+function isInteractableVisualStampOnly(update) {
+  if (!update || typeof update !== 'object' || Array.isArray(update)) return false;
+  const entries = flattenUpdatePaths(update);
+  if (entries.length === 0) return false;
+  let stamped = false;
+  for (const [path, value] of entries) {
+    if (!INTERACTABLE_VISUAL_STAMP_PATHS.includes(path)) return false;
+    if (path === 'flags.fabricate.isInteractableVisual') {
+      if (value !== true) return false;
+      stamped = true;
+    }
+  }
+  return stamped;
+}
+
 /**
  * Ownership guard for a linked-visual UPDATE write. A write is permitted when the
- * resolved document is ALREADY a Fabricate interactable visual, OR when the write
- * itself STAMPS the reverse provenance flag (`flags.fabricate.isInteractableVisual
- * === true`). The stamp exception preserves the relink edge, which writes the
- * reverse flag onto a GM-selected document that is not yet a Fabricate visual;
- * that write only adds provenance (no `hidden`/`texture` change), so it is safe.
- * Any other write to a non-Fabricate document is rejected.
+ * resolved document is ALREADY a Fabricate interactable visual (any write), OR when
+ * the update is EXACTLY the relink provenance stamp — the `flags.fabricate` reverse
+ * block ({@link buildLinkedVisualFlags}) and NOTHING else. The stamp exception
+ * preserves the relink edge (writing the reverse flag onto a GM-selected document
+ * that is not yet a Fabricate visual) while a strict, fail-closed allowlist stops a
+ * crafted payload from smuggling `hidden`/`texture`/geometry writes — or a
+ * dot-notation-flattened foreign key — alongside the stamp against a foreign
+ * document. Any other write to a non-Fabricate document is rejected.
  *
  * @param {object} doc  The resolved visual document.
  * @param {object} [update]  The pending document update patch.
@@ -480,5 +547,5 @@ export function isInteractableVisual(doc) {
  */
 export function mayApplyInteractableVisualUpdate(doc, update) {
   if (isInteractableVisual(doc)) return true;
-  return update?.flags?.fabricate?.isInteractableVisual === true;
+  return isInteractableVisualStampOnly(update);
 }

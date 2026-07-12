@@ -480,14 +480,62 @@ test('mayApplyInteractableVisualUpdate permits an owned doc or a provenance-stam
   // A foreign document rejects a core-data write (hidden/texture).
   assert.equal(mayApplyInteractableVisualUpdate(foreignDoc, { hidden: true }), false);
   assert.equal(mayApplyInteractableVisualUpdate(foreignDoc, { texture: { src: 'x' } }), false);
-  // The relink stamp (writing the reverse flag onto a GM-selected doc) is allowed.
+  // The relink stamp (writing the reverse flag onto a GM-selected doc) is allowed,
+  // whether the ref block is minimal or complete.
   assert.equal(
     mayApplyInteractableVisualUpdate(foreignDoc, { flags: { fabricate: { isInteractableVisual: true } } }),
     true
   );
+  assert.equal(mayApplyInteractableVisualUpdate(foreignDoc, { flags: { fabricate } }), true);
   // A clear write (isInteractableVisual: null) onto a foreign doc is NOT a stamp → rejected.
   assert.equal(
     mayApplyInteractableVisualUpdate(foreignDoc, { flags: { fabricate: { isInteractableVisual: null } } }),
     false
+  );
+});
+
+test('mayApplyInteractableVisualUpdate rejects core-data smuggled alongside the stamp (strict allowlist)', () => {
+  const foreignDoc = { flags: {} };
+  // Nested smuggle: the stamp is present but so is core data → rejected.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      flags: { fabricate: { isInteractableVisual: true } },
+      hidden: true,
+      texture: { src: 'evil.webp' },
+      x: 0,
+      y: 0
+    }),
+    false
+  );
+  // Dot-notation smuggle: a flattened stamp key alongside a flattened core key → rejected.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      'flags.fabricate.isInteractableVisual': true,
+      hidden: true
+    }),
+    false
+  );
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      'flags.fabricate.isInteractableVisual': true,
+      'texture.src': 'evil.webp'
+    }),
+    false
+  );
+  // A foreign flag namespace alongside the stamp → rejected.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      flags: { fabricate: { isInteractableVisual: true }, core: { sheetClass: 'x' } }
+    }),
+    false
+  );
+  // A pure dot-notation stamp (no core data) is still a valid stamp → allowed.
+  assert.equal(
+    mayApplyInteractableVisualUpdate(foreignDoc, {
+      'flags.fabricate.isInteractableVisual': true,
+      'flags.fabricate.linkedRegionUuid': 'Scene.s.Region.r',
+      'flags.fabricate.linkedBehaviorId': 'b1'
+    }),
+    true
   );
 });
