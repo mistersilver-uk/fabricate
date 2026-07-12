@@ -686,7 +686,7 @@ export async function runFormulaRouted({
       diceGroups,
       // Additive on a min-tier failure only: the tier that WAS rolled, for a richer
       // chat/journal explanation later. Absent on a normal route.
-      ...(minTierFailed ? { minTierFailed: true, rolledOutcomeId: matched?.id ?? null } : {}),
+      ...(minTierFailed && { minTierFailed: true, rolledOutcomeId: matched?.id ?? null }),
     },
     message: success ? null : `${label} check failed`,
   };

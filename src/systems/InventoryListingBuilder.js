@@ -853,7 +853,7 @@ export class InventoryListingBuilder {
     // Tool id → componentId, so a recipe's tool references resolve to components.
     const toolComponentById = new Map();
     for (const tool of Array.isArray(system?.tools) ? system.tools : []) {
-      if (tool?.id && tool?.componentId) toolComponentById.set(tool.id, tool.componentId);
+      if (tool?.id && tool.componentId) toolComponentById.set(tool.id, tool.componentId);
     }
 
     // Used-by: per-recipe dedupe of (targetId, role).

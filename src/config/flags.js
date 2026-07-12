@@ -36,7 +36,7 @@ export function getFabricateFlag(document, key, defaultValue = null) {
 
   try {
     const value = document.getFlag(FABRICATE_FLAG_NAMESPACE, normalizeFlagKey(key));
-    return value !== undefined && value !== null ? value : defaultValue;
+    return value ?? defaultValue;
   } catch {
     return defaultValue;
   }

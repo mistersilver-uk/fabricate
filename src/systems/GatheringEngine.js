@@ -3400,7 +3400,7 @@ function normalizeCheckResult(raw) {
     diagnostic: raw.diagnostic ?? null,
     // Preserve the engine-evaluated flag (issue 419) so the shared breakage seam
     // can honour `data.breakTools` / `checkBreakage` triggers under checkDriven.
-    ...(raw.engineEvaluated === true ? { engineEvaluated: true } : {}),
+    ...(raw.engineEvaluated === true && { engineEvaluated: true }),
   };
 }
 

@@ -152,7 +152,7 @@ function _reconcileTieredRecipe(recipe) {
     for (const step of recipe.steps) {
       if (!_isPlainObject(step)) continue;
       const ok = _reconcileContainer(step, `${recipe.id}/${step.id}`);
-      migratable = migratable && ok;
+      migratable &&= ok;
     }
   }
 

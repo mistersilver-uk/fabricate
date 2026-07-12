@@ -174,7 +174,7 @@ function claimedRoleId(item, systemId, roleKey) {
   const perSystem = roles[systemId];
   if (!perSystem || typeof perSystem !== 'object') return null;
   const claimed = perSystem[roleKey];
-  return claimed == null ? null : claimed;
+  return claimed ?? null;
 }
 
 /**

@@ -326,9 +326,9 @@ export class GatheringEnvironmentStore {
         ? (data.eventSelectionMode ?? data.hazardSelectionMode)
         : 'allDrops',
       eventPolicy: normalizeEventPolicy(data?.eventPolicy ?? data?.hazardPolicy),
-      ...(blindSelection ? { blindSelection } : {}),
-      ...(forcedTaskIds.length > 0 ? { forcedTaskIds } : {}),
-      ...(forcedEventIds.length > 0 ? { forcedEventIds } : {}),
+      ...(blindSelection && { blindSelection }),
+      ...(forcedTaskIds.length > 0 && { forcedTaskIds }),
+      ...(forcedEventIds.length > 0 && { forcedEventIds }),
       // Per-environment node runtime state (taskId → node object), so a library
       // task's resource nodes deplete/respawn independently in each environment.
       nodeRuntime: normalizeNodeRuntime(data?.nodeRuntime),

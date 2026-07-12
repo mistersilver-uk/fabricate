@@ -242,7 +242,7 @@ export class CraftingRunManager {
     run.status = 'inProgress';
     run.currentStepIndex = stepIndex;
     step.status = 'inProgress';
-    step.startedAt = step.startedAt ?? worldTime;
+    step.startedAt ??= worldTime;
     step.updatedAt = worldTime;
     await this.updateRun(actor, run);
     return run;
@@ -272,7 +272,7 @@ export class CraftingRunManager {
     const nextStep = run.steps[nextIndex];
     if (nextStep) {
       nextStep.status = 'inProgress';
-      nextStep.startedAt = nextStep.startedAt ?? worldTime;
+      nextStep.startedAt ??= worldTime;
       nextStep.updatedAt = worldTime;
     }
     await this.updateRun(actor, run);
