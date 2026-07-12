@@ -972,6 +972,61 @@ test('routed check: a misconfiguration records step failure and never reports su
   );
 });
 
+test('routed check: a misconfiguration aborts BEFORE consuming ingredients (issue 85)', async () => {
+  // The core defect: a matched signature that resolves to an unroutable result group
+  // must abort with ZERO mutation. Before the fix, ingredients were consumed at the
+  // top of the success path and the misconfiguration was only detected AFTER — so the
+  // player lost ingredients on a GM-side misconfiguration. The source herb (id
+  // `herb-t`) IS the ingredient the recipe consumes, so it lands in the consumption
+  // plan; assert it is left untouched.
+  const { system, herb, recipe } = buildLegacyOutcomeRoutingFixture();
+  setupGame(system);
+
+  const sourceActor = new FakeActor('BrewerNoConsume', [herb]);
+  const craftingActor = new FakeActor('BrewerNoConsume');
+
+  const recipeManager = buildMockRecipeManager(true);
+  const runManager = new CraftingRunManager();
+  const resolutionService = buildResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
+
+  // The routed check succeeds with an outcome that matches NO result group name
+  // ("pass" / "Weak Brew"), so resolution yields disposition:'misconfiguration'.
+  engine._runCraftingCheck = async () => ({
+    success: true,
+    outcome: 'partial',
+    value: null,
+    data: {},
+  });
+
+  const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(craftResult.success, false, 'a misconfiguration must not report success');
+  assert.equal(craftResult.results, null, 'no results are returned on a misconfiguration');
+  assert.equal(
+    craftResult.disposition,
+    'misconfiguration',
+    'the result carries the misconfiguration disposition'
+  );
+  assert.match(
+    craftResult.message,
+    /No result group matches outcome "partial"/,
+    'the actionable GM diagnostic surfaces as the message'
+  );
+
+  // The load-bearing assertions for issue 85: ingredients are NOT consumed.
+  assert.equal(herb._updates.length, 0, 'the ingredient must NOT be updated (not partially consumed)');
+  assert.equal(herb._deleted, false, 'the ingredient must NOT be deleted');
+  assert.equal(herb.system.quantity, 5, 'the ingredient quantity is unchanged');
+  assert.equal(craftingActor._createdDocs.length, 0, 'no items are created');
+
+  // The run is closed out as a failure, not left dangling active.
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run lingers');
+  const history = runManager.getRunHistory(craftingActor);
+  assert.equal(history.length, 1, 'the misconfigured craft records exactly one failed run');
+  assert.equal(history[0].status, 'failed', 'the run is recorded as a step failure');
+});
+
 // ===========================================================================
 // Group 4: Progressive mode integration (AC4)
 // ===========================================================================

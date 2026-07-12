@@ -193,7 +193,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 4. If signature matches:
    - resolve the target recipe + ingredient set,
    - execute provider-specific routing (`ingredientSet` or `check`),
-   - if routed output does not resolve to a valid result group, abort with crafting-system misconfiguration error and do not apply player-failure consumption,
+   - if routed output does not resolve to a valid result group, abort with a crafting-system misconfiguration error BEFORE any consumption — no ingredients, currency, or tools are consumed or broken — and report failure (never a player success with zero items),
    - if routing returns a reserved failure keyword, apply alchemy failure policy (`consumeOnFail`, default true),
    - on success, consume inputs and create outputs normally.
 5. Learn flow:

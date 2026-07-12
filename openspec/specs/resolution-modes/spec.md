@@ -152,7 +152,9 @@ Resolution never aborts with a misconfiguration for an unmatched success outcome
   2. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes the failure path.
   3. If the scope has exactly one result group, that single group is produced for any non-failure outcome (no mapping required).
   4. Otherwise, with multiple result groups, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
-  5. If multiple result groups are present and no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
+  5. If multiple result groups are present and no result-group name matches, execution aborts with a crafting-system misconfiguration error (not a player failure outcome).
+     The abort is a zero-mutation abort: it happens BEFORE any consumption, so no ingredients, currency, or tools are consumed or broken, and the craft reports failure (never a player success with zero items).
+     A resolved-but-unassigned outcome tier (`unrouted-tier`) is treated identically.
 
 ### Validation
 
@@ -239,7 +241,7 @@ This alchemy-scoped resolution MUST NOT be pushed into the shared `findMatchingC
 - Signature overlap is invalid across all recipes in the system.
 - No-signature-match (a fizzle) is treated as a failed attempt: the player sees a specific failure message and the submitted ingredients are consumed (per `alchemy.consumeOnFail`).
 Learning is never granted by a fizzle.
-- The matched-but-unroutable **misconfiguration** path (abort without applying player-failure consumption; return actionable GM diagnostics) applies to **Tiered only** (None/Simple do not route by name).
+- The matched-but-unroutable **misconfiguration** path applies to **Tiered only** (None/Simple do not route by name): the craft aborts with ZERO mutation BEFORE any consumption (no ingredients, currency, or tools consumed or broken), reports failure (never a player success with zero items), and returns actionable GM diagnostics.
 The reserved-keyword "nothing" rule must not collide with Simple's producing failure group.
 
 ### Alchemy UI Interaction Model

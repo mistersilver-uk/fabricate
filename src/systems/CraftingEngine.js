@@ -98,6 +98,23 @@ export class CraftingEngine {
   }
 
   /**
+   * A resolution `meta.disposition` that represents a crafting-system MISCONFIGURATION
+   * (issue 85): a matched signature whose awarded result group cannot be resolved. This
+   * is a GM-side authoring gap, not a rolled player failure — the craft must abort with
+   * ZERO mutation (no ingredient, currency, or tool consumption) and report failure, not
+   * a silent empty success. Covers an unrecognized routed/tiered check outcome
+   * (`misconfiguration`), a resolved-but-unassigned outcome tier (`unrouted-tier`), and an
+   * unknown resolution mode (`error`).
+   *
+   * @private
+   * @param {string|null|undefined} disposition
+   * @returns {boolean}
+   */
+  _isMisconfigurationDisposition(disposition) {
+    return ['misconfiguration', 'unrouted-tier', 'error'].includes(disposition);
+  }
+
+  /**
    * Attempt to craft an item using a recipe
    * @param {Actor} craftingActor - The actor where results will be added
    * @param {Actor[]} componentSourceActors - The actors to consume ingredients from
@@ -605,6 +622,59 @@ export class CraftingEngine {
         };
       }
 
+      // PRE-CONSUMPTION MISCONFIGURATION GATE (issue 85). Resolve the awarded result
+      // group(s) BEFORE consuming anything. A matched signature whose routed/tiered
+      // check outcome resolves to no valid result group (an unrecognized outcome, an
+      // unrouted tier, or an unknown mode) is a crafting-system misconfiguration — a
+      // GM-side authoring gap, not a player success or a rolled failure. Abort here with
+      // ZERO mutation so ingredients, currency, and tools are never consumed or broken,
+      // record the run as a step failure, and surface the actionable GM diagnostic
+      // (spec `resolution-modes` §Alchemy Mode and `recipes-and-steps` §Alchemy Execution
+      // Lifecycle). Resolution is a pure, deterministic read of the recipe/step/ingredient
+      // set/check result, so it agrees with the resolution `_createResultItems` performs
+      // after consumption — this simply moves detection ahead of any mutation.
+      if (typeof resolutionService?.resolveResultGroups === 'function') {
+        const preflightResolution = resolutionService.resolveResultGroups({
+          recipe: executionRecipe,
+          step,
+          ingredientSet,
+          checkResult,
+          selectedResultGroupId: options?.resultGroupId || null,
+        });
+        if (this._isMisconfigurationDisposition(preflightResolution?.meta?.disposition)) {
+          const message = preflightResolution.meta.error || 'Crafting resolution failed';
+          if (runManager && run) {
+            await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+              selectedIngredientSetId: ingredientSet.id,
+              lastCheckResult: {
+                success: false,
+                reason: message,
+                outcome: checkResult.outcome ?? undefined,
+                value: checkResult.value ?? undefined,
+                data: checkResult.data || {},
+              },
+              consumedIngredients: [],
+              usedTools: [],
+            });
+          }
+          await this._postCraftChatMessage({
+            success: false,
+            craftingActor,
+            recipe,
+            consumedIngredients: [],
+            tools: [],
+            createdResults: [],
+            failureReason: message,
+          });
+          return {
+            success: false,
+            results: null,
+            message,
+            disposition: 'misconfiguration',
+          };
+        }
+      }
+
       // Consume ingredients from the single craft selection's item plan.
       const consumedItems = await this._consumeIngredients(craftSelection.plan);
 
@@ -641,8 +711,11 @@ export class CraftingEngine {
       // losing currency if ingredient consumption throws.
       await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
-      // Create the result item(s)
-      const { items: resultItems, resolutionMeta } = await this._createResultItems(
+      // Create the result item(s). The awarded result group was already resolved and
+      // validated by the pre-consumption misconfiguration gate above (a matched signature
+      // that could not resolve to a valid result group aborted before any consumption),
+      // so this deterministic re-resolution inside `_createResultItems` yields real groups.
+      const { items: resultItems } = await this._createResultItems(
         craftingActor,
         executionRecipe,
         step,
@@ -654,45 +727,6 @@ export class CraftingEngine {
         null,
         resolveComponent
       );
-
-      if (
-        resolutionMeta?.disposition === 'error' ||
-        resolutionMeta?.disposition === 'misconfiguration'
-      ) {
-        const message = resolutionMeta.error || 'Crafting resolution failed';
-        if (runManager && run) {
-          await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
-            selectedIngredientSetId: ingredientSet.id,
-            lastCheckResult: {
-              success: false,
-              reason: message,
-              outcome: checkResult.outcome ?? undefined,
-              value: checkResult.value ?? undefined,
-              data: checkResult.data || {},
-            },
-            consumedIngredients: consumedItems.map(({ item, quantity }) => ({
-              actorUuid: item.parent?.uuid || null,
-              itemUuid: item.uuid,
-              quantity,
-            })),
-            usedTools,
-          });
-        }
-        await this._postCraftChatMessage({
-          success: false,
-          craftingActor,
-          recipe,
-          consumedIngredients: consumedItems,
-          tools: toolValidation.tools,
-          createdResults: [],
-          failureReason: message,
-        });
-        return {
-          success: false,
-          results: null,
-          message,
-        };
-      }
 
       if (runManager && run) {
         run = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
