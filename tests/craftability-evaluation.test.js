@@ -1148,3 +1148,106 @@ test('issue 551: a currency-matched tile shows a coin icon instead of a blank', 
   );
   assert.notEqual(result.ingredientStates[0].img, null);
 });
+
+// ---------------------------------------------------------------------------
+// Issue 553: the displayed ingredient tile must match the option/item the
+// engine actually consumes. The engine (resolveIngredientSelection) walks groups
+// in order and deducts consumed quantities, so a shared component can satisfy an
+// earlier group and force a later group onto a DIFFERENT option/item. The tile
+// must follow the engine's selection, not re-derive its own.
+// ---------------------------------------------------------------------------
+
+test('issue 553: a component shared across two groups shows the option the engine consumes, not a re-derived one', () => {
+  // Recipe: group1 options [A, B], group2 options [A, C]. Actor holds 1x A, 1x B, 1x C.
+  // Engine: group1 takes A (A now exhausted); group2 cannot use A, falls through to C.
+  // The old display re-derived group2 as satisfied by A (no deduction) — wrong.
+  const systemId = 'sys-553-comp';
+  const compA = 'comp-553-a';
+  const compB = 'comp-553-b';
+  const compC = 'comp-553-c';
+  const srcA = 'Item.553-a-source';
+  const srcB = 'Item.553-b-source';
+  const srcC = 'Item.553-c-source';
+
+  const set = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData(compA, 1), makeComponentIngredientData(compB, 1)]),
+    makeGroupData([makeComponentIngredientData(compA, 1), makeComponentIngredientData(compC, 1)]),
+  ]);
+  const recipe = new Recipe({
+    name: 'Shared Component Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compA, registeredItemUuid: srcA, name: 'Component A', img: 'icons/a.webp' },
+    { id: compB, registeredItemUuid: srcB, name: 'Component B', img: 'icons/b.webp' },
+    { id: compC, registeredItemUuid: srcC, name: 'Component C', img: 'icons/c.webp' },
+  ]);
+
+  const actor = makeActor([
+    makeComponentItem('held-a', srcA, 1),
+    makeComponentItem('held-b', srcB, 1),
+    makeComponentItem('held-c', srcC, 1),
+  ]);
+  const result = manager.evaluateCraftability([actor], recipe);
+
+  assert.equal(result.canCraft, true, 'shared component still yields a craftable recipe via A + C');
+  assert.equal(result.ingredientStates.length, 2);
+
+  // group1 consumes A.
+  assert.equal(result.ingredientStates[0].componentId, compA, 'group1 shows the consumed A');
+  assert.equal(result.ingredientStates[0].name, 'Component A');
+
+  // group2 must show C (the engine's fall-through), NOT the re-derived A.
+  assert.equal(
+    result.ingredientStates[1].componentId,
+    compC,
+    'group2 shows the option the engine actually consumes (C), not the shared A'
+  );
+  assert.equal(result.ingredientStates[1].name, 'Component C');
+  assert.equal(result.ingredientStates[1].img, 'icons/c.webp');
+  assert.equal(result.ingredientStates[1].satisfied, true);
+});
+
+test('issue 553: two items sharing a tag show the item each group actually consumes', () => {
+  // Two groups both satisfied by tag 'metal'; actor holds two DIFFERENT metal items.
+  // The engine consumes metal-A for group1 (deducting it) and metal-B for group2.
+  // The old display borrowed the FIRST tag-matching item (metal-A) for BOTH tiles.
+  const systemId = 'sys-553-tag';
+  const set = makeIngredientSet([
+    makeGroupData([makeTagIngredientData(['metal'], 1)]),
+    makeGroupData([makeTagIngredientData(['metal'], 1)]),
+  ]);
+  const recipe = new Recipe({
+    name: 'Shared Tag Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, []);
+
+  const actor = makeActor([
+    makeTaggedItem('metal-a', ['metal'], 'icons/metal-a.webp', 1),
+    makeTaggedItem('metal-b', ['metal'], 'icons/metal-b.webp', 1),
+  ]);
+  const result = manager.evaluateCraftability([actor], recipe);
+
+  assert.equal(result.canCraft, true, 'two distinct metal items satisfy the two metal groups');
+  assert.equal(result.ingredientStates.length, 2);
+
+  // group1's tile borrows the image of the item the engine consumes first (metal-A).
+  assert.equal(
+    result.ingredientStates[0].img,
+    'icons/metal-a.webp',
+    'group1 tile shows the consumed metal-A image'
+  );
+
+  // group2's tile must borrow metal-B's image — the item the engine consumes for it —
+  // not metal-A (the first tag-matching held item the old display re-derived).
+  assert.equal(
+    result.ingredientStates[1].img,
+    'icons/metal-b.webp',
+    'group2 tile shows the consumed metal-B image, not the re-derived first-match metal-A'
+  );
+});

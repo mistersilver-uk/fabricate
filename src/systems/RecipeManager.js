@@ -741,6 +741,13 @@ export class RecipeManager {
       (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
     );
 
+    // resolveIngredientSelection appends exactly ONE entry to selectedIngredients
+    // per NON-missing group, in group order (an item- or currency-satisfied group
+    // pushes its chosen option; a missing group pushes to missingGroups instead).
+    // Track how many satisfied groups we have seen so each satisfied group can read
+    // its own chosen option by position.
+    let satisfiedGroupIndex = 0;
+
     return groups.map((group) => {
       const options = group.options || [];
 
@@ -770,39 +777,41 @@ export class RecipeManager {
         };
       }
 
-      // This group is satisfied — find which option was selected.
-      // The selectedIngredients array holds the chosen option objects in group order.
-      // We match by position: selected options appear in the same order as groups
-      // (groups are iterated in order; selectedIngredients are appended in order).
-      //
-      // To avoid positional assumptions we instead compute have/need for each option
-      // using the availableItems (no remaining-quantity deduction here — we only need
-      // display values, and the group is already known to be satisfied).
-      const optionStates = options.map((ing) => {
-        const matchingItems = availableItems.filter((item) =>
-          this.ingredientMatchesItem(recipe, ing, item)
-        );
-        const totalQty = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
-        return {
-          ingredient: ing,
-          description: this._resolveIngredientDescription(recipe, ing) || '',
-          need: ing.quantity,
-          have: totalQty,
-          satisfied: totalQty >= ing.quantity,
-        };
-      });
+      // This group is satisfied — display the SAME option the engine will consume
+      // (issue 553), read straight from the selection rather than re-derived here.
+      // A previous version recomputed each option's have/need from availableItems
+      // with no remaining-quantity deduction and picked the first satisfied option;
+      // when one component can satisfy two groups, that could name/picture an option
+      // the craft does not spend (the engine deducts as it walks groups, so a later
+      // group falls through to a different option). Mirroring the engine's chosen
+      // option keeps the tile and the craft in agreement.
+      const chosenOption =
+        selection?.selectedIngredients?.[satisfiedGroupIndex] ?? options[0] ?? null;
+      satisfiedGroupIndex += 1;
 
-      const satisfiedOption = optionStates.find((s) => s.satisfied) || optionStates[0];
+      // The specific inventory item the engine will consume for this option, from the
+      // same consumption plan, so a shared tag/component tile shows the CONSUMED item
+      // rather than the first inventory item that merely matches (issue 553).
+      const consumedItem =
+        (selection?.plan || []).find((entry) => entry.ingredient === chosenOption)?.item || null;
+
+      const matchingItems = availableItems.filter((item) =>
+        this.ingredientMatchesItem(recipe, chosenOption, item)
+      );
+      const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
       const visual = this._resolveIngredientVisual(
         recipe,
-        satisfiedOption?.ingredient || options[0],
-        availableItems
+        chosenOption,
+        availableItems,
+        consumedItem
       );
       return {
         ...visual,
-        description: optionStates.map((s) => s.description).join(' OR '),
-        need: satisfiedOption?.need || 1,
-        have: satisfiedOption?.have || 0,
+        description: options
+          .map((o) => this._resolveIngredientDescription(recipe, o) || '')
+          .join(' OR '),
+        need: Number(chosenOption?.quantity || 1),
+        have,
         satisfied: true,
       };
     });
@@ -842,10 +851,15 @@ export class RecipeManager {
    * @param {Ingredient|null} ingredient
    * @param {Item[]} [availableItems] - live inventory used to resolve a tag tile's
    *   image from a satisfying item; defaults to none.
+   * @param {Item|null} [consumedItem] - the specific inventory item the engine will
+   *   actually consume for this option (from the resolved consumption plan). When
+   *   supplied, a tag tile borrows THIS item's image so the tile matches the item
+   *   the craft spends, not merely the first inventory item that shares the tag
+   *   (issue 553). Falls back to the first tag-matching held item (issue 551).
    * @returns {{ componentId: string|null, name: string, img: string|null }}
    * @private
    */
-  _resolveIngredientVisual(recipe, ingredient, availableItems = []) {
+  _resolveIngredientVisual(recipe, ingredient, availableItems = [], consumedItem = null) {
     const match = ingredient?.match || null;
     if (match?.type === 'component' && match.componentId) {
       return {
@@ -858,9 +872,9 @@ export class RecipeManager {
     const name = ingredient?.getDescription?.() || '';
 
     if (match?.type === 'tags') {
-      const matchingItem = (availableItems || []).find((item) =>
-        this.ingredientMatchesItem(recipe, ingredient, item)
-      );
+      const matchingItem =
+        consumedItem ||
+        (availableItems || []).find((item) => this.ingredientMatchesItem(recipe, ingredient, item));
       return { componentId: null, name, img: matchingItem?.img || FALLBACK_TAG_IMG };
     }
 
