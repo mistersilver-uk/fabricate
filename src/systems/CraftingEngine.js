@@ -1,4 +1,9 @@
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  FABRICATE_FLAG_NAMESPACE,
+  getFabricateFlag,
+  isSafeFlagKeySegment,
+  setFabricateFlag,
+} from '../config/flags.js';
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
@@ -38,6 +43,47 @@ function toolDisplayReference(tool) {
   const componentId = tool?.componentId || tool?.systemItemId;
   if (componentId) return `componentId: ${componentId}`;
   return tool?.label || tool?.name || tool?.id || 'unknown';
+}
+
+/**
+ * Stamp the durable per-system component identity on a crafted OUTPUT item's data,
+ * BEFORE creation, so the inventory matcher attributes it to its OWN component
+ * regardless of naming collisions or Foundry's transitive `_stats.duplicateSource`
+ * chain (issue 539). A crafted item built from `sourceItem.toObject()` inherits the
+ * source's `duplicateSource`, which — for a component whose source was itself
+ * duplicated from a SIBLING component's item — points at the sibling and mis-attributes
+ * the output through the raw-reference fall-through.
+ *
+ * The stamp keys the SAME location the canonical reader `resolveComponentForItem` reads
+ * FIRST for an owned item — its tier-1 durable-flag identity
+ * (`durableClaimedComponent` → `claimedRoleId` → `flags.fabricate.roles[systemId].componentId`
+ * in `src/utils/sourceUuid.js`) — so a freshly crafted item resolves to its own component
+ * by identity and never reaches the source-ref tier. Mirrors the source-side stamp
+ * {@link CraftingSystemManager#autoStampComponentSources} writes via
+ * `setFabricateFlag(source, 'roles.<systemId>.componentId', id)`: the roles map lives at
+ * the doubly-nested `flags.fabricate.fabricate.roles` path (`normalizeFlagKey` prefixes
+ * `fabricate.`, then `expandObject` nests it under the `fabricate` scope), so on a plain
+ * item-data object that same path is written directly.
+ *
+ * A dotted/unsafe `systemId` can never be a `roles` map key (every stamp/repair site skips
+ * it), so it is skipped here too and the item resolves via the raw-reference fall-through.
+ *
+ * @param {object} itemData - The plain item-data object about to be created.
+ * @param {string|null|undefined} systemId - The crafting system's id.
+ * @param {string|null|undefined} componentId - The result component's id.
+ */
+function stampCraftedComponentIdentity(itemData, systemId, componentId) {
+  if (!itemData || !componentId || !isSafeFlagKeySegment(systemId)) return;
+  // Build the doubly-nested `flags.fabricate.fabricate.roles[systemId]` container in
+  // place without depending on `foundry.utils.setProperty` (the source-side stamp goes
+  // through `setFlag`; here the item is unsaved data), preserving any sibling flags and
+  // any existing `roles` leaves for other systems.
+  const flags = (itemData.flags ||= {});
+  const namespace = (flags[FABRICATE_FLAG_NAMESPACE] ||= {});
+  const nested = (namespace[FABRICATE_FLAG_NAMESPACE] ||= {});
+  const roles = (nested.roles ||= {});
+  const perSystem = (roles[systemId] ||= {});
+  perSystem.componentId = componentId;
 }
 
 /**
@@ -95,6 +141,23 @@ export class CraftingEngine {
    */
   _alchemyComponentResolver(options) {
     return options?.isAlchemyAttempt === true ? resolveAlchemySubmissionComponent : undefined;
+  }
+
+  /**
+   * A resolution `meta.disposition` that represents a crafting-system MISCONFIGURATION
+   * (issue 85): a matched signature whose awarded result group cannot be resolved. This
+   * is a GM-side authoring gap, not a rolled player failure — the craft must abort with
+   * ZERO mutation (no ingredient, currency, or tool consumption) and report failure, not
+   * a silent empty success. Covers an unrecognized routed/tiered check outcome
+   * (`misconfiguration`), a resolved-but-unassigned outcome tier (`unrouted-tier`), and an
+   * unknown resolution mode (`error`).
+   *
+   * @private
+   * @param {string|null|undefined} disposition
+   * @returns {boolean}
+   */
+  _isMisconfigurationDisposition(disposition) {
+    return ['misconfiguration', 'unrouted-tier', 'error'].includes(disposition);
   }
 
   /**
@@ -605,6 +668,59 @@ export class CraftingEngine {
         };
       }
 
+      // PRE-CONSUMPTION MISCONFIGURATION GATE (issue 85). Resolve the awarded result
+      // group(s) BEFORE consuming anything. A matched signature whose routed/tiered
+      // check outcome resolves to no valid result group (an unrecognized outcome, an
+      // unrouted tier, or an unknown mode) is a crafting-system misconfiguration — a
+      // GM-side authoring gap, not a player success or a rolled failure. Abort here with
+      // ZERO mutation so ingredients, currency, and tools are never consumed or broken,
+      // record the run as a step failure, and surface the actionable GM diagnostic
+      // (spec `resolution-modes` §Alchemy Mode and `recipes-and-steps` §Alchemy Execution
+      // Lifecycle). Resolution is a pure, deterministic read of the recipe/step/ingredient
+      // set/check result, so it agrees with the resolution `_createResultItems` performs
+      // after consumption — this simply moves detection ahead of any mutation.
+      if (typeof resolutionService?.resolveResultGroups === 'function') {
+        const preflightResolution = resolutionService.resolveResultGroups({
+          recipe: executionRecipe,
+          step,
+          ingredientSet,
+          checkResult,
+          selectedResultGroupId: options?.resultGroupId || null,
+        });
+        if (this._isMisconfigurationDisposition(preflightResolution?.meta?.disposition)) {
+          const message = preflightResolution.meta.error || 'Crafting resolution failed';
+          if (runManager && run) {
+            await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+              selectedIngredientSetId: ingredientSet.id,
+              lastCheckResult: {
+                success: false,
+                reason: message,
+                outcome: checkResult.outcome ?? undefined,
+                value: checkResult.value ?? undefined,
+                data: checkResult.data || {},
+              },
+              consumedIngredients: [],
+              usedTools: [],
+            });
+          }
+          await this._postCraftChatMessage({
+            success: false,
+            craftingActor,
+            recipe,
+            consumedIngredients: [],
+            tools: [],
+            createdResults: [],
+            failureReason: message,
+          });
+          return {
+            success: false,
+            results: null,
+            message,
+            disposition: preflightResolution.meta.disposition,
+          };
+        }
+      }
+
       // Consume ingredients from the single craft selection's item plan.
       const consumedItems = await this._consumeIngredients(craftSelection.plan);
 
@@ -641,8 +757,11 @@ export class CraftingEngine {
       // losing currency if ingredient consumption throws.
       await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
-      // Create the result item(s)
-      const { items: resultItems, resolutionMeta } = await this._createResultItems(
+      // Create the result item(s). The awarded result group was already resolved and
+      // validated by the pre-consumption misconfiguration gate above (a matched signature
+      // that could not resolve to a valid result group aborted before any consumption),
+      // so this deterministic re-resolution inside `_createResultItems` yields real groups.
+      const { items: resultItems } = await this._createResultItems(
         craftingActor,
         executionRecipe,
         step,
@@ -654,45 +773,6 @@ export class CraftingEngine {
         null,
         resolveComponent
       );
-
-      if (
-        resolutionMeta?.disposition === 'error' ||
-        resolutionMeta?.disposition === 'misconfiguration'
-      ) {
-        const message = resolutionMeta.error || 'Crafting resolution failed';
-        if (runManager && run) {
-          await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
-            selectedIngredientSetId: ingredientSet.id,
-            lastCheckResult: {
-              success: false,
-              reason: message,
-              outcome: checkResult.outcome ?? undefined,
-              value: checkResult.value ?? undefined,
-              data: checkResult.data || {},
-            },
-            consumedIngredients: consumedItems.map(({ item, quantity }) => ({
-              actorUuid: item.parent?.uuid || null,
-              itemUuid: item.uuid,
-              quantity,
-            })),
-            usedTools,
-          });
-        }
-        await this._postCraftChatMessage({
-          success: false,
-          craftingActor,
-          recipe,
-          consumedIngredients: consumedItems,
-          tools: toolValidation.tools,
-          createdResults: [],
-          failureReason: message,
-        });
-        return {
-          success: false,
-          results: null,
-          message,
-        };
-      }
 
       if (runManager && run) {
         run = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
@@ -1146,10 +1226,15 @@ export class CraftingEngine {
       resolvedEssences
     );
 
-    if (
-      resolutionMeta?.disposition === 'error' ||
-      resolutionMeta?.disposition === 'misconfiguration'
-    ) {
+    // Timed misconfiguration (issue 85). Unlike the immediate path, a timed step
+    // consumed its inputs at START, so a routing misconfiguration only surfaces here at
+    // FINISH (the check outcome is unknowable until the gate matures): it can only record
+    // a failure with NO refund, never a true zero-mutation abort. Route through the shared
+    // `_isMisconfigurationDisposition` predicate so this matches the immediate path and
+    // covers `unrouted-tier` too — a tier-routed recipe whose matured outcome resolves to
+    // an authored success tier no group lists would otherwise fall through to
+    // `completeStepSuccess` with empty results (a false success with lost inputs).
+    if (this._isMisconfigurationDisposition(resolutionMeta?.disposition)) {
       const message = resolutionMeta.error || 'Crafting resolution failed';
       await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
         selectedIngredientSetId: ingredientSet?.id,
@@ -1172,7 +1257,15 @@ export class CraftingEngine {
         createdResults: [],
         failureReason: message,
       });
-      return { resolved: true, result: { success: false, results: null, message } };
+      return {
+        resolved: true,
+        result: {
+          success: false,
+          results: null,
+          message,
+          disposition: resolutionMeta.disposition,
+        },
+      };
     }
 
     const completedRun = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
@@ -2341,6 +2434,14 @@ export class CraftingEngine {
         foundry.utils.setProperty(itemData, path, value);
       }
     }
+
+    // Stamp the durable component identity on the crafted output so the inventory
+    // matcher attributes it to its OWN component and not a sibling reached through a
+    // transitive `_stats.duplicateSource` (issue 539). Keyed on the result's managed
+    // component id + the recipe's crafting system id; a result with no managed component
+    // (a bare `itemUuid` output) or an unsafe system id is left unstamped and resolves
+    // via the raw-reference fall-through.
+    stampCraftedComponentIdentity(itemData, recipe.craftingSystemId, managedItem?.id);
 
     // Create the item in crafting actor's inventory
     const [createdItem] = await craftingActor.createEmbeddedDocuments('Item', [itemData]);

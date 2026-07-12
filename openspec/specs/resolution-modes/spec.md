@@ -152,7 +152,10 @@ Resolution never aborts with a misconfiguration for an unmatched success outcome
   2. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes the failure path.
   3. If the scope has exactly one result group, that single group is produced for any non-failure outcome (no mapping required).
   4. Otherwise, with multiple result groups, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
-  5. If multiple result groups are present and no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
+  5. If multiple result groups are present and no result-group name matches, execution aborts with a crafting-system misconfiguration error (not a player failure outcome).
+     For an instant (non-timed) step this is a zero-mutation abort: it happens BEFORE any consumption, so no ingredients, currency, or tools are consumed or broken, and the craft reports failure (never a player success with zero items).
+     A resolved-but-unassigned outcome tier (`unrouted-tier`) is treated identically.
+     Timed exception: a time-gated `routedByCheck` step consumes its inputs at START (the check outcome is unknowable until the gate matures), so a routing misconfiguration detected at FINISH cannot un-consume — it records a step FAILURE with no refund and still reports failure (never a false success with zero items), rather than a true zero-mutation abort.
 
 ### Validation
 
@@ -237,9 +240,14 @@ This alchemy-scoped resolution MUST NOT be pushed into the shared `findMatchingC
 - A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
 - Submitted quantity is counted per submission (one submission = one unit), not by reading an item's stack `system.quantity`; the workbench is responsible for expanding a stack into one submission per unit, consistent with occurrence-based essence accumulation and submitted-ingredient consumption.
 - Signature overlap is invalid across all recipes in the system.
+Two ingredient sets overlap only when they are genuinely ambiguous: a single plausible submission satisfies BOTH sets' group requirements at once.
+A pair conflicts iff some **transversal** of one set — the natural "the ingredients each requirement calls for" craft, choosing one satisfying option per group and supplying exactly its required quantity of units — also satisfies every group of the other set (in either direction).
+The transversal is quantity-aware: a `quantity: N` option can supply up to `N` DISTINCT components, so a `{metal x2}` group crafted iron + gold overlaps a `{iron},{gold}` set.
+This transversal condition is a sound (never under-rejecting) approximation of the ambiguity the superset-tolerant, first-match runtime exhibits; it treats a target group as covered by the mere presence of one matching component rather than re-checking that group's own quantity, so it may over-reject rather than miss a genuine collision.
+Merely sharing a common base component (water, reagent, flask) is NOT overlap when the sets are otherwise distinguishable (e.g. `{Water},{Herb}` vs `{Water},{Mineral}`); overlap DOES include a set whose group requirements are a subset of another's (e.g. `{Water}` vs `{Water},{Herb}`, since every transversal of the larger set also satisfies the smaller), and two single-group sets sharing a component that satisfies both.
 - No-signature-match (a fizzle) is treated as a failed attempt: the player sees a specific failure message and the submitted ingredients are consumed (per `alchemy.consumeOnFail`).
 Learning is never granted by a fizzle.
-- The matched-but-unroutable **misconfiguration** path (abort without applying player-failure consumption; return actionable GM diagnostics) applies to **Tiered only** (None/Simple do not route by name).
+- The matched-but-unroutable **misconfiguration** path applies to **Tiered only** (None/Simple do not route by name): the craft aborts with ZERO mutation BEFORE any consumption (no ingredients, currency, or tools consumed or broken), reports failure (never a player success with zero items), and returns actionable GM diagnostics.
 The reserved-keyword "nothing" rule must not collide with Simple's producing failure group.
 
 ### Alchemy UI Interaction Model
