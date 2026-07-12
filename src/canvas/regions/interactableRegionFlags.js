@@ -532,13 +532,13 @@ function isInteractableVisualStampOnly(update) {
 
 /**
  * Bidirectional-link verification: is the visual `doc` GENUINELY linked to the live
- * `behavior`, by a round-trip that the socket layer cannot mint? PURE.
+ * `behavior`, by a reverse-flag↔forward-link round-trip? PURE.
  *
  * The reverse flag on a visual (`flags.fabricate.{isInteractableVisual,
  * linkedRegionUuid,linkedBehaviorId}`) is mintable via a stamp-only write, so it
  * MUST NOT by itself authorize a core-data write or delete. This authorizes those
- * edges against the SOURCE OF TRUTH — the `fabricate.interactable` behaviour that
- * legitimately links the visual — requiring ALL of:
+ * edges against the `fabricate.interactable` behaviour the visual claims, requiring
+ * ALL of:
  *   (a) the visual carries a well-formed reverse flag ({@link readLinkedVisualRef});
  *   (b) `behavior` exists and is a `fabricate.interactable` behaviour
  *       ({@link isInteractableRegionBehavior}) — the caller resolves it from the
@@ -546,12 +546,18 @@ function isInteractableVisualStampOnly(update) {
  *   (c) the behaviour's FORWARD link (`system.linkedVisual.uuid`) points back to
  *       THIS exact document (`doc.uuid`).
  *
- * An attacker who mints a reverse flag pointing at a fake behaviour fails (b); one
- * pointing at a real behaviour fails (c), because that behaviour's forward link
- * points at its genuine tile, not the attacker's target. Creating/mutating a
- * `fabricate.interactable` behaviour is a privileged Foundry region op (and its own
- * write edge is `isInteractableRegionBehavior`-guarded), so the forward link is not
- * socket-mintable.
+ * This is DEFENSE-IN-DEPTH that raises the bar, NOT a complete closure of the
+ * escalation. An attacker who mints a reverse flag pointing at a fake behaviour
+ * fails (b); one pointing at a real behaviour fails (c) as long as that behaviour's
+ * forward link still points at its genuine tile. HOWEVER the forward link is itself
+ * writable over the socket: the `INTERACTABLE_BEHAVIOR_UPDATE` edge
+ * (`applyInteractableBehaviorUpdate`) applies an arbitrary caller `update` to any
+ * `fabricate.interactable` behaviour (guarded only on the target's TYPE, with no
+ * field restriction and no sender authentication), so a determined attacker can
+ * forge `system.linkedVisual.uuid` to point at a target tile and then satisfy this
+ * round-trip. The round-trip therefore raises the cheapest escalation from a single
+ * message to a multi-message forge; FULL closure requires authenticating the socket
+ * SENDER as a GM — a module-wide socket-transport change tracked by issue 593.
  *
  * @param {object} doc  The resolved visual document (must expose `uuid`).
  * @param {object} behavior  The behaviour resolved from the reverse flag's ref.
