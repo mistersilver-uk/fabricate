@@ -16,7 +16,9 @@ const harness = createMountedComponentHarness({
     // item flags — copy both so the harness module graph resolves.
     'src/config/flags.js',
     'src/models/match/matchTypes.js',
-    'src/ui/svelte/apps/manager/recipe/recipeReadiness.js'
+    'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+    // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
+    'src/systems/recipeActivationMessages.js'
   ],
   compiledModules: ['src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'],
   componentPath: 'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'
@@ -105,6 +107,46 @@ describe('RecipeValidationTab (mounted)', () => {
     assert.equal(target.querySelector('[data-issue="requirementOverlap"]'), null, 'no overlap issue without a catalogue');
     const overlapCheck = target.querySelector('[data-check="noRequirementOverlap"]');
     assert.equal(overlapCheck.dataset.satisfied, 'true', 'overlap check passes with no catalogue');
+    harness.remount();
+  });
+
+  it('surfaces the alchemy result-selection and signature-collision blockers (issue 549)', async () => {
+    const target = await harness.mount({
+      recipe: {
+        name: 'Mana Potion',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [{ id: 'r1' }, { id: 'r2' }]
+      },
+      alchemy: { checkMode: 'simple' },
+      signatureConflicts: [
+        {
+          code: 'signatureCollision',
+          params: { recipeA: 'Mana Potion', recipeB: 'Healing Potion', setA: '1', setB: '1', components: 'Water' },
+          message: 'Overlapping signatures between "Mana Potion" and "Healing Potion" (shared components: Water)'
+        }
+      ]
+    });
+    assert.ok(target.querySelector('[data-issue="alchemyResultSelection"]'), 'result-selection blocker row listed');
+    const collision = target.querySelector('[data-issue="signatureCollision"]');
+    assert.ok(collision, 'signature-collision blocker row listed');
+    assert.match(collision.textContent, /Healing Potion/, 'names the other recipe');
+    assert.match(collision.textContent, /Water/, 'names the shared component, not a raw id');
+    assert.equal(target.querySelector('[data-check="noSignatureCollision"]').dataset.satisfied, 'false');
+    assert.equal(target.querySelector('[data-check="alchemyResultSelection"]').dataset.satisfied, 'false');
+    harness.remount();
+  });
+
+  it('reports an alchemy recipe with no blockers as ready (issue 549)', async () => {
+    const target = await harness.mount({
+      recipe: { name: 'Mana Potion', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'r1' }] },
+      alchemy: { checkMode: 'simple' },
+      signatureConflicts: []
+    });
+    assert.equal(target.querySelector('[data-issue="alchemyResultSelection"]'), null);
+    assert.equal(target.querySelector('[data-issue="signatureCollision"]'), null);
+    assert.equal(target.querySelector('[data-check="noSignatureCollision"]').dataset.satisfied, 'true');
+    assert.equal(target.querySelector('[data-check="alchemyResultSelection"]').dataset.satisfied, 'true');
     harness.remount();
   });
 

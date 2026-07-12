@@ -21,7 +21,7 @@
   import RecipeResultsTab from './recipe/RecipeResultsTab.svelte';
   import RecipeToolsTab from './recipe/RecipeToolsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
-  import { evaluateRecipeReadiness } from './recipe/recipeReadiness.js';
+  import { evaluateRecipeReadiness, blocksEnable } from './recipe/recipeReadiness.js';
 
   let {
     recipe = null,
@@ -48,6 +48,13 @@
     routingProvider = null,
     routedOutcomeTierOptions = [],
     routedOutcomeTiersDefined = false,
+    // Alchemy enable-blocker inputs (issue 549): the alchemy context ({ checkMode })
+    // for an alchemy system (null otherwise) and the cross-recipe signature conflicts
+    // touching this recipe. Threaded through this wrapper so the Validation tab and
+    // the enable-toggle gate receive them (a tab prop skipping this wrapper silently
+    // drops to its default).
+    alchemy = null,
+    signatureConflicts = [],
     // Progressive systems award a recipe's results in order, so the Results tab
     // exposes drag-reorder on the result rows. Other modes ignore result order.
     progressive = false,
@@ -172,10 +179,16 @@
   const readiness = $derived(evaluateRecipeReadiness({ ...(recipe || {}) }, {
     systemComponents: componentTagOptions,
     routingProvider,
-    routedOutcomeTierOptions
+    routedOutcomeTierOptions,
+    alchemy,
+    signatureConflicts
   }));
   const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
   const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
+  // While the recipe is OFF, an enable-blocking issue disables the enable toggle so
+  // the GM cannot trigger the hard activation failure (issue 549); disabling stays
+  // free. Predicted from the same readiness the Validation tab renders.
+  const enableBlocked = $derived(!enabled && blocksEnable(readiness.issues));
   const badges = $derived({
     validation: [
       ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
@@ -236,6 +249,7 @@
             onNameInput={(value) => onUpdateRecipe({ name: value })}
             onDescriptionInput={(value) => onUpdateRecipe({ description: value })}
             {onToggleEnabled}
+            {enableBlocked}
             onChooseImage={chooseImage}
             {isMultiStep}
             {checkTierOptions}
@@ -294,6 +308,8 @@
             {componentTagOptions}
             {routingProvider}
             {routedOutcomeTierOptions}
+            {alchemy}
+            {signatureConflicts}
             onSelectIssue={selectIssue}
           />
         {/if}

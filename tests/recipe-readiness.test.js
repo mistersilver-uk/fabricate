@@ -311,6 +311,124 @@ describe('evaluateRecipeReadiness', () => {
   });
 });
 
+describe('evaluateRecipeReadiness alchemy enable blockers', () => {
+  // A ready alchemy Simple recipe: one ingredient set, one SUCCESS result group.
+  function alchemyRecipe(resultGroups) {
+    return {
+      name: 'Mana Potion',
+      enabled: true,
+      ingredientSets: [{ id: 's1' }],
+      resultGroups
+    };
+  }
+
+  it('surfaces the alchemy result-selection blocker when a Simple recipe has more than one success result set', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([{ id: 'r1' }, { id: 'r2' }]),
+      { alchemy: { checkMode: 'simple' } }
+    );
+    const blocker = issues.find(i => i.id === 'alchemyResultSelection');
+    assert.ok(blocker, 'alchemyResultSelection blocker surfaced');
+    assert.equal(blocker.severity, 'critical');
+    assert.equal(blocker.blocks, 'enable');
+    assert.equal(blocker.target, 'results');
+    assert.equal(check(checks, 'alchemyResultSelection').satisfied, false);
+    assert.equal(blocksEnable(issues), true);
+  });
+
+  it('does not surface the result-selection blocker for a TIERED alchemy recipe with more than one result set', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([{ id: 'r1' }, { id: 'r2' }]),
+      { alchemy: { checkMode: 'tiered' } }
+    );
+    // Tiered routes by the crafting-check outcome, so result-set cardinality is
+    // unconstrained here — the cardinality rule (and its check row) is skipped.
+    assert.equal(issues.some(i => i.id === 'alchemyResultSelection'), false, 'tiered skips the cardinality rule');
+    assert.equal(check(checks, 'alchemyResultSelection'), undefined, 'no cardinality check row under tiered');
+  });
+
+  it('fires the result-selection blocker (without double-firing noResultGroup) when every alchemy result set is a failure set', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([{ id: 'r1', role: 'failure' }]),
+      { alchemy: { checkMode: 'simple' } }
+    );
+    const blocker = issues.find(i => i.id === 'alchemyResultSelection');
+    assert.ok(blocker, 'all-failure result sets leave no success set to resolve');
+    assert.equal(blocker.blocks, 'enable');
+    assert.equal(blocker.target, 'results');
+    assert.equal(check(checks, 'alchemyResultSelection').satisfied, false);
+    // A present (failure-only) result set still satisfies hasResultGroup, so
+    // noResultGroup must NOT double-fire — only the alchemy rule speaks here.
+    assert.equal(issues.some(i => i.id === 'noResultGroup'), false, 'noResultGroup does not double-fire');
+    assert.equal(check(checks, 'hasResultGroup').satisfied, true, 'a present result set satisfies hasResultGroup');
+  });
+
+  it('leaves the result-selection check silent for an alchemy recipe with no result sets at all', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([]),
+      { alchemy: { checkMode: 'simple' } }
+    );
+    // The empty case is spoken to by noResultGroup only; the alchemy cardinality row
+    // stays silent so it does not read as a satisfied row beside the failing one.
+    assert.equal(check(checks, 'alchemyResultSelection'), undefined, 'no vacuously-satisfied cardinality row');
+    assert.equal(issues.some(i => i.id === 'alchemyResultSelection'), false);
+    assert.ok(issues.some(i => i.id === 'noResultGroup'), 'the empty case stays a noResultGroup gap');
+  });
+
+  it('ignores the reserved failure result set when counting alchemy success result sets', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([{ id: 'r1' }, { id: 'r2', role: 'failure' }]),
+      { alchemy: { checkMode: 'simple' } }
+    );
+    assert.equal(issues.some(i => i.id === 'alchemyResultSelection'), false, 'one success + one failure group is valid');
+    assert.equal(check(checks, 'alchemyResultSelection').satisfied, true);
+  });
+
+  it('surfaces a signature-collision blocker from precomputed conflicts, carrying its coded params', () => {
+    const conflict = {
+      code: 'signatureCollision',
+      params: { recipeA: 'Mana Potion', recipeB: 'Healing Potion', setA: '1', setB: '1', components: 'Water' },
+      message: 'Overlapping signatures between "Mana Potion" and "Healing Potion" (shared components: Water)'
+    };
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([{ id: 'r1' }]),
+      { alchemy: { checkMode: 'simple' }, signatureConflicts: [conflict] }
+    );
+    const blocker = issues.find(i => i.id === 'signatureCollision');
+    assert.ok(blocker, 'signatureCollision blocker surfaced');
+    assert.equal(blocker.severity, 'critical');
+    assert.equal(blocker.blocks, 'enable');
+    assert.equal(blocker.target, 'ingredients');
+    assert.equal(blocker.code, 'signatureCollision');
+    assert.deepEqual(blocker.params, conflict.params, 'carries the coded params so the tab can localize without leaking ids');
+    assert.equal(check(checks, 'noSignatureCollision').satisfied, false);
+    assert.equal(blocksEnable(issues), true);
+  });
+
+  it('reports an alchemy recipe as ready once the result-selection and signature blockers are resolved', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      alchemyRecipe([{ id: 'r1' }]),
+      { alchemy: { checkMode: 'simple' }, signatureConflicts: [] }
+    );
+    assert.equal(check(checks, 'alchemyResultSelection').satisfied, true);
+    assert.equal(check(checks, 'noSignatureCollision').satisfied, true);
+    assert.equal(issues.some(i => i.id === 'alchemyResultSelection'), false);
+    assert.equal(issues.some(i => i.id === 'signatureCollision'), false);
+    assert.equal(blocksEnable(issues), false);
+  });
+
+  it('adds no alchemy checks or blockers for a non-alchemy system', () => {
+    const { checks, issues } = evaluateRecipeReadiness(
+      { name: 'Axe', enabled: true, ingredientSets: [{ id: 's1' }, { id: 's2' }], resultGroups: [{ id: 'r1' }, { id: 'r2' }] },
+      { signatureConflicts: [{ code: 'signatureCollision', params: {}, message: 'x' }] }
+    );
+    assert.equal(check(checks, 'alchemyResultSelection'), undefined);
+    assert.equal(check(checks, 'noSignatureCollision'), undefined);
+    assert.equal(issues.some(i => i.id === 'alchemyResultSelection'), false);
+    assert.equal(issues.some(i => i.id === 'signatureCollision'), false, 'conflicts are ignored without an alchemy context');
+  });
+});
+
 describe('evaluateRecipeReadiness overlapping requirements', () => {
   // Iron Ore is tagged "metal"; the system catalogue lets the tag requirement
   // expand to component ids.
