@@ -1759,6 +1759,29 @@ A freshly-created interactable behaviour **never inherits another interactable's
 The pure decisions live in `src/canvas/regions/interactableCreationGuard.js` / `interactableRegionFlags.js` / `interactableConfigActions.js`; the `preCreateRegionBehavior` Foundry edge in `src/main.js` is a thin, no-throw adapter that allows creation, stamps the sentinel, and notifies the GM.
 Fabricate's own drag/drop placement paths are unchanged — they pre-build a complete `system` and never go through the unconfigured path.
 
+### Region-level ownership & provenance-aware deletion (issue 533)
+
+A `fabricate.interactable` region reaches Fabricate through two different lifecycles that MUST be distinguished at delete time.
+A **CREATED** region is spawned by a drag/drop or click-to-place placement and exists ONLY to be the interactable, so Fabricate owns the whole Region.
+A **PROMOTED** region is a region the user already drew for another purpose (lighting/darkness, conditions, a third-party module) that a GM points Fabricate at via the Manage panel's "Promote region to interactable"; Fabricate owns only the one behaviour it attached, and the Region plus every other (foreign) behaviour on it are the user's data.
+
+```js
+region.flags.fabricate = {
+  interactableRegion: true   // stamped ONLY on a region Fabricate CREATED
+}
+```
+
+Requirements:
+
+1. **Ownership is stamped at create.** When Fabricate CREATES a region (`_spawnInteractableRegion`) it stamps `flags.fabricate.interactableRegion = true` (`buildInteractableRegionFlags`).
+Promotion attaches a behaviour to the user's existing region and MUST NOT stamp this flag.
+2. **Deletion removes only what Fabricate added.** Deleting an interactable (from the config panel or the Manage panel) routes through the pure decision `decideInteractableDeletion` (region flag + behaviour list + target behaviour → a plan) and the thin edge `executeInteractableDeletion` (`src/canvas/regions/interactableDeletion.js`).
+A region that is **Fabricate-created AND carries no foreign behaviours** is deleted wholesale (`region.delete()`).
+Otherwise — a **promoted** foreign region, OR a region also carrying non-Fabricate behaviours — only Fabricate's `fabricate.interactable` behaviour(s) are removed (`region.deleteEmbeddedDocuments('RegionBehavior', …)`), leaving the Region and every foreign behaviour intact; a now-stale ownership stamp on a kept region is cleared (`unsetFlag`).
+The confirm copy states which will happen (whole region vs only the Fabricate interactable).
+3. **Safe legacy default.** A region created before this flag existed carries no ownership stamp, so its provenance is unknown; unknown provenance is treated as **promoted (do-not-destroy)** — the conservative choice that can never destroy user data.
+The cost is that a legacy Fabricate-created region may be left behind as an empty Region after its interactable is removed; that is a harmless leftover the GM can delete by hand, never data loss.
+
 ### Linked Visual reverse flags (holds no state; reflects env depletion + concealment)
 
 The linked visual (Tile / Drawing / Token) carries only a reverse pointer back at its owning Region + Behaviour; it holds NO authoritative interactable state of its own (no node pool, no eligibility):

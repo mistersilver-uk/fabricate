@@ -9,6 +9,10 @@ import {
   readInteractableBehaviorSystem,
 } from '../canvas/regions/interactableRegionFlags.js';
 import {
+  planInteractableDeletion,
+  executeInteractableDeletion,
+} from '../canvas/regions/interactableDeletion.js';
+import {
   resolveLinkedVisual,
   recreateLinkedTile,
   recreateLinkedDrawing,
@@ -251,15 +255,29 @@ export class InteractablesManagerApp extends SvelteApplicationMixin(
         const behavior = this._resolveBehavior(ref);
         const region = behavior?.parent ?? null;
         if (!region) return false;
+        // Provenance-aware deletion (issue 533): only a region Fabricate CREATED is
+        // deleted wholesale. A PROMOTED region (or one carrying foreign behaviours)
+        // keeps its geometry + foreign behaviours — we remove only Fabricate's
+        // behaviour. The confirm copy states which will happen.
+        const plan = planInteractableDeletion(region, {
+          targetBehaviorId: behavior?.id ?? behavior?._id ?? null
+        });
+        const deletesRegion = plan.scope === 'region';
+        const promptKey = deletesRegion
+          ? 'FABRICATE.Canvas.Manage.DeletePromptRegion'
+          : 'FABRICATE.Canvas.Manage.DeletePromptBehaviour';
+        const promptFallback = deletesRegion
+          ? 'Delete this interactable? Fabricate created this region, so the whole region is deleted. This cannot be undone. (The linked marker, if any, is left on the scene.)'
+          : 'Remove this interactable? Your region and any other behaviours on it are kept — only the Fabricate interactable is removed. (The linked marker, if any, is left on the scene.)';
         const confirmed = await confirmDialog({
           window: { title: this._t('FABRICATE.Canvas.Manage.DeleteTitle', 'Delete interactable') },
-          content: `<p>${this._t('FABRICATE.Canvas.Manage.DeletePrompt', 'Delete this interactable region? This cannot be undone. (The linked marker, if any, is left on the scene.)')}</p>`,
+          content: `<p>${this._t(promptKey, promptFallback)}</p>`,
           yes: { label: this._t('FABRICATE.Canvas.Manage.DeleteConfirm', 'Delete') },
           no: { label: this._t('FABRICATE.Canvas.Manage.DeleteCancel', 'Cancel') }
         });
         if (confirmed !== true) return false;
         try {
-          await region.delete?.();
+          await executeInteractableDeletion(region, plan);
         } catch (_error) {
           // Tolerate; refresh regardless.
         }
