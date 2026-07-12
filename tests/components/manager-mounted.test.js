@@ -254,7 +254,7 @@ function compileManagerRoot() {
     'src/migration/migrateRecipeForModeChange.js',
     // RecipeValidationTab localizes a signature-collision blocker row via this pure
     // leaf (issue 549); copy it so the mounted import resolves.
-    'src/systems/recipeActivationMessages.js',
+    'src/utils/recipeActivationMessages.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });

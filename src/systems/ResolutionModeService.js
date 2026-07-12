@@ -1,4 +1,5 @@
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
+import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import {
   matchResultGroupsByName,
   normalizeRoutedName,
@@ -100,28 +101,48 @@ export class ResolutionModeService {
   }
 
   /**
+   * A human-readable label for a step / ingredient set / result — the author-given
+   * `name` when present, otherwise a 1-based POSITION (issue 595). NEVER the entity's
+   * internal id, so a validation message for an unnamed entity cannot leak one.
+   * @param {{name?: string}} entity
+   * @param {number} index 0-based index of the entity in its collection
+   * @returns {string}
+   * @private
+   */
+  _entityLabel(entity, index) {
+    const name = typeof entity?.name === 'string' ? entity.name.trim() : '';
+    return name || String(index + 1);
+  }
+
+  /**
    * Reserved/duplicate routed `ResultGroup.name` validation, applied under
    * `routedByCheck` mode (check routing keys on the group name). Reserved names
    * (fail/miss/hazard families) may not name a result group; names must be unique
-   * under trim-normalized comparison.
+   * under trim-normalized comparison. Pushes coded, id-free issues (issue 595); the
+   * caller supplies a pre-computed, name-or-position `stepLabel` (never an id).
    * @param {Array<{id?: string, name?: string}>} groups
-   * @param {{name?: string, id?: string}} step
-   * @param {string[]} errors
+   * @param {string} stepLabel human-readable step label (name or 1-based position)
+   * @param {Array<{code: string|null, params: object, message: string}>} issues
    */
-  _validateRoutedGroupNames(groups, step, errors) {
+  _validateRoutedGroupNames(groups, stepLabel, issues) {
     const seenNames = new Set();
-    const label = step?.name || step?.id;
     for (const group of groups || []) {
       const normalized = normalizeRoutedName(group?.name);
       if (!normalized) continue;
       if (isReservedRoutedName(normalized)) {
-        errors.push(
-          `Result group name "${group.name}" conflicts with reserved routing keyword in step "${label}"`
+        issues.push(
+          buildRecipeActivationIssue('routedGroupNameReserved', {
+            groupName: group.name,
+            step: stepLabel,
+          })
         );
       }
       if (seenNames.has(normalized)) {
-        errors.push(
-          `Duplicate result group name "${group.name}" (case-insensitive) in step "${label}" — routed mode requires unique names`
+        issues.push(
+          buildRecipeActivationIssue('routedGroupNameDuplicate', {
+            groupName: group.name,
+            step: stepLabel,
+          })
         );
       }
       seenNames.add(normalized);
@@ -145,36 +166,44 @@ export class ResolutionModeService {
    * @returns {{valid: boolean, errors: string[]}}
    */
   validateRecipe(recipe, { requireComplete = true } = {}) {
-    const errors = [];
+    // Issues carry a stable `code` + human-readable params (step/set/result label:
+    // name-or-1-based-position, never an id) so the UI can localize the failure
+    // id-free (issue 595); `errors` is derived from their headless English messages,
+    // preserving the pre-fix wording for NAMED entities byte-for-byte.
+    const issues = [];
+    const plain = (message) => {
+      issues.push({ code: null, params: {}, message });
+    };
     const system = this.getSystem(recipe);
-    if (!system) return { valid: true, errors };
+    if (!system) return { valid: true, errors: [], issues };
 
     const mode = this.getMode(recipe);
     const steps = this.getExecutionSteps(recipe);
 
-    for (const step of steps) {
+    for (const [stepIndex, step] of steps.entries()) {
+      const stepLabel = this._entityLabel(step, stepIndex);
       const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
       const groups = Array.isArray(step?.resultGroups) ? step.resultGroups : [];
 
       if (mode === 'simple') {
         if (requireComplete && sets.length !== 1)
-          errors.push(
-            `Step "${step.name || step.id}" must have exactly 1 ingredient set in simple mode`
+          issues.push(
+            buildRecipeActivationIssue('stepIngredientSetCountExact', { step: stepLabel, mode })
           );
         if (requireComplete && groups.length !== 1)
-          errors.push(
-            `Step "${step.name || step.id}" must have exactly 1 result group in simple mode`
+          issues.push(
+            buildRecipeActivationIssue('stepResultGroupCountExact', { step: stepLabel, mode })
           );
       }
 
       if (mode === 'routedByIngredients' || mode === 'routedByCheck') {
         if (requireComplete && sets.length === 0)
-          errors.push(
-            `Step "${step.name || step.id}" must have at least 1 ingredient set in ${mode} mode`
+          issues.push(
+            buildRecipeActivationIssue('stepIngredientSetCountMin', { step: stepLabel, mode })
           );
         if (requireComplete && groups.length === 0)
-          errors.push(
-            `Step "${step.name || step.id}" must have at least 1 result group in ${mode} mode`
+          issues.push(
+            buildRecipeActivationIssue('stepResultGroupCountMin', { step: stepLabel, mode })
           );
 
         // The routing basis is the MODE (no per-recipe provider). A
@@ -185,19 +214,23 @@ export class ResolutionModeService {
         if (mode === 'routedByIngredients') {
           // Reference integrity: an ingredient set's resultGroupId must point at a
           // real group in the step (the former `mapped` invariant, now canonical).
+          // The message reports the set by name-or-position and never echoes the
+          // missing group id (issue 595).
           const groupIds = new Set(groups.map((g) => g.id));
-          for (const set of sets) {
+          for (const [setIndex, set] of sets.entries()) {
             const mappedId = set?.resultGroupId || null;
             if (mappedId && !groupIds.has(mappedId)) {
-              errors.push(
-                `Ingredient set "${set.name || set.id}" has invalid resultGroupId "${mappedId}"`
+              issues.push(
+                buildRecipeActivationIssue('ingredientSetInvalidResultGroup', {
+                  set: this._entityLabel(set, setIndex),
+                })
               );
             }
           }
         } else {
           // Reserved/duplicate ResultGroup.name applies under check routing, which
           // keys on the group name (spec 004 §routedByCheck Validation).
-          this._validateRoutedGroupNames(groups, step, errors);
+          this._validateRoutedGroupNames(groups, stepLabel, issues);
         }
       }
 
@@ -208,33 +241,31 @@ export class ResolutionModeService {
         // authoring shell can be created, and enforce it only when a complete recipe
         // is required (persistence-complete / activation).
         if (requireComplete && !this._hasRollFormula(system?.craftingCheck?.progressive)) {
-          errors.push(
-            'Progressive mode requires a configured progressive crafting check (roll formula)'
-          );
+          plain('Progressive mode requires a configured progressive crafting check (roll formula)');
         }
         if (requireComplete && sets.length !== 1)
-          errors.push(
-            `Step "${step.name || step.id}" must have exactly 1 ingredient set in progressive mode`
+          issues.push(
+            buildRecipeActivationIssue('stepIngredientSetCountExact', { step: stepLabel, mode })
           );
         if (requireComplete && groups.length !== 1)
-          errors.push(
-            `Step "${step.name || step.id}" must have exactly 1 result group in progressive mode`
+          issues.push(
+            buildRecipeActivationIssue('stepResultGroupCountExact', { step: stepLabel, mode })
           );
 
         const results = groups?.[0]?.results || [];
         if (requireComplete && results.length === 0) {
-          errors.push(
-            `Step "${step.name || step.id}" requires ordered results in progressive mode`
+          issues.push(
+            buildRecipeActivationIssue('stepRequiresOrderedResults', { step: stepLabel })
           );
         }
-        for (const result of results) {
+        for (const [resultIndex, result] of results.entries()) {
           const difficulty = this._getDifficulty(
             system,
             result?.componentId || result?.systemItemId
           );
           if (!Number.isFinite(difficulty) || difficulty < 1) {
-            errors.push(
-              `Result "${result?.id || 'unknown'}" references component without valid difficulty`
+            issues.push(
+              buildRecipeActivationIssue('stepResultDifficulty', { result: resultIndex + 1 })
             );
           }
         }
@@ -248,41 +279,44 @@ export class ResolutionModeService {
       const setsTop = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       const groupsTop = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
       if (requireComplete && setsTop.length === 0)
-        errors.push('Alchemy recipe must have at least 1 ingredient set');
+        plain('Alchemy recipe must have at least 1 ingredient set');
       if (requireComplete && setsTop.length > 1)
-        errors.push('Alchemy recipe must have exactly 1 ingredient set');
+        plain('Alchemy recipe must have exactly 1 ingredient set');
       // No explicit steps allowed
       const explicitSteps =
         typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
       const hasExplicitSteps =
         explicitSteps.length > 1 ||
         (explicitSteps.length === 1 && explicitSteps[0]?.id !== 'implicit-step');
-      if (hasExplicitSteps) errors.push('Alchemy recipe must not have explicit steps');
+      if (hasExplicitSteps) plain('Alchemy recipe must not have explicit steps');
 
       const checkMode = system?.alchemy?.checkMode || 'none';
       if (checkMode === 'tiered') {
         // Tiered routes exactly like `routedByCheck`: at least one result group with
         // reserved/duplicate group-name protection (name-uniqueness moved here from
         // the model for Tiered only). Tier-assignment completeness is a system-level
-        // warning surfaced by `systemValidation`, not a per-recipe blocker.
+        // warning surfaced by `systemValidation`, not a per-recipe blocker. The
+        // routed-name check is scoped to the recipe (an implicit single step), so its
+        // step label is the recipe name or position 1 — never the recipe id.
         if (requireComplete && groupsTop.length === 0)
-          errors.push('Alchemy recipe must have at least 1 result group');
-        this._validateRoutedGroupNames(groupsTop, { name: recipe.name, id: recipe.id }, errors);
+          plain('Alchemy recipe must have at least 1 result group');
+        this._validateRoutedGroupNames(groupsTop, this._entityLabel(recipe, 0), issues);
       } else {
         // None / Simple: exactly one SUCCESS group. Simple additionally carries a
         // reserved `role: 'failure'` group, but its ABSENCE is TOLERATED (a
         // settings-only None→Simple flip runs no recipe migration).
         const successGroups = groupsTop.filter((group) => group?.role !== 'failure');
         if (requireComplete && successGroups.length === 0)
-          errors.push('Alchemy recipe must have at least 1 result group');
+          plain('Alchemy recipe must have at least 1 result group');
         if (requireComplete && successGroups.length > 1)
-          errors.push('Alchemy recipe must have exactly 1 result group');
+          plain('Alchemy recipe must have exactly 1 result group');
       }
     }
 
     return {
-      valid: errors.length === 0,
-      errors,
+      valid: issues.length === 0,
+      errors: issues.map((issue) => issue.message),
+      issues,
     };
   }
 

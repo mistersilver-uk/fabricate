@@ -8,7 +8,7 @@
  * headless English `.message` (for `console`/non-UI callers, which read
  * `err.message`) but ALSO carries the structured `activationIssues` so the UI
  * layer can render a localized, id-free toast via
- * {@link module:systems/recipeActivationMessages.localizeRecipeActivationError}.
+ * {@link module:utils/recipeActivationMessages.localizeRecipeActivationError}.
  *
  * @typedef {{ code: string|null, params?: object, message: string }} ActivationIssue
  */

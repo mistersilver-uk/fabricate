@@ -9,7 +9,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { localizeActivationIssue } from '../../../../../systems/recipeActivationMessages.js';
+  import { localizeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
   import { evaluateRecipeReadiness } from './recipeReadiness.js';
 
   let {
