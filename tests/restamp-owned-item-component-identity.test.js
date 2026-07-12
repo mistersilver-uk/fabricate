@@ -143,12 +143,41 @@ test('600: idempotent — a second run stamps nothing', async () => {
   );
 });
 
-test('600: a foreign-system role leaf is NOT clobbered (per-leaf merge write)', async () => {
-  // The item already carries a DIFFERENT system's leaf; sysA has no leaf but name-matches.
+test('600: an item durably flagged for another system is NOT stamped into a merely same-named system (issue 538)', async () => {
+  // The item already carries a DIFFERENT system's COMPONENT identity (roles.sysB.componentId)
+  // and only shares a display NAME with sysA's component (no raw-ref link to sysA). At runtime
+  // the #538 gate suppresses the cross-system name fallback, so it does NOT resolve into sysA —
+  // the migration must NOT manufacture a permanent roles.sysA leaf.
   const item = makeOwnedItem({
     name: 'Healing Potion',
     uuid: 'Item.owned-copy',
     roles: { sysB: { componentId: 'b-comp' } },
+  });
+
+  const writes = planOwnedItemComponentRestamp(item, [SYS_A]);
+  assert.deepEqual(writes, [], 'a component-flagged item is skipped entirely (no sysA write planned)');
+
+  const summary = await restampOwnedItemComponentIdentity({
+    actors: [makeActor([item])],
+    systems: [SYS_A],
+    writeFlag,
+  });
+
+  assert.equal(summary.stampedLeaves, 0, 'nothing is stamped');
+  assert.equal(item.setFlagCalls.length, 0, 'no setFlag fired');
+  const roles = item.flags.fabricate.fabricate.roles;
+  assert.equal(roles.sysA, undefined, 'NO sysA leaf is manufactured');
+  assert.equal(roles.sysB.componentId, 'b-comp', 'the sysB component identity is preserved');
+});
+
+test('600: a legitimate stamp preserves a pre-existing unrelated role leaf (per-leaf merge write)', async () => {
+  // The item is UNFLAGGED for component identity (only a sibling system's TOOL leaf, which the
+  // #538 gate ignores) and name-matches sysA, so it is a legitimate stamp target. The write must
+  // add roles.sysA.componentId while the unrelated roles.sysB.toolId leaf survives the merge.
+  const item = makeOwnedItem({
+    name: 'Healing Potion',
+    uuid: 'Item.owned-copy',
+    roles: { sysB: { toolId: 'b-tool' } },
   });
 
   await restampOwnedItemComponentIdentity({
@@ -158,8 +187,62 @@ test('600: a foreign-system role leaf is NOT clobbered (per-leaf merge write)', 
   });
 
   const roles = item.flags.fabricate.fabricate.roles;
-  assert.equal(roles.sysA.componentId, HEALING.id, 'sysA leaf added');
-  assert.equal(roles.sysB.componentId, 'b-comp', 'the foreign sysB leaf is preserved');
+  assert.equal(roles.sysA.componentId, HEALING.id, 'sysA component leaf added');
+  assert.equal(roles.sysB.toolId, 'b-tool', 'the unrelated sysB tool leaf is preserved');
+});
+
+test('600: a legacy flat componentId-scalar item is NOT stamped into a merely same-named system', async () => {
+  // The migration's primary target class: an owned copy carrying the legacy flat
+  // `flags.fabricate.componentId` scalar (naming a component in ANOTHER system, absent from
+  // sysA). `itemHasComponentIdentityFlag` is true via the legacy tier, so — exactly as at
+  // runtime — it must NOT loosely name-match sysA. No leaf may be stamped.
+  const item = makeOwnedItem({
+    name: 'Healing Potion',
+    uuid: 'Item.owned-copy',
+    componentId: 'other-system-component',
+  });
+
+  const writes = planOwnedItemComponentRestamp(item, [SYS_A]);
+  assert.deepEqual(writes, [], 'a legacy-scalar-flagged item is skipped entirely');
+
+  const summary = await restampOwnedItemComponentIdentity({
+    actors: [makeActor([item])],
+    systems: [SYS_A],
+    writeFlag,
+  });
+  assert.equal(summary.stampedLeaves, 0, 'nothing is stamped');
+  assert.equal(item.flags.fabricate.fabricate.roles.sysA, undefined, 'no sysA leaf manufactured');
+});
+
+test('600: an unflagged item that name-matches NOTHING in a system gains no phantom leaf', async () => {
+  const item = makeOwnedItem({ name: 'Unrelated Widget', uuid: 'Item.owned-copy' });
+
+  const writes = planOwnedItemComponentRestamp(item, [SYS_A]);
+  assert.deepEqual(writes, [], 'no name match ⇒ no write');
+
+  const summary = await restampOwnedItemComponentIdentity({
+    actors: [makeActor([item])],
+    systems: [SYS_A],
+    writeFlag,
+  });
+  assert.equal(summary.stampedLeaves, 0);
+  assert.equal(item.flags.fabricate.fabricate.roles.sysA, undefined, 'no phantom sysA leaf');
+});
+
+test('600: an unflagged item stamps only the name-matching system, never an unrelated one', async () => {
+  const sword = { id: 'sword', name: 'Iron Sword', registeredItemUuid: 'Item.sword-src' };
+  const systemB = { id: 'sysB', components: [sword] };
+  const item = makeOwnedItem({ name: 'Healing Potion', uuid: 'Item.owned-copy' });
+
+  await restampOwnedItemComponentIdentity({
+    actors: [makeActor([item])],
+    systems: [SYS_A, systemB],
+    writeFlag,
+  });
+
+  const roles = item.flags.fabricate.fabricate.roles;
+  assert.equal(roles.sysA.componentId, HEALING.id, 'sysA (name match) stamped');
+  assert.equal(roles.sysB, undefined, 'the unrelated sysB is never stamped');
 });
 
 test('600: a dotted/unsafe systemId is skipped safely (no mis-nested flag)', async () => {

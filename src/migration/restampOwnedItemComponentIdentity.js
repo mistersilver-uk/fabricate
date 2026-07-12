@@ -37,7 +37,7 @@
 
 import { isSafeFlagKeySegment } from '../config/flags.js';
 import { findComponentByNameSilently } from '../utils/componentNameMatch.js';
-import { resolveComponentForItem } from '../utils/sourceUuid.js';
+import { itemHasComponentIdentityFlag, resolveComponentForItem } from '../utils/sourceUuid.js';
 
 /**
  * Plan the durable-identity leaf writes a single owned item needs to stop resolving to a
@@ -46,12 +46,22 @@ import { resolveComponentForItem } from '../utils/sourceUuid.js';
  * source references), but a component name-matches (case-insensitive, the shared runtime
  * name-fallback semantics), emit one `roles.<systemId>.componentId` write.
  *
- * A system in which the item ALREADY resolves (durable leaf present, or a raw-ref /
- * source-uuid intersection) yields no write — that is the idempotence + "leave durably
- * flagged items untouched" guard, since `resolveComponentForItem` reads the per-system
- * `roles` leaf first. The name match is intentionally telemetry-free
- * ({@link findComponentByNameSilently}) so this detection pass does not pollute the issue-540
- * Phase 3 telemetry window that measures live runtime reliance on the fallback.
+ * An item that ALREADY carries ANY durable component identity — a `roles.<system>.componentId`
+ * leaf for SOME system, OR the legacy flat `flags.fabricate.componentId` scalar — is skipped
+ * ENTIRELY (no system considered). This mirrors the runtime name-fallback gate exactly: the
+ * live matcher ({@link findMatchingComponent}) reaches the name compare only when BOTH
+ * `resolveComponentForItem` returns null AND `!itemHasComponentIdentityFlag(item)` — the
+ * issue-538 rule that a flagged item's identity IS its component id and must never loosely
+ * name-match a same-named component in a DIFFERENT system. Omitting this gate would MANUFACTURE
+ * and make PERMANENT the exact cross-system duplicate-inventory projection #538 prevents (an
+ * item flagged for system B, sharing only a display name with a component in system A, would be
+ * stamped into A even though it does not resolve there at runtime).
+ *
+ * For an item that passes that gate, a system in which it ALREADY resolves (a raw-ref /
+ * source-uuid intersection) yields no write — the existing per-system `resolveComponentForItem`
+ * guard. The name match is intentionally telemetry-free ({@link findComponentByNameSilently}) so
+ * this detection pass does not pollute the issue-540 Phase 3 telemetry window that measures live
+ * runtime reliance on the fallback.
  *
  * @param {Item|object|null} item - An owned actor item (reads `name`, `getFlag`, source metadata).
  * @param {Array<{id?: string, components?: Array<object>}>} systems - The world's crafting systems.
@@ -60,6 +70,13 @@ import { resolveComponentForItem } from '../utils/sourceUuid.js';
 export function planOwnedItemComponentRestamp(item, systems) {
   const writes = [];
   if (!item || typeof item !== 'object') return writes;
+  // Cross-system suppression (issue 538): an item already bearing ANY durable component
+  // identity (a `roles` leaf for some system, or the legacy flat scalar) never reaches the
+  // name fallback at runtime, so the migration must not stamp it into a merely same-named
+  // system either. This is the item-level counterpart of `findMatchingComponent`'s
+  // `!itemHasComponentIdentityFlag(item)` guard and covers this migration's own primary
+  // target — legacy flat-flag owned copies.
+  if (itemHasComponentIdentityFlag(item)) return writes;
   for (const system of Array.isArray(systems) ? systems : []) {
     const systemId = system?.id;
     // Dotted/unsafe system ids can never have been written as a `roles` map key, so there
