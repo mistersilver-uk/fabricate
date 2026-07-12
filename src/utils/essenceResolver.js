@@ -63,7 +63,7 @@ export function findMatchingComponent(item, components = [], systemId) {
 export function resolveItemEssences(
   item,
   components = [],
-  systemId,
+  systemId = null,
   resolveComponent = findMatchingComponent
 ) {
   const flaggedEssences = normalizeEssences(getFabricateFlag(item, 'essences', {}));

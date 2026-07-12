@@ -6,7 +6,11 @@ import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakag
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
-import { accumulateSubmissionEssences, resolveItemEssences } from '../utils/essenceResolver.js';
+import {
+  accumulateSubmissionEssences,
+  findMatchingComponent,
+  resolveItemEssences,
+} from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
@@ -2215,7 +2219,7 @@ export class CraftingEngine {
     checkResult = null,
     selectedResultGroupId = null,
     precomputedEssences = null,
-    resolveComponent
+    resolveComponent = findMatchingComponent
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -2376,7 +2380,7 @@ export class CraftingEngine {
     consumedItems,
     recipe,
     precomputedEssences = null,
-    resolveComponent
+    resolveComponent = findMatchingComponent
   ) {
     // 1. Get the crafting system and verify essences are enabled
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
@@ -3140,7 +3144,7 @@ export class CraftingEngine {
     checkResult = null,
     step = null,
     precomputedEssences = null,
-    resolveComponent
+    resolveComponent = findMatchingComponent
   ) {
     if (!macroUuid) return null;
 
@@ -3212,10 +3216,15 @@ export class CraftingEngine {
    * @param {Function} [resolveComponent] - Optional component resolver injected on the
    *   alchemy craft path (issue 578) so a tier-4-only consumed item contributes its
    *   component's essences to effect transfer / property-macro context; defaults
-   *   (undefined) to the shared standard-craft resolver via {@link resolveItemEssences}.
+   *   to the shared standard-craft resolver {@link findMatchingComponent} via {@link resolveItemEssences}.
    * @private
    */
-  _buildEssenceContext(consumedItems, recipe = null, precomputedEssences = null, resolveComponent) {
+  _buildEssenceContext(
+    consumedItems,
+    recipe = null,
+    precomputedEssences = null,
+    resolveComponent = findMatchingComponent
+  ) {
     if (precomputedEssences && typeof precomputedEssences === 'object') {
       return { resolvedEssences: { ...precomputedEssences }, essenceSources: {} };
     }

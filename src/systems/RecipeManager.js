@@ -3,7 +3,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
-import { accumulateItemEssences } from '../utils/essenceResolver.js';
+import { accumulateItemEssences, findMatchingComponent } from '../utils/essenceResolver.js';
 import {
   itemResolvesToComponent,
   itemResolvesToTool,
@@ -1339,12 +1339,12 @@ export class RecipeManager {
    *   components and system id for essence resolution.
    * @param {Function} [resolveComponent] - Optional component resolver injected on the
    *   alchemy craft path (issue 578) so a tier-4-only item contributes its component's
-   *   essences. Defaults (undefined) to the shared {@link findMatchingComponent} via
+   *   essences. Defaults to the shared {@link findMatchingComponent} via
    *   {@link accumulateItemEssences} used by standard crafting — byte-for-byte unchanged.
    * @returns {Object} - Accumulated essences { 'light': 3, 'fire': 2 }
    * @private
    */
-  _accumulateEssences(items, recipe = null, resolveComponent) {
+  _accumulateEssences(items, recipe = null, resolveComponent = findMatchingComponent) {
     return accumulateItemEssences(items, {
       components: this._getSystemComponents(recipe),
       systemId: recipe?.craftingSystemId,
