@@ -1015,3 +1015,136 @@ test('evaluateShoppingRequirement unions all ingredient sets with the max need p
   assert.equal(byName.Iron.satisfied, false);
   assert.equal(byName.Iron.have, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Issue 551: tag- and currency-matched ingredient tiles resolve an image
+// ---------------------------------------------------------------------------
+
+/**
+ * A tag-carrying inventory item: matched by its fabricate `tags` flag, and
+ * exposing its own `img` so a tag-matched tile can borrow it.
+ */
+function makeTaggedItem(uuid, tags, img, quantity = 1) {
+  return {
+    uuid,
+    id: uuid,
+    img,
+    system: { quantity },
+    flags: {},
+    getFlag: (_scope, key) => (key === 'fabricate.tags' ? tags : undefined),
+  };
+}
+
+function makeTagIngredientData(tags, quantity = 1) {
+  return { match: { type: 'tags', tags, tagMatch: 'any' }, quantity };
+}
+
+function makeCurrencyIngredientData(unit, amount, quantity = 1) {
+  return { match: { type: 'currency', unit, amount }, quantity };
+}
+
+test('issue 551: a satisfied tag-matched tile shows the held item image, and switches when option A is exhausted', () => {
+  const systemId = 'sys-551-switch';
+  const set = makeIngredientSet([
+    makeGroupData([makeTagIngredientData(['metal'], 1), makeTagIngredientData(['wood'], 1)]),
+  ]);
+  const recipe = new Recipe({
+    name: 'Alt Tag Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, []);
+
+  // Option A (metal) is held: the tile shows the metal item's own image.
+  const withMetal = manager.evaluateCraftability(
+    [makeActor([makeTaggedItem('metal-item', ['metal'], 'icons/metal.webp', 2)])],
+    recipe
+  );
+  assert.equal(withMetal.ingredientStates[0].satisfied, true);
+  assert.equal(
+    withMetal.ingredientStates[0].img,
+    'icons/metal.webp',
+    'tag tile borrows the satisfying item image'
+  );
+
+  // Metal is exhausted (only wood remains): the tile switches to option B's image.
+  const withWood = manager.evaluateCraftability(
+    [makeActor([makeTaggedItem('wood-item', ['wood'], 'icons/wood.webp', 1)])],
+    recipe
+  );
+  assert.equal(withWood.ingredientStates[0].satisfied, true);
+  assert.equal(
+    withWood.ingredientStates[0].img,
+    'icons/wood.webp',
+    'tag tile switches to the other option image when the first is gone'
+  );
+});
+
+test('issue 551: a short-stocked tag group shows the first matching held item image', () => {
+  const systemId = 'sys-551-missing';
+  const set = makeIngredientSet([makeGroupData([makeTagIngredientData(['metal'], 3)])]);
+  const recipe = new Recipe({
+    name: 'Missing Tag Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, []);
+
+  // Holds one metal item but needs three: the group is missing, yet the tile
+  // still shows the (insufficient) held item's own image rather than a blank.
+  const result = manager.evaluateCraftability(
+    [makeActor([makeTaggedItem('metal-item', ['metal'], 'icons/metal.webp', 1)])],
+    recipe
+  );
+  assert.equal(result.canCraft, false);
+  assert.equal(result.ingredientStates[0].satisfied, false);
+  assert.equal(result.ingredientStates[0].have, 1);
+  assert.equal(
+    result.ingredientStates[0].img,
+    'icons/metal.webp',
+    'missing tag tile resolves the first matching held item image'
+  );
+});
+
+test('issue 551: an unmatched tag group falls back to a tag icon, never a null image', () => {
+  const systemId = 'sys-551-tagfallback';
+  const set = makeIngredientSet([makeGroupData([makeTagIngredientData(['gem'], 1)])]);
+  const recipe = new Recipe({
+    name: 'Empty Tag Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, []);
+
+  const result = manager.evaluateCraftability([makeActor([])], recipe);
+  assert.equal(result.ingredientStates[0].satisfied, false);
+  assert.equal(
+    result.ingredientStates[0].img,
+    'icons/svg/item-bag.svg',
+    'tag tile with nothing in inventory falls back to a tag icon, not null'
+  );
+  assert.notEqual(result.ingredientStates[0].img, null);
+});
+
+test('issue 551: a currency-matched tile shows a coin icon instead of a blank', () => {
+  const systemId = 'sys-551-currency';
+  const set = makeIngredientSet([makeGroupData([makeCurrencyIngredientData('gp', 100)])]);
+  const recipe = new Recipe({
+    name: 'Currency Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, []);
+
+  const result = manager.evaluateCraftability([makeActor([])], recipe);
+  assert.equal(
+    result.ingredientStates[0].img,
+    'icons/svg/coins.svg',
+    'currency tile resolves a coin icon'
+  );
+  assert.notEqual(result.ingredientStates[0].img, null);
+});
