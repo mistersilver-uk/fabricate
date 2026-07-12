@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+# Opt-in bundle-size visualizer report (npm run build:analyze, issue #146)
+stats.html
 *.log
 .DS_Store
 .vscode/
