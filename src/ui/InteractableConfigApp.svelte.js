@@ -32,6 +32,10 @@ import {
 } from '../canvas/linkedVisuals/linkedInteractableVisual.js';
 import { identifyRegionBehaviorRef } from '../canvas/regions/interactableRegionNodeAdapter.js';
 import { readInteractableBehaviorSystem } from '../canvas/regions/interactableRegionFlags.js';
+import {
+  planInteractableDeletion,
+  executeInteractableDeletion,
+} from '../canvas/regions/interactableDeletion.js';
 import { resolveMarkerHidden } from '../canvas/regions/interactableRegionActivation.js';
 import { choiceDialog, localize } from './svelte/util/foundryBridge.js';
 
@@ -485,6 +489,14 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
         const behavior = this._resolveBehavior();
         const region = behavior?.parent ?? null;
         if (!region) return;
+        // Provenance-aware deletion (issue 533): only a region Fabricate CREATED is
+        // deleted wholesale. A PROMOTED region (or one carrying foreign behaviours)
+        // keeps its geometry + foreign behaviours — we remove only Fabricate's
+        // behaviour. The confirm copy states which will happen.
+        const plan = planInteractableDeletion(region, {
+          targetBehaviorId: behavior?.id ?? behavior?._id ?? null
+        });
+        const deletesRegion = plan.scope === 'region';
         // One 3-way choice: Cancel (no-op), Delete interactable (leave the linked
         // marker), or Delete interactable + the linked visual marker. A linked
         // Token is the GM's own document, so the "+ visual" option is suppressed
@@ -501,7 +513,14 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
 
         const choice = await choiceDialog({
           title: this._t('FABRICATE.Canvas.Interactable.Config.DeleteTitle', 'Delete interactable'),
-          content: this._t('FABRICATE.Canvas.Interactable.Config.DeletePrompt', 'Delete this interactable region? This cannot be undone.'),
+          content: this._t(
+            deletesRegion
+              ? 'FABRICATE.Canvas.Interactable.Config.DeletePromptRegion'
+              : 'FABRICATE.Canvas.Interactable.Config.DeletePromptBehaviour',
+            deletesRegion
+              ? 'Fabricate created this region, so deleting the interactable deletes the whole region. This cannot be undone.'
+              : 'Your region and any other behaviours on it are kept — only the Fabricate interactable is removed.'
+          ),
           choices,
           defaultAction: 'delete'
         });
@@ -522,7 +541,7 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
             });
           }
         }
-        try { await region.delete?.(); } catch (_error) { /* tolerate. */ }
+        try { await executeInteractableDeletion(region, plan); } catch (_error) { /* tolerate. */ }
         void this.close();
       }
     };

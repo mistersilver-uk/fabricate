@@ -52,6 +52,7 @@ import {
   interactableBehaviorsContainingToken,
   selectRepromptTokenDoc,
 } from './regionHitTest.js';
+import { buildInteractableRegionFlags } from './regions/interactableDeletion.js';
 import {
   shouldPromptOnEnter,
   buildActivationRequest,
@@ -360,6 +361,11 @@ class InteractableManager {
           name: region.name,
           shapes: [{ type: 'rectangle', x, y, width, height }],
           behaviors: [{ type: 'fabricate.interactable', system: behaviorSystem }],
+          // Stamp region-level ownership: Fabricate CREATED this region, so deleting
+          // the interactable may safely delete the whole region (issue 533). A
+          // PROMOTED region (a user region Fabricate is merely pointed at) never
+          // gets this flag, so its delete removes only Fabricate's behaviour.
+          flags: buildInteractableRegionFlags(),
         },
       ]);
       regionDoc = created ?? null;
