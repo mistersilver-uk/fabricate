@@ -121,6 +121,82 @@ test('localizeActivationIssue falls back to the issue default when the key is mi
   assert.match(out, /Ash/);
 });
 
+test('localizeActivationIssue degrades safely for an unrecognized code — returns the English message, never the code or a key', () => {
+  const issue = {
+    code: 'someFutureCodeNotYetMapped',
+    params: { detail: 'anything' },
+    message: 'A step has no result set.',
+  };
+  // An unmapped code must fall through to the uncoded path and surface the
+  // already-English `message` — never the raw code, never a FABRICATE.* key.
+  const localizeFn = (key) => key; // even a real localize fn must not be consulted
+  const out = localizeActivationIssue(issue, localizeFn);
+  assert.equal(out, 'A step has no result set.');
+  assert.ok(!out.includes('someFutureCodeNotYetMapped'), 'must not surface the raw code');
+  assert.ok(!out.startsWith('FABRICATE.'), 'must not surface a lang key');
+});
+
+test('an UNNAMED shared component is dropped from the collision label — no id leaks on the component path', () => {
+  // A colliding pair whose shared satisfying component has NO managed name. The
+  // component-name label must OMIT it rather than fall back to its id, exercising
+  // `_overlapComponentNames`' name filter.
+  const components = [{ id: 'nZ8kLq2pWv4tYr6b', name: '', tags: [] }];
+  const group = () => ({
+    id: `grp-${Math.random().toString(36).slice(2)}`,
+    options: [{ match: { type: 'component', componentId: 'nZ8kLq2pWv4tYr6b' }, quantity: 1 }],
+  });
+  const recipes = [
+    {
+      id: 'r-a',
+      name: 'Alpha',
+      ingredientSets: [{ id: 'setAAAAAAAAAAAAAA', ingredientGroups: [group()] }],
+    },
+    {
+      id: 'r-b',
+      name: 'Beta',
+      ingredientSets: [{ id: 'setBBBBBBBBBBBBBB', ingredientGroups: [group()] }],
+    },
+  ];
+  const system = { id: 'sys-alch', resolutionMode: 'alchemy' };
+  const { conflicts } = buildValidator(system, recipes, components).validateSystem('sys-alch');
+
+  assert.ok(conflicts.length > 0, 'expected an overlap conflict');
+  const conflict = conflicts[0];
+
+  // The unnamed component is dropped: the components label is empty, and neither
+  // the params nor the default message carries the component id.
+  assert.equal(
+    conflict.params.components,
+    '',
+    'unnamed component must be dropped, not id-substituted'
+  );
+  assert.ok(!conflict.params.components.includes('nZ8kLq2pWv4tYr6b'));
+  assert.doesNotMatch(conflict.message, FOUNDRY_ID_RE, `message leaked an id: ${conflict.message}`);
+  assert.ok(!conflict.message.includes('nZ8kLq2pWv4tYr6b'));
+  // The default message drops the "(shared components: …)" clause entirely when
+  // there are no named components, so no empty-parens artifact surfaces.
+  assert.ok(!conflict.message.includes('shared components'));
+
+  // The localized toast is likewise id-free even though the component is unnamed.
+  const error = new RecipeActivationError('Beta', [
+    { code: conflict.code, params: conflict.params, message: conflict.message },
+  ]);
+  const localizeFn = (key, data) => {
+    const templates = {
+      'FABRICATE.Admin.Manager.RecipeActivation.CannotEnable':
+        'Cannot enable recipe "{name}": {errors}',
+      'FABRICATE.Admin.Manager.RecipeActivation.IssueSignatureCollision':
+        'Recipe "{recipeA}" and recipe "{recipeB}" share components ({components}).',
+    };
+    const t = templates[key];
+    if (!t) return key;
+    return t.replaceAll(/\{(\w+)\}/g, (m, k) => (data && data[k] != null ? String(data[k]) : m));
+  };
+  const toast = localizeRecipeActivationError(error, localizeFn);
+  assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
+  assert.ok(!toast.includes('nZ8kLq2pWv4tYr6b'));
+});
+
 test('localizeRecipeActivationError builds a localized, id-free toast from a RecipeActivationError', () => {
   const { system, recipes, components } = collidingSystem();
   const { conflicts } = buildValidator(system, recipes, components).validateSystem('sys-alch');
