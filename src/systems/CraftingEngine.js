@@ -11,6 +11,7 @@ import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakag
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
+import { matchComponentByName } from '../utils/componentNameMatch.js';
 import {
   accumulateSubmissionEssences,
   findMatchingComponent,
@@ -3801,10 +3802,13 @@ export class CraftingEngine {
       );
       if (byUuid.length > 0) return byUuid;
     }
-    // Name fallback (issue 557)
-    const name = component.name;
-    if (name) {
-      return items.filter((item) => item.name === name);
+    // Name fallback (issue 557). Shared, telemetry-bearing helper (issue 540); this
+    // salvage path stays case-SENSITIVE (`item.name === component.name`), unlike the
+    // three case-insensitive read/craft sites.
+    if (component.name) {
+      return items.filter((item) =>
+        matchComponentByName(item, component, { caseSensitive: true, systemId: system?.id })
+      );
     }
     return [];
   }
