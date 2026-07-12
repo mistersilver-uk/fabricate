@@ -17,6 +17,12 @@ import { computeSystemVisibility } from './systemValidation.js';
 const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
 const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
+// Match-kind fallback icons for ingredient tiles whose match carries no managed
+// component id (issue 551). A tag match falls back to a generic item icon when
+// nothing in inventory currently satisfies it; a currency match — which never
+// resolves to an inventory item — always shows a coin icon.
+const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
+const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -754,7 +760,7 @@ export class RecipeManager {
         const description =
           this._resolveIngredientDescription(recipe, ingredient) ||
           options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
-        const visual = this._resolveIngredientVisual(recipe, ingredient);
+        const visual = this._resolveIngredientVisual(recipe, ingredient, availableItems);
         return {
           ...visual,
           description,
@@ -789,7 +795,8 @@ export class RecipeManager {
       const satisfiedOption = optionStates.find((s) => s.satisfied) || optionStates[0];
       const visual = this._resolveIngredientVisual(
         recipe,
-        satisfiedOption?.ingredient || options[0]
+        satisfiedOption?.ingredient || options[0],
+        availableItems
       );
       return {
         ...visual,
@@ -823,16 +830,22 @@ export class RecipeManager {
   /**
    * Resolve the tile visuals (component id, display name, icon image) for an
    * ingredient, so the player detail can render an image grid. Component-typed
-   * matches resolve through the managed component library; anything else falls
-   * back to a null image (the UI thumbnail then shows its default) and the
-   * ingredient's own description as the name.
+   * matches resolve through the managed component library. Tag- and currency-typed
+   * matches carry no managed component id, so their image is resolved from a live
+   * inventory item that satisfies the match (issue 551): a tag tile shows the img
+   * of the first held item matching the tag, falling back to a generic tag icon
+   * when nothing in inventory matches; a currency tile always shows a coin icon (currency never
+   * resolves to an inventory item). Anything else falls back to a null image (the
+   * UI thumbnail then shows its default) and the ingredient's own description.
    *
    * @param {Recipe} recipe
    * @param {Ingredient|null} ingredient
+   * @param {Item[]} [availableItems] - live inventory used to resolve a tag tile's
+   *   image from a satisfying item; defaults to none.
    * @returns {{ componentId: string|null, name: string, img: string|null }}
    * @private
    */
-  _resolveIngredientVisual(recipe, ingredient) {
+  _resolveIngredientVisual(recipe, ingredient, availableItems = []) {
     const match = ingredient?.match || null;
     if (match?.type === 'component' && match.componentId) {
       return {
@@ -841,7 +854,21 @@ export class RecipeManager {
         img: this.resolveComponentImg(recipe, match.componentId),
       };
     }
-    return { componentId: null, name: ingredient?.getDescription?.() || '', img: null };
+
+    const name = ingredient?.getDescription?.() || '';
+
+    if (match?.type === 'tags') {
+      const matchingItem = (availableItems || []).find((item) =>
+        this.ingredientMatchesItem(recipe, ingredient, item)
+      );
+      return { componentId: null, name, img: matchingItem?.img || FALLBACK_TAG_IMG };
+    }
+
+    if (match?.type === 'currency') {
+      return { componentId: null, name, img: FALLBACK_CURRENCY_IMG };
+    }
+
+    return { componentId: null, name, img: null };
   }
 
   /**
