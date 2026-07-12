@@ -531,21 +531,73 @@ function isInteractableVisualStampOnly(update) {
 }
 
 /**
- * Ownership guard for a linked-visual UPDATE write. A write is permitted when the
- * resolved document is ALREADY a Fabricate interactable visual (any write), OR when
- * the update is EXACTLY the relink provenance stamp — the `flags.fabricate` reverse
- * block ({@link buildLinkedVisualFlags}) and NOTHING else. The stamp exception
- * preserves the relink edge (writing the reverse flag onto a GM-selected document
- * that is not yet a Fabricate visual) while a strict, fail-closed allowlist stops a
- * crafted payload from smuggling `hidden`/`texture`/geometry writes — or a
- * dot-notation-flattened foreign key — alongside the stamp against a foreign
- * document. Any other write to a non-Fabricate document is rejected.
+ * Bidirectional-link verification: is the visual `doc` GENUINELY linked to the live
+ * `behavior`, by a round-trip that the socket layer cannot mint? PURE.
+ *
+ * The reverse flag on a visual (`flags.fabricate.{isInteractableVisual,
+ * linkedRegionUuid,linkedBehaviorId}`) is mintable via a stamp-only write, so it
+ * MUST NOT by itself authorize a core-data write or delete. This authorizes those
+ * edges against the SOURCE OF TRUTH — the `fabricate.interactable` behaviour that
+ * legitimately links the visual — requiring ALL of:
+ *   (a) the visual carries a well-formed reverse flag ({@link readLinkedVisualRef});
+ *   (b) `behavior` exists and is a `fabricate.interactable` behaviour
+ *       ({@link isInteractableRegionBehavior}) — the caller resolves it from the
+ *       reverse flag's `linkedRegionUuid`/`linkedBehaviorId`;
+ *   (c) the behaviour's FORWARD link (`system.linkedVisual.uuid`) points back to
+ *       THIS exact document (`doc.uuid`).
+ *
+ * An attacker who mints a reverse flag pointing at a fake behaviour fails (b); one
+ * pointing at a real behaviour fails (c), because that behaviour's forward link
+ * points at its genuine tile, not the attacker's target. Creating/mutating a
+ * `fabricate.interactable` behaviour is a privileged Foundry region op (and its own
+ * write edge is `isInteractableRegionBehavior`-guarded), so the forward link is not
+ * socket-mintable.
+ *
+ * @param {object} doc  The resolved visual document (must expose `uuid`).
+ * @param {object} behavior  The behaviour resolved from the reverse flag's ref.
+ * @returns {boolean}
+ */
+export function visualLinkRoundTrips(doc, behavior) {
+  if (!readLinkedVisualRef(doc)) return false;
+  if (!isInteractableRegionBehavior(behavior)) return false;
+  const forwardUuid = coerceString(behavior?.system?.linkedVisual?.uuid);
+  const docUuid = coerceString(doc?.uuid);
+  if (!forwardUuid || !docUuid) return false;
+  return forwardUuid === docUuid;
+}
+
+/**
+ * Ownership guard for a linked-visual UPDATE write. Permitted when EITHER the update
+ * is EXACTLY the relink provenance stamp — the `flags.fabricate` reverse block
+ * ({@link buildLinkedVisualFlags}) and NOTHING else (the mint itself; writes no core
+ * data, so it is harmless even against a not-yet-linked GM-selected document) — OR
+ * the visual is GENUINELY bidirectionally linked to `behavior`
+ * ({@link visualLinkRoundTrips}). A minted reverse flag no longer authorizes a
+ * core-data write on its own; and the strict, fail-closed stamp allowlist stops a
+ * crafted payload from smuggling `hidden`/`texture`/geometry — or a
+ * dot-notation-flattened foreign key — alongside the stamp.
  *
  * @param {object} doc  The resolved visual document.
  * @param {object} [update]  The pending document update patch.
+ * @param {object} [behavior]  The behaviour resolved from the doc's reverse-flag ref.
  * @returns {boolean}
  */
-export function mayApplyInteractableVisualUpdate(doc, update) {
-  if (isInteractableVisual(doc)) return true;
-  return isInteractableVisualStampOnly(update);
+export function mayApplyInteractableVisualUpdate(doc, update, behavior) {
+  if (isInteractableVisualStampOnly(update)) return true;
+  return visualLinkRoundTrips(doc, behavior);
+}
+
+/**
+ * Ownership guard for a linked-visual DELETE (terminal). Permitted ONLY when the
+ * visual is GENUINELY bidirectionally linked to `behavior`
+ * ({@link visualLinkRoundTrips}). A minted reverse flag — pointing at a fake or a
+ * mismatched behaviour — never authorizes a delete, closing the mint-then-delete
+ * escalation.
+ *
+ * @param {object} doc  The resolved visual document.
+ * @param {object} [behavior]  The behaviour resolved from the doc's reverse-flag ref.
+ * @returns {boolean}
+ */
+export function mayDeleteInteractableVisual(doc, behavior) {
+  return visualLinkRoundTrips(doc, behavior);
 }

@@ -26,8 +26,9 @@ import {
 } from './interactableSocket.js';
 import {
   isInteractableRegionBehavior,
-  isInteractableVisual,
   mayApplyInteractableVisualUpdate,
+  mayDeleteInteractableVisual,
+  readLinkedVisualRef,
 } from './regions/interactableRegionFlags.js';
 import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
 
@@ -149,6 +150,27 @@ function resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName } = {
 }
 
 /**
+ * Resolve the `fabricate.interactable` behaviour a visual claims to be linked to,
+ * from the visual's reverse flag ref (`linkedRegionUuid` + `linkedBehaviorId`). The
+ * Foundry edge for {@link visualLinkRoundTrips}: `fromUuidSync(regionUuid)` → the
+ * Region → `behaviors.get(behaviorId)`. Returns null when the visual carries no
+ * reverse flag or the behaviour cannot be resolved. No-throw.
+ *
+ * @param {object} doc  The resolved visual document.
+ * @returns {object|null}
+ */
+function resolveLinkedBehaviorForVisual(doc) {
+  const ref = readLinkedVisualRef(doc);
+  if (!ref) return null;
+  try {
+    const region = globalThis.fromUuidSync?.(String(ref.regionUuid));
+    return region?.behaviors?.get?.(String(ref.behaviorId)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Apply a linked-visual update (the active-GM edge for writing a linked
  * Tile/Drawing/Token, e.g. the relink reverse-flag write). No-throw, no-op when
  * the visual is missing.
@@ -165,11 +187,12 @@ export async function applyInteractableVisualUpdate({
 } = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.update) return;
-  // Ownership guard: only write to a document that is already a Fabricate
-  // interactable visual, OR when the write itself stamps the reverse provenance
-  // flag (the relink edge onto a GM-selected document). Any other write to a
-  // foreign document — resolved by a drifted/crafted uuid — is refused.
-  if (!mayApplyInteractableVisualUpdate(doc, update)) {
+  // Ownership guard: permit the relink provenance STAMP (writes no core data), or a
+  // core-data write only when the visual is GENUINELY bidirectionally linked to its
+  // behaviour (mint-proof — a reverse flag alone does not authorize a core write).
+  // Any other write to a foreign/minted document is refused.
+  const behavior = resolveLinkedBehaviorForVisual(doc);
+  if (!mayApplyInteractableVisualUpdate(doc, update, behavior)) {
     console.warn(
       'Fabricate | Refused an interactable visual update: the resolved document is not a Fabricate interactable visual',
       { sceneId, visualUuid, docId, documentName }
@@ -197,10 +220,12 @@ export async function applyInteractableVisualDelete({
 } = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.delete) return;
-  // Ownership guard: NEVER delete a document that is not a Fabricate interactable
-  // visual. A drifted/crafted uuid could otherwise resolve to a foreign
-  // Tile/Drawing/Token and delete it outright.
-  if (!isInteractableVisual(doc)) {
+  // Ownership guard: NEVER delete a document unless it is GENUINELY bidirectionally
+  // linked to its behaviour (mint-proof). A drifted/crafted uuid — or a minted
+  // reverse flag — could otherwise resolve to a foreign Tile/Drawing/Token and
+  // delete it outright.
+  const behavior = resolveLinkedBehaviorForVisual(doc);
+  if (!mayDeleteInteractableVisual(doc, behavior)) {
     console.warn(
       'Fabricate | Refused an interactable visual delete: the resolved document is not a Fabricate interactable visual',
       { sceneId, visualUuid, docId, documentName }
