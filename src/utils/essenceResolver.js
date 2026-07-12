@@ -1,6 +1,6 @@
 import { getFabricateFlag } from '../config/flags.js';
 
-import { resolveComponentForItem } from './sourceUuid.js';
+import { itemHasComponentIdentityFlag, resolveComponentForItem } from './sourceUuid.js';
 
 function normalizeEssences(essences = {}) {
   const normalized = {};
@@ -31,6 +31,15 @@ export function findMatchingComponent(item, components = [], systemId) {
   // created before source refs existed (its closure is deferred to issue 557).
   const resolved = resolveComponentForItem(item, components, systemId);
   if (resolved) return resolved;
+
+  // Suppress the cross-system NAME fallback for an item that already carries a durable
+  // component identity (issue 538). Its identity IS its component id, and the resolver
+  // above already tried this system's candidate set through the durable + raw-ref tiers.
+  // A same-named component in ANOTHER system is a DIFFERENT component, so name-matching
+  // it here would project the one owned item as a duplicate inventory row per system.
+  // Items with NO identity flag keep the name fallback (the pre-identity compatibility
+  // path, removal tracked by issue 540).
+  if (itemHasComponentIdentityFlag(item)) return null;
 
   return (
     components.find(

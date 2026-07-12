@@ -241,6 +241,39 @@ function durableClaimedComponent(item, candidates, systemId) {
 }
 
 /**
+ * Whether an owned item carries ANY durable COMPONENT identity claim — a per-system
+ * `flags.fabricate.roles[*].componentId` for some system, OR the legacy flat
+ * `flags.fabricate.componentId` scalar. Reads the SAME canonical locations
+ * {@link resolveComponentForItem}'s durable tiers trust (the `roles` map that #556/#567
+ * canonicalized, then the transitional legacy scalar), so a newly-flagged item and a
+ * legacy flat-flag item are both recognized.
+ *
+ * The gate for suppressing the cross-system NAME fallback (issue 538): a flagged
+ * item's identity IS its component id, so it must not loosely name-match a same-named
+ * component in a DIFFERENT system — the per-system resolver has already tried the
+ * candidate set that could legitimately bear its id, and a name hit in another system
+ * only spawns a duplicate inventory row. Unlike {@link claimedRoleId} this is
+ * system-agnostic (any system's `componentId` leaf counts) because the name-fallback
+ * suppression must fire regardless of which system the item is flagged to.
+ *
+ * @param {Item|object|null} item
+ * @returns {boolean} True when the item bears a component identity flag (roles or legacy scalar).
+ */
+export function itemHasComponentIdentityFlag(item) {
+  if (!item || typeof item !== 'object') return false;
+  // Legacy flat scalar — honored until the one-shot restamp backfills the roles map.
+  if (getFabricateFlag(item, 'componentId', null) != null) return true;
+  // Per-system roles map — a non-nullish `componentId` leaf under ANY system is a claim.
+  const roles = getFabricateFlag(item, 'roles', null);
+  if (roles && typeof roles === 'object') {
+    for (const perSystem of Object.values(roles)) {
+      if (perSystem && typeof perSystem === 'object' && perSystem.componentId != null) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Resolve which single component an owned item IS, within ONE crafting system's
  * candidate set, scoped by that system's id. The shared, list-aware, system-scoped
  * component matcher — the component-kind analogue of {@link matchRecipeItemDefinition}.
