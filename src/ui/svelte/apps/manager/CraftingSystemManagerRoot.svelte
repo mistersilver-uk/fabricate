@@ -1093,6 +1093,21 @@
   // Progressive systems award a recipe's results in order, so the Results tab
   // enables drag-reorder of the result rows (resolution mode is a system setting).
   const recipeProgressive = $derived(selectedSystem?.resolutionMode === 'progressive');
+  // Alchemy enable-blocker context for the recipe editor's Validation tab (issue
+  // 549): the alchemy check mode (drives the result-selection blocker) and the
+  // cross-recipe signature conflicts touching this recipe. Both are null/[] for every
+  // non-alchemy system, so those systems gain no new checks. The conflicts recompute
+  // against the LIVE draft's ingredient sets (and the current recipe list) so the tab
+  // predicts the collision before the GM saves and clicks enable.
+  const recipeAlchemy = $derived(
+    selectedSystem?.resolutionMode === 'alchemy' ? { checkMode: alchemyCheckMode || 'none' } : null
+  );
+  const recipeSignatureConflicts = $derived.by(() => {
+    if (!recipeAlchemy || !recipeDraft?.id) return [];
+    // Reference the live recipe list so the prediction recomputes after a refresh.
+    void $viewState.recipes;
+    return store.getRecipeSignatureConflicts?.(recipeDraft.id, recipeDraft) || [];
+  });
   // The per-recipe "restrict to specific users" editor only applies under the
   // system's `player` recipe-visibility list mode; other modes gate visibility
   // globally, per-knowledge, or not at all.
@@ -5105,6 +5120,8 @@
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        alchemy={recipeAlchemy}
+        signatureConflicts={recipeSignatureConflicts}
         playerListMode={recipePlayerListMode}
         worldUsers={$viewState.worldUsers || []}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}

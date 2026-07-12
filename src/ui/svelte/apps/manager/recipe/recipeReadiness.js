@@ -368,6 +368,76 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
 }
 
 /**
+ * Alchemy-only enable blockers (issue 549). An alchemy system enables a recipe
+ * through {@link RecipeManager#_validateRecipeForActivation}; two of its checks are
+ * invisible to the generic readiness list and used to throw only on the enable
+ * click:
+ *
+ *  - the alchemy RESULT-SELECTION rule (the retired `resultSelection.provider`
+ *    analog): None/Simple check modes must resolve to exactly one SUCCESS result
+ *    set (the reserved `role: 'failure'` group is not a selectable outcome), so an
+ *    all-failure or multi-success configuration cannot be enabled. Tiered routes by
+ *    the crafting-check outcome, so its result-set cardinality is unconstrained here
+ *    (its routing warnings ride the `routingProvider === 'check'` path). Mirrors
+ *    `ResolutionModeService.validateRecipe`'s alchemy branch, changing nothing about
+ *    what passes/fails — the empty-result-set case stays `noResultGroup`.
+ *  - the cross-recipe SIGNATURE-COLLISION rule (issue 547): each conflict is a
+ *    reason the alchemy runtime cannot tell this recipe apart from another. The
+ *    conflicts are precomputed by the caller via `SignatureValidator` (the same
+ *    validator the enable path and `systemValidation` use — no duplication) and
+ *    passed in as coded `{ code, params, message }` so the tab can localize them
+ *    without leaking ids (issue 550).
+ *
+ * Both are critical, enable-blocking issues. With no alchemy context (every
+ * non-alchemy system) this returns nothing, so those systems see no new checks.
+ *
+ * @param {object} recipe Projected plain recipe.
+ * @param {{ checkMode?: string }|null} alchemy Alchemy context, or null for a
+ *   non-alchemy system.
+ * @param {{ code?: string, params?: object, message?: string }[]} signatureConflicts
+ * @returns {{ issues: ReadinessIssue[], checks: ReadinessCheck[] }}
+ */
+function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
+  const issues = [];
+  const checks = [];
+  if (!alchemy) return { issues, checks };
+
+  // None/Simple result-selection cardinality (Tiered routes by check outcome).
+  if ((alchemy.checkMode || 'none') !== 'tiered') {
+    const resultGroups = asArray(recipe?.resultGroups);
+    const successGroups = resultGroups.filter((group) => group?.role !== 'failure');
+    // The empty case is already reported as `noResultGroup`; only flag a present
+    // result-set list that does not resolve to a single success group.
+    const invalid = resultGroups.length > 0 && successGroups.length !== 1;
+    if (invalid) {
+      issues.push({
+        id: 'alchemyResultSelection',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'results',
+      });
+    }
+    checks.push({ id: 'alchemyResultSelection', satisfied: !invalid });
+  }
+
+  const conflicts = asArray(signatureConflicts);
+  for (const conflict of conflicts) {
+    issues.push({
+      id: 'signatureCollision',
+      severity: 'critical',
+      blocks: 'enable',
+      target: 'ingredients',
+      code: conflict?.code || 'signatureCollision',
+      params: conflict?.params || {},
+      message: conflict?.message || '',
+    });
+  }
+  checks.push({ id: 'noSignatureCollision', satisfied: conflicts.length === 0 });
+
+  return { issues, checks };
+}
+
+/**
  * @param {object} recipe Projected plain recipe.
  * @param {object} [options]
  * @param {object[]} [options.systemComponents] Managed components (`{ id, tags }`)
@@ -379,6 +449,12 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
  * @param {RoutedOutcomeTier[]} [options.routedOutcomeTierOptions] The system's
  *   success-filtered routed-check outcome tiers (`{id,name}`), used to flag
  *   unrouted groups and unproduced tiers.
+ * @param {{ checkMode?: string }|null} [options.alchemy] Alchemy context for an
+ *   alchemy system (`{ checkMode }`); null/absent for every other mode. Drives the
+ *   alchemy result-selection and signature-collision enable blockers (issue 549).
+ * @param {{ code?: string, params?: object, message?: string }[]} [options.signatureConflicts]
+ *   Cross-recipe ingredient-signature conflicts touching this recipe, precomputed by
+ *   the caller via `SignatureValidator`. Only surfaced when `alchemy` is present.
  * @returns {{ checks: ReadinessCheck[], issues: ReadinessIssue[] }}
  */
 export function evaluateRecipeReadiness(recipe = {}, options = {}) {
@@ -386,6 +462,11 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const routingProvider = options.routingProvider || null;
   const routedOutcomeTierOptions = Array.isArray(options.routedOutcomeTierOptions)
     ? options.routedOutcomeTierOptions
+    : [];
+  const alchemy =
+    options.alchemy && typeof options.alchemy === 'object' ? options.alchemy : null;
+  const signatureConflicts = Array.isArray(options.signatureConflicts)
+    ? options.signatureConflicts
     : [];
   const executionSteps = getExecutionSteps(recipe);
   const isMultiStep = executionSteps.length > 0 && executionSteps[0].explicit;
@@ -432,6 +513,13 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
     issues.push(...routed.issues);
     checks.push(...routed.checks);
   }
+
+  // Alchemy-only enable blockers: the result-selection cardinality rule and the
+  // cross-recipe signature collisions the enable path enforces but the generic
+  // readiness checks never inspect (issue 549).
+  const alchemyReadiness = collectAlchemyReadiness(recipe, alchemy, signatureConflicts);
+  issues.push(...alchemyReadiness.issues);
+  checks.push(...alchemyReadiness.checks);
 
   // A disabled recipe still saves, but flag that it cannot be enabled until the
   // critical requirements above are met. The store/model projects `incomplete`;

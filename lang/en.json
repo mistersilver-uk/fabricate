@@ -1715,6 +1715,8 @@
             "CheckNoRequirementOverlap": "No overlapping ingredient requirements",
             "CheckRoutedResultGroupsRouted": "Every check-mode result set is assigned a check outcome",
             "CheckRoutedOutcomeTiersProduced": "Every check success outcome produces a result set",
+            "CheckAlchemyResultSelection": "Resolves to exactly one result set",
+            "CheckNoSignatureCollision": "No ingredient-signature collision with another recipe",
             "IssueNoName": "The recipe needs a name.",
             "IssueNoIngredientSet": "A step has no ingredient set.",
             "IssueNoResultGroup": "A step has no result set.",
@@ -1723,7 +1725,8 @@
             "IssueDuplicateRequirement": "A set repeats the same ingredient requirement.",
             "IssueRequirementOverlap": "Two requirements in a set can be satisfied by the same component (ambiguous).",
             "IssueUnroutedResultGroup": "A result set is not assigned to any check outcome and will never be produced.",
-            "IssueUnproducedOutcomeTier": "A check outcome is not assigned to any result set, so it produces nothing."
+            "IssueUnproducedOutcomeTier": "A check outcome is not assigned to any result set, so it produces nothing.",
+            "IssueAlchemyResultSelection": "An alchemy recipe must resolve to exactly one result set before it can be enabled."
           },
           "PlayerVisibility": "Player visibility",
           "Inspector": "Selected recipe inspector",
@@ -1754,6 +1757,8 @@
           "RecipeItemLockedImageTooltip": "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image.",
           "EnabledHint": "Available to players while on.",
           "DisabledHint": "Hidden from players while off.",
+          "EnableBlockedHint": "Resolve the issues on the Validation tab before enabling.",
+          "EnableBlockedTooltip": "Resolve the issues on the Validation tab before enabling this recipe.",
           "RecipeItem": "Recipe item",
           "RecipeItemDropHint": "Drag an item here to link it.",
           "RecipeItemReplaceHint": "Drop an item to replace it, or right-click to unlink.",

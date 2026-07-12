@@ -252,6 +252,9 @@ function compileManagerRoot() {
     // CraftingSystemManagerRoot seeds a routing provider when a recipe enters
     // Complex mode, reusing chooseSeedProvider from this pure migration module.
     'src/migration/migrateRecipeForModeChange.js',
+    // RecipeValidationTab localizes a signature-collision blocker row via this pure
+    // leaf (issue 549); copy it so the mounted import resolves.
+    'src/systems/recipeActivationMessages.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });

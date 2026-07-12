@@ -9,6 +9,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { localizeActivationIssue } from '../../../../../systems/recipeActivationMessages.js';
   import { evaluateRecipeReadiness } from './recipeReadiness.js';
 
   let {
@@ -19,6 +20,12 @@
     // unrouted result groups and unproduced success tiers.
     routingProvider = null,
     routedOutcomeTierOptions = [],
+    // Alchemy enable-blocker inputs (issue 549): the alchemy context ({ checkMode })
+    // for an alchemy system (null otherwise) and the cross-recipe signature conflicts
+    // touching this recipe, precomputed via SignatureValidator. Drive the alchemy
+    // result-selection and signature-collision blocker rows.
+    alchemy = null,
+    signatureConflicts = [],
     onSelectIssue = () => {}
   } = $props();
 
@@ -30,7 +37,9 @@
   const readiness = $derived(evaluateRecipeReadiness(recipe || {}, {
     systemComponents: componentTagOptions,
     routingProvider,
-    routedOutcomeTierOptions
+    routedOutcomeTierOptions,
+    alchemy,
+    signatureConflicts
   }));
   const issuesBy = $derived({
     critical: readiness.issues.filter(issue => issue.severity === 'critical'),
@@ -46,7 +55,9 @@
     noDuplicateMatches: ['CheckNoDuplicateMatches', 'No duplicate component or tag matches'],
     noRequirementOverlap: ['CheckNoRequirementOverlap', 'No overlapping ingredient requirements'],
     routedResultGroupsRouted: ['CheckRoutedResultGroupsRouted', 'Every check-mode result set is assigned a check outcome'],
-    routedOutcomeTiersProduced: ['CheckRoutedOutcomeTiersProduced', 'Every check success outcome produces a result set']
+    routedOutcomeTiersProduced: ['CheckRoutedOutcomeTiersProduced', 'Every check success outcome produces a result set'],
+    alchemyResultSelection: ['CheckAlchemyResultSelection', 'Resolves to exactly one result set'],
+    noSignatureCollision: ['CheckNoSignatureCollision', 'No ingredient-signature collision with another recipe']
   };
   const ISSUE_LABELS = {
     noName: ['IssueNoName', 'The recipe needs a name.'],
@@ -57,7 +68,8 @@
     duplicateRequirement: ['IssueDuplicateRequirement', 'A set repeats the same ingredient requirement.'],
     requirementOverlap: ['IssueRequirementOverlap', 'Two requirements in a set can be satisfied by the same component (ambiguous).'],
     unroutedResultGroup: ['IssueUnroutedResultGroup', 'A result set is not assigned to any check outcome and will never be produced.'],
-    unproducedOutcomeTier: ['IssueUnproducedOutcomeTier', 'A check outcome is not assigned to any result set, so it produces nothing.']
+    unproducedOutcomeTier: ['IssueUnproducedOutcomeTier', 'A check outcome is not assigned to any result set, so it produces nothing.'],
+    alchemyResultSelection: ['IssueAlchemyResultSelection', 'An alchemy recipe must resolve to exactly one result set before it can be enabled.']
   };
 
   function checkLabel(id) {
@@ -65,6 +77,15 @@
     return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
   }
   function issueTitle(issue) {
+    // A signature collision carries dynamic, id-free params (the other recipe, the
+    // shared component names); reuse the RecipeActivation localizer (issue 550) so the
+    // tab row reads identically to the enable-failure toast.
+    if (issue.id === 'signatureCollision') {
+      return localizeActivationIssue(
+        { code: issue.code, params: issue.params, message: issue.message },
+        localize
+      );
+    }
     const meta = ISSUE_LABELS[issue.id] || [issue.id, issue.id];
     const base = text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
     return issue.stepName ? `${issue.stepName}: ${base}` : base;
