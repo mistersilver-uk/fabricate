@@ -24,7 +24,14 @@ import {
   applyInteractableBehaviorUpdate,
   applyInteractableVisualUpdate,
   applyInteractableVisualDelete,
+  handleInteractableSocketMessage,
 } from '../../src/canvas/interactableSocketBridge.js';
+import {
+  INTERACTABLE_BEHAVIOR_UPDATE,
+  INTERACTABLE_VISUAL_UPDATE,
+  INTERACTABLE_VISUAL_DELETE,
+  INTERACTABLE_ACTIVATE,
+} from '../../src/canvas/interactableSocket.js';
 
 const SCENE_ID = 's1';
 const REGION_ID = 'r1';
@@ -251,5 +258,209 @@ describe('applyInteractableVisualDelete ownership guard', () => {
     await applyInteractableVisualDelete({ sceneId: SCENE_ID, visualUuid: VISUAL_UUID });
     assert.equal(minted.deletes.length, 0, 'a mismatched forward link does not authorize a delete');
     assert.equal(warnings.length, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sender authentication (issue 593): handleInteractableSocketMessage gates the
+// privileged edges on the server-attested socket SENDER (the trusted 2nd callback
+// arg), not the receiver alone. These drive the full inbound dispatch through
+// real apply* seams so the sender gate is exercised end-to-end.
+// ---------------------------------------------------------------------------
+
+const GM_ID = 'gm1';
+
+// This client is the active GM (the receiver that applies). `game.user ===
+// game.users.activeGM` makes `isActiveGM()` true. `behavior`/`visual`/`linkedBehavior`
+// wire the resolvers the real apply* seams walk.
+function installActiveGmWorld({ behavior = null, visual = null, linkedBehavior = null } = {}) {
+  const gm = { id: GM_ID };
+  globalThis.game = {
+    user: gm,
+    users: { activeGM: gm },
+    scenes: {
+      get: (id) =>
+        id === SCENE_ID
+          ? { regions: { get: (rid) => (rid === REGION_ID ? { behaviors: { get: (bid) => (bid === BEHAVIOR_ID ? behavior : null) } } : null) } }
+          : null,
+    },
+  };
+  globalThis.fromUuidSync = (uuid) => {
+    if (uuid === VISUAL_UUID) return visual;
+    if (uuid === REGION_UUID) return { behaviors: { get: (bid) => (bid === BEHAVIOR_ID ? linkedBehavior : null) } };
+    return null;
+  };
+}
+
+// A non-GM sender: any id other than the GM; `isSenderGM` resolves it as non-GM.
+const NON_GM_SENDER = { senderId: 'player1', isSenderGM: (id) => id === GM_ID };
+// A GM sender.
+const GM_SENDER = { senderId: GM_ID, isSenderGM: (id) => id === GM_ID };
+
+describe('handleInteractableSocketMessage sender authentication (issue 593)', () => {
+  it('refuses a NON-GM VISUAL_DELETE against a genuinely-linked tile (no delete, warns)', async () => {
+    const doc = makeVisual(OWNED_VISUAL_FLAGS);
+    installActiveGmWorld({ visual: doc, linkedBehavior: makeLinkedBehavior(VISUAL_UUID) });
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_VISUAL_DELETE, sceneId: SCENE_ID, visualUuid: VISUAL_UUID },
+      NON_GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(doc.deletes.length, 0, 'a non-GM sender cannot delete even a linked visual');
+    assert.equal(warnings.length, 1);
+  });
+
+  it('refuses a NON-GM core-field VISUAL_UPDATE (hidden) even on a linked tile (no write, warns)', async () => {
+    const doc = makeVisual(OWNED_VISUAL_FLAGS);
+    installActiveGmWorld({ visual: doc, linkedBehavior: makeLinkedBehavior(VISUAL_UUID) });
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_VISUAL_UPDATE, sceneId: SCENE_ID, visualUuid: VISUAL_UUID, update: { hidden: true } },
+      NON_GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(doc.updates.length, 0, 'a non-GM sender cannot core-mutate a visual');
+    assert.equal(warnings.length, 1);
+  });
+
+  it('refuses a NON-GM BEHAVIOR_UPDATE carrying system.linkedVisual (forward-link forge)', async () => {
+    const behavior = makeBehavior('fabricate.interactable');
+    installActiveGmWorld({ behavior });
+    handleInteractableSocketMessage(
+      {
+        action: INTERACTABLE_BEHAVIOR_UPDATE,
+        sceneId: SCENE_ID,
+        regionId: REGION_ID,
+        behaviorId: BEHAVIOR_ID,
+        update: { system: { linkedVisual: { uuid: VISUAL_UUID, documentName: 'Tile' } } },
+      },
+      NON_GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(behavior.calls.length, 0, 'the forward-link forge never reaches the behaviour');
+    assert.equal(warnings.length, 1);
+  });
+
+  it('refuses a NON-GM VISUAL_UPDATE minting a reverse flag (stamp)', async () => {
+    const fresh = makeVisual({});
+    installActiveGmWorld({ visual: fresh });
+    handleInteractableSocketMessage(
+      {
+        action: INTERACTABLE_VISUAL_UPDATE,
+        sceneId: SCENE_ID,
+        visualUuid: VISUAL_UUID,
+        update: { flags: { fabricate: { isInteractableVisual: true, linkedRegionUuid: REGION_UUID, linkedBehaviorId: BEHAVIOR_ID } } },
+      },
+      NON_GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(fresh.updates.length, 0, 'a non-GM sender cannot mint a reverse flag');
+    assert.equal(warnings.length, 1);
+  });
+
+  it('blocks the full #534 3-message chain replayed from a NON-GM sender (foreign tile untouched)', async () => {
+    // The foreign target tile the attacker wants to delete. It carries no genuine
+    // link; the behaviour is a real fabricate.interactable the attacker discovered.
+    const foreignTile = makeVisual({});
+    const behavior = makeBehavior('fabricate.interactable');
+    behavior.system = { linkedVisual: { uuid: null } };
+    installActiveGmWorld({ behavior, visual: foreignTile });
+
+    // (1) Forge the forward link on the behaviour.
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_BEHAVIOR_UPDATE, sceneId: SCENE_ID, regionId: REGION_ID, behaviorId: BEHAVIOR_ID, update: { system: { linkedVisual: { uuid: VISUAL_UUID, documentName: 'Tile' } } } },
+      NON_GM_SENDER
+    );
+    // (2) Mint the reverse flag on the foreign tile.
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_VISUAL_UPDATE, sceneId: SCENE_ID, visualUuid: VISUAL_UUID, update: { flags: { fabricate: { isInteractableVisual: true, linkedRegionUuid: REGION_UUID, linkedBehaviorId: BEHAVIOR_ID } } } },
+      NON_GM_SENDER
+    );
+    // (3) Delete the foreign tile.
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_VISUAL_DELETE, sceneId: SCENE_ID, visualUuid: VISUAL_UUID },
+      NON_GM_SENDER
+    );
+    await Promise.resolve();
+
+    assert.equal(behavior.calls.length, 0, 'step 1 forge is refused');
+    assert.equal(foreignTile.updates.length, 0, 'step 2 mint is refused');
+    assert.equal(foreignTile.deletes.length, 0, 'step 3 delete never reaches the foreign tile');
+    assert.equal(warnings.length, 3, 'each refused step is logged');
+  });
+
+  it('permits a GM sender: relink stamp VISUAL_UPDATE, state BEHAVIOR_UPDATE', async () => {
+    // Relink stamp onto a fresh GM-selected tile.
+    const fresh = makeVisual({});
+    installActiveGmWorld({ visual: fresh });
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_VISUAL_UPDATE, sceneId: SCENE_ID, visualUuid: VISUAL_UUID, update: { flags: { fabricate: { isInteractableVisual: true, linkedRegionUuid: REGION_UUID, linkedBehaviorId: BEHAVIOR_ID } } } },
+      GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(fresh.updates.length, 1, 'a GM sender may write the relink stamp');
+
+    // A GM sender may write any behaviour field (e.g. state), unlike a non-GM.
+    const behavior = makeBehavior('fabricate.interactable');
+    installActiveGmWorld({ behavior });
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_BEHAVIOR_UPDATE, sceneId: SCENE_ID, regionId: REGION_ID, behaviorId: BEHAVIOR_ID, update: { system: { state: { enabled: false } } } },
+      GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(behavior.calls.length, 1, 'a GM sender may write state');
+    assert.deepEqual(behavior.calls[0], { system: { state: { enabled: false } } });
+  });
+
+  it('permits a GM sender to delete a genuinely-linked visual (secondary-GM apply)', async () => {
+    const doc = makeVisual(OWNED_VISUAL_FLAGS);
+    installActiveGmWorld({ visual: doc, linkedBehavior: makeLinkedBehavior(VISUAL_UUID) });
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_VISUAL_DELETE, sceneId: SCENE_ID, visualUuid: VISUAL_UUID },
+      GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(doc.deletes.length, 1, 'a GM sender may delete a linked visual');
+  });
+
+  it('permits a legitimate NON-GM gather: a system.node-only BEHAVIOR_UPDATE is applied', async () => {
+    const behavior = makeBehavior('fabricate.interactable');
+    installActiveGmWorld({ behavior });
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_BEHAVIOR_UPDATE, sceneId: SCENE_ID, regionId: REGION_ID, behaviorId: BEHAVIOR_ID, update: { system: { node: { current: 2 } } } },
+      NON_GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(behavior.calls.length, 1, 'the issue-302 scoped-pool decrement is applied');
+    assert.deepEqual(behavior.calls[0], { system: { node: { current: 2 } } });
+  });
+
+  it('refuses a NON-GM BEHAVIOR_UPDATE mixing system.node with a foreign field', async () => {
+    const behavior = makeBehavior('fabricate.interactable');
+    installActiveGmWorld({ behavior });
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_BEHAVIOR_UPDATE, sceneId: SCENE_ID, regionId: REGION_ID, behaviorId: BEHAVIOR_ID, update: { system: { node: { current: 2 }, state: { enabled: false } } } },
+      NON_GM_SENDER
+    );
+    await Promise.resolve();
+    assert.equal(behavior.calls.length, 0, 'a mixed node + foreign write is refused wholesale');
+    assert.equal(warnings.length, 1);
+  });
+
+  it('refuses an impersonated INTERACTABLE_ACTIVATE (payload userId !== sender)', () => {
+    const behavior = makeBehavior('fabricate.interactable');
+    installActiveGmWorld({ behavior });
+    const granted = [];
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_ACTIVATE, sceneId: SCENE_ID, regionId: REGION_ID, behaviorId: BEHAVIOR_ID, userId: 'victim' },
+      { senderId: 'attacker', isSenderGM: () => false, validateAndGrant: (r) => granted.push(r) }
+    );
+    assert.equal(granted.length, 0, 'an impersonated activation is refused before validate/grant');
+
+    // The genuine requester (userId === sender) is granted.
+    handleInteractableSocketMessage(
+      { action: INTERACTABLE_ACTIVATE, sceneId: SCENE_ID, regionId: REGION_ID, behaviorId: BEHAVIOR_ID, userId: 'victim' },
+      { senderId: 'victim', isSenderGM: () => false, validateAndGrant: (r) => granted.push(r) }
+    );
+    assert.equal(granted.length, 1, 'the authenticated requester is honored');
   });
 });

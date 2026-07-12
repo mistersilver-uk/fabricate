@@ -29,8 +29,20 @@ import {
   routeInteractableActivationGranted,
   routeInteractableActivationDenied
 } from '../../src/canvas/interactableSocket.js';
+import { mayApplyNonGmBehaviorUpdate } from '../../src/canvas/regions/interactableRegionFlags.js';
 
 const NODE_UPDATE = { system: { node: { current: 1 } } };
+
+let capturedWarnings;
+let originalWarn;
+function silenceWarnings() {
+  capturedWarnings = [];
+  originalWarn = console.warn;
+  console.warn = (...args) => capturedWarnings.push(args);
+}
+function restoreWarnings() {
+  console.warn = originalWarn;
+}
 
 // --- behaviour-update validation --------------------------------------------
 
@@ -133,6 +145,89 @@ test('behaviour router applies an inbound update only on the active GM', () => {
   assert.equal(ignored.length, 0);
 });
 
+// --- sender-auth: non-GM behaviour-update allowlist (issue 593) -------------
+
+test('mayApplyNonGmBehaviorUpdate permits ONLY system.node writes (nested + dot-notation)', () => {
+  // Legitimate issue-302 player scoped-pool decrement.
+  assert.equal(mayApplyNonGmBehaviorUpdate({ system: { node: { current: 3 } } }), true);
+  assert.equal(mayApplyNonGmBehaviorUpdate({ 'system.node.current': 3 }), true);
+  assert.equal(mayApplyNonGmBehaviorUpdate({ system: { node: { current: 3, respawn: { at: 1 } } } }), true);
+});
+
+test('mayApplyNonGmBehaviorUpdate refuses every non-node write (fail-closed)', () => {
+  // The forward-link forge (issue 534 step 1).
+  assert.equal(mayApplyNonGmBehaviorUpdate({ system: { linkedVisual: { uuid: 'Scene.s1.Tile.t1' } } }), false);
+  assert.equal(mayApplyNonGmBehaviorUpdate({ system: { state: { enabled: false } } }), false);
+  assert.equal(mayApplyNonGmBehaviorUpdate({ system: { state: { locked: true } } }), false);
+  assert.equal(mayApplyNonGmBehaviorUpdate({ presentation: { hidden: true } }), false);
+  // A dot-notation-smuggled foreign key alongside a node key rejects the whole write.
+  assert.equal(mayApplyNonGmBehaviorUpdate({ 'system.node.current': 1, 'system.linkedVisual.uuid': 'x' }), false);
+  assert.equal(mayApplyNonGmBehaviorUpdate({ system: { node: { current: 1 }, state: { enabled: false } } }), false);
+  // Empty / malformed updates fail closed.
+  assert.equal(mayApplyNonGmBehaviorUpdate({}), false);
+  assert.equal(mayApplyNonGmBehaviorUpdate(null), false);
+  assert.equal(mayApplyNonGmBehaviorUpdate([{ system: { node: {} } }]), false);
+});
+
+test('behaviour router refuses a NON-GM sender writing system.linkedVisual (forge), applies a node-only write', () => {
+  silenceWarnings();
+  try {
+    const forged = [];
+    // Non-GM sender forging the forward link → refused, no apply, warns.
+    assert.equal(
+      routeInteractableBehaviorMessage(
+        { action: INTERACTABLE_BEHAVIOR_UPDATE, sceneId: 's1', regionId: 'r1', behaviorId: 'b1', update: { system: { linkedVisual: { uuid: 'Scene.s1.Tile.t1', documentName: 'Tile' } } } },
+        { isActiveGM: () => true, senderIsGM: false, applyUpdate: (a) => forged.push(a) }
+      ),
+      false
+    );
+    assert.equal(forged.length, 0, 'no forge write reaches the behaviour');
+    assert.equal(capturedWarnings.length, 1, 'the refused forge is logged');
+
+    // Non-GM sender writing ONLY system.node → applied (issue-302 gather decrement).
+    const applied = [];
+    assert.equal(
+      routeInteractableBehaviorMessage(
+        { action: INTERACTABLE_BEHAVIOR_UPDATE, sceneId: 's1', regionId: 'r1', behaviorId: 'b1', update: NODE_UPDATE },
+        { isActiveGM: () => true, senderIsGM: false, applyUpdate: (a) => applied.push(a) }
+      ),
+      true
+    );
+    assert.deepEqual(applied, [{ sceneId: 's1', regionId: 'r1', behaviorId: 'b1', update: NODE_UPDATE }]);
+  } finally {
+    restoreWarnings();
+  }
+});
+
+test('behaviour router lets a GM sender write ANY field (state, linkedVisual)', () => {
+  const applied = [];
+  assert.equal(
+    routeInteractableBehaviorMessage(
+      { action: INTERACTABLE_BEHAVIOR_UPDATE, sceneId: 's1', regionId: 'r1', behaviorId: 'b1', update: { system: { state: { enabled: false } } } },
+      { isActiveGM: () => true, senderIsGM: true, applyUpdate: (a) => applied.push(a) }
+    ),
+    true
+  );
+  assert.equal(applied.length, 1);
+});
+
+test('behaviour router refuses a NON-GM write mixing system.node with a foreign field', () => {
+  silenceWarnings();
+  try {
+    const applied = [];
+    assert.equal(
+      routeInteractableBehaviorMessage(
+        { action: INTERACTABLE_BEHAVIOR_UPDATE, sceneId: 's1', regionId: 'r1', behaviorId: 'b1', update: { system: { node: { current: 1 }, state: { enabled: false } } } },
+        { isActiveGM: () => true, senderIsGM: false, applyUpdate: (a) => applied.push(a) }
+      ),
+      false
+    );
+    assert.equal(applied.length, 0);
+  } finally {
+    restoreWarnings();
+  }
+});
+
 // --- activate routing -------------------------------------------------------
 
 test('activate routes to validateAndGrant only on the active GM', () => {
@@ -147,6 +242,30 @@ test('activate routes to validateAndGrant only on the active GM', () => {
   assert.equal(ignored.length, 0);
 
   assert.equal(routeInteractableActivateMessage({ action: 'other' }, { isActiveGM: () => true, validateAndGrant: () => {} }), false);
+});
+
+test('activate refuses an impersonated request (payload userId !== authenticated sender)', () => {
+  silenceWarnings();
+  try {
+    const granted = [];
+    const payload = { action: INTERACTABLE_ACTIVATE, sceneId: 's1', regionId: 'r1', behaviorId: 'b1', userId: 'victim' };
+    // The attacker emits a request claiming to be `victim`, but the server-attested
+    // sender is `attacker`. Refused, no grant.
+    assert.equal(
+      routeInteractableActivateMessage(payload, { isActiveGM: () => true, senderId: 'attacker', validateAndGrant: (r) => granted.push(r) }),
+      false
+    );
+    assert.equal(granted.length, 0);
+    // The matching sender is honored.
+    const ok = [];
+    assert.equal(
+      routeInteractableActivateMessage(payload, { isActiveGM: () => true, senderId: 'victim', validateAndGrant: (r) => ok.push(r) }),
+      true
+    );
+    assert.equal(ok.length, 1);
+  } finally {
+    restoreWarnings();
+  }
 });
 
 // --- granted routing --------------------------------------------------------

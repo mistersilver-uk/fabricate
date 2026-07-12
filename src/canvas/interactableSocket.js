@@ -22,6 +22,8 @@
  * (`behavior.update`, `game.socket.emit`).
  */
 
+import { mayApplyNonGmBehaviorUpdate } from './regions/interactableRegionFlags.js';
+
 export const INTERACTABLE_SOCKET = 'module.fabricate';
 
 // Region-first model actions. The behaviour update routes a behaviour `system`
@@ -220,19 +222,43 @@ export function createInteractableBehaviorWriter({ isActiveGM, emitUpdate, apply
 }
 
 /**
- * Route an inbound behaviour-update socket message: only the active GM applies.
- * Returns `true` when applied, `false` otherwise.
+ * Route an inbound behaviour-update socket message: only the active GM applies, and
+ * the write is authenticated against the server-attested socket SENDER (issue 593).
+ * A GM sender may write any field; a NON-GM sender's `update` must pass the strict
+ * `system.node`-only allowlist ({@link mayApplyNonGmBehaviorUpdate}) — the legitimate
+ * issue-302 player scoped-pool decrement — so a non-GM can never forge
+ * `system.linkedVisual`, mutate `system.state`, or touch presentation/marker config.
+ * A refused non-GM write bails LOUDLY so it is observable. Returns `true` when
+ * applied, `false` otherwise.
  *
  * @param {object} payload
  * @param {object} deps
  * @param {() => boolean} deps.isActiveGM
+ * @param {boolean} deps.senderIsGM  Whether the server-attested socket sender is a GM.
  * @param {(args: { sceneId: string, regionId: string, behaviorId: string, update: object }) => (void|Promise<void>)} deps.applyUpdate
  * @returns {boolean}
  */
-export function routeInteractableBehaviorMessage(payload, { isActiveGM, applyUpdate } = {}) {
+export function routeInteractableBehaviorMessage(
+  payload,
+  { isActiveGM, senderIsGM, applyUpdate } = {}
+) {
   const normalized = validateBehaviorUpdatePayload(payload);
   if (!normalized) return false;
   if (typeof isActiveGM === 'function' && isActiveGM() !== true) return false;
+  // Sender authentication: a non-GM sender may only write the interactable's own
+  // scoped node pool. Any other field (linkedVisual forge, state, presentation,
+  // marker/lock config) is refused loudly.
+  if (senderIsGM !== true && !mayApplyNonGmBehaviorUpdate(normalized.update)) {
+    console.warn(
+      'Fabricate | Refused an interactable behaviour update from a non-GM sender: only system.node writes are permitted',
+      {
+        sceneId: normalized.sceneId,
+        regionId: normalized.regionId,
+        behaviorId: normalized.behaviorId,
+      }
+    );
+    return false;
+  }
   applyUpdate?.({
     sceneId: normalized.sceneId,
     regionId: normalized.regionId,
@@ -247,16 +273,33 @@ export function routeInteractableBehaviorMessage(payload, { isActiveGM, applyUpd
  * `validateAndGrant` collaborator performs the full validation checklist + emits
  * the grant (it owns the Foundry edges). Returns `true` when handled by the GM.
  *
+ * Sender authentication (issue 593): when the server-attested socket `senderId` is
+ * provided, the request's `userId` MUST match it, so a player cannot request
+ * activation under another user's identity (impersonation). Returns `false` (no
+ * grant) on a mismatch.
+ *
  * @param {object} payload
  * @param {object} deps
  * @param {() => boolean} deps.isActiveGM
+ * @param {string} [deps.senderId]  The server-attested socket sender's user id.
  * @param {(request: object) => (void|Promise<void>)} deps.validateAndGrant
  * @returns {boolean}
  */
-export function routeInteractableActivateMessage(payload, { isActiveGM, validateAndGrant } = {}) {
+export function routeInteractableActivateMessage(
+  payload,
+  { isActiveGM, senderId, validateAndGrant } = {}
+) {
   const normalized = validateActivatePayload(payload);
   if (!normalized) return false;
   if (typeof isActiveGM === 'function' && isActiveGM() !== true) return false;
+  // Impersonation guard: the requesting userId must be the authenticated sender.
+  if (senderId !== undefined && senderId !== null && normalized.userId !== String(senderId)) {
+    console.warn(
+      'Fabricate | Refused an interactable activation request: payload userId does not match the authenticated sender',
+      { userId: normalized.userId, senderId: String(senderId) }
+    );
+    return false;
+  }
   validateAndGrant?.(normalized);
   return true;
 }
