@@ -15,14 +15,17 @@ function makeComponent(id, tags = []) {
   return { id, name: id, tags };
 }
 
-function makeIngredient(matchType, { componentId = null, tags = [], tagMatch = 'any' } = {}) {
+function makeIngredient(
+  matchType,
+  { componentId = null, tags = [], tagMatch = 'any', quantity = 1 } = {}
+) {
   if (matchType === 'component') {
-    return { match: { type: 'component', componentId } };
+    return { match: { type: 'component', componentId }, quantity };
   }
   if (matchType === 'tags') {
-    return { match: { type: 'tags', tags, tagMatch } };
+    return { match: { type: 'tags', tags, tagMatch }, quantity };
   }
-  return { match: null };
+  return { match: null, quantity };
 }
 
 function makeGroup(options) {
@@ -570,6 +573,97 @@ test('shared base with disjoint option-alternative second groups → no conflict
     result.valid,
     true,
     `Disjoint distinguishing groups must not collide; got: ${JSON.stringify(result.conflicts)}`
+  );
+  assert.equal(result.conflicts.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 21. quantity>=2 multi-component group joint satisfiability (issue 547 follow-up)
+//
+// A `quantity: 2` "metal"-tag group is naturally crafted with TWO DISTINCT metal
+// components (iron + gold). That single craft also fully satisfies a second
+// recipe whose two single-component groups are {iron} and {gold}, so the runtime
+// (first-match) would silently brew the wrong recipe. The transversal test must
+// let a quantity>=2 group contribute multiple distinct components, or it
+// under-rejects this genuine ambiguity.
+// ---------------------------------------------------------------------------
+
+test('quantity>=2 multi-component group vs its distinct components → conflict (issue 547)', () => {
+  const components = [
+    makeComponent('comp-iron', ['metal']),
+    makeComponent('comp-gold', ['metal']),
+    makeComponent('comp-salt'),
+    makeComponent('comp-pepper'),
+  ];
+
+  // Recipe A: {metal x2}, {salt}, {pepper} — the metal group is crafted iron+gold.
+  const recipeA = makeRecipe('r-a', 'Alloy Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('tags', { tags: ['metal'], tagMatch: 'any', quantity: 2 })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-salt' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-pepper' })]),
+    ]),
+  ]);
+
+  // Recipe B: {iron}, {gold} — satisfied by iron+gold, which A's natural craft supplies.
+  const recipeB = makeRecipe('r-b', 'Iron & Gold Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-iron' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-gold' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeB, recipeA], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    false,
+    'A quantity>=2 multi-component craft that also fully matches another set must be rejected'
+  );
+  assert.ok(result.conflicts.length > 0);
+});
+
+// ---------------------------------------------------------------------------
+// 22. quantity 1 multi-component group does NOT over-reject (issue 547)
+//
+// The same shape but with quantity 1 supplies only ONE metal unit, so a natural
+// craft is iron OR gold — never both — and does not satisfy the {iron},{gold}
+// set. Must stay enablable (guards against the fix over-rejecting quantity 1).
+// ---------------------------------------------------------------------------
+
+test('quantity 1 multi-component group vs its distinct components → no conflict (issue 547)', () => {
+  const components = [
+    makeComponent('comp-iron', ['metal']),
+    makeComponent('comp-gold', ['metal']),
+    makeComponent('comp-salt'),
+    makeComponent('comp-pepper'),
+  ];
+
+  const recipeA = makeRecipe('r-a', 'Single Metal Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('tags', { tags: ['metal'], tagMatch: 'any', quantity: 1 })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-salt' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-pepper' })]),
+    ]),
+  ]);
+
+  const recipeB = makeRecipe('r-b', 'Iron & Gold Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-iron' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-gold' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeB, recipeA], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    true,
+    `A quantity 1 metal group supplies only one unit and cannot satisfy {iron},{gold}; got: ${JSON.stringify(result.conflicts)}`
   );
   assert.equal(result.conflicts.length, 0);
 });
