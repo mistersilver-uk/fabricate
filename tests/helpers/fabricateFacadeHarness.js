@@ -26,6 +26,8 @@
  * harness too.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { isGatheringActorSelectableByUser } from '../../src/config/preferencesCleanup.js';
 import { AlchemyListingBuilder } from '../../src/systems/AlchemyListingBuilder.js';
 import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js';
@@ -34,7 +36,7 @@ import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js
 function installFoundryShim() {
   globalThis.foundry = globalThis.foundry ?? {
     utils: {
-      randomID: () => `id-${Math.random().toString(36).slice(2)}`,
+      randomID: () => `id-${randomUUID().replace(/-/g, '').slice(0, 16)}`,
       getProperty: (object, path) =>
         String(path || '')
           .split('.')
