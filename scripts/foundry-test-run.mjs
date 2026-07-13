@@ -1194,9 +1194,9 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Shard', img: 'icons/commodities/gems/gem-fragments-red.webp' },
       // simple system — multi-option ingredient recipe (issue #552): two
       // interchangeable coil components the crafter holds + the woven result.
-      { name: 'Smoke Copper Coil', img: 'icons/commodities/metal/wire-copper.webp' },
-      { name: 'Smoke Bronze Coil', img: 'icons/commodities/metal/wire-brass.webp' },
-      { name: 'Smoke Filigree', img: 'icons/commodities/metal/mail-chain-gold.webp' },
+      { name: 'Smoke Copper Coil', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
+      { name: 'Smoke Bronze Coil', img: 'icons/commodities/metal/ingot-engraved-silver.webp' },
+      { name: 'Smoke Filigree', img: 'icons/commodities/metal/ingot-gold.webp' },
       // routedByIngredients system
       { name: 'Smoke Ingot A', img: 'icons/commodities/metal/ingot-engraved-silver.webp' },
       { name: 'Smoke Ingot B', img: 'icons/commodities/metal/ingot-gold.webp' },
@@ -1379,7 +1379,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       name: 'Smoke Weave Filigree',
       description: 'Simple-mode craft with one ingredient group offering two interchangeable coils (issue #552).',
       craftingSystemId: simpleSystemId,
-      img: 'icons/commodities/metal/mail-chain-gold.webp',
+      img: 'icons/commodities/metal/ingot-gold.webp',
       ingredientSets: [{
         ingredientGroups: [{
           id: 'smoke-coil-choice',
