@@ -122,7 +122,11 @@ const SEMVER_CASES = [
   ['1.4.0-beta.1', '1.4.0-rc.1', -1],
   ['1.4.0-alpha.1', '1.4.0-beta.1', -1],
   ['1.4.0-beta.1', '1.4.0-beta.1.1', -1],
-  ['1.4.0+build.1', '1.4.0+build.2', 0],
+  // Build metadata is refused outright, not parsed-and-ignored: nothing we publish carries it,
+  // and matching it pushed the pattern past Sonar's regex-complexity limit. `null` = no opinion,
+  // which is the correct answer from a comparator that only ever annotates a report.
+  ['1.4.0+build.1', '1.4.0', null],
+  ['1.4.0', '1.4.0+build.1', null],
   ['not-a-version', '1.4.0', null],
   ['1.4.0', 'v1.4.0', null],
   [undefined, '1.4.0', null]
@@ -151,13 +155,14 @@ for (const [v1, v0] of DISAGREEMENT_CASES) {
   });
 }
 
-test('parseSemver strips build metadata and splits prerelease identifiers', () => {
-  assert.deepEqual(parseSemver('1.5.0-beta.7+abc123'), {
+test('parseSemver splits prerelease identifiers and refuses build metadata', () => {
+  assert.deepEqual(parseSemver('1.5.0-beta.7'), {
     major: 1,
     minor: 5,
     patch: 0,
     prerelease: ['beta', '7']
   });
   assert.deepEqual(parseSemver('1.5.0'), { major: 1, minor: 5, patch: 0, prerelease: [] });
+  assert.equal(parseSemver('1.5.0-beta.7+abc123'), null, 'build metadata is not accepted');
   assert.equal(parseSemver('v1.5.0'), null, 'a tag is not a version');
 });

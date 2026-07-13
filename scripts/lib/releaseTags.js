@@ -52,11 +52,19 @@ const TAG_SHAPES = 'vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-rc.N (no leading zeros)';
 export function parseReleaseTag(tag) {
   if (typeof tag !== 'string') return null;
 
+  // Read the named groups explicitly rather than spreading `match.groups`: the two branches must
+  // return the SAME SHAPE, and a spread hides which keys each one actually contributes.
   const beta = BETA_TAG_RE.exec(tag);
-  if (beta) return { tag, ...beta.groups, kind: 'beta' };
+  if (beta) {
+    const { version, base, prerelease } = beta.groups;
+    return { tag, version, base, kind: 'beta', prerelease };
+  }
 
   const stable = STABLE_TAG_RE.exec(tag);
-  if (stable) return { tag, ...stable.groups, kind: 'stable', prerelease: null };
+  if (stable) {
+    const { version, base } = stable.groups;
+    return { tag, version, base, kind: 'stable', prerelease: null };
+  }
 
   return null;
 }
@@ -74,7 +82,11 @@ export function parseReleaseTag(tag) {
  */
 export function assertReleaseTagKind(kind) {
   if (kind !== 'any' && !RELEASE_TAG_KINDS.includes(kind)) {
-    throw new TypeError(`Unknown release tag kind '${kind}'. Expected one of: beta, stable, any.`);
+    // String(): `kind` is unknown, and a bare interpolation would report an object as
+    // "[object Object]" — the error must name what was actually passed.
+    throw new TypeError(
+      `Unknown release tag kind '${String(kind)}'. Expected one of: beta, stable, any.`
+    );
   }
 }
 
@@ -92,12 +104,16 @@ export function validateReleaseTag(tag, kind = 'any') {
 
   const parsed = parseReleaseTag(tag);
   if (!parsed) {
-    return { ok: false, error: `Tag '${tag}' is not a release tag. Expected ${TAG_SHAPES}.` };
+    // String(): see assertReleaseTagKind — `tag` is unknown and must not report as [object Object].
+    return {
+      ok: false,
+      error: `Tag '${String(tag)}' is not a release tag. Expected ${TAG_SHAPES}.`,
+    };
   }
   if (kind !== 'any' && parsed.kind !== kind) {
     return {
       ok: false,
-      error: `Tag '${parsed.tag}' is a ${parsed.kind} release tag, but a ${kind} tag is required.`,
+      error: `Tag '${parsed.tag}' is a ${parsed.kind} release tag, but a ${String(kind)} tag is required.`,
     };
   }
   return { ok: true, ...parsed };

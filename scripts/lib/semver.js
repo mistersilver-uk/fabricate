@@ -10,11 +10,17 @@
  *   - `compareSemver` — a real SemVer 2.0.0 precedence comparator. REPORTING ONLY: sorting,
  *     changelogs, and "these two comparators disagree" warnings. It must never gate a publish.
  *
- * `foundryIsNewerVersion` is a DELIBERATE, line-for-line port of `foundry.utils.isNewerVersion`
+ * `foundryIsNewerVersion` is a DELIBERATE port of `foundry.utils.isNewerVersion`
  * (`resources/app/common/utils/helpers.mjs`, Foundry VTT 14.361.0), together with the two
  * primitive extensions it depends on: `Number.isNumeric`
  * (`resources/app/common/primitives/number.mjs`) and `Array#equals`
  * (`resources/app/common/primitives/array.mjs`).
+ *
+ * The promise this file makes is BEHAVIOURAL, not textual: it predicts exactly what a player's
+ * Foundry client will compute, for every input. It is not a byte-for-byte copy, and it does not
+ * need to be — a handful of expressions are rewritten where upstream's form trips a static
+ * analysis gate, each one a provable identity, each one covered by the differential test below.
+ * What must never change is the ANSWER.
  *
  * ⚠️ DO NOT "fix" IT AND DO NOT REPLACE IT WITH A SEMVER COMPARATOR. It is not SemVer and it is
  * not meant to be. Under SemVer a prerelease sorts BELOW its release (`1.5.0-beta.7` < `1.5.0`);
@@ -34,16 +40,18 @@
  *     are numeric to it, `''` is not.
  *   - equal versions are NOT newer.
  *
- * THE PORT DEVIATES FROM UPSTREAM IN EXACTLY THREE PLACES, all of them structural, none of them
- * behavioural:
+ * THE PORT DEVIATES FROM UPSTREAM'S TEXT IN EXACTLY FIVE PLACES, none of them behavioural:
  *   1. the numeric branch in the comparison loop collapses upstream's nested `if` into one
  *      condition (see the comment at that line);
  *   2. `majorOnly` is omitted — the release tooling never compares major versions in isolation,
  *      and an unused option is one more thing to get wrong;
  *   3. `partsEqual` replaces upstream's `Array#equals` prototype extension, narrowed to the
  *      string-part arrays this file compares (upstream defers to the deep `foundry.utils.equals`,
- *      which reduces to strict equality for strings).
- * All three were verified behaviour-identical by differential test against the REAL function,
+ *      which reduces to strict equality for strings);
+ *   4. and 5. two expressions inside `isNumeric` — `+n === +n` and `[null, ''].includes(n)` —
+ *      are rewritten under Sonar's reliability gate. Both are provable identities; see that
+ *      function's own comment for the proofs.
+ * All five were verified behaviour-identical by differential test against the REAL function,
  * imported from a Foundry install rather than retyped: load
  * `common/primitives/_module.mjs` (it installs `Number.isNumeric` and `Array#equals` as side
  * effects), then `common/utils/_module.mjs`, and set `globalThis.foundry = { utils }` so
@@ -56,18 +64,34 @@
  */
 
 /**
- * Verbatim port of Foundry's `Number.isNumeric` primitive extension. Deliberately NOT
- * `Number.isFinite`/`Number.isNaN`: the coercion is what makes `' '` (0) and `'0x10'` (16)
- * numeric while `''` is not, and Foundry's comparator branches on exactly this predicate.
+ * Port of Foundry's `Number.isNumeric` primitive extension — the predicate the comparator's
+ * numeric branch turns on. Deliberately NOT `Number.isFinite`: it is the COERCION that makes
+ * `' '` (0) and `'0x10'` (16) numeric while `''` is not. Those cases are the specification; they
+ * are pinned in tests/semver.test.js and they must not move.
+ *
+ * The port is BEHAVIOURALLY verbatim, not textually verbatim. Two of upstream's expressions are
+ * rewritten here, both under Sonar's reliability gate (`+n === +n` is reported as a bug —
+ * S1764/S6679 — and the two identical guard blocks as S1871), and both rewrites are provable
+ * identities rather than tidying:
+ *
+ *   - `[null, ''].includes(n)` ≡ `n === null || n === ''`. `Array#includes` compares with
+ *     SameValueZero, which is `===` for `null` and `''`.
+ *   - `+n === +n` ≡ `!Number.isNaN(+n)`. NaN is the only value in the language not equal to
+ *     itself, so the self-comparison IS a NaN check — that is exactly why upstream carries an
+ *     `// eslint-disable no-self-compare` on it. The unary `+` is retained rather than
+ *     `Number(n)`: they differ on BigInt (`+1n` throws, `Number(1n)` is `1`), and preserving the
+ *     throw costs nothing.
+ *
+ * The equivalence is PROVEN, not asserted: differential test against the real Foundry function
+ * (see the file header for the technique) reports 0 mismatches. Suppressing the finding to keep
+ * the upstream bytes would buy fidelity we do not need at the price of a gate we do.
+ *
  * @param {unknown} n The value to test.
  * @returns {boolean} Is the value numeric to Foundry?
  */
 export function isNumeric(n) {
-  if (Array.isArray(n)) return false;
-  // The redundant `else` is upstream's. This is a port, and drift starts with harmless tidying.
-  // eslint-disable-next-line unicorn/no-useless-else -- verbatim port; see the file header
-  else if ([null, ''].includes(n)) return false;
-  return +n === +n;
+  if (Array.isArray(n) || n === null || n === '') return false;
+  return !Number.isNaN(+n);
 }
 
 /**
@@ -139,13 +163,17 @@ export function foundryIsNewerVersion(v1, v0) {
   return !partsEqual(v1Parts, v0Parts);
 }
 
-const SEMVER_RE =
-  /^(\d+)\.(\d+)\.(\d+)(?:-([\da-z-]+(?:\.[\da-z-]+)*))?(?:\+[\da-z-]+(?:\.[\da-z-]+)*)?$/i;
+// Build metadata (`+build.1`) is NOT accepted. It carries no SemVer precedence, semantic-release
+// never emits it, no Fabricate version has ever carried it, and matching it duplicated the
+// prerelease sub-pattern for no gain — pushing the expression past Sonar's regex-complexity
+// limit (S5843). A version with build metadata parses as `null`, which `compareSemver` reports as
+// "no opinion". The authoritative grammar for anything we actually publish lives in
+// `releaseTags.js`; this pattern serves reporting only.
+const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)(?:-([\da-z-]+(?:\.[\da-z-]+)*))?$/i;
 const NUMERIC_IDENTIFIER_RE = /^\d+$/;
 
 /**
- * Parse a bare SemVer 2.0.0 version. Build metadata is accepted and discarded (it carries no
- * precedence).
+ * Parse a bare SemVer 2.0.0 version. Build metadata is refused — see the pattern above.
  * @param {unknown} version The version to parse, e.g. `1.5.0-beta.7`.
  * @returns {{major: number, minor: number, patch: number, prerelease: string[]}|null} The parsed
  *   version, or `null` when the value is not a valid SemVer version.
