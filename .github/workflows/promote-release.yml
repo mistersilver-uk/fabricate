@@ -21,16 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Validate RC tag
-        run: |
-          if ! echo "${{ inputs.rc_tag }}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
-            echo "::error::Tag '${{ inputs.rc_tag }}' does not match RC pattern v*.*.*-rc.*"
-            exit 1
-          fi
-
+      # Tag validation runs AFTER checkout (it needs scripts/), not before it. The
+      # validator is deliberately zero-dependency, so it runs on the runner's
+      # preinstalled Node — before setup-node and npm ci.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Validate release tag
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+        run: node scripts/validate-release-tag.mjs "$RC_TAG" --kind beta
 
       - name: Validate tag exists
         run: |

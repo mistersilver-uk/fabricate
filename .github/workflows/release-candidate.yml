@@ -52,14 +52,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Record RC tags at HEAD before semantic-release
+      - name: Record prerelease tags at HEAD before semantic-release
         run: |
           git fetch --tags --force
-          git tag --points-at HEAD -l "v*-rc.*" \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$' \
-            | sort > "$RUNNER_TEMP/rc-tags-before.txt" || true
+          # `--filter` echoes the tags that match the shared release-tag patterns and always
+          # exits 0 (no tag at HEAD is the normal case). It replaces a hand-copied `grep -E`
+          # that recognised `-rc.N` only. See scripts/lib/releaseTags.js.
+          git tag --points-at HEAD -l "v*-*" \
+            | node scripts/validate-release-tag.mjs --filter --kind beta \
+            | sort > "$RUNNER_TEMP/rc-tags-before.txt"
 
-          echo "RC tags at HEAD before semantic-release:"
+          echo "Prerelease tags at HEAD before semantic-release:"
           cat "$RUNNER_TEMP/rc-tags-before.txt" || true
       - name: Semantic Release
         env:
@@ -69,11 +72,11 @@ jobs:
         id: detect_rc_tag
         run: |
           git fetch --tags --force
-          git tag --points-at HEAD -l "v*-rc.*" \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$' \
-            | sort > "$RUNNER_TEMP/rc-tags-after.txt" || true
+          git tag --points-at HEAD -l "v*-*" \
+            | node scripts/validate-release-tag.mjs --filter --kind beta \
+            | sort > "$RUNNER_TEMP/rc-tags-after.txt"
 
-          echo "RC tags at HEAD after semantic-release:"
+          echo "Prerelease tags at HEAD after semantic-release:"
           cat "$RUNNER_TEMP/rc-tags-after.txt" || true
 
           comm -13 "$RUNNER_TEMP/rc-tags-before.txt" "$RUNNER_TEMP/rc-tags-after.txt" \

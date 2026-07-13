@@ -53,16 +53,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Validate RC tag
-        run: |
-          if ! echo "${{ inputs.rc_tag }}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
-            echo "::error::Tag '${{ inputs.rc_tag }}' does not match RC pattern v*.*.*-rc.*"
-            exit 1
-          fi
-
+      # Tag validation runs AFTER checkout (it needs scripts/), not before it. The
+      # validator is deliberately zero-dependency, so it runs on the runner's
+      # preinstalled Node — before setup-node and npm ci.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Validate release tag
+        id: version
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+        run: |
+          VERSION=$(node scripts/validate-release-tag.mjs "$RC_TAG" --kind beta)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing $RC_TAG → version $VERSION"
 
       - name: Validate tag exists
         run: |
@@ -70,13 +75,6 @@ jobs:
             echo "::error::Tag '${{ inputs.rc_tag }}' does not exist"
             exit 1
           fi
-
-      - name: Extract version
-        id: version
-        run: |
-          VERSION=$(echo "${{ inputs.rc_tag }}" | sed 's/^v//')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing ${{ inputs.rc_tag }} → version $VERSION"
 
       - name: Checkout RC tag
         run: git checkout "${{ inputs.rc_tag }}"
