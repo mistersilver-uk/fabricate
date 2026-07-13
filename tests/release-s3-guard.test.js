@@ -7,6 +7,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const { assertPublishSafety, fetchPublishState } = await import('../scripts/lib/publishGuard.js');
+// The comparator the guard's remedy is measured against — the same one that decides the refusal.
+const { foundryIsNewerVersion } = await import('../scripts/lib/semver.js');
 const { main, resolveChannelConfig, runCheckHeads, deriveS3Layout, s3StatusFromError } = await import(
   '../scripts/release-s3.js'
 );
@@ -98,6 +100,9 @@ const safetyOf = ({ version, state, allowDowngrade = false, staged = [CHANNEL, T
     allowDowngrade,
   });
 
+/** Read back the version the refusal advises the operator to publish instead. */
+const remedyOf = (error) => /MINOR bump \(e\.g\. ([^)]+)\)/.exec(error)?.[1] ?? null;
+
 test('assertPublishSafety allows a target that has no head yet', () => {
   const verdict = safetyOf({ version: '1.4.0-beta.1', state: [head(CHANNEL, null), head(TESTER, null)] });
   assert.equal(verdict.ok, true);
@@ -136,9 +141,11 @@ test('assertPublishSafety refuses a Foundry-newer head, names the target, and na
   assert.equal(refused.label, 'tester-closed-beta-2026');
   assert.match(verdict.error, /tester-closed-beta-2026/);
   assert.match(verdict.error, /1\.5\.0-beta\.1/);
-  // The remedy is a forced MINOR bump — never the downgrade override — and it stays on the
-  // prerelease line it is rescuing.
-  assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.5\.0-beta\.1\)/);
+  // The remedy is a forced MINOR bump — never the downgrade override — it stays on the prerelease
+  // line it is rescuing, and it is measured from the HEAD (1.5.0-beta.1), so it must land ABOVE it:
+  // suggesting 1.5.0-beta.1 would be suggesting the head itself, which publishes as a no-op.
+  assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.6\.0-beta\.1\)/);
+  assert.ok(foundryIsNewerVersion(remedyOf(verdict.error), '1.5.0-beta.1'));
   assert.match(verdict.error, /Do NOT reach for --allow-downgrade/);
 });
 
@@ -174,14 +181,66 @@ test('assertPublishSafety fails closed when a rollover glued to the prerelease s
   assert.doesNotMatch(verdict.error, /e\.g\. 1\.5\.0\)/);
 });
 
-test('assertPublishSafety suggests a bare stable remedy only for a stable version', () => {
+test('assertPublishSafety derives the remedy from the HEAD, not from the version being published', () => {
+  // 1.4.1 refused by a 1.5.0 head. Bumping the VERSION's minor gives 1.5.0 — the head itself, which
+  // the guard would then ALLOW (an equal head is not a backwards move), moving nothing and leaving
+  // the cohort silent. The remedy must clear the head: 1.6.0.
+  const verdict = safetyOf({ version: '1.4.1', state: [head(CHANNEL, '1.5.0')], staged: [CHANNEL] });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.6\.0\)/);
+  assert.doesNotMatch(verdict.error, /e\.g\. 1\.5\.0\)/);
+});
+
+test('assertPublishSafety suggests one remedy that clears EVERY refused head', () => {
+  // Two targets, two different heads. The suggestion has to clear both, not just the first.
   const verdict = safetyOf({
-    version: '1.4.1',
-    state: [head(CHANNEL, '1.5.0')],
-    staged: [CHANNEL],
+    version: '1.4.0-beta.1',
+    state: [head(CHANNEL, '1.4.9-beta.3'), head(TESTER, '1.6.0')],
   });
   assert.equal(verdict.ok, false);
-  assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.5\.0\)/);
+  const remedy = remedyOf(verdict.error);
+  assert.equal(remedy, '1.7.0-beta.1');
+  assert.ok(foundryIsNewerVersion(remedy, '1.4.9-beta.3'));
+  assert.ok(foundryIsNewerVersion(remedy, '1.6.0'));
+});
+
+test('every remedy the guard prints is one Foundry would actually accept over the head', () => {
+  // THE PROPERTY, not a string. The refusal promises the remedy "is the only change that makes
+  // Foundry compare the new build as newer" — so assert exactly that, over a corpus, and no future
+  // edit to suggestMinorBump can quietly make the sentence false again. Both previous versions of
+  // this function pass individual pinned examples and fail here.
+  const corpus = [
+    '1.4.0', '1.4.1', '1.4.9', '1.4.10', '1.5.0', '1.5.1', '1.9.0', '1.10.0', '2.0.0', '2.1.0',
+    '1.4.0-beta.1', '1.4.9-beta.1', '1.4.9-beta.3', '1.4.10-beta.1', '1.5.0-beta.1',
+    '1.5.0-beta.7', '1.5.0-beta.10', '1.10.0-beta.1', '2.0.0-beta.1', '1.5.1-rc.2',
+  ];
+
+  let refused = 0;
+  let cleared = 0;
+  for (const version of corpus) {
+    for (const current of corpus) {
+      const verdict = safetyOf({ version, state: [head(CHANNEL, current)], staged: [CHANNEL] });
+      if (verdict.ok) continue;
+      refused += 1;
+
+      const remedy = remedyOf(verdict.error);
+      assert.ok(remedy, `no remedy named for ${version} over head ${current}`);
+      // The remedy must CLEAR the head — not equal it (which the guard would allow as a no-op that
+      // never advances the head) and not fall under it (which it would refuse all over again).
+      assert.notEqual(remedy, current, `remedy for ${version} over head ${current} IS the head`);
+      assert.ok(
+        foundryIsNewerVersion(remedy, current),
+        `remedy ${remedy} does not clear head ${current} (publishing ${version})`
+      );
+      // And it must stay on the line it is rescuing: a prerelease version never gets a bare stable
+      // remedy, which would strand a private channel at a stable head.
+      assert.equal(remedy.includes('-'), version.includes('-'), `remedy ${remedy} switched line from ${version}`);
+      cleared += 1;
+    }
+  }
+
+  assert.equal(cleared, refused);
+  assert.ok(refused > 100, `the corpus must actually exercise refusals (got ${refused})`);
 });
 
 test('assertPublishSafety records a comparator disagreement WITHOUT changing the verdict', () => {
@@ -294,6 +353,8 @@ async function makeHarness({ heads = {}, exists = () => false } = {}) {
   const puts = [];
   const gets = [];
   const calls = { build: 0, zip: 0 };
+  // Patched by runWithBuild, so a test can hand main() a manifest the build should have refused.
+  let manifestPatch = {};
 
   const deps = {
     log: () => {},
@@ -302,7 +363,13 @@ async function makeHarness({ heads = {}, exists = () => false } = {}) {
       calls.build += 1;
       return {
         distDir,
-        manifest: { id: 'fabricate', title: 'Fabricate', version, compatibility: { minimum: '13' } },
+        manifest: {
+          id: 'fabricate',
+          title: 'Fabricate',
+          version,
+          compatibility: { minimum: '13' },
+          ...manifestPatch,
+        },
       };
     },
     zip: (from, to) => {
@@ -328,7 +395,13 @@ async function makeHarness({ heads = {}, exists = () => false } = {}) {
       deps,
     });
 
-  return { run, puts, gets, calls, configPath };
+  /** Run with the built manifest patched — e.g. a field the build left empty. */
+  const runWithBuild = (patch, ...flags) => {
+    manifestPatch = patch;
+    return run(...flags);
+  };
+
+  return { run, runWithBuild, puts, gets, calls, configPath };
 }
 
 const manifestAt = (version) => ({ status: 200, body: JSON.stringify({ version }) });
@@ -407,6 +480,20 @@ test('main() --dry-run touches no bucket at all: no reads, no writes', async () 
   // …and it really did the work: it did not pass by failing early.
   assert.equal(harness.calls.build, 1);
   assert.equal(harness.calls.zip, 2);
+});
+
+test('main() refuses a built manifest whose required field is absent OR empty', async () => {
+  // The empty-string arm is the one that matters: a `title: ''` is a well-formed JSON manifest that
+  // Foundry will happily install and display as nameless. `undefined` would be caught by almost
+  // anything; `''` is caught only by this check.
+  for (const broken of [{ title: '' }, { compatibility: '' }, { version: undefined }]) {
+    const harness = await makeHarness();
+    await assert.rejects(
+      harness.runWithBuild(broken, '--version', '1.4.0-beta.1'),
+      /missing required field/
+    );
+    assert.deepEqual(harness.puts, []);
+  }
 });
 
 test('main() --check-heads reads the heads and BUILDS NOTHING', async () => {

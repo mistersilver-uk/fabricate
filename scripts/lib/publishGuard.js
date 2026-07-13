@@ -277,7 +277,12 @@ function reportDisagreement({ version, label, head, warnings }) {
  */
 function buildRefusal(version, refusals) {
   const lines = refusals.map((refusal) => `  - ${refusal.reason}`);
-  const bump = suggestMinorBump(version);
+  // The remedy is derived from the HEADS, not from the version — see suggestMinorBump. A refusal
+  // can name several targets with different heads, and the one suggestion has to clear ALL of them.
+  const bump = suggestMinorBump(
+    version,
+    refusals.map((refusal) => refusal.head)
+  );
   const remedy = bump
     ? `Bump the version instead — a forced MINOR bump (e.g. ${bump}) is the supported remedy`
     : 'Bump the version instead — a forced MINOR bump is the supported remedy';
@@ -294,17 +299,28 @@ function buildRefusal(version, refusals) {
 }
 
 /**
- * Suggest the next minor version, for the refusal's remedy line — PRESERVING the prerelease
- * identifier, which is the whole correctness of this function.
+ * Suggest a version that actually escapes the stall, for the refusal's remedy line.
  *
- * The remedy line is the one string in this file a maintainer will copy verbatim into a release,
- * so suggesting `1.5.0` to escape a stall on the `beta` channel would walk them straight into the
- * failure the guard exists to prevent: `isNewerVersion('1.5.0', '1.4.9-beta.3') === true`, so the
- * publish would be ALLOWED, and it would leave the beta head at a bare stable version — no longer
- * ahead of the public registry. The next public release then compares as newer than the beta head
- * and Foundry offers the entire private cohort a manifest rewrite out of the channel. The
- * suggestion must therefore stay on the line it is rescuing: `1.5.0-beta.1`, which the real
- * comparator also ranks above `1.4.9-beta.3` (verified by differential test).
+ * TWO OPERANDS, AND BOTH ARE EASY TO GET WRONG — this line has now been wrong in each of them.
+ *
+ *   1. The BUMP IS DERIVED FROM THE HEAD, never from the version being published. The refusal
+ *      exists precisely because the head OUTRANKS the version, so bumping the version's own minor
+ *      lands wherever the version happened to be — usually still under the head, and in the worst
+ *      case exactly ON it. Suggesting the head itself is the dangerous shape: the guard ALLOWS a
+ *      publish equal to the head (an equal head is not a backwards move), the head never advances,
+ *      and every client on that feed goes quiet — the exact failure this whole file exists to
+ *      prevent, re-entered through the advice it prints. The invariant is pinned as a property, not
+ *      as strings, in tests/release-s3-guard.test.js: for every refusing pair in a corpus,
+ *      `foundryIsNewerVersion(remedy, head)` must be `true`.
+ *   2. The PRERELEASE IDENTIFIER COMES FROM THE VERSION, and must be preserved. Suggesting a bare
+ *      `1.5.0` to escape a stall on the `beta` channel clears the head (`isNewerVersion('1.5.0',
+ *      '1.4.9-beta.3') === true`) but leaves the beta head at a stable version — no longer ahead of
+ *      the public registry — so the next public release compares as newer than the beta head and
+ *      Foundry offers the entire private cohort a manifest rewrite out of the channel. The remedy
+ *      must stay on the line it is rescuing: `1.5.0-beta.1`.
+ *
+ * A refusal can name several targets whose heads differ, so the suggestion must clear EVERY one of
+ * them; a candidate is built per head and the first that clears them all is returned.
  *
  * WHAT THE STALL ACTUALLY IS, since "a double-digit patch rollover" is the wrong summary and would
  * send a reader looking for the bug in the wrong place. It is a double-digit rollover in the part
@@ -320,14 +336,29 @@ function buildRefusal(version, refusals) {
  * The number semantic-release ultimately computes is its own business; this is an illustration of
  * the SHAPE the operator must force.
  *
- * @param {string} version The version being published.
- * @returns {string|null} `1.5.0-beta.1` for `1.4.10-beta.1`, `1.5.0` for `1.4.10`, or `null` when
- *   the version is not SemVer.
+ * @param {string} version The version being published (the source of the prerelease identifier).
+ * @param {string[]} heads The heads that refused it (the source of the number).
+ * @returns {string|null} `1.5.0-beta.1` for `1.4.10-beta.1` over a `1.4.9-beta.3` head; `1.6.0` for
+ *   `1.4.1` over a `1.5.0` head; or `null` when no version here parses as SemVer, in which case the
+ *   remedy is named without an example rather than guessed at.
  */
-function suggestMinorBump(version) {
-  const parsed = parseSemver(version);
-  if (!parsed) return null;
-  const next = `${parsed.major}.${parsed.minor + 1}.0`;
-  const [identifier] = parsed.prerelease;
-  return identifier ? `${next}-${identifier}.1` : next;
+function suggestMinorBump(version, heads) {
+  const parsedVersion = parseSemver(version);
+  if (!parsedVersion) return null;
+  const [identifier] = parsedVersion.prerelease;
+
+  const candidates = [];
+  for (const head of heads) {
+    const parsedHead = parseSemver(head);
+    if (!parsedHead) return null;
+    const next = `${parsedHead.major}.${parsedHead.minor + 1}.0`;
+    candidates.push(identifier ? `${next}-${identifier}.1` : next);
+  }
+
+  // Only ever offer a candidate the comparator itself agrees clears every head. If none does, say
+  // nothing: no advice beats advice the guard would refuse.
+  return (
+    candidates.find((candidate) => heads.every((head) => foundryIsNewerVersion(candidate, head))) ??
+    null
+  );
 }
