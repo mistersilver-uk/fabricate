@@ -7,7 +7,9 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const { assertPublishSafety, fetchPublishState } = await import('../scripts/lib/publishGuard.js');
-const { main, resolveChannelConfig, runCheckHeads, deriveS3Layout } = await import('../scripts/release-s3.js');
+const { main, resolveChannelConfig, runCheckHeads, deriveS3Layout, s3StatusFromError } = await import(
+  '../scripts/release-s3.js'
+);
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -134,8 +136,9 @@ test('assertPublishSafety refuses a Foundry-newer head, names the target, and na
   assert.equal(refused.label, 'tester-closed-beta-2026');
   assert.match(verdict.error, /tester-closed-beta-2026/);
   assert.match(verdict.error, /1\.5\.0-beta\.1/);
-  // The remedy is a forced MINOR bump — never the downgrade override.
-  assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.5\.0\)/);
+  // The remedy is a forced MINOR bump — never the downgrade override — and it stays on the
+  // prerelease line it is rescuing.
+  assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.5\.0-beta\.1\)/);
   assert.match(verdict.error, /Do NOT reach for --allow-downgrade/);
 });
 
@@ -149,15 +152,36 @@ test('assertPublishSafety allows a backwards move only under --allow-downgrade',
   assert.ok(verdict.decisions.every((d) => d.decision === 'allow-downgrade'));
 });
 
-test('assertPublishSafety fails closed on the patch-rollover pair Foundry orders backwards', () => {
-  // Foundry compares "10-beta" against "9-beta" as STRINGS ("9" > "1"), so 1.4.9-beta.3 outranks
-  // 1.4.10-beta.1 — the channel would silently stop offering updates at the tenth build.
+test('assertPublishSafety fails closed when a rollover glued to the prerelease suffix orders backwards', () => {
+  // NOT "a double-digit patch rollover" — a double-digit rollover in the part GLUED TO THE
+  // PRERELEASE SUFFIX, which is the only part compared as text. Verified against the real
+  // isNewerVersion: ('1.4.10-beta.1','1.4.9-beta.1') === false, while ('1.5.0-beta.10',
+  // '1.5.0-beta.9'), ('1.10.0-beta.1','1.9.0-beta.1') and ('1.4.10','1.4.9') are all true. So it
+  // can only fire on a channel carrying prereleases — which is why the remedy must stay on that
+  // line rather than escaping to a bare stable version.
   const verdict = safetyOf({
     version: '1.4.10-beta.1',
     state: [head(CHANNEL, '1.4.9-beta.3'), head(TESTER, '1.4.9-beta.3')],
   });
   assert.equal(verdict.ok, false);
   assert.match(verdict.error, /1\.4\.9-beta\.3/);
+
+  // The remedy is pinned HERE, on the input where it is counter-intuitive. `1.5.0` would satisfy
+  // the guard (isNewerVersion('1.5.0','1.4.9-beta.3') === true) and strand the beta channel at a
+  // bare stable head, no longer ahead of the public registry — so the next public release would
+  // offer the whole private cohort a manifest rewrite out of it.
+  assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.5\.0-beta\.1\)/);
+  assert.doesNotMatch(verdict.error, /e\.g\. 1\.5\.0\)/);
+});
+
+test('assertPublishSafety suggests a bare stable remedy only for a stable version', () => {
+  const verdict = safetyOf({
+    version: '1.4.1',
+    state: [head(CHANNEL, '1.5.0')],
+    staged: [CHANNEL],
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.5\.0\)/);
 });
 
 test('assertPublishSafety records a comparator disagreement WITHOUT changing the verdict', () => {
@@ -218,6 +242,24 @@ test('fetchPublishState treats a 403 as a HARD ERROR, never an absent head', asy
     fetchPublishState([CHANNEL], reader({ [BETA_CHANNEL_MANIFEST]: { status: 403, body: null } })),
     /HTTP 403[\S\s]*s3:ListBucket/
   );
+});
+
+// The one production step no injected S3 port can reach: turning an AWS error into 403-vs-404.
+// Get this wrong in either direction and every head in the channel reads as absent, the guard
+// allows every publish, and nothing else in the pipeline notices.
+test('s3StatusFromError keeps a denial a denial and a miss a miss', () => {
+  assert.equal(s3StatusFromError({ $metadata: { httpStatusCode: 403 } }), 403);
+  assert.equal(s3StatusFromError({ name: 'AccessDenied' }), 403);
+  assert.equal(s3StatusFromError({ name: 'Forbidden' }), 403);
+  assert.equal(s3StatusFromError({ $metadata: { httpStatusCode: 404 } }), 404);
+  assert.equal(s3StatusFromError({ name: 'NoSuchKey' }), 404);
+  assert.equal(s3StatusFromError({ name: 'NotFound' }), 404);
+  // The status on the error WINS over the name — deleting that read must not silently degrade.
+  assert.equal(s3StatusFromError({ name: 'NoSuchKey', $metadata: { httpStatusCode: 403 } }), 403);
+  // Neither: the reader must rethrow rather than invent a status, because a fabricated 404 is an
+  // absent head, and an absent head skips the guard.
+  assert.equal(s3StatusFromError(new Error('socket hang up')), null);
+  assert.equal(s3StatusFromError(undefined), null);
 });
 
 test('fetchPublishState refuses a head manifest it cannot read', async () => {
@@ -348,6 +390,25 @@ test('main() publishes over a newer head only under --allow-downgrade', async ()
   assert.equal(harness.puts.length, 4);
 });
 
+test('main() --dry-run touches no bucket at all: no reads, no writes', async () => {
+  // The guard and the upload loop currently share one `if (!dryRun)` block. That is load-bearing:
+  // a dry run has no credentials, so hoisting the head read out of that block to "also print the
+  // verdict on a dry run" would hoist it into a code path where every GetObject 403s — and, worse,
+  // would leave the upload loop behind it. Pin BOTH halves: zero gets AND zero puts.
+  const harness = await makeHarness({
+    heads: { [BETA_CHANNEL_MANIFEST]: manifestAt('1.5.0-beta.1') },
+  });
+
+  const result = await harness.run('--version', '1.4.0-beta.1', '--dry-run');
+
+  assert.deepEqual(harness.puts, []);
+  assert.deepEqual(harness.gets, []);
+  assert.equal(result.safety, null);
+  // …and it really did the work: it did not pass by failing early.
+  assert.equal(harness.calls.build, 1);
+  assert.equal(harness.calls.zip, 2);
+});
+
 test('main() --check-heads reads the heads and BUILDS NOTHING', async () => {
   const harness = await makeHarness({
     heads: { [BETA_CHANNEL_MANIFEST]: manifestAt('1.3.0-beta.9') },
@@ -387,6 +448,28 @@ test('main() refuses to publish a channel whose tester secret is unset', async (
     /S3_EARLY_ACCESS_PATH_SECRET is unset/
   );
   assert.deepEqual(harness.puts, []);
+});
+
+test('main() refuses a channel that declares tester groups but no testerSecretEnv', async () => {
+  // The other arm of the same refusal — a plausible mistake when adding a second cohort.
+  const dir = await mkdtemp(join(tmpdir(), 'fabricate-release-s3-'));
+  const configPath = join(dir, 'release.s3.config.json');
+  await writeFile(
+    configPath,
+    JSON.stringify({
+      ...CONFIG,
+      channels: { ...CONFIG.channels, 'early-access': { testerGroups: ['patrons-2027'] } },
+    })
+  );
+
+  await assert.rejects(
+    main({
+      argv: ['node', 'release-s3.js', '--config', configPath, '--version', '1.5.0', '--channel', 'early-access'],
+      env: { S3_TESTER_PATH_SECRET: 'seg', S3_EARLY_ACCESS_PATH_SECRET: 'ea-seg' },
+      deps: { log: () => {} },
+    }),
+    /declares no "testerSecretEnv"/
+  );
 });
 
 test('runCheckHeads reads every private target of the channel it is asked about', async () => {

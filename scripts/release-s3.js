@@ -194,7 +194,7 @@ export function resolveChannelConfig(config, channel) {
       channel,
       testerGroups: [...(declared.testerGroups ?? [])],
       testerSecretEnv: declared.testerSecretEnv ?? null,
-      source: 'declared'
+      source: 'declared',
     };
   }
 
@@ -203,7 +203,7 @@ export function resolveChannelConfig(config, channel) {
       channel,
       testerGroups: [...(config.testerGroups ?? [])],
       testerSecretEnv: DEFAULT_TESTER_SECRET_ENV,
-      source: 'default'
+      source: 'default',
     };
   }
 
@@ -240,7 +240,14 @@ export function resolveChannelConfig(config, channel) {
  *   channelTarget: PublishTarget, testerTargets: PublishTarget[], targets: PublishTarget[]
  * }}
  */
-export function deriveS3Layout({ moduleId, channel, version, baseUrl, testerGroups = [], testerSegment = '' }) {
+export function deriveS3Layout({
+  moduleId,
+  channel,
+  version,
+  baseUrl,
+  testerGroups = [],
+  testerSegment = '',
+}) {
   const base = baseUrl.replace(/\/+$/, '');
   const zipName = `${moduleId}-${version}.zip`;
 
@@ -255,12 +262,17 @@ export function deriveS3Layout({ moduleId, channel, version, baseUrl, testerGrou
       manifestKey,
       manifestUrl: `${base}/${manifestKey}`,
       // Each feed references its OWN zip — cohorts never share a download.
-      downloadUrl: `${base}/${zipKey}`
+      downloadUrl: `${base}/${zipKey}`,
     };
   };
 
   const channelPrefix = `modules/${moduleId}/${channel}`;
-  const channelTarget = makeTarget('channel', null, channelPrefix, `${channelPrefix}/latest/module.json`);
+  const channelTarget = makeTarget(
+    'channel',
+    null,
+    channelPrefix,
+    `${channelPrefix}/latest/module.json`
+  );
 
   // The secret segment sits between the (public) group and the module id so the
   // tester feed URL can't be guessed from the group name alone.
@@ -278,7 +290,7 @@ export function deriveS3Layout({ moduleId, channel, version, baseUrl, testerGrou
     version,
     channelTarget,
     testerTargets,
-    targets: [channelTarget, ...testerTargets]
+    targets: [channelTarget, ...testerTargets],
   };
 }
 
@@ -315,10 +327,21 @@ function fail(message) {
 
 /**
  * Map an AWS SDK error to an HTTP status, or `null` when it carries none.
+ *
+ * EXPORTED SO IT CAN BE PINNED. This is the ONLY place in production where an S3 error becomes
+ * "absent" (404) or "denied" (403), and every other test injects the whole S3 port — so an
+ * un-exported version of this function is the one part of the guard that no test can reach, and
+ * "AccessDenied just means the key isn't there yet" is a one-line edit that makes the guard fail
+ * OPEN on every target at once. It is a plausible edit, too: the first person to run
+ * `--check-heads` before the IAM grant lands sees a 403 and is tempted to make it go away.
+ *
+ * A `null` return means "this error carries no HTTP status" — the caller MUST rethrow it rather
+ * than invent one, because a fabricated 404 is an absent head.
+ *
  * @param {{name?: string, $metadata?: {httpStatusCode?: number}}} error The SDK error.
- * @returns {number|null} The status.
+ * @returns {number|null} The status, or `null` when the error carries none.
  */
-function httpStatusOf(error) {
+export function s3StatusFromError(error) {
   const status = error?.$metadata?.httpStatusCode;
   if (typeof status === 'number') return status;
   if (error?.name === 'NoSuchKey' || error?.name === 'NotFound') return 404;
@@ -332,7 +355,8 @@ function httpStatusOf(error) {
  * @returns {Promise<S3Port>} The port.
  */
 async function createDefaultS3Client({ bucket, region }) {
-  const { S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const { S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } =
+    await import('@aws-sdk/client-s3');
   const s3 = new S3Client(region ? { region } : {});
 
   return {
@@ -341,7 +365,7 @@ async function createDefaultS3Client({ bucket, region }) {
         await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
         return true;
       } catch (error) {
-        if (httpStatusOf(error) === 404) return false;
+        if (s3StatusFromError(error) === 404) return false;
         throw error;
       }
     },
@@ -352,19 +376,21 @@ async function createDefaultS3Client({ bucket, region }) {
       } catch (error) {
         // A status-carrying error is DATA for the guard (404 ⇒ absent; 403 ⇒ a hard error, which
         // the guard raises itself). Anything else is a genuine fault: rethrow it.
-        const status = httpStatusOf(error);
+        const status = s3StatusFromError(error);
         if (status === null) throw error;
         return { status, body: null };
       }
     },
     putObject: ({ key, body, contentType, cacheControl }) =>
-      s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-        CacheControl: cacheControl
-      }))
+      s3.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+          CacheControl: cacheControl,
+        })
+      ),
   };
 }
 
@@ -378,7 +404,10 @@ async function createDefaultS3Client({ bucket, region }) {
  */
 async function defaultBuild({ version }) {
   try {
-    execSync(`node scripts/release.js --dist-version "${version}" --no-zip`, { cwd: ROOT, stdio: 'inherit' });
+    execSync(`node scripts/release.js --dist-version "${version}" --no-zip`, {
+      cwd: ROOT,
+      stdio: 'inherit',
+    });
   } catch {
     fail('build failed');
   }
@@ -388,7 +417,10 @@ async function defaultBuild({ version }) {
   try {
     return { distDir, manifest: JSON.parse(await readFile(manifestPath, 'utf8')) };
   } catch (error) {
-    return fail(`build did not produce a readable ${manifestPath}: ${error.message}`);
+    // `fail` always throws, so this is not a missing return — and it is deliberately NOT written as
+    // `return fail(…)`: consuming the value of a function a static analyser types as `void` is
+    // reported as a reliability BUG (Sonar S3699), which fails the gate outright.
+    fail(`build did not produce a readable ${manifestPath}: ${error.message}`);
   }
 }
 
@@ -430,10 +462,10 @@ function resolvePublishPlan({ config, channel, version, env: envMap }) {
   const testerSegment = trimSlashes(secretEnv ? envMap[secretEnv] || '' : '');
   if (channelConfig.testerGroups.length > 0 && !testerSegment) {
     fail(
-      `channel "${channel}" declares ${channelConfig.testerGroups.length} tester group(s) but `
-      + `${secretEnv ? `${secretEnv} is unset` : 'declares no "testerSecretEnv"'} — refusing to `
-      + "publish to a guessable path. Set that channel's OWN secret (a GitHub Actions secret in CI; "
-      + 'an env var locally) before publishing.'
+      `channel "${channel}" declares ${channelConfig.testerGroups.length} tester group(s) but ` +
+        `${secretEnv ? `${secretEnv} is unset` : 'declares no "testerSecretEnv"'} — refusing to ` +
+        "publish to a guessable path. Set that channel's OWN secret (a GitHub Actions secret in CI; " +
+        'an env var locally) before publishing.'
     );
   }
 
@@ -443,7 +475,7 @@ function resolvePublishPlan({ config, channel, version, env: envMap }) {
     version,
     baseUrl: baseUrl || 'https://example.invalid',
     testerGroups: channelConfig.testerGroups,
-    testerSegment
+    testerSegment,
   });
 
   return { moduleId, bucket, baseUrl, channelConfig, testerSegment, layout };
@@ -492,7 +524,7 @@ export async function runCheckHeads({ config, version, channel, deps = {} }) {
     version,
     staged: plan.layout.targets.map((target) => ({ target })),
     state: heads,
-    allowDowngrade: false
+    allowDowngrade: false,
   });
 
   return { channel, version, heads, safety };
@@ -538,7 +570,12 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
 
   // 2. --check-heads is read-only: no build, no staging, no writes.
   if (checkHeads) {
-    const report = await runCheckHeads({ config, version, channel, deps: { ...deps, env: envInput } });
+    const report = await runCheckHeads({
+      config,
+      version,
+      channel,
+      deps: { ...deps, env: envInput },
+    });
     printHeadReport(report, log);
     if (!report.safety.ok) fail(report.safety.error);
     return report;
@@ -550,9 +587,12 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
   if (!dryRun) requireBucketAndBaseUrl(plan);
 
   const { layout } = plan;
-  log(`release-s3: module=${plan.moduleId} channel=${channel} version=${version}${dryRun ? ' (dry-run)' : ''}`);
+  log(
+    `release-s3: module=${plan.moduleId} channel=${channel} version=${version}${dryRun ? ' (dry-run)' : ''}`
+  );
   // The bucket host + baseUrl are part of the secret feed URL — only print them locally.
-  if (!ci) log(`release-s3: bucket=${plan.bucket || '(unset)'} baseUrl=${plan.baseUrl || '(unset)'}`);
+  if (!ci)
+    log(`release-s3: bucket=${plan.bucket || '(unset)'} baseUrl=${plan.baseUrl || '(unset)'}`);
   log(`release-s3: targets=channel + ${plan.channelConfig.testerGroups.length} tester group(s)\n`);
 
   // 4. Build dist/ at the requested version, then validate the built manifest.
@@ -561,14 +601,15 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
   const { distDir, manifest: built } = await build({ version });
 
   for (const f of ['id', 'title', 'version', 'compatibility']) {
-    if (built[f] === undefined || built[f] === null || built[f] === '') {
+    if ([undefined, null, ''].includes(built[f])) {
       fail(`built module.json is missing required field "${f}"`);
     }
   }
   if (built.id !== plan.moduleId) {
     fail(`config moduleId "${plan.moduleId}" does not match built module.json id "${built.id}"`);
   }
-  if (built.version !== version) fail(`version mismatch: requested ${version} built ${built.version}`);
+  if (built.version !== version)
+    fail(`version mismatch: requested ${version} built ${built.version}`);
 
   // 5. Stage one zip per target: rewrite dist/module.json with that target's feed URLs, then zip
   //    dist/ to a per-target staging path. Staged zips live outside dist/ so they are not nested
@@ -588,9 +629,11 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
     const zipPath = join(outDir, layout.zipName);
     zip(distDir, zipPath);
     // Label only in CI (the key carries the secret segment); full key locally.
-    log(ci
-      ? `release-s3: staged ${target.label}`
-      : `release-s3: staged ${target.label} -> ${target.zipKey}`);
+    log(
+      ci
+        ? `release-s3: staged ${target.label}`
+        : `release-s3: staged ${target.label} -> ${target.zipKey}`
+    );
     staged.push({ target, body, zipPath });
   }
 
@@ -614,12 +657,17 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
     //     half-published release behind).
     for (const { target } of staged) {
       if (await s3.headObject(target.zipKey)) {
-        if (!overwrite) fail(ci
-          ? `${target.label} version zip already exists — pass --overwrite to replace it`
-          : `s3://${plan.bucket}/${target.zipKey} already exists — pass --overwrite to replace it`);
-        log(ci
-          ? `release-s3: will overwrite ${target.label} (--overwrite set)`
-          : `release-s3: will overwrite ${target.zipKey} (--overwrite set)`);
+        if (!overwrite)
+          fail(
+            ci
+              ? `${target.label} version zip already exists — pass --overwrite to replace it`
+              : `s3://${plan.bucket}/${target.zipKey} already exists — pass --overwrite to replace it`
+          );
+        log(
+          ci
+            ? `release-s3: will overwrite ${target.label} (--overwrite set)`
+            : `release-s3: will overwrite ${target.zipKey} (--overwrite set)`
+        );
       }
     }
 
@@ -631,14 +679,14 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
         key: target.zipKey,
         body: zipBytes,
         contentType: 'application/zip',
-        cacheControl: CACHE_IMMUTABLE
+        cacheControl: CACHE_IMMUTABLE,
       });
       if (!ci) log(`release-s3: upload manifest -> s3://${plan.bucket}/${target.manifestKey}`);
       await s3.putObject({
         key: target.manifestKey,
         body: JSON.stringify(body, null, 2),
         contentType: 'application/json',
-        cacheControl: CACHE_NO_CACHE
+        cacheControl: CACHE_NO_CACHE,
       });
       if (ci) log(`release-s3: uploaded ${target.label} (zip + manifest)`);
       put.push(target.zipKey, target.manifestKey);
@@ -678,16 +726,20 @@ function printSummary({ layout, dryRun, segment, ci, log }) {
   // CI: the install URLs ARE the cohort secret — never print them to job logs.
   if (ci) {
     const verb = dryRun ? 'would publish' : 'published';
-    log(`\nrelease-s3: ${verb} channel + ${layout.testerTargets.length} tester feed(s) `
-      + `(v${layout.version}). Install URLs withheld from CI logs — run a local `
-      + `\`--dry-run\` with the channel's tester secret set to retrieve them.`);
+    log(
+      `\nrelease-s3: ${verb} channel + ${layout.testerTargets.length} tester feed(s) ` +
+        `(v${layout.version}). Install URLs withheld from CI logs — run a local ` +
+        `\`--dry-run\` with the channel's tester secret set to retrieve them.`
+    );
     return;
   }
   // Local/dry-run: print the real install URLs so the maintainer can distribute
   // them privately (local stdout is not a public artifact). `segment` is the live
   // secret here by design — do not redact.
   void segment;
-  const header = dryRun ? 'DRY-RUN — install URLs that would be published:' : 'Published install URLs:';
+  const header = dryRun
+    ? 'DRY-RUN — install URLs that would be published:'
+    : 'Published install URLs:';
   log('\n' + '═'.repeat(header.length));
   log(header);
   log('═'.repeat(header.length) + '\n');
@@ -699,14 +751,18 @@ function printSummary({ layout, dryRun, segment, ci, log }) {
   }
 }
 
-// Run main only when invoked directly (not when imported by tests)
+// Run main only when invoked directly (not when imported by tests). This is the CLI's ONLY
+// `exit(1)`: `fail()` throws, so that a refusal can be asserted by a test instead of killing the
+// test runner, and the exit code is applied here at the boundary.
 const isMainModule = argv[1] && fileURLToPath(import.meta.url) === argv[1];
 if (isMainModule) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     // In CI, redact the secret segment from any error text (AWS errors can echo
     // the object key) before it lands in the job log.
     const rendered = String(error?.stack || error);
     console.error(isCI(env) ? redactSegment(rendered, activeTesterSegment) : rendered);
     exit(1);
-  });
+  }
 }

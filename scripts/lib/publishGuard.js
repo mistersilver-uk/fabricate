@@ -294,12 +294,40 @@ function buildRefusal(version, refusals) {
 }
 
 /**
- * Suggest the next minor version, for the refusal's remedy line.
+ * Suggest the next minor version, for the refusal's remedy line — PRESERVING the prerelease
+ * identifier, which is the whole correctness of this function.
+ *
+ * The remedy line is the one string in this file a maintainer will copy verbatim into a release,
+ * so suggesting `1.5.0` to escape a stall on the `beta` channel would walk them straight into the
+ * failure the guard exists to prevent: `isNewerVersion('1.5.0', '1.4.9-beta.3') === true`, so the
+ * publish would be ALLOWED, and it would leave the beta head at a bare stable version — no longer
+ * ahead of the public registry. The next public release then compares as newer than the beta head
+ * and Foundry offers the entire private cohort a manifest rewrite out of the channel. The
+ * suggestion must therefore stay on the line it is rescuing: `1.5.0-beta.1`, which the real
+ * comparator also ranks above `1.4.9-beta.3` (verified by differential test).
+ *
+ * WHAT THE STALL ACTUALLY IS, since "a double-digit patch rollover" is the wrong summary and would
+ * send a reader looking for the bug in the wrong place. It is a double-digit rollover in the part
+ * GLUED TO THE PRERELEASE SUFFIX, because only that part is compared as text. Against the real
+ * `isNewerVersion`:
+ *   - `('1.5.0-beta.10', '1.5.0-beta.9')  === true`   the beta counter is its own dot-part. Fine.
+ *   - `('1.10.0-beta.1', '1.9.0-beta.1')  === true`   minor is its own dot-part. Fine.
+ *   - `('1.4.10', '1.4.9')                === true`   a pure-stable channel can NEVER stall.
+ *   - `('1.4.10-beta.1', '1.4.9-beta.1')  === false`  "10-beta" vs "9-beta", compared as STRINGS.
+ * So a refusal for this reason can only ever fire on a channel carrying prereleases — which is
+ * precisely why a bare-stable remedy is wrong by construction, not merely untidy.
+ *
+ * The number semantic-release ultimately computes is its own business; this is an illustration of
+ * the SHAPE the operator must force.
+ *
  * @param {string} version The version being published.
- * @returns {string|null} `1.5.0` for `1.4.10-beta.1`, or `null` when the version is not SemVer.
+ * @returns {string|null} `1.5.0-beta.1` for `1.4.10-beta.1`, `1.5.0` for `1.4.10`, or `null` when
+ *   the version is not SemVer.
  */
 function suggestMinorBump(version) {
   const parsed = parseSemver(version);
   if (!parsed) return null;
-  return `${parsed.major}.${parsed.minor + 1}.0`;
+  const next = `${parsed.major}.${parsed.minor + 1}.0`;
+  const [identifier] = parsed.prerelease;
+  return identifier ? `${next}-${identifier}.1` : next;
 }
