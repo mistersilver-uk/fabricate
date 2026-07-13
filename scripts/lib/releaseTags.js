@@ -51,8 +51,10 @@ const TAG_SHAPES = 'vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-rc.N (no leading zeros)';
  */
 function describe(value) {
   if (typeof value === 'string') return value;
+  if (value === undefined) return 'undefined';
   try {
-    return JSON.stringify(value) ?? String(value);
+    // JSON.stringify returns undefined (not a string) for a function or a symbol.
+    return JSON.stringify(value) ?? Object.prototype.toString.call(value);
   } catch {
     // Circular, or a BigInt — JSON.stringify throws on both.
     return Object.prototype.toString.call(value);
