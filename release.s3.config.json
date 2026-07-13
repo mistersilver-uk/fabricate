@@ -3,5 +3,18 @@
   "bucket": "fabricate-modules-088545273404-eu-west-2-an",
   "baseUrl": "https://fabricate-modules-088545273404-eu-west-2-an.s3.eu-west-2.amazonaws.com",
   "channel": "beta",
-  "testerGroups": ["closed-beta-2026"]
+  "testerGroups": ["closed-beta-2026"],
+  "channels": {
+    "beta": {
+      "testerGroups": ["closed-beta-2026"],
+      "testerSecretEnv": "S3_TESTER_PATH_SECRET"
+    },
+    "early-access": {
+      "testerGroups": ["patrons-2026"],
+      "testerSecretEnv": "S3_EARLY_ACCESS_PATH_SECRET"
+    },
+    "public": {
+      "testerGroups": []
+    }
+  }
 }
