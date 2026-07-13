@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyAwsEnv,
   collectModuleTargets,
   formatTable,
-  parseArgs
+  parseArgs,
+  resolveAwsEnv
 } from '../scripts/latest-module-versions.mjs';
 
 test('parseArgs accepts profile, channel, JSON mode, and explicit modules', () => {
@@ -19,6 +21,71 @@ test('parseArgs accepts profile, channel, JSON mode, and explicit modules', () =
   assert.equal(options.channel, 'beta');
   assert.equal(options.json, true);
   assert.deepEqual(options.include, ['extra-module', 'second-module']);
+});
+
+test('resolveAwsEnv omits AWS_PROFILE entirely in CI so the SDK uses OIDC credentials', () => {
+  const resolved = resolveAwsEnv({}, { GITHUB_ACTIONS: 'true', AWS_REGION: 'eu-west-2' });
+
+  // The KEY must be absent, not present-and-undefined: `process.env.AWS_PROFILE = undefined`
+  // stores the string "undefined", which the SDK resolves as a profile name; and the SDK skips
+  // the environment-variable credential provider whenever AWS_PROFILE is set at all.
+  assert.equal('AWS_PROFILE' in resolved, false);
+  assert.equal(Object.keys(resolved).includes('AWS_PROFILE'), false);
+  assert.equal(resolved.AWS_REGION, 'eu-west-2');
+  assert.equal(resolved.AWS_SDK_LOAD_CONFIG, '1');
+});
+
+test('resolveAwsEnv ignores an inherited AWS_PROFILE in CI unless --profile is passed', () => {
+  const env = { GITHUB_ACTIONS: 'true', AWS_PROFILE: 'fabricate-beta' };
+
+  assert.equal('AWS_PROFILE' in resolveAwsEnv({}, env), false);
+  assert.equal(resolveAwsEnv({ profile: 'release-role' }, env).AWS_PROFILE, 'release-role');
+});
+
+test('resolveAwsEnv falls back to the local default profile outside CI', () => {
+  assert.equal(resolveAwsEnv({}, {}).AWS_PROFILE, 'fabricate-beta');
+  assert.equal(resolveAwsEnv({}, { AWS_PROFILE: 'other' }).AWS_PROFILE, 'other');
+  assert.equal(resolveAwsEnv({ profile: 'explicit' }, { AWS_PROFILE: 'other' }).AWS_PROFILE, 'explicit');
+  assert.equal(resolveAwsEnv({}, {}).AWS_REGION, 'eu-west-2');
+  assert.equal(resolveAwsEnv({ region: 'us-east-1' }, {}).AWS_REGION, 'us-east-1');
+});
+
+test('applyAwsEnv DELETES a stale AWS_PROFILE in CI — Object.assign cannot remove a key', () => {
+  // The seam that actually runs in CI. Asserting only resolveAwsEnv's return value would miss
+  // this entirely: an inherited AWS_PROFILE survives an Object.assign that simply omits the key,
+  // and the SDK then skips the env-var credential provider and ignores OIDC.
+  const target = { AWS_PROFILE: 'fabricate-beta', AWS_REGION: 'us-east-1' };
+  applyAwsEnv({}, { GITHUB_ACTIONS: 'true' }, target);
+
+  assert.equal('AWS_PROFILE' in target, false);
+  assert.equal(target.AWS_REGION, 'eu-west-2');
+});
+
+test('applyAwsEnv defaults its target to process.env and removes a stale AWS_PROFILE there', () => {
+  const original = process.env.AWS_PROFILE;
+  process.env.AWS_PROFILE = 'stale-profile';
+
+  try {
+    applyAwsEnv({}, { GITHUB_ACTIONS: 'true' });
+    assert.equal('AWS_PROFILE' in process.env, false);
+  } finally {
+    if (original === undefined) delete process.env.AWS_PROFILE;
+    else process.env.AWS_PROFILE = original;
+  }
+});
+
+test('applyAwsEnv keeps an explicitly requested profile in CI', () => {
+  const target = {};
+  applyAwsEnv({ profile: 'release-role' }, { GITHUB_ACTIONS: 'true' }, target);
+
+  assert.equal(target.AWS_PROFILE, 'release-role');
+});
+
+test('parseArgs does not default the AWS profile — an unset profile must stay unset', () => {
+  const options = parseArgs([]);
+
+  assert.equal('profile' in options, false);
+  assert.equal('region' in options, false);
 });
 
 test('collectModuleTargets combines Fabricate and premium modules without bucket listing', () => {

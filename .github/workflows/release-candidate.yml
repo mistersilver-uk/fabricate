@@ -52,14 +52,24 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Record RC tags at HEAD before semantic-release
+      - name: Record prerelease tags at HEAD before semantic-release
+        # `shell: bash` is REQUIRED, not cosmetic: it runs with `-o pipefail`, which the default
+        # `bash -e {0}` does NOT. Without it a crash inside the filter (a typo'd flag, a broken
+        # import) is discarded mid-pipe, the step takes `sort`'s exit status, the tag list comes
+        # out empty, and the job reports "no new RC tag" — a green run that mints a tag and
+        # publishes nothing to S3.
+        shell: bash
         run: |
           git fetch --tags --force
-          git tag --points-at HEAD -l "v*-rc.*" \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$' \
-            | sort > "$RUNNER_TEMP/rc-tags-before.txt" || true
+          # `--filter` echoes the tags matching the shared release-tag patterns, and exits 0
+          # whatever the input CONTAINS (no tag at HEAD is the normal case) — but non-zero if the
+          # invocation itself is wrong. It replaces a hand-copied `grep -E` that recognised
+          # `-rc.N` only. See scripts/lib/releaseTags.js.
+          git tag --points-at HEAD -l "v*-*" \
+            | node scripts/validate-release-tag.mjs --filter --kind beta \
+            | sort > "$RUNNER_TEMP/rc-tags-before.txt"
 
-          echo "RC tags at HEAD before semantic-release:"
+          echo "Prerelease tags at HEAD before semantic-release:"
           cat "$RUNNER_TEMP/rc-tags-before.txt" || true
       - name: Semantic Release
         env:
@@ -67,13 +77,16 @@ jobs:
         run: npx semantic-release
       - name: Detect new RC tag at HEAD
         id: detect_rc_tag
+        # See the "before" step: `shell: bash` gives this pipe `-o pipefail`, so a filter crash
+        # fails the step instead of silently yielding an empty tag list.
+        shell: bash
         run: |
           git fetch --tags --force
-          git tag --points-at HEAD -l "v*-rc.*" \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$' \
-            | sort > "$RUNNER_TEMP/rc-tags-after.txt" || true
+          git tag --points-at HEAD -l "v*-*" \
+            | node scripts/validate-release-tag.mjs --filter --kind beta \
+            | sort > "$RUNNER_TEMP/rc-tags-after.txt"
 
-          echo "RC tags at HEAD after semantic-release:"
+          echo "Prerelease tags at HEAD after semantic-release:"
           cat "$RUNNER_TEMP/rc-tags-after.txt" || true
 
           comm -13 "$RUNNER_TEMP/rc-tags-before.txt" "$RUNNER_TEMP/rc-tags-after.txt" \

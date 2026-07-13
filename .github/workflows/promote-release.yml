@@ -21,16 +21,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Validate RC tag
-        run: |
-          if ! echo "${{ inputs.rc_tag }}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
-            echo "::error::Tag '${{ inputs.rc_tag }}' does not match RC pattern v*.*.*-rc.*"
-            exit 1
-          fi
-
+      # Tag validation runs AFTER checkout (it needs scripts/), not before it. The
+      # validator is deliberately zero-dependency, so it runs on the runner's
+      # preinstalled Node — before setup-node and npm ci.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      # The base version is derived by the SAME parser that validates the tag. It used to be a
+      # `sed 's/^v//; s/-rc\.[0-9]*$//'` — a fifth hand-copied rc literal, which would have left
+      # BASE as `1.4.0-beta.3` for a beta tag and published `gh release create v1.4.0-beta.3
+      # --latest`: a permanent, public, garbage release.
+      - name: Validate release tag and derive the promotion target
+        id: version
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+        run: |
+          BASE=$(node scripts/validate-release-tag.mjs "$RC_TAG" --kind beta --print base)
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "Promoting $RC_TAG → v$BASE"
 
       - name: Validate tag exists
         run: |
@@ -38,13 +47,6 @@ jobs:
             echo "::error::Tag '${{ inputs.rc_tag }}' does not exist"
             exit 1
           fi
-
-      - name: Extract base version
-        id: version
-        run: |
-          BASE=$(echo "${{ inputs.rc_tag }}" | sed 's/^v//; s/-rc\.[0-9]*$//')
-          echo "base=$BASE" >> "$GITHUB_OUTPUT"
-          echo "Promoting ${{ inputs.rc_tag }} → v$BASE"
 
       - name: Checkout RC tag
         run: git checkout "${{ inputs.rc_tag }}"
@@ -67,8 +69,10 @@ jobs:
           BASE="${{ steps.version.outputs.base }}"
           NOTES=""
 
-          # Collect notes from all RC tags for this base version
-          for tag in $(git tag -l "v${BASE}-rc.*" | sort -V); do
+          # Collect notes from every prerelease tag for this base version. The glob is kind-
+          # agnostic (`-*`, not `-rc.*`) so it keeps working after the beta cutover; today only
+          # `-rc.N` tags exist, so it matches exactly what it always did.
+          for tag in $(git tag -l "v${BASE}-*" | sort -V); do
             RC_NOTES=$(gh release view "$tag" --json body --jq '.body' 2>/dev/null || echo "")
             if [ -n "$RC_NOTES" ]; then
               NOTES="${NOTES}
