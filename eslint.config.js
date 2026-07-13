@@ -224,11 +224,12 @@ export default [
   //    CLI entry points, so process control and console output are expected.
   //
   //    This block CONFIGURES every `scripts/` file, but the gated `lint` (and
-  //    `format:check`) script only passes it the release-tag/semver libs and their
-  //    CLI, named one by one. That is deliberate: `scripts/lib/zip.js` has lint
-  //    errors and fails Prettier, and its autofixes would land on the Windows
+  //    `format:check`) script only passes it the release-tag/semver/publish-guard
+  //    libs and their CLI, named one by one. That is deliberate: `scripts/lib/zip.js`
+  //    has lint errors and fails Prettier, and its autofixes would land on the Windows
   //    `Compress-Archive` path that builds the published artefact — with no test
-  //    coverage to catch a regression. Add new script files to the gate as they
+  //    coverage to catch a regression. `scripts/release-s3.js` is likewise still out
+  //    (9 lint errors, fails Prettier). Add new script files to the gate as they
   //    land; do NOT widen the gate to `scripts/lib/**` until zip.js is cleaned up
   //    and covered.
   {
