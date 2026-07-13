@@ -25,8 +25,13 @@ const FOUNDRY_CASES = [
   // The stale-head case the publish guard must catch: a genuinely newer patch DOES win.
   ['1.5.1', '1.5.0-beta.7', true, 'a newer patch beats a soaking prerelease'],
 
-  // Patch rollover: part 3 is compared as a STRING ("10-beta" < "9-beta"), so this fails closed.
+  // The stall is a rollover in the part GLUED to the prerelease suffix, NOT "a patch rollover":
+  // part 3 is compared as a STRING ("10-beta" < "9-beta"). A pure-stable channel can never stall
+  // ('1.4.10' > '1.4.9'), and neither counter rolls over badly on its own — see the pairs below.
   ['1.4.10-beta.1', '1.4.9-beta.3', false, 'string compare on a suffixed part; 10 loses to 9'],
+  ['1.4.10', '1.4.9', true, 'a pure-stable channel can never stall — no suffix to glue to'],
+  ['1.5.0-beta.10', '1.5.0-beta.9', true, 'the beta counter is its own dot-part; it compares numerically'],
+  ['1.10.0-beta.1', '1.9.0-beta.1', true, 'minor is its own dot-part too; only the glued part stalls'],
 
   // Prerelease ids are compared as strings: beta < rc alphabetically.
   ['1.3.0-beta.1', '1.3.0-rc.85', false, 'beta sorts below rc as a string'],
