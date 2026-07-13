@@ -41,6 +41,25 @@ export const STABLE_TAG_RE =
 const TAG_SHAPES = 'vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-rc.N (no leading zeros)';
 
 /**
+ * Render an untrusted value for an error message.
+ *
+ * `String(value)` is NOT enough: an object renders as `[object Object]`, which names nothing — the
+ * caller learns only that it passed something wrong, not what. These messages are read by an
+ * operator staring at a failed release, so they have to name the actual input.
+ * @param {unknown} value The value to describe.
+ * @returns {string} The value itself when it is a string, else a JSON rendering of it.
+ */
+function describe(value) {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    // Circular, or a BigInt — JSON.stringify throws on both.
+    return Object.prototype.toString.call(value);
+  }
+}
+
+/**
  * Parse a release tag into its kind, its bare version, and its base version.
  * @param {unknown} tag The tag to parse, e.g. `v1.4.0-beta.3`.
  * @returns {{tag: string, version: string, base: string, kind: 'beta'|'stable',
@@ -82,10 +101,8 @@ export function parseReleaseTag(tag) {
  */
 export function assertReleaseTagKind(kind) {
   if (kind !== 'any' && !RELEASE_TAG_KINDS.includes(kind)) {
-    // String(): `kind` is unknown, and a bare interpolation would report an object as
-    // "[object Object]" — the error must name what was actually passed.
     throw new TypeError(
-      `Unknown release tag kind '${String(kind)}'. Expected one of: beta, stable, any.`
+      `Unknown release tag kind '${describe(kind)}'. Expected one of: beta, stable, any.`
     );
   }
 }
@@ -104,10 +121,9 @@ export function validateReleaseTag(tag, kind = 'any') {
 
   const parsed = parseReleaseTag(tag);
   if (!parsed) {
-    // String(): see assertReleaseTagKind — `tag` is unknown and must not report as [object Object].
     return {
       ok: false,
-      error: `Tag '${String(tag)}' is not a release tag. Expected ${TAG_SHAPES}.`,
+      error: `Tag '${describe(tag)}' is not a release tag. Expected ${TAG_SHAPES}.`,
     };
   }
   if (kind !== 'any' && parsed.kind !== kind) {

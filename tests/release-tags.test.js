@@ -8,7 +8,7 @@ import {
   BETA_TAG_RE,
   STABLE_TAG_RE,
   parseReleaseTag,
-  validateReleaseTag
+  validateReleaseTag,
 } from '../scripts/lib/releaseTags.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,19 +23,19 @@ const PARSE_CASES = [
       version: '1.4.0-beta.3',
       base: '1.4.0',
       kind: 'beta',
-      prerelease: 'beta'
+      prerelease: 'beta',
     },
-    'the post-cutover prerelease tag the retired RC regex rejected'
+    'the post-cutover prerelease tag the retired RC regex rejected',
   ],
   [
     'v1.0.0-rc.85',
     { tag: 'v1.0.0-rc.85', version: '1.0.0-rc.85', base: '1.0.0', kind: 'beta', prerelease: 'rc' },
-    'transitional: rc tags stay valid until the Phase 2 cutover'
+    'transitional: rc tags stay valid until the Phase 2 cutover',
   ],
   [
     'v1.4.0',
     { tag: 'v1.4.0', version: '1.4.0', base: '1.4.0', kind: 'stable', prerelease: null },
-    'a promoted public release tag'
+    'a promoted public release tag',
   ],
   [
     'v0.0.0-beta.0',
@@ -44,9 +44,9 @@ const PARSE_CASES = [
       version: '0.0.0-beta.0',
       base: '0.0.0',
       kind: 'beta',
-      prerelease: 'beta'
+      prerelease: 'beta',
     },
-    'a bare zero is a legal numeric identifier — only LEADING zeros are not'
+    'a bare zero is a legal numeric identifier — only LEADING zeros are not',
   ],
   ['1.4.0', null, 'a bare version is not a tag'],
   ['v1.4', null, 'a partial version is not a tag'],
@@ -66,7 +66,7 @@ const PARSE_CASES = [
   ['v1.4.0-beta.03', null, 'a leading zero in the prerelease number too'],
 
   [undefined, null, 'a non-string is not a tag'],
-  [null, null, 'a non-string is not a tag']
+  [null, null, 'a non-string is not a tag'],
 ];
 
 for (const [tag, expected, why] of PARSE_CASES) {
@@ -96,7 +96,7 @@ const VALIDATE_CASES = [
   ['v1.0.0-rc.85', 'any', true],
   ['v1.4.0', 'any', true],
   ['nonsense', 'any', false],
-  ['nonsense', 'beta', false]
+  ['nonsense', 'beta', false],
 ];
 
 for (const [tag, kind, expected] of VALIDATE_CASES) {
@@ -116,6 +116,23 @@ test('validateReleaseTag defaults to the any kind', () => {
 test('validateReleaseTag throws on an unknown kind — a caller bug is never a valid tag', () => {
   assert.throws(() => validateReleaseTag('v1.4.0', 'rc'), TypeError);
   assert.throws(() => validateReleaseTag('v1.4.0', 'early-access'), TypeError);
+});
+
+test('a refusal names the value it was actually given, never [object Object]', () => {
+  // These messages are read by an operator staring at a failed release, so they have to name the
+  // input. `String(value)` renders an object as "[object Object]", which names nothing — Sonar's
+  // S6551 flags exactly that, and wrapping the interpolation in String() does not fix it.
+  assert.match(validateReleaseTag({ tag: 'v1.0.0' }).error, /\{"tag":"v1\.0\.0"\}/);
+  assert.match(validateReleaseTag(['v1.0.0']).error, /\["v1\.0\.0"\]/);
+  assert.throws(
+    () => validateReleaseTag('v1.4.0', { kind: 'beta' }),
+    /Unknown release tag kind '\{"kind":"beta"\}'/
+  );
+
+  // Strings and nullish values keep their existing, already-honest rendering.
+  assert.match(validateReleaseTag('').error, /Tag '' is not a release tag/);
+  assert.match(validateReleaseTag(null).error, /Tag 'null' is not a release tag/);
+  assert.match(validateReleaseTag(undefined).error, /Tag 'undefined' is not a release tag/);
 });
 
 test('the exported patterns are anchored and mutually exclusive', () => {
@@ -155,7 +172,7 @@ const CLI_CASES = [
   [['v1.4.0', '--kind', 'nonsense'], 2, 'an unknown kind is a usage error, not a valid tag'],
   [['v1.4.0', '--print', 'nonsense'], 2, 'an unknown print field is a usage error too'],
   [['v1.4.0', '--kind'], 2, 'a flag with no value is a usage error'],
-  [[], 2, 'no tag at all is a usage error']
+  [[], 2, 'no tag at all is a usage error'],
 ];
 
 for (const [args, code, why] of CLI_CASES) {
@@ -169,7 +186,7 @@ for (const [args, code, why] of CLI_CASES) {
 const PRINT_CASES = [
   ['version', '1.4.0-beta.3'],
   ['base', '1.4.0'],
-  ['tag', 'v1.4.0-beta.3']
+  ['tag', 'v1.4.0-beta.3'],
 ];
 
 for (const [field, expected] of PRINT_CASES) {
