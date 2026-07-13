@@ -23,46 +23,72 @@
 /** The kinds of release tag a caller may require. */
 export const RELEASE_TAG_KINDS = Object.freeze(['beta', 'stable']);
 
-/** `v1.4.0-beta.3` / `v1.4.0-rc.85`. Group 1 is the bare version, group 2 the prerelease id. */
-export const BETA_TAG_RE = /^v(\d+\.\d+\.\d+-(beta|rc)\.\d+)$/;
+/**
+ * Every numeric identifier is SemVer's `(0|[1-9]\d*)`, NOT `\d+`: leading zeros are refused.
+ * `v1.04.0` is not a version, it is a typo — and both `promote-release` and `release-s3` take the
+ * tag as a HUMAN-TYPED `workflow_dispatch` input, so a typo that validates clean here goes on to
+ * mint a permanent garbage tag (and, in `promote-release`, a public GitHub release).
+ *
+ * `v1.4.0-beta.3` / `v1.4.0-rc.85`. Named groups; see `parseReleaseTag`.
+ */
+export const BETA_TAG_RE =
+  /^v(?<version>(?<base>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))-(?<prerelease>beta|rc)\.(?:0|[1-9]\d*))$/;
 
-/** `v1.4.0`. Group 1 is the bare version. */
-export const STABLE_TAG_RE = /^v(\d+\.\d+\.\d+)$/;
+/** `v1.4.0`. Named groups; `version` and `base` are the same string for a stable tag. */
+export const STABLE_TAG_RE =
+  /^v(?<version>(?<base>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)))$/;
 
-const TAG_SHAPES = 'vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-rc.N';
+const TAG_SHAPES = 'vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-rc.N (no leading zeros)';
 
 /**
- * Parse a release tag into its kind and its bare version.
+ * Parse a release tag into its kind, its bare version, and its base version.
  * @param {unknown} tag The tag to parse, e.g. `v1.4.0-beta.3`.
- * @returns {{tag: string, version: string, kind: 'beta'|'stable', prerelease: string|null}|null}
- *   The parsed tag, or `null` when the value is not a release tag. `version` never carries the
- *   leading `v`; it is the only form safe to hand to a version comparator.
+ * @returns {{tag: string, version: string, base: string, kind: 'beta'|'stable',
+ *   prerelease: string|null}|null} The parsed tag, or `null` when the value is not a release tag.
+ *   `version` never carries the leading `v`; it is the only form safe to hand to a version
+ *   comparator. `base` is the version a prerelease would be promoted to (`v1.4.0-beta.3` →
+ *   `1.4.0`) — the promotion workflow must derive it HERE, not by stripping `-rc.N` by hand.
  */
 export function parseReleaseTag(tag) {
   if (typeof tag !== 'string') return null;
 
   const beta = BETA_TAG_RE.exec(tag);
-  if (beta) return { tag, version: beta[1], kind: 'beta', prerelease: beta[2] };
+  if (beta) return { tag, ...beta.groups, kind: 'beta' };
 
   const stable = STABLE_TAG_RE.exec(tag);
-  if (stable) return { tag, version: stable[1], kind: 'stable', prerelease: null };
+  if (stable) return { tag, ...stable.groups, kind: 'stable', prerelease: null };
 
   return null;
+}
+
+/**
+ * Assert that a caller-supplied kind is one this module understands.
+ *
+ * Callers must run this EAGERLY, before doing any work — `validate-release-tag.mjs --filter`
+ * would otherwise only discover a typo'd `--kind` on the first line of input, and the normal case
+ * (no tags at HEAD, empty stdin) has no lines at all, so the bug would exit 0 and silently pass.
+ *
+ * @param {unknown} kind The kind to check.
+ * @throws {TypeError} If `kind` is not one of `beta`, `stable`, or `any` — an unknown kind is a
+ *   caller bug, not a bad tag, and must never be reported as "this tag is fine".
+ */
+export function assertReleaseTagKind(kind) {
+  if (kind !== 'any' && !RELEASE_TAG_KINDS.includes(kind)) {
+    throw new TypeError(`Unknown release tag kind '${kind}'. Expected one of: beta, stable, any.`);
+  }
 }
 
 /**
  * Validate a release tag against a required kind.
  * @param {unknown} tag The tag to validate.
  * @param {'beta'|'stable'|'any'} [kind] The kind the caller requires. `any` accepts both.
- * @returns {{ok: true, tag: string, version: string, kind: 'beta'|'stable', prerelease: string|null}
- *   |{ok: false, error: string}} The parsed tag, or a refusal naming the reason.
- * @throws {TypeError} If `kind` is not one of `beta`, `stable`, or `any` — an unknown kind is a
- *   caller bug, not a bad tag, and must never be reported as "this tag is fine".
+ * @returns {{ok: true, tag: string, version: string, base: string, kind: 'beta'|'stable',
+ *   prerelease: string|null}|{ok: false, error: string}} The parsed tag, or a refusal naming the
+ *   reason.
+ * @throws {TypeError} If `kind` is unknown. See `assertReleaseTagKind`.
  */
 export function validateReleaseTag(tag, kind = 'any') {
-  if (kind !== 'any' && !RELEASE_TAG_KINDS.includes(kind)) {
-    throw new TypeError(`Unknown release tag kind '${kind}'. Expected one of: beta, stable, any.`);
-  }
+  assertReleaseTagKind(kind);
 
   const parsed = parseReleaseTag(tag);
   if (!parsed) {

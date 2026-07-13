@@ -111,6 +111,27 @@ export function resolveAwsEnv(options = {}, environment = env) {
 }
 
 /**
+ * Apply the resolved AWS environment to a target environment object (`process.env` by default).
+ *
+ * `Object.assign` alone is NOT enough, and that gap is the whole bug 0.4 exists to close: assign
+ * cannot REMOVE a key. If `AWS_PROFILE` is already set in the runner's environment, an omitted
+ * key leaves the stale value in place, the SDK sees a profile, skips the environment-variable
+ * credential provider, and ignores the OIDC credentials entirely. So an omitted `AWS_PROFILE` is
+ * explicitly DELETED, not merely not-written.
+ *
+ * @param {Record<string, string|boolean|string[]>} [options] Parsed CLI options.
+ * @param {Record<string, string|undefined>} [environment] The process environment to read.
+ * @param {Record<string, string|undefined>} [target] The environment object to mutate.
+ * @returns {Record<string, string>} The AWS environment that was applied.
+ */
+export function applyAwsEnv(options = {}, environment = env, target = process.env) {
+  const resolved = resolveAwsEnv(options, environment);
+  Object.assign(target, resolved);
+  if (!('AWS_PROFILE' in resolved)) delete target.AWS_PROFILE;
+  return resolved;
+}
+
+/**
  * @param {string} path
  * @returns {Promise<boolean>}
  */
@@ -318,9 +339,8 @@ async function main() {
     return;
   }
 
-  // Assign only the keys resolveAwsEnv returns. An absent AWS_PROFILE must stay absent.
-  const awsEnv = resolveAwsEnv(options, env);
-  Object.assign(process.env, awsEnv);
+  // An absent AWS_PROFILE must be absent from process.env too — deleted, not just not-written.
+  const awsEnv = applyAwsEnv(options, env);
 
   const fabricateConfig = await readJsonIfExists(String(options.config));
   const premiumConfig = options.premium === false

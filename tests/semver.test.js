@@ -42,6 +42,22 @@ const FOUNDRY_CASES = [
   ['1.4.0', '1.4.0', false, 'identical versions are not newer'],
   ['1.4.0-rc.3', '1.4.0-rc.3', false, 'identical prereleases are not newer'],
 
+  // DRIFT GUARD for the collapsed `if` in the comparison loop (review of PR for issue 627, round
+  // 1: two reviewers independently claimed upstream writes the string comparison as `else if` and
+  // that the collapse therefore diverges — it does not; upstream is a plain `if`). These two
+  // cases are the ones that WOULD flip if an `else` were ever "restored": they only reach the
+  // string comparison BECAUSE the numeric branch fell through on numerically-equal parts. Note
+  // the asymmetry — it is real, and both expectations were taken from the real Foundry function,
+  // not derived by hand.
+  ['1.04.0', '1.4.0', false, 'numerically equal parts fall through to a string compare'],
+  ['1.4.0', '1.04.0', true, 'and that string compare is asymmetric'],
+
+  // DRIFT GUARD for `isNumeric`: this case is wrong under a "sane" /^\d+$/ predicate (which would
+  // string-compare '0x10' against '9' and answer false) and right only under Foundry's coercing
+  // Number.isNumeric, which reads '0x10' as 16. Without it, the internal predicate could be
+  // swapped for a plausible-looking one and this whole suite would stay green.
+  ['1.4.0x10', '1.4.9', true, 'Foundry coerces the hex part to 16; a /^\\d+$/ predicate would not'],
+
   // Nullish guards — copied verbatim, and NOT inverted. An absent target is never newer; an
   // absent reference is beaten by anything. Callers must branch on an absent channel head
   // BEFORE calling this, not rely on it to mean "nothing published yet".

@@ -34,6 +34,22 @@
  *     are numeric to it, `''` is not.
  *   - equal versions are NOT newer.
  *
+ * THE PORT DEVIATES FROM UPSTREAM IN EXACTLY THREE PLACES, all of them structural, none of them
+ * behavioural:
+ *   1. the numeric branch in the comparison loop collapses upstream's nested `if` into one
+ *      condition (see the comment at that line);
+ *   2. `majorOnly` is omitted — the release tooling never compares major versions in isolation,
+ *      and an unused option is one more thing to get wrong;
+ *   3. `partsEqual` replaces upstream's `Array#equals` prototype extension, narrowed to the
+ *      string-part arrays this file compares (upstream defers to the deep `foundry.utils.equals`,
+ *      which reduces to strict equality for strings).
+ * All three were verified behaviour-identical by differential test against the REAL function,
+ * imported from a Foundry install rather than retyped: load
+ * `common/primitives/_module.mjs` (it installs `Number.isNumeric` and `Array#equals` as side
+ * effects), then `common/utils/_module.mjs`, and set `globalThis.foundry = { utils }` so
+ * `Array#equals` can reach `foundry.utils.equals`. Use that technique for any future check. A
+ * hand-reconstruction of upstream has already produced two false "divergence" reports.
+ *
  * Inputs are bare versions (`1.4.0-rc.3`), never tags (`v1.4.0-rc.3`). Use
  * `parseReleaseTag` from `./releaseTags.js` to strip the `v` before comparing; there is no
  * normalisation here, and a stray `v` would be compared as a string part.
@@ -98,9 +114,16 @@ export function foundryIsNewerVersion(v1, v0) {
     if (p0 === undefined) return true;
 
     // If both parts are numbers, use numeric comparison to avoid cases like "12" < "5".
-    // Upstream nests this as `if (both numeric) { if (differ) return … }`; collapsing the two
-    // conditions is the ONLY deviation from the upstream source and is behaviour-identical —
-    // both forms fall through to the string comparison when the parts are numerically equal.
+    //
+    // The only deviation from upstream IN THIS LOOP: upstream nests this as
+    // `if (both numeric) { if (differ) return … }` and collapsing the two conditions into one is
+    // behaviour-identical — both forms fall through to the string comparison below when the parts
+    // are numerically equal but textually different ("04" vs "4"). Verified by differential test
+    // against the REAL function, imported from a Foundry install
+    // (`common/utils/_module.mjs` after `common/primitives/_module.mjs`): 0 mismatches over the
+    // full pair matrix. Reconstructing upstream by hand to "check" this has now misled two
+    // reviewers into believing the next line is an `else if` — it is not. Import the real
+    // function; never retype it. The pinned drift cases live in tests/semver.test.js.
     if (isNumeric(p0) && isNumeric(p1) && Number(p1) !== Number(p0)) {
       return Number(p1) > Number(p0);
     }
