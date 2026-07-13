@@ -112,20 +112,32 @@ export function redactSegment(str, segment) {
 }
 
 /**
- * Strip leading/trailing `/` from a path segment. Written as a linear scan rather
- * than a regex so there is no backtracking/ReDoS surface on the (config/secret)
- * input.
+ * Strip trailing `/` from a URL or path. A linear scan, NOT `replace(/\/+$/, '')`: the anchored
+ * `+` is retried from every position on a run of slashes, which is quadratic on an input like
+ * `'/////…/a'`. Both of this file's inputs (a config-supplied base URL and an env-supplied secret)
+ * are cheap to make pathological, and neither is worth a backtracking surface.
  *
- * @param {string} value
- * @returns {string}
+ * @param {string} value The value to strip.
+ * @returns {string} The value with no trailing slash. `''` in, `''` out.
+ */
+function stripTrailingSlashes(value) {
+  const s = String(value ?? '');
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end -= 1;
+  return s.slice(0, end);
+}
+
+/**
+ * Strip leading AND trailing `/` from a path segment. Same reasoning as above.
+ *
+ * @param {string} value The value to trim.
+ * @returns {string} The trimmed value.
  */
 function trimSlashes(value) {
-  const s = String(value ?? '');
+  const s = stripTrailingSlashes(value);
   let start = 0;
-  let end = s.length;
-  while (start < end && s[start] === '/') start += 1;
-  while (end > start && s[end - 1] === '/') end -= 1;
-  return s.slice(start, end);
+  while (start < s.length && s[start] === '/') start += 1;
+  return s.slice(start);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -248,7 +260,7 @@ export function deriveS3Layout({
   testerGroups = [],
   testerSegment = '',
 }) {
-  const base = baseUrl.replace(/\/+$/, '');
+  const base = stripTrailingSlashes(baseUrl);
   const zipName = `${moduleId}-${version}.zip`;
 
   /** @returns {PublishTarget} */
@@ -455,17 +467,17 @@ function resolvePublishPlan({ config, channel, version, env: envMap }) {
   if (!channel) fail('config is missing "channel" (and no --channel given)');
 
   const bucket = envMap.S3_RELEASE_BUCKET || config.bucket || '';
-  const baseUrl = (envMap.RELEASE_BASE_URL || config.baseUrl || '').replace(/\/+$/, '');
+  const baseUrl = stripTrailingSlashes(envMap.RELEASE_BASE_URL || config.baseUrl || '');
   const channelConfig = resolveChannelConfig(config, channel);
 
   const secretEnv = channelConfig.testerSecretEnv;
   const testerSegment = trimSlashes(secretEnv ? envMap[secretEnv] || '' : '');
   if (channelConfig.testerGroups.length > 0 && !testerSegment) {
+    const cause = secretEnv ? `${secretEnv} is unset` : 'declares no "testerSecretEnv"';
     fail(
       `channel "${channel}" declares ${channelConfig.testerGroups.length} tester group(s) but ` +
-        `${secretEnv ? `${secretEnv} is unset` : 'declares no "testerSecretEnv"'} — refusing to ` +
-        "publish to a guessable path. Set that channel's OWN secret (a GitHub Actions secret in CI; " +
-        'an env var locally) before publishing.'
+        `${cause} — refusing to publish to a guessable path. Set that channel's OWN secret (a ` +
+        'GitHub Actions secret in CI; an env var locally) before publishing.'
     );
   }
 
@@ -545,81 +557,129 @@ export async function runCheckHeads({ config, version, channel, deps = {} }) {
  *   the keys actually written.
  */
 export async function main({ argv: argvInput = argv, env: envInput = env, deps = {} } = {}) {
-  const args = argvInput.slice(2);
   const log = deps.log ?? console.log;
   const ci = isCI(envInput);
-
-  const version = getFlag(args, '--version');
-  const channelOverride = getFlag(args, '--channel');
-  const configPath = getFlag(args, '--config') || join(ROOT, 'release.s3.config.json');
-  const dryRun = args.includes('--dry-run');
-  const overwrite = args.includes('--overwrite');
-  const checkHeads = args.includes('--check-heads');
-  const allowDowngrade = args.includes('--allow-downgrade');
+  const options = parseArgs(argvInput.slice(2));
+  const { version, dryRun } = options;
 
   if (!version) fail('--version <ver> is required');
 
-  // 1. Load config + env overrides
-  let config;
-  try {
-    config = JSON.parse(await readFile(configPath, 'utf8'));
-  } catch (error) {
-    fail(`could not read config at ${configPath}: ${error.message}`);
-  }
-  const channel = channelOverride || config.channel;
+  const config = await loadConfig(options.configPath);
+  const channel = options.channelOverride || config.channel;
 
-  // 2. --check-heads is read-only: no build, no staging, no writes.
-  if (checkHeads) {
-    const report = await runCheckHeads({
-      config,
-      version,
-      channel,
-      deps: { ...deps, env: envInput },
-    });
-    printHeadReport(report, log);
-    if (!report.safety.ok) fail(report.safety.error);
-    return report;
+  // --check-heads is read-only: no build, no staging, no writes.
+  if (options.checkHeads) {
+    return reportHeads({ config, version, channel, deps, env: envInput, log });
   }
 
-  // 3. Resolve the channel's own targets (tester groups + secret come from the CHANNEL).
+  // Resolve the channel's own targets (its tester groups + secret come from the CHANNEL).
   const plan = resolvePublishPlan({ config, channel, version, env: envInput });
+  // Assigned BEFORE anything can throw with an S3 key in it, so the CLI's catch-all can redact it.
   activeTesterSegment = plan.testerSegment;
   if (!dryRun) requireBucketAndBaseUrl(plan);
+  printPlan({ plan, channel, version, dryRun, ci, log });
 
-  const { layout } = plan;
-  log(
-    `release-s3: module=${plan.moduleId} channel=${channel} version=${version}${dryRun ? ' (dry-run)' : ''}`
-  );
-  // The bucket host + baseUrl are part of the secret feed URL — only print them locally.
-  if (!ci)
-    log(`release-s3: bucket=${plan.bucket || '(unset)'} baseUrl=${plan.baseUrl || '(unset)'}`);
-  log(`release-s3: targets=channel + ${plan.channelConfig.testerGroups.length} tester group(s)\n`);
-
-  // 4. Build dist/ at the requested version, then validate the built manifest.
+  // Build dist/ at the requested version, then validate what came out.
   log('release-s3: building...');
   const build = deps.build ?? defaultBuild;
   const { distDir, manifest: built } = await build({ version });
+  assertBuiltManifest(built, { moduleId: plan.moduleId, version });
 
-  for (const f of ['id', 'title', 'version', 'compatibility']) {
-    if ([undefined, null, ''].includes(built[f])) {
-      fail(`built module.json is missing required field "${f}"`);
+  const staged = await stageTargets({ plan, built, distDir, deps, ci, log });
+
+  // Guard, then upload — and a dry-run does NEITHER, because it reaches no bucket at all (it has no
+  // credentials to reach one with). Both live inside publishTargets, which composes them in that
+  // order and cannot be re-ordered from here.
+  const { safety, put } = dryRun
+    ? { safety: null, put: [] }
+    : await publishTargets({ plan, staged, version, options, deps, env: envInput, ci, log });
+
+  printSummary({ layout: plan.layout, dryRun, segment: plan.testerSegment, ci, log });
+  return { layout: plan.layout, staged, safety, put, dryRun };
+}
+
+/**
+ * @param {string[]} args The argv slice.
+ * @returns {{version: string|null, channelOverride: string|null, configPath: string,
+ *   dryRun: boolean, overwrite: boolean, checkHeads: boolean, allowDowngrade: boolean}} The options.
+ */
+function parseArgs(args) {
+  return {
+    version: getFlag(args, '--version'),
+    channelOverride: getFlag(args, '--channel'),
+    configPath: getFlag(args, '--config') || join(ROOT, 'release.s3.config.json'),
+    dryRun: args.includes('--dry-run'),
+    overwrite: args.includes('--overwrite'),
+    checkHeads: args.includes('--check-heads'),
+    allowDowngrade: args.includes('--allow-downgrade'),
+  };
+}
+
+/**
+ * @param {string} configPath The config to read.
+ * @returns {Promise<object>} The parsed config.
+ */
+async function loadConfig(configPath) {
+  try {
+    return JSON.parse(await readFile(configPath, 'utf8'));
+  } catch (error) {
+    // Not `return fail(…)`: see defaultBuild.
+    fail(`could not read config at ${configPath}: ${error.message}`);
+  }
+}
+
+/**
+ * The `--check-heads` command: read, report, and refuse if the guard would.
+ * @param {{config: object, version: string, channel: string, deps: ReleaseDeps,
+ *   env: Record<string, string|undefined>, log: (...args: unknown[]) => void}} opts The inputs.
+ * @returns {Promise<object>} The head report.
+ */
+async function reportHeads({ config, version, channel, deps, env: envMap, log }) {
+  const report = await runCheckHeads({ config, version, channel, deps: { ...deps, env: envMap } });
+  printHeadReport(report, log);
+  if (!report.safety.ok) fail(report.safety.error);
+  return report;
+}
+
+/**
+ * Refuse a build that did not produce a usable manifest. The empty-string arm matters: a `title: ''`
+ * is well-formed JSON that Foundry will happily install as a nameless module.
+ * @param {object} built The built module.json.
+ * @param {{moduleId: string, version: string}} expected What was asked for.
+ * @returns {void}
+ */
+function assertBuiltManifest(built, { moduleId, version }) {
+  for (const field of ['id', 'title', 'version', 'compatibility']) {
+    if ([undefined, null, ''].includes(built[field])) {
+      fail(`built module.json is missing required field "${field}"`);
     }
   }
-  if (built.id !== plan.moduleId) {
-    fail(`config moduleId "${plan.moduleId}" does not match built module.json id "${built.id}"`);
+  if (built.id !== moduleId) {
+    fail(`config moduleId "${moduleId}" does not match built module.json id "${built.id}"`);
   }
-  if (built.version !== version)
+  if (built.version !== version) {
     fail(`version mismatch: requested ${version} built ${built.version}`);
+  }
+}
 
-  // 5. Stage one zip per target: rewrite dist/module.json with that target's feed URLs, then zip
-  //    dist/ to a per-target staging path. Staged zips live outside dist/ so they are not nested
-  //    into the next target's archive.
+/**
+ * Stage one zip per target: rewrite dist/module.json with that target's OWN feed URLs, then zip
+ * dist/ to a per-target staging path. Staged zips live outside dist/ so they are not nested into the
+ * next target's archive.
+ *
+ * @param {{plan: object, built: object, distDir: string, deps: ReleaseDeps, ci: boolean,
+ *   log: (...args: unknown[]) => void}} opts The plan, the built manifest, and the collaborators.
+ * @returns {Promise<Array<{target: PublishTarget, body: object, zipPath: string}>>} The staged
+ *   targets, in publish order.
+ */
+async function stageTargets({ plan, built, distDir, deps, ci, log }) {
+  const { layout } = plan;
   const stagingDir = deps.stagingDir ?? STAGING_DIR;
   const zip = deps.zip ?? zipDirectory;
   const distManifestPath = join(distDir, 'module.json');
   await rm(stagingDir, { recursive: true, force: true });
 
-  const staged = []; // { target, body, zipPath }
+  const staged = [];
   for (const target of layout.targets) {
     const body = { ...built, manifest: target.manifestUrl, download: target.downloadUrl };
     await writeFile(distManifestPath, JSON.stringify(body, null, 2) + '\n');
@@ -636,66 +696,132 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
     );
     staged.push({ target, body, zipPath });
   }
+  return staged;
+}
 
-  // 6. Guard, then upload. A dry-run reaches no bucket at all, so it does neither.
-  let safety = null;
-  const put = [];
-  if (!dryRun) {
-    const createClient = deps.createS3Client ?? createDefaultS3Client;
-    const s3 = await createClient({ bucket: plan.bucket, region: envInput.AWS_REGION });
+/**
+ * Publish the staged targets — GUARD FIRST, ALWAYS.
+ *
+ * This function exists so that ordering is a structural property rather than a convention: the guard
+ * is not "the first thing in a long function that also uploads", it is the first of three steps this
+ * function composes, and `main()` cannot reach the uploads without going through it. `main()`'s
+ * headline test asserts ZERO `PutObject` calls when a head is Foundry-newer, and that assertion is
+ * only as good as this ordering.
+ *
+ * @param {{plan: object, staged: object[], version: string, options: object, deps: ReleaseDeps,
+ *   env: Record<string, string|undefined>, ci: boolean, log: (...args: unknown[]) => void}} opts
+ * @returns {Promise<{safety: object, put: string[]}>} The guard's verdict and the keys written.
+ */
+async function publishTargets({ plan, staged, version, options, deps, env: envMap, ci, log }) {
+  const createClient = deps.createS3Client ?? createDefaultS3Client;
+  const s3 = await createClient({ bucket: plan.bucket, region: envMap.AWS_REGION });
 
-    // 6a. THE GUARD. Every head, read per TARGET, BEFORE a single object is written.
-    const state = await fetchPublishState(layout.targets, { getObject: s3.getObject });
-    safety = assertPublishSafety({ version, staged, state, allowDowngrade });
-    for (const warning of safety.warnings) log(`release-s3: ⚠ ${warning}`);
-    for (const decision of safety.decisions) {
-      log(`release-s3: head ${decision.label}: ${decision.decision} — ${decision.reason}`);
-    }
-    if (!safety.ok) fail(safety.error);
+  // 1. THE GUARD. Every head, read per TARGET, BEFORE a single object is written.
+  const safety = await guardHeads({
+    s3,
+    plan,
+    staged,
+    version,
+    allowDowngrade: options.allowDowngrade,
+    log,
+  });
 
-    // 6b. Pre-flight ALL versioned zips before uploading anything (fail-fast, so we never leave a
-    //     half-published release behind).
-    for (const { target } of staged) {
-      if (await s3.headObject(target.zipKey)) {
-        if (!overwrite)
-          fail(
-            ci
-              ? `${target.label} version zip already exists — pass --overwrite to replace it`
-              : `s3://${plan.bucket}/${target.zipKey} already exists — pass --overwrite to replace it`
-          );
-        log(
-          ci
-            ? `release-s3: will overwrite ${target.label} (--overwrite set)`
-            : `release-s3: will overwrite ${target.zipKey} (--overwrite set)`
-        );
-      }
-    }
+  // 2. Pre-flight ALL versioned zips before uploading anything (fail-fast, so we never leave a
+  //    half-published release behind).
+  await preflightZips({ s3, staged, plan, overwrite: options.overwrite, ci, log });
 
-    // 6c. Upload.
-    for (const { target, body, zipPath } of staged) {
-      const zipBytes = await readFile(zipPath);
-      if (!ci) log(`release-s3: upload zip      -> s3://${plan.bucket}/${target.zipKey}`);
-      await s3.putObject({
-        key: target.zipKey,
-        body: zipBytes,
-        contentType: 'application/zip',
-        cacheControl: CACHE_IMMUTABLE,
-      });
-      if (!ci) log(`release-s3: upload manifest -> s3://${plan.bucket}/${target.manifestKey}`);
-      await s3.putObject({
-        key: target.manifestKey,
-        body: JSON.stringify(body, null, 2),
-        contentType: 'application/json',
-        cacheControl: CACHE_NO_CACHE,
-      });
-      if (ci) log(`release-s3: uploaded ${target.label} (zip + manifest)`);
-      put.push(target.zipKey, target.manifestKey);
-    }
+  // 3. Upload.
+  const put = await uploadTargets({ s3, staged, plan, ci, log });
+  return { safety, put };
+}
+
+/**
+ * Read every target's head and refuse the publish if any of them would be moved backwards.
+ * @param {{s3: S3Port, plan: object, staged: object[], version: string, allowDowngrade: boolean,
+ *   log: (...args: unknown[]) => void}} opts The port, plan, staged targets and verdict inputs.
+ * @returns {Promise<object>} The guard's verdict. Throws when it refuses.
+ */
+async function guardHeads({ s3, plan, staged, version, allowDowngrade, log }) {
+  const state = await fetchPublishState(plan.layout.targets, { getObject: s3.getObject });
+  const safety = assertPublishSafety({ version, staged, state, allowDowngrade });
+
+  for (const warning of safety.warnings) log(`release-s3: ⚠ ${warning}`);
+  for (const decision of safety.decisions) {
+    log(`release-s3: head ${decision.label}: ${decision.decision} — ${decision.reason}`);
   }
+  if (!safety.ok) fail(safety.error);
+  return safety;
+}
 
-  // 7. Install-URL summary
-  printSummary({ layout, dryRun, segment: plan.testerSegment, ci, log });
-  return { layout, staged, safety, put, dryRun };
+/**
+ * @param {{s3: S3Port, staged: object[], plan: object, overwrite: boolean, ci: boolean,
+ *   log: (...args: unknown[]) => void}} opts The port, the staged targets, and the mode.
+ * @returns {Promise<void>}
+ */
+async function preflightZips({ s3, staged, plan, overwrite, ci, log }) {
+  for (const { target } of staged) {
+    if (!(await s3.headObject(target.zipKey))) continue;
+    if (!overwrite) {
+      fail(
+        ci
+          ? `${target.label} version zip already exists — pass --overwrite to replace it`
+          : `s3://${plan.bucket}/${target.zipKey} already exists — pass --overwrite to replace it`
+      );
+    }
+    log(
+      ci
+        ? `release-s3: will overwrite ${target.label} (--overwrite set)`
+        : `release-s3: will overwrite ${target.zipKey} (--overwrite set)`
+    );
+  }
+}
+
+/**
+ * @param {{s3: S3Port, staged: object[], plan: object, ci: boolean,
+ *   log: (...args: unknown[]) => void}} opts The port, the staged targets, and the mode.
+ * @returns {Promise<string[]>} The keys written, in order.
+ */
+async function uploadTargets({ s3, staged, plan, ci, log }) {
+  const put = [];
+  for (const { target, body, zipPath } of staged) {
+    const zipBytes = await readFile(zipPath);
+    if (!ci) log(`release-s3: upload zip      -> s3://${plan.bucket}/${target.zipKey}`);
+    await s3.putObject({
+      key: target.zipKey,
+      body: zipBytes,
+      contentType: 'application/zip',
+      cacheControl: CACHE_IMMUTABLE,
+    });
+    if (!ci) log(`release-s3: upload manifest -> s3://${plan.bucket}/${target.manifestKey}`);
+    await s3.putObject({
+      key: target.manifestKey,
+      body: JSON.stringify(body, null, 2),
+      contentType: 'application/json',
+      cacheControl: CACHE_NO_CACHE,
+    });
+    if (ci) log(`release-s3: uploaded ${target.label} (zip + manifest)`);
+    put.push(target.zipKey, target.manifestKey);
+  }
+  return put;
+}
+
+/**
+ * @param {{plan: object, channel: string, version: string, dryRun: boolean, ci: boolean,
+ *   log: (...args: unknown[]) => void}} opts What is about to happen.
+ * @returns {void}
+ */
+function printPlan({ plan, channel, version, dryRun, ci, log }) {
+  log(
+    `release-s3: module=${plan.moduleId} channel=${channel} version=${version}${dryRun ? ' (dry-run)' : ''}`
+  );
+  // Neither the bucket nor the base URL is a secret — both are committed in release.s3.config.json,
+  // in a public repo. The ONLY secret here is the tester path segment, which appears in no line of
+  // this function. They are still withheld in CI simply because a CI log has no reader who needs
+  // them, and every key printed elsewhere is built from them.
+  if (!ci) {
+    log(`release-s3: bucket=${plan.bucket || '(unset)'} baseUrl=${plan.baseUrl || '(unset)'}`);
+  }
+  log(`release-s3: targets=channel + ${plan.channelConfig.testerGroups.length} tester group(s)\n`);
 }
 
 /**
