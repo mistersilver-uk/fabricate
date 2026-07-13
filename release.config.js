@@ -30,6 +30,7 @@
  *   feat   → minor bump (new feature)
  *   fix    → patch bump (bug fix)
  *   perf   → patch bump (performance)
+ *   revert → patch bump (reverts a prior change)
  *   BREAKING CHANGE footer → major bump
  *
  * Commit types that do NOT trigger a release:
