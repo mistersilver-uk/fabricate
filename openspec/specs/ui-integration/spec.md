@@ -509,11 +509,14 @@ Actions:
 In Manager, the recipes browser header offers a single primary `Create recipe` action (no crafting-system import/export on the recipes header); creating a recipe follows a create-then-edit model — `store.createRecipe` persists a new identity-only *incomplete shell* in the selected system via `RecipeManager.createRecipe({ craftingSystemId }, { allowIncomplete: true })` (it saves because persistence gates on structural validity only, not completeness) and the manager immediately opens the recipe-edit view on it.
 The new shell carries the default recipe name and image until edited, and the browse row surfaces a derived `Incomplete` chip until ingredient sets and result groups are added.
 The recipe browse row `Edit` action opens that same dedicated recipe-edit view rather than editing inline, and that Edit action is available regardless of the recipe's `locked` state.
-The recipe-edit view holds a recipe identity card (name, description, image, and an `enabled` on/off toggle) editing a local draft in the central `manager-main`, and the GM manager's right-hand context inspector panel (the global `manager-inspector` aside) holds the recipe-item link card.
+The recipe-edit view is the **five-tab editor** specified in `## Recipe Editor` below — Overview, Ingredients, Results, Tools and Validation — over a controlled local draft in the central `manager-main`, with the GM manager's right-hand context inspector panel (the global `manager-inspector` aside) carrying that editor's context rail.
+Ingredients, essences, tools, steps and results are all authored there; none of them is deferred, and there is no *Catalyst* concept in the editor (Tools replaced it).
 Identity edits track a dirty state surfaced by a header dirty chip, persist via `store.updateRecipe` → `RecipeManager.updateRecipe(recipeId, updates, { allowIncomplete: true })` (so an identity-only save is not blocked by the shell's still-empty ingredients/results), and a dirty draft prompts a discard confirmation on route exit.
 The recipe-edit header follows the standard editor convention shared with the gathering-task, gathering-event, and environment editors: an `Unsaved` chip (when dirty), `Back to recipes`, `Delete recipe` (danger, enabled whenever a recipe is selected), and `Save`.
-The recipe-item card is the partial implementation of the `### Visibility Form` recipe-item selector (see below); the Visibility Form's per-recipe restriction editor (restricted toggle + allowed-users allow-list) is implemented for the `player` list mode, and the rest of `## Recipe Editor` (ingredients, catalysts, essences, steps, and results) remain deferred.
-The inspector panel that carries the recipe-item card is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and suppressed (central column full-width) when the selected system's recipe knowledge mode does not consume an item (`knowledge.mode === 'learned'`); the layout collapses to a single column at the Manager container's narrow breakpoint (`@container fabricate-manager (max-width: 960px)`), mirroring the environment editor.
+The context rail is **always present** on `recipe-edit`, and what its top section carries is decided by the system's canonical `visibilityMode` through `craftingEffect` (see `### Context rail`): the read-only access roster in `restricted`, the read-only Books & Scrolls "Appears in" summary in `item` / `knowledge`, and no top section at all in `global`.
+It is **not** gated on the superseded `knowledge.mode`.
+The layout collapses to a single column at the Manager container's narrow breakpoint (`@container fabricate-manager (max-width: 960px)`), mirroring the environment editor.
+The recipe editor carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card is retired (see `### Visibility Form`), and the canonical `recipe.access` grant is authored on the Access tab.
 The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
 Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
@@ -884,8 +887,11 @@ Ingredient set editor supports:
   - Add/remove groups
   - Add/remove OR options within a group
   - Item placeholder options that match one or more configured system tags
-- Catalysts grid per set
 - Essences per set (when enabled)
+
+Required tools are **not** authored here.
+*Catalyst* is a retired concept — Tools replaced it, and the recipe's tools are authored on the editor's **Tools** tab at recipe and step scope.
+The persisted per-**set** `IngredientSet.toolIds` field has no editor of its own; it round-trips unchanged.
 
 Result editor changes by mode.
 The UI must expose required data fields from `004`, but mode logic itself is defined in `004`.
