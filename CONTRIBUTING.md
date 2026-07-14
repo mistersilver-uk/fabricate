@@ -656,33 +656,36 @@ Runs:
 If the smoke test fails, the workflow opens (or comments on an existing) GitHub Issue labelled `foundry-smoke-failure`.
 Requires two repository secrets: `FOUNDRY_USERNAME` and `FOUNDRY_PASSWORD`.
 
-### Release-candidate workflow
+### Beta workflow
 
-File: `.github/workflows/release-candidate.yml`
+Superseded by the three-channel model; full rewrite pending in #627 Phase 4.
+
+File: `.github/workflows/beta.yml`
 
 Trigger: push to `main`.
 
 Steps:
 
 1. Run unit tests (`npm test`) and build.
-2. Run the Foundry integration smoke test (via the reusable workflow).
-3. Run `semantic-release` to determine the version bump, inject the release version into `module.json`, build and zip the module, and publish a GitHub prerelease.
-4. Compare RC tags pointing at `HEAD` before and after `semantic-release`.
-If exactly one new `v<x.y.z>-rc.N` tag was created, call `.github/workflows/release-s3.yml` with `dry_run: false` and `overwrite: false`.
-If no RC tag was created, skip S3 publishing.
-If multiple new RC tags are detected at `HEAD`, fail the run because the S3 publish target is ambiguous.
+2. Run the Foundry integration smoke test (via the reusable workflow, with `require_credentials: true` so the job fails rather than skipping green when Foundry credentials are unset).
+3. Run `semantic-release` to determine the version bump and inject a `-beta.N` version into the built `dist/module.json`.
+On `main` NO GitHub release object is created — that omission is what keeps the private beta channel private — so the config's `successCmd` writes `next_version`/`next_tag` to `$GITHUB_OUTPUT` as the version signal.
+4. When `next_version` is non-empty, call `.github/workflows/release-s3.yml` with `channel: beta`, `tag: <next_tag>`, `dry_run: false`, and `overwrite: false`.
+When `next_version` is empty (a push with no releasing commits), skip S3 publishing without failing the run.
 
-### S3 release-candidate workflow
+### S3 publish workflow
+
+Superseded by the three-channel model; full rewrite pending in #627 Phase 4.
 
 File: `.github/workflows/release-s3.yml`
 
 Triggers:
 
-- Manual `workflow_dispatch`, with `rc_tag`, `dry_run`, and `overwrite` inputs.
-- Reusable `workflow_call` from the release-candidate workflow, using the same inputs.
+- Manual `workflow_dispatch`, with `tag`, `channel`, `check_heads`, `dry_run`, and `overwrite` inputs.
+- Reusable `workflow_call` from `beta.yml` (and, in later #627 chunks, the early-access/public promotion workflows), using the same inputs.
 
-Manual dispatch is the operator path for dry-runs, recovery reruns, and intentional overwrite attempts.
-Automatic calls from `release-candidate.yml` publish only a newly-created RC tag and do not overwrite an existing versioned zip.
+Manual dispatch is the operator path for dry-runs, `--check-heads` reads, recovery reruns, and intentional overwrite attempts.
+Automatic calls from `beta.yml` publish only a newly-minted beta tag and do not overwrite an existing versioned zip.
 
 **Closed-beta tester path secret.**
 The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, where `<segment>` comes from the repository **secret** `S3_TESTER_PATH_SECRET` (env var of the same name locally) — never the committed config.
@@ -837,8 +840,8 @@ The pipeline is configured in `release.config.js`.
 2. Generates release notes with `@semantic-release/release-notes-generator`.
 3. Calls `node scripts/release.js --version <new-version>` via `@semantic-release/exec`.
 This injects the version into `module.json`, runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
-4. Creates a GitHub Release with the zip and the raw `module.json` as assets.
-5. On `main`, the release-candidate workflow detects the newly-created RC tag at `HEAD` and publishes that exact tag to S3 through the reusable S3 workflow.
+4. Creates a drafted GitHub Release with the zip and the raw `module.json` as assets — on the `release` and hotfix lines only; on `main` no GitHub release object is created.
+5. On `main`, `beta.yml` reads the minted `next_tag` from `$GITHUB_OUTPUT` (not a tag diff) and publishes that exact tag to the beta channel through the reusable S3 workflow.
 
 GitHub Releases are the canonical release history.
 There is no committed `CHANGELOG.md` in this repository; release notes are generated from Conventional Commits per release candidate and aggregated across that base's RCs when an RC is promoted.
