@@ -4660,11 +4660,29 @@
       >
         <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
       </button>
+      <!--
+        The rail's crafting-system card. The kicker names what the card CONTAINS
+        ("Crafting system"), not the product — the product name is already on the
+        titlebar. The card is a real `<select>`, so the rail can switch system without
+        a round trip through the system library, and a back link out to that library.
+        The "GM management workspace" caption that used to hang below it is gone: the
+        section label beneath the card already says GM management.
+      -->
       <section class="manager-rail-block" aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}>
-        <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Product', 'Fabricate')}</p>
         {#if selectedSystem}
           <div class="manager-scope-card">
-            <span class="manager-scope-name" title={selectedSystem.name}>{selectedSystem.name}</span>
+            <p class="manager-kicker">{text('FABRICATE.Admin.Manager.CraftingSystem', 'Crafting system')}</p>
+            <select
+              class="manager-scope-select"
+              data-manager-scope-select
+              value={selectedSystem.id}
+              aria-label={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
+              onchange={(event) => selectSystem(event.currentTarget.value, currentView)}
+            >
+              {#each $viewState.systems || [] as system (system.id)}
+                <option value={system.id}>{system.name}</option>
+              {/each}
+            </select>
             <button
               type="button"
               class="manager-scope-return"
@@ -4672,13 +4690,14 @@
               title={text('FABRICATE.Admin.Manager.ReturnToSystemLibrary', 'Return to System Library')}
               onclick={backToSystemsBrowser}
             >
-              <i class="fas fa-list" aria-hidden="true"></i>
+              <i class="fas fa-arrow-left-long" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.AllCraftingSystems', 'All crafting systems')}</span>
             </button>
           </div>
         {:else}
+          <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Product', 'Fabricate')}</p>
           <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</h2>
         {/if}
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Workspace', 'GM management workspace')}</p>
       </section>
 
       <!--
@@ -4694,7 +4713,7 @@
             <i class="fas fa-clipboard-check" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')}</span>
             {#if systemOverviewCount > 0}
-              <span class="manager-nav-count manager-chip is-mono" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
+              <span class="manager-nav-count" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
             {/if}
           </button>
           {#if recipesRouteEnabled}
@@ -4709,7 +4728,7 @@
               >
                 <i class="fas fa-hammer" aria-hidden="true"></i>
                 <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
-                <span class="manager-nav-count manager-chip is-mono">{$viewState.recipes?.length || 0}</span>
+                <span class="manager-nav-count">{$viewState.recipes?.length || 0}</span>
               </button>
               <button
                 type="button"
@@ -4736,7 +4755,7 @@
                       <i class={craftingItem.icon} aria-hidden="true"></i>
                       <span class="manager-nav-label">{text(craftingItem.labelKey, craftingItem.labelFallback)}</span>
                       {#if craftingItem.count != null}
-                        <span class="manager-nav-count manager-chip is-mono">{craftingItem.count}</span>
+                        <span class="manager-nav-count">{craftingItem.count}</span>
                       {/if}
                     </button>
                   {/each}
@@ -4747,24 +4766,24 @@
           <button type="button" class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`} aria-current={currentView === 'components' || currentView === 'component-edit' ? 'page' : undefined} onclick={() => setView('components')}>
             <i class="fas fa-boxes" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
-            <span class="manager-nav-count manager-chip is-mono">{selectedCounts.components}</span>
+            <span class="manager-nav-count">{selectedCounts.components}</span>
           </button>
           <button type="button" class={`manager-nav-button ${currentView === 'tags' ? 'is-active' : ''}`} aria-current={currentView === 'tags' ? 'page' : undefined} onclick={() => setView('tags')}>
             <i class="fas fa-tags" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span>
-            <span class="manager-nav-count manager-chip is-mono">{selectedCounts.itemTags + selectedCounts.recipeCategories}</span>
+            <span class="manager-nav-count">{selectedCounts.itemTags + selectedCounts.recipeCategories}</span>
           </button>
           {#if canShowEssences}
             <button type="button" class={`manager-nav-button ${currentView === 'essences' || currentView === 'essence-edit' ? 'is-active' : ''}`} aria-current={currentView === 'essences' || currentView === 'essence-edit' ? 'page' : undefined} onclick={() => setView('essences')}>
               <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
               <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</span>
-              <span class="manager-nav-count manager-chip is-mono">{selectedCounts.essences}</span>
+              <span class="manager-nav-count">{selectedCounts.essences}</span>
             </button>
           {/if}
           <button type="button" class={`manager-nav-button ${currentView === 'tools' ? 'is-active' : ''}`} aria-current={currentView === 'tools' ? 'page' : undefined} onclick={() => setView('tools')}>
             <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
-            <span class="manager-nav-count manager-chip is-mono">{toolsNavCount}</span>
+            <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
           <button type="button" class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`} aria-current={currentView === 'checks' ? 'page' : undefined} onclick={() => setView('checks')}>
             <i class="fas fa-dice-d20" aria-hidden="true"></i>
@@ -4782,7 +4801,7 @@
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
                 <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span>
-                <span class="manager-nav-count manager-chip is-mono">{gatheringNavCounts.total}</span>
+                <span class="manager-nav-count">{gatheringNavCounts.total}</span>
               </button>
               <button
                 type="button"
@@ -4809,7 +4828,7 @@
                       <i class={gatheringItem.icon} aria-hidden="true"></i>
                       <span class="manager-nav-label">{text(gatheringItem.labelKey, gatheringItem.labelFallback)}</span>
                       {#if gatheringNavCounts[gatheringItem.id] != null}
-                        <span class="manager-nav-count manager-chip is-mono">{gatheringNavCounts[gatheringItem.id]}</span>
+                        <span class="manager-nav-count">{gatheringNavCounts[gatheringItem.id]}</span>
                       {/if}
                     </button>
                   {/each}
@@ -5195,7 +5214,6 @@
         recipeSearchTerm={$viewState.recipeSearchTerm || ''}
         selectedRecipeId={selectedRecipe?.id || ''}
         {showRecipeCategories}
-        selectedSystemName={selectedSystem?.name || ''}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}

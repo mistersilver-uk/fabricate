@@ -4012,27 +4012,31 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
     assert.ok(target.querySelector('.manager-system-edit-form'));
 
+    // The rail's crafting-system card SELECTS (issue 643): a real `<select>` naming the
+    // current system and listing every other, so the GM can switch system without a
+    // round trip through the system library — which the old name + icon-button card had
+    // no way to do at all.
     const scopeCard = target.querySelector('.manager-scope-card');
     assert.ok(scopeCard, 'selected system scope card should render');
-    assert.equal(scopeCard.querySelector('.manager-scope-name')?.textContent.trim(), 'Alchemy');
-    assert.equal(scopeCard.querySelector('.manager-scope-name')?.tagName, 'SPAN');
+    const scopeSelect = scopeCard.querySelector('[data-manager-scope-select]');
+    assert.ok(scopeSelect, 'the rail card should expose a system select');
+    assert.equal(scopeSelect.tagName, 'SELECT');
+    assert.equal(scopeSelect.value, 'alchemy', 'the select names the selected system');
+    assert.ok(
+      Array.from(scopeSelect.options).map((option) => option.value).includes('alchemy'),
+      'the select lists the systems the manager knows about'
+    );
+    assert.equal(
+      scopeCard.querySelector('.manager-scope-name'),
+      null,
+      'the static name span is retired, not merely hidden'
+    );
+
     const returnButton = scopeCard.querySelector('.manager-scope-return');
     assert.ok(returnButton, 'selected system scope should expose a return-to-library button');
     assert.equal(returnButton.getAttribute('aria-label'), 'Return to System Library');
     assert.equal(returnButton.getAttribute('title'), 'Return to System Library');
-
-    const callsBeforeScopeNameClick = calls.length;
-    scopeCard
-      .querySelector('.manager-scope-name')
-      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.equal(
-      calls.length,
-      callsBeforeScopeNameClick,
-      'clicking the selected system name should not route or clear selection'
-    );
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+    assert.match(returnButton.textContent, /All crafting systems/);
 
     const callsBeforeReturn = calls.length;
     returnButton.click();
@@ -4094,7 +4098,14 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
     assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
-    assert.ok(target.textContent.includes('Recipe library'));
+    // ONE page header, owned by the shell (issue 643). The library used to render a
+    // second — kicker + "Recipe library" + a second subtitle — directly beneath the
+    // shell's breadcrumb / "Recipes" / subtitle / Create block.
+    assert.equal(
+      target.querySelectorAll('.manager-main .manager-section-header').length,
+      0,
+      'the library must not stack a second page header under the shell header'
+    );
     assert.ok(target.textContent.includes('Healing Draught'));
     assert.ok(target.textContent.includes('Restores a small amount of health.'));
     assert.ok(target.textContent.includes('Player visibility'));

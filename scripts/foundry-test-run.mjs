@@ -4194,8 +4194,16 @@ async function main() {
             throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
         }
-        if (await page.locator('.fabricate-manager .manager-scope-card .manager-scope-name:has-text("The Herbalist")').count() === 0) {
-          throw new Error('Manager selected-system scope is missing static selected-system text.');
+        // The rail's crafting-system card SELECTS (issue 643): it names the current system
+        // AND lists every other, so the GM can switch without a round trip through the
+        // system library. The old card could only name it.
+        const scopeSelectValue = await page
+          .locator('.fabricate-manager .manager-scope-card [data-manager-scope-select]')
+          .first()
+          .inputValue()
+          .catch(() => '');
+        if (scopeSelectValue !== craftingSetup.systemId) {
+          throw new Error(`Manager rail system select should name the selected system. Saw: "${scopeSelectValue}".`);
         }
         if (await page.locator('.fabricate-manager .manager-scope-return[aria-label="Return to System Library"]').count() === 0) {
           throw new Error('Manager selected-system scope is missing the return-to-library action.');
@@ -4506,6 +4514,29 @@ async function main() {
           label: 'manager-recipes-narrow',
         });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
+
+        // The row's "No check" warning pill fires when the SYSTEM has no usable crafting
+        // check (no authored rollFormula) — a system-level fact, so it cannot exist in the
+        // routed-check smoke system whatever a recipe is authored to do. Switch to the
+        // check-less "Smoke Simple Forge" through the rail's new system select (which also
+        // proves the select routes), photograph the warning row, and switch back. Guarded:
+        // a hiccup records a failed step rather than aborting the phase.
+        const scopeSelect = page.locator('.fabricate-manager [data-manager-scope-select]').first();
+        try {
+          await scopeSelect.selectOption({ label: 'Smoke Simple Forge' });
+          await page.waitForTimeout(750);
+          await page.locator('.fabricate-manager .manager-recipe-row [data-recipe-check="none"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertRecipeRowsHittable(page, 'recipes no-check');
+          await captureStableManagerView(page, {
+            layout: 'recipes no check',
+            label: 'manager-recipes-no-check',
+          });
+        } finally {
+          await scopeSelect.selectOption(craftingSetup.systemId).catch(() => {});
+          await page.waitForTimeout(750);
+          await openManagerCraftingSection(page, 'recipes', 'recipes');
+        }
 
         // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the
         // Books & Scrolls recipe-item surface + the Settings placeholder. Guarded so a

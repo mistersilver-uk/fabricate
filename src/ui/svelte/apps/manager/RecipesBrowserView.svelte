@@ -39,7 +39,6 @@
     recipeSearchTerm = '',
     selectedRecipeId = '',
     showRecipeCategories = false,
-    selectedSystemName = '',
     resolutionMode = 'simple',
     onSearchChange = () => {},
     onSelectRecipe = () => {},
@@ -277,15 +276,13 @@
   }
 </script>
 
+<!--
+  There is ONE page header, and the shell owns it. This view used to render a SECOND
+  one — kicker + "Recipe library" + a second subtitle — directly under the shell's
+  breadcrumb / "Recipes" / subtitle / Create block: ~74px of duplicated chrome saying
+  what the breadcrumb and the titlebar's gold system badge already said.
+-->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}>
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">{selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Recipe.Library', 'Recipe library')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.Recipe.LibraryHint', 'Browse recipes for the selected system and open the existing editor for changes.')}</p>
-    </div>
-  </section>
-
   <section class="manager-toolbar manager-recipe-toolbar" aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}>
     <div class="manager-recipe-filter-row">
       <label class="manager-search">

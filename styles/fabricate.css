@@ -1380,16 +1380,27 @@
 }
 
 /*
-  The screen title is the manager's display type. This class (0,2,0) deliberately
-  outranks the `.fabricate-manager h1..h6 { font-family: var(--font-primary) }` reset
-  (0,1,1) above, which is what makes the serif adoption stick on the header's <h1>.
+  The screen title is the manager's display type — and the ONLY page title on the
+  screen (issue 643: the recipe library used to render a second `manager-section-header`
+  under this one). It carries the weight that buys, at 22px/600 in the display face.
+  This class (0,2,0) deliberately outranks the
+  `.fabricate-manager h1..h6 { font-family: var(--font-primary) }` reset (0,1,1) above,
+  which is what makes the serif adoption stick on the header's <h1>.
 */
 .fabricate-manager .manager-title {
   margin: 0;
   font-family: var(--fab-font-serif);
-  font-size: 1.05rem;
+  font-size: 1.375rem;
+  font-weight: 600;
   line-height: 1.2;
   overflow-wrap: anywhere;
+}
+
+/* The page's single loudest action (Create recipe, Create system) reads at the title's
+   scale, not at the 34px of a row button. */
+.fabricate-manager .manager-header-actions .manager-button.is-primary {
+  min-height: 38px;
+  padding: 0 var(--fab-space-4);
 }
 
 .fabricate-manager .manager-subtitle {
@@ -1522,10 +1533,9 @@
 
 /*
   The 56px collapsed rail keeps ONLY the icon gutter. Every element the Studio rail
-  adds has to opt out explicitly, or it blows the column out: the scope card (above,
-  via `.manager-rail-block`), the uppercase section label, and the mono count badges
-  — the badges now also carry `.manager-chip` (`display: inline-flex`), which this
-  4-class selector outranks.
+  adds has to opt out explicitly, or it blows the column out: the crafting-system card
+  and its `<select>` (above, via `.manager-rail-block`), the uppercase section label,
+  and the mono count numerals.
 */
 .fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title {
   display: none;
@@ -1572,6 +1582,20 @@
 
 .fabricate-manager[data-manager-view="essences"] .manager-main {
   grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+/*
+  The recipe library (issue 643) is filter bar → list → pager, with no per-view page
+  header of its own: the shell's `.manager-header` is the only one. The rows are named
+  explicitly rather than left to the shared `auto auto 1fr`, which would have handed the
+  `1fr` to the PAGER once the duplicate header went.
+
+  `position: relative` is the containing block for the blocked-enable flash, which floats
+  over the list instead of shoving every row down the page when it fires.
+*/
+.fabricate-manager[data-manager-view="recipes"] .manager-main {
+  position: relative;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .fabricate-manager[data-manager-view="essence-edit"] .manager-main {
@@ -3780,21 +3804,23 @@
 
 /*
   The rail's crafting-system selector card (issue 643). It reads as a raised card in
-  the rail — a flat `--fab-bg-2` surface at radius 9 — with the system name set in
-  the Studio serif. Geometry (the 64px height, the name/return grid, the two-line
-  clamp) is unchanged: it is what keeps a long user-authored system name from
-  reflowing the nav below it.
+  the rail — a flat `--fab-bg-2` surface at radius 9 — and it SELECTS: a micro-label,
+  a real `<select>` over every system, and a back link out to the system library. It
+  used to be a fixed 64px box holding the system's name and an icon-only button, with
+  no way to switch system from the rail at all.
+
+  The card is content-height (a `<select>` cannot be clamped to two lines the way the
+  old static name was), and the select ellipsises rather than reflowing the nav below.
 */
 .fabricate-manager .manager-scope-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-1);
   width: 100%;
   min-width: 0;
-  height: 64px;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 9px;
   color: inherit;
   background: var(--fab-bg-2);
@@ -3803,42 +3829,70 @@
   overflow: hidden;
 }
 
-.fabricate-manager .manager-scope-name {
-  display: -webkit-box;
+/* The card's own micro-label is tighter and quieter than a page kicker. */
+.fabricate-manager .manager-scope-card .manager-kicker {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+}
+
+/* The system's name is set in the display face wherever it is named — including here,
+   where it is now the select's own value rather than a static span. */
+.fabricate-manager .manager-scope-select {
+  width: 100%;
   min-width: 0;
-  max-width: 100%;
-  max-height: 2.36em;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  height: 32px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 7px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
   font-family: var(--fab-font-serif);
-  font-size: 1.05rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  line-height: 1.18;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  text-overflow: ellipsis;
+  cursor: pointer;
 }
 
 .fabricate-manager .manager-scope-return {
   appearance: none;
   -webkit-appearance: none;
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--fab-mv2-border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-chip);
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 24px;
+  padding: var(--fab-space-2xs) var(--fab-space-1);
+  border: 0;
   border-radius: 6px;
   color: var(--fab-mv2-text-muted);
-  background: var(--fab-overlay-dark-14);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: left;
   cursor: pointer;
+}
+
+.fabricate-manager .manager-scope-return i {
+  flex: 0 0 auto;
+  font-size: 0.6rem;
+}
+
+.fabricate-manager .manager-scope-return span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-scope-return:hover,
 .fabricate-manager .manager-scope-return:focus-visible {
   color: var(--fab-mv2-text);
-  border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-success-soft);
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-manager .manager-recipe-identity,
@@ -6984,33 +7038,36 @@
   opacity: 0.72;
 }
 
-.fabricate-manager .manager-nav-label,
-.fabricate-manager .manager-nav-count {
+.fabricate-manager .manager-nav-label {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
 /*
-  Rail count badges (issue 643) reuse the shared `.manager-chip.is-mono` variant so
-  every tabular number in the product reads the same. They only need to be smaller
-  and quieter than a content chip — hence the override rather than a fork. The
-  disabled Graph row's "Soon" span deliberately stays a bare `.manager-nav-count`:
-  it is dead UI and this change does not elevate it.
+  A rail count badge is a BARE NUMERAL, not a badge (issue 643): mono, tabular, subtle,
+  pushed to the end of the row. It used to borrow `.manager-chip` and then spend five
+  declarations undoing the chip — the 999px border, the fill, the 24px min-height — so
+  every nav row still carried a button-shaped badge and stood taller than the numeral
+  needed. Its own rule owes nothing to the chip, so nothing has to be undone.
+
+  The disabled Graph row's "Soon" span is the one non-numeric `.manager-nav-count`. It
+  is dead UI and this change does not elevate it, so it simply reads as quiet text.
 */
-.fabricate-manager .manager-nav-count.manager-chip {
+.fabricate-manager .manager-nav-count {
   flex: 0 0 auto;
-  min-height: 18px;
-  padding: 0 var(--fab-space-1);
-  border-color: transparent;
+  min-width: 0;
   color: var(--fab-text-subtle);
-  background: transparent;
-  font-size: 0.66rem;
+  font-family: var(--fab-font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: normal;
 }
 
-.fabricate-manager .manager-nav-button.is-active .manager-nav-count.manager-chip,
-.fabricate-manager .manager-nav-subitem.is-active .manager-nav-count.manager-chip {
+.fabricate-manager .manager-nav-button.is-active .manager-nav-count,
+.fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
   color: var(--fab-mv2-accent);
+  font-weight: 700;
 }
 
 .fabricate-manager .manager-inspector-card {

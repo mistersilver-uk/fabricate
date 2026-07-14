@@ -161,7 +161,11 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-recipes',
     label: 'Manager recipes',
-    smokeLabels: ['manager-recipes-normal', 'manager-recipes-narrow'],
+    // `manager-recipes-no-check` photographs the row's "No check" WARNING pill. That is a
+    // SYSTEM-level state (no authored `rollFormula`), so it is unreachable in the
+    // routed-check smoke system however a recipe is authored — the harness switches system
+    // through the rail's select to capture it.
+    smokeLabels: ['manager-recipes-normal', 'manager-recipes-narrow', 'manager-recipes-no-check'],
     // The library inspector deliberately lives under `apps/manager/recipes/` and NOT
     // `apps/manager/recipe/` (issue 643): the latter is RECIPE_EDIT_MATCHES, so a
     // browser-side component placed there would republish the five recipe-EDITOR

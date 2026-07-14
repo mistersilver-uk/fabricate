@@ -240,19 +240,24 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('renders the rail section label and mono count badges without elevating the dead Graph row', () => {
+  it('renders the rail section label and bare mono count numerals without elevating the dead Graph row', () => {
     assert.ok(rootSource.includes('class="manager-rail-title"'), 'the rail should carry an uppercase section label');
     assert.ok(rootSource.includes('data-manager-rail-section'), 'the rail section label should be addressable');
     assert.ok(
       lang.FABRICATE.Admin.Manager.Nav.SectionLabel === 'GM management',
       'the rail section label should be localized'
     );
-    // Every numeric badge is the shared mono chip; the disabled Graph row's "Soon"
-    // span stays a bare `.manager-nav-count`. Restyling it would elevate dead UI in
-    // the very change that refuses the dead per-recipe reorder toggle.
+    // A rail count is a BARE NUMERAL, not a badge (issue 643). Borrowing `.manager-chip`
+    // meant every nav row wore a bordered, 24px-tall, button-shaped pill that the CSS then
+    // spent five declarations undoing; `.manager-nav-count` owns its own rule instead.
     assert.ok(
-      rootSource.includes('<span class="manager-nav-count manager-chip is-mono">{selectedCounts.components}</span>'),
-      'numeric rail counts should render as the shared mono chip'
+      rootSource.includes('<span class="manager-nav-count">{selectedCounts.components}</span>'),
+      'a rail count should render as a bare numeral, not a chip'
+    );
+    assert.equal(
+      rootSource.includes('manager-nav-count manager-chip'),
+      false,
+      'no rail count should borrow the content chip'
     );
     assert.ok(
       rootSource.includes("<span class=\"manager-nav-count\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"),
@@ -867,7 +872,13 @@ describe('CraftingSystemManager source contract', () => {
       'root should keep disabled Recipes in the planned placeholder list when experimental features are off'
     );
     assert.ok(rootSource.includes('selectSystemAndShowBrowser'), 'root should keep an explicit systems-browser route');
-    assert.ok(rootSource.includes('manager-scope-card'), 'root should render selected system scope as static rail text');
+    assert.ok(rootSource.includes('manager-scope-card'), 'root should render the selected system in a rail card');
+    // The rail card SELECTS (issue 643): before this the rail could name the selected
+    // system but offered no way at all to switch to another one.
+    assert.ok(rootSource.includes('data-manager-scope-select'), 'the rail card should carry a real system select');
+    assert.ok(!rootSource.includes('manager-scope-name'), 'the static rail name span is retired, not merely hidden');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.AllCraftingSystems'), 'the rail back link should be localized');
+    assert.ok(!rootSource.includes('FABRICATE.Admin.Manager.Workspace'), 'the rail should not repeat "GM management" below its own section label');
     assert.ok(rootSource.includes('manager-scope-return'), 'root should expose a return-to-system-library rail action');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.ReturnToSystemLibrary'), 'return-to-library action should be localized');
     assert.ok(!rootSource.includes('SystemEdit.EditBadge'), 'system settings nav should not render the former Edit badge');
@@ -914,8 +925,8 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes("manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}"), 'expanded gathering rail should style as one submenu group');
     assert.ok(rootSource.includes('const gatheringEventDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : [])'), 'root should derive reusable gathering event counts from selected gathering config');
     assert.ok(rootSource.includes('total: environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length'), 'gathering parent count should summarize environments, tasks, and events');
-    // Issue 643: rail count badges are now the shared mono chip variant.
-    assert.ok(rootSource.includes('<span class="manager-nav-count manager-chip is-mono">{gatheringNavCounts.total}</span>'), 'gathering parent should render a summary count chip');
+    // Issue 643: a rail count is a bare mono numeral, not a chip.
+    assert.ok(rootSource.includes('<span class="manager-nav-count">{gatheringNavCounts.total}</span>'), 'gathering parent should render a summary count numeral');
     assert.ok(rootSource.includes('gatheringNavCounts[gatheringItem.id]'), 'gathering submenu items should render their count chips from gathered section counts');
     assert.equal(rootSource.includes("manager-nav-parent ${isGatheringRoute ? 'is-active' : ''}"), false, 'gathering parent should not use the selected pill class');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Nav.ExpandGathering'), 'gathering rail expand label should be localized');
@@ -1435,7 +1446,7 @@ describe('CraftingSystemManager source contract', () => {
       'root should wire a top-level Tools nav button to setView(\'tools\')'
     );
     assert.ok(
-      rootSource.includes('<span class="manager-nav-count manager-chip is-mono">{toolsNavCount}</span>'),
+      rootSource.includes('<span class="manager-nav-count">{toolsNavCount}</span>'),
       'root should render a Tools nav count chip'
     );
     assert.ok(

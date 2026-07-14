@@ -312,30 +312,36 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
   assert.ok(onKnobBlock.includes('transform: translateX(14px);'), 'enabled status should move the toggle knob on');
 });
 
-test('manager selected system scope is static text with a return-to-library control', () => {
+// The rail's crafting-system card SELECTS (issue 643). It used to be a fixed 64px box
+// holding the system's name and an icon-only button, with no way to switch system from
+// the rail at all — so the card is now a micro-label, a real `<select>` over every
+// system, and a text back link out to the system library.
+test('the rail crafting-system card selects a system and links back to the library', () => {
   const scopeBlock = blockFor('.fabricate-manager .manager-scope-card');
-  const scopeTitleBlock = blockFor('.fabricate-manager .manager-scope-name');
+  const selectBlock = blockFor('.fabricate-manager .manager-scope-select');
   const returnBlock = blockFor('.fabricate-manager .manager-scope-return');
   const returnFocusBlock = blockFor('.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible');
   const focusBlock = blockFor('.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible');
 
-  assert.ok(scopeBlock.includes('display: grid;'), 'selected system scope should reserve space for the return icon');
-  assert.ok(scopeBlock.includes('grid-template-columns: minmax(0, 1fr) 28px;'), 'scope card should keep name and return icon aligned');
-  assert.ok(scopeBlock.includes('height: 64px;'), 'scope card should keep a stable fixed height');
+  assert.ok(scopeBlock.includes('display: grid;'), 'the card stacks its label, select and back link');
+  assert.ok(scopeBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'the card is one column, not name + icon button');
+  assert.equal(scopeBlock.includes('height: 64px;'), false, 'a select cannot be clamped into the old fixed-height box');
   assert.ok(scopeBlock.includes('white-space: normal;'), 'scope card should not inherit host nowrap rules');
   assert.ok(scopeBlock.includes('overflow: hidden;'), 'scope card should prevent long names from affecting nav layout');
-  assert.ok(scopeBlock.includes('border: 1px solid var(--fab-mv2-border);'), 'scope card should render as a visible rail card');
-  assert.ok(scopeTitleBlock.includes('min-width: 0;'), 'scope title should be allowed to shrink inside the grid');
-  assert.ok(scopeTitleBlock.includes('max-width: 100%;'), 'scope title should not overflow the scope card');
-  assert.ok(scopeTitleBlock.includes('max-height: 2.36em;'), 'scope title should have a hard two-line height cap');
-  assert.ok(scopeTitleBlock.includes('font-size: 1.05rem;'), 'scope title should be prominent in the rail card');
-  assert.ok(scopeTitleBlock.includes('-webkit-line-clamp: 2;'), 'scope title should clamp long selected system names');
-  assert.ok(scopeTitleBlock.includes('overflow: hidden;'), 'scope title should not overflow its parent');
-  assert.ok(scopeTitleBlock.includes('overflow-wrap: anywhere;'), 'scope title should break very long system names before overflow');
-  assert.ok(scopeTitleBlock.includes('white-space: normal;'), 'scope title should not inherit host nowrap rules');
-  assert.ok(returnBlock.includes('width: 28px;'), 'return icon should have a stable hit target inside the scope card');
-  assert.ok(returnBlock.includes('color: var(--fab-mv2-text-muted);'), 'return icon should avoid danger styling');
-  assert.ok(returnFocusBlock.includes('border-color: var(--fab-mv2-border-strong);'), 'return focus should stay within manager styling');
+  assert.ok(scopeBlock.includes('border: 1px solid var(--fab-mv2-border-strong);'), 'scope card should render as a visible rail card');
+
+  // The system's name is set in the display face wherever it is named — here it is the
+  // select's own value, so the serif moves onto the control.
+  assert.ok(selectBlock.includes('font-family: var(--fab-font-serif);'), 'the selected system name keeps the display face');
+  assert.ok(selectBlock.includes('min-width: 0;'), 'the select may shrink inside the rail');
+  assert.ok(selectBlock.includes('text-overflow: ellipsis;'), 'a long system name ellipsises rather than reflowing the nav');
+  assert.equal(css.includes('.fabricate-manager .manager-scope-name'), false, 'the retired static name span should be gone, not merely unused');
+
+  // The back link is a text link inside the card, not a 28px icon button beside a name.
+  assert.ok(returnBlock.includes('color: var(--fab-mv2-text-muted);'), 'the back link reads as quiet navigation, not an action');
+  assert.ok(returnBlock.includes('border: 0;'), 'the back link is a link, not a bordered button');
+  assert.ok(returnBlock.includes('text-overflow: ellipsis;') || returnBlock.includes('min-width: 0;'), 'the back link may shrink');
+  assert.ok(returnFocusBlock.includes('background: var(--fab-surface-soft);'), 'the back link keeps a manager-styled hover');
   assert.ok(focusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager focus should remain visible');
   assert.equal(scopeBlock.includes('orange'), false, 'scope card should not use orange focus styling');
   assert.equal(scopeBlock.includes('red'), false, 'scope card should not use red focus styling');
@@ -705,7 +711,8 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     '.fabricate-manager .manager-rail-title,\n.fabricate-manager .manager-card-title',
     '.fabricate-manager .manager-inspector-name',
     '.fabricate-manager .manager-recipe-name-row .manager-system-name',
-    '.fabricate-manager .manager-scope-name',
+    // The rail's selected system is now the `<select>`'s own value, not a static span.
+    '.fabricate-manager .manager-scope-select',
     '.fabricate-manager .manager-recipe-ingredient-set-name',
     '.fabricate-manager input[data-recipe-field="name"]'
   ];
@@ -2099,23 +2106,35 @@ test('the stacked manager body sizes its regions to content instead of sharing i
   assert.ok(railRule.includes('overflow: hidden auto;'), 'the bounded stacked rail scrolls its own nav');
 });
 
-// Issue 643: the Studio rail adds a section label and turns the count badges into
-// shared mono chips. `.manager-chip` sets `display: inline-flex`, so a badge that is
-// not explicitly re-hidden would survive into the 56px strip and blow the column out.
-// Both new elements therefore need their own collapsed treatment, asserted here.
-test('collapsed manager rail also hides the studio section label and the mono count badges', () => {
+// Issue 643: the Studio rail adds a section label, a crafting-system card and count
+// numerals. Each has to opt out of the 56px collapsed strip explicitly, or it blows the
+// icon column out.
+//
+// A rail count is a BARE NUMERAL, not a badge. It used to borrow `.manager-chip` and then
+// spend five declarations undoing it (the 999px border, the fill, the 24px min-height), so
+// every nav row still wore a button-shaped badge. Its own rule owes the chip nothing.
+test('collapsed manager rail hides the section label, the system card and the count numerals', () => {
   const collapsedRailTitleBlock = blockFor('.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title');
+  const collapsedRailBlockBlock = blockFor('.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-block');
   const railTitleBlock = blockFor('.fabricate-manager .manager-rail-title');
-  const navCountChipBlock = blockFor('.fabricate-manager .manager-nav-count.manager-chip');
+  const navCountBlock = blockFor('.fabricate-manager .manager-nav-count');
 
   assert.ok(collapsedRailTitleBlock.includes('display: none;'), 'collapsed rail should hide the uppercase section label');
+  assert.ok(collapsedRailBlockBlock.includes('display: none;'), 'collapsed rail should hide the crafting-system card and its select');
   assert.ok(railTitleBlock.includes('letter-spacing:'), 'the rail section label should track wider than a card title');
-  assert.ok(navCountChipBlock.includes('flex: 0 0 auto;'), 'a rail count badge should not shrink the nav label away');
-  // The 4-class collapsed selector (0,4,0) must outrank `.fabricate-manager .manager-chip`
-  // (0,2,0), or the chips reappear as inline-flex inside the icon strip.
+
+  assert.ok(navCountBlock.includes('flex: 0 0 auto;'), 'a rail count should not shrink the nav label away');
+  assert.ok(navCountBlock.includes('font-family: var(--fab-font-mono);'), 'a rail count is a numeric and reads in the mono face');
+  assert.ok(navCountBlock.includes('font-variant-numeric: tabular-nums;'), 'a rail count must not change width between 9 and 10');
+  assert.equal(
+    css.includes('.fabricate-manager .manager-nav-count.manager-chip'),
+    false,
+    'the rail count should own its rule rather than borrowing (and undoing) the content chip'
+  );
+
   const collapsedHideIndex = css.indexOf('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {');
   const groupedHideIndex = css.indexOf('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,\n.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {');
-  assert.ok(collapsedHideIndex >= 0 || groupedHideIndex >= 0, 'collapsed rail must still hide the nav count badges');
+  assert.ok(collapsedHideIndex >= 0 || groupedHideIndex >= 0, 'collapsed rail must still hide the nav counts');
 });
 
 test('the manager titlebar caps the selected system badge and keeps the status line on one line', () => {
