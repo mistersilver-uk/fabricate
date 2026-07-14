@@ -3073,44 +3073,62 @@
   cursor: default;
 }
 
+/* Switch (issue 643). The state colour now lives on the TRACK, and the button
+   itself is a bare flex row rather than a tinted pill — so the control reads as a
+   switch rather than a badge, and the row it sits in stays calm. The `is-on` /
+   `is-off` blocks set local `--fab-toggle-*` custom properties which the track and
+   knob consume; nothing else re-declares geometry.
+
+   Off is NEUTRAL (bg-3 / border-strong), not amber: a disabled recipe, component
+   or environment is an ordinary state, not a warning. `is-danger` keeps its tint,
+   because a delete-on-depletion toggle genuinely is one. */
 .fabricate-manager .manager-status-toggle {
+  --fab-toggle-track: var(--fab-bg-3);
+  --fab-toggle-track-border: var(--fab-border-strong);
+  --fab-toggle-knob: var(--fab-text-secondary);
+
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--fab-space-1);
+  gap: var(--fab-space-2);
   width: auto;
   min-width: 0;
-  max-width: 64px;
+  max-width: 78px;
   height: 24px;
-  padding: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-2xs) var(--fab-space-2xs);
-  border: 1px solid var(--fab-mv2-border);
+  padding: 0;
+  border: 0;
   border-radius: 999px;
   color: var(--fab-mv2-text);
-  background: var(--fab-overlay-dark-18);
+  background: none;
   white-space: nowrap;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-status-toggle.is-on {
-  border-color: var(--fab-success-border);
-  background: var(--fab-success-soft);
+  --fab-toggle-track: var(--fab-success);
+  --fab-toggle-track-border: var(--fab-success-border);
+  --fab-toggle-knob: var(--fab-on-success);
 }
 
 .fabricate-manager .manager-status-toggle.is-off {
-  border-color: var(--fab-warning-border);
+  --fab-toggle-track: var(--fab-bg-3);
+  --fab-toggle-track-border: var(--fab-border-strong);
+  --fab-toggle-knob: var(--fab-text-secondary);
+
   color: var(--fab-mv2-text-muted);
-  background: var(--fab-warning-soft);
 }
 
 /* Danger-active state: the depleted "delete the token" toggle carries `is-danger`
    alongside `is-on` so the irreversible-delete signal lands on the toggle itself
    (the adjacent `manager-chip is-danger` alert reinforces it). */
 .fabricate-manager .manager-status-toggle.is-danger {
-  border-color: var(--fab-danger-border);
+  --fab-toggle-track: var(--fab-danger);
+  --fab-toggle-track-border: var(--fab-danger-border);
+  --fab-toggle-knob: var(--fab-on-accent);
+
   color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
 }
 
 .fabricate-manager .manager-status-toggle:hover {
@@ -3128,28 +3146,36 @@
   box-shadow: none;
 }
 
+/* 34x20 track, 14x14 knob inset 2px — the knob travels 34 - 2 - 14 - 2 = 16px,
+   i.e. left:2px -> left:16px. Animated with `transform`, not `left`: it is the
+   same visual travel without laying out on every frame. */
 .fabricate-manager .manager-status-toggle-track {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  width: 24px;
-  height: 14px;
-  flex: 0 0 24px;
-  padding: var(--fab-space-2xs);
+  width: 34px;
+  height: 20px;
+  flex: 0 0 34px;
+  padding: 0;
+  border: 1px solid var(--fab-toggle-track-border);
   border-radius: 999px;
-  background: var(--fab-overlay-light-14);
+  background: var(--fab-toggle-track);
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
 
 .fabricate-manager .manager-status-toggle-knob {
-  width: 10px;
-  height: 10px;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--fab-mv2-text-muted);
-  transition: transform 120ms ease, background-color 120ms ease;
+  background: var(--fab-toggle-knob);
+  transition: transform 150ms ease, background-color 150ms ease;
 }
 
 .fabricate-manager .manager-status-toggle.is-on .manager-status-toggle-knob {
-  transform: translateX(10px);
-  background: var(--fab-mv2-accent);
+  transform: translateX(14px);
 }
 
 .fabricate-manager .manager-status-toggle-label {
@@ -3560,22 +3586,36 @@
   max-width: 100%;
 }
 
+/* Pill (issue 643): fully-rounded rather than 6px-cornered, matching the Recipe
+   Studio language. `manager-chip` is shared by every manager screen, so this is
+   restyled once here rather than forked into a recipe-only component — a second
+   chip idiom sitting beside the old one would be plainly visible on any screen
+   that shows both. */
 .fabricate-manager .manager-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--fab-space-1);
+  gap: var(--fab-space-chip);
   width: fit-content;
   max-width: 100%;
   min-height: 24px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
+  border-radius: 999px;
   color: var(--fab-mv2-text);
   background: var(--fab-overlay-light-06);
   font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.2;
+}
+
+/* Numerics are mono everywhere in the Recipe Studio language: counts, DCs, step
+   numbers, quantities. Opt-in via `is-mono` so a text chip is unaffected.
+   `tabular-nums` keeps columns of numbers aligned even on the fallback face. */
+.fabricate-manager .manager-chip.is-mono {
+  font-family: var(--fab-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 .fabricate-manager .manager-chip-row {

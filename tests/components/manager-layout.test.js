@@ -277,15 +277,24 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
 
   assert.ok(toggleBlock.includes('appearance: none;'), 'system status toggles should normalize host button styles');
   assert.ok(toggleBlock.includes('width: auto;'), 'system status toggles should size to their On/Off label instead of filling the status column');
-  assert.ok(toggleBlock.includes('max-width: 64px;'), 'system status toggles should keep compact geometry');
+  assert.ok(toggleBlock.includes('max-width: 78px;'), 'system status toggles should keep compact geometry');
   assert.ok(toggleBlock.includes('border-radius: 999px;'), 'system status toggles should read as toggle buttons');
   assert.ok(focusBlock.includes('outline: none;') && focusBlock.includes('box-shadow: none;'), 'mouse focus should not inherit the host orange focus ring');
   assert.ok(focusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'keyboard focus should keep a manager focus-visible ring');
   assert.ok(onBlock.includes('var(--fab-success'), 'enabled status should use the manager success accent family');
-  assert.ok(offBlock.includes('var(--fab-warning'), 'disabled status should use a distinct muted warning/off color');
-  assert.ok(trackBlock.includes('width: 24px;'), 'toggle track should reserve only enough space for the compact state control');
+  // Issue 643: OFF is now NEUTRAL (bg-3 / border-strong), not amber. A disabled
+  // recipe, component or environment is an ordinary state, not a warning. The
+  // state colour moved onto the TRACK via the local --fab-toggle-* properties,
+  // so these assertions read the custom-property declarations, not a background.
+  assert.ok(offBlock.includes('var(--fab-bg-3)'), 'disabled status should read as a neutral off switch, not a warning');
+  assert.ok(offBlock.includes('var(--fab-border-strong)'), 'the off track should keep a visible edge');
+  assert.ok(trackBlock.includes('width: 34px;'), 'toggle track should use the 34x20 switch geometry');
+  assert.ok(trackBlock.includes('height: 20px;'), 'toggle track should use the 34x20 switch geometry');
+  assert.ok(trackBlock.includes('background: var(--fab-toggle-track);'), 'the track should carry the state colour');
+  assert.ok(knobBlock.includes('width: 14px;'), 'toggle knob should use the 14x14 switch geometry');
   assert.ok(knobBlock.includes('transition: transform'), 'toggle knob should expose a clear state change');
-  assert.ok(onKnobBlock.includes('transform: translateX(10px);'), 'enabled status should move the toggle knob on');
+  // 34px track - 2px inset - 14px knob - 2px inset = 14px of travel (left 2 -> 16).
+  assert.ok(onKnobBlock.includes('transform: translateX(14px);'), 'enabled status should move the toggle knob on');
 });
 
 test('manager selected system scope is static text with a return-to-library control', () => {
