@@ -6852,6 +6852,19 @@
   background: var(--fab-border);
 }
 
+/* Quiet ghost button (used by the header Back and the Validation "View" links). */
+.fabricate-manager .manager-button.is-ghost {
+  border-color: transparent;
+  color: var(--fab-text-muted);
+  background: transparent;
+}
+
+.fabricate-manager .manager-button.is-ghost:not(:disabled):hover {
+  border-color: var(--fab-border);
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+}
+
 /* Dashed accent add-button used across the rebuilt requirement tabs. */
 .fabricate-manager .manager-button.is-dashed {
   border-style: dashed;
@@ -6863,6 +6876,113 @@
 .fabricate-manager .manager-button.is-dashed:not(:disabled):hover {
   border-color: var(--fab-accent);
   background: var(--fab-accent-soft);
+}
+
+/* ── Rebuilt Validation tab (issue 643 §E): grouped, bordered, tagged row stack ─ */
+.fabricate-manager .manager-recipe-validation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-4);
+}
+
+.fabricate-manager .manager-recipe-val-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-val-group-label {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-recipe-val-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 10px;
+  list-style: none;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-recipe-val-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+}
+
+.fabricate-manager .manager-recipe-val-row:first-child {
+  border-top: 0;
+}
+
+.fabricate-manager .manager-recipe-val-status {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-recipe-val-row.is-pass .manager-recipe-val-status {
+  color: var(--fab-success);
+}
+
+.fabricate-manager .manager-recipe-val-row.is-warn .manager-recipe-val-status {
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-recipe-val-row.is-block .manager-recipe-val-status {
+  color: var(--fab-danger);
+}
+
+.fabricate-manager .manager-recipe-val-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fabricate-manager .manager-recipe-val-title {
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-val-detail {
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-recipe-val-view {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-recipe-val-pill {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-recipe-val-pill.is-pass {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-recipe-val-pill.is-warn {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-recipe-val-pill.is-block {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
 }
 
 /* Nested ingredient editor: sets -> groups -> options + per-set essences. */

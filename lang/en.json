@@ -1831,10 +1831,18 @@
           "PerStepTools": "Tools per step",
           "Validation": {
             "Title": "Validation",
+            "Intro": "A recipe saves even while incomplete, but only enables when every blocking issue is cleared.",
             "Readiness": "Recipe readiness",
             "Issues": "Issues",
             "NoIssues": "No issues detected.",
             "View": "View",
+            "GroupIngredients": "Ingredients",
+            "GroupResults": "Results",
+            "GroupResolution": "Resolution",
+            "GroupRequirements": "Requirements",
+            "StatusPass": "Pass",
+            "StatusWarn": "Warning",
+            "StatusBlock": "Blocks enable",
             "Severity": {
               "critical": "Critical",
               "warning": "Warning",
