@@ -282,7 +282,7 @@ async function pickPopoverOption(target, trigger, optionPattern) {
   await flushRender();
 }
 
-// Open a requirement's single "or..." (Accept instead) popover.
+// Open a requirement's single "or..." popover.
 async function openOrMenu(target, groupId) {
   target.querySelector(`[data-recipe-group-id="${groupId}"] .manager-recipe-or-trigger`).click();
   await flushRender();
@@ -2239,6 +2239,95 @@ describe('RecipeEditView (mounted)', () => {
         `the "or..." menu offers ${token}`
       );
     }
+    editHarness.remount();
+  });
+
+  it('splits the "or..." menu into Accept instead (OR) and Require as well (AND on the set)', async () => {
+    // The four choices do NOT all mean the same thing. Component / Tag / Currency are
+    // real OR alternatives appended to THIS requirement; Essence is an AND requirement
+    // that bubbles to the owning ingredient SET (there is no essence match type). One
+    // flat list named "Accept instead" would tell a screen-reader user that the essence
+    // choice replaces the ingredient — the exact mislabelling the split exists to stop.
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+
+    const groups = [...document.querySelectorAll('[data-popover-group]')];
+    assert.deepEqual(
+      groups.map((group) => group.getAttribute('aria-label')),
+      ['Accept instead', 'Require as well'],
+      'two ARIA groups, in that order'
+    );
+    for (const group of groups) {
+      assert.equal(group.getAttribute('role'), 'group');
+    }
+
+    const accept = groups[0];
+    const require_ = groups[1];
+    assert.deepEqual(
+      [...accept.querySelectorAll('[data-recipe-add]')].map((option) =>
+        option.getAttribute('data-recipe-add')
+      ),
+      ['alternative-component', 'alternative-tag', 'alternative-currency'],
+      'the three real match types are the OR alternatives'
+    );
+    assert.deepEqual(
+      [...require_.querySelectorAll('[data-recipe-add]')].map((option) =>
+        option.getAttribute('data-recipe-add')
+      ),
+      ['alternative-essence'],
+      'essence is an AND requirement on the SET, never an OR alternative'
+    );
+    editHarness.remount();
+  });
+
+  it('gives the "or..." trigger, dialog and search a NEUTRAL accessible name', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    const NEUTRAL = 'Add an alternative or an extra requirement';
+
+    const trigger = target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-or-trigger');
+    assert.equal(trigger.getAttribute('aria-label'), NEUTRAL, 'the trigger does not claim to be Accept instead');
+
+    await openOrMenu(target, 'grp-1');
+    const dialog = document.querySelector('.manager-travel-popover[role="dialog"]');
+    assert.equal(dialog.getAttribute('aria-label'), NEUTRAL);
+    assert.equal(dialog.querySelector('[role="listbox"]').getAttribute('aria-label'), NEUTRAL);
+    assert.equal(dialog.querySelector('input[type="text"]').getAttribute('aria-label'), NEUTRAL);
+    editHarness.remount();
+  });
+
+  it('drops the Require as well heading entirely when the system has no essences', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
+    await openOrMenu(target, 'grp-1');
+
+    assert.deepEqual(
+      [...document.querySelectorAll('[data-popover-group]')].map((group) =>
+        group.getAttribute('aria-label')
+      ),
+      ['Accept instead'],
+      'an empty heading is not rendered'
+    );
     editHarness.remount();
   });
 

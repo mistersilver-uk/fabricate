@@ -8,15 +8,21 @@
   `onChange(nextGroup)` and is dropped entirely via `onRemove()`.
 
   The loose per-row and footer add-buttons are replaced by ONE "or…" popover per
-  requirement (issue 643). It offers what Fabricate can actually honour:
+  requirement (issue 643). It offers what Fabricate can actually honour, under TWO
+  headings — because the four choices do not all mean the same thing:
 
    - "Accept instead" — Component / Tag / Currency: the THREE real ingredient match
      types (`src/models/match/matchTypes.js`), each appended to THIS requirement as a
      new OR alternative for the row's own picker to fill in.
    - "Require as well" — Essence: there is NO essence match type. An essence
      requirement is a property of the ingredient SET (`IngredientSet.essences`), an
-     AND requirement, not an OR alternative — so it is offered under its own heading
-     and bubbles up to the set rather than being mislabelled as an alternative.
+     AND requirement, not an OR alternative — so it sits under its own heading and
+     bubbles up to the set rather than being mislabelled as an alternative.
+
+  The split is an ACCESSIBILITY contract, not decoration: the trigger, dialog and
+  search field therefore carry a NEUTRAL accessible name. Naming the whole control
+  "Accept instead" and then handing a screen-reader user a control that adds an AND
+  requirement would be a lie in exactly the place the visible headings prevent one.
 
   The `data-recipe-add` token family (`alternative-component` / `alternative-tag` /
   `alternative-essence` / `alternative-currency`) is PRESERVED on the four choices.
@@ -47,18 +53,45 @@
   const options = $derived(Array.isArray(group?.options) ? group.options : []);
   const hasAlternatives = $derived(options.length >= 2);
 
-  // The four choices, each carrying its own `data-recipe-add` token. Currency and
-  // essence appear only when the system actually configures them, so the menu never
-  // offers a choice the system cannot honour.
-  const acceptInsteadOptions = $derived([
+  // The NEUTRAL accessible name for the trigger, the dialog and its search field. The
+  // menu's two headings carry the meaning; naming the control after only one of them
+  // would tell a screen-reader user "Accept instead" and then hand them the essence
+  // choice, which adds an AND requirement to the set.
+  const orMenuLabel = $derived(
+    text('FABRICATE.Admin.Manager.Recipe.OrMenuLabel', 'Add an alternative or an extra requirement')
+  );
+
+  // The two headings. `accept-instead` holds the real OR alternatives; `require-as-well`
+  // holds the one choice that is an AND requirement on the owning SET.
+  const orMenuGroups = $derived([
+    {
+      id: 'accept-instead',
+      label: text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
+    },
+    ...((essenceOptions || []).length > 0
+      ? [
+          {
+            id: 'require-as-well',
+            label: text('FABRICATE.Admin.Manager.Recipe.RequireAsWell', 'Require as well')
+          }
+        ]
+      : [])
+  ]);
+
+  // The four choices, each carrying its own `data-recipe-add` token and its heading.
+  // Currency and essence appear only when the system actually configures them, so the
+  // menu never offers a choice the system cannot honour.
+  const orMenuOptions = $derived([
     {
       id: 'component',
+      group: 'accept-instead',
       addMarker: 'alternative-component',
       icon: 'fas fa-cube',
       label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')
     },
     {
       id: 'tags',
+      group: 'accept-instead',
       addMarker: 'alternative-tag',
       icon: 'fas fa-tags',
       label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')
@@ -67,6 +100,7 @@
       ? [
           {
             id: 'currency',
+            group: 'accept-instead',
             addMarker: 'alternative-currency',
             icon: 'fa-solid fa-coins',
             label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')
@@ -77,6 +111,7 @@
       ? [
           {
             id: 'essence',
+            group: 'require-as-well',
             addMarker: 'alternative-essence',
             icon: 'fas fa-flask-vial',
             label: text('FABRICATE.Admin.Manager.Recipe.AddSetEssenceRequirement', 'Require an essence on this set')
@@ -152,20 +187,21 @@
 
   <div class="manager-recipe-requirement-adds">
     <SearchablePopover
-      options={acceptInsteadOptions}
+      options={orMenuOptions}
+      optionGroups={orMenuGroups}
       pickerClass="manager-recipe-or-picker"
       triggerClass="manager-chip manager-recipe-or-trigger"
       triggerIcon="fas fa-code-branch"
       triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
-      triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')}
-      triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AcceptInsteadHint', 'Accept another kind of ingredient in place of this one.')}
-      dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')}
-      searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')}
-      searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')}
+      triggerAriaLabel={orMenuLabel}
+      triggerTitle={text('FABRICATE.Admin.Manager.Recipe.OrTriggerHint', 'Accept another kind of ingredient in place of this one, or require an essence on the whole set.')}
+      dialogAriaLabel={orMenuLabel}
+      searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder', 'Search options...')}
+      searchAriaLabel={orMenuLabel}
       emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
       showChevron={false}
-      minWidth={200}
-      maxWidth={280}
+      minWidth={220}
+      maxWidth={300}
       onChoose={(type) => appendAlternative(type)}
     />
   </div>
