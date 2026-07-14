@@ -11471,6 +11471,26 @@
   min-width: 0;
 }
 
+/* Recipe editor header identity block (issue 643): medallion + name + the
+   "<category> · <mode>" subline. `min-width: 0` on the copy column is what keeps a
+   long recipe name ellipsising instead of forcing the header wider than the shell. */
+.fabricate-manager .manager-recipe-edit-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-edit-heading-copy {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-edit-heading-copy .manager-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .fabricate-manager .manager-recipe-tab {
   display: flex;
   flex-direction: column;

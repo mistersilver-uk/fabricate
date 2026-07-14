@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
 const overviewPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte');
-const inspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
+const railPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
 const browserInspectorPath = resolve(
@@ -28,7 +28,7 @@ const editSource = readFileSync(editPath, 'utf8');
 // editor is fully controlled: the root holds the recipe draft and the shell forwards
 // identity edits via onUpdateRecipe / onToggleEnabled (no form, no local draft state).
 const overviewSource = readFileSync(overviewPath, 'utf8');
-const inspectorSource = readFileSync(inspectorPath, 'utf8');
+const railSource = readFileSync(railPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const browserSource = readFileSync(browserPath, 'utf8');
 const browserInspectorSource = readFileSync(browserInspectorPath, 'utf8');
@@ -102,62 +102,147 @@ describe('RecipeEditView identity-only single column', () => {
   });
 });
 
-describe('RecipeItemInspector recipe-item link card', () => {
-  it('renders an inspector card with the recipe-item section', () => {
-    assert.ok(inspectorSource.includes('manager-inspector-card'), 'reuses inspector card');
-    assert.ok(inspectorSource.includes('data-recipe-section="recipe-item"'), 'recipe-item section marker');
-    assert.ok(inspectorSource.includes('manager-environment-scene-linked'), 'reuses linked container class');
-    assert.ok(inspectorSource.includes('manager-environment-scene-dropzone'), 'reuses dropzone class');
+describe('RecipeContextRail (issue 643 §4b)', () => {
+  it('renders inspector cards with the frozen recipe-item section marker', () => {
+    assert.ok(railSource.includes('manager-inspector-card'), 'reuses inspector card');
+    assert.ok(
+      railSource.includes('data-recipe-section="recipe-item"'),
+      'recipe-item section marker (FROZEN: the smoke harness waits on it)'
+    );
+    assert.ok(
+      railSource.includes('manager-environment-scene-linked'),
+      'reuses linked container class'
+    );
   });
 
-  it('uses item iconography, not scene/map icons, and no scene-locked-image branch', () => {
-    assert.ok(inspectorSource.includes('fa-box'), 'dropzone uses an item box icon');
-    assert.ok(inspectorSource.includes('fa-suitcase'), 'missing thumb uses a suitcase icon');
+  it('is MODE-CONDITIONAL off craftingEffect, and renders neither section under global', () => {
+    assert.ok(railSource.includes('visibilityEffect?.showAccess'), 'restricted branch');
+    assert.ok(railSource.includes('visibilityEffect?.showBooksScrolls'), 'item/knowledge branch');
+    // The prop must NOT be called `effect`: the compiler then reads `$effect(...)` as
+    // a store subscription (`$` + `effect`) and the component throws at mount.
+    assert.equal(
+      /^\s*effect = /m.test(railSource),
+      false,
+      'the craftingEffect prop is never named `effect` (it would shadow the $effect rune)'
+    );
+  });
+
+  it('carries NO book drop zone and NO "link another" — adding to a book lives on Books & Scrolls', () => {
+    assert.equal(railSource.includes('use:dragDrop'), false, 'no drop action');
+    assert.equal(railSource.includes('data-recipe-item-dropzone'), false, 'no drop zone');
+    assert.equal(railSource.includes('onAddRecipeItem'), false, 'no add-recipe-item path');
+    assert.equal(railSource.includes('RecipeItemLinkAnother'), false, 'no link-another affordance');
+    // Removing THIS recipe from a book it already appears in is still allowed.
+    assert.ok(railSource.includes('onRemoveRecipeItem('), 'per-row removal retained');
+    assert.ok(railSource.includes('data-recipe-open-books'), 'deep-links to Books & Scrolls');
+  });
+
+  it('never resolves access ids itself and never mutates the grant', () => {
+    // The store resolves (over EVERY world actor, not the PC roster); the rail takes
+    // resolved rows. Unresolvable ids are dropped from display, never persisted away.
+    assert.ok(railSource.includes('accessPlayers'), 'takes resolved players');
+    assert.ok(railSource.includes('accessCharacters'), 'takes resolved characters');
+    assert.equal(railSource.includes('characterIds'), false, 'the rail never touches grant ids');
+    assert.equal(railSource.includes('playerIds'), false, 'the rail never touches grant ids');
+    assert.equal(railSource.includes('saveRecipeAccess'), false, 'the rail is read-only');
+    assert.ok(railSource.includes('data-recipe-open-access'), 'deep-links to the Access tab');
+  });
+
+  it('treats the character->player relation as a SET, with the whole-table case distinct', () => {
+    assert.ok(railSource.includes('controlledBy'), 'reads the controller SET');
     assert.ok(
-      inspectorSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
+      railSource.includes('sharedWithAllPlayers'),
+      'ownership.default >= OWNER reaches the whole table'
+    );
+    assert.ok(
+      railSource.includes('Rail.SharedWithAllPlayers'),
+      'the whole-table case has its OWN string, never "Played by <one name>"'
+    );
+    assert.equal(railSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+  });
+
+  it('uses item iconography and the shared image constant', () => {
+    assert.ok(railSource.includes('fa-suitcase'), 'missing thumb uses a suitcase icon');
+    assert.ok(
+      railSource.includes(
+        "import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js'"
+      ),
       'image fallback uses the shared DEFAULT_RECIPE_IMAGE constant'
     );
-    assert.equal(inspectorSource.includes("'icons/svg/item-bag.svg'"), false, 'no bag-SVG literal fallback');
-    assert.equal(inspectorSource.includes('fa-map'), false, 'no map icon');
-    assert.equal(inspectorSource.includes('data-scene-locked-image'), false, 'no scene-locked-image branch');
-  });
-
-  it('drops Foundry items via dragDrop + resolveDropData with the Item-only guard', () => {
-    assert.ok(inspectorSource.includes('use:dragDrop'), 'uses the dragDrop action');
-    assert.ok(inspectorSource.includes('resolveDropData'), 'resolves drop data');
-    assert.ok(inspectorSource.includes("type !== 'Item' || !uuid"), 'Item-only + non-empty uuid guard');
-    assert.ok(inspectorSource.includes('onAddRecipeItem('), 'links via onAddRecipeItem');
-    assert.ok(inspectorSource.includes('onSetRecipeItem('), 'persists via onSetRecipeItem');
+    assert.equal(railSource.includes("'icons/svg/item-bag.svg'"), false, 'no bag-SVG literal');
+    assert.equal(railSource.includes('fa-map'), false, 'no map icon');
   });
 
   it('uses the canonical recipeItemId, never the legacy linkedRecipeItemUuid', () => {
-    assert.ok(inspectorSource.includes('recipeItemId'), 'references recipeItemId');
-    assert.equal(inspectorSource.includes('linkedRecipeItemUuid'), false, 'never references the legacy alias');
+    assert.ok(railSource.includes('recipeItemId'), 'references recipeItemId');
+    assert.equal(
+      railSource.includes('linkedRecipeItemUuid'),
+      false,
+      'never references the legacy alias'
+    );
   });
 
   it('does not delete the shared recipe-item definition on unlink', () => {
-    assert.equal(inspectorSource.includes('deleteRecipeItemDefinition'), false, 'unlink must not delete the shared definition');
+    assert.equal(
+      railSource.includes('deleteRecipeItemDefinition'),
+      false,
+      'unlink must not delete the shared definition'
+    );
   });
 
-  it('resolves the underlying item in a cancelled-guarded $effect', () => {
-    assert.ok(inspectorSource.includes('globalThis.fromUuid'), 'resolves via fromUuid');
-    assert.ok(inspectorSource.includes('let cancelled = false'), 'effect carries a cancelled guard');
-    assert.ok(inspectorSource.includes('cancelled = true'), 'cleanup flips the cancelled guard');
+  it('resolves each linked book in a cancelled-guarded $effect', () => {
+    assert.ok(railSource.includes('globalThis.fromUuid'), 'resolves via fromUuid');
+    assert.ok(railSource.includes('let cancelled = false'), 'effect carries a cancelled guard');
+    assert.ok(railSource.includes('cancelled = true'), 'cleanup flips the cancelled guard');
   });
 
-  it('carries the EnvironmentSummaryInspector a11y contract', () => {
-    // The recipe-item card now lists every linked book (many-to-many), so the a11y
-    // contract is a labelled list rather than a single group container.
-    assert.ok(inspectorSource.includes('data-recipe-item-links'), 'renders the linked-items list');
-    assert.ok(inspectorSource.includes('aria-label='), 'the list has an aria-label');
-    assert.ok(inspectorSource.includes('svelte-ignore a11y_no_noninteractive_element_interactions'), 'carries the ignore comment');
-    assert.ok(inspectorSource.includes('manager-icon-button is-danger'), 'visible danger unlink button');
+  it('carries the linked-list a11y contract and the missing state', () => {
+    assert.ok(railSource.includes('data-recipe-item-links'), 'renders the linked-items list');
+    assert.ok(railSource.includes('aria-label='), 'the list has an aria-label');
+    assert.ok(railSource.includes('manager-icon-button is-danger'), 'visible danger unlink button');
+    assert.ok(railSource.includes('onOpenItem('), 'open wired');
+    assert.ok(
+      railSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'),
+      'missing state copy'
+    );
   });
 
-  it('wires open, copy, and missing states', () => {
-    assert.ok(inspectorSource.includes('onOpenItem('), 'open wired');
-    assert.ok(inspectorSource.includes('onCopyItemUuid('), 'copy-uuid wired');
-    assert.ok(inspectorSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'), 'missing state copy');
+  it('renders Step mode and Recipe mode as real SegmentedControls and the validation mini-list', () => {
+    assert.ok(railSource.includes("import SegmentedControl from '../SegmentedControl.svelte'"));
+    assert.ok(railSource.includes("optionDataAttr=\"data-recipe-step-mode-option\""));
+    assert.ok(railSource.includes("optionDataAttr=\"data-recipe-mode-option\""));
+    assert.ok(railSource.includes('data-recipe-validation-clear'), 'an All clear pill');
+    assert.ok(railSource.includes('data-recipe-rail-check'), 'the failing-check list');
+  });
+});
+
+describe('RecipeModeBanner (issue 643 §5)', () => {
+  const bannerSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte'),
+    'utf8'
+  );
+
+  it('reuses the canonical resolution-mode option list rather than re-authoring one', () => {
+    assert.ok(
+      bannerSource.includes("import { resolutionModeOptions } from '../resolutionModeOptions.js'"),
+      'reads the canonical { value, icon, labelKey, descKey } list'
+    );
+    assert.equal(bannerSource.includes('MODE_INFO'), false, 'no second, drifting copy of the table');
+  });
+
+  it('states that the mode is SYSTEM-level and routes to Crafting Settings', () => {
+    assert.ok(bannerSource.includes('data-recipe-mode-banner-settings'), 'a settings deep-link');
+    assert.ok(bannerSource.includes('ModeBanner.SettingsHint'), 'says the mode is system-wide');
+    // A per-recipe resolution mode does not exist; the banner must not offer one.
+    assert.equal(bannerSource.includes('onChange'), false, 'no per-recipe mode control');
+  });
+
+  it('is rendered by the editor shell above the tab strip, so it heads EVERY tab', () => {
+    assert.ok(editSource.includes('<RecipeModeBanner'), 'the shell renders the banner');
+    assert.ok(
+      editSource.indexOf('<RecipeModeBanner') < editSource.indexOf('<RecipeEditorTabs'),
+      'the banner sits above the tab strip and therefore heads every tab'
+    );
   });
 });
 
@@ -177,13 +262,16 @@ describe('adminStore recipe-item projections + API', () => {
 });
 
 describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
-  it('owns the root-held recipe draft, staging handlers, and a knowledge-mode derived value', () => {
+  it('owns the root-held recipe draft and its staging handlers', () => {
     assert.ok(/async function saveRecipeDraft\(/.test(rootSource), 'saveRecipeDraft defined');
     assert.ok(/function backToRecipesBrowse\(/.test(rootSource), 'backToRecipesBrowse defined');
     assert.ok(/async function deleteRecipeFromEdit\(/.test(rootSource), 'deleteRecipeFromEdit defined');
     assert.ok(/function patchRecipeDraft\(/.test(rootSource), 'patchRecipeDraft stages edits into the draft');
-    assert.ok(/async function handleAddRecipeItem\(/.test(rootSource), 'handleAddRecipeItem defined');
-    assert.ok(/function handleSetRecipeItem\(/.test(rootSource), 'handleSetRecipeItem defined');
+    // Adding a recipe to a book is authored on Books & Scrolls (issue 643 §2c), so
+    // the recipe-side add/link handlers are gone; per-book REMOVAL is retained.
+    assert.equal(rootSource.includes('handleAddRecipeItem'), false, 'no recipe-side book-add path');
+    assert.equal(rootSource.includes('handleSetRecipeItem'), false, 'no recipe-side book-link path');
+    assert.ok(/async function handleRemoveRecipeItem\(/.test(rootSource), 'handleRemoveRecipeItem retained');
     assert.ok(/async function handleToggleRecipeEnabled\(/.test(rootSource), 'handleToggleRecipeEnabled defined');
     // The draft + baseline + JSON-diff dirty flag are the source of truth.
     assert.ok(/let recipeDraft = \$state\(null\)/.test(rootSource), 'recipeDraft state declared');
@@ -194,7 +282,9 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.equal(rootSource.includes('store.setRecipeComplexity?.('), false, 'editor no longer calls store.setRecipeComplexity');
     assert.equal(rootSource.includes('store.revertRecipeToSingleStep?.('), false, 'editor no longer calls store.revertRecipeToSingleStep');
     assert.ok(rootSource.includes('canSaveRecipeEdit'), 'canSaveRecipeEdit derived');
-    assert.ok(rootSource.includes('recipeKnowledgeMode'), 'recipeKnowledgeMode derived');
+    // The rail's composition keys off the CANONICAL visibilityMode matrix, not the
+    // legacy recipeVisibility.knowledge.mode the old inspector gate read.
+    assert.equal(rootSource.includes('recipeKnowledgeMode'), false, 'the legacy knowledge-mode gate is gone');
   });
 
   it('stages destructive in-draft actions through the confirm-only store helper', () => {
@@ -220,11 +310,11 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     // The alchemy recipe editor hides the Simple/Complex toggle entirely.
     assert.ok(
       rootSource.includes("hideComplexToggle={selectedSystem?.resolutionMode === 'alchemy'}"),
-      'the recipe inspector hides the Complex toggle for alchemy'
+      'the context rail hides the Complex toggle for alchemy'
     );
     assert.ok(
-      inspectorSource.includes('hideComplexToggle'),
-      'RecipeItemInspector honours a hideComplexToggle prop'
+      railSource.includes('hideComplexToggle'),
+      'RecipeContextRail honours a hideComplexToggle prop'
     );
   });
 
@@ -288,19 +378,29 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.equal(recipeViewMount.includes('onDirtyChange='), false, 'no onDirtyChange prop on the controlled view');
   });
 
-  it('renders the recipe-item card in the global inspector aside, gated on knowledge mode', () => {
-    assert.ok(rootSource.includes("import RecipeItemInspector from './RecipeItemInspector.svelte'"), 'imports the inspector component');
-    assert.ok(rootSource.includes('<RecipeItemInspector'), 'renders the inspector in an aside branch');
+  it('renders the context rail in the global inspector aside, ALWAYS present on recipe-edit', () => {
+    assert.ok(rootSource.includes("import RecipeContextRail from './recipe/RecipeContextRail.svelte'"), 'imports the rail component');
+    assert.ok(rootSource.includes('<RecipeContextRail'), 'renders the rail in an aside branch');
+    // The rail is never hidden: recipe-edit is absent from the two-column override
+    // list, so a hidden inspector left a 300px dead column (issue 643 §8).
+    assert.equal(rootSource.includes('recipeInspectorVisible'), false, 'no conditional-hide gate remains');
     assert.ok(
-      rootSource.includes("recipeInspectorVisible = $derived(currentView === 'recipe-edit'")
-        && rootSource.includes("recipeKnowledgeMode === 'item'")
-        && rootSource.includes("recipeKnowledgeMode === 'learned'")
-        && rootSource.includes("recipeKnowledgeMode === 'itemOrLearned'"),
-      'recipeInspectorVisible gates on item / learned / itemOrLearned (every knowledge mode needs the recipe-item link)'
+      rootSource.includes('recipeRailEffect = $derived(craftingEffect('),
+      'the rail composition is driven by the canonical craftingEffect matrix'
     );
     assert.ok(
-      rootSource.includes("(currentView !== 'recipe-edit' || recipeInspectorVisible)"),
-      'aside suppression allows recipe-edit only when the inspector is visible'
+      rootSource.includes('store.resolveRecipeAccess?.('),
+      'access ids are resolved in the STORE, never in the rail'
+    );
+    // The aside's suppression list no longer names recipe-edit at all.
+    const asideGuard = rootSource.slice(
+      rootSource.indexOf("{#if currentView !== 'environment-edit' && currentView !== 'checks'"),
+      rootSource.indexOf('<aside class="manager-inspector"')
+    );
+    assert.equal(
+      asideGuard.includes("currentView !== 'recipe-edit'"),
+      false,
+      'the aside is never suppressed on recipe-edit — the context rail is always present'
     );
   });
 
@@ -416,7 +516,7 @@ describe('linked scene/recipe-item name truncation (shared class)', () => {
   });
 
   it('is the shared class used by both the recipe-item and environment scene cards', () => {
-    assert.ok(inspectorSource.includes('class="manager-environment-scene-name'), 'recipe-item card uses the shared name class');
+    assert.ok(railSource.includes('class="manager-environment-scene-name'), 'the rail books card uses the shared name class');
   });
 });
 
@@ -499,10 +599,10 @@ describe('recipe default image is the blueprint, sourced from one canonical lite
     );
     assert.equal(editSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"), false, 'no local bag-SVG literal in the view');
     assert.ok(
-      inspectorSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
-      'RecipeItemInspector imports the constant'
+      railSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js'"),
+      'RecipeContextRail imports the constant'
     );
-    assert.equal(inspectorSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"), false, 'no local bag-SVG literal in the inspector');
+    assert.equal(railSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"), false, 'no local bag-SVG literal in the rail');
   });
 });
 
@@ -533,8 +633,10 @@ describe('recipe image helpers prefer the linked recipe-item image', () => {
       browserInspectorSource.includes('recipe?.recipeItemImg || resolveRecipeImage(recipe)'),
       'inspector hero image prefers the linked item image, then the shared resolver'
     );
+    // The root imports the shared constant for the editor header's medallion, but must
+    // never re-own a local image-resolution helper.
     assert.equal(
-      rootSource.includes('DEFAULT_RECIPE_IMAGE'),
+      /function\s+recipeImage\s*\(/.test(rootSource),
       false,
       'the root no longer owns a recipe image helper'
     );

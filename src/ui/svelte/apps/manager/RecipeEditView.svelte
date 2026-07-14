@@ -16,6 +16,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import RecipeEditorTabs from './recipe/RecipeEditorTabs.svelte';
+  import RecipeModeBanner from './recipe/RecipeModeBanner.svelte';
   import RecipeOverviewTab from './recipe/RecipeOverviewTab.svelte';
   import RecipeIngredientsTab from './recipe/RecipeIngredientsTab.svelte';
   import RecipeResultsTab from './recipe/RecipeResultsTab.svelte';
@@ -63,6 +64,14 @@
     playerListMode = false,
     // Non-GM world users ({ id, name }) offered as the restriction allow-list.
     worldUsers = [],
+    // The SYSTEM's resolution mode. Never per-recipe: the banner reports it on every
+    // tab and routes to Crafting Settings, which is the only place it can change.
+    resolutionMode = 'simple',
+    // Requested-tab handshake (a nonce, so the same tab can be re-requested): the
+    // context rail deep-links into a tab of the editor it sits beside.
+    requestedTab = '',
+    requestedTabNonce = 0,
+    onOpenCraftingSettings = () => {},
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
     onAddStep = () => {},
@@ -204,6 +213,16 @@
     lastRecipeId = nextRecipeId;
   });
 
+  // Honour an external tab request (the context rail's validation deep-link). Keyed
+  // on the NONCE so requesting the tab the user has since navigated away from still
+  // works, and so a stale `requestedTab` never fights manual tab clicks.
+  let lastRequestedTabNonce = $state(0);
+  $effect(() => {
+    if (requestedTabNonce === lastRequestedTabNonce) return;
+    lastRequestedTabNonce = requestedTabNonce;
+    if (TAB_IDS.includes(requestedTab)) activeTab = requestedTab;
+  });
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -214,6 +233,8 @@
     const value = await onPickImagePath(img || DEFAULT_RECIPE_IMAGE);
     if (value) onUpdateRecipe({ img: value });
   }
+
+  const TAB_IDS = ['overview', 'ingredients', 'results', 'tools', 'validation'];
 
   // Deep-link from a validation issue: switch to the tab that hosts the gap.
   function selectIssue(targetTab) {
@@ -226,6 +247,8 @@
 <main class="manager-main manager-recipe-edit-main" aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}>
   {#if recipe}
     <div class="manager-recipe-edit-view" data-recipe-editor>
+      <RecipeModeBanner {resolutionMode} onOpenSettings={onOpenCraftingSettings} />
+
       <RecipeEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
 
       <div

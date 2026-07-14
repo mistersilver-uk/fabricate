@@ -13,6 +13,12 @@
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions
   } from '../../../../utils/routedOutcomeKeywords.js';
+  import {
+    getRecipeCategoryLabel,
+    normalizeRecipeCategory
+  } from '../../../../utils/recipeCategories.js';
+  import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
@@ -46,7 +52,9 @@
     CRAFTING_VIEWS,
   } from './crafting/craftingNav.js';
   import RecipeEditView from './RecipeEditView.svelte';
-  import RecipeItemInspector from './RecipeItemInspector.svelte';
+  import RecipeContextRail from './recipe/RecipeContextRail.svelte';
+  import { evaluateRecipeReadiness } from './recipe/recipeReadiness.js';
+  import { craftingEffect } from './crafting/craftingVisibility.js';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
@@ -85,6 +93,10 @@
   // is the last-persisted snapshot. Both are deep PLAIN clones so JSON.stringify
   // comparison drives the dirty flag (mirrors the gathering-task/event editors).
   let recipeDraft = $state(null);
+  // Requested recipe-editor tab + nonce: the context rail deep-links into a tab of
+  // the editor it sits beside (the tab state lives inside RecipeEditView).
+  let requestedRecipeTab = $state('');
+  let requestedRecipeTabNonce = $state(0);
   let recipeDraftBaseline = $state(null);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
@@ -1112,6 +1124,32 @@
   // system's `player` recipe-visibility list mode; other modes gate visibility
   // globally, per-knowledge, or not at all.
   const recipePlayerListMode = $derived(selectedSystem?.recipeVisibility?.listMode === 'player');
+
+  // --- Recipe editor context rail (issue 643 §4b) --------------------------------
+  // The rail's top section is MODE-CONDITIONAL off the same craftingEffect matrix the
+  // nav and Crafting Settings read, so there is exactly one source of truth for which
+  // conditional surface a visibility mode implies.
+  const recipeRailEffect = $derived(craftingEffect(selectedSystem?.visibilityMode || 'knowledge'));
+  // Resolution happens in the STORE (the rail never touches ids): granted characters
+  // resolve over EVERY world actor, not the player-character roster, because the
+  // runtime predicate applies no type filter. The rosters are passed explicitly so the
+  // reactive dependency on them is visible here rather than hidden inside the store.
+  const recipeAccessRoster = $derived(
+    store.resolveRecipeAccess?.(recipeDraft?.access, {
+      players: $viewState.worldUsers || [],
+      characters: $viewState.accessCharacters || [],
+    }) || { players: [], characters: [] }
+  );
+  // The rail's validation mini-list reads the SAME pure evaluator the Validation tab
+  // renders, so the two can never disagree.
+  const recipeRailReadiness = $derived(evaluateRecipeReadiness({ ...(recipeDraft || {}) }, {
+    systemComponents: selectedSystem?.componentTagOptions || [],
+    routingProvider: recipeRoutingProvider,
+    routedOutcomeTierOptions: recipeRoutedOutcomeTierOptions,
+    alchemy: recipeAlchemy,
+    signatureConflicts: recipeSignatureConflicts,
+  }));
+
   const recipeEditDirty = $derived(Boolean(recipeDraft)
     && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline));
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
@@ -1138,7 +1176,6 @@
   const canSaveRecipeEdit = $derived(recipeEditDirty === true
     && Boolean(recipeDraft?.name?.trim())
     && recipeEditSaving !== true);
-  const recipeKnowledgeMode = $derived(selectedSystem?.recipeVisibility?.knowledge?.mode || 'itemOrLearned');
   const recipeItemDefinitions = $derived(selectedSystem?.recipeItemDefinitions || []);
   // Locked recipe-item image for the Overview tab: resolve from the STAGED draft's
   // recipeItemId against the available definitions, so staging a link change updates
@@ -1151,16 +1188,6 @@
       return def?.img || '';
     })()
   );
-  // The recipe-item card lives in the global inspector and is shown for every
-  // knowledge mode, including 'learned': learning a recipe requires it to link a
-  // recipe item (the book the player learns from) — `learnRecipe` /
-  // `learnRecipesFromOwnedItem` refuse a recipe with no recipe-item reference —
-  // and this inspector is the only place the link is authored. Suppressing it for
-  // 'learned' left learned-only systems with no way to make any recipe learnable.
-  const recipeInspectorVisible = $derived(currentView === 'recipe-edit'
-    && (recipeKnowledgeMode === 'item'
-      || recipeKnowledgeMode === 'learned'
-      || recipeKnowledgeMode === 'itemOrLearned'));
   const componentForEdit = $derived(currentView === 'component-edit'
     ? itemCards.find(item => item.id === selectedComponentId) || null
     : null);
@@ -1664,6 +1691,15 @@
     return `${count} ${text(key, fallback)}`;
   }
 
+  // The recipe editor's header subline: "<category> · <resolution mode>". The mode is
+  // the SYSTEM's, restated here because it dictates the editor's whole shape; the
+  // banner on each tab is where the GM goes to change it.
+  function recipeEditSubtitle() {
+    const category = getRecipeCategoryLabel(normalizeRecipeCategory(recipeDraft?.category), localize);
+    const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
+    return `${category} · ${mode}`;
+  }
+
   function resolutionModeLabel(mode) {
     const labels = {
       simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
@@ -1840,8 +1876,7 @@
 
   function viewSubtitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Subtitle', 'Manage recipes for the selected crafting system.');
-    if (currentView === 'recipe-edit' && !recipeInspectorVisible) return text('FABRICATE.Admin.Manager.Recipe.EditIdentityOnlySubtitle', 'Edit identity for this recipe.');
-    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditSubtitle', 'Edit identity and the linked recipe item for this recipe.');
+    if (currentView === 'recipe-edit') return recipeEditSubtitle();
     if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsHint', 'System-level crafting rules: resolution mode and recipe visibility.');
     if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Subtitle', 'Grant individual recipes to specific characters or players.');
     if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Subtitle', 'Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.');
@@ -2377,46 +2412,26 @@
     recipeDraftBaseline = recipeDraftBaseline ? { ...recipeDraftBaseline, enabled: next } : recipeDraftBaseline;
   }
 
-  async function handleAddRecipeItem(itemUuid) {
-    // Adding the definition to the system library is an immediate side effect; the
-    // resulting link id is staged via handleSetRecipeItem.
-    return store.addRecipeItemFromUuid?.(selectedSystemId, itemUuid);
+  // Deep-link from the recipe editor's context rail to the Access screen, with THIS
+  // recipe selected. The rail is read-only: authoring a grant lives on the Access tab,
+  // which owns the canonical `recipe.access` editor.
+  function openRecipeAccess() {
+    if (recipeDraft?.id) selectedRecipeIdForAccess = recipeDraft.id;
+    openCraftingSection('access');
   }
 
-  // Set the recipe's book membership from the recipe editor (issue 511 many-to-many).
-  // Membership lives on the book, so this reconciles the definitions' `recipeIds`
-  // directly (no "Recipe updated" toast): linking ADDS the recipe to `recipeItemId`;
-  // unlinking (null) REMOVES it from the currently-shown book. Full multi-membership
-  // is managed on the book's Contents tab.
-  async function handleSetRecipeItem(recipeItemId) {
-    const rid = recipeDraft?.id;
-    if (!rid) return false;
-    const liveRecipe = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
-    const membership = new Set((liveRecipe?.recipeItemIds || []).map((id) => String(id)));
-    if (recipeItemId) {
-      membership.add(String(recipeItemId));
-    } else {
-      const shown = String(liveRecipe?.recipeItemId || '');
-      if (shown) membership.delete(shown);
-    }
-    await store.setRecipeBookMembership?.(rid, [...membership]);
-    // The change is persisted live (book-side), so re-sync the draft's projected
-    // membership on BOTH draft and baseline — keeping the recipe-item card current
-    // without marking the recipe draft dirty for a book change.
-    const updated = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
-    if (updated) {
-      const patch = {
-        recipeItemId: updated.recipeItemId || '',
-        recipeItemIds: Array.isArray(updated.recipeItemIds) ? updated.recipeItemIds : [],
-      };
-      if (recipeDraft) recipeDraft = { ...recipeDraft, ...patch };
-      if (recipeDraftBaseline) recipeDraftBaseline = { ...recipeDraftBaseline, ...patch };
-    }
-    return true;
+  // Switch the recipe editor's active tab from outside the editor (the rail's
+  // validation mini-list). The tab lives inside RecipeEditView, so this is the
+  // requested-tab + nonce handshake the system editor already uses — a nonce, not a
+  // plain value, so asking for the SAME tab twice still re-selects it.
+  function openRecipeEditorTab(tab) {
+    requestedRecipeTab = tab;
+    requestedRecipeTabNonce += 1;
   }
 
   // Remove ONE book from this recipe's membership (issue 511 many-to-many) — used
-  // by the recipe-item inspector's per-book unlink. Other linked books are kept.
+  // by the context rail's per-book unlink. Other linked books are kept. ADDING a
+  // recipe to a book is authored on Books & Scrolls, not here.
   async function handleRemoveRecipeItem(recipeItemId) {
     const rid = recipeDraft?.id;
     if (!rid || !recipeItemId) return false;
@@ -4335,8 +4350,21 @@
           <span>{text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')}</span>
         {/if}
       </nav>
-      <h1 class="manager-title">{viewTitle()}</h1>
-      <p class="manager-subtitle">{viewSubtitle()}</p>
+      {#if currentView === 'recipe-edit' && recipeDraft}
+        <!-- The recipe editor's identity header: the recipe's real image (never a
+             glyph-only avatar — a recipe HAS an img), its name, and the
+             "<category> · <resolution mode>" subline. -->
+        <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
+          <Medallion src={recipeDraft.img || DEFAULT_RECIPE_IMAGE} icon="fas fa-scroll" size={44} />
+          <div class="manager-recipe-edit-heading-copy">
+            <h1 class="manager-title" title={recipeDraft.name || ''}>{recipeDraft.name || viewTitle()}</h1>
+            <p class="manager-subtitle" data-recipe-edit-subline>{viewSubtitle()}</p>
+          </div>
+        </div>
+      {:else}
+        <h1 class="manager-title">{viewTitle()}</h1>
+        <p class="manager-subtitle">{viewSubtitle()}</p>
+      {/if}
       {#if currentView === 'environment-edit' && environmentDraftForDisplay}
         <div class="manager-environment-header-pills" data-environment-status-pills>
           <span class={`manager-chip ${environmentDraftForDisplay.enabled === false ? 'is-neutral' : 'is-active'}`} data-status-pill="active">
@@ -5034,6 +5062,10 @@
         signatureConflicts={recipeSignatureConflicts}
         playerListMode={recipePlayerListMode}
         worldUsers={$viewState.worldUsers || []}
+        resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        requestedTab={requestedRecipeTab}
+        requestedTabNonce={requestedRecipeTabNonce}
+        onOpenCraftingSettings={() => openCraftingSection('settings')}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
         onAddStep={handleAddStep}
@@ -5163,7 +5195,10 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
+    <!-- The recipe editor's context rail is ALWAYS present (issue 643 §8): recipe-edit
+         is absent from the two-column override list, so a hidden inspector used to
+         leave a 300px dead column. An always-present rail incidentally fixes that. -->
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit'}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">
@@ -6672,23 +6707,27 @@
           </section>
         {/if}
       {:else if currentView === 'recipe-edit'}
-        <RecipeItemInspector
+        <RecipeContextRail
           recipe={recipeDraft}
+          visibilityEffect={recipeRailEffect}
+          accessPlayers={recipeAccessRoster.players}
+          accessCharacters={recipeAccessRoster.characters}
           {recipeItemDefinitions}
           categories={selectedSystem?.categories || []}
           multiStepEnabled={recipeMultiStepEnabled}
           complex={recipeComplex}
           multiSetAllowed={recipeMultiSetAllowed}
           hideComplexToggle={selectedSystem?.resolutionMode === 'alchemy'}
+          readiness={recipeRailReadiness}
           onSetComplexity={handleSetRecipeComplexity}
-          onAddRecipeItem={handleAddRecipeItem}
-          onSetRecipeItem={handleSetRecipeItem}
           onRemoveRecipeItem={handleRemoveRecipeItem}
           onSetCategory={handleSetRecipeCategory}
           onEnterMultiStep={handleEnterMultiStep}
           onRevertToSingleStep={handleRevertToSingleStep}
           onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
-          onCopyItemUuid={(uuid) => services?.onCopySourceUuid?.(uuid)}
+          onOpenAccess={openRecipeAccess}
+          onOpenBooksScrolls={() => openCraftingSection('books-scrolls')}
+          onSelectIssue={() => openRecipeEditorTab('validation')}
         />
       {:else if currentView === 'access'}
         <GrantAccessInspector

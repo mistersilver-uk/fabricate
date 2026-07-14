@@ -16,12 +16,13 @@ const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
-// The recipe editor's four screenshot frames (overview/ingredients/validation/
-// multi-step) share the same trigger files, so any recipe editor/inspector/
-// sub-component change republishes all four.
+// The recipe editor's five screenshot frames (overview/ingredients/validation/
+// multi-step/tools) share the same trigger files, so any recipe editor / context-rail
+// / sub-component change republishes all five. The rail (RecipeContextRail) lives
+// under `recipe/` and is covered by the glob below; the BROWSER inspector deliberately
+// does not (see the manager-recipes recipe).
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
 ];
 

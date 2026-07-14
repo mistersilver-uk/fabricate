@@ -104,7 +104,7 @@
   ];
 
   // Resolve each configured macro UUID to a { name, img, missing } display, mirroring the
-  // RecipeItemInspector/EnvironmentSummaryInspector linked-document pattern.
+  // RecipeContextRail/EnvironmentSummaryInspector linked-document pattern.
   let currencyMacroDocs = $state({});
 
   function setCurrencyMacroDoc(key, doc) {

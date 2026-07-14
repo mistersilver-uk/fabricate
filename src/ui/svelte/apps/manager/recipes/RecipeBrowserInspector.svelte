@@ -11,7 +11,7 @@
      screenshot map's RECIPE_EDIT_MATCHES globs the latter and would republish the
      five recipe-EDITOR frames instead of the browser frame;
    - it is named RecipeBrowserInspector, not RecipeInspector, to avoid colliding with
-     the existing RecipeItemInspector.
+     the recipe EDITOR's own frames.
 
   The row-derivation helpers below (structure label, step / result counts,
   requirements summary) moved here with it — the root had no other caller.

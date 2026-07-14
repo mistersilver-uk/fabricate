@@ -81,6 +81,7 @@ import {
   localizeRecipePersistenceError,
 } from '../../../utils/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
+import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -2302,6 +2303,10 @@ export function createAdminStore(services) {
     recipeCategories: [],
     showVisibilitySummary: false,
     worldUsers: [],
+    // EVERY world actor (not the player-character roster), each carrying its
+    // control set. The recipe editor's context rail resolves granted character
+    // ids over this list; see `src/utils/recipeAccessRoster.js`.
+    accessCharacters: [],
     // The derived `evaluateSystemValidation` report for the selected system,
     // consumed by the GM system-overview view, its rail count badge, and the
     // system-blocker banner. A derived/computed view — nothing is persisted on
@@ -3495,6 +3500,38 @@ export function createAdminStore(services) {
     }));
   }
 
+  // Re-project BOTH access rosters (non-GM users + every world actor with its
+  // control set). The owning app wires this to user AND actor CRUD, because
+  // `controlledBy` / `sharedWithAllPlayers` derive from `actor.ownership` as well as
+  // from `user.character`. Cheap and surgical, like refreshWorldUsers: no full
+  // refresh().
+  function refreshAccessRosters() {
+    viewState.update((state) => ({
+      ...state,
+      worldUsers: services.getWorldUsers?.() || [],
+      accessCharacters: services.getAccessCharacterActors?.() || [],
+    }));
+  }
+
+  /**
+   * Resolve a recipe's `access` grant into displayable player / character rows.
+   * Resolution lives HERE (not in the rail): the rail receives resolved rows and
+   * never touches ids. Unresolvable ids are dropped from display and never persisted
+   * away — the rail is read-only.
+   *
+   * @param {{characterIds?: string[], playerIds?: string[]}|null} access
+   * @param {{players?: object[], characters?: object[]}} [rosters] Defaults to the
+   *   currently projected rosters; callers inside a Svelte `$derived` pass them
+   *   explicitly so the reactive dependency is visible.
+   */
+  function resolveRecipeAccess(access, rosters = null) {
+    const state = rosters || get(viewState);
+    return resolveRecipeAccessRoster(access, {
+      players: state.players || state.worldUsers || [],
+      characters: state.characters || state.accessCharacters || [],
+    });
+  }
+
   async function _saveGatheringConfig(config) {
     const normalized = _normalizeGatheringConfig(config, _randomID);
     await services.setSetting?.(GATHERING_CONFIG_SETTING, normalized);
@@ -4685,6 +4722,9 @@ export function createAdminStore(services) {
     // Non-GM world users, for the per-recipe "restrict to specific users" editor.
     // Sourced through the injected service so the store never touches `game.*`.
     const worldUsers = services.getWorldUsers?.() || [];
+    // Every world actor with its control set (see getAccessCharacterActors): the
+    // rail resolves granted character ids over this, NOT the PC-filtered roster.
+    const accessCharacters = services.getAccessCharacterActors?.() || [];
 
     let selectedSystemData = null;
     let essenceCards = [];
@@ -4754,6 +4794,7 @@ export function createAdminStore(services) {
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       worldUsers,
+      accessCharacters,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
     }));
@@ -4832,6 +4873,7 @@ export function createAdminStore(services) {
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       worldUsers,
+      accessCharacters,
       systemValidation,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
@@ -8023,6 +8065,8 @@ export function createAdminStore(services) {
     refresh,
     refreshGatheringConfig,
     refreshWorldUsers,
+    refreshAccessRosters,
+    resolveRecipeAccess,
     destroy,
   };
 }

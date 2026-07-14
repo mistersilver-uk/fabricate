@@ -81,7 +81,7 @@
     dragIndex = -1;
   }
 
-  // Mirror RecipeItemInspector: 'ingredientSet' is Ingredient routing; 'check'
+  // Routing provider: 'ingredientSet' is Ingredient routing; 'check'
   // routes by the system crafting-check outcome.
   const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
   const isCheckRouting = $derived(routingProvider === 'check');

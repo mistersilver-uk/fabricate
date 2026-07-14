@@ -147,10 +147,23 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     );
   });
 
-  it('gates the inspector aside for recipe-edit on recipeInspectorVisible', () => {
-    assert.ok(
-      rootSource.includes("(currentView !== 'recipe-edit' || recipeInspectorVisible)"),
-      'inspector aside should render for recipe-edit only when recipeInspectorVisible'
+  it('never suppresses the inspector aside on recipe-edit (the context rail is always present)', () => {
+    // recipe-edit is absent from the two-column override list, so a hidden inspector
+    // rendered a 300px dead column. The always-present context rail fixes that
+    // (issue 643 §8), and the aside guard no longer names recipe-edit at all.
+    assert.equal(
+      rootSource.includes('recipeInspectorVisible'),
+      false,
+      'the conditional-hide gate is gone'
+    );
+    const asideGuard = rootSource.slice(
+      rootSource.indexOf("{#if currentView !== 'environment-edit' && currentView !== 'checks'"),
+      rootSource.indexOf('<aside class="manager-inspector"')
+    );
+    assert.equal(
+      asideGuard.includes("currentView !== 'recipe-edit'"),
+      false,
+      'the aside is never suppressed on recipe-edit'
     );
   });
 

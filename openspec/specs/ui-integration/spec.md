@@ -732,19 +732,62 @@ It is GM-only; players never see it.
 
 Scoped to a single crafting system.
 
-The Manager recipe-edit view partially implements this editor: the identity surface from `### Base Form` (Name and Description, plus a player-facing image and an `enabled` on/off toggle, edited as a local draft with a standard `Unsaved` chip + `Back to recipes` + `Delete recipe` + `Save` header and a dirty/route-exit guard), the `recipeItemId` selector from `### Visibility Form`, and the `### Visibility Form` player-mode restriction editor (restricted toggle + allowed-users allow-list, shown only while `listMode === "player"`) are implemented.
-Because ingredients/steps/results are deferred, the recipe under edit is typically an *incomplete shell*: it is created (via "+ Create recipe") and its identity is saved through the `allowIncomplete` authoring path, which gates on structural validity only.
-The shell remains non-craftable (the engine still gates on completeness) and the browse row shows a derived `Incomplete` chip until those deferred sections are filled in.
-The Locked toggle, Category, the Step Structure UI, and the Step Editor remain deferred.
+The Manager recipe-edit view is a **five-tab editor** — Overview, Ingredients, Results, Tools, Validation — over a controlled local draft.
+Every edit stages into that draft and commits in one `updateRecipe` call on Save (through the `allowIncomplete` authoring path, which gates on structural validity only); the `enabled` toggle is the single immediate exception, because enabling validates against the persisted recipe.
+The shared header carries an `Unsaved` chip, `Back to recipes`, `Delete recipe` and `Save`, and every route exit runs the Manager confirm-discard guard.
+A recipe whose ingredients or results are still empty is a persistable *incomplete shell*: it stays non-craftable (the engine gates on completeness) and the browse row shows a derived `Incomplete` chip.
+
+### Resolution-mode banner
+
+Every tab is headed by a **resolution-mode banner** naming the crafting system's `resolutionMode`, describing what it means, and offering a chip that routes to Crafting Settings.
+Resolution mode is a property of the **system**, never of a recipe: the banner reports it and offers no per-recipe control, because the mode dictates the editor's whole shape (one ingredient set or many, tier routing, the alchemy result slots) from outside the recipe.
+Its copy and icons come from the canonical `resolutionModeOptions` list that System Settings and Crafting Settings already render, so no second, drifting table exists.
+
+### Context rail
+
+The editor's right-hand column is the shell's existing `manager-inspector` aside (not a second nested grid), and it is **always present** on `recipe-edit`.
+
+Its top section is **mode-conditional**, driven by the system's canonical `visibilityMode` through the `craftingEffect(mode)` matrix — the same single source of truth the crafting nav and Crafting Settings consume:
+
+| `visibilityMode` | `craftingEffect` | Rail top section |
+| --- | --- | --- |
+| `restricted` | `showAccess` | **Who can craft this** — the players and characters granted this recipe, plus a **Manage access** deep-link to the Access tab |
+| `item`, `knowledge` | `showBooksScrolls` | **Appears in** — the books/scrolls that teach this recipe, plus an **Open Books & Scrolls** deep-link |
+| `global` | neither | No section: a globally-visible system grants no per-recipe access and uses no books |
+
+The rail is **read-only in every mode**.
+Authoring lives on the owning screen: the Access tab owns `recipe.access`, and Books & Scrolls owns book membership.
+
+Below the mode-conditional section, in every mode, the rail carries the recipe's **Category** selector, the **Recipe mode** (Simple / Complex) segmented control when the system's resolution mode permits multiple ingredient sets, the **Step mode** (Single / Multi-step) segmented control, and a **Validation** mini-list showing either an *All clear* pill or the failing readiness checks with a deep-link into the Validation tab.
+
+### Access rosters (restricted mode)
+
+The rail's access rows are **resolved in the admin store** and handed to the rail as display rows; the rail never resolves an id itself.
+Three rules govern that resolution, and each exists because the naive alternative silently misreports who can craft a recipe:
+
+- **A character's controlling players are a SET, not one user.**
+The runtime predicate grants access to any viewer whose **assigned character** is that actor **OR** who holds Foundry `OWNER` on it — a union, not a fallback chain.
+Each resolved character therefore carries `controlledBy: Array<{ id, name, avatar, assigned }>` (assigned-first, then name-sorted), never a singular "played by" field.
+- **`ownership.default >= OWNER` reaches the whole table.**
+When it does, the character carries `sharedWithAllPlayers: true` and the rail renders **"Shared with all players"** — a distinct string, never "Played by ⟨one name⟩", which would tell the GM that one player got the recipe when in fact everyone did.
+With no controllers at all, the rail renders **no** sub-line rather than inventing an attribution.
+- **GMs are filtered before ownership is tested.**
+`Document#testUserPermission` short-circuits every GM (Assistant GMs included) to `OWNER`, so the roster is derived from Foundry's non-GM `game.users.players` roster first.
+The same roster now backs the Access tab's grantable **Players** list, which previously offered GMs as targets even though granting one had no effect.
+
+Granted **character** ids resolve over **every world actor**, not the player-character roster: the runtime predicate applies no type filter, so a grant naming a non-player-character actor is still honoured by the engine and must still be displayed.
+An id that no longer resolves (a deleted actor or user) is **dropped from display and never persisted away** — rendering the rail must not mutate the grant.
+The rosters re-project on user CRUD and on actor CRUD, with `updateActor` key-filtered to `ownership` / `name` / `img` changes so an ordinary HP update does not re-project.
 
 ### Base Form
 
 - Name (implemented in Manager)
 - Description (implemented in Manager)
-- Category (if enabled; always includes reserved `General`) — deferred
-- Locked toggle — deferred
+- Category (always includes reserved `General`) — implemented, in the context rail
+- Locked toggle — see `### Locked`
 
 In Manager, the recipe-edit identity card additionally edits a player-facing image (via the FilePicker) and an `enabled` on/off toggle alongside Name and Description.
+The editor header shows the recipe's image, its name, and a `⟨category⟩ · ⟨resolution mode⟩` sub-line.
 
 The Overview tab additionally offers an optional **Minimum success tier** dropdown, shown only when the selected system runs a `routedByCheck` check whose routed `type` is `fixed`.
 Its options are that fixed check's success outcome tiers ranked ascending by `start`, preceded by a default `No override (use rolled tier)` entry, and it authors the recipe's `minSuccessOutcomeId`.
@@ -752,48 +795,30 @@ Selecting a tier makes a craft that rolls below it fail outright (see `004`); th
 
 ### Visibility Form
 
-If `listMode === "global"`:
+Per-recipe visibility is authored on the **Access tab** (`recipe.access = { characterIds, playerIds }`), gated by the system's `visibilityMode: 'restricted'`.
+The recipe editor itself carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card (gated on the superseded `recipeVisibility.listMode`) is retired, and `access` is read-forward-seeded from `visibility.allowedUserIds` for legacy systems.
+The recipe editor's context rail shows a **read-only** summary of the grant plus a deep-link to the Access tab.
 
-- No per-recipe visibility controls shown.
-- Restricted visibility toggle and allowed users multiselect are hidden.
+If the system's visibility mode consumes an item or teaches by knowledge (`item` / `knowledge`):
 
-If `listMode === "player"`:
+- The recipe's context rail lists **every** book/scroll that teaches it, because recipe↔book membership is **many-to-many** (`RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`).
+There is no book/scroll `kind` — `RecipeItemDefinition` manages every recipe item regardless of Foundry item type.
+- Each row previews that book's name/image/source status (falling back to the legacy scalar `recipe.recipeItemId` only for a fully un-migrated system), offers Open item, and offers a per-book **remove**, which removes the recipe from **that** book's membership only and does **not** delete the shared definition.
+A row whose definition's `originItemUuid` no longer resolves shows a missing/stale state and retains the link.
+- **Adding** a recipe to a book is authored from the book's side (Books & Scrolls → the recipe-item editor stages `recipeIds` and persists on Save).
+The recipe editor carries no drop zone and no "link another" affordance: a second authoring path for the same many-to-many is duplication, not a capability.
+- Membership changes apply immediately (through `setRecipeBookMembership`), independently of the recipe draft's Save.
 
-- A **restrict to specific users** toggle bound to `recipe.visibility.restricted`, shown on the recipe editor's Overview tab only while the system's `listMode === "player"`.
-- When restriction is on, an allow-list of the world's non-GM users bound to `recipe.visibility.allowedUserIds`.
-The user options come from a `getWorldUsers` service projected into the admin store as `worldUsers`; the store never reads Foundry globals directly.
-- When restriction is on and the allow-list is empty, the editor SHALL surface a warning that the recipe is restricted with no users selected, so no player can see it.
-This is a valid configuration and saves without error.
-- The toggle and allow-list stage `recipe.visibility = { restricted, allowedUserIds }` into the recipe draft and persist through the normal recipe-draft save flow, not on change.
-- When the world has no non-GM users, the allow-list shows an empty-state note instead of user rows.
-
-If knowledge mode includes item matching or learning:
-
-- Recipe item selector / drop zone
-- Preview of each linked recipe item definition (name, image, and source status)
-- Per-book unlink action
-- Helper text: owned copies match by UUID or resolved source UUID of the linked recipe item definition
-
-The recipe item selector is **partially implemented** by a recipe-item link card (`RecipeItemInspector`) rendered in the GM manager's right-hand context inspector panel (the global `manager-inspector` aside), not a view-internal column.
-Because recipe↔book membership is **many-to-many** (issue 511: `RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`), the card enumerates **every** book/scroll that teaches this recipe as a **list** rather than showing a single scalar link.
-Each list row previews that book's name/image/source status and offers Open item, Copy item UUID, and a per-book Unlink (also right-click) — Unlink removes the recipe from **that** book's membership only, leaving the recipe's other books intact.
-Below the list a compact drop zone links another book: dropping a Foundry Item links it via `addRecipeItemFromUuid` (which synthesizes or dedups a `RecipeItemDefinition`) and adds the recipe to its membership.
-Each row falls back to the legacy scalar `recipe.recipeItemId` only for a fully un-migrated system, and a row whose definition's `originItemUuid` no longer resolves shows a missing/stale state and retains the link.
-The central `manager-main` holds the recipe identity card; the recipe-item card sits beside it in the shared inspector panel.
-Linking or unlinking applies immediately (through `setRecipeBookMembership`) and is independent of the identity Save draft, and unlinking does **not** delete the shared definition.
-The inspector panel is shown for knowledge modes that consume an item (`item`/`itemOrLearned`) and suppressed (full-width main) for `learned`.
-The player-mode restricted-visibility toggle and allowed-users allow-list are implemented on the Overview tab as described above.
-
+Owned copies match by UUID or resolved source UUID of the linked recipe item definition.
 If the required linkage is missing, show a validation warning.
-
-The canonical recipe-editor flow must not require manual UUID entry for recipe items.
-The selector should follow the same drag/drop-first interaction pattern used elsewhere for component and essence-source selection.
 
 ### Step Structure UI
 
+Step mode (Single / Multi-step) is authored from the context rail's segmented control, and is offered when the system enables multi-step recipes — or whenever the recipe already has steps, so a multi-step recipe can always be reverted.
+
 If multistep is enabled:
 
-- Step list with add/remove/reorder (drag and drop)
+- Step list with add/remove/reorder (drag and drop), on the Overview tab
 - One-step editor per step
 
 If multistep is disabled:

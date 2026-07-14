@@ -114,6 +114,62 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
+  // The access rosters are the manager's only Foundry user/ownership surface, and every
+  // rule below is one a naive implementation gets WRONG in a way that silently
+  // UNDER- or OVER-reports who can craft a recipe (issue 643 §4b).
+  it('derives the access rosters from the non-GM roster, never by testing a GM', () => {
+    // `Document#testUserPermission` short-circuits EVERY GM (Assistant included, since
+    // `User#isGM` is `hasRole(ASSISTANT)`) to OWNER, so GMs must be filtered FIRST.
+    assert.ok(appSource.includes('game.users?.players'), 'uses the canonical Foundry non-GM roster');
+    assert.ok(appSource.includes('_playerUsers()'), 'both rosters go through the one GM filter');
+    assert.equal(
+      appSource.includes('actor.isOwner'),
+      false,
+      'never uses the game.user-scoped Actor#isOwner (always true on a GM client)'
+    );
+  });
+
+  it('models "who plays this character" as a SET, with the whole-table case explicit', () => {
+    assert.ok(
+      appSource.includes("actor.testUserPermission?.(user, 'OWNER')"),
+      'OWNER holders control the actor'
+    );
+    assert.ok(appSource.includes('user.character.id === actor.id'), 'the assigned player too');
+    assert.ok(appSource.includes('controlledBy'), 'the union is exposed as a set');
+    assert.ok(
+      appSource.includes('sharedWithAllPlayers'),
+      'ownership.default >= OWNER reaches the whole table'
+    );
+    assert.ok(appSource.includes('actor.ownership?.default'), 'reads the default ownership level');
+    assert.equal(appSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+  });
+
+  it('resolves granted character ids over EVERY world actor, not the PC-filtered roster', () => {
+    // The runtime predicate applies no type filter, so a grant naming a non-PC actor is
+    // still honoured — resolving over the filtered roster would drop it from display.
+    assert.ok(appSource.includes('getAccessCharacterActors:'), 'exposes the unfiltered roster');
+    const unfiltered = appSource.slice(
+      appSource.indexOf('getAccessCharacterActors:'),
+      appSource.indexOf('getWorldItemOptions:')
+    );
+    assert.equal(
+      unfiltered.includes('isPlayerCharacterActor'),
+      false,
+      'the access roster applies no player-character type filter'
+    );
+  });
+
+  it('key-filters the noisy updateActor hook so an HP tick does not reproject', () => {
+    assert.ok(appSource.includes("Hooks.on('updateActor'"), 'actor updates are hooked');
+    assert.ok(
+      appSource.includes("'ownership' in diff || 'name' in diff || 'img' in diff"),
+      'only ownership / name / img reproject the rosters'
+    );
+    assert.ok(appSource.includes("'createActor'"), 'actor creation reprojects');
+    assert.ok(appSource.includes("'deleteActor'"), 'actor deletion reprojects');
+    assert.ok(appSource.includes('refreshAccessRosters'), 'reprojects both rosters, not just users');
+  });
+
   it('guards manager startup against unready Fabricate services', () => {
     assert.ok(appSource.includes('isFabricateReady'), 'manager app should expose readiness through services');
     assert.ok(appSource.includes('onFabricateReady'), 'manager app should expose a ready callback service');

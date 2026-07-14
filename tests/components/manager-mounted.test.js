@@ -127,9 +127,13 @@ function compileManagerRoot() {
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
   for (const recipeComponent of [
     'RecipeEditorTabs',
+    // The editor's mode banner + context rail (issue 643). The rail REPLACED
+    // RecipeItemInspector and lives under `recipe/` so the screenshot map's
+    // RECIPE_EDIT_MATCHES glob republishes the editor frames when it changes.
+    'RecipeModeBanner',
+    'RecipeContextRail',
     'RecipeOverviewTab',
     'RecipeIngredientsTab',
     'RecipeResultsTab',

@@ -38,6 +38,12 @@ const RAW_MODULES = [
   // The validation tab localizes a signature-collision blocker row via this pure
   // leaf (issue 549).
   'src/utils/recipeActivationMessages.js',
+  // The resolution-mode banner reuses the CANONICAL option list (value/icon/label/
+   // desc) rather than re-authoring a MODE_INFO table. It was not in this allowlist
+  // before, and a missing raw module HANGS the suite (`# cancelled`) instead of
+  // failing it.
+  'src/ui/svelte/apps/manager/resolutionModeOptions.js',
+  // The context rail resolves the recipe's category label for its Category card.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
   ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -46,6 +52,9 @@ const RAW_MODULES = [
 // The new tab + section components the editor shell composes.
 const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  // The resolution-mode banner heads every editor tab (issue 643 §5).
+  'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
@@ -76,12 +85,16 @@ const editHarness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 });
 
-const inspectorHarness = createMountedComponentHarness({
+// The recipe editor's context rail (issue 643 §4b) — it REPLACED RecipeItemInspector.
+const railHarness = createMountedComponentHarness({
   repoRoot,
-  tmpPrefix: 'fabricate-recipe-item-inspector-',
+  tmpPrefix: 'fabricate-recipe-context-rail-',
   rawModules: RAW_MODULES,
-  compiledModules: ['src/ui/svelte/apps/manager/RecipeItemInspector.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/RecipeItemInspector.svelte',
+  compiledModules: [
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte',
+  ],
+  componentPath: 'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte',
 });
 
 const stepsHarness = createMountedComponentHarness({
@@ -116,14 +129,17 @@ function identityProps(overrides = {}) {
   };
 }
 
-function inspectorProps(overrides = {}) {
+// The rail's default effect is the `knowledge` row of the craftingVisibility matrix
+// (showBooksScrolls), which is also the manager's default visibility mode.
+function railProps(overrides = {}) {
   return {
     recipe: RECIPE,
+    visibilityEffect: { showAccess: false, showBooksScrolls: true },
+    accessPlayers: [],
+    accessCharacters: [],
     recipeItemDefinitions: [],
-    onAddRecipeItem: () => false,
-    onSetRecipeItem: () => {},
+    readiness: { checks: [], issues: [] },
     onOpenItem: () => {},
-    onCopyItemUuid: () => {},
     ...overrides,
   };
 }
@@ -262,16 +278,6 @@ async function pickPopoverOption(target, trigger, optionPattern) {
     .find((option) => optionPattern.test(option.textContent))
     .click();
   await flushRender();
-}
-
-// Drive a drop through the dragDrop action using a plain Event + a dataTransfer
-// stub (text/plain JSON), not a synthetic native DragEvent.
-function dispatchDrop(node, payload) {
-  const event = new globalThis.window.Event('drop', { bubbles: true, cancelable: true });
-  event.dataTransfer = {
-    getData: (type) => (type === 'text/plain' ? JSON.stringify(payload) : ''),
-  };
-  node.dispatchEvent(event);
 }
 
 describe('RecipeEditView (mounted)', () => {
@@ -1381,7 +1387,7 @@ describe('RecipeEditView (mounted)', () => {
   }
 
   // Fire a native drag lifecycle event (the handlers read no dataTransfer, so a
-  // plain bubbling Event suffices, mirroring dispatchDrop above).
+  // plain bubbling Event suffices).
   function fireDrag(node, type) {
     node.dispatchEvent(
       new globalThis.window.Event(type, { bubbles: true, cancelable: true })
@@ -2944,9 +2950,9 @@ describe('RecipeEditView (mounted)', () => {
   });
 });
 
-describe('RecipeItemInspector (mounted)', () => {
+describe('RecipeContextRail (mounted)', () => {
   before(async () => {
-    await inspectorHarness.setup();
+    await railHarness.setup();
     // The harness installs game.i18n but not fromUuid; provide a default stub.
     globalThis.foundry = {};
     globalThis.fromUuid = async () => null;
@@ -2955,164 +2961,55 @@ describe('RecipeItemInspector (mounted)', () => {
   after(() => {
     delete globalThis.fromUuid;
     delete globalThis.foundry;
-    inspectorHarness.teardown();
+    railHarness.teardown();
   });
 
   beforeEach(() => {
     globalThis.fromUuid = async () => null;
   });
 
-  it('renders the recipe-item card with an empty dropzone', async () => {
-    const target = await inspectorHarness.mount(inspectorProps());
+  it('renders the "Appears in" card with no drop zone and no "link another" affordance', async () => {
+    const target = await railHarness.mount(railProps());
     assert.ok(
       target.querySelector('[data-recipe-section="recipe-item"]'),
-      'recipe-item card renders'
+      'the books & scrolls card renders under the knowledge/item effect'
     );
-    assert.ok(target.querySelector('[data-recipe-item-dropzone]'), 'empty dropzone present');
-    inspectorHarness.remount();
+    // §2c: adding a recipe to a book is authored on Books & Scrolls. The recipe-side
+    // drop zone was a SECOND authoring path for the same many-to-many and is removed.
+    assert.equal(
+      target.querySelector('[data-recipe-item-dropzone]'),
+      null,
+      'no drop zone: adding a recipe to a book happens on Books & Scrolls'
+    );
+    assert.ok(target.querySelector('[data-recipe-item-empty]'), 'shows the empty summary copy');
+    railHarness.remount();
   });
 
-  it('links an item on a valid Item drop and ignores a non-Item drop', async () => {
-    const added = [];
-    const set = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        onAddRecipeItem: (uuid) => {
-          added.push(uuid);
-          return { item: { id: 'ri1' }, action: 'added' };
-        },
-        onSetRecipeItem: (id) => set.push(id),
-      })
+  it('deep-links to Books & Scrolls', async () => {
+    const opened = [];
+    const target = await railHarness.mount(
+      railProps({ onOpenBooksScrolls: () => opened.push(true) })
     );
-    const dropzone = target.querySelector('[data-recipe-item-dropzone]');
-    assert.ok(dropzone, 'empty dropzone present');
-
-    // Non-Item drop is a no-op.
-    dispatchDrop(dropzone, { type: 'Scene', uuid: 'Scene.s1' });
-    await Promise.resolve();
-    assert.equal(added.length, 0, 'non-Item drop ignored');
-
-    // Valid Item drop links it.
-    dispatchDrop(dropzone, { type: 'Item', uuid: 'Item.it1' });
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.deepEqual(added, ['Item.it1'], 'onAddRecipeItem called with the item uuid');
-    assert.deepEqual(set, ['ri1'], 'onSetRecipeItem called with the new definition id');
-    inspectorHarness.remount();
+    target.querySelector('[data-recipe-open-books]').click();
+    assert.deepEqual(opened, [true], 'the Open Books & Scrolls button routes to the owning screen');
+    railHarness.remount();
   });
 
-  it('still links a deduped (skipped) drop', async () => {
-    const set = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        onAddRecipeItem: () => ({ item: { id: 'ri-existing' }, action: 'skipped' }),
-        onSetRecipeItem: (id) => set.push(id),
-      })
+  it('omits the books card entirely under the global visibility mode', async () => {
+    const target = await railHarness.mount(
+      railProps({ visibilityEffect: { showAccess: false, showBooksScrolls: false } })
     );
-    dispatchDrop(target.querySelector('[data-recipe-item-dropzone]'), {
-      type: 'Item',
-      uuid: 'Item.dupe',
-    });
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.deepEqual(set, ['ri-existing'], 'skipped action still sets the recipeItemId');
-    inspectorHarness.remount();
-  });
-
-  it('derives the linked image/name from the STAGED recipeItemId against the definitions', async () => {
-    // Two definitions; fromUuid resolves a doc per uuid so the thumb/name come from
-    // the resolved source. The displayed pair must track the recipe draft's
-    // recipeItemId — the staged source — not any persisted projection.
-    const DOCS = {
-      'Item.blue': { name: 'Blue Potion', img: 'icons/blue-potion.webp' },
-      'Item.green': { name: 'Green Potion', img: 'icons/green-potion.webp' },
-    };
-    globalThis.fromUuid = async (uuid) => DOCS[uuid] || null;
-    const DEFS = [
-      { id: 'ri-blue', name: 'Blue Def', img: 'icons/blue-def.webp', originItemUuid: 'Item.blue' },
-      {
-        id: 'ri-green',
-        name: 'Green Def',
-        img: 'icons/green-def.webp',
-        originItemUuid: 'Item.green',
-      },
-    ];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri-blue' },
-        recipeItemDefinitions: DEFS,
-      })
+    assert.equal(
+      target.querySelector('[data-recipe-section="recipe-item"]'),
+      null,
+      'a globally-visible system uses no books'
     );
-    await new Promise((r) => setTimeout(r, 10));
-    const imgEl = target.querySelector(
-      '[data-recipe-item-linked] img.manager-environment-scene-thumb'
+    assert.equal(
+      target.querySelector('[data-recipe-section="access"]'),
+      null,
+      'a globally-visible system grants no per-recipe access'
     );
-    const nameEl = target.querySelector(
-      '[data-recipe-item-linked] .manager-environment-scene-name'
-    );
-    assert.ok(
-      imgEl.getAttribute('src').includes('blue-potion'),
-      'shows the blue source image for the staged ri-blue link'
-    );
-    assert.ok(
-      nameEl.textContent.includes('Blue Potion'),
-      'shows the blue source name for the staged ri-blue link'
-    );
-
-    // Regression: staging a different recipeItemId updates the preview WITHOUT a
-    // save — the inspector resolves from the (staged) draft, not a persisted record.
-    inspectorHarness.remount();
-    const restaged = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri-green' },
-        recipeItemDefinitions: DEFS,
-      })
-    );
-    await new Promise((r) => setTimeout(r, 10));
-    const imgAfter = restaged.querySelector(
-      '[data-recipe-item-linked] img.manager-environment-scene-thumb'
-    );
-    const nameAfter = restaged.querySelector(
-      '[data-recipe-item-linked] .manager-environment-scene-name'
-    );
-    assert.ok(
-      imgAfter.getAttribute('src').includes('green-potion'),
-      'staged ri-green link swaps the displayed image without a save'
-    );
-    assert.ok(
-      nameAfter.textContent.includes('Green Potion'),
-      'staged ri-green link swaps the displayed name without a save'
-    );
-    inspectorHarness.remount();
-  });
-
-  it('renders the missing state when fromUuid resolves to null', async () => {
-    globalThis.fromUuid = async () => null;
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri1' },
-        recipeItemDefinitions: [
-          {
-            id: 'ri1',
-            name: 'Old Item',
-            img: 'icons/svg/item-bag.svg',
-            originItemUuid: 'Item.gone',
-          },
-        ],
-      })
-    );
-    // Let the async resolution $effect settle before asserting.
-    await new Promise((r) => setTimeout(r, 10));
-    assert.ok(
-      target.querySelector('[data-recipe-item-missing]'),
-      'missing state renders when the source item no longer resolves'
-    );
-    // The link is retained (the linked container, not the empty dropzone).
-    assert.ok(
-      target.querySelector('[data-recipe-item-linked]'),
-      'the link is retained in the missing state'
-    );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('enumerates every linked book (many-to-many) and unlinks one via onRemoveRecipeItem', async () => {
@@ -3122,8 +3019,8 @@ describe('RecipeItemInspector (mounted)', () => {
       { id: 'ri-a', name: 'Alpha Tome', img: 'icons/a.webp', originItemUuid: 'Item.a' },
       { id: 'ri-b', name: 'Beta Scroll', img: 'icons/b.webp', originItemUuid: 'Item.b' },
     ];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, recipeItemId: 'ri-a', recipeItemIds: ['ri-a', 'ri-b'] },
         recipeItemDefinitions: DEFS,
         onRemoveRecipeItem: (id) => removed.push(id),
@@ -3134,31 +3031,214 @@ describe('RecipeItemInspector (mounted)', () => {
     assert.equal(rows.length, 2, 'both linked books are listed');
     assert.ok(target.querySelector('[data-recipe-item-link="ri-a"]'), 'lists the first book');
     assert.ok(target.querySelector('[data-recipe-item-link="ri-b"]'), 'lists the second book');
-    // A compact dropzone remains for linking another book.
-    assert.ok(target.querySelector('[data-recipe-item-dropzone]'), 'keeps a link-another dropzone');
 
     // The per-row unlink removes only that book.
-    target
-      .querySelector('[data-recipe-item-link="ri-b"] .manager-icon-button.is-danger')
-      .click();
+    target.querySelector('[data-recipe-item-link="ri-b"] .manager-icon-button.is-danger').click();
     assert.deepEqual(removed, ['ri-b'], 'unlink calls onRemoveRecipeItem with the book id');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
+  it('resolves each linked book image/name from its source document', async () => {
+    const DOCS = { 'Item.blue': { name: 'Blue Potion', img: 'icons/blue-potion.webp' } };
+    globalThis.fromUuid = async (uuid) => DOCS[uuid] || null;
+    const target = await railHarness.mount(
+      railProps({
+        recipe: { ...RECIPE, recipeItemId: 'ri-blue', recipeItemIds: ['ri-blue'] },
+        recipeItemDefinitions: [
+          {
+            id: 'ri-blue',
+            name: 'Blue Def',
+            img: 'icons/blue-def.webp',
+            originItemUuid: 'Item.blue',
+          },
+        ],
+      })
+    );
+    await new Promise((r) => setTimeout(r, 10));
+    assert.ok(
+      target
+        .querySelector('[data-recipe-item-linked] img.manager-environment-scene-thumb')
+        .getAttribute('src')
+        .includes('blue-potion'),
+      'shows the resolved source image'
+    );
+    assert.ok(
+      target
+        .querySelector('[data-recipe-item-linked] .manager-environment-scene-name')
+        .textContent.includes('Blue Potion'),
+      'shows the resolved source name'
+    );
+    railHarness.remount();
+  });
+
+  it('renders the missing state when fromUuid resolves to null', async () => {
+    globalThis.fromUuid = async () => null;
+    const target = await railHarness.mount(
+      railProps({
+        recipe: { ...RECIPE, recipeItemId: 'ri1', recipeItemIds: ['ri1'] },
+        recipeItemDefinitions: [
+          {
+            id: 'ri1',
+            name: 'Old Item',
+            img: 'icons/svg/item-bag.svg',
+            originItemUuid: 'Item.gone',
+          },
+        ],
+      })
+    );
+    await new Promise((r) => setTimeout(r, 10));
+    assert.ok(
+      target.querySelector('[data-recipe-item-missing]'),
+      'missing state renders when the source item no longer resolves'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-item-linked]'),
+      'the link is retained in the missing state'
+    );
+    railHarness.remount();
+  });
+
+  // --- the RESTRICTED branch (issue 643 §4b) ----------------------------------
+  const RESTRICTED = { showAccess: true, showBooksScrolls: false };
+
+  it('lists players and characters with access under the restricted mode, and no books card', async () => {
+    const target = await railHarness.mount(
+      railProps({
+        visibilityEffect: RESTRICTED,
+        accessPlayers: [{ id: 'u1', name: 'Ada', avatar: 'icons/ada.webp' }],
+        accessCharacters: [
+          {
+            id: 'a1',
+            name: 'Thorin',
+            img: 'icons/thorin.webp',
+            controlledBy: [{ id: 'u1', name: 'Ada', avatar: '', assigned: true }],
+            sharedWithAllPlayers: false,
+          },
+        ],
+      })
+    );
+    assert.ok(target.querySelector('[data-recipe-section="access"]'), 'access card renders');
+    assert.equal(
+      target.querySelector('[data-recipe-section="recipe-item"]'),
+      null,
+      'restricted systems use no books'
+    );
+    assert.ok(target.querySelector('[data-recipe-access-player="u1"]'), 'lists the granted player');
+    assert.ok(
+      target.querySelector('[data-recipe-access-character="a1"]'),
+      'lists the granted character'
+    );
+    assert.equal(
+      target
+        .querySelector('[data-recipe-access-character="a1"] [data-recipe-access-subline]')
+        .textContent.trim(),
+      'Played by Ada',
+      'a single controller reads "Played by <name>"'
+    );
+    railHarness.remount();
+  });
+
+  it('says "Shared with all players" rather than naming one player when ownership.default is OWNER', async () => {
+    // THE bug this field exists to prevent: `getUserLevel` falls through to
+    // ownership.default, so an "All Players = Owner" actor is controlled by EVERY
+    // player. Naming one of them would tell the GM the opposite of the truth.
+    const target = await railHarness.mount(
+      railProps({
+        visibilityEffect: RESTRICTED,
+        accessCharacters: [
+          {
+            id: 'a1',
+            name: 'The Party Wagon',
+            img: '',
+            controlledBy: [
+              { id: 'u1', name: 'Ada', avatar: '', assigned: false },
+              { id: 'u2', name: 'Brin', avatar: '', assigned: false },
+            ],
+            sharedWithAllPlayers: true,
+          },
+        ],
+      })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-access-subline]').textContent.trim(),
+      'Shared with all players',
+      'the whole-table grant is stated as such, never as "Played by <one name>"'
+    );
+    railHarness.remount();
+  });
+
+  it('renders no sub-line at all when nobody controls the granted character', async () => {
+    const target = await railHarness.mount(
+      railProps({
+        visibilityEffect: RESTRICTED,
+        accessCharacters: [
+          { id: 'a1', name: 'Orphan NPC', img: '', controlledBy: [], sharedWithAllPlayers: false },
+        ],
+      })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-access-subline]'),
+      null,
+      'an empty control set invents no attribution'
+    );
+    railHarness.remount();
+  });
+
+  it('collapses three or more controllers to "+N" and keeps the full list in the title', async () => {
+    const target = await railHarness.mount(
+      railProps({
+        visibilityEffect: RESTRICTED,
+        accessCharacters: [
+          {
+            id: 'a1',
+            name: 'Shared Hireling',
+            img: '',
+            controlledBy: [
+              { id: 'u1', name: 'Ada', avatar: '', assigned: true },
+              { id: 'u2', name: 'Brin', avatar: '', assigned: false },
+              { id: 'u3', name: 'Cade', avatar: '', assigned: false },
+            ],
+            sharedWithAllPlayers: false,
+          },
+        ],
+      })
+    );
+    const subline = target.querySelector('[data-recipe-access-subline]');
+    assert.equal(subline.textContent.trim(), 'Played by Ada +2', 'collapses to +N');
+    assert.equal(
+      subline.getAttribute('title'),
+      'Ada, Brin, Cade',
+      'the "+N" collapse never hides a name — the full list is in the title'
+    );
+    railHarness.remount();
+  });
+
+  it('shows an empty-grant message and still deep-links to Manage access', async () => {
+    const opened = [];
+    const target = await railHarness.mount(
+      railProps({ visibilityEffect: RESTRICTED, onOpenAccess: () => opened.push(true) })
+    );
+    assert.ok(target.querySelector('[data-recipe-access-empty]'), 'states that nothing is granted');
+    target.querySelector('[data-recipe-open-access]').click();
+    assert.deepEqual(opened, [true], 'Manage access routes to the Access tab');
+    railHarness.remount();
+  });
+
+  // --- category ----------------------------------------------------------------
   it('disables the category selector and shows only General when no categories exist', async () => {
-    const target = await inspectorHarness.mount(inspectorProps({ categories: [] }));
+    const target = await railHarness.mount(railProps({ categories: [] }));
     const select = target.querySelector('[data-recipe-category-select]');
     assert.ok(select, 'category selector renders');
     assert.equal(select.disabled, true, 'selector is disabled with no custom categories');
     const options = [...select.querySelectorAll('option')];
     assert.equal(options.length, 1, 'only one option present');
     assert.equal(options[0].value, 'general', 'the sole option is the General fallback');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('enables the selector with custom categories and reports the current category', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, category: 'Potions' },
         categories: ['Potions', 'Weapons'],
       })
@@ -3172,13 +3252,13 @@ describe('RecipeItemInspector (mounted)', () => {
       'General precedes the custom categories'
     );
     assert.equal(select.value, 'Potions', 'reflects the recipe category');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('calls onSetCategory when a different category is chosen', async () => {
     const chosen = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, category: 'general' },
         categories: ['Potions'],
         onSetCategory: (category) => chosen.push(category),
@@ -3189,41 +3269,36 @@ describe('RecipeItemInspector (mounted)', () => {
     select.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
     await Promise.resolve();
     assert.deepEqual(chosen, ['Potions'], 'onSetCategory receives the selected category');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
-  it('hides the step-mode toggle when multi-step is not enabled and the recipe is single-step', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, steps: [] },
-        multiStepEnabled: false,
-      })
+  // --- step mode / recipe mode (now SegmentedControls) ---------------------------
+  it('hides the step-mode control when multi-step is not enabled and the recipe is single-step', async () => {
+    const target = await railHarness.mount(
+      railProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: false })
     );
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       null,
       'step-mode card is hidden'
     );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
-  it('shows the step-mode toggle for a single-step recipe when multi-step is enabled', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, steps: [] },
-        multiStepEnabled: true,
-      })
+  it('shows the step-mode control for a single-step recipe when multi-step is enabled', async () => {
+    const target = await railHarness.mount(
+      railProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: true })
     );
     assert.ok(
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       'step-mode card renders when enabled'
     );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
-  it('still shows the step-mode toggle for a multi-step recipe even when the feature is off (to allow revert)', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+  it('still shows the step-mode control for a multi-step recipe even when the feature is off (to allow revert)', async () => {
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] },
         multiStepEnabled: false,
       })
@@ -3232,14 +3307,14 @@ describe('RecipeItemInspector (mounted)', () => {
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       'step-mode card stays visible so multi-step can be reverted'
     );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('shows single-step selected and fires onEnterMultiStep when switching to multi', async () => {
     const entered = [];
     const reverted = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, steps: [] },
         multiStepEnabled: true,
         onEnterMultiStep: () => entered.push(true),
@@ -3248,148 +3323,161 @@ describe('RecipeItemInspector (mounted)', () => {
     );
     const single = target.querySelector('[data-recipe-step-mode-option="single"]');
     const multi = target.querySelector('[data-recipe-step-mode-option="multi"]');
-    assert.ok(
-      single.classList.contains('is-selected'),
-      'single is selected when there are no steps'
-    );
-    assert.equal(multi.classList.contains('is-selected'), false, 'multi is not selected');
+    assert.ok(single.classList.contains('is-active'), 'single is active when there are no steps');
+    assert.equal(multi.classList.contains('is-active'), false, 'multi is not active');
 
-    single.click();
-    assert.equal(entered.length, 0, 'clicking the already-active single mode is a no-op');
-
-    multi.click();
-    assert.deepEqual(entered, [true], 'clicking multi fires onEnterMultiStep');
+    // The SegmentedControl's real control is the (visually hidden) radio — the label
+    // is only the styled surface, so the keyboard/AT path is what the test drives.
+    multi.querySelector('input[type="radio"]').click();
+    await flushRender();
+    assert.deepEqual(entered, [true], 'choosing multi fires onEnterMultiStep');
     assert.equal(reverted.length, 0, 'revert not called when entering multi');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('shows multi-step selected and fires onRevertToSingleStep when switching to single', async () => {
     const entered = [];
     const reverted = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] },
         onEnterMultiStep: () => entered.push(true),
         onRevertToSingleStep: () => reverted.push(true),
       })
     );
-    const single = target.querySelector('[data-recipe-step-mode-option="single"]');
     const multi = target.querySelector('[data-recipe-step-mode-option="multi"]');
-    assert.ok(multi.classList.contains('is-selected'), 'multi is selected when steps exist');
+    assert.ok(multi.classList.contains('is-active'), 'multi is active when steps exist');
 
-    multi.click();
-    assert.equal(reverted.length, 0, 'clicking the already-active multi mode is a no-op');
-
-    single.click();
-    assert.deepEqual(reverted, [true], 'clicking single fires onRevertToSingleStep');
+    target.querySelector('[data-recipe-step-mode-option="single"] input[type="radio"]').click();
+    await flushRender();
+    assert.deepEqual(reverted, [true], 'choosing single fires onRevertToSingleStep');
     assert.equal(entered.length, 0, 'enter not called when reverting');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
-  it('renders the recipe-mode toggle with Simple selected when the system allows complex', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, steps: [] },
-        multiStepEnabled: false,
-        multiSetAllowed: true,
-      })
+  it('renders the recipe-mode control with Simple active when the system allows complex', async () => {
+    const target = await railHarness.mount(
+      railProps({ recipe: { ...RECIPE, steps: [] }, multiSetAllowed: true })
     );
     const card = target.querySelector('[data-recipe-section="recipe-mode"]');
     assert.ok(card, 'recipe-mode card renders when complex is an available choice');
-    const simple = card.querySelector('[data-recipe-mode-option="simple"]');
-    assert.ok(simple.classList.contains('is-selected'), 'Simple is selected when complex is false');
-    inspectorHarness.remount();
+    assert.ok(
+      card.querySelector('[data-recipe-mode-option="simple"]').classList.contains('is-active'),
+      'Simple is active when complex is false'
+    );
+    railHarness.remount();
   });
 
   it('hides the recipe-mode section when the system forbids multiple sets and the recipe is not already complex', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        complex: false,
-        multiSetAllowed: false,
-      })
+    const target = await railHarness.mount(railProps({ complex: false, multiSetAllowed: false }));
+    assert.equal(
+      target.querySelector('[data-recipe-section="recipe-mode"]'),
+      null,
+      'a simple-resolution system does not show the recipe-mode control at all'
+    );
+    railHarness.remount();
+  });
+
+  it('still shows the recipe-mode section for an already-complex recipe even when the system forbids multiple sets', async () => {
+    const target = await railHarness.mount(railProps({ complex: true, multiSetAllowed: false }));
+    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
+    assert.ok(card, 'an already-complex recipe keeps the control so it can be reverted');
+    assert.ok(
+      card.querySelector('[data-recipe-mode-option="complex"]').classList.contains('is-active'),
+      'Complex is active for an already-complex recipe'
+    );
+    railHarness.remount();
+  });
+
+  it('hides the recipe-mode section entirely for alchemy (hideComplexToggle)', async () => {
+    const target = await railHarness.mount(
+      railProps({ complex: false, multiSetAllowed: true, hideComplexToggle: true })
     );
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-mode"]'),
       null,
-      'a simple-resolution system does not show the recipe-mode toggle at all'
+      'alchemy recipes always have exactly one ingredient set'
     );
-    inspectorHarness.remount();
-  });
-
-  it('still shows the recipe-mode section for an already-complex recipe even when the system forbids multiple sets', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        complex: true,
-        multiSetAllowed: false,
-      })
-    );
-    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
-    assert.ok(card, 'an already-complex recipe keeps the recipe-mode toggle so it can be reverted');
-    const complex = card.querySelector('[data-recipe-mode-option="complex"]');
-    assert.ok(
-      complex.classList.contains('is-selected'),
-      'Complex is selected for an already-complex recipe'
-    );
-    inspectorHarness.remount();
-  });
-
-  it('enables the Complex option when multiSetAllowed is true', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        complex: false,
-        multiSetAllowed: true,
-      })
-    );
-    const complex = target.querySelector('[data-recipe-mode-option="complex"]');
-    assert.equal(
-      complex.disabled,
-      false,
-      'Complex is enabled when the system allows multiple sets'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-mode-hint="locked"]'),
-      null,
-      'no locked hint when allowed'
-    );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('fires onSetComplexity(true) on Complex and onSetComplexity(false) on Simple', async () => {
     const calls = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         complex: false,
         multiSetAllowed: true,
         onSetComplexity: (next) => calls.push(next),
       })
     );
-    target.querySelector('[data-recipe-mode-option="complex"]').click();
-    assert.deepEqual(calls, [true], 'clicking Complex requests complex mode');
+    target.querySelector('[data-recipe-mode-option="complex"] input[type="radio"]').click();
+    await flushRender();
+    assert.deepEqual(calls, [true], 'choosing Complex requests complex mode');
 
-    inspectorHarness.remount();
-    const target2 = await inspectorHarness.mount(
-      inspectorProps({
+    railHarness.remount();
+    const target2 = await railHarness.mount(
+      railProps({
         complex: true,
         multiSetAllowed: true,
         onSetComplexity: (next) => calls.push(next),
       })
     );
-    target2.querySelector('[data-recipe-mode-option="simple"]').click();
-    assert.deepEqual(calls, [true, false], 'clicking Simple requests simple mode');
-    inspectorHarness.remount();
+    target2.querySelector('[data-recipe-mode-option="simple"] input[type="radio"]').click();
+    await flushRender();
+    assert.deepEqual(calls, [true, false], 'choosing Simple requests simple mode');
+    railHarness.remount();
   });
 
   // The per-recipe Check/Ingredient routing sub-selector was removed when the
   // routing basis became a property of the system MODE (routedByIngredients /
-  // routedByCheck). The inspector no longer renders a routing toggle.
+  // routedByCheck). The rail renders no routing toggle.
   it('does not render a per-recipe routing toggle (routing basis is the system mode)', async () => {
-    const target = await inspectorHarness.mount(inspectorProps({ complex: true }));
+    const target = await railHarness.mount(railProps({ complex: true }));
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-routing"]'),
       null,
       'the routing sub-selector is gone'
     );
-    inspectorHarness.remount();
+    railHarness.remount();
+  });
+
+  // --- the validation mini-list --------------------------------------------------
+  it('shows an All clear pill when the readiness evaluator reports no issues', async () => {
+    const target = await railHarness.mount(railProps({ readiness: { checks: [], issues: [] } }));
+    assert.ok(target.querySelector('[data-recipe-validation-clear]'), 'renders the All clear pill');
+    assert.equal(
+      target.querySelector('[data-recipe-validation-issues]'),
+      null,
+      'no issue list when clear'
+    );
+    railHarness.remount();
+  });
+
+  it('lists the failing checks and deep-links to the Validation tab', async () => {
+    const selected = [];
+    const target = await railHarness.mount(
+      railProps({
+        readiness: {
+          checks: [
+            { id: 'hasName', satisfied: true },
+            { id: 'hasResultGroup', satisfied: false },
+          ],
+          issues: [{ id: 'noResultGroup', severity: 'critical' }],
+        },
+        onSelectIssue: (requested) => selected.push(requested),
+      })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-validation-clear]'),
+      null,
+      'no All clear pill while an issue stands'
+    );
+    const rows = target.querySelectorAll('[data-recipe-rail-check]');
+    assert.equal(rows.length, 1, 'only the FAILING check is listed');
+    assert.equal(rows[0].getAttribute('data-recipe-rail-check'), 'hasResultGroup');
+    target.querySelector('[data-recipe-open-validation]').click();
+    assert.deepEqual(selected, ['validation'], 'the review button opens the Validation tab');
+    railHarness.remount();
   });
 });
 
