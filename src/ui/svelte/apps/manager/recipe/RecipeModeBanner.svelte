@@ -38,8 +38,8 @@
   </span>
   <div class="manager-recipe-mode-banner-copy">
     <p class="manager-recipe-mode-banner-title">
-      <span class="manager-recipe-mode-banner-kicker">{text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}</span>
-      <strong>{text(mode.labelKey, mode.fallback)}</strong>
+      <strong>{text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}: {text(mode.labelKey, mode.fallback)}</strong>
+      <span class="manager-recipe-mode-banner-scope manager-muted">· {text('FABRICATE.Admin.Manager.Recipe.ModeBanner.SetForSystem', 'set for this crafting system')}</span>
     </p>
     <p class="manager-recipe-mode-banner-desc manager-muted">{text(mode.descKey, mode.descFallback)}</p>
   </div>
@@ -50,7 +50,7 @@
     title={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.SettingsHint', 'Resolution mode is set for the whole crafting system, not per recipe.')}
     onclick={() => onOpenSettings()}
   >
-    <i class="fas fa-sliders" aria-hidden="true"></i>
+    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Settings', 'System settings')}</span>
   </button>
 </div>
@@ -90,18 +90,21 @@
 
   .manager-recipe-mode-banner-title {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-1);
     margin: 0;
     font-size: 0.82rem;
   }
 
-  .manager-recipe-mode-banner-kicker {
-    color: var(--fab-text-subtle);
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  .manager-recipe-mode-banner-title strong {
+    color: var(--fab-text);
+    font-weight: 600;
+  }
+
+  .manager-recipe-mode-banner-scope {
+    font-size: 0.72rem;
+    font-weight: 400;
   }
 
   /* The description is the ONE sentence this banner exists to deliver. It used to be

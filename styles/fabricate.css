@@ -1401,6 +1401,23 @@
 .fabricate-manager .manager-header-actions .manager-button.is-primary {
   min-height: 38px;
   padding: 0 var(--fab-space-4);
+
+  /* Save is the loudest thing on screen (§F6): solid green, heavier weight. */
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+/* Ghost Back button (§F6): quiet, so the green Save wins the eye. */
+.fabricate-manager .manager-header-actions .manager-button.is-ghost {
+  border-color: transparent;
+  color: var(--fab-text-muted);
+  background: transparent;
+}
+
+.fabricate-manager .manager-header-actions .manager-button.is-ghost:not(:disabled):hover {
+  border-color: var(--fab-border);
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-manager .manager-subtitle {

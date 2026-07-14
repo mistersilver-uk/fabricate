@@ -1670,6 +1670,7 @@
             "years": "yr"
           },
           "DurationInstant": "Instant",
+          "CheckDcShort": "DC",
           "NameLabel": "Recipe name",
           "FlavourLabel": "Flavour text",
           "EnabledTitle": "Enabled",
@@ -1893,6 +1894,7 @@
           },
           "ModeBanner": {
             "Kicker": "Resolution mode",
+            "SetForSystem": "set for this crafting system",
             "Settings": "System settings",
             "SettingsHint": "Resolution mode is set for the whole crafting system, not per recipe."
           },

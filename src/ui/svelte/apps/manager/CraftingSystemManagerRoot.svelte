@@ -1694,7 +1694,18 @@
   function recipeEditSubtitle() {
     const category = getRecipeCategoryLabel(normalizeRecipeCategory(recipeDraft?.category), localize);
     const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    return `${category} · ${mode}`;
+    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check DC from the same
+    // projected `checkSummary` the browser row's check pill reads. A DC-kind check
+    // shows its number; a check-bearing system with no usable check shows "—";
+    // dynamic / progressive / by-ingredients modes carry no DC and omit the segment.
+    const summary = selectedRecipe?.checkSummary || null;
+    let dcSuffix = '';
+    if (summary?.kind === 'dc' && Number.isFinite(Number(summary.dc))) {
+      dcSuffix = ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC')} ${summary.dc}`;
+    } else if (summary?.kind === 'none') {
+      dcSuffix = ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC')} —`;
+    }
+    return `${category} · ${mode}${dcSuffix}`;
   }
 
   function resolutionModeLabel(mode) {
@@ -4370,7 +4381,8 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToRecipesBrowse}>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', 'Edit recipe')}</span>
+          <!-- Name the recipe (§F5), not the generic "Edit recipe". -->
+          <span>{recipeDraft?.name || text('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', 'Edit recipe')}</span>
         {/if}
         {#if currentView === 'component-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -4453,7 +4465,7 @@
         {#if recipeEditDirty}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</span>
         {/if}
-        <button type="button" class="manager-button" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
+        <button type="button" class="manager-button is-ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
         </button>

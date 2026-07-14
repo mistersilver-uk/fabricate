@@ -248,11 +248,11 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
     assert.equal(bannerSource.includes('onChange'), false, 'no per-recipe mode control');
   });
 
-  it('is rendered by the editor shell above the tab strip, so it heads EVERY tab', () => {
+  it('is rendered by the editor shell below the tab strip so the tabs stay attached to the header (§4.2)', () => {
     assert.ok(editSource.includes('<RecipeModeBanner'), 'the shell renders the banner');
     assert.ok(
-      editSource.indexOf('<RecipeModeBanner') < editSource.indexOf('<RecipeEditorTabs'),
-      'the banner sits above the tab strip and therefore heads every tab'
+      editSource.indexOf('<RecipeEditorTabs') < editSource.indexOf('<RecipeModeBanner'),
+      'header → tabs → banner → content: the banner sits below the tab strip'
     );
   });
 

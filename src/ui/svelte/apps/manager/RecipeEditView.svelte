@@ -200,11 +200,41 @@
   }));
   const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
   const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
+
+  // Tab count badges (issue 643 §F1): Ingredients / Results / Tools carry a mono
+  // count so the strip reads like the prototype. Multi-step recipes sum each tab's
+  // count across every step; single-step recipes read the recipe-scope arrays.
+  function countIngredients(scope) {
+    const sets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+    return sets.reduce((total, set) => {
+      const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups.length : 0;
+      const essences = set?.essences && typeof set.essences === 'object' ? Object.keys(set.essences).length : 0;
+      return total + groups + essences;
+    }, 0);
+  }
+  function countResults(scope) {
+    const groups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+    return groups.reduce((total, group) => total + (Array.isArray(group?.results) ? group.results.length : 0), 0);
+  }
+  function countTools(scope) {
+    return Array.isArray(scope?.toolIds) ? scope.toolIds.length : 0;
+  }
+  function sumOverScopes(counter) {
+    if (isMultiStep) return steps.reduce((total, step) => total + counter(step), 0);
+    return counter(recipe || {});
+  }
+  const ingredientsCount = $derived(sumOverScopes(countIngredients));
+  const resultsCount = $derived(sumOverScopes(countResults));
+  // Tools also carries the recipe-level (global) tools in multi-step mode.
+  const toolsCount = $derived(sumOverScopes(countTools) + (isMultiStep ? countTools(recipe || {}) : 0));
   // While the recipe is OFF, an enable-blocking issue disables the enable toggle so
   // the GM cannot trigger the hard activation failure (issue 549); disabling stays
   // free. Predicted from the same readiness the Validation tab renders.
   const enableBlocked = $derived(!enabled && blocksEnable(readiness.issues));
   const badges = $derived({
+    ingredients: ingredientsCount > 0 ? [{ label: String(ingredientsCount), tone: 'neutral' }] : [],
+    results: resultsCount > 0 ? [{ label: String(resultsCount), tone: 'neutral' }] : [],
+    tools: toolsCount > 0 ? [{ label: String(toolsCount), tone: 'neutral' }] : [],
     validation: [
       ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
       ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : [])
@@ -253,9 +283,11 @@
 <main class="manager-main manager-recipe-edit-main" aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}>
   {#if recipe}
     <div class="manager-recipe-edit-view" data-recipe-editor>
-      <RecipeModeBanner {resolutionMode} onOpenSettings={onOpenCraftingSettings} />
-
+      <!-- Header → tabs → banner → content (§4.2): the banner sits BELOW the tab strip
+           so the tabs stay attached to the header above them. -->
       <RecipeEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
+
+      <RecipeModeBanner {resolutionMode} onOpenSettings={onOpenCraftingSettings} />
 
       <div
         class="manager-editor-tab-panel"
