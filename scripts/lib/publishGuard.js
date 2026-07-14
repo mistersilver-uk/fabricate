@@ -34,11 +34,30 @@
 import { compareSemver, foundryIsNewerVersion, parseSemver } from './semver.js';
 
 /**
+ * @typedef {object} ManifestHead
+ * @property {string} version - the version the head manifest advertises
+ * @property {string|undefined} etag - the manifest object's S3 ETag (drives the conditional write)
+ * @property {string} body - the manifest EXACTLY as S3 stores it (the PUT body, no trailing newline)
+ */
+
+/**
+ * @typedef {object} ZipHead
+ * @property {string|undefined} etag - the versioned zip's S3 ETag
+ * @property {number|undefined} size - the zip's byte length
+ * @property {Record<string, string>} metadata - the zip's user metadata (the provenance stamp:
+ *   `fabricate-version`, `fabricate-source-sha`, `fabricate-build-profile`), lower-cased by S3
+ */
+
+/**
  * @typedef {object} HeadRecord
  * @property {string} label       - the target's stable, secret-free label (`tester-closed-beta-2026`)
  * @property {string} manifestKey - the S3 key of the target's `latest` manifest
  * @property {boolean} present    - does the target have a published head at all?
  * @property {string|null} head   - the version that head advertises, or `null` when absent
+ * @property {ManifestHead|null} manifest - the head manifest's version/etag/serialised body, or
+ *   `null` when the manifest is a 404. Branched on explicitly — never handed to the comparator.
+ * @property {ZipHead|null} zip - the ALREADY-PUBLISHED versioned zip for this version, or `null`
+ *   when absent (a fresh publish) or unreadable. Its `metadata` carries the build provenance.
  */
 
 /**
@@ -46,26 +65,42 @@ import { compareSemver, foundryIsNewerVersion, parseSemver } from './semver.js';
  * @property {string} label
  * @property {boolean} present
  * @property {string|null} head
- * @property {'allow'|'allow-no-head'|'allow-downgrade'|'refuse'} decision
+ * @property {'allow'|'allow-no-head'|'allow-downgrade'|'allow-resume'|'allow-overwrite'|'refuse'} decision
+ * @property {'downgrade'|'provenance'|'missing'|null} [kind] - why a `refuse` refused (or the reason
+ *   an `allow-overwrite` was only permitted under `--overwrite`)
+ * @property {boolean} [skipZip] - skip this target's zip PUT (the byte-identical zip is already up)
+ * @property {boolean} [skipManifest] - skip this target's manifest PUT (already advertises this
+ *   version with a byte-identical body)
  * @property {string} reason
  */
 
 /**
- * Read the current head of every target.
+ * Read the current head — and the already-published versioned zip — of every target.
  *
- * `getObject` is the only collaborator, and it is injected: the guard is exercised in tests against
- * a double, never against S3. It MUST resolve to `{ status: number, body: string|null }` — an HTTP
- * status, not a thrown AWS error — so that this function can tell 404 (absent) from 403 (a
- * permissions failure) without knowing anything about the SDK's error taxonomy.
+ * Two collaborators, both injected so the guard is exercised against doubles, never against S3:
  *
- * @param {Array<{label: string, manifestKey: string}>} targets The targets about to be published.
- * @param {{getObject: (key: string) => Promise<{status: number, body: string|null}>}} io The
- *   injected object reader.
+ *   - `getObject(key)` MUST resolve to `{ status: number, body: string|null, etag?: string }` — an
+ *     HTTP status, not a thrown AWS error — so this function can tell 404 (absent) from 403 (a
+ *     permissions failure) without knowing the SDK's error taxonomy. The `etag` it returns is what
+ *     the manifest's conditional write (`IfMatch`) is anchored to.
+ *   - `headObject(zipKey)` is OPTIONAL (the read-only `--check-heads` path omits it: it compares
+ *     heads, never zips). When supplied it MUST resolve to `{ etag, size, metadata }` for a present
+ *     zip or `null` for an absent one; a bare boolean is tolerated for back-compat (the legacy port
+ *     answered "does the key exist?"), but then no provenance is available and the zip is treated as
+ *     being of an unidentified build.
+ *
+ * The return is the array of records `assertPublishSafety` consumes VERBATIM — no reshaping happens
+ * between the two, which is where a resume bug would otherwise hide.
+ *
+ * @param {Array<{label: string, manifestKey: string, zipKey?: string}>} targets The targets about to
+ *   be published.
+ * @param {{getObject: (key: string) => Promise<{status: number, body: string|null, etag?: string}>,
+ *   headObject?: (key: string) => Promise<ZipHead|boolean|null>}} io The injected object readers.
  * @returns {Promise<HeadRecord[]>} One record per target, in the order given.
  * @throws {Error} If any target's manifest cannot be read (403, 5xx, unparseable, or advertising no
  *   version). A storage error is NEVER reported as an absent head.
  */
-export async function fetchPublishState(targets, { getObject } = {}) {
+export async function fetchPublishState(targets, { getObject, headObject } = {}) {
   if (typeof getObject !== 'function') {
     throw new TypeError('fetchPublishState: a `getObject(key)` reader is required.');
   }
@@ -74,19 +109,36 @@ export async function fetchPublishState(targets, { getObject } = {}) {
   // only ever a handful of targets.
   const state = [];
   for (const target of targets) {
-    state.push(await readHead(target, getObject));
+    state.push(await readHead(target, getObject, headObject));
   }
   return state;
 }
 
 /**
- * Read one target's head.
- * @param {{label: string, manifestKey: string}} target The target to read.
- * @param {(key: string) => Promise<{status: number, body: string|null}>} getObject The reader.
+ * Coerce whatever `headObject` returned into a `ZipHead|null`.
+ *
+ * `null`/`false`/`undefined` ⇒ absent. A bare `true` (the legacy boolean port) ⇒ present but with
+ * NO provenance — an empty metadata map, so the guard reads it as an unidentified build. An object
+ * is taken as-is, with a metadata map that is always present.
+ * @param {ZipHead|boolean|null|undefined} raw What `headObject` resolved to.
+ * @returns {ZipHead|null} The normalised zip head.
+ */
+function normaliseZipHead(raw) {
+  if (!raw) return null;
+  if (raw === true) return { etag: undefined, size: undefined, metadata: {} };
+  return { etag: raw.etag, size: raw.size, metadata: raw.metadata ?? {} };
+}
+
+/**
+ * Read one target's head manifest and its already-published zip.
+ * @param {{label: string, manifestKey: string, zipKey?: string}} target The target to read.
+ * @param {(key: string) => Promise<{status: number, body: string|null, etag?: string}>} getObject
+ *   The manifest reader.
+ * @param {((key: string) => Promise<ZipHead|boolean|null>)|undefined} headObject The zip reader.
  * @returns {Promise<HeadRecord>} The head record.
  */
-async function readHead(target, getObject) {
-  const { label, manifestKey } = target;
+async function readHead(target, getObject, headObject) {
+  const { label, manifestKey, zipKey } = target;
   const response = await getObject(manifestKey);
 
   if (typeof response?.status !== 'number') {
@@ -96,8 +148,13 @@ async function readHead(target, getObject) {
     );
   }
 
+  // The zip head is read for EVERY target (a partial publish can leave a zip with no manifest), but
+  // only when a reader and a zip key are both available.
+  const zip =
+    typeof headObject === 'function' && zipKey ? normaliseZipHead(await headObject(zipKey)) : null;
+
   if (response.status === 404) {
-    return { label, manifestKey, present: false, head: null };
+    return { label, manifestKey, present: false, head: null, manifest: null, zip };
   }
 
   if (response.status !== 200) {
@@ -111,9 +168,10 @@ async function readHead(target, getObject) {
     );
   }
 
+  const body = String(response.body);
   let manifest;
   try {
-    manifest = JSON.parse(String(response.body));
+    manifest = JSON.parse(body);
   } catch {
     throw new Error(
       `the head manifest of ${label} (${manifestKey}) is not valid JSON — refusing to publish ` +
@@ -129,30 +187,88 @@ async function readHead(target, getObject) {
     );
   }
 
-  return { label, manifestKey, present: true, head: head.trim() };
+  // `body` is retained EXACTLY as S3 returned it (the PUT form, with no trailing newline), so the
+  // resume check can compare it byte-for-byte against what would be PUT.
+  return {
+    label,
+    manifestKey,
+    present: true,
+    head: head.trim(),
+    manifest: { version: head.trim(), etag: response.etag, body },
+    zip,
+  };
 }
 
 /**
- * Decide whether a version may be published over the current heads. PURE: no I/O, no printing, no
- * throwing on a refusal — it RETURNS the verdict, so the caller (and the tests) can inspect every
- * per-target decision and every warning.
+ * Serialise a manifest body EXACTLY as `release-s3.js` PUTs it: two-space-indented JSON with NO
+ * trailing newline. `release-s3.js` writes the *dist* manifest with a trailing `\n` but PUTs the
+ * body without one, so the resume comparison MUST be against this form — comparing the dist form
+ * reads every resume as a different build and fails closed.
+ * @param {unknown} body The manifest object about to be published.
+ * @returns {string|null} The serialised body, or `null` when there is nothing to compare.
+ */
+export function serialiseManifestBody(body) {
+  return body == null ? null : JSON.stringify(body, null, 2);
+}
+
+/**
+ * Does an already-published zip's provenance prove it came from THIS build?
+ *
+ * Sameness of build is established by recorded provenance, never by bytes (the archive is not
+ * byte-reproducible across builds). A source sha or profile that is absent, or the sentinel
+ * `unknown` a backfill stamps where no tag maps, is treated as an UNIDENTIFIED build and never
+ * satisfies the test — so it fails closed rather than assuming a match.
+ * @param {ZipHead|null} zip The already-published zip's head.
+ * @param {string|undefined} sourceSha The source commit of the build being published.
+ * @param {string} buildProfile The build profile being published.
+ * @returns {boolean} `true` only when both sha and profile are present, identified, and equal.
+ */
+function provenanceProvesSameBuild(zip, sourceSha, buildProfile) {
+  if (!zip?.metadata) return false;
+  const zipSha = zip.metadata['fabricate-source-sha'];
+  const zipProfile = zip.metadata['fabricate-build-profile'];
+  if (!sourceSha || sourceSha === 'unknown') return false;
+  if (!zipSha || zipSha === 'unknown') return false;
+  if (zipSha !== sourceSha) return false;
+  return Boolean(zipProfile) && zipProfile === buildProfile;
+}
+
+/**
+ * Decide whether a version may be published over the current heads AND the already-published zips.
+ * PURE: no I/O, no printing, no throwing on a refusal — it RETURNS the verdict, so the caller (and
+ * the tests) can inspect every per-target decision, every warning, and every skip.
  *
  * It does throw on a caller bug (a malformed `staged` entry), which is not a verdict.
  *
  * @param {object} options The options.
  * @param {string} options.version The version being published.
- * @param {Array<{target: {label: string, manifestKey: string}}>} options.staged The staged
- *   publish entries — one per target that is about to be written.
- * @param {HeadRecord[]} options.state The heads read by `fetchPublishState`.
- * @param {boolean} [options.allowDowngrade] Explicit override; see the refusal text for why this is
- *   almost never the right answer.
- * @returns {{ok: boolean, version: string, allowDowngrade: boolean, decisions: TargetDecision[],
- *   warnings: string[], error: string|null}} The verdict.
+ * @param {string} [options.sourceSha] The source commit of the build being published — the identity
+ *   half of the provenance the guard matches against an already-published zip.
+ * @param {string} [options.buildProfile] The build profile being published (default `community`).
+ * @param {Array<{target: {label: string, manifestKey: string, zipKey?: string}, body?: unknown}>}
+ *   options.staged The staged publish entries — one per target that is about to be written. `body`
+ *   is the manifest that would be PUT (the resume check compares its serialised form).
+ * @param {HeadRecord[]} options.state The heads read by `fetchPublishState`, VERBATIM.
+ * @param {boolean} [options.allowDowngrade] Explicit override for a Foundry-newer head.
+ * @param {boolean} [options.overwrite] Explicit override for a same-version content swap.
+ * @returns {{ok: boolean, version: string, allowDowngrade: boolean, overwrite: boolean,
+ *   decisions: TargetDecision[], warnings: string[], violations: TargetDecision[],
+ *   skipZipKeys: string[], skipManifestKeys: string[], error: string|null}} The verdict.
  */
-export function assertPublishSafety({ version, staged, state, allowDowngrade = false }) {
+export function assertPublishSafety({
+  version,
+  sourceSha,
+  buildProfile = 'community',
+  staged,
+  state,
+  allowDowngrade = false,
+  overwrite = false,
+}) {
   const heads = new Map(state.map((record) => [record.manifestKey, record]));
   const decisions = [];
   const warnings = [];
+  const skipZipKeys = [];
+  const skipManifestKeys = [];
 
   for (const entry of staged) {
     const target = entry?.target;
@@ -160,58 +276,118 @@ export function assertPublishSafety({ version, staged, state, allowDowngrade = f
       throw new TypeError('assertPublishSafety: every staged entry must carry a `target`.');
     }
     const record = heads.get(target.manifestKey);
-    decisions.push(
-      record
-        ? decideTarget({ version, record, allowDowngrade, warnings })
-        : {
-            label: target.label,
-            present: false,
-            head: null,
-            decision: 'refuse',
-            // Fail CLOSED on a hole in the state: a target we are about to write but never read is
-            // a target whose head we do not know.
-            reason: `no head was read for ${target.label}, so it cannot be shown to be safe.`,
-          }
-    );
+    const decision = record
+      ? decideTarget({
+          version,
+          sourceSha,
+          buildProfile,
+          record,
+          manifestBody: entry.body,
+          allowDowngrade,
+          overwrite,
+          warnings,
+        })
+      : {
+          label: target.label,
+          present: false,
+          head: null,
+          decision: 'refuse',
+          kind: 'missing',
+          // Fail CLOSED on a hole in the state: a target we are about to write but never read is
+          // a target whose head we do not know.
+          reason: `no head was read for ${target.label}, so it cannot be shown to be safe.`,
+        };
+
+    if (decision.skipZip && target.zipKey) skipZipKeys.push(target.zipKey);
+    if (decision.skipManifest) skipManifestKeys.push(target.manifestKey);
+    decisions.push(decision);
   }
 
-  const refusals = decisions.filter((decision) => decision.decision === 'refuse');
+  const violations = decisions.filter((decision) => decision.decision === 'refuse');
   return {
-    ok: refusals.length === 0,
+    ok: violations.length === 0,
     version,
     allowDowngrade,
+    overwrite,
     decisions,
     warnings,
-    error: refusals.length === 0 ? null : buildRefusal(version, refusals),
+    violations,
+    skipZipKeys,
+    skipManifestKeys,
+    error: violations.length === 0 ? null : buildCombinedRefusal(version, violations),
   };
 }
 
 /**
- * Decide one target, appending any comparator disagreement to `warnings`.
- * @param {{version: string, record: HeadRecord, allowDowngrade: boolean, warnings: string[]}} args
- *   The version being published, the target's head, the override, and the warnings sink.
+ * Decide one target against the full decision table, appending any comparator disagreement to
+ * `warnings`. The head ordering is checked FIRST (a Foundry-newer head is refused regardless of the
+ * zip); only when the head is not newer does the already-published zip's provenance come into play.
+ * @param {{version: string, sourceSha: string|undefined, buildProfile: string, record: HeadRecord,
+ *   manifestBody: unknown, allowDowngrade: boolean, overwrite: boolean, warnings: string[]}} args
+ *   The publish inputs, the target's head, the overrides, and the warnings sink.
  * @returns {TargetDecision} The decision for this target.
  */
-function decideTarget({ version, record, allowDowngrade, warnings }) {
-  const { label, present, head } = record;
+function decideTarget({
+  version,
+  sourceSha,
+  buildProfile,
+  record,
+  manifestBody,
+  allowDowngrade,
+  overwrite,
+  warnings,
+}) {
+  const { label, present, head, zip } = record;
+  const zipPresent = zip != null;
+  const sameBuild = provenanceProvesSameBuild(zip, sourceSha, buildProfile);
 
   // RULE 2. The absent head is branched on BEFORE any comparison — never handed to a comparator
   // that would treat a missing operand as older than everything.
   if (!present) {
+    // A zip with no manifest is a publish that died before its manifest write. Resume it (skip the
+    // identical immutable zip) when provenance proves the same build; refuse an orphan zip of a
+    // different or unidentified build unless --overwrite, rather than silently replacing immutable
+    // bytes.
+    if (zipPresent && !sameBuild && !overwrite) {
+      return refusal(label, false, null, 'provenance', provenanceReason(label, version, zip));
+    }
     return {
       label,
       present: false,
       head: null,
       decision: 'allow-no-head',
+      skipZip: zipPresent && sameBuild,
       reason: `${label} has no published head yet, so nothing can be moved backwards.`,
     };
   }
 
-  // RULE 1. Foundry's comparator, and only Foundry's comparator, decides.
+  // RULE 1. Foundry's comparator, and only Foundry's comparator, decides the head ordering.
   const headIsNewer = foundryIsNewerVersion(head, version);
   reportDisagreement({ version, label, head, warnings });
 
-  if (!headIsNewer) {
+  if (headIsNewer) {
+    if (allowDowngrade) {
+      return {
+        label,
+        present: true,
+        head,
+        decision: 'allow-downgrade',
+        reason:
+          `${label} advertises ${head}, which Foundry considers NEWER than ${version} — allowed ` +
+          'only because --allow-downgrade was passed.',
+      };
+    }
+    return refusal(
+      label,
+      true,
+      head,
+      'downgrade',
+      `${label} already advertises ${head}, which Foundry considers newer than ${version}.`
+    );
+  }
+
+  // The head is not newer. With no already-published zip this is a plain forward publish.
+  if (!zipPresent) {
     return {
       label,
       present: true,
@@ -221,25 +397,102 @@ function decideTarget({ version, record, allowDowngrade, warnings }) {
     };
   }
 
-  if (allowDowngrade) {
+  // A zip already exists for this version. Sameness of build decides: matching provenance AND a
+  // byte-identical manifest body is the resume path (skip the zip PUT); anything else is a
+  // same-version content swap, refused unless --overwrite.
+  const bodyMatches = serialiseManifestBody(manifestBody) === record.manifest?.body;
+  if (sameBuild && bodyMatches) {
     return {
       label,
       present: true,
       head,
-      decision: 'allow-downgrade',
-      reason:
-        `${label} advertises ${head}, which Foundry considers NEWER than ${version} — allowed ` +
-        'only because --allow-downgrade was passed.',
+      decision: 'allow-resume',
+      skipZip: true,
+      skipManifest: true,
+      reason: `${label} already published ${version} from this same build — resuming, nothing to re-upload.`,
     };
   }
 
-  return {
-    label,
-    present: true,
-    head,
-    decision: 'refuse',
-    reason: `${label} already advertises ${head}, which Foundry considers newer than ${version}.`,
-  };
+  if (overwrite) {
+    return {
+      label,
+      present: true,
+      head,
+      decision: 'allow-overwrite',
+      kind: 'provenance',
+      reason:
+        `${label} already published ${version} from a DIFFERENT or unidentified build — replacing ` +
+        'its immutable artefacts only because --overwrite was passed.',
+    };
+  }
+
+  return refusal(label, true, head, 'provenance', provenanceReason(label, version, zip));
+}
+
+/**
+ * Build a `refuse` decision.
+ * @param {string} label The target label.
+ * @param {boolean} present Whether the target has a head.
+ * @param {string|null} head The head version, or null.
+ * @param {'downgrade'|'provenance'|'missing'} kind Why it refused.
+ * @param {string} reason The human-readable reason.
+ * @returns {TargetDecision} The refusal.
+ */
+function refusal(label, present, head, kind, reason) {
+  return { label, present, head, decision: 'refuse', kind, reason };
+}
+
+/**
+ * The reason line for a same-version content swap.
+ * @param {string} label The target label.
+ * @param {string} version The version being (re)published.
+ * @param {ZipHead|null} zip The already-published zip whose provenance did not match.
+ * @returns {string} The reason.
+ */
+function provenanceReason(label, version, zip) {
+  const sha = zip?.metadata?.['fabricate-source-sha'];
+  const provenance = sha && sha !== 'unknown' ? `source ${sha}` : 'no identifiable provenance';
+  return (
+    `${label} already published ${version} from a build with ${provenance}, which does NOT match ` +
+    'the build being published — publishing would replace an already-distributed immutable ' +
+    'artefact with different bytes under the same version.'
+  );
+}
+
+/**
+ * Compose the combined refusal message. Head-ordering and missing-head refusals go through the
+ * existing backwards-move text (with its minor-bump remedy); content-swap refusals get their own
+ * text. Both may fire in one publish.
+ * @param {string} version The version being published.
+ * @param {TargetDecision[]} violations Every refused target.
+ * @returns {string} The refusal text.
+ */
+function buildCombinedRefusal(version, violations) {
+  const backwards = violations.filter((v) => v.kind === 'downgrade' || v.kind === 'missing');
+  const swaps = violations.filter((v) => v.kind === 'provenance');
+  const parts = [];
+  if (backwards.length > 0) parts.push(buildRefusal(version, backwards));
+  if (swaps.length > 0) parts.push(buildProvenanceRefusal(version, swaps));
+  return parts.join('\n\n');
+}
+
+/**
+ * The refusal text for one or more same-version content swaps.
+ * @param {string} version The version being (re)published.
+ * @param {TargetDecision[]} swaps The refused targets.
+ * @returns {string} The refusal text.
+ */
+function buildProvenanceRefusal(version, swaps) {
+  const lines = swaps.map((swap) => `  - ${swap.reason}`);
+  return (
+    `refusing to re-publish ${version}: it would replace ${swaps.length} already-published ` +
+    'immutable artefact(s) with bytes from a different build.\n' +
+    lines.join('\n') +
+    '\nRe-run the publish from the SAME commit to resume it without an override. --overwrite exists ' +
+    'only for an artefact NO cohort has installed yet; it must NEVER be the routine remedy for a ' +
+    'failed publish of an already-distributed version, because clients already on that version ' +
+    'never re-download it and would run different bytes under one version string.'
+  );
 }
 
 /**
