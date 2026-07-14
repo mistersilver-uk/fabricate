@@ -10,8 +10,7 @@
   ],
   "compatibility": {
     "minimum": "13",
-    "verified": "14",
-    "maximum": "14"
+    "verified": "14"
   },
   "esmodules": [
     "main.js"
