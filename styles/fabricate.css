@@ -1,11 +1,84 @@
 /* Fabricate v2 - Universal Crafting System Styles */
 
+/* Self-hosted product faces (issue 643).
+   Signika and Font Awesome already come from Foundry core via `--font-primary`;
+   these two do not exist in core, so the module ships them.
+
+   Both are SIL OFL 1.1 (see assets/fonts/OFL-*.txt) — redistributable alongside
+   the module's own PolyForm Noncommercial licence. Latin subsets only, and only
+   the weights the UI actually uses: this sheet is loaded GLOBALLY into the
+   Foundry document, so every world pays the download whether or not Fabricate is
+   ever opened. Keep the face/weight list minimal.
+
+   `font-display: swap` renders Georgia / ui-monospace immediately and swaps when
+   the face arrives, so a slow or missing font never blanks the UI. */
+
+@font-face {
+  font-family: Spectral;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/spectral-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Spectral;
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../assets/fonts/spectral-latin-500-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Spectral;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../assets/fonts/spectral-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Spectral;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/spectral-latin-700-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+}
+
 :root {
   /* Fabricate product UI design-system tokens.
      See the UI design-system requirements in openspec/specs/ui-integration/spec.md.
      Theme colour literals live only in `[data-fabricate-theme]` blocks below.
      Existing `--fab-v2-*` aliases map through canonical `--fab-*` tokens until
      each component migrates intentionally. */
+
+  /* Typographic faces (issue 643). These live in `:root`, NOT in a theme block:
+     `tests/components/theme-colour-contract.test.js` asserts every theme block
+     defines an identical token set, so a font token added to one theme would have
+     to be added to all seven for no benefit — the faces do not vary by theme.
+
+     `--fab-font-mono` was already REFERENCED twice in this sheet while undefined
+     (falling back to generic `monospace`); defining it now intentionally changes
+     rendering at those call sites. Sans stays Foundry core's Signika, via
+     `--font-primary`, which the module does not define. */
+  --fab-font-serif: "Spectral", "Georgia", "Times New Roman", serif;
+  --fab-font-mono: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
   --fab-space-1: 4px;
   --fab-space-2: 8px;
   --fab-space-3: 12px;
@@ -198,6 +271,8 @@
   --fab-shadow-sm: 0 8px 18px rgb(17 26 35 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(17 26 35 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(17 26 35 / 34%);
+  --fab-badge-gold: #C9A15E;
+  --fab-on-badge-gold: #1A1206;
 }
 
 :root[data-fabricate-theme="mythwright"],
@@ -316,6 +391,8 @@
   --fab-shadow-sm: 0 8px 18px rgb(0 0 0 / 18%);
   --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
+  --fab-badge-gold: #C2A24E;
+  --fab-on-badge-gold: #101806;
 }
 
 :root[data-fabricate-theme="ironblood-forge"],
@@ -434,6 +511,8 @@
   --fab-shadow-sm: 0 8px 18px rgb(20 18 20 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(20 18 20 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(20 18 20 / 34%);
+  --fab-badge-gold: #C79A4F;
+  --fab-on-badge-gold: #1A1005;
 }
 
 :root[data-fabricate-theme="hearth-herb"],
@@ -552,6 +631,8 @@
   --fab-shadow-sm: 0 8px 18px rgb(22 28 25 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(22 28 25 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(22 28 25 / 34%);
+  --fab-badge-gold: #C7A257;
+  --fab-on-badge-gold: #1B1408;
 }
 
 :root[data-fabricate-theme="starglass-arcana"],
@@ -670,6 +751,8 @@
   --fab-shadow-sm: 0 8px 18px rgb(18 24 36 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(18 24 36 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(18 24 36 / 34%);
+  --fab-badge-gold: #C0A468;
+  --fab-on-badge-gold: #141024;
 }
 
 :root[data-fabricate-theme="foundry-native"],
@@ -788,6 +871,8 @@
   --fab-shadow-sm: 0 8px 18px rgb(0 0 0 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
+  --fab-badge-gold: #C9A15E;
+  --fab-on-badge-gold: #1A1206;
 }
 
 :root[data-fabricate-theme="sovereign"],
@@ -906,6 +991,8 @@
   --fab-shadow-sm: 0 8px 18px rgb(10 14 26 / 24%);
   --fab-shadow-md: 0 10px 24px rgb(10 14 26 / 32%);
   --fab-shadow-lg: 0 14px 38px rgb(10 14 26 / 40%);
+  --fab-badge-gold: #CBA75F;
+  --fab-on-badge-gold: #171208;
 }
 
 /* ==========================================
