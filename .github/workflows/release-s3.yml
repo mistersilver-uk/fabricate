@@ -104,14 +104,18 @@ jobs:
           echo "Publishing $RELEASE_TAG → version $VERSION (channel $CHANNEL, kind $KIND)"
 
       - name: Validate tag exists
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          if ! git tag -l "${{ inputs.tag }}" | grep -q .; then
-            echo "::error::Tag '${{ inputs.tag }}' does not exist"
+          if ! git tag -l "$RELEASE_TAG" | grep -q .; then
+            echo "::error::Tag '$RELEASE_TAG' does not exist"
             exit 1
           fi
 
       - name: Checkout release tag
-        run: git checkout "${{ inputs.tag }}"
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: git checkout "$RELEASE_TAG"
 
       - uses: actions/setup-node@v6
         with:
@@ -139,10 +143,12 @@ jobs:
           # channel's tester groups when that channel's tester-path secret is unset.
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
           S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+          CHANNEL: ${{ inputs.channel }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           node scripts/release-s3.js \
-            --version "${{ steps.version.outputs.version }}" \
-            --channel "${{ inputs.channel }}" \
+            --version "$VERSION" \
+            --channel "$CHANNEL" \
             ${{ inputs.check_heads == true && '--check-heads' || '' }} \
             ${{ inputs.dry_run == true && '--dry-run' || '' }} \
             ${{ inputs.overwrite == true && '--overwrite' || '' }}
