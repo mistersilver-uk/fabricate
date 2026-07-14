@@ -1,0 +1,186 @@
+name: "Promote to Early Access"
+
+# The PRERELEASE PROMOTION (issue #627, task 3.4): move a tested `beta` commit onto `release`, which
+# mints the stable version and publishes early-access.
+#
+# This workflow does the MERGE ONLY. Pushing `release` triggers release.yml (task 3.3), which mints
+# the stable version and publishes early-access — so the mint is NOT duplicated here.
+#
+# Before merging it verifies, in order:
+#   1. the tag SHAPE is a beta tag;
+#   2. the tag EXISTS;
+#   3. the tag's commit is an ANCESTOR of origin/main (it was tested and merged);
+#   4. EVERY private `beta` target — the channel manifest AND every tester manifest, enumerated via
+#      deriveS3Layout — already advertises the tag's version.
+#
+# Why (4) on top of (3): the git tag is pushed BEFORE the publish job, so a tag whose beta publish
+# failed is still an ancestor of main yet leaves a STALE beta head. Promoting it would carry a
+# version the beta cohort never received, which later turns a hotfix into a cohort defection
+# (Registry lead prohibition). A channel-only check would pass a partial publish that wrote the
+# channel manifest but not the closed-beta-2026 tester manifest, so both are checked — the same
+# enumeration the public promotion (3.5) uses, so the two can never drift.
+#
+# Refuses: a non-beta tag, a nonexistent tag, a non-ancestor commit, and a tag the beta head does
+# not advertise.
+
+on:
+  workflow_dispatch:
+    inputs:
+      beta_tag:
+        description: "The tested beta tag to promote (e.g. v1.4.0-beta.3)"
+        required: true
+        type: string
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v6
+        with:
+          ref: release
+          fetch-depth: 0
+
+      - name: Validate the tag shape
+        id: validate
+        env:
+          BETA_TAG: ${{ inputs.beta_tag }}
+        run: |
+          # Rejects a non-beta tag (stable, malformed, empty) via the shared validator. Prints the
+          # bare version (`v` stripped) — the version the beta channel must already advertise.
+          VERSION=$(node scripts/validate-release-tag.mjs "$BETA_TAG" --kind beta)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Promoting $BETA_TAG (version $VERSION)"
+
+      - name: Assert the tag exists and its commit is an ancestor of origin/main
+        env:
+          BETA_TAG: ${{ inputs.beta_tag }}
+        run: |
+          git fetch origin main --tags --force
+          if ! git tag -l "$BETA_TAG" | grep -q .; then
+            echo "::error::Tag '$BETA_TAG' does not exist."
+            exit 1
+          fi
+          # Ancestry proves the tag was built from a commit that reached main (i.e. it was tested on
+          # the beta line and merged), not an arbitrary or reverted commit. Do NOT try to look this
+          # up via `gh run list --workflow foundry-integration.yml` (empty for a reusable workflow)
+          # or `gh run list --commit ... [0]` (the newest run may be cancelled).
+          if ! git merge-base --is-ancestor "${BETA_TAG}^{commit}" origin/main; then
+            echo "::error::${BETA_TAG}'s commit is not an ancestor of origin/main — refusing to promote an untested/unmerged commit."
+            exit 1
+          fi
+          echo "$BETA_TAG is an ancestor of origin/main."
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Configure AWS credentials (OIDC)
+        # Needed to read the private beta manifests (they are not anonymously readable).
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Assert every beta target advertises the tag's version
+        env:
+          EXPECTED_VERSION: ${{ steps.validate.outputs.version }}
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+          # The tester feed segment is secret; deriveS3Layout needs it to build the tester manifest
+          # key. Without it the tester target is unreachable and this step fails closed.
+          S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+          import { deriveS3Layout, resolveChannelConfig } from './scripts/release-s3.js';
+
+          const expected = process.env.EXPECTED_VERSION;
+          const config = JSON.parse(await readFile('release.s3.config.json', 'utf8'));
+          const bucket = process.env.S3_RELEASE_BUCKET || config.bucket;
+          const baseUrl = process.env.RELEASE_BASE_URL || config.baseUrl;
+
+          // Resolve the beta channel's OWN tester groups + secret, then derive every target (the
+          // channel manifest AND each tester manifest) — the same enumeration the publish and the
+          // public promotion use, so a partial publish cannot slip through a channel-only check.
+          const channelConfig = resolveChannelConfig(config, 'beta');
+          const secretEnv = channelConfig.testerSecretEnv;
+          const testerSegment = (secretEnv ? process.env[secretEnv] || '' : '').replace(/^\/+|\/+$/g, '');
+          if (channelConfig.testerGroups.length > 0 && !testerSegment) {
+            throw new Error(
+              `beta declares ${channelConfig.testerGroups.length} tester group(s) but ${secretEnv} is unset — cannot verify the tester head.`
+            );
+          }
+
+          const { targets } = deriveS3Layout({
+            moduleId: config.moduleId,
+            channel: 'beta',
+            version: expected,
+            baseUrl,
+            testerGroups: channelConfig.testerGroups,
+            testerSegment,
+          });
+
+          const s3 = new S3Client({ region: process.env.AWS_REGION });
+          let failed = false;
+          for (const target of targets) {
+            let advertised;
+            try {
+              const res = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: target.manifestKey }));
+              advertised = JSON.parse(await res.Body.transformToString()).version;
+            } catch (error) {
+              // Print only the LABEL and the error NAME — the manifest key carries the secret segment.
+              console.error(`::error::beta target ${target.label} is unreachable (${error?.name || 'Error'}); cannot confirm it advertises v${expected}.`);
+              failed = true;
+              continue;
+            }
+            if (advertised !== expected) {
+              console.error(`::error::beta target ${target.label} advertises v${advertised}, not v${expected} — this tag's beta publish did not complete (stale head). Refusing to promote.`);
+              failed = true;
+            } else {
+              console.log(`beta target ${target.label} advertises v${expected} ✓`);
+            }
+          }
+          if (failed) {
+            throw new Error(`one or more beta targets do not advertise v${expected}`);
+          }
+          console.log(`All beta targets advertise v${expected}.`);
+          NODE
+
+      - name: Mint an App installation token (bypass actor + workflow trigger)
+        id: apptoken
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_KEY }}
+
+      - name: Merge the beta tag into release and push (triggers release.yml)
+        env:
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
+          BETA_TAG: ${{ inputs.beta_tag }}
+        run: |
+          git config user.name "fabricate-release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          # Two reasons the push MUST use the App token, not the default GITHUB_TOKEN:
+          #   1. A push made with GITHUB_TOKEN does NOT trigger another workflow (GitHub's recursion
+          #      guard), so release.yml (push: [release]) would never fire — the whole point here.
+          #   2. It is the ruleset bypass actor, so a future ruleset on `release` still lets it push.
+          # actions/checkout left an http.extraheader carrying the DEFAULT GITHUB_TOKEN
+          # (github-actions[bot]); it overrides the credential in the remote URL, so without clearing
+          # it the push would authenticate as github-actions[bot] and neither trigger release.yml nor
+          # bypass a ruleset. Clear it, then point origin at the App token.
+          git config --unset-all http.https://github.com/.extraheader || true
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git checkout -B release origin/release
+          # --no-ff, NEVER a squash: semantic-release recomputes the stable version from the
+          # Conventional Commit types on `release`, and a squash collapses them.
+          git merge --no-ff "$BETA_TAG" -m "chore(#627): promote $BETA_TAG into release"
+          git push origin HEAD:release
+          echo "Merged $BETA_TAG into release and pushed; release.yml will now mint the stable version and publish early-access."
