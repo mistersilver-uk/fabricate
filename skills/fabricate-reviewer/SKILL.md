@@ -45,6 +45,8 @@ The implementation must faithfully realize the proposed delta; when it justifiab
 - The change achieves its stated goal, and any artifact it produces is faithful to the real system.
 A synthetic, mocked, or hand-authored stand-in presented as real output or evidence (e.g. a fabricated "screenshot" that does not depict the running app) is a finding, not a convenience — judge the artifact against reality, not just the diff against style.
 - Hand-maintained mirrors of other parts of the repo (selectors, labels, path/recipe maps, fixture lists) are guarded by a test that fails when they drift; flag an unguarded mirror as a finding.
+- When a change ports or re-implements external code (e.g. a Foundry core function reproduced under `scripts/`), verify it against the ACTUAL upstream — import the real function and differential-test it, or read the real source — never against a copy retyped from memory.
+A hand-reconstructed "original" invents phantom divergences and yields false findings; the deliberate quirks of a faithful port (a prerelease outranking its GA in Foundry's version compare, for one) look like bugs only against a wrong mental model.
 - When validation, the authoring UI, and the runtime each read the SAME conceptual data (e.g. routed outcome names, available options, allowed keys), confirm they read the SAME field.
 A validation rule that demands data the authoring UI offers no way to produce — or that reads a legacy/duplicate field the runtime no longer consumes — creates an unfixable error state for the user; flag the source-of-truth mismatch as a finding, and prefer a single shared accessor over three independent reads.
 - A whole-system configuration gap (e.g. a routed mode with no usable check) should surface as ONE system-level issue, not as N per-entity errors the user cannot individually resolve; flag per-entity criticals that have no per-entity fix.
@@ -57,6 +59,8 @@ An omission does not fail the suite — it hangs and is reported as `# cancelled
 - API surfaces are behavior-first rather than getter-heavy data bags.
 - Global state is isolated behind seams that tests can control.
 - Tests are meaningful, not trivial.
+- A passing unit test of a pure helper does not prove the composition that calls it works; a behaviour is covered only when the WIRING is exercised — the handler, `main()`, or `if (!dryRun)` branch that must invoke the helper, not just the helper in isolation.
+Flag a test that pins a pure predicate while the path consuming it (an event handler's routing, a guard threaded through `main()`, a conditional branch) is unexercised: the pure test stays green while the real path can be broken.
 - Svelte components follow existing repo patterns.
 - No stray debug logging remains.
 - Validation results from the implementer or CI pass without warnings that matter.
