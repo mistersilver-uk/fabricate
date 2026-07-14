@@ -17,7 +17,10 @@
    - "Require as well" — Essence: there is NO essence match type. An essence
      requirement is a property of the ingredient SET (`IngredientSet.essences`), an
      AND requirement, not an OR alternative — so it sits under its own heading and
-     bubbles up to the set rather than being mislabelled as an alternative.
+     bubbles up to the set rather than being mislabelled as an alternative. It is
+     offered only while the set can still take one (`addableEssenceOptions`): once the
+     set requires every essence the system defines, the choice would do nothing, and an
+     entry that no-ops on click is worse than an absent entry.
 
   The split is an ACCESSIBILITY contract, not decoration: the trigger, dialog and
   search field therefore carry a NEUTRAL accessible name. Naming the whole control
@@ -37,9 +40,13 @@
     componentOptions = [],
     itemTags = [],
     currencyUnits = [],
-    // Non-empty only when the system has essences: unlocks the popover's per-SET
-    // essence requirement, which is bubbled up rather than appended here.
-    essenceOptions = [],
+    // The essences the owning SET can still be given — the system's essences MINUS the
+    // ones it already requires, computed by the set (which owns `essences`). Non-empty
+    // is what unlocks the popover's per-SET essence choice, which is bubbled up rather
+    // than appended here. Empty means the set already requires every essence the system
+    // has, so the choice would be a no-op and is not offered at all: a menu entry that
+    // does nothing when clicked is worse than an absent one.
+    addableEssenceOptions = [],
     onChange = () => {},
     onRemove = () => {},
     onAddEssenceRequirement = () => {}
@@ -68,7 +75,7 @@
       id: 'accept-instead',
       label: text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
     },
-    ...((essenceOptions || []).length > 0
+    ...((addableEssenceOptions || []).length > 0
       ? [
           {
             id: 'require-as-well',
@@ -79,8 +86,9 @@
   ]);
 
   // The four choices, each carrying its own `data-recipe-add` token and its heading.
-  // Currency and essence appear only when the system actually configures them, so the
-  // menu never offers a choice the system cannot honour.
+  // Currency appears only when the system configures units, and Essence only while the
+  // owning set can still take one — so the menu never offers a choice that the system
+  // cannot honour or that would do nothing.
   const orMenuOptions = $derived([
     {
       id: 'component',
@@ -107,7 +115,7 @@
           }
         ]
       : []),
-    ...((essenceOptions || []).length > 0
+    ...((addableEssenceOptions || []).length > 0
       ? [
           {
             id: 'essence',

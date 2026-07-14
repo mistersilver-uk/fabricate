@@ -2379,6 +2379,63 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('drops the essence choice once the SET already requires every system essence', async () => {
+    // The handler seeds "the first essence the set does not already require" — so with
+    // every essence required it returned silently while the menu still offered the entry
+    // and clicking it did nothing. A dead choice is a bug, not a no-op: the set OWNS
+    // `essences`, so it is the set that decides whether another can still be added.
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+        set: { essences: { 'ess-life': 2, 'ess-water': 1 } },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+
+    assert.equal(
+      document.querySelector('[data-recipe-add="alternative-essence"]'),
+      null,
+      'the exhausted essence choice is not offered'
+    );
+    assert.deepEqual(
+      [...document.querySelectorAll('[data-popover-group]')].map((group) =>
+        group.getAttribute('aria-label')
+      ),
+      ['Accept instead'],
+      'and its now-empty heading goes with it'
+    );
+    // The real OR alternatives are untouched — only the dead choice is gone.
+    assert.ok(document.querySelector('[data-recipe-add="alternative-component"]'));
+    assert.ok(document.querySelector('[data-recipe-add="alternative-tag"]'));
+    assert.equal(patches.length, 0, 'opening the menu authors nothing');
+    editHarness.remount();
+  });
+
+  it('still offers the essence choice while the set requires only SOME of the essences', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+        set: { essences: { 'ess-life': 2 } },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+    assert.ok(
+      document.querySelector('[data-recipe-add="alternative-essence"]'),
+      'one essence is still addable, so the choice stays'
+    );
+    editHarness.remount();
+  });
+
   it('appends a third alternative to an already-mixed OR group from the "or..." menu', async () => {
     const { target, patches } = await mountSingleGroup(
       [

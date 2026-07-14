@@ -124,8 +124,17 @@
   // `IngredientSet.essences` is an AND requirement on the whole SET. Choosing it seeds
   // the first essence the set does not already require, at amount 1; the per-set
   // essence editor below refines it.
+  //
+  // The SET owns `essences`, so the set is the only thing that can say whether another
+  // essence can still be added. It hands the requirement cards exactly the addable ones
+  // — once this is empty the popover drops the choice entirely, rather than offering an
+  // entry whose handler would silently return.
+  const addableEssenceOptions = $derived(
+    (essenceOptions || []).filter((essence) => !(essence.id in essences))
+  );
+
   function addEssenceRequirement() {
-    const next = (essenceOptions || []).find((essence) => !(essence.id in essences));
+    const next = addableEssenceOptions[0];
     if (!next) return;
     updateEssences({ ...essences, [next.id]: 1 });
   }
@@ -185,7 +194,7 @@
           {componentOptions}
           {itemTags}
           {currencyUnits}
-          {essenceOptions}
+          {addableEssenceOptions}
           onChange={(nextGroup) => updateGroup(index, nextGroup)}
           onRemove={() => removeGroup(index)}
           onAddEssenceRequirement={addEssenceRequirement}
