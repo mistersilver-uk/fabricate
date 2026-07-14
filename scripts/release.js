@@ -67,6 +67,35 @@ export function rewriteModuleJson(manifest) {
 }
 
 /**
+ * Apply the release artefact's self-contained URLs to a dist/-ready manifest.
+ *
+ * The in-zip `manifest` MUST be the repository's LATEST-release manifest URL — never version-pinned,
+ * and never a channel (S3) URL — so a public client updating from this artefact is not put through a
+ * manifest-rewrite prompt on every update: a version-pinned manifest URL changes each release, which
+ * Foundry treats as a manifest move and confirms with the user. A latest-release URL is stable across
+ * every public release, so the update is silent. `download` STAYS version-pinned so the artefact
+ * always fetches its OWN archive (the latest zip would be wrong the moment a newer one is published).
+ *
+ * Drafts are excluded from GitHub's "latest", so a private early-access draft is never served from
+ * /releases/latest/ — the un-draft (the release promotion) is what first makes a version the latest.
+ * The version-pinned URL SENT TO THE REGISTRY is a different artefact, constructed by the promotion
+ * workflow from the version; it is deliberately NOT read from this field. See issue #627 task 3.6 and
+ * the "Self-contained distribution targets" requirement in
+ * openspec/specs/release-and-distribution/spec.md.
+ *
+ * @param {object} manifest - dist/-ready manifest (post rewriteModuleJson). Mutated in place.
+ * @param {string} releaseVersion - the bare version, no leading `v` (e.g. `1.5.0`).
+ * @returns {object} The same manifest, for chaining.
+ */
+export function applyReleaseUrls(manifest, releaseVersion) {
+  const tag = `v${releaseVersion}`;
+  const releasesBase = 'https://github.com/mistersilver-uk/fabricate/releases';
+  manifest.manifest = `${releasesBase}/latest/download/module.json`;
+  manifest.download = `${releasesBase}/download/${tag}/fabricate-${tag}.zip`;
+  return manifest;
+}
+
+/**
  * Return the list of relative file paths that must exist inside dist/
  * based on the (already-rewritten) manifest.
  *
@@ -280,12 +309,10 @@ async function main() {
   console.log('Writing dist/module.json...');
   const distManifest = rewriteModuleJson(manifest);
 
-  // Pin manifest and download URLs to the specific version tag
+  // Bake the release artefact's self-contained URLs: a LATEST-release manifest (not version-pinned,
+  // so no per-update rewrite prompt) and a version-pinned download. See applyReleaseUrls.
   if (releaseVersion) {
-    const tag = `v${releaseVersion}`;
-    const baseUrl = `https://github.com/mistersilver-uk/fabricate/releases/download/${tag}`;
-    distManifest.manifest = `${baseUrl}/module.json`;
-    distManifest.download = `${baseUrl}/fabricate-${tag}.zip`;
+    applyReleaseUrls(distManifest, releaseVersion);
   }
 
   await writeFile(join(distDir, 'module.json'), JSON.stringify(distManifest, null, 2));

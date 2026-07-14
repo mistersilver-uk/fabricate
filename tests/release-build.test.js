@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
-const { rewriteModuleJson, getRequiredFiles, validateDist, getFlag, parseReleaseVersionOptions } = await import('../scripts/release.js');
+const { rewriteModuleJson, getRequiredFiles, validateDist, getFlag, parseReleaseVersionOptions, applyReleaseUrls } = await import('../scripts/release.js');
 
 // ───────────────────────────────────────────────────────────────────────────
 // rewriteModuleJson() tests
@@ -177,6 +180,88 @@ test('parseReleaseVersionOptions rejects simultaneous source and dist version fl
   assert.throws(
     () => parseReleaseVersionOptions(['--version', '0.2.0-rc.1', '--dist-version', '0.2.0-rc.1']),
     /mutually exclusive/
+  );
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// applyReleaseUrls() tests — issue #627 task 3.6
+//
+// The release artefact's in-zip module.json must bake the repository's LATEST-release manifest URL
+// (never version-pinned, never a channel URL) so public clients are not manifest-rewrite-prompted on
+// every update, while `download` stays version-pinned so the artefact fetches its own archive.
+// ───────────────────────────────────────────────────────────────────────────
+
+test('applyReleaseUrls bakes the LATEST-release manifest URL, not a version-pinned one', () => {
+  const manifest = applyReleaseUrls({}, '1.5.0');
+  assert.equal(
+    manifest.manifest,
+    'https://github.com/mistersilver-uk/fabricate/releases/latest/download/module.json'
+  );
+  // The manifest URL must be stable across releases: it must NOT carry the version anywhere.
+  assert.ok(!manifest.manifest.includes('1.5.0'), 'manifest URL must not be version-pinned');
+  assert.ok(manifest.manifest.includes('/releases/latest/'), 'manifest URL must be the latest-release URL');
+});
+
+test('applyReleaseUrls keeps the download URL version-pinned', () => {
+  const manifest = applyReleaseUrls({}, '1.5.0');
+  assert.equal(
+    manifest.download,
+    'https://github.com/mistersilver-uk/fabricate/releases/download/v1.5.0/fabricate-v1.5.0.zip'
+  );
+  assert.ok(manifest.download.includes('/v1.5.0/'), 'download URL must be pinned to the version tag');
+});
+
+test('applyReleaseUrls never points at an S3 channel feed', () => {
+  const manifest = applyReleaseUrls({}, '2.0.0-beta.3');
+  // Neither URL may be a channel (S3) URL — both stay on the GitHub releases host.
+  for (const url of [manifest.manifest, manifest.download]) {
+    assert.ok(url.startsWith('https://github.com/mistersilver-uk/fabricate/releases/'), url);
+    assert.ok(!url.includes('modules/'), `must not be a channel feed URL: ${url}`);
+    assert.ok(!url.includes('amazonaws.com'), `must not be an S3 URL: ${url}`);
+  }
+  // A prerelease build still pins its own download but keeps the stable latest-release manifest.
+  assert.equal(
+    manifest.download,
+    'https://github.com/mistersilver-uk/fabricate/releases/download/v2.0.0-beta.3/fabricate-v2.0.0-beta.3.zip'
+  );
+  assert.ok(manifest.manifest.endsWith('/releases/latest/download/module.json'));
+});
+
+test('applyReleaseUrls mutates and returns the same manifest, preserving other fields', () => {
+  const original = { id: 'fabricate', version: '1.5.0', esmodules: ['main.js'] };
+  const result = applyReleaseUrls(original, '1.5.0');
+  assert.equal(result, original, 'returns the same object it mutated');
+  assert.equal(result.id, 'fabricate');
+  assert.deepEqual(result.esmodules, ['main.js']);
+});
+
+// A build-wiring integration test. The pure applyReleaseUrls tests above cannot catch a DELETED (or
+// mis-gated) call site inside release.js's main(): a real `--dist-version` build is what proves the
+// URLs actually reach dist/module.json. The download URL is the effective mutation-catcher — the
+// tracked source module.json already carries a latest-release *manifest*, but its download URL is the
+// latest one, so a missing call site leaves dist with a non-version-pinned download and this fails.
+test('release.js --dist-version wires the release URLs into the built dist/module.json', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const version = '9.9.9-wiretest';
+  const trackedManifestPath = join(root, 'module.json');
+  const trackedBefore = readFileSync(trackedManifestPath, 'utf8');
+
+  execFileSync(process.execPath, ['scripts/release.js', '--dist-version', version, '--no-zip'], {
+    cwd: root,
+    stdio: 'ignore',
+  });
+
+  const built = JSON.parse(readFileSync(join(root, 'dist', 'module.json'), 'utf8'));
+  const expected = applyReleaseUrls({}, version);
+  assert.equal(built.version, version, '--dist-version must set the built version');
+  assert.equal(built.manifest, expected.manifest, 'built manifest must be the latest-release URL');
+  assert.equal(built.download, expected.download, 'built download must be the version-pinned URL');
+
+  // --dist-version must NOT mutate the tracked source module.json (only --version is allowed to).
+  assert.equal(
+    readFileSync(trackedManifestPath, 'utf8'),
+    trackedBefore,
+    'tracked module.json must be untouched by a --dist-version build'
   );
 });
 
