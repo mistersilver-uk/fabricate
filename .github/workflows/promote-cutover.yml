@@ -18,6 +18,10 @@ on:
         description: "Dry run — compute and print only; no tag, draft, S3 write, or push."
         type: boolean
         default: true
+      forward_port_only:
+        description: "Skip the (already-done) mint + EA publish; only forward-port release into main."
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,6 +47,7 @@ jobs:
           fetch-depth: 0
 
       - name: Forward main onto release (the prerelease promotion merge)
+        if: ${{ !inputs.forward_port_only }}
         run: |
           git config user.name "fabricate-release-bot"
           git config user.email "release-bot@users.noreply.github.com"
@@ -61,11 +66,12 @@ jobs:
       - run: npm ci
 
       - name: Push the promoted commit onto release
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && !inputs.forward_port_only }}
         run: git push origin HEAD:release
 
       - name: Semantic-release — mint the stable version as a draft
         id: semrel
+        if: ${{ !inputs.forward_port_only }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # This workflow MUST be dispatched with `--ref release`. GITHUB_REF_NAME/GITHUB_REF are
@@ -87,12 +93,14 @@ jobs:
           echo "Computed stable version: $VER"
 
       - name: Configure AWS credentials (OIDC)
+        if: ${{ !inputs.forward_port_only }}
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Publish the stable version to the early-access channel
+        if: ${{ !inputs.forward_port_only }}
         env:
           S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
@@ -117,10 +125,15 @@ jobs:
         run: |
           git config user.name "fabricate-release-bot"
           git config user.email "release-bot@users.noreply.github.com"
-          git fetch origin main
-          git checkout -B main origin/main
-          git merge --no-ff release -m "chore(#627): forward-port release into main"
+          # actions/checkout configured an http.extraheader with the DEFAULT GITHUB_TOKEN
+          # (github-actions[bot]) — NOT a ruleset bypass actor. It overrides a credential in the
+          # remote URL, so the push would authenticate as github-actions and be REJECTED by the
+          # linear-history + PR rules. Clear it so the App token (the bypass actor) is used.
+          git config --unset-all http.https://github.com/.extraheader || true
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch origin main release --force
+          git checkout -B main origin/main
+          git merge --no-ff origin/release -m "chore(#627): forward-port release into main"
           git push origin HEAD:main
 
       - name: Dry-run summary
