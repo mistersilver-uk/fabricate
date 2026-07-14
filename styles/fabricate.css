@@ -2922,7 +2922,17 @@
    table head are both gone. The class name is frozen — the smoke harness's overflow
    check pins it and FAILS OPEN, so a rename silently stops measuring the rows
    instead of failing. */
+/* The recipe rows measure THEMSELVES (issue 643 §8). The row's collapse ladder used to
+   query `fabricate-manager` — the whole app — but `.manager-body` is
+   `220px + 1fr + 300px` above 1120px and only collapses to one column at or below it.
+   So the row is at its NARROWEST (~570-760px) in the 1121-1280px band, where not one
+   manager-keyed step fired, and at its WIDEST (nearly the full window) once the layout
+   stacks, where they all did. Keying the ladder to this container — the box the row
+   actually lives in — makes each step fire when the ROW is short of room, which is the
+   only thing the ladder was ever about. */
 .fabricate-manager .manager-recipes-table {
+  container-type: inline-size;
+  container-name: fabricate-recipes;
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
@@ -3069,14 +3079,21 @@
   margin-left: auto;
 }
 
+/* The name row can carry THREE `white-space: nowrap` pills (Disabled + Locked + Can't
+   enable) beside the name. Nothing bounded it, so on a narrow row they could push out
+   of the identity cell. `overflow: hidden` is the backstop; the name giving way first
+   (`flex: 0 1 auto` + `min-width: 0` + ellipsis) is what makes the pills survive. */
 .fabricate-manager .manager-recipe-name-row {
   display: flex;
   gap: var(--fab-space-1);
   align-items: center;
   min-width: 0;
+  overflow: hidden;
 }
 
 .fabricate-manager .manager-recipe-name-row .manager-system-name {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   font-family: var(--fab-font-serif);
   text-overflow: ellipsis;
@@ -14844,26 +14861,31 @@
 /* The recipe row's collapse ladder (issue 643 §8). Drop order is fixed:
    (1) description, (2) I/O + steps readout, (3) check pill, (4) the toggle's On/Off
    text — and NEVER the lock, enable or edit controls. The row keeps its switch and
-   its aria-label at every width, so nothing that can be operated disappears. */
-@container fabricate-manager (max-width: 960px) {
+   its aria-label at every width, so nothing that can be operated disappears.
+
+   The steps query `fabricate-recipes` — the ROW's own container (`.manager-recipes-table`)
+   — not the whole manager. The control cluster needs roughly 420px and the identity cell
+   another 160 to stay legible, so the row starts giving things up around 680px of table
+   width, wherever the window happens to be. */
+@container fabricate-recipes (max-width: 680px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-description {
     display: none;
   }
 }
 
-@container fabricate-manager (max-width: 860px) {
+@container fabricate-recipes (max-width: 600px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-io {
     display: none;
   }
 }
 
-@container fabricate-manager (max-width: 760px) {
+@container fabricate-recipes (max-width: 520px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-check {
     display: none;
   }
 }
 
-@container fabricate-manager (max-width: 680px) {
+@container fabricate-recipes (max-width: 440px) {
   .fabricate-manager .manager-recipe-row .manager-status-toggle-label {
     display: none;
   }

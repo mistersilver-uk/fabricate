@@ -573,21 +573,35 @@ test('manager recipes browser defines a non-overflowing card row', () => {
 
 // The collapse ladder (issue 643 §8). Drop order is fixed and monotonic, and the
 // lock / enable / edit controls are never in it.
+//
+// The ladder measures the ROW's own container, not the manager. `.manager-body` is
+// `220px + 1fr + 300px` above 1120px and only collapses to one column at or below it,
+// so a manager-keyed ladder fired NONE of its steps in the 1121-1280px band — exactly
+// where the row is at its narrowest (~570-760px) — and every step once the layout
+// stacked, where the row has the whole window. Keying it to `.manager-recipes-table`
+// makes each step fire when the row is actually short of room.
 test('manager recipe row collapses in the specified order and never drops its controls', () => {
+  const tableBlock = blockFor('.fabricate-manager .manager-recipes-table');
+  assert.ok(
+    tableBlock.includes('container-type: inline-size;') &&
+      tableBlock.includes('container-name: fabricate-recipes;'),
+    'the row ladder needs a container that measures the ROW, not the whole manager'
+  );
+
   const LADDER = [
-    [960, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
-    [860, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
-    [760, '.fabricate-manager .manager-recipe-row .manager-recipe-check'],
-    [680, '.fabricate-manager .manager-recipe-row .manager-status-toggle-label']
+    [680, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
+    [600, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
+    [520, '.fabricate-manager .manager-recipe-row .manager-recipe-check'],
+    [440, '.fabricate-manager .manager-recipe-row .manager-status-toggle-label']
   ];
 
   for (const [width, selector] of LADDER) {
-    const query = css.slice(css.indexOf(`@container fabricate-manager (max-width: ${width}px)`));
-    assert.ok(query.length > 0, `a ${width}px container query should exist`);
+    const query = css.slice(css.indexOf(`@container fabricate-recipes (max-width: ${width}px)`));
+    assert.ok(query.length > 0, `a ${width}px recipe-container query should exist`);
     const rule = query.slice(query.indexOf(selector));
     assert.ok(
       query.includes(selector) && rule.slice(0, rule.indexOf('}')).includes('display: none;'),
-      `${selector} should drop at ${width}px`
+      `${selector} should drop at ${width}px of ROW width`
     );
   }
 
@@ -598,6 +612,16 @@ test('manager recipe row collapses in the specified order and never drops its co
       `${kept} must survive every width — it is an operable control`
     );
   }
+
+  // The three status pills are all `white-space: nowrap`, and the identity cell set no
+  // overflow: they could spill out of it. The name gives way first; the row clips.
+  const nameRowBlock = blockFor('.fabricate-manager .manager-recipe-name-row');
+  const nameBlock = blockFor('.fabricate-manager .manager-recipe-name-row .manager-system-name');
+  assert.ok(nameRowBlock.includes('overflow: hidden;'), 'the pills cannot escape the identity cell');
+  assert.ok(
+    nameBlock.includes('flex: 0 1 auto;') && nameBlock.includes('min-width: 0;'),
+    'the name is what gives way, so the pills stay readable'
+  );
 });
 
 // Selection is an identity cue ("you are here"), never a status. Success/amber stay

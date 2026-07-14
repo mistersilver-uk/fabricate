@@ -244,6 +244,28 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
       'the banner sits above the tab strip and therefore heads every tab'
     );
   });
+
+  it('reads as an INFO banner with an icon medallion, not as one more card', () => {
+    assert.ok(
+      bannerSource.includes('manager-recipe-mode-banner-medallion'),
+      'the icon sits in a medallion'
+    );
+    assert.ok(
+      bannerSource.includes('background: var(--fab-info-soft);') &&
+        bannerSource.includes('border: 1px solid var(--fab-info-border);'),
+      'the banner is info-toned — it explains why the editor below it has the shape it has'
+    );
+  });
+
+  it('lets the description WRAP — it is the one sentence the banner exists to deliver', () => {
+    // It was `white-space: nowrap` + ellipsis, so at 900px (and for any longer localized
+    // string) the sentence was truncated to a few words.
+    const desc = bannerSource.slice(bannerSource.indexOf('.manager-recipe-mode-banner-desc'));
+    const block = desc.slice(0, desc.indexOf('}'));
+    assert.equal(block.includes('white-space: nowrap;'), false, 'the sentence is not truncated');
+    assert.ok(block.includes('-webkit-line-clamp: 2;'), 'it wraps, clamped to two lines');
+    assert.ok(block.includes('line-height: 1.45;'));
+  });
 });
 
 describe('adminStore recipe-item projections + API', () => {

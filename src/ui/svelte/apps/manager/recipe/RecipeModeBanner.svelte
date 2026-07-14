@@ -33,7 +33,9 @@
 </script>
 
 <div class="manager-recipe-mode-banner" data-recipe-mode-banner={mode.value}>
-  <i class={`${mode.icon} manager-recipe-mode-banner-icon`} aria-hidden="true"></i>
+  <span class="manager-recipe-mode-banner-medallion" aria-hidden="true">
+    <i class={mode.icon}></i>
+  </span>
   <div class="manager-recipe-mode-banner-copy">
     <p class="manager-recipe-mode-banner-title">
       <span class="manager-recipe-mode-banner-kicker">{text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}</span>
@@ -54,20 +56,31 @@
 </div>
 
 <style>
+  /* The banner is INFO-toned, not a plain card: it explains why the editor below it
+     has the shape it has, and a `--fab-surface-soft` panel reads as just another card
+     in a page made of cards. */
   .manager-recipe-mode-banner {
     display: flex;
     align-items: center;
     gap: var(--fab-space-3);
     padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
+    border: 1px solid var(--fab-info-border);
     border-radius: 10px;
-    background: var(--fab-surface-soft);
+    background: var(--fab-info-soft);
   }
 
-  .manager-recipe-mode-banner-icon {
+  .manager-recipe-mode-banner-medallion {
+    display: inline-flex;
     flex: 0 0 auto;
-    color: var(--fab-accent);
-    font-size: 0.95rem;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--fab-info-border);
+    border-radius: 8px;
+    color: var(--fab-info-text);
+    background: var(--fab-bg-3);
+    font-size: 0.85rem;
   }
 
   .manager-recipe-mode-banner-copy {
@@ -91,12 +104,18 @@
     text-transform: uppercase;
   }
 
+  /* The description is the ONE sentence this banner exists to deliver. It used to be
+     `white-space: nowrap` + ellipsis, so at 900px — and for any longer localized
+     string — it was truncated to a few words. It wraps, clamped to two lines. */
   .manager-recipe-mode-banner-desc {
+    display: -webkit-box;
     margin: 2px 0 0;
     overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     font-size: 0.72rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.45;
+    white-space: normal;
   }
 
   .manager-recipe-mode-banner-action {
