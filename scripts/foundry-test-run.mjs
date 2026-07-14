@@ -876,6 +876,47 @@ async function assertManagerLayoutStable(page, label) {
 }
 
 /**
+ * Assert at least one recipe row is actually REACHABLE — a pointer hit-test, not a
+ * DOM count.
+ *
+ * `assertManagerLayoutStable` measures horizontal overflow and counts rows it FINDS in
+ * the DOM, so it passed cleanly on a 900px library that rendered no row a GM could see
+ * or click (issue 643): the stacked body squeezed `.manager-table-scroll` to ~24px and
+ * the inspector's background painted over the rows, while every row was still in the
+ * DOM at its full 76px. Only a hit-test fails on that, so this is the check that the
+ * narrow library is usable at all.
+ *
+ * The rows legitimately sit below the fold once the body stacks, so the first row is
+ * scrolled into view before the test — "reachable after a scroll" is the contract,
+ * "already on screen" is not.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} label
+ */
+async function assertRecipeRowsHittable(page, label) {
+  const report = await withDeadline(page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll('.manager-recipe-row'));
+    rows[0]?.scrollIntoView({ block: 'center' });
+    const hittable = rows.filter((row) => {
+      const rect = row.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) return false;
+      const x = Math.round(rect.left + Math.min(rect.width / 2, 60));
+      const y = Math.round(rect.top + (rect.height / 2));
+      if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
+      const hit = document.elementFromPoint(x, y);
+      return Boolean(hit) && row.contains(hit);
+    }).length;
+    return { total: rows.length, hittable };
+  }), 30_000, `assertRecipeRowsHittable ${label}`);
+
+  if (report.hittable === 0) {
+    throw new Error(
+      `Recipe library rendered no VISIBLE row at ${label}: ${report.total} row(s) present in the DOM, 0 reachable by a pointer (clipped, zero-height, or painted over).`
+    );
+  }
+}
+
+/**
  * Click a target only if it is present, swallowing transient failures. For
  * non-essential pointer-exercise interactions whose availability depends on a
  * manager UI still in flux — never hangs on a missing element, never fails the run.
@@ -3222,6 +3263,10 @@ async function main() {
           },
           // Two currency units so the currency-cost requirement row can target a unit.
           itemTags: ['rare', 'reagent', 'metallic'],
+          // Two authored recipe categories, so the library's group-by-category treatment
+          // is exercised with MORE THAN ONE group. A single "General" bucket proves
+          // nothing about grouping (issue 643).
+          recipeCategories: ['Alchemy', 'Smithing'],
           requirements: {
             currency: {
               enabled: true,
@@ -3533,6 +3578,62 @@ async function main() {
             }
           ]
         }, { allowIncomplete: true });
+
+        // ── Recipe-library row states (issue 643) ────────────────────────────────
+        // Every fixture recipe above is enabled, unlocked, complete and uncategorised,
+        // so the library's Disabled row, Locked row, "Can't enable" pill, empty-Produces
+        // danger row and category grouping had NEVER been photographed. These two seed
+        // the missing states rather than mutating a recipe another phase depends on.
+        //
+        // 'Temper a Blade' carries an ingredient set and a result group with NO results:
+        // structurally sound (persistable) but not craftable, so `_isRecipeIncomplete` is
+        // true and, being OFF, it renders as "Can't enable" — enabling it would be refused.
+        const emptyResultRecipe = await rm.createRecipe({
+          name: 'Temper a Blade',
+          description: 'Re-harden a finished blade to raise its edge retention.',
+          craftingSystemId: systemId,
+          img: 'icons/skills/melee/hand-grip-sword-red.webp',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Iron Sword',
+              options: [{
+                quantity: 1,
+                match: { type: 'component', componentId: componentMap['Iron Sword'] }
+              }]
+            }]
+          }],
+          resultGroups: [{ name: 'Tempered Blade', results: [] }]
+        }, { allowIncomplete: true });
+        await rm.updateRecipe(emptyResultRecipe.id, { enabled: false, category: 'Smithing' });
+
+        // A COMPLETE recipe that is locked (visible to players, GM-only to craft) — the
+        // one row state the lock control writes and nothing had ever captured.
+        const lockedRecipe = await rm.createRecipe({
+          name: 'Quench a Blade',
+          description: 'Plunge the hot blade into brine to set its temper.',
+          craftingSystemId: systemId,
+          img: 'icons/skills/trades/smithing-anvil-silver-red.webp',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Iron Ore',
+              options: [{
+                quantity: 1,
+                match: { type: 'component', componentId: componentMap['Iron Ore'] }
+              }]
+            }]
+          }],
+          resultGroups: [{
+            name: 'Tempered Weapon',
+            results: [{ componentId: componentMap['Iron Sword'], quantity: 1 }]
+          }]
+        });
+        await rm.updateRecipe(lockedRecipe.id, { locked: true, category: 'Smithing' });
+
+        // Spread the existing recipes across the two authored categories so the library
+        // renders THREE groups (Alchemy / General / Smithing), not one.
+        await rm.updateRecipe(recipe1.id, { category: 'Smithing' });
+        await rm.updateRecipe(recipe2.id, { category: 'Alchemy' });
+        await rm.updateRecipe(multiStepRecipe.id, { category: 'Smithing' });
 
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
         const gatheringEnvironment = await environmentStore.create({
@@ -4386,15 +4487,21 @@ async function main() {
         await openManagerCraftingSection(page, 'recipes', 'recipes');
         await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion")').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
+        await assertRecipeRowsHittable(page, 'recipes normal');
         await captureStableManagerView(page, { layout: 'recipes normal', label: 'manager-recipes-normal' });
 
         // The rich recipe row (issue 643) is the highest horizontal-overflow risk in the
         // manager: identity + I/O readout + check pill + lock + toggle + three actions on
         // one line. Drive it at the narrow width too — assertManagerLayoutStable only
         // flags what it FINDS, so a width nobody measures is coverage nobody has.
+        //
+        // And a row nobody can SEE is coverage nobody has either: the layout check counts
+        // DOM rows, so it passed on a 900px library that showed zero of them. The hit-test
+        // runs before the capture (and scrolls the first row into view, which is also the
+        // frame worth photographing at this width).
+        await setManagerWindowSize(page, { width: 900, height: 700 });
+        await assertRecipeRowsHittable(page, 'recipes narrow');
         await captureStableManagerView(page, {
-          width: 900,
-          height: 700,
           layout: 'recipes narrow',
           label: 'manager-recipes-narrow',
         });

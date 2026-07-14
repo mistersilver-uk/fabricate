@@ -2049,9 +2049,54 @@ test('collapsed manager rail reclaims content width and keeps section nav as an 
   );
   assert.ok(collapsedNavButtonBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'collapsed nav buttons should collapse to a single centered icon column');
   assert.ok(
-    css.includes('@container fabricate-manager (max-width: 1120px) {\n  .fabricate-manager .manager-body,\n  .fabricate-manager .manager-body.is-rail-collapsed {'),
+    stackedBodyRule().includes('grid-template-columns: 1fr;'),
     'narrow container query should still stack the collapsed body to a single column'
   );
+});
+
+// The stacked body rule, read out of the 1120px container query rather than off the base
+// `.manager-body` block (`blockFor` returns the FIRST match, which is the base rule).
+function stackedBodyRule() {
+  const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const selector =
+    '.fabricate-manager .manager-body,\n  .fabricate-manager .manager-body.is-rail-collapsed {';
+  const start = query.indexOf(selector);
+  if (start < 0) return '';
+  const rule = query.slice(start);
+  return rule.slice(0, rule.indexOf('}') + 1);
+}
+
+// Issue 643 — the bug that made the recipe library render ZERO visible rows at 900px.
+//
+// Stacked, `.manager-body`'s three children land in implicit `auto` rows inside a box of
+// DEFINITE height, and each of them carries `min-height: 0` + `overflow: hidden` — so each
+// contributes a min-content size of ZERO and the track-sizing algorithm SHARES the body's
+// height between them rather than sizing each to its content. Measured at 900x700: rail
+// 225px (its whole nav clipped away), main 200px, inspector 179px, `.manager-table-scroll`
+// squeezed to 24px, and every recipe row still in the DOM at its full 76px — which is
+// precisely why `assertManagerLayoutStable` (a DOM row count plus an overflow measurement)
+// passed on a library that showed nothing at all.
+//
+// `max-content` tracks cannot be squeezed. This is a correctness rule, not tidiness.
+test('the stacked manager body sizes its regions to content instead of sharing its height', () => {
+  const bodyRule = stackedBodyRule();
+  assert.ok(bodyRule, 'the 1120px query must still carry a stacked-body rule');
+  assert.ok(
+    bodyRule.includes('grid-auto-rows: max-content;'),
+    'stacked rail / main / inspector rows must size to content, or each is squeezed to a share of the body height'
+  );
+  assert.ok(
+    bodyRule.includes('overflow-y: auto;'),
+    'the body is what scrolls once its regions keep their own height'
+  );
+
+  // Left at its content height the stacked rail is ~650px of navigation ABOVE the content
+  // it navigates to, so the GM would scroll past the entire nav to reach row one.
+  const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const railStart = query.indexOf('.fabricate-manager .manager-rail {');
+  const railRule = query.slice(railStart, query.indexOf('}', railStart) + 1);
+  assert.ok(railRule.includes('max-height:'), 'the stacked rail is bounded, not a full-height wall of nav');
+  assert.ok(railRule.includes('overflow: hidden auto;'), 'the bounded stacked rail scrolls its own nav');
 });
 
 // Issue 643: the Studio rail adds a section label and turns the count badges into

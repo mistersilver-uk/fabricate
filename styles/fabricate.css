@@ -10474,13 +10474,36 @@
 }
 
 @container fabricate-manager (max-width: 1120px) {
+  /*
+    `grid-auto-rows: max-content` is LOAD-BEARING, not tidiness (issue 643).
+
+    Stacked, the body's three children land in three implicit `auto` rows inside a
+    box whose height is definite (the shell's `1fr`). Every one of them carries
+    `min-height: 0` + `overflow: hidden`, so each contributes a min-content size of
+    ZERO — and the track-sizing algorithm then distributes the body's height ACROSS
+    the three rows instead of letting them size to their content. Measured at 900x700
+    before this rule: rail 225px (its whole nav clipped away), main 200px, inspector
+    179px, and `.manager-table-scroll` squeezed to 24px — the recipe library rendered
+    every row at full height in the DOM while showing NONE of them, painted under the
+    inspector's background. `max-content` tracks cannot be squeezed, so each region
+    keeps its own height and `.manager-body` (already `overflow-y: auto`) does the
+    scrolling — which is what the stacked reading order always assumed.
+  */
   .fabricate-manager .manager-body,
   .fabricate-manager .manager-body.is-rail-collapsed {
     grid-template-columns: 1fr;
+    grid-auto-rows: max-content;
     overflow-y: auto;
   }
 
+  /*
+    Stacked, the rail is a full-height nav sitting ABOVE the content it navigates to.
+    Left at its content height it is ~650px of chrome the GM must scroll past before
+    the first row, so it becomes a bounded, self-scrolling strip instead.
+  */
   .fabricate-manager .manager-rail {
+    max-height: 232px;
+    overflow: hidden auto;
     border-right: 0;
     border-bottom: 1px solid var(--fab-mv2-border);
   }
