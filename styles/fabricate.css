@@ -1240,7 +1240,7 @@
   container-type: inline-size;
   container-name: fabricate-manager;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   height: 100%;
   min-width: 0;
   overflow: hidden;
@@ -1285,6 +1285,76 @@
   outline-offset: 2px;
 }
 
+/*
+  The manager titlebar (issue 643) — a thin identity strip above the header, shared
+  by every manager screen. The gold badge carries the SELECTED crafting system's
+  name: user-authored text, so it is capped and ellipsised rather than allowed to
+  push the right-hand status line off the strip. Both are pure `--fab-*` tokens, so
+  the strip re-skins with every theme.
+*/
+.fabricate-manager .manager-titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-4);
+  border-bottom: 1px solid var(--fab-mv2-border);
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-titlebar-icon {
+  flex: 0 0 auto;
+  color: var(--fab-mv2-accent);
+  font-size: 0.82rem;
+}
+
+.fabricate-manager .manager-titlebar-product {
+  flex: 0 0 auto;
+  color: var(--fab-mv2-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-titlebar-badge {
+  flex: 0 1 auto;
+  overflow: hidden;
+  max-width: 220px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border-radius: 5px;
+  color: var(--fab-on-badge-gold);
+  background: var(--fab-badge-gold);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-titlebar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  margin-left: auto;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-titlebar-status-icon {
+  flex: 0 0 auto;
+  color: var(--fab-mv2-info);
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-titlebar-status-text {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .fabricate-manager .manager-header {
   display: flex;
   align-items: center;
@@ -1309,8 +1379,14 @@
   text-transform: uppercase;
 }
 
+/*
+  The screen title is the manager's display type. This class (0,2,0) deliberately
+  outranks the `.fabricate-manager h1..h6 { font-family: var(--font-primary) }` reset
+  (0,1,1) above, which is what makes the serif adoption stick on the header's <h1>.
+*/
 .fabricate-manager .manager-title {
   margin: 0;
+  font-family: var(--fab-font-serif);
   font-size: 1.05rem;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -1441,6 +1517,17 @@
 }
 
 .fabricate-manager .manager-body.is-rail-collapsed .manager-rail-block {
+  display: none;
+}
+
+/*
+  The 56px collapsed rail keeps ONLY the icon gutter. Every element the Studio rail
+  adds has to opt out explicitly, or it blows the column out: the scope card (above,
+  via `.manager-rail-block`), the uppercase section label, and the mono count badges
+  — the badges now also carry `.manager-chip` (`display: inline-flex`), which this
+  4-class selector outranks.
+*/
+.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title {
   display: none;
 }
 
@@ -3468,6 +3555,13 @@
   border-radius: 6px;
 }
 
+/*
+  The rail's crafting-system selector card (issue 643). It reads as a raised card in
+  the rail — a flat `--fab-bg-2` surface at radius 9 — with the system name set in
+  the Studio serif. Geometry (the 64px height, the name/return grid, the two-line
+  clamp) is unchanged: it is what keeps a long user-authored system name from
+  reflowing the nav below it.
+*/
 .fabricate-manager .manager-scope-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 28px;
@@ -3478,9 +3572,9 @@
   height: 64px;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
+  border-radius: 9px;
   color: inherit;
-  background: var(--fab-success-soft);
+  background: var(--fab-bg-2);
   text-align: left;
   white-space: normal;
   overflow: hidden;
@@ -3493,8 +3587,9 @@
   max-height: 2.36em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  font-family: var(--fab-font-serif);
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.18;
   overflow: hidden;
   overflow-wrap: anywhere;
@@ -6465,6 +6560,14 @@
   text-transform: uppercase;
 }
 
+/* The rail's own section label sits tighter and tracks wider than a card title. */
+.fabricate-manager .manager-rail-title {
+  padding: 0 var(--fab-space-1);
+  color: var(--fab-text-subtle);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+}
+
 .fabricate-manager .manager-nav-button {
   appearance: none;
   -webkit-appearance: none;
@@ -6477,16 +6580,29 @@
   min-height: 36px;
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--fab-mv2-text);
+  border-radius: 7px;
+  color: var(--fab-mv2-text-muted);
   background: transparent;
+  font-weight: 500;
   text-align: left;
 }
 
+.fabricate-manager .manager-nav-button:hover:not(:disabled) {
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+}
+
+/*
+  The active nav row is ACCENT, not success: the rail's selected state is an identity
+  cue ("you are here"), never a status. Success/amber stay reserved for enabled and
+  warning states on the rows the manager screens list.
+*/
 .fabricate-manager .manager-nav-button.is-active {
-  border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-success-soft);
+  color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  font-weight: 600;
 }
 
 .fabricate-manager .manager-nav-button:focus {
@@ -6597,10 +6713,11 @@
 }
 
 .fabricate-manager .manager-nav-subitem.is-active {
-  color: var(--fab-mv2-text);
-  border-color: var(--fab-success-border);
-  background: var(--fab-success-soft);
+  color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  font-weight: 600;
 }
 
 .fabricate-manager .manager-nav-subitem:focus {
@@ -6632,6 +6749,29 @@
 .fabricate-manager .manager-nav-count {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/*
+  Rail count badges (issue 643) reuse the shared `.manager-chip.is-mono` variant so
+  every tabular number in the product reads the same. They only need to be smaller
+  and quieter than a content chip — hence the override rather than a fork. The
+  disabled Graph row's "Soon" span deliberately stays a bare `.manager-nav-count`:
+  it is dead UI and this change does not elevate it.
+*/
+.fabricate-manager .manager-nav-count.manager-chip {
+  flex: 0 0 auto;
+  min-height: 18px;
+  padding: 0 var(--fab-space-1);
+  border-color: transparent;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  font-size: 0.66rem;
+  overflow-wrap: normal;
+}
+
+.fabricate-manager .manager-nav-button.is-active .manager-nav-count.manager-chip,
+.fabricate-manager .manager-nav-subitem.is-active .manager-nav-count.manager-chip {
+  color: var(--fab-mv2-accent);
 }
 
 .fabricate-manager .manager-inspector-card {

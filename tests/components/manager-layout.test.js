@@ -369,7 +369,12 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
   assert.equal(expandedToggleBlock, '', 'expanded gathering toggle should not override collapsed geometry');
   assert.ok(submenuBlock.includes('padding-left: var(--fab-space-3);'), 'gathering submenu entries should be nested inside the group');
   assert.ok(subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto;'), 'gathering submenu entries should keep count chips inside their rows');
-  assert.ok(activeSubitemBlock.includes('background: var(--fab-success-soft);'), 'only selected gathering submenu entries should use selected fill');
+  // Issue 643: the rail's selected state is an IDENTITY cue ("you are here"), so it
+  // moved off the success family onto the accent family. Success stays reserved for
+  // the enabled/disabled status the manager screens' rows report.
+  assert.ok(activeSubitemBlock.includes('background: var(--fab-accent-soft);'), 'only selected gathering submenu entries should use selected fill');
+  assert.ok(activeSubitemBlock.includes('border-color: var(--fab-accent-border);'), 'selected gathering submenu entries should carry the accent edge');
+  assert.equal(activeSubitemBlock.includes('var(--fab-success'), false, 'the rail selected state should not reuse the enabled-status success family');
   assert.ok(activeSubitemBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'), 'selected gathering submenu entries should keep the active left accent');
   assert.ok(toggleFocusBlock.includes('outline: none;'), 'mouse focus on gathering toggle should not inherit the host outline');
   assert.ok(toggleFocusBlock.includes('box-shadow: none;'), 'mouse focus on gathering toggle should not inherit the host orange focus shadow');
@@ -1893,6 +1898,52 @@ test('collapsed manager rail reclaims content width and keeps section nav as an 
     css.includes('@container fabricate-manager (max-width: 1120px) {\n  .fabricate-manager .manager-body,\n  .fabricate-manager .manager-body.is-rail-collapsed {'),
     'narrow container query should still stack the collapsed body to a single column'
   );
+});
+
+// Issue 643: the Studio rail adds a section label and turns the count badges into
+// shared mono chips. `.manager-chip` sets `display: inline-flex`, so a badge that is
+// not explicitly re-hidden would survive into the 56px strip and blow the column out.
+// Both new elements therefore need their own collapsed treatment, asserted here.
+test('collapsed manager rail also hides the studio section label and the mono count badges', () => {
+  const collapsedRailTitleBlock = blockFor('.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title');
+  const railTitleBlock = blockFor('.fabricate-manager .manager-rail-title');
+  const navCountChipBlock = blockFor('.fabricate-manager .manager-nav-count.manager-chip');
+
+  assert.ok(collapsedRailTitleBlock.includes('display: none;'), 'collapsed rail should hide the uppercase section label');
+  assert.ok(railTitleBlock.includes('letter-spacing:'), 'the rail section label should track wider than a card title');
+  assert.ok(navCountChipBlock.includes('flex: 0 0 auto;'), 'a rail count badge should not shrink the nav label away');
+  // The 4-class collapsed selector (0,4,0) must outrank `.fabricate-manager .manager-chip`
+  // (0,2,0), or the chips reappear as inline-flex inside the icon strip.
+  const collapsedHideIndex = css.indexOf('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {');
+  const groupedHideIndex = css.indexOf('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,\n.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {');
+  assert.ok(collapsedHideIndex >= 0 || groupedHideIndex >= 0, 'collapsed rail must still hide the nav count badges');
+});
+
+test('the manager titlebar caps the selected system badge and keeps the status line on one line', () => {
+  const rootBlock = blockFor('.fabricate-manager');
+  const titlebarBlock = blockFor('.fabricate-manager .manager-titlebar');
+  const iconBlock = blockFor('.fabricate-manager .manager-titlebar-icon');
+  const badgeBlock = blockFor('.fabricate-manager .manager-titlebar-badge');
+  const statusBlock = blockFor('.fabricate-manager .manager-titlebar-status');
+  const statusTextBlock = blockFor('.fabricate-manager .manager-titlebar-status-text');
+  const titleBlock = blockFor('.fabricate-manager .manager-title');
+
+  assert.ok(
+    rootBlock.includes('grid-template-rows: auto auto 1fr;'),
+    'the manager shell must reserve a row for the titlebar, or the header takes the 1fr row and the body collapses'
+  );
+  assert.ok(titlebarBlock.includes('display: flex;'), 'the titlebar should lay its identity strip out in one row');
+  assert.ok(titlebarBlock.includes('min-width: 0;'), 'the titlebar must be allowed to shrink inside the manager grid');
+  assert.ok(iconBlock.includes('color: var(--fab-mv2-accent);'), 'the titlebar icon should read as the accent identity mark');
+  // The badge carries the SELECTED SYSTEM's name — user-authored text of any length.
+  assert.ok(badgeBlock.includes('background: var(--fab-badge-gold);'), 'the system badge should use the gold badge token');
+  assert.ok(badgeBlock.includes('color: var(--fab-on-badge-gold);'), 'the system badge should use its paired on-gold text token');
+  assert.ok(badgeBlock.includes('max-width:'), 'the system badge must cap its width against long system names');
+  assert.ok(badgeBlock.includes('text-overflow: ellipsis;') && badgeBlock.includes('white-space: nowrap;'), 'the system badge should ellipsis rather than push the status line off the strip');
+  assert.ok(statusBlock.includes('margin-left: auto;'), 'the status line should sit right-aligned');
+  assert.ok(statusBlock.includes('color: var(--fab-mv2-text-muted);'), 'the status line should read as muted metadata');
+  assert.ok(statusTextBlock.includes('text-overflow: ellipsis;'), 'a long resolution-mode label should ellipsis, not wrap the strip');
+  assert.ok(titleBlock.includes('font-family: var(--fab-font-serif);'), 'the manager screen title should override the host h1 font with the studio serif');
 });
 
 test('every view-specific manager-body grid override narrows the rail column when collapsed', () => {

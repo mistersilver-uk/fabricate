@@ -140,6 +140,28 @@ export function routedHasOutcomeTiers(routed) {
 }
 
 /**
+ * How many outcome tiers a routed check has authored — success AND failure tiers,
+ * counted by id exactly as {@link routedHasOutcomeTiers} tests. The active list is
+ * `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
+ *
+ * The manager titlebar reports this beside the resolution-mode label ("Routed by
+ * check · 4 outcome tiers"), so it must agree with the has-any predicate: a count
+ * derived from tier NAMES would silently drop an id-bearing tier the GM has not
+ * named yet, and the titlebar would disagree with the editor about how many tiers
+ * exist.
+ *
+ * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @returns {number}
+ */
+export function routedOutcomeTierCount(routed) {
+  if (!routed) return 0;
+  const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+  return (Array.isArray(tiers) ? tiers : []).filter((tier) => tier?.id).length;
+}
+
+/**
  * The recipe-tier list offered to the recipe editor's "Check tier" dropdown for
  * the selected system, resolved from its active crafting-check mode. Recipe tiers
  * are authored on a RELATIVE check (simple-static or routed-relative), so this

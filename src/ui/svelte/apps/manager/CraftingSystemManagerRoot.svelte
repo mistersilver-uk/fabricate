@@ -9,6 +9,7 @@
   import {
     routedSuccessTierOptions,
     routedHasOutcomeTiers,
+    routedOutcomeTierCount,
     routedOutcomeTierNames,
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions
@@ -1705,6 +1706,30 @@
       alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy')
     };
     return labels[mode] || mode || text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple');
+  }
+
+  // The titlebar's right-hand status line. Resolution mode is a SYSTEM property, so
+  // this reports the selected system's mode — and, only when that mode actually
+  // routes by outcome tier, how many tiers the GM has authored on its routed check.
+  // A `simple`/`progressive`/`alchemy` system has no tiers to count, and a routed
+  // system with none yet says so by omission rather than by printing "0".
+  const titlebarOutcomeTierCount = $derived(
+    selectedSystem?.resolutionMode === 'routedByCheck'
+      ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)
+      : 0
+  );
+
+  function titlebarStatusLabel() {
+    const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
+    if (titlebarOutcomeTierCount <= 0) return mode;
+    const tiers = formatCount(
+      'FABRICATE.Admin.Manager.Titlebar.OutcomeTier',
+      'outcome tier',
+      'FABRICATE.Admin.Manager.Titlebar.OutcomeTiers',
+      'outcome tiers',
+      titlebarOutcomeTierCount
+    );
+    return `${mode} · ${tiers}`;
   }
 
   function featureLabels(system) {
@@ -4251,6 +4276,34 @@
 </script>
 
 <div class="fabricate-manager" data-manager-view={currentView}>
+  <!--
+    The manager titlebar: a thin, always-present identity strip above the header.
+    It answers "which crafting system am I editing, and how does it resolve?" from
+    every screen, so the gold badge carries the SELECTED SYSTEM's name (user-authored
+    text — hence max-width + ellipsis + title) and never a theme or product name.
+  -->
+  <div class="manager-titlebar" data-manager-titlebar aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}>
+    <i class="fas fa-layer-group manager-titlebar-icon" aria-hidden="true"></i>
+    <span class="manager-titlebar-product">{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</span>
+    {#if selectedSystem}
+      <span
+        class="manager-titlebar-badge"
+        data-manager-titlebar-system
+        title={selectedSystem.name}
+        aria-label={text('FABRICATE.Admin.Manager.Titlebar.SystemBadge', 'Selected crafting system')}
+      >{selectedSystem.name}</span>
+      <span
+        class="manager-titlebar-status"
+        data-manager-titlebar-status
+        title={titlebarStatusLabel()}
+        aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
+      >
+        <i class="fas fa-dice-d20 manager-titlebar-status-icon" aria-hidden="true"></i>
+        <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
+      </span>
+    {/if}
+  </div>
+
   <header class="manager-header">
     <div class="manager-heading">
       <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
@@ -4628,13 +4681,20 @@
         <p class="manager-muted">{text('FABRICATE.Admin.Manager.Workspace', 'GM management workspace')}</p>
       </section>
 
+      <!--
+        The rail's uppercase section label. Hidden entirely in the 56px collapsed
+        rail (with the scope card and the count badges) so the icon gutter stays the
+        only thing that has to fit.
+      -->
+      <p class="manager-rail-title" data-manager-rail-section>{text('FABRICATE.Admin.Manager.Nav.SectionLabel', 'GM management')}</p>
+
       <nav class="manager-nav" aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}>
         {#if selectedSystem}
           <button type="button" class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`} aria-current={currentView === 'system-edit' ? 'page' : undefined} data-nav-system-edit onclick={() => editSystem(selectedSystem.id)}>
             <i class="fas fa-clipboard-check" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')}</span>
             {#if systemOverviewCount > 0}
-              <span class="manager-nav-count" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
+              <span class="manager-nav-count manager-chip is-mono" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
             {/if}
           </button>
           {#if recipesRouteEnabled}
@@ -4649,7 +4709,7 @@
               >
                 <i class="fas fa-hammer" aria-hidden="true"></i>
                 <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
-                <span class="manager-nav-count">{$viewState.recipes?.length || 0}</span>
+                <span class="manager-nav-count manager-chip is-mono">{$viewState.recipes?.length || 0}</span>
               </button>
               <button
                 type="button"
@@ -4676,7 +4736,7 @@
                       <i class={craftingItem.icon} aria-hidden="true"></i>
                       <span class="manager-nav-label">{text(craftingItem.labelKey, craftingItem.labelFallback)}</span>
                       {#if craftingItem.count != null}
-                        <span class="manager-nav-count">{craftingItem.count}</span>
+                        <span class="manager-nav-count manager-chip is-mono">{craftingItem.count}</span>
                       {/if}
                     </button>
                   {/each}
@@ -4687,24 +4747,24 @@
           <button type="button" class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`} aria-current={currentView === 'components' || currentView === 'component-edit' ? 'page' : undefined} onclick={() => setView('components')}>
             <i class="fas fa-boxes" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
-            <span class="manager-nav-count">{selectedCounts.components}</span>
+            <span class="manager-nav-count manager-chip is-mono">{selectedCounts.components}</span>
           </button>
           <button type="button" class={`manager-nav-button ${currentView === 'tags' ? 'is-active' : ''}`} aria-current={currentView === 'tags' ? 'page' : undefined} onclick={() => setView('tags')}>
             <i class="fas fa-tags" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span>
-            <span class="manager-nav-count">{selectedCounts.itemTags + selectedCounts.recipeCategories}</span>
+            <span class="manager-nav-count manager-chip is-mono">{selectedCounts.itemTags + selectedCounts.recipeCategories}</span>
           </button>
           {#if canShowEssences}
             <button type="button" class={`manager-nav-button ${currentView === 'essences' || currentView === 'essence-edit' ? 'is-active' : ''}`} aria-current={currentView === 'essences' || currentView === 'essence-edit' ? 'page' : undefined} onclick={() => setView('essences')}>
               <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
               <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</span>
-              <span class="manager-nav-count">{selectedCounts.essences}</span>
+              <span class="manager-nav-count manager-chip is-mono">{selectedCounts.essences}</span>
             </button>
           {/if}
           <button type="button" class={`manager-nav-button ${currentView === 'tools' ? 'is-active' : ''}`} aria-current={currentView === 'tools' ? 'page' : undefined} onclick={() => setView('tools')}>
             <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
-            <span class="manager-nav-count">{toolsNavCount}</span>
+            <span class="manager-nav-count manager-chip is-mono">{toolsNavCount}</span>
           </button>
           <button type="button" class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`} aria-current={currentView === 'checks' ? 'page' : undefined} onclick={() => setView('checks')}>
             <i class="fas fa-dice-d20" aria-hidden="true"></i>
@@ -4722,7 +4782,7 @@
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
                 <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span>
-                <span class="manager-nav-count">{gatheringNavCounts.total}</span>
+                <span class="manager-nav-count manager-chip is-mono">{gatheringNavCounts.total}</span>
               </button>
               <button
                 type="button"
@@ -4749,7 +4809,7 @@
                       <i class={gatheringItem.icon} aria-hidden="true"></i>
                       <span class="manager-nav-label">{text(gatheringItem.labelKey, gatheringItem.labelFallback)}</span>
                       {#if gatheringNavCounts[gatheringItem.id] != null}
-                        <span class="manager-nav-count">{gatheringNavCounts[gatheringItem.id]}</span>
+                        <span class="manager-nav-count manager-chip is-mono">{gatheringNavCounts[gatheringItem.id]}</span>
                       {/if}
                     </button>
                   {/each}

@@ -1436,7 +1436,15 @@
           "TagsCategories": "Tags & Categories",
           "Checks": "Checks",
           "Rules": "Rules",
-          "Graph": "Graph"
+          "Graph": "Graph",
+          "SectionLabel": "GM management"
+        },
+        "Titlebar": {
+          "Label": "Crafting manager",
+          "SystemBadge": "Selected crafting system",
+          "Status": "Selected system resolution",
+          "OutcomeTier": "outcome tier",
+          "OutcomeTiers": "outcome tiers"
         },
         "Crafting": {
           "CraftingTabs": {
