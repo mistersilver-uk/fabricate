@@ -879,8 +879,9 @@ The trade when you promote the soak (route 2) is that you ship a patch that has 
 It leaks no *feature* work, but it forgoes *soak time* — choose it knowingly.
 
 **Pre-flight.**
-Before cutting a hotfix line, run `node scripts/hotfix-preflight.mjs v<base>` (for example `v1.4.0`).
-It computes the next patch tag and **refuses** when that tag already exists on `origin` — a signal that a patch is soaking, so route 2 applies.
+Before cutting a hotfix line, run `git ls-remote --tags origin | node scripts/hotfix-preflight.mjs v<base>` (for example `v1.4.0`).
+It computes the next patch tag and **refuses** when that tag already appears in the piped remote-tag listing — a signal that a patch is soaking, so route 2 applies.
+The tool never runs `git` itself; you pipe the tag listing in, and an empty or malformed listing is treated as unverifiable and refused.
 This is defense-in-depth: semantic-release also refuses the collision (`EINVALIDNEXTVERSION`), but the pre-flight refuses earlier, before the branch is cut, and more legibly.
 
 **Route 1 — cut a hotfix line.**
