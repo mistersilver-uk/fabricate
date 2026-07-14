@@ -13,19 +13,37 @@
    - it is named RecipeBrowserInspector, not RecipeInspector, to avoid colliding with
      the recipe EDITOR's own frames.
 
-  The row-derivation helpers below (structure label, step / result counts,
-  requirements summary) moved here with it — the root had no other caller.
+  Contents (brief §3.3): hero (image + name + category/status chips + flavour), a 2x2
+  STAT grid (Ingredients / Results / Steps / Crafting check), a REQUIRES list and a
+  PRODUCES list — both icon-chip + name + mono quantity rows built from the recipe's
+  real ingredient options and result items — then the recipe actions.
+
+  Produces is not optional garnish: a recipe library inspector that cannot tell the GM
+  what the recipe makes is not finished, and an empty list is a DANGER row ("a
+  successful craft makes nothing"), not a blank.
+
+  The walk over execution scopes -> sets -> groups -> options lives in the pure
+  `recipeBrowserModel.js` (`buildRecipeRequirementRows` / `buildRecipeProduceRows`), so
+  it is unit tested without a DOM and is written once for both lists.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
+  import {
+    buildRecipeProduceRows,
+    buildRecipeRequirementRows
+  } from '../../../../../utils/recipeBrowserModel.js';
 
   let {
     selectedRecipe = null,
     recipeCount = 0,
     componentCount = 0,
+    // The system's components and essences, used ONLY to resolve the names and images
+    // of the ids the recipe references. The inspector reads; it never authors.
+    componentOptions = [],
+    essenceOptions = [],
     showRecipeCategories = false,
     showVisibilitySummary = false,
     onDuplicate = () => {},
@@ -40,10 +58,12 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
-    const key = count === 1 ? keySingular : keyPlural;
-    const fallback = count === 1 ? fallbackSingular : fallbackPlural;
-    return `${count} ${text(key, fallback)}`;
+  function format(key, fallback, replacements) {
+    let result = text(key, fallback);
+    for (const [token, value] of Object.entries(replacements)) {
+      result = result.replace(`{${token}}`, value);
+    }
+    return result;
   }
 
   function truncateDescription(description) {
@@ -57,94 +77,106 @@
     return recipe?.recipeItemImg || resolveRecipeImage(recipe);
   }
 
-  function ingredientCount(recipe) {
-    return recipe?.ingredientCount ?? recipe?.ingredients?.length ?? 0;
+  // The 2x2 stat grid asks the four questions a GM actually has about a recipe they
+  // are looking at: what does it take, what does it make, how many steps, and what do
+  // I have to roll. (The old grid answered Category / Structure / Steps / Result-groups
+  // — two of which are restatements of the row the GM just clicked.)
+  //
+  // `results` is the one stat with a DANGER state: a recipe that produces nothing is
+  // not merely unfinished, it is a successful craft that makes nothing.
+  const CHECK_LABELS = {
+    dc: ['FABRICATE.Admin.Manager.Recipe.CheckDcValue', 'DC {dc}'],
+    dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
+    progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
+    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', '—']
+  };
+
+  function checkValue(recipe) {
+    const summary = recipe?.checkSummary || { kind: 'none', dc: null };
+    const [labelKey, fallback] = CHECK_LABELS[summary.kind] || CHECK_LABELS.none;
+    return format(labelKey, fallback, { dc: summary.dc ?? '' });
   }
 
-  function toolCount(recipe) {
-    return recipe?.toolCount ?? recipe?.tools?.length ?? 0;
-  }
+  const stats = $derived(
+    selectedRecipe
+      ? [
+          {
+            id: 'ingredients',
+            value: selectedRecipe.ingredientCount ?? 0,
+            // `Recipe.Ingredients` is the LOWERCASE count word ("2 ingredients"); the
+            // sentence-case section noun is `IngredientsSection`.
+            label: text('FABRICATE.Admin.Manager.Recipe.IngredientsSection', 'Ingredients'),
+            tone: ''
+          },
+          {
+            id: 'results',
+            value: selectedRecipe.resultItemCount ?? 0,
+            label: text('FABRICATE.Admin.Manager.Recipe.Results', 'Results'),
+            tone: (selectedRecipe.resultItemCount ?? 0) === 0 ? 'danger' : ''
+          },
+          {
+            id: 'steps',
+            value: selectedRecipe.stepCount ?? 0,
+            label: text('FABRICATE.Admin.Manager.Recipe.Steps', 'Steps'),
+            tone: ''
+          },
+          {
+            id: 'check',
+            value: checkValue(selectedRecipe),
+            label: text('FABRICATE.Admin.Manager.Recipe.CraftingCheck', 'Crafting check'),
+            tone: selectedRecipe.checkSummary?.kind === 'none' ? 'muted' : ''
+          }
+        ]
+      : []
+  );
 
-  function stepCount(recipe) {
-    return recipe?.stepCount ?? 0;
-  }
+  // Requires / Produces are derived by the pure model (filter/sort/group live there
+  // too), so the walk over steps -> sets -> groups -> options exists once and is unit
+  // tested without a DOM.
+  const requirementRows = $derived(
+    selectedRecipe
+      ? buildRecipeRequirementRows(selectedRecipe, { componentOptions, essenceOptions })
+      : []
+  );
+  const produceRows = $derived(
+    selectedRecipe ? buildRecipeProduceRows(selectedRecipe, { componentOptions }) : []
+  );
+  // The recipe's success outputs. A `role: 'failure'` group is what a FAILED alchemy
+  // craft makes; listing it under "Produces" would tell the GM the recipe makes
+  // something when a successful craft makes nothing.
+  const successRows = $derived(produceRows.filter((row) => !row.failure));
 
-  function resultGroupCount(recipe) {
-    return recipe?.resultGroupCount ?? 0;
-  }
+  const UNNAMED_COMPONENT = 'FABRICATE.Admin.Manager.Recipe.UnknownComponent';
 
-  function structureLabel(recipe) {
-    const labels = {
-      multiStep: text('FABRICATE.Admin.Manager.Recipe.MultiStep', 'Multi-step'),
-      singleStep: text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step'),
-      simple: text('FABRICATE.Admin.Manager.Recipe.Simple', 'Simple')
-    };
-    return labels[recipe?.structureKey] || (recipe?.isSimple
-      ? text('FABRICATE.Admin.Manager.Recipe.Simple', 'Simple')
-      : text('FABRICATE.Admin.Manager.Recipe.Advanced', 'Advanced'));
-  }
-
-  function stepRequirementSummary(step) {
-    if (!step) return text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements');
-    if (step.hasAlternatives) {
-      return text('FABRICATE.Admin.Manager.Recipe.AlternativeSets', '{count} alternative sets')
-        .replace('{count}', step.ingredientSetCount || step.ingredientSetSummaries?.length || 0);
+  function requirementName(row) {
+    if (row.kind === 'tags') {
+      const tags = (row.tags || []).join(', ');
+      if (!tags) return text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set');
+      return row.tagMatch === 'all'
+        ? format('FABRICATE.Admin.Manager.Recipe.TagsAll', 'All of: {tags}', { tags })
+        : format('FABRICATE.Admin.Manager.Recipe.TagsAny', 'Any of: {tags}', { tags });
     }
-    const ingredients = step.ingredientCount || 0;
-    const tools = step.toolCount || 0;
-    const ingredientLabel = formatCount(
-      'FABRICATE.Admin.Manager.Recipe.Ingredient',
-      'ingredient',
-      'FABRICATE.Admin.Manager.Recipe.Ingredients',
-      'ingredients',
-      ingredients
-    );
-    if (tools <= 0) return ingredientLabel;
-    const toolLabel = formatCount(
-      'FABRICATE.Admin.Manager.Recipe.Tool',
-      'tool',
-      'FABRICATE.Admin.Manager.Recipe.Tools',
-      'tools',
-      tools
-    );
-    return `${ingredientLabel}, ${toolLabel}`;
+    if (row.kind === 'currency') {
+      return format('FABRICATE.Admin.Manager.Recipe.CurrencyCost', '{amount} {unit}', {
+        amount: row.amount,
+        unit: row.unit
+      });
+    }
+    if (row.kind === 'essence') {
+      return row.name || text('FABRICATE.Admin.Manager.Recipe.UnknownEssence', 'Unknown essence');
+    }
+    return row.name || text(UNNAMED_COMPONENT, 'Unknown component');
   }
 
-  function requirementsSummary(recipe) {
-    const steps = Array.isArray(recipe?.requirementsPreview) ? recipe.requirementsPreview : [];
-    if (steps.length > 1) {
-      return text('FABRICATE.Admin.Manager.Recipe.StepRequirements', '{count} steps')
-        .replace('{count}', steps.length);
-    }
-    if (steps.length === 1) return stepRequirementSummary(steps[0]);
-    return stepRequirementSummary({
-      ingredientCount: ingredientCount(recipe),
-      toolCount: toolCount(recipe),
-      ingredientSetCount: 1
-    });
+  // The quantity column is a MONO numeric. A currency row already carries its amount in
+  // the name ("25 gp"), so it has no separate quantity to show.
+  function requirementQuantity(row) {
+    if (row.kind === 'currency') return '';
+    return `×${row.quantity}`;
   }
 
-  function requirementsPreviewItems(recipe) {
-    const steps = Array.isArray(recipe?.requirementsPreview) ? recipe.requirementsPreview : [];
-    if (steps.length > 0) {
-      return steps.map(step => ({
-        id: step.id,
-        label: step.name,
-        value: stepRequirementSummary(step)
-      }));
-    }
-    return [
-      {
-        id: 'ingredients',
-        label: text('FABRICATE.Admin.Manager.Recipe.Ingredients', 'ingredients'),
-        value: ingredientCount(recipe)
-      },
-      {
-        id: 'tools',
-        label: text('FABRICATE.Admin.Manager.Recipe.Tools', 'tools'),
-        value: toolCount(recipe)
-      }
-    ];
+  function produceName(row) {
+    return row.name || text(UNNAMED_COMPONENT, 'Unknown component');
   }
 </script>
 
@@ -156,6 +188,11 @@
         <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}</p>
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
         <div class="manager-chip-row">
+          {#if showRecipeCategories}
+            <span class="manager-chip" data-recipe-category>
+              {selectedRecipe.category || text('FABRICATE.Admin.Manager.Recipe.General', 'General')}
+            </span>
+          {/if}
           <span class={`manager-chip ${selectedRecipe.enabled === false ? 'is-disabled' : 'is-active'}`}>
             {selectedRecipe.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
           </span>
@@ -184,21 +221,15 @@
 
   <section class="manager-inspector-card">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Details', 'Recipe details')}</h3>
-    <div class="manager-fact-grid">
-      {#if showRecipeCategories}
-        <div class="manager-fact" data-recipe-fact="category">
-          <span class="manager-fact-line"><strong>{selectedRecipe.category || text('FABRICATE.Admin.Manager.Recipe.General', 'General')}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span></span>
+    <!-- The four questions a GM has about the recipe they just clicked: what does it
+         take, what does it make, how many steps, what do they roll. -->
+    <div class="manager-recipe-stat-grid">
+      {#each stats as stat (stat.id)}
+        <div class="manager-recipe-stat" data-recipe-fact={stat.id}>
+          <strong class={`manager-recipe-stat-value ${stat.tone ? `is-${stat.tone}` : ''}`}>{stat.value}</strong>
+          <span class="manager-recipe-stat-label">{stat.label}</span>
         </div>
-      {/if}
-      <div class="manager-fact" data-recipe-fact="structure">
-        <span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Structure', 'Structure')}</span></span>
-      </div>
-      <div class="manager-fact" data-recipe-fact="steps">
-        <span class="manager-fact-line"><strong>{stepCount(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Steps', 'Steps')}</span></span>
-      </div>
-      <div class="manager-fact" data-recipe-fact="result-groups">
-        <span class="manager-fact-line"><strong>{resultGroupCount(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.ResultGroups', 'Result groups')}</span></span>
-      </div>
+      {/each}
     </div>
     {#if showVisibilitySummary}
       <p class="manager-muted">
@@ -209,16 +240,65 @@
   </section>
 
   <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Requirements', 'Requirements')}</h3>
-    <p class="manager-muted">{requirementsSummary(selectedRecipe)}</p>
-    <div class="manager-requirements-list">
-      {#each requirementsPreviewItems(selectedRecipe) as item (item.label)}
-        <div class="manager-requirement-row">
-          <span>{item.label}</span>
-          <strong>{item.value}</strong>
-        </div>
-      {/each}
-    </div>
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}</h3>
+    {#if requirementRows.length === 0}
+      <p class="manager-muted" data-recipe-requires-empty>{text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}</p>
+    {:else}
+      <div class="manager-recipe-flow-list">
+        {#each requirementRows as row (row.id)}
+          <!-- A requirement with alternatives is satisfied by ANY ONE of them, so an
+               alternative row is marked as an OR — never as a second thing to bring. -->
+          <div
+            class={`manager-recipe-flow-row ${row.alternative ? 'is-alternative' : ''}`}
+            data-recipe-requirement={row.kind}
+          >
+            <span class="manager-recipe-flow-icon" aria-hidden="true">
+              {#if row.img}
+                <img src={row.img} alt="" />
+              {:else}
+                <i class={row.icon}></i>
+              {/if}
+            </span>
+            <span class="manager-recipe-flow-name">
+              {#if row.alternative}<span class="manager-recipe-flow-or">{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>{/if}
+              {requirementName(row)}
+            </span>
+            <span class="manager-recipe-flow-qty">{requirementQuantity(row)}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </section>
+
+  <section class="manager-inspector-card">
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}</h3>
+    {#if successRows.length === 0}
+      <!-- Not "unfinished": a recipe with no results is a SUCCESSFUL craft that makes
+           nothing. It is the one danger state in this inspector. -->
+      <p class="manager-recipe-flow-empty" data-recipe-produces-empty>
+        <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.NoResults', 'No results — a successful craft makes nothing.')}</span>
+      </p>
+    {:else}
+      <div class="manager-recipe-flow-list">
+        {#each successRows as row (row.id)}
+          <div class="manager-recipe-flow-row is-produced" data-recipe-produces>
+            <span class="manager-recipe-flow-icon" aria-hidden="true">
+              {#if row.img}
+                <img src={row.img} alt="" />
+              {:else}
+                <i class="fas fa-cube"></i>
+              {/if}
+            </span>
+            <span class="manager-recipe-flow-name">{produceName(row)}</span>
+            {#if row.groupName}
+              <span class="manager-chip manager-recipe-flow-group">{row.groupName}</span>
+            {/if}
+            <span class="manager-recipe-flow-qty">×{row.quantity}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </section>
 
   <section class="manager-inspector-card">

@@ -247,6 +247,193 @@ export function deriveRecipeStatuses(recipe) {
   return pills;
 }
 
+// ---------------------------------------------------------------------------
+// The library inspector's Requires / Produces lists (issue 643 §3.3).
+//
+// The inspector must be able to tell a GM what a recipe consumes and what it makes.
+// Both answers live in the SAME nested shape — execution scope (the recipe itself, or
+// each of its steps) → ingredient sets / result groups → options / results — so the
+// walk is written once here, as pure data over the projected row, and both lists are
+// built from it. Names and images are resolved against the caller's component and
+// essence rosters; nothing here localizes.
+// ---------------------------------------------------------------------------
+
+/**
+ * The recipe's execution scopes: its explicit `steps[]` when it has any, otherwise the
+ * recipe itself as a single implicit scope. Mirrors `Recipe.getExecutionSteps()` for
+ * the projected (plain-object) row, which carries no methods.
+ *
+ * @param {object} recipe a projected recipe row.
+ * @returns {{id: string, name: string, multi: boolean, ingredientSets: object[], resultGroups: object[]}[]}
+ * @private
+ */
+function executionScopes(recipe) {
+  const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+  if (steps.length > 0) {
+    return steps.map((step, index) => ({
+      id: step?.id || `step-${index + 1}`,
+      name: step?.name || `Step ${index + 1}`,
+      multi: steps.length > 1,
+      ingredientSets: Array.isArray(step?.ingredientSets) ? step.ingredientSets : [],
+      resultGroups: Array.isArray(step?.resultGroups) ? step.resultGroups : [],
+    }));
+  }
+  return [
+    {
+      id: 'implicit-step',
+      name: '',
+      multi: false,
+      ingredientSets: Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [],
+      resultGroups: Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [],
+    },
+  ];
+}
+
+function findById(roster, id) {
+  return (Array.isArray(roster) ? roster : []).find((entry) => entry?.id === id) || null;
+}
+
+/**
+ * One Requires row per ingredient OPTION, in authoring order.
+ *
+ * An option is not always a component: the three real match types are `component`,
+ * `tags` and `currency` (`src/models/match/matchTypes.js`), and each is reported as
+ * itself rather than flattened into a component row it is not. A requirement (an
+ * `ingredientGroup`) with two or more options is satisfied by ANY ONE of them, so
+ * every option after the first is flagged `alternative: true` — the caller renders
+ * that as an OR, never as a second thing to bring.
+ *
+ * Per-SET essences are AND requirements on the whole set, so they follow that set's
+ * options as their own `essence` rows.
+ *
+ * @param {object} recipe a projected recipe row.
+ * @param {{componentOptions?: object[], essenceOptions?: object[]}} [rosters]
+ * @returns {object[]} rows: `{ id, kind, name, img, quantity, alternative, setId, setName, scopeName, … }`
+ */
+export function buildRecipeRequirementRows(recipe, rosters = {}) {
+  const components = rosters.componentOptions;
+  const essences = rosters.essenceOptions;
+  const rows = [];
+
+  for (const scope of executionScopes(recipe)) {
+    for (const [setIndex, set] of (scope.ingredientSets || []).entries()) {
+      const setId = set?.id || `${scope.id}-set-${setIndex + 1}`;
+      const setName = set?.name || '';
+      const base = { setId, setName, scopeName: scope.multi ? scope.name : '' };
+      const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : [];
+
+      for (const [groupIndex, group] of groups.entries()) {
+        const options = Array.isArray(group?.options) ? group.options : [];
+        for (const [optionIndex, option] of options.entries()) {
+          rows.push({
+            ...base,
+            ...describeRequirementOption(option, components),
+            id: `${setId}:${group?.id || groupIndex}:${option?.id || optionIndex}`,
+            alternative: optionIndex > 0,
+          });
+        }
+      }
+
+      for (const [essenceId, amount] of Object.entries(set?.essences || {})) {
+        rows.push({
+          ...base,
+          id: `${setId}:essence:${essenceId}`,
+          kind: 'essence',
+          name: findById(essences, essenceId)?.name || '',
+          icon: findById(essences, essenceId)?.icon || 'fas fa-flask-vial',
+          img: '',
+          quantity: Number(amount) || 0,
+          alternative: false,
+        });
+      }
+    }
+  }
+
+  return rows;
+}
+
+function describeRequirementOption(option, components) {
+  const match = option?.match || {};
+  const quantity = Number(option?.quantity) > 0 ? Number(option.quantity) : 1;
+
+  if (match.type === 'tags') {
+    return {
+      kind: 'tags',
+      name: '',
+      tags: Array.isArray(match.tags) ? [...match.tags] : [],
+      tagMatch: match.tagMatch === 'all' ? 'all' : 'any',
+      icon: 'fas fa-tags',
+      img: '',
+      quantity,
+    };
+  }
+  if (match.type === 'currency') {
+    return {
+      kind: 'currency',
+      name: '',
+      unit: match.unit || '',
+      amount: Number(match.amount) || 0,
+      icon: 'fa-solid fa-coins',
+      img: '',
+      quantity,
+    };
+  }
+
+  const component = findById(components, match.componentId);
+  return {
+    kind: 'component',
+    componentId: match.componentId || '',
+    name: component?.name || '',
+    img: component?.img || '',
+    icon: 'fas fa-cube',
+    quantity,
+  };
+}
+
+/**
+ * One Produces row per result item, in authoring order, tagged with the result GROUP
+ * it belongs to. A recipe produces ONE group's items (which group is chosen by outcome
+ * routing at craft time), so the group name is carried on the row rather than the rows
+ * being summed into a single output count — there is no such number in a routed mode.
+ *
+ * An EMPTY list is the danger state the caller renders as "a successful craft makes
+ * nothing"; it is not an error here.
+ *
+ * @param {object} recipe a projected recipe row.
+ * @param {{componentOptions?: object[]}} [rosters]
+ * @returns {object[]} rows: `{ id, componentId, name, img, quantity, groupId, groupName, failure, scopeName }`
+ */
+export function buildRecipeProduceRows(recipe, rosters = {}) {
+  const components = rosters.componentOptions;
+  const rows = [];
+
+  for (const scope of executionScopes(recipe)) {
+    for (const [groupIndex, group] of (scope.resultGroups || []).entries()) {
+      const groupId = group?.id || `${scope.id}-group-${groupIndex + 1}`;
+      const results = Array.isArray(group?.results) ? group.results : [];
+
+      for (const [resultIndex, result] of results.entries()) {
+        const component = findById(components, result?.componentId);
+        rows.push({
+          id: `${groupId}:${result?.id || resultIndex}`,
+          componentId: result?.componentId || '',
+          name: component?.name || '',
+          img: component?.img || '',
+          quantity: Number(result?.quantity) > 0 ? Number(result.quantity) : 1,
+          groupId,
+          groupName: group?.name || '',
+          // The reserved alchemy-Simple failure group: what a FAILED craft makes. It is
+          // not a success output and must never be shown as one.
+          failure: group?.role === 'failure',
+          scopeName: scope.multi ? scope.name : '',
+        });
+      }
+    }
+  }
+
+  return rows;
+}
+
 /**
  * Run the whole pipeline in one call: filter → sort → paginate (→ group the page).
  * Grouping is applied to the PAGE, not the full list, so the pager stays the unit

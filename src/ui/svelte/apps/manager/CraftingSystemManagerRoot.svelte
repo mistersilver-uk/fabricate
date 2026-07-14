@@ -6633,6 +6633,8 @@
           {selectedRecipe}
           recipeCount={($viewState.recipes || []).length}
           componentCount={selectedCounts.components}
+          componentOptions={selectedSystem?.managedItemOptions || []}
+          essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
           {showRecipeCategories}
           showVisibilitySummary={$viewState.showVisibilitySummary}
           onDuplicate={() => duplicateRecipe()}

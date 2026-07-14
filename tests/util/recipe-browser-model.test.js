@@ -4,6 +4,8 @@ import {
   RECIPE_DEFAULT_PAGE_SIZE,
   attentionRank,
   buildRecipeBrowserModel,
+  buildRecipeProduceRows,
+  buildRecipeRequirementRows,
   deriveRecipeIo,
   deriveRecipeStatuses,
   describeActiveFilters,
@@ -233,5 +235,234 @@ describe('recipeBrowserModel — the whole pipeline', () => {
     assert.equal(model.groups.length, 1);
     assert.equal(model.groups[0].category, '');
     assert.equal(model.groups[0].recipes.length, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The library inspector's Requires / Produces lists (issue 643 §3.3).
+//
+// Both walk the same nested shape — execution scope (the recipe, or each step) ->
+// sets / result groups -> options / results — so both are exercised against the same
+// two fixtures: a single-scope recipe and a multi-step one.
+// ---------------------------------------------------------------------------
+
+const COMPONENTS = [
+  { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' },
+  { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp' },
+  { id: 'cmp-sludge', name: 'Sludge', img: '' }
+];
+const ESSENCES = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
+
+const SINGLE_SCOPE = {
+  id: 'r1',
+  ingredientSets: [
+    {
+      id: 'set-1',
+      name: 'Primary',
+      essences: { fire: 2 },
+      ingredientGroups: [
+        {
+          id: 'grp-1',
+          options: [
+            { id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } },
+            {
+              id: 'o2',
+              quantity: 1,
+              match: { type: 'tags', tags: ['herbal', 'rare'], tagMatch: 'all' }
+            },
+            { id: 'o3', quantity: 1, match: { type: 'currency', unit: 'gp', amount: 25 } }
+          ]
+        }
+      ]
+    }
+  ],
+  resultGroups: [
+    {
+      id: 'g-success',
+      name: 'On success',
+      results: [{ id: 'res-1', componentId: 'cmp-potion', quantity: 2 }]
+    },
+    {
+      id: 'g-failure',
+      name: 'On a failed check',
+      role: 'failure',
+      results: [{ id: 'res-2', componentId: 'cmp-sludge', quantity: 1 }]
+    }
+  ]
+};
+
+describe('recipeBrowserModel — the inspector Requires list', () => {
+  const rows = buildRecipeRequirementRows(SINGLE_SCOPE, {
+    componentOptions: COMPONENTS,
+    essenceOptions: ESSENCES
+  });
+
+  it('reports each option AS ITS OWN MATCH TYPE, never flattened into a component', () => {
+    assert.deepEqual(
+      rows.map((row) => row.kind),
+      ['component', 'tags', 'currency', 'essence'],
+      'the three real match types, then the set-scoped essence requirement'
+    );
+    assert.equal(rows[0].name, 'Mountain Herb');
+    assert.equal(rows[0].img, 'icons/herb.webp');
+    assert.equal(rows[0].quantity, 2);
+    assert.deepEqual(rows[1].tags, ['herbal', 'rare']);
+    assert.equal(rows[1].tagMatch, 'all', 'tagMatch is carried, not dropped');
+    assert.deepEqual([rows[2].unit, rows[2].amount], ['gp', 25]);
+  });
+
+  it('flags every option after the first as an ALTERNATIVE (any one satisfies the requirement)', () => {
+    assert.deepEqual(
+      rows.map((row) => row.alternative),
+      [false, true, true, false],
+      'the OR alternatives are flagged; the set-scoped essence is an AND requirement'
+    );
+  });
+
+  it('carries the per-SET essence requirement with its resolved name and amount', () => {
+    const essence = rows.at(-1);
+    assert.equal(essence.name, 'Fire');
+    assert.equal(essence.quantity, 2);
+    assert.equal(essence.setId, 'set-1');
+  });
+
+  it('leaves an unresolvable component NAMELESS rather than inventing one', () => {
+    const [row] = buildRecipeRequirementRows(
+      {
+        ingredientSets: [
+          {
+            id: 's',
+            ingredientGroups: [
+              {
+                id: 'g',
+                options: [{ id: 'o', match: { type: 'component', componentId: 'gone' } }]
+              }
+            ]
+          }
+        ]
+      },
+      { componentOptions: COMPONENTS }
+    );
+    assert.equal(row.name, '', 'the caller localizes the "unknown component" fallback');
+    assert.equal(row.componentId, 'gone', 'the id survives so the GM can still trace it');
+    assert.equal(row.quantity, 1, 'a missing quantity defaults to 1');
+  });
+});
+
+describe('recipeBrowserModel — the inspector Produces list', () => {
+  const rows = buildRecipeProduceRows(SINGLE_SCOPE, { componentOptions: COMPONENTS });
+
+  it('reports each result item with its group, name, image and quantity', () => {
+    const success = rows.find((row) => row.groupId === 'g-success');
+    assert.equal(success.name, 'Healing Potion');
+    assert.equal(success.img, 'icons/potion.webp');
+    assert.equal(success.quantity, 2);
+    assert.equal(success.groupName, 'On success');
+    assert.equal(success.failure, false);
+  });
+
+  it("marks the reserved role: 'failure' group so it is never shown as an output", () => {
+    const failure = rows.find((row) => row.groupId === 'g-failure');
+    assert.equal(
+      failure.failure,
+      true,
+      'what a FAILED craft makes is not what the recipe produces'
+    );
+  });
+
+  it('returns an empty list for a recipe with no results — the danger state, not an error', () => {
+    assert.deepEqual(buildRecipeProduceRows({ resultGroups: [] }, {}), []);
+    assert.deepEqual(buildRecipeProduceRows({}, {}), []);
+  });
+});
+
+describe('recipeBrowserModel — multi-step recipes', () => {
+  const MULTI_STEP = {
+    id: 'r2',
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Macerate',
+        ingredientSets: [
+          {
+            id: 's1',
+            essences: { fire: 1 },
+            ingredientGroups: [
+              {
+                id: 'g1',
+                options: [
+                  { id: 'o1', quantity: 3, match: { type: 'component', componentId: 'cmp-herb' } }
+                ]
+              }
+            ]
+          }
+        ],
+        resultGroups: [
+          { id: 'rg1', name: 'Pulp', results: [{ id: 'x1', componentId: 'cmp-sludge', quantity: 1 }] }
+        ]
+      },
+      {
+        id: 'step-2',
+        name: 'Distil',
+        ingredientSets: [
+          {
+            id: 's2',
+            ingredientGroups: [
+              {
+                id: 'g2',
+                options: [
+                  { id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-sludge' } }
+                ]
+              }
+            ]
+          }
+        ],
+        resultGroups: [
+          {
+            id: 'rg2',
+            name: 'On success',
+            results: [{ id: 'x2', componentId: 'cmp-potion', quantity: 1 }]
+          }
+        ]
+      }
+    ]
+  };
+
+  it('walks EVERY step, tagging each row with the step it belongs to', () => {
+    const requires = buildRecipeRequirementRows(MULTI_STEP, {
+      componentOptions: COMPONENTS,
+      essenceOptions: ESSENCES
+    });
+    assert.deepEqual(
+      requires.map((row) => [row.scopeName, row.kind]),
+      [
+        ['Macerate', 'component'],
+        ['Macerate', 'essence'],
+        ['Distil', 'component']
+      ],
+      'a step-scoped requirement is not silently attributed to the recipe'
+    );
+
+    const produces = buildRecipeProduceRows(MULTI_STEP, { componentOptions: COMPONENTS });
+    assert.deepEqual(
+      produces.map((row) => [row.scopeName, row.name]),
+      [
+        ['Macerate', 'Sludge'],
+        ['Distil', 'Healing Potion']
+      ]
+    );
+  });
+
+  it('leaves the scope name blank for a single-step recipe (there is nothing to disambiguate)', () => {
+    const rows = buildRecipeRequirementRows(SINGLE_SCOPE, { componentOptions: COMPONENTS });
+    assert.deepEqual(new Set(rows.map((row) => row.scopeName)), new Set(['']));
+  });
+
+  it('emits stable, unique row ids so a Svelte keyed each cannot collide', () => {
+    const ids = buildRecipeRequirementRows(MULTI_STEP, {
+      componentOptions: COMPONENTS,
+      essenceOptions: ESSENCES
+    }).map((row) => row.id);
+    assert.equal(new Set(ids).size, ids.length);
   });
 });

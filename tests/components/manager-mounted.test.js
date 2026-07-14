@@ -4168,13 +4168,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-recipe-action="delete"]'),
       'recipe inspector should expose a Delete action'
     );
+    // The 2x2 stat grid (issue 643, brief §3.3) answers the four questions a GM has
+    // about the recipe they just clicked. Structure and Result-groups restated the row
+    // itself and are gone; Ingredients, Results and the Crafting check replace them.
+    for (const fact of ['ingredients', 'results', 'steps', 'check']) {
+      assert.ok(
+        target.querySelector(`[data-recipe-fact="${fact}"]`),
+        `recipe inspector should expose the ${fact} stat`
+      );
+    }
     assert.ok(
-      target.querySelector('[data-recipe-fact="structure"]'),
-      'recipe inspector should expose a Structure fact'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-fact="result-groups"]'),
-      'recipe inspector should expose a Result groups fact'
+      target.querySelector('.manager-recipe-stat-grid'),
+      'recipe inspector should render the stat grid, not the generic fact list'
     );
     const heroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
     assert.ok(heroRow, 'recipe inspector should use the prominent hero title row');

@@ -327,12 +327,85 @@ describe('RecipesBrowserView lock and enable controls', () => {
   });
 });
 
+// The library inspector against brief §3.3: a 2x2 stat grid answering the four
+// questions a GM has about the recipe they just clicked, then what it REQUIRES and
+// what it PRODUCES. An inspector that cannot say what a recipe makes is not finished.
+const INSPECTOR_COMPONENTS = [
+  { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' },
+  { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp' }
+];
+const INSPECTOR_ESSENCES = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
+
+function makeAuthoredRecipe(overrides = {}) {
+  return makeRecipe({
+    ingredientSets: [
+      {
+        id: 'set-1',
+        essences: { fire: 2 },
+        ingredientGroups: [
+          {
+            id: 'grp-1',
+            options: [
+              { id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } },
+              { id: 'o2', quantity: 1, match: { type: 'currency', unit: 'gp', amount: 25 } }
+            ]
+          }
+        ]
+      }
+    ],
+    resultGroups: [
+      {
+        id: 'g1',
+        name: 'On success',
+        results: [{ id: 'res-1', componentId: 'cmp-potion', quantity: 3 }]
+      }
+    ],
+    ...overrides
+  });
+}
+
 describe('RecipeBrowserInspector (mounted)', () => {
-  it('renders the selected recipe with its image, facts and actions', async () => {
+  it('answers Ingredients / Results / Steps / Crafting check in the stat grid', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r1',
+        stepCount: 2,
+        ingredientCount: 4,
+        resultItemCount: 3,
+        checkSummary: { kind: 'dc', dc: 17 }
+      }),
+      recipeCount: 1
+    });
+
+    const stat = (id) => root.querySelector(`[data-recipe-fact="${id}"] .manager-recipe-stat-value`);
+    assert.equal(stat('ingredients').textContent, '4');
+    assert.equal(stat('results').textContent, '3');
+    assert.equal(stat('steps').textContent, '2');
+    assert.equal(stat('check').textContent, 'DC 17', 'the store already projects the resolved DC');
+    assert.equal(
+      root.querySelector('[data-recipe-fact="structure"]'),
+      null,
+      'Structure restated the row the GM just clicked and is gone'
+    );
+  });
+
+  it('marks a recipe that produces nothing as a DANGER stat, not merely a zero', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: 'r1', resultItemCount: 0, resultGroups: [] }),
+      recipeCount: 1
+    });
+    assert.ok(
+      root
+        .querySelector('[data-recipe-fact="results"] .manager-recipe-stat-value')
+        .classList.contains('is-danger')
+    );
+  });
+
+  it('renders the selected recipe with its image and actions', async () => {
     let duplicated = 0;
     let deleted = 0;
     const root = await inspector.mount({
-      selectedRecipe: makeRecipe({ id: 'r1', stepCount: 2, resultGroupCount: 3 }),
+      selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
       recipeCount: 1,
       showRecipeCategories: true,
       onDuplicate: () => { duplicated += 1; },
@@ -340,13 +413,86 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
 
     assert.equal(root.querySelector('[data-medallion]').dataset.medallion, 'image');
-    assert.equal(root.querySelector('[data-recipe-fact="steps"] strong').textContent, '2');
-    assert.equal(root.querySelector('[data-recipe-fact="result-groups"] strong').textContent, '3');
+    assert.ok(root.querySelector('[data-recipe-category]'), 'the category is a hero chip, not a stat');
 
     root.querySelector('[data-recipe-action="duplicate"]').click();
     root.querySelector('[data-recipe-action="delete"]').click();
     flushSync();
     assert.deepEqual([duplicated, deleted], [1, 1]);
+  });
+
+  it('lists what the recipe REQUIRES, each option as its own match type', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS,
+      essenceOptions: INSPECTOR_ESSENCES
+    });
+
+    const rows = [...root.querySelectorAll('[data-recipe-requirement]')];
+    assert.deepEqual(
+      rows.map((row) => row.dataset.recipeRequirement),
+      ['component', 'currency', 'essence'],
+      'a currency cost is not a component, and a per-SET essence is not an alternative'
+    );
+    assert.match(rows[0].textContent, /Mountain Herb/);
+    assert.match(rows[0].querySelector('.manager-recipe-flow-qty').textContent, /×2/);
+    assert.match(rows[1].textContent, /25 gp/);
+    // The second OPTION of the same requirement is an alternative: any one satisfies it.
+    assert.ok(rows[1].classList.contains('is-alternative'));
+    assert.equal(rows[0].classList.contains('is-alternative'), false);
+    assert.match(rows[2].textContent, /Fire/);
+  });
+
+  it('lists what the recipe PRODUCES, with the group and a mono quantity', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    const rows = [...root.querySelectorAll('[data-recipe-produces]')];
+    assert.equal(rows.length, 1);
+    assert.match(rows[0].textContent, /Healing Potion/);
+    assert.match(rows[0].textContent, /On success/);
+    assert.match(rows[0].querySelector('.manager-recipe-flow-qty').textContent, /×3/);
+    assert.equal(root.querySelector('[data-recipe-produces-empty]'), null);
+  });
+
+  it('says outright that a recipe with no results makes nothing on a successful craft', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: 'r1', resultGroups: [], resultItemCount: 0 }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    const empty = root.querySelector('[data-recipe-produces-empty]');
+    assert.ok(empty, 'the GM is told, not left with a blank card');
+    assert.match(empty.textContent, /a successful craft makes nothing/);
+  });
+
+  it("never lists the reserved role: 'failure' group as something the recipe produces", async () => {
+    // The alchemy-Simple failure group is what a FAILED craft makes. Listing it under
+    // Produces would tell the GM the recipe makes something when a success makes nothing.
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r1',
+        resultItemCount: 1,
+        resultGroups: [
+          {
+            id: 'g-fail',
+            name: 'On a failed check',
+            role: 'failure',
+            results: [{ id: 'x', componentId: 'cmp-potion', quantity: 1 }]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    assert.equal(root.querySelectorAll('[data-recipe-produces]').length, 0);
+    assert.ok(root.querySelector('[data-recipe-produces-empty]'));
   });
 
   it("says a locked, incomplete, disabled recipe can't be enabled", async () => {

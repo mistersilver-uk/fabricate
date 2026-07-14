@@ -3209,6 +3209,162 @@
   gap: var(--fab-space-chip);
 }
 
+/* ---------------------------------------------------------------------------
+   The library inspector (issue 643, brief §3.3).
+
+   A 2x2 STAT grid — Ingredients / Results / Steps / Crafting check — then the
+   REQUIRES and PRODUCES lists. Both lists are icon chip + name + mono quantity in a
+   bordered row, so a GM can read what a recipe takes and makes without opening it.
+   --------------------------------------------------------------------------- */
+.fabricate-manager .manager-recipe-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+}
+
+/* The stat VALUE is a name-scale number: serif, per the typographic contract, with
+   tabular figures so a 9 -> 10 change cannot reflow the tile. */
+.fabricate-manager .manager-recipe-stat-value {
+  overflow: hidden;
+  color: var(--fab-mv2-text);
+  font-family: var(--fab-font-serif);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Zero results is not "unfinished" — it is a successful craft that makes nothing. */
+.fabricate-manager .manager-recipe-stat-value.is-danger {
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-recipe-stat-value.is-muted {
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-recipe-stat-label {
+  color: var(--fab-text-subtle);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-flow-row {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-width: 0;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-bg-1);
+}
+
+/* A produced item is a SUCCESS output, and rings accordingly. */
+.fabricate-manager .manager-recipe-flow-row.is-produced {
+  border-color: var(--fab-success-border);
+}
+
+/* An alternative satisfies the SAME requirement (any one of them will do), so it is
+   inset and led by an OR — never presented as a second thing to bring. */
+.fabricate-manager .manager-recipe-flow-row.is-alternative {
+  margin-left: var(--fab-space-3);
+  border-style: dashed;
+}
+
+.fabricate-manager .manager-recipe-flow-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--fab-accent);
+  background: var(--fab-bg-3);
+  font-size: 0.66rem;
+}
+
+.fabricate-manager .manager-recipe-flow-icon img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-recipe-flow-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-flow-or {
+  margin-right: var(--fab-space-1);
+  color: var(--fab-accent);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.fabricate-manager .manager-recipe-flow-group {
+  flex: 0 0 auto;
+  max-width: 40%;
+  overflow: hidden;
+  font-size: 0.6rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Quantities are numerics: mono, tabular. */
+.fabricate-manager .manager-recipe-flow-qty {
+  flex: 0 0 auto;
+  color: var(--fab-text-secondary);
+  font-family: var(--fab-font-mono);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-flow-empty {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  margin: 0;
+  padding: var(--fab-space-2) var(--fab-space-2);
+  border: 1px solid var(--fab-danger-border);
+  border-radius: 8px;
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
 /* The blocked-enable flash: an ERROR the GM must be able to read and dismiss. It
    REPLACES the Foundry notification (which the store suppresses while this owns the
    message), so it never auto-hides out from under them. */

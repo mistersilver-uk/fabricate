@@ -806,12 +806,29 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(systemEditSource.includes('SystemOverviewView'), 'the Validation tab renders the overview list');
     assert.ok(systemEditSource.includes('manager-system-workspace'), 'the workspace mirrors the environment workspace');
 
-    // Recipe detail facts still use the shared inline fact-line/fact-label typography
-    // as the environment details card (the layout reference) — they just live in the
-    // extracted library inspector now (issue 643) rather than inlined in the root.
+    // The library inspector's detail card is a 2x2 STAT grid (issue 643, brief §3.3),
+    // not the generic fact-line list: it answers Ingredients / Results / Steps /
+    // Crafting check. Structure and Result-groups were restatements of the row the GM
+    // had just clicked, and Produces — the one thing the old inspector could not tell
+    // them — is now a first-class section.
     assert.ok(
-      recipeBrowserInspectorSource.includes('<span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">'),
-      'recipe details facts use the shared manager-fact-line/label styling'
+      recipeBrowserInspectorSource.includes('class="manager-recipe-stat-grid"'),
+      'the library inspector renders the 2x2 stat grid'
+    );
+    for (const fact of ['ingredients', 'results', 'steps', 'check']) {
+      assert.ok(
+        recipeBrowserInspectorSource.includes(`id: '${fact}'`),
+        `the stat grid answers "${fact}"`
+      );
+    }
+    assert.ok(
+      recipeBrowserInspectorSource.includes('data-recipe-produces-empty'),
+      'a recipe that makes nothing on a success says so'
+    );
+    assert.ok(
+      recipeBrowserInspectorSource.includes('buildRecipeRequirementRows') &&
+        recipeBrowserInspectorSource.includes('buildRecipeProduceRows'),
+      'the Requires/Produces walk lives in the pure model, not in the component'
     );
   });
 
