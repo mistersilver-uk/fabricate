@@ -32,12 +32,6 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
-  import {
-    GENERAL_RECIPE_CATEGORY,
-    getEffectiveRecipeCategories,
-    getRecipeCategoryLabel,
-    normalizeRecipeCategory
-  } from '../../../../../utils/recipeCategories.js';
   import SegmentedControl from '../SegmentedControl.svelte';
 
   let {
@@ -52,7 +46,6 @@
     accessPlayers = [],
     accessCharacters = [],
     recipeItemDefinitions = [],
-    categories = [],
     multiStepEnabled = false,
     complex = false,
     multiSetAllowed = false,
@@ -64,7 +57,6 @@
     readiness = { checks: [], issues: [] },
     onSetComplexity = () => {},
     onRemoveRecipeItem = () => {},
-    onSetCategory = () => {},
     onEnterMultiStep = () => {},
     onRevertToSingleStep = () => {},
     onOpenItem = () => {},
@@ -175,24 +167,8 @@
     (accessPlayers || []).length > 0 || (accessCharacters || []).length > 0
   );
 
-  // --- Category ------------------------------------------------------------------
-  const effectiveCategories = $derived(getEffectiveRecipeCategories(categories));
-  const hasCustomCategories = $derived(effectiveCategories.length > 1);
-  const currentCategory = $derived(normalizeRecipeCategory(recipe?.category));
-  // Keep a stale custom value selectable so the field never silently blanks.
-  function buildCategoryOptions() {
-    if (!hasCustomCategories) return [GENERAL_RECIPE_CATEGORY];
-    if (effectiveCategories.includes(currentCategory)) return effectiveCategories;
-    return [...effectiveCategories, currentCategory];
-  }
-  const categoryOptions = $derived(buildCategoryOptions());
-  const selectedCategory = $derived(hasCustomCategories ? currentCategory : GENERAL_RECIPE_CATEGORY);
-
-  function changeCategory(event) {
-    const next = String(event.currentTarget.value || GENERAL_RECIPE_CATEGORY);
-    if (next === currentCategory) return;
-    onSetCategory(next);
-  }
+  // Category authoring moved to the Overview tab (prototype §5.1); the rail no
+  // longer carries a category control (issue 643 G-note).
 
   // --- Step mode / recipe mode ---------------------------------------------------
   const isMultiStep = $derived((recipe?.steps?.length ?? 0) >= 1);
@@ -387,26 +363,6 @@
 {/if}
 
 {#if recipe}
-  <section class="manager-inspector-card" data-recipe-section="recipe-category">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</h3>
-    <label class="manager-field">
-      <span class="sr-only">{text('FABRICATE.Admin.Manager.Recipe.CategorySelectLabel', 'Select recipe category')}</span>
-      <select
-        data-recipe-category-select
-        value={selectedCategory}
-        disabled={!hasCustomCategories}
-        title={hasCustomCategories
-          ? text('FABRICATE.Admin.Manager.Recipe.CategorySelectLabel', 'Select recipe category')
-          : text('FABRICATE.Admin.Manager.Recipe.CategoryNoneHint', 'No categories defined. Add some under Tags and Categories.')}
-        onchange={changeCategory}
-      >
-        {#each categoryOptions as category (category)}
-          <option value={category}>{getRecipeCategoryLabel(category, localize)}</option>
-        {/each}
-      </select>
-    </label>
-  </section>
-
   {#if complexAllowed}
     <!-- Multi-set authoring is gated by `Recipe.complex` PLUS the mode's structural
          constraints — never by resolutionMode alone. A system whose mode forbids

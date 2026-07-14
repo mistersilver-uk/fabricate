@@ -56,13 +56,24 @@ describe('RecipeEditView identity-only single column', () => {
     assert.equal(editSource.includes('is-inspector-hidden'), false, 'no inspector-hidden toggle');
   });
 
-  it('reuses the environment identity card structure on the Overview tab', () => {
-    assert.ok(overviewSource.includes('manager-task-core-card'), 'reuses the unscoped task core card');
-    assert.ok(overviewSource.includes('manager-task-image-picker'), 'reuses the image picker');
+  it('rebuilds the Overview tab to the prototype (micro-labels, select row, status cards, inline duration)', () => {
+    // The card-stack chrome is gone: micro-labels over unwrapped fields (issue 643).
+    assert.equal(overviewSource.includes('manager-task-core-card'), false, 'no reused task core card wrapper');
+    assert.ok(overviewSource.includes('manager-recipe-micro-label'), 'uppercase micro-labels over fields');
+    assert.ok(overviewSource.includes('manager-task-image-picker'), 'keeps the shared image picker (capability)');
     assert.ok(overviewSource.includes('manager-status-toggle'), 'reuses the status toggle');
+    // Category authored on Overview (prototype §5.1), not the rail.
+    assert.ok(overviewSource.includes('data-recipe-category-select'), 'category select lives on Overview');
+    // Two side-by-side status cards (Enabled + Locked).
+    assert.ok(overviewSource.includes('manager-recipe-status-card'), 'status cards for enabled + locked');
+    assert.ok(overviewSource.includes('data-recipe-section="enabled-status"'), 'enabled status card');
+    assert.ok(overviewSource.includes('data-recipe-section="locked-status"'), 'locked status card');
+    // Always-visible inline duration steppers replace the popover on the tab.
+    assert.ok(overviewSource.includes('RecipeDurationSteppers'), 'inline duration steppers on the Duration card');
     assert.ok(overviewSource.includes('data-recipe-field="name"'), 'name field bound');
     assert.ok(overviewSource.includes('data-recipe-field="description"'), 'description field bound');
     assert.ok(overviewSource.includes('data-recipe-field="enabled"'), 'enabled toggle bound');
+    assert.ok(overviewSource.includes('data-recipe-field="locked"'), 'locked toggle bound');
     assert.ok(overviewSource.includes('data-recipe-field="img"'), 'image picker bound');
   });
 

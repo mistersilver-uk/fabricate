@@ -5144,6 +5144,8 @@
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
+        categories={selectedSystem?.categories || []}
+        onSetCategory={handleSetRecipeCategory}
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
@@ -6804,7 +6806,6 @@
           accessPlayers={recipeAccessRoster.players}
           accessCharacters={recipeAccessRoster.characters}
           {recipeItemDefinitions}
-          categories={selectedSystem?.categories || []}
           multiStepEnabled={recipeMultiStepEnabled}
           complex={recipeComplex}
           multiSetAllowed={recipeMultiSetAllowed}
@@ -6812,7 +6813,6 @@
           readiness={recipeRailReadiness}
           onSetComplexity={handleSetRecipeComplexity}
           onRemoveRecipeItem={handleRemoveRecipeItem}
-          onSetCategory={handleSetRecipeCategory}
           onEnterMultiStep={handleEnterMultiStep}
           onRevertToSingleStep={handleRevertToSingleStep}
           onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}

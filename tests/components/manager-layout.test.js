@@ -688,23 +688,23 @@ test('long-labelled switches escape the status cell geometry', () => {
   assert.ok(filterLabelBlock.includes('text-transform: uppercase;'), 'a filter micro-label is a micro-label');
   assert.ok(blockFor('.fabricate-manager .manager-recipe-filter-divider').includes('width: 1px;'), 'the view controls are ruled apart');
 
-  // (2) The Overview Locked card has no image picker, so its switch + hint are a
-  // left-aligned row rather than the media column's centred, 14ch-clamped stack.
-  const toggleRowBlock = blockFor('.fabricate-manager .manager-recipe-toggle-row');
-  const toggleRowCopyBlock = blockFor('.fabricate-manager .manager-recipe-toggle-row p');
+  // (2) The Overview Enabled/Locked status cards are left-aligned rows (icon + copy
+  // + switch), not the media column's centred, 14ch-clamped stack (issue 643).
+  const statusCardBlock = blockFor('.fabricate-manager .manager-recipe-status-card');
+  const statusSubBlock = blockFor('.fabricate-manager .manager-recipe-status-sub');
   assert.ok(
-    toggleRowBlock.includes('display: flex;') && toggleRowBlock.includes('align-items: center;'),
-    'a switch with a sentence beside it is a row, not a centred stack'
+    statusCardBlock.includes('display: flex;') && statusCardBlock.includes('align-items: center;'),
+    'a status card is an icon + copy + switch row, not a centred stack'
   );
   assert.equal(
-    toggleRowCopyBlock.includes('max-width:'),
+    statusSubBlock.includes('max-width:'),
     false,
-    'the hint beside a switch must not be clamped to the 96px media column width'
+    'the status sub-line must not be clamped to the 96px media column width'
   );
   assert.equal(
-    toggleRowCopyBlock.includes('text-align: center;'),
+    statusSubBlock.includes('text-align: center;'),
     false,
-    'the hint beside a switch reads left-aligned, not centred mid-card'
+    'the status sub-line reads left-aligned, not centred mid-card'
   );
 });
 

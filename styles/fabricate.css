@@ -3270,21 +3270,214 @@
   background: var(--fab-danger-soft);
 }
 
-/* A switch + its helper line, side by side, in a card that has NO media column. The
-   media-column stack (`.manager-task-core-status`) centres its copy and clamps it to
-   14ch, which is right under a 96px image picker and wrong across a full-width card —
-   it strands the hint mid-card, three words to a line. */
-.fabricate-manager .manager-recipe-toggle-row {
+/* ── Recipe Overview tab (issue 643 rebuild) ─────────────────────────────────
+   The prototype's Overview drops the card-stack chrome for uppercase micro-labels
+   over unwrapped fields, a select row, two side-by-side status cards, and an
+   always-visible inline duration-stepper row. */
+
+.fabricate-manager .manager-recipe-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-4);
+}
+
+.fabricate-manager .manager-recipe-overview-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-recipe-overview-media {
+  flex: 0 0 auto;
+}
+
+/* A compact 56px recipe image on Overview — the header carries the large avatar. */
+.fabricate-manager .manager-recipe-overview-image {
+  width: 56px;
+  height: 56px;
+  min-height: 0;
+}
+
+.fabricate-manager .manager-recipe-overview-fields {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-recipe-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+/* Uppercase micro-label over an unwrapped field (prototype §5.1). */
+.fabricate-manager .manager-recipe-micro-label {
+  color: var(--fab-text-subtle);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-recipe-name-input {
+  font-family: var(--fab-font-serif);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-flavour-input {
+  min-height: 68px;
+  resize: vertical;
+}
+
+/* Select row: Category / conditional DC-check / conditional Minimum success tier. */
+.fabricate-manager .manager-recipe-overview-selects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--fab-space-3);
+}
+
+/* Two side-by-side status cards (Enabled / Locked). */
+.fabricate-manager .manager-recipe-overview-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-recipe-status-card {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
   min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-surface-soft);
 }
 
-.fabricate-manager .manager-recipe-toggle-row p {
+/* The card's border + fill reflect its state. */
+.fabricate-manager .manager-recipe-status-card.is-enabled.is-on {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-recipe-status-card.is-locked.is-on {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-recipe-status-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-icon {
+  color: var(--fab-success-text);
+}
+
+.fabricate-manager .manager-recipe-status-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-status-title {
   margin: 0;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-status-sub {
+  margin: 2px 0 0;
   min-width: 0;
   line-height: 1.35;
+}
+
+/* Section title reused by the Duration and Step-durations cards (serif, no h3
+   card-heading chrome). */
+.fabricate-manager .manager-recipe-section-title {
+  margin: 0;
+  font-family: var(--fab-font-serif);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-duration-card,
+.fabricate-manager .manager-recipe-steps-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-border);
+  border-radius: 12px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-recipe-duration-card-head,
+.fabricate-manager .manager-recipe-steps-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-recipe-duration-card-head p,
+.fabricate-manager .manager-recipe-steps-card-head p {
+  margin: 2px 0 0;
+}
+
+.fabricate-manager .manager-recipe-duration-pill {
+  flex: 0 0 auto;
+  font-family: var(--fab-font-mono);
+}
+
+/* Inline duration steppers: a row of five unit columns (Year…Minute). */
+.fabricate-manager .manager-recipe-duration-steppers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-duration-label {
+  font-family: var(--fab-font-mono);
+  font-size: 0.8rem;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-recipe-duration-columns {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-duration-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--fab-space-1);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  text-align: center;
+}
+
+.fabricate-manager .manager-recipe-duration-column-label {
+  color: var(--fab-text-subtle);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Per-step inline duration steppers inside the multi-step Step-durations body. */
+.fabricate-manager .manager-recipe-step-durations {
+  margin-bottom: var(--fab-space-2);
 }
 
 /* The three-row filter bar. Row one is every FILTER (search, status, lock, category);

@@ -143,6 +143,7 @@ function compileManagerRoot() {
     'RecipeValidationTab',
     'RecipeStepAccordion',
     'RecipeDurationEditor',
+    'RecipeDurationSteppers',
     'RecipeIngredientsSection',
     'RecipeIngredientSetCard',
     'RecipeIngredientGroupCard',
@@ -3669,12 +3670,16 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the Locked card is not the recipe-item locked-image affordance'
     );
-    // The card has no media column, so its switch and hint are one left-aligned row.
-    // `.manager-task-core-status` is the 96px image-picker stack: centred copy clamped
-    // to 14ch, which strands this card's hint mid-card at three words to a line.
+    // The Locked card is a left-aligned status card (icon + copy + switch), not the
+    // 96px image-picker media stack (`.manager-task-core-status`), which centres its
+    // copy and 14ch-clamps it (issue 643).
     assert.ok(
-      card.querySelector('.manager-recipe-toggle-row [data-recipe-field="locked"]'),
-      'the Locked switch and its hint sit in a left-aligned toggle row'
+      card.querySelector('.manager-recipe-status-card') || card.classList.contains('manager-recipe-status-card'),
+      'the Locked switch and its copy sit in a status card'
+    );
+    assert.ok(
+      card.querySelector('[data-recipe-field="locked"]'),
+      'the Locked switch renders in the status card'
     );
     assert.equal(
       card.querySelector('.manager-task-core-status'),

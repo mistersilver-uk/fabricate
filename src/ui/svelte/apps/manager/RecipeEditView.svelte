@@ -43,6 +43,11 @@
     itemTags = [],
     checkTierOptions = [],
     minSuccessTierOptions = [],
+    // Category lives on the Overview tab (prototype §5.1). Threaded through this
+    // wrapper so the Overview tab receives them (a tab prop skipping this wrapper
+    // silently drops to its default and the control never renders).
+    categories = [],
+    onSetCategory = () => {},
     // Result routing (routed systems): the per-recipe routing mode (provider) and
     // the system's routed-check outcome tiers {id,name} for the result-set
     // assignment controls.
@@ -276,6 +281,8 @@
             {enableBlocked}
             onChooseImage={chooseImage}
             {isMultiStep}
+            {categories}
+            {onSetCategory}
             {checkTierOptions}
             {minSuccessTierOptions}
             {locked}

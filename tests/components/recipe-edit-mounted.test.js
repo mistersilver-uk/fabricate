@@ -73,6 +73,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
@@ -105,6 +106,7 @@ const stepsHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
     'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   ],
@@ -915,7 +917,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders a single-step Duration control on the Overview tab whose edits emit onUpdateRecipe({ timeRequirement })', async () => {
+  it('renders always-visible inline Duration steppers on the Overview tab whose edits emit onUpdateRecipe({ timeRequirement })', async () => {
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
@@ -924,14 +926,18 @@ describe('RecipeEditView (mounted)', () => {
     );
     const durationSection = target.querySelector('[data-recipe-section="duration"]');
     assert.ok(durationSection, 'the single-step Overview shows the Duration section');
-    const trigger = durationSection.querySelector('[data-recipe-duration-trigger]');
-    assert.match(trigger.textContent, /Add duration/, 'an unset duration reads Add duration');
-    trigger.click();
-    await flushRender();
-    // Each unit is the shared Stepper: the PRIMARY control is a real, typeable
-    // number input; the -/+ buttons are adjuncts. A click-only stepper would be a
-    // keyboard regression.
-    const daysInput = document.querySelector(
+    // The steppers are ALWAYS visible now (no popover trigger) — the tab is no longer
+    // the sole path behind a click (issue 643 §10).
+    assert.ok(durationSection.querySelector('[data-recipe-duration-steppers]'), 'inline duration steppers render');
+    assert.equal(
+      durationSection.querySelector('[data-recipe-duration-trigger]'),
+      null,
+      'the single-step Duration card no longer routes through a popover trigger'
+    );
+    // Each unit is the shared Stepper: the PRIMARY control is a real, typeable number
+    // input; the chevron buttons are adjuncts. A click-only stepper would be a keyboard
+    // regression.
+    const daysInput = durationSection.querySelector(
       '[data-recipe-duration-unit="days"] [data-stepper-input]'
     );
     assert.ok(daysInput, 'the duration editor exposes a typeable days input');
@@ -958,15 +964,10 @@ describe('RecipeEditView (mounted)', () => {
         onUpdateRecipe: (patch) => patches.push(patch),
       })
     );
-    const trigger = target.querySelector(
-      '[data-recipe-section="duration"] [data-recipe-duration-trigger]'
+    const hoursInput = target.querySelector(
+      '[data-recipe-section="duration"] [data-recipe-duration-unit="hours"] [data-stepper-input]'
     );
-    assert.match(trigger.textContent, /5 hours/, 'a set duration reads its formatted value');
-    trigger.click();
-    await flushRender();
-    const hoursInput = document.querySelector(
-      '[data-recipe-duration-unit="hours"] [data-stepper-input]'
-    );
+    assert.equal(hoursInput.value, '5', 'the hours stepper reflects the set duration');
     // The Stepper ignores a partially-typed empty field mid-keystroke, so a zeroing
     // edit is typed as '0' and commits on input.
     hoursInput.value = '0';
@@ -976,15 +977,13 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('increments a duration unit via the up stepper button', async () => {
+  it('increments a duration unit via the up stepper chevron', async () => {
     const patches = [];
     const target = await editHarness.mount(
       identityProps({ onUpdateRecipe: (patch) => patches.push(patch) })
     );
-    target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
-    await flushRender();
-    const upDays = document.querySelector(
-      '[data-recipe-duration-stepper="days"] [data-stepper-increment]'
+    const upDays = target.querySelector(
+      '[data-recipe-section="duration"] [data-recipe-duration-unit="days"] [data-stepper-increment]'
     );
     assert.ok(upDays, 'each unit exposes an increment adjunct');
     upDays.click();
@@ -1004,39 +1003,12 @@ describe('RecipeEditView (mounted)', () => {
     const target = await editHarness.mount(
       identityProps({ onUpdateRecipe: (patch) => patches.push(patch) })
     );
-    target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
-    await flushRender();
-    const downHours = document.querySelector(
-      '[data-recipe-duration-stepper="hours"] [data-stepper-decrement]'
+    const downHours = target.querySelector(
+      '[data-recipe-section="duration"] [data-recipe-duration-unit="hours"] [data-stepper-decrement]'
     );
     assert.equal(downHours.disabled, true, 'the decrement adjunct is disabled at zero');
     downHours.click();
     assert.equal(patches.length, 0, 'a zero unit cannot be decremented below zero');
-    editHarness.remount();
-  });
-
-  it('clears the single-step recipe duration when the trigger is right-clicked', async () => {
-    const patches = [];
-    const target = await editHarness.mount(
-      identityProps({
-        recipe: {
-          ...RECIPE,
-          timeRequirement: { minutes: 0, hours: 5, days: 0, months: 0, years: 0 },
-        },
-        onUpdateRecipe: (patch) => patches.push(patch),
-      })
-    );
-    const trigger = target.querySelector(
-      '[data-recipe-section="duration"] [data-recipe-duration-trigger]'
-    );
-    trigger.dispatchEvent(
-      new globalThis.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true })
-    );
-    assert.deepEqual(
-      patches.at(-1),
-      { timeRequirement: null },
-      'right-clicking a set duration clears it'
-    );
     editHarness.remount();
   });
 
@@ -3536,21 +3508,21 @@ describe('RecipeContextRail (mounted)', () => {
     railHarness.remount();
   });
 
-  // --- category ----------------------------------------------------------------
+  // --- category (moved to Overview, threaded through RecipeEditView) ------------
   it('disables the category selector and shows only General when no categories exist', async () => {
-    const target = await railHarness.mount(railProps({ categories: [] }));
+    const target = await editHarness.mount(identityProps({ categories: [] }));
     const select = target.querySelector('[data-recipe-category-select]');
-    assert.ok(select, 'category selector renders');
+    assert.ok(select, 'category selector renders on Overview');
     assert.equal(select.disabled, true, 'selector is disabled with no custom categories');
     const options = [...select.querySelectorAll('option')];
     assert.equal(options.length, 1, 'only one option present');
     assert.equal(options[0].value, 'general', 'the sole option is the General fallback');
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('enables the selector with custom categories and reports the current category', async () => {
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      identityProps({
         recipe: { ...RECIPE, category: 'Potions' },
         categories: ['Potions', 'Weapons'],
       })
@@ -3564,13 +3536,13 @@ describe('RecipeContextRail (mounted)', () => {
       'General precedes the custom categories'
     );
     assert.equal(select.value, 'Potions', 'reflects the recipe category');
-    railHarness.remount();
+    editHarness.remount();
   });
 
-  it('calls onSetCategory when a different category is chosen', async () => {
+  it('threads onSetCategory through RecipeEditView when a different category is chosen', async () => {
     const chosen = [];
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      identityProps({
         recipe: { ...RECIPE, category: 'general' },
         categories: ['Potions'],
         onSetCategory: (category) => chosen.push(category),
@@ -3579,9 +3551,9 @@ describe('RecipeContextRail (mounted)', () => {
     const select = target.querySelector('[data-recipe-category-select]');
     select.value = 'Potions';
     select.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
-    await Promise.resolve();
+    await flushRender();
     assert.deepEqual(chosen, ['Potions'], 'onSetCategory receives the selected category');
-    railHarness.remount();
+    editHarness.remount();
   });
 
   // --- step mode / recipe mode (now SegmentedControls) ---------------------------

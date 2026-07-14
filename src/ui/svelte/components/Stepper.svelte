@@ -30,8 +30,15 @@
     decrementLabel = '',
     incrementLabel = '',
     disabled = false,
+    // 'horizontal' (default): [−] [input] [+], for inline quantities.
+    // 'vertical': up-chevron / big mono input / down-chevron, for the Overview
+    // duration unit columns — the increment sits on TOP so the visual stacks the
+    // way a spinner reads.
+    orientation = 'horizontal',
     onChange = () => {}
   } = $props();
+
+  const isVertical = $derived(orientation === 'vertical');
 
   function clamp(candidate) {
     let next = candidate;
@@ -69,40 +76,76 @@
   }
 </script>
 
-<div class="fab-stepper" class:is-disabled={disabled}>
-  <button
-    type="button"
-    class="fab-stepper-adjunct"
-    data-stepper-decrement
-    aria-label={decrementLabel || undefined}
-    disabled={disabled || atMin}
-    onclick={() => commit(numericValue - step)}
-  >
-    <i class="fas fa-minus" aria-hidden="true"></i>
-  </button>
-  <input
-    type="number"
-    class="fab-stepper-input"
-    data-stepper-input
-    value={numericValue}
-    min={min ?? undefined}
-    max={max ?? undefined}
-    {step}
-    {disabled}
-    aria-label={ariaLabel || undefined}
-    oninput={onInput}
-    onblur={onBlur}
-  />
-  <button
-    type="button"
-    class="fab-stepper-adjunct"
-    data-stepper-increment
-    aria-label={incrementLabel || undefined}
-    disabled={disabled || atMax}
-    onclick={() => commit(numericValue + step)}
-  >
-    <i class="fas fa-plus" aria-hidden="true"></i>
-  </button>
+<div class="fab-stepper" class:is-disabled={disabled} class:is-vertical={isVertical}>
+  {#if isVertical}
+    <button
+      type="button"
+      class="fab-stepper-adjunct"
+      data-stepper-increment
+      aria-label={incrementLabel || undefined}
+      disabled={disabled || atMax}
+      onclick={() => commit(numericValue + step)}
+    >
+      <i class="fas fa-chevron-up" aria-hidden="true"></i>
+    </button>
+    <input
+      type="number"
+      class="fab-stepper-input"
+      data-stepper-input
+      value={numericValue}
+      min={min ?? undefined}
+      max={max ?? undefined}
+      {step}
+      {disabled}
+      aria-label={ariaLabel || undefined}
+      oninput={onInput}
+      onblur={onBlur}
+    />
+    <button
+      type="button"
+      class="fab-stepper-adjunct"
+      data-stepper-decrement
+      aria-label={decrementLabel || undefined}
+      disabled={disabled || atMin}
+      onclick={() => commit(numericValue - step)}
+    >
+      <i class="fas fa-chevron-down" aria-hidden="true"></i>
+    </button>
+  {:else}
+    <button
+      type="button"
+      class="fab-stepper-adjunct"
+      data-stepper-decrement
+      aria-label={decrementLabel || undefined}
+      disabled={disabled || atMin}
+      onclick={() => commit(numericValue - step)}
+    >
+      <i class="fas fa-minus" aria-hidden="true"></i>
+    </button>
+    <input
+      type="number"
+      class="fab-stepper-input"
+      data-stepper-input
+      value={numericValue}
+      min={min ?? undefined}
+      max={max ?? undefined}
+      {step}
+      {disabled}
+      aria-label={ariaLabel || undefined}
+      oninput={onInput}
+      onblur={onBlur}
+    />
+    <button
+      type="button"
+      class="fab-stepper-adjunct"
+      data-stepper-increment
+      aria-label={incrementLabel || undefined}
+      disabled={disabled || atMax}
+      onclick={() => commit(numericValue + step)}
+    >
+      <i class="fas fa-plus" aria-hidden="true"></i>
+    </button>
+  {/if}
 </div>
 
 <style>
@@ -118,6 +161,31 @@
 
   .fab-stepper.is-disabled {
     opacity: 0.55;
+  }
+
+  /* Vertical spinner (Overview duration columns): up-chevron / big mono value /
+     down-chevron stacked, filling the column width. */
+  .fab-stepper.is-vertical {
+    flex-direction: column;
+    width: 100%;
+    padding: var(--fab-space-2xs) 0;
+    gap: 0;
+    background: transparent;
+    border: 0;
+  }
+
+  .fab-stepper.is-vertical .fab-stepper-adjunct {
+    width: 100%;
+    height: 26px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+  }
+
+  .fab-stepper.is-vertical .fab-stepper-input {
+    width: 100%;
+    height: 30px;
+    font-size: 1.05rem;
+    font-weight: 600;
   }
 
   .fab-stepper-adjunct {
