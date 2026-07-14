@@ -1210,8 +1210,13 @@ function createStore(calls = [], options = {}) {
     importRecipes: () => calls.push(['importRecipes']),
     exportRecipes: () => calls.push(['exportRecipes']),
     setRecipeSearch: (term) => calls.push(['setRecipeSearch', term]),
-    toggleRecipeEnabled: (id, enabled) => {
-      calls.push(['toggleRecipeEnabled', id, enabled]);
+    // The THIRD argument is load-bearing and is captured deliberately. It carries the
+    // blocked-enable `onBlocked` sink: supplying it is what makes the real store
+    // SUPPRESS its Foundry notification. Drop it anywhere in the row → root → store
+    // chain and the in-window flash dies while the toast silently returns, so a stub
+    // that swallowed it would let that regression through green.
+    toggleRecipeEnabled: (id, enabled, toggleOptions) => {
+      calls.push(['toggleRecipeEnabled', id, enabled, toggleOptions]);
       return options.toggleRecipeEnabledResult ?? true;
     },
     updateRecipe: (id, updates, opts) => {
@@ -4218,11 +4223,38 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['deleteRecipe', 'r2'],
     ]);
     assert.ok(calls.some((call) => call[0] === 'setRecipeSearch' && call[1] === 'elixir'));
-    assert.ok(
-      calls.some(
-        (call) => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true
-      )
+    const enableCall = calls.find(
+      (call) => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true
     );
+    assert.ok(enableCall, 'the row toggle reaches the store through the root');
+
+    // THE CHAIN, END TO END. `RecipesBrowserView` hands its `onToggleEnabled` prop an
+    // `onBlocked` sink; the ROOT must forward that third argument to
+    // `store.toggleRecipeEnabled`, because supplying it is exactly what makes the real
+    // store suppress its Foundry notification. Two half-proofs (the row emits it; the
+    // store honours it) both stay green while the root quietly drops it — and the flash
+    // dies while the toast returns. So this asserts the whole path: the store received
+    // the sink, and driving that sink renders the in-window flash.
+    assert.equal(
+      typeof enableCall[3]?.onBlocked,
+      'function',
+      'the root must forward the row\'s blocked-message sink to the store — dropping it silently restores the Foundry toast'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-flash]'),
+      null,
+      'nothing has been refused yet'
+    );
+    enableCall[3].onBlocked('This recipe has no result groups.');
+    flushSync();
+    const flash = target.querySelector('[data-recipe-flash]');
+    assert.ok(flash, 'the refusal the store pushes back through the sink renders in-window');
+    assert.equal(flash.getAttribute('role'), 'alert');
+    assert.match(flash.textContent, /This recipe has no result groups\./);
+    target.querySelector('[data-recipe-flash-dismiss]').click();
+    flushSync();
+    assert.equal(target.querySelector('[data-recipe-flash]'), null, 'the flash is dismissible');
+
     // The recipes header no longer renders crafting-system import/export.
     assert.ok(
       !calls.some((call) => call[0] === 'importRecipes'),

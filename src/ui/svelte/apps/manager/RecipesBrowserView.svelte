@@ -178,10 +178,11 @@
     return `manager-recipe-group-${category || 'all'}`;
   }
 
-  function groupCountText(category) {
-    const count = model.filtered.filter(
-      (recipe) => (recipe.category || 'general') === category
-    ).length;
+  // The header counts what the GROUP RENDERS, not what the whole filtered list holds.
+  // `buildRecipeBrowserModel` groups the PAGE, so counting `model.filtered` would put
+  // "12 recipes" above three rows on page 2.
+  function groupCountText(group) {
+    const count = (group?.recipes || []).length;
     return count === 1
       ? text('FABRICATE.Admin.Manager.Recipe.GroupCountOne', '1 recipe')
       : format('FABRICATE.Admin.Manager.Recipe.GroupCount', '{count} recipes', { count });
@@ -430,7 +431,7 @@
             {#if grouped}
               <CollapsibleGroupHeader
                 name={categoryLabel(group.category)}
-                countText={groupCountText(group.category)}
+                countText={groupCountText(group)}
                 expanded={isExpanded(group.category)}
                 controls={groupRegionId(group.category)}
                 onToggle={() => toggleGroup(group.category)}

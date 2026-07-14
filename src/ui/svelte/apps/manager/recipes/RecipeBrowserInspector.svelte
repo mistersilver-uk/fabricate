@@ -31,6 +31,7 @@
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
+  import { getRecipeCategoryLabel } from '../../../../../utils/recipeCategories.js';
   import {
     buildRecipeProduceRows,
     buildRecipeRequirementRows
@@ -189,8 +190,10 @@
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
         <div class="manager-chip-row">
           {#if showRecipeCategories}
+            <!-- Through the SAME label helper the rows use: a recipe with no category
+                 (or the reserved `general`) is localized, not rendered raw. -->
             <span class="manager-chip" data-recipe-category>
-              {selectedRecipe.category || text('FABRICATE.Admin.Manager.Recipe.General', 'General')}
+              {getRecipeCategoryLabel(selectedRecipe.category, localize)}
             </span>
           {/if}
           <span class={`manager-chip ${selectedRecipe.enabled === false ? 'is-disabled' : 'is-active'}`}>

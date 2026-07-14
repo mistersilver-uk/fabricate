@@ -126,6 +126,44 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(root.querySelector('[role="table"]'), null);
   });
 
+  // The model groups the PAGE, not the filtered list. A header counting the filtered
+  // list therefore reads "12 recipes" above the three rows page 2 actually renders.
+  it('counts what the group RENDERS, not what the whole filtered list holds', async () => {
+    const many = Array.from({ length: 12 }, (_, index) =>
+      makeRecipe({
+        id: `r${index + 1}`,
+        // Zero-padded so name-ascending order is also numeric order.
+        name: `Draught ${String(index + 1).padStart(2, '0')}`,
+        category: 'alchemy'
+      })
+    );
+    const root = await browser.mount({
+      recipes: many,
+      recipeCategories: [{ name: 'alchemy', count: 12 }],
+      showRecipeCategories: true
+    });
+
+    const countText = () => root.querySelector('.fab-group-count').textContent.trim();
+    const renderedRows = () => root.querySelectorAll('.manager-recipe-row').length;
+
+    assert.equal(renderedRows(), 12, 'the default page holds all twelve');
+    assert.equal(countText(), '12 recipes');
+
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '10';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    assert.equal(renderedRows(), 10, 'page 1 of a 10-row page');
+    assert.equal(countText(), '10 recipes', 'the header counts the page, not the 12 filtered');
+
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+
+    assert.equal(renderedRows(), 2, 'page 2 holds the remaining two');
+    assert.equal(countText(), '2 recipes', 'the header agrees with the two rows below it');
+  });
+
   it('collapses and re-expands a category group through its header button', async () => {
     const root = await browser.mount({
       recipes: GROUPED,
@@ -429,6 +467,48 @@ describe('RecipeBrowserInspector (mounted)', () => {
     root.querySelector('[data-recipe-action="delete"]').click();
     flushSync();
     assert.deepEqual([duplicated, deleted], [1, 1]);
+  });
+
+  // The rows render `getRecipeCategoryLabel(...)`; the inspector rendered
+  // `selectedRecipe.category` raw, so the same recipe read "General" in the row and
+  // "general" in the inspector inches away. (The harness's i18n stub echoes the key,
+  // so the localized reserved label surfaces here as its key — which is exactly the
+  // evidence that the helper, not the raw field, produced it.)
+  it('labels the category through the same helper the rows use', async () => {
+    const general = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: 'r1', category: 'general' }),
+      recipeCount: 1,
+      showRecipeCategories: true
+    });
+    assert.equal(
+      general.querySelector('[data-recipe-category]').textContent.trim(),
+      'FABRICATE.Common.General',
+      'the reserved category is localized, not printed raw'
+    );
+    inspector.remount();
+
+    const custom = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: 'r1', category: 'Alchemy' }),
+      recipeCount: 1,
+      showRecipeCategories: true
+    });
+    assert.equal(
+      custom.querySelector('[data-recipe-category]').textContent.trim(),
+      'Alchemy',
+      'a custom category keeps the GM-authored name'
+    );
+  });
+
+  it('falls back to the reserved label when the recipe carries no category', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: 'r1', category: '' }),
+      recipeCount: 1,
+      showRecipeCategories: true
+    });
+    assert.equal(
+      root.querySelector('[data-recipe-category]').textContent.trim(),
+      'FABRICATE.Common.General'
+    );
   });
 
   it('lists what the recipe REQUIRES, each option as its own match type', async () => {
