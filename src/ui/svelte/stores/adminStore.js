@@ -3489,22 +3489,14 @@ export function createAdminStore(services) {
     }));
   }
 
-  // Re-project the non-GM world users backing the per-recipe restriction
-  // allow-list. Cheap and surgical (no full `refresh()`), so the owning app can
-  // wire it to Foundry's user CRUD hooks and keep the allow-list current when a
-  // player is added, renamed, or removed while the manager is open.
-  function refreshWorldUsers() {
-    viewState.update((state) => ({
-      ...state,
-      worldUsers: services.getWorldUsers?.() || [],
-    }));
-  }
-
   // Re-project BOTH access rosters (non-GM users + every world actor with its
   // control set). The owning app wires this to user AND actor CRUD, because
   // `controlledBy` / `sharedWithAllPlayers` derive from `actor.ownership` as well as
-  // from `user.character`. Cheap and surgical, like refreshWorldUsers: no full
-  // refresh().
+  // from `user.character`. Cheap and surgical: no full `refresh()`.
+  //
+  // This REPLACED a users-only `refreshWorldUsers`, which had no production caller left
+  // once the hooks moved here: the two rosters move together, because the same user and
+  // actor CRUD changes both.
   function refreshAccessRosters() {
     viewState.update((state) => ({
       ...state,
@@ -8064,7 +8056,6 @@ export function createAdminStore(services) {
     setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
     refresh,
     refreshGatheringConfig,
-    refreshWorldUsers,
     refreshAccessRosters,
     resolveRecipeAccess,
     destroy,

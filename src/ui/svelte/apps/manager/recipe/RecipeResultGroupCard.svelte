@@ -63,6 +63,14 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  function format(key, fallback, replacements) {
+    let result = text(key, fallback);
+    for (const [token, value] of Object.entries(replacements)) {
+      result = result.replace(`{${token}}`, value);
+    }
+    return result;
+  }
+
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
 
   // Drag-reorder state (progressive only). Local so it survives the store refresh
@@ -99,8 +107,22 @@
   function moveItem(index, delta) {
     const target = index + delta;
     if (target < 0 || target >= results.length) return;
+
+    // Read the name BEFORE the move. `reorderItem` emits the reordered group, and once
+    // the parent round-trips the new prop `results[index]` is the item that swapped INTO
+    // this slot — so announcing after the move can name the wrong result.
+    const name = componentNameFor(results[index]);
+    const total = results.length;
     reorderItem(index, target);
-    announcement = `${componentNameFor(results[index])} ${text('FABRICATE.Admin.Manager.Recipe.MovedToPosition', 'moved to position')} ${target + 1} ${text('FABRICATE.Admin.Manager.Recipe.OfCount', 'of')} ${results.length}`;
+
+    // ONE key with three placeholders, not a concatenation of "moved to position" + "of":
+    // word order is not universal, and a sentence assembled from fragments cannot be
+    // translated.
+    announcement = format(
+      'FABRICATE.Admin.Manager.Recipe.ResultMoveAnnouncement',
+      '{name} moved to position {position} of {total}',
+      { name, position: target + 1, total }
+    );
   }
 
   // Routing provider: 'ingredientSet' is Ingredient routing; 'check'

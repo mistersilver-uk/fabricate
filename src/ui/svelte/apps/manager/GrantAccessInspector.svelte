@@ -97,9 +97,12 @@
     persist([...grantedCharacterIds], playerIds);
   }
 
-  // Player roster rows show the user's human-readable role (GM / Player / Trusted
-  // Player / …) as the subtitle and tint the leading icon with that user's Foundry
-  // colour, both sourced from the game users data.
+  // Player roster rows show the user's human-readable role as the subtitle and tint the
+  // leading icon with that user's Foundry colour, both sourced from the game users data.
+  // The roster is `game.users.players` — GM-free by construction — so the only roles
+  // that appear are Player and Trusted Player. A GM is never a grantable target: the
+  // runtime predicate already returns true for any GM viewer before it reads
+  // `playerIds`, so granting one would do nothing.
   const playerRows = $derived((players || []).map((player) => ({
     id: player.id,
     name: player.name,

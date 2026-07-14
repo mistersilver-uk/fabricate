@@ -127,6 +127,25 @@ describe('CraftingSystemManager source contract', () => {
       false,
       'never uses the game.user-scoped Actor#isOwner (always true on a GM client)'
     );
+    // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
+    // A `!isGM` filter alone admits role-NONE users, offering the GM a grantable target
+    // the engine ignores.
+    const fallback = appSource.slice(
+      appSource.indexOf('_playerUsers() {'),
+      appSource.indexOf('_userRoleLabel(role) {')
+    );
+    assert.ok(
+      fallback.includes("hasRole('PLAYER')") && fallback.includes('USER_ROLES?.PLAYER'),
+      'the fallback applies the same role floor as the canonical roster'
+    );
+    // Everything this labels comes from the GM-free roster, so a GAMEMASTER/ASSISTANT
+    // branch would be unreachable code claiming to handle a case that cannot arrive.
+    const roleLabel = appSource.slice(appSource.indexOf('_userRoleLabel(role) {'));
+    assert.equal(
+      roleLabel.slice(0, roleLabel.indexOf('_userColor')).includes('RoleGamemaster'),
+      false,
+      'a GM never reaches the role label — the roster excludes them'
+    );
   });
 
   it('models "who plays this character" as a SET, with the whole-table case explicit', () => {

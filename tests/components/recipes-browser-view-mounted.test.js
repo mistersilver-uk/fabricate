@@ -228,6 +228,16 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     }
   });
 
+  it('says "1 group", never "1 groups"', async () => {
+    const root = await browser.mount({
+      recipes: [makeRecipe({ resultGroupCount: 1 })],
+      resolutionMode: 'routedByCheck'
+    });
+    const io = root.querySelector('[data-recipe-io]').textContent;
+    assert.match(io, /1 group\b/);
+    assert.equal(/1 groups/.test(io), false);
+  });
+
   it('shows the projected check DC, and an em dash when the system has no usable check', async () => {
     const withDc = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'dc', dc: 18 } })] });
     const dcPill = withDc.querySelector('[data-recipe-check]');

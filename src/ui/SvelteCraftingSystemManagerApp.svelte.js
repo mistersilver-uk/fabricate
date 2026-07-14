@@ -819,36 +819,35 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   // report every actor as controlled by every GM. Never use `Actor#isOwner` /
   // `Document#permission` here — both are `game.user`-scoped and always true on the
   // GM's own client.
+  //
+  // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`), so
+  // it applies the ROLE floor too: a role-NONE user is not a player and cannot be
+  // granted a recipe, and admitting one here would offer the GM a grantable target the
+  // engine ignores.
   _playerUsers() {
     const players = game.users?.players;
     if (Array.isArray(players)) return players;
-    return Array.from(game.users?.contents || []).filter((user) => user?.isGM !== true);
+
+    const PLAYER = globalThis.CONST?.USER_ROLES?.PLAYER ?? 1;
+    return Array.from(game.users?.contents || []).filter((user) => {
+      if (user?.isGM === true) return false;
+      if (typeof user?.hasRole === 'function') return user.hasRole('PLAYER') === true;
+      return Number(user?.role ?? 0) >= Number(PLAYER);
+    });
   }
 
+  // Every roster this labels comes from `_playerUsers()`, which is GM-free by
+  // construction — so GAMEMASTER and ASSISTANT are unreachable here and are not
+  // enumerated. What remains are the two roles a grantable user can actually hold.
   _userRoleLabel(role) {
-    const USER_ROLES = globalThis.CONST?.USER_ROLES || {
-      NONE: 0,
-      PLAYER: 1,
-      TRUSTED: 2,
-      ASSISTANT: 3,
-      GAMEMASTER: 4,
-    };
+    const USER_ROLES = globalThis.CONST?.USER_ROLES || { NONE: 0, PLAYER: 1, TRUSTED: 2 };
     const loc = (key, fallback) => {
       const translated = game?.i18n?.localize?.(key);
       return translated && translated !== key ? translated : fallback;
     };
-    switch (role) {
-      case USER_ROLES.GAMEMASTER:
-        return loc('USER.RoleGamemaster', 'Game Master');
-      case USER_ROLES.ASSISTANT:
-        return loc('USER.RoleAssistant', 'Assistant GM');
-      case USER_ROLES.TRUSTED:
-        return loc('USER.RoleTrusted', 'Trusted Player');
-      case USER_ROLES.PLAYER:
-        return loc('USER.RolePlayer', 'Player');
-      default:
-        return loc('USER.RoleNone', 'None');
-    }
+    if (role === USER_ROLES.TRUSTED) return loc('USER.RoleTrusted', 'Trusted Player');
+    if (role === USER_ROLES.PLAYER) return loc('USER.RolePlayer', 'Player');
+    return loc('USER.RoleNone', 'None');
   }
 
   // Foundry `User#color` is a Color (v11+) or a plain string on older cores.

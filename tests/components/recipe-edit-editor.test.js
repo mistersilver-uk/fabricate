@@ -268,6 +268,48 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
   });
 });
 
+describe('the progressive reorder announcement', () => {
+  const cardSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte'),
+    'utf8'
+  );
+  const moveItem = cardSource.slice(
+    cardSource.indexOf('function moveItem('),
+    cardSource.indexOf('// Routing provider:')
+  );
+
+  it('reads the moved result NAME before the reorder, not after', () => {
+    // `reorderItem` emits the reordered group. Once the parent round-trips the new prop,
+    // `results[index]` is the item that swapped INTO that slot — so a name read after the
+    // move announces the wrong result.
+    const nameRead = moveItem.indexOf('componentNameFor(results[index])');
+    const reorder = moveItem.indexOf('reorderItem(index, target)');
+    assert.ok(nameRead > -1 && reorder > -1);
+    assert.ok(nameRead < reorder, 'the name is captured before the array moves under it');
+    assert.ok(
+      moveItem.indexOf('const total = results.length') < reorder,
+      'so is the total'
+    );
+  });
+
+  it('announces through ONE localized key with placeholders, not a concatenation', () => {
+    // "…MovedToPosition… {n} …OfCount… {n}" hard-codes English word order into the
+    // component; a translator cannot reorder a sentence assembled from fragments.
+    assert.ok(moveItem.includes('ResultMoveAnnouncement'), 'one key carries the whole sentence');
+    for (const fragment of ['MovedToPosition', 'OfCount']) {
+      assert.equal(
+        cardSource.includes(fragment),
+        false,
+        `${fragment} was a sentence fragment and is gone`
+      );
+    }
+    const announcement = lang.FABRICATE.Admin.Manager.Recipe.ResultMoveAnnouncement;
+    for (const token of ['{name}', '{position}', '{total}']) {
+      assert.ok(announcement.includes(token), `the key takes ${token}`);
+    }
+  });
+});
+
 describe('adminStore recipe-item projections + API', () => {
   it('exports updateRecipe and addRecipeItemFromUuid', () => {
     assert.ok(/async function updateRecipe\(/.test(storeSource), 'updateRecipe defined');

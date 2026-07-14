@@ -218,15 +218,21 @@
   // The I/O readout (issue 643 §9): always "N in"; "N out" ONLY in simple and
   // progressive — a tier- or set-keyed mode has no single outputs number, so it
   // reports the RESULT-GROUP count with a routing glyph instead.
+  function groupsText(count) {
+    // "1 groups" is not a sentence. The singular is its own key, as GroupCount /
+    // GroupCountOne already are.
+    return count === 1
+      ? text('FABRICATE.Admin.Manager.Recipe.CountResultGroupsOne', '1 group')
+      : format('FABRICATE.Admin.Manager.Recipe.CountResultGroups', '{count} groups', { count });
+  }
+
   function ioReadout(recipe) {
     const io = deriveRecipeIo(recipe, resolutionMode);
     const inText = format('FABRICATE.Admin.Manager.Recipe.CountIn', '{count} in', { count: io.inCount });
     const outText =
       io.outKind === 'items'
         ? format('FABRICATE.Admin.Manager.Recipe.CountOut', '{count} out', { count: io.outCount })
-        : format('FABRICATE.Admin.Manager.Recipe.CountResultGroups', '{count} groups', {
-            count: io.outCount
-          });
+        : groupsText(io.outCount);
     return { ...io, inText, outText, routed: io.outKind === 'groups' };
   }
 
