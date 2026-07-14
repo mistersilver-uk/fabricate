@@ -142,6 +142,8 @@ Clean-up semantics for stale runs/learned records are defined in `007-destructiv
 
 ## Versioning
 
-- Semantic versioning for module releases.
-- Foundry compatibility declared in `module.json`.
-- Before the first stable release, backwards compatibility is not guaranteed.
+- Semantic versioning for module releases, authored solely by the release automation; versions are never created, renamed, or copied by hand.
+- `main` carries prerelease versions; the `release` branch and any hotfix line carry stable versions.
+- Foundry compatibility is declared in `module.json` and is hand-maintained.
+- Breaking changes to persisted data shapes and public APIs are signalled by a major version bump and governed by `openspec/specs/destructive-changes-and-migrations/spec.md`.
+- Distribution channels, release promotion, and the Foundry registry contract are specified in `openspec/specs/release-and-distribution/spec.md`.

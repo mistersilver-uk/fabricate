@@ -41,20 +41,22 @@ The delta is NOT versioned as files in the repository; it lives in a managed blo
 
 ### Requirement: Branch and PR workflow
 
-All mutating agent work MUST happen on a non-`main` branch and be delivered through a PR targeting `main`.
+All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and be delivered through a PR targeting `main`.
+A PR targets `release` or a hotfix line only for a hotfix to the current public release.
+The release automation's forward-port merge from `release` into `main` is not agent work and is exempt from this requirement.
 
 #### Scenario: starting mutable work
 
 - **WHEN** an agent will edit implementation, documentation, specs, prompts, skills, or workflow files
 - **THEN** it verifies the current branch first
-- **AND** if the branch is `main`, it creates or switches to a task branch before editing
+- **AND** if the branch is `main`, `release`, or a hotfix line, it creates or switches to a task branch before editing
 
 #### Scenario: finishing mutable work
 
 - **WHEN** an agent completes a scoped change
 - **THEN** it commits the change to the task branch
 - **AND** pushes the branch
-- **AND** opens or updates a PR targeting `main`
+- **AND** opens or updates a PR targeting `main`, or `release` or a hotfix line when the change is a hotfix to the current public release
 - **AND** the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf`
 - **AND** the PR description uses H2 sections for `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`
 
@@ -67,8 +69,15 @@ All mutating agent work MUST happen on a non-`main` branch and be delivered thro
 #### Scenario: read-only review work
 
 - **WHEN** a review-only agent evaluates work
-- **THEN** it reviews the active branch and PR against `main`
+- **THEN** it reviews the active branch and PR against the PR's base branch
 - **AND** it must not commit, push, or merge
+
+#### Scenario: working near the release branch
+
+- **WHEN** an agent works on or near `release` or a hotfix line
+- **THEN** it MUST NOT rebase or force-push that branch, because the release automation stores release state in git tags and in git notes
+- **AND** it MUST NOT squash-merge a prerelease line into `release`, because squashing collapses Conventional Commit types and mis-computes the stable version
+- **AND** it MUST NOT merge `release` or `main` into a hotfix line; a fix leaves a hotfix line by cherry-pick
 
 ### Requirement: Shared skill source
 
