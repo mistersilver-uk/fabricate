@@ -854,6 +854,42 @@ describe('CraftingSystemManager source contract', () => {
         recipeBrowserInspectorSource.includes('buildRecipeProduceRows'),
       'the Requires/Produces walk lives in the pure model, not in the component'
     );
+
+    // The inspector is ONE column on the panel background (issue 643): section labels are
+    // uppercase micro-labels directly on the panel, not five nested `.manager-inspector-card`
+    // boxes under `<h3>` titles, and there is no invented "Recipe details" heading.
+    assert.equal(
+      recipeBrowserInspectorSource.includes('manager-inspector-card'),
+      false,
+      'the inspector sections are micro-labels on the panel, not nested cards'
+    );
+    assert.equal(
+      recipeBrowserInspectorSource.includes('Recipe.Details'),
+      false,
+      'the invented "Recipe details" heading is gone'
+    );
+
+    // `Edit recipe` is the point of the inspector: the accent-filled primary. There used to
+    // be no Edit at all, and Delete sat as a peer of Duplicate.
+    assert.ok(
+      recipeBrowserInspectorSource.includes('data-recipe-action="edit"'),
+      'the inspector exposes the primary Edit action'
+    );
+    assert.ok(
+      recipeBrowserInspectorSource.includes('onEdit = () => {}'),
+      'the inspector takes an onEdit callback'
+    );
+    assert.ok(
+      recipeBrowserInspectorSource.includes('manager-recipe-browser-inspector-delete'),
+      'Delete is demoted to a ghost danger link, not a peer button'
+    );
+
+    // The reserved alchemy-Simple failure group is SHOWN (danger-toned), not filtered out —
+    // deleting it made an alchemy recipe's failure output invisible.
+    assert.ok(
+      recipeBrowserInspectorSource.includes("data-recipe-produces={row.failure ? 'failure' : 'success'}"),
+      'every produced group is rendered, toned by role'
+    );
   });
 
   it('keeps first-slice action and navigation hierarchy focused', () => {

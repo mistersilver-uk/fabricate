@@ -3406,10 +3406,123 @@
 /* ---------------------------------------------------------------------------
    The library inspector (issue 643, brief §3.3).
 
-   A 2x2 STAT grid — Ingredients / Results / Steps / Crafting check — then the
-   REQUIRES and PRODUCES lists. Both lists are icon chip + name + mono quantity in a
-   bordered row, so a GM can read what a recipe takes and makes without opening it.
+   ONE column on the panel background — NOT a stack of boxes. Every section used to be
+   wrapped in a `.manager-inspector-card` under its own `<h3>`: five bordered cards,
+   inside a panel, inside a window, one of them titled "Recipe details" over a stat grid
+   that needs no title. Sections are uppercase micro-labels sitting directly on the
+   background; only the things that ARE objects (the stat tiles, the flow rows) keep a box.
+
+   Note on width: the column is the SHELL's `.manager-inspector`, shared by every manager
+   screen, so it stays at 300px. The prototype's 320px would be a blast-radius change
+   across the whole manager for 20px, and nesting a second grid inside `.manager-main` to
+   get it is exactly what overflows the recipe row at 1280px.
    --------------------------------------------------------------------------- */
+.fabricate-manager .manager-recipe-browser-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* A section label, not a card title: it sits ON the panel, titling what follows. */
+.fabricate-manager .manager-recipe-browser-inspector-label {
+  margin: var(--fab-space-2) 0 0;
+  color: var(--fab-text-subtle);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-recipe-browser-inspector-label:first-child {
+  margin-top: 0;
+}
+
+.fabricate-manager .manager-recipe-browser-inspector-hero {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-browser-inspector-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+/* The flavour text, WHOLE. It used to be cut at 160 characters in the one panel with the
+   room to show it. */
+.fabricate-manager .manager-recipe-browser-inspector-flavour {
+  margin: 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/*
+  The point of the inspector. `Edit recipe` is the accent-filled primary and the loudest
+  thing on the panel; Duplicate is its secondary; Delete is a ghost danger link below.
+  Before this there was NO Edit button at all and Delete was a visual peer of Duplicate —
+  so the panel's loudest action was destroying the recipe.
+*/
+.fabricate-manager .manager-recipe-browser-inspector-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-browser-inspector-duplicate {
+  width: 100%;
+  min-height: 34px;
+  justify-content: center;
+}
+
+.fabricate-manager .manager-recipe-browser-inspector-edit {
+  width: 100%;
+  min-height: 38px;
+  justify-content: center;
+  border-color: var(--fab-accent-border);
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-recipe-browser-inspector-edit:not(:disabled):hover,
+.fabricate-manager .manager-recipe-browser-inspector-edit:focus-visible {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-strong);
+}
+
+.fabricate-manager .manager-recipe-browser-inspector-delete {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 26px;
+  padding: 0;
+  border: 0;
+  color: var(--fab-danger-text);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-browser-inspector-delete:hover,
+.fabricate-manager .manager-recipe-browser-inspector-delete:focus-visible {
+  text-decoration: underline;
+}
+
 .fabricate-manager .manager-recipe-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3447,6 +3560,11 @@
   color: var(--fab-danger-text);
 }
 
+/* A system that cannot roll for this recipe, exactly as the row's pill says. */
+.fabricate-manager .manager-recipe-stat-value.is-warning {
+  color: var(--fab-warning-text);
+}
+
 .fabricate-manager .manager-recipe-stat-value.is-muted {
   color: var(--fab-mv2-text-muted);
 }
@@ -3478,6 +3596,13 @@
 /* A produced item is a SUCCESS output, and rings accordingly. */
 .fabricate-manager .manager-recipe-flow-row.is-produced {
   border-color: var(--fab-success-border);
+}
+
+/* The reserved alchemy-Simple failure group: what a FAILED craft makes. It exists in that
+   ONE place — the routed modes produce nothing at all on a failure — and it rings in danger
+   so it can never be read as something the recipe produces on success. */
+.fabricate-manager .manager-recipe-flow-row.is-failure {
+  border-color: var(--fab-danger-border);
 }
 
 /* An alternative satisfies the SAME requirement (any one of them will do), so it is
@@ -3526,13 +3651,36 @@
   letter-spacing: 0.08em;
 }
 
+/*
+  The result-group pill carries the GM-AUTHORED group name — Fabricate's outcome tiers are
+  authored, so the name is the recipe's and never a made-up crit/success/fail vocabulary.
+  Its TONE is not: it is toned by the role the group plays, so a success output and the
+  reserved alchemy failure output can never be read as the same thing. It used to be a
+  neutral grey 0.75rem/700 content chip, which said neither.
+*/
 .fabricate-manager .manager-recipe-flow-group {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
   max-width: 40%;
   overflow: hidden;
-  font-size: 0.6rem;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-flow-group.is-success {
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-recipe-flow-group.is-failure {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
 }
 
 /* Quantities are numerics: mono, tabular. */

@@ -4185,20 +4185,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
 
-    // The standalone Recipe Editor was removed, so the inspector no longer
-    // offers Edit; duplicate/delete remain.
-    assert.equal(
-      target.querySelector('[data-recipe-action="edit"]'),
-      null,
-      'recipe inspector should no longer expose an Edit action'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-action="duplicate"]'),
-      'recipe inspector should expose a Duplicate action'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-action="delete"]'),
-      'recipe inspector should expose a Delete action'
+    // `Edit recipe` is the POINT of the inspector and its primary action (issue 643).
+    // The panel used to offer Duplicate and Delete as visual peers and no Edit at all,
+    // which made destroying the recipe the loudest thing on it.
+    const inspectorActions = Array.from(
+      target.querySelectorAll('.manager-recipe-browser-inspector-actions [data-recipe-action]')
+    ).map((button) => button.dataset.recipeAction);
+    assert.deepEqual(
+      inspectorActions,
+      ['duplicate', 'edit', 'delete'],
+      'Duplicate (secondary), then Edit (primary), then Delete demoted below it'
     );
     // The 2x2 stat grid (issue 643, brief §3.3) answers the four questions a GM has
     // about the recipe they just clicked. Structure and Result-groups restated the row
@@ -4213,8 +4209,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-recipe-stat-grid'),
       'recipe inspector should render the stat grid, not the generic fact list'
     );
-    const heroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
-    assert.ok(heroRow, 'recipe inspector should use the prominent hero title row');
+    // The inspector is ONE column on the panel background, not five nested boxes: it used
+    // to wrap every section in a `.manager-inspector-card` under its own <h3>, including an
+    // invented "Recipe details" heading over a stat grid that needs no title.
+    assert.equal(
+      target.querySelectorAll('.manager-recipe-browser-inspector .manager-inspector-card').length,
+      0,
+      'the inspector sections are micro-labels on the panel, not nested cards'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-inspector]').textContent.includes('Recipe details'),
+      false,
+      'the invented "Recipe details" heading is gone'
+    );
+    const heroRow = target.querySelector('.manager-recipe-browser-inspector-hero');
+    assert.ok(heroRow, 'recipe inspector should lead with its hero');
     assert.equal(
       heroRow.querySelector('[data-medallion]').dataset.medallion,
       'image',

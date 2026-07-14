@@ -6655,6 +6655,7 @@
           essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
           {showRecipeCategories}
           showVisibilitySummary={$viewState.showVisibilitySummary}
+          onEdit={() => editRecipe(selectedRecipe?.id)}
           onDuplicate={() => duplicateRecipe()}
           onDelete={() => deleteRecipe()}
           onAddComponents={() => setView('components')}

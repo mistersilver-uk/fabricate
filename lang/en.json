@@ -1840,7 +1840,6 @@
           "PlayerVisibility": "Player visibility",
           "Inspector": "Selected recipe inspector",
           "Selected": "Selected recipe",
-          "Details": "Recipe details",
           "SelectRecipe": "Select a recipe",
           "InspectorHint": "The inspector shows recipe status, structure, and requirements for the selected row.",
           "Edit": "Edit recipe",

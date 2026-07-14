@@ -47,12 +47,11 @@
     essenceOptions = [],
     showRecipeCategories = false,
     showVisibilitySummary = false,
+    onEdit = () => {},
     onDuplicate = () => {},
     onDelete = () => {},
     onAddComponents = () => {}
   } = $props();
-
-  const INSPECTOR_DESCRIPTION_LIMIT = 160;
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -65,13 +64,6 @@
       result = result.replace(`{${token}}`, value);
     }
     return result;
-  }
-
-  function truncateDescription(description) {
-    if (typeof description !== 'string') return '';
-    const trimmed = description.trim();
-    if (trimmed.length <= INSPECTOR_DESCRIPTION_LIMIT) return trimmed;
-    return `${trimmed.slice(0, INSPECTOR_DESCRIPTION_LIMIT).trimEnd()}…`;
   }
 
   function recipeImage(recipe) {
@@ -89,7 +81,8 @@
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDcValue', 'DC {dc}'],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
     progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', '—']
+    ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients'],
+    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check']
   };
 
   function checkValue(recipe) {
@@ -125,7 +118,9 @@
             id: 'check',
             value: checkValue(selectedRecipe),
             label: text('FABRICATE.Admin.Manager.Recipe.CraftingCheck', 'Crafting check'),
-            tone: selectedRecipe.checkSummary?.kind === 'none' ? 'muted' : ''
+            // A system that cannot roll for this recipe is a WARNING, exactly as the row's
+            // pill says. `ingredients` is not: it is a working, roll-free configuration.
+            tone: selectedRecipe.checkSummary?.kind === 'none' ? 'warning' : ''
           }
         ]
       : []
@@ -142,9 +137,16 @@
   const produceRows = $derived(
     selectedRecipe ? buildRecipeProduceRows(selectedRecipe, { componentOptions }) : []
   );
-  // The recipe's success outputs. A `role: 'failure'` group is what a FAILED alchemy
-  // craft makes; listing it under "Produces" would tell the GM the recipe makes
-  // something when a successful craft makes nothing.
+  // Every produced row is listed, TONED BY ROLE. A `role: 'failure'` group is the reserved
+  // alchemy-Simple group — what a FAILED craft makes — and it exists ONLY there; the routed
+  // modes produce nothing at all on a failure, so no failure row is ever invented for them.
+  //
+  // Filtering the failure group out (as this did) made an alchemy recipe's failure output
+  // invisible in the one surface whose job is to say what a recipe makes. It is rendered as
+  // a danger-bordered row instead, so it can never be mistaken for a success output.
+  //
+  // The empty-Produces warning still keys on the SUCCESS rows: a recipe whose only group is
+  // the failure group still makes nothing when the craft succeeds, and the GM is told so.
   const successRows = $derived(produceRows.filter((row) => !row.failure));
 
   const UNNAMED_COMPONENT = 'FABRICATE.Admin.Manager.Recipe.UnknownComponent';
@@ -182,12 +184,27 @@
 </script>
 
 {#if selectedRecipe}
-  <section class="manager-inspector-card" data-recipe-inspector>
-    <div class="manager-inspector-title-row is-hero-large">
-      <Medallion src={recipeImage(selectedRecipe)} icon="fas fa-scroll" size={56} />
-      <div class="manager-inspector-copy">
-        <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}</p>
+  <!--
+    The inspector is ONE column on the panel background, not a stack of boxes. It used to
+    wrap every section in a bordered panel card under its own heading — five cards, inside a
+    panel, inside a window — and invented a details heading for a stat grid that needs no
+    title. Sections are now uppercase micro-labels sitting directly on the background; only
+    the things that ARE objects (stat tiles, flow rows) keep a box.
+  -->
+  <section class="manager-recipe-browser-inspector" data-recipe-inspector>
+    <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}</p>
+
+    <div class="manager-recipe-browser-inspector-hero">
+      <Medallion src={recipeImage(selectedRecipe)} icon="fas fa-scroll" size={52} />
+      <div class="manager-recipe-browser-inspector-identity">
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
+        <!--
+          TWO chips on one line: what it is, and whether it is on. The third chip used to be
+          "Unlocked" — a pill for a NON-state, which forced the row to wrap — and the status
+          chip said "Active" while the row's switch inches away said "On", giving the same
+          state two names on one screen. Locked keeps its pill (a real state); Incomplete /
+          Can't enable appear only when true.
+        -->
         <div class="manager-chip-row">
           {#if showRecipeCategories}
             <!-- Through the SAME label helper the rows use: a recipe with no category
@@ -196,13 +213,15 @@
               {getRecipeCategoryLabel(selectedRecipe.category, localize)}
             </span>
           {/if}
-          <span class={`manager-chip ${selectedRecipe.enabled === false ? 'is-disabled' : 'is-active'}`}>
-            {selectedRecipe.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-          </span>
+          <StatusPill
+            tone={selectedRecipe.enabled === false ? 'subtle' : 'success'}
+            icon="fas fa-circle"
+            label={selectedRecipe.enabled === false
+              ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+              : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+          />
           {#if selectedRecipe.locked}
             <StatusPill tone="accent" icon="fas fa-lock" label={text('FABRICATE.Admin.Manager.Recipe.Locked', 'Locked')} />
-          {:else}
-            <span class="manager-chip is-active">{text('FABRICATE.Admin.Manager.Recipe.Unlocked', 'Unlocked')}</span>
           {/if}
           {#if selectedRecipe.incomplete}
             <StatusPill
@@ -217,15 +236,15 @@
       </div>
     </div>
 
-    <p class="manager-muted">
-      {truncateDescription(selectedRecipe.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+    <!-- The flavour text, whole. It used to be cut at 160 characters, in the one panel
+         with the room to show it. -->
+    <p class="manager-recipe-browser-inspector-flavour">
+      {selectedRecipe.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
     </p>
-  </section>
 
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Details', 'Recipe details')}</h3>
     <!-- The four questions a GM has about the recipe they just clicked: what does it
-         take, what does it make, how many steps, what do they roll. -->
+         take, what does it make, how many steps, what do they roll. No heading — a 2x2
+         grid of labelled numbers does not need one. -->
     <div class="manager-recipe-stat-grid">
       {#each stats as stat (stat.id)}
         <div class="manager-recipe-stat" data-recipe-fact={stat.id}>
@@ -234,16 +253,15 @@
         </div>
       {/each}
     </div>
+
     {#if showVisibilitySummary}
       <p class="manager-muted">
         <strong>{text('FABRICATE.Admin.Manager.Recipe.PlayerVisibility', 'Player visibility')}:</strong>
         {selectedRecipe.visibilitySummary}
       </p>
     {/if}
-  </section>
 
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}</h3>
+    <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}</p>
     {#if requirementRows.length === 0}
       <p class="manager-muted" data-recipe-requires-empty>{text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}</p>
     {:else}
@@ -271,47 +289,63 @@
         {/each}
       </div>
     {/if}
-  </section>
 
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}</h3>
-    {#if successRows.length === 0}
-      <!-- Not "unfinished": a recipe with no results is a SUCCESSFUL craft that makes
-           nothing. It is the one danger state in this inspector. -->
-      <p class="manager-recipe-flow-empty" data-recipe-produces-empty>
-        <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.NoResults', 'No results — a successful craft makes nothing.')}</span>
-      </p>
-    {:else}
-      <div class="manager-recipe-flow-list">
-        {#each successRows as row (row.id)}
-          <div class="manager-recipe-flow-row is-produced" data-recipe-produces>
-            <span class="manager-recipe-flow-icon" aria-hidden="true">
-              {#if row.img}
-                <img src={row.img} alt="" />
-              {:else}
-                <i class="fas fa-cube"></i>
-              {/if}
-            </span>
-            <span class="manager-recipe-flow-name">{produceName(row)}</span>
-            {#if row.groupName}
-              <span class="manager-chip manager-recipe-flow-group">{row.groupName}</span>
+    <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}</p>
+    <div class="manager-recipe-flow-list">
+      <!--
+        Every produced row, TONED BY ROLE. A `role: 'failure'` group is the reserved
+        alchemy-Simple group — what a FAILED craft makes — and it exists only there; the
+        routed modes produce nothing at all on a failure, so no failure row is invented for
+        them. Filtering it out made an alchemy recipe's failure output invisible in the one
+        surface whose job is to say what a recipe makes.
+      -->
+      {#each produceRows as row (row.id)}
+        <div
+          class={`manager-recipe-flow-row ${row.failure ? 'is-failure' : 'is-produced'}`}
+          data-recipe-produces={row.failure ? 'failure' : 'success'}
+        >
+          <span class="manager-recipe-flow-icon" aria-hidden="true">
+            {#if row.img}
+              <img src={row.img} alt="" />
+            {:else}
+              <i class="fas fa-cube"></i>
             {/if}
-            <span class="manager-recipe-flow-qty">×{row.quantity}</span>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </section>
+          </span>
+          <span class="manager-recipe-flow-name">{produceName(row)}</span>
+          {#if row.groupName}
+            <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
+                 tiers are authored, so the NAME is the recipe's; the tone is not. -->
+            <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}>{row.groupName}</span>
+          {/if}
+          <span class="manager-recipe-flow-qty">×{row.quantity}</span>
+        </div>
+      {/each}
+      {#if successRows.length === 0}
+        <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that
+             makes nothing — true even when a failure group is listed above. -->
+        <p class="manager-recipe-flow-empty" data-recipe-produces-empty>
+          <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.NoResults', 'No results — a successful craft makes nothing.')}</span>
+        </p>
+      {/if}
+    </div>
 
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Actions', 'Recipe actions')}</h3>
-    <div class="manager-inspector-actions">
-      <button type="button" class="manager-button" data-recipe-action="duplicate" onclick={() => onDuplicate()}>
+    <!--
+      The point of the inspector. `Edit recipe` is the accent-filled primary and the
+      loudest thing on the panel; Duplicate is its secondary; Delete is demoted to a ghost
+      danger link. Before this there was NO Edit button at all, and Delete sat as a visual
+      peer of Duplicate — so the panel's loudest action was destroying the recipe.
+    -->
+    <div class="manager-recipe-browser-inspector-actions">
+      <button type="button" class="manager-button manager-recipe-browser-inspector-duplicate" data-recipe-action="duplicate" onclick={() => onDuplicate()}>
         <i class="fas fa-copy" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
       </button>
-      <button type="button" class="manager-button is-danger" data-recipe-action="delete" onclick={() => onDelete()}>
+      <button type="button" class="manager-button manager-recipe-browser-inspector-edit" data-recipe-action="edit" onclick={() => onEdit()}>
+        <i class="fas fa-pen" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
+      </button>
+      <button type="button" class="manager-recipe-browser-inspector-delete" data-recipe-action="delete" onclick={() => onDelete()}>
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
       </button>

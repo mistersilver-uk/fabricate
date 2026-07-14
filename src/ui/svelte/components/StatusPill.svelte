@@ -1,8 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The four recipe-row / inspector states, as one pill:
+  The recipe-row / inspector states, as one pill:
 
-   - `subtle`  — Disabled (a recipe the GM switched off).
+   - `subtle`  — Disabled (a recipe the GM switched off), and the inspector's Off state.
+   - `success` — the inspector's On state (a dot + the word, mirroring the row's switch).
    - `accent`  — Locked (visible to players, GM-only to craft).
    - `danger`  — Can't enable (an activation blocker: enabling would be refused).
    - `warning` — Incomplete (a persistable authoring shell, not yet craftable).
@@ -12,7 +13,7 @@
   `icon` class, so nothing here reaches for `game.i18n`.
 
   Props:
-   - tone: 'subtle' | 'accent' | 'danger' | 'warning'.
+   - tone: 'subtle' | 'success' | 'accent' | 'danger' | 'warning'.
    - icon: a Font Awesome class string (e.g. 'fas fa-lock'); omitted renders none.
    - label: the already-localized pill text.
    - title: optional hover text.
@@ -47,6 +48,17 @@
   .fab-status-pill.is-subtle {
     color: var(--fab-text-subtle);
     background: var(--fab-surface-raised);
+  }
+
+  .fab-status-pill.is-success {
+    color: var(--fab-success-text);
+    border-color: var(--fab-success-border);
+    background: var(--fab-success-soft);
+  }
+
+  /* The 6px status dot the inspector's On/Off pill leads with. */
+  .fab-status-pill i.fa-circle {
+    font-size: 0.36rem;
   }
 
   .fab-status-pill.is-accent {

@@ -544,6 +544,23 @@ The flash **floats** over the list rather than sitting in flow above it: an in-f
 The **lock toggle** gives `recipe.locked` a real write path from the row.
 Unlike enable, locking is **never gated**, in either direction: a GM locks a recipe precisely while it is unfinished, so refusing the write on incompleteness would make the control useless exactly when it is wanted.
 
+The **inspector** is one column on the panel background, not a stack of bordered cards.
+Section headings are uppercase micro-labels sitting directly on the panel — `Selected recipe`, `Requires`, `Produces` — not `<h3>` titles inside nested `manager-inspector-card` boxes, and there is no invented "Recipe details" heading over the stat grid.
+Only the things that are objects keep a box: the 2×2 stat grid (Ingredients / Results / Steps / Crafting check) and the Requires / Produces flow rows.
+
+The hero chip row carries exactly two chips on one line: the category and a status pill (a dot plus `On`/`Off`, naming the state exactly as the row's switch does).
+There is no chip for the *absence* of a state — the retired `Unlocked` chip named a non-state and forced the row to wrap; `Locked`, `Incomplete` and `Can't enable` are shown only when true.
+The flavour text is shown whole, in the one surface with room for it.
+
+The **Produces** list shows every produced group, **toned by role**.
+The result-group pill carries the GM-authored group name (Fabricate's outcome tiers are authored, so the name is the recipe's — never a crit/success/fail vocabulary the model does not have); its tone is the role the group plays, success-soft or danger-soft.
+The reserved `role: 'failure'` group — the alchemy-Simple failure output — is **rendered** (danger-bordered), not filtered out, so an alchemy recipe's failure output is visible; no failure row is invented in a routed mode, where a failed craft produces nothing.
+The successful-craft-makes-nothing warning still keys on the success rows: a recipe whose only group is the failure group still makes nothing when the craft succeeds, and says so.
+
+The inspector's primary action is **`Edit recipe`** — the accent-filled, full-width, loudest control on the panel, and the point of the inspector.
+`Duplicate recipe` is its secondary above it; `Delete recipe` is demoted to a ghost danger link below it, so the panel's loudest action is never destroying the recipe.
+The inspector column stays at the shell's shared 300px; it is not widened per view.
+
 Actions:
 
 - Create

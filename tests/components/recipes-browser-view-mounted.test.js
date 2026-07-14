@@ -504,13 +504,18 @@ describe('RecipeBrowserInspector (mounted)', () => {
     );
   });
 
-  it('renders the selected recipe with its image and actions', async () => {
+  // `Edit recipe` is the POINT of the inspector: the accent-filled primary and the loudest
+  // thing on the panel. There used to be NO Edit button at all, and Delete sat as a visual
+  // peer of Duplicate — so the panel's loudest action was destroying the recipe.
+  it('renders the selected recipe with its image and its Duplicate / Edit / Delete ladder', async () => {
+    let edited = 0;
     let duplicated = 0;
     let deleted = 0;
     const root = await inspector.mount({
       selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
       recipeCount: 1,
       showRecipeCategories: true,
+      onEdit: () => { edited += 1; },
       onDuplicate: () => { duplicated += 1; },
       onDelete: () => { deleted += 1; }
     });
@@ -518,10 +523,84 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(root.querySelector('[data-medallion]').dataset.medallion, 'image');
     assert.ok(root.querySelector('[data-recipe-category]'), 'the category is a hero chip, not a stat');
 
+    assert.deepEqual(
+      [...root.querySelectorAll('.manager-recipe-browser-inspector-actions [data-recipe-action]')].map(
+        (button) => button.dataset.recipeAction
+      ),
+      ['duplicate', 'edit', 'delete'],
+      'Duplicate (secondary), then Edit (primary), then Delete demoted below it'
+    );
+
+    root.querySelector('[data-recipe-action="edit"]').click();
     root.querySelector('[data-recipe-action="duplicate"]').click();
     root.querySelector('[data-recipe-action="delete"]').click();
     flushSync();
-    assert.deepEqual([duplicated, deleted], [1, 1]);
+    assert.deepEqual([edited, duplicated, deleted], [1, 1, 1]);
+  });
+
+  // The inspector is ONE column on the panel background, not five nested boxes.
+  it('renders its sections as micro-labels on the panel, not as nested cards', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    assert.equal(
+      root.querySelectorAll('.manager-inspector-card').length,
+      0,
+      'a panel inside a window does not also need five boxes'
+    );
+    assert.equal(
+      root.textContent.includes('Recipe details'),
+      false,
+      'the invented heading over the stat grid is gone'
+    );
+    assert.deepEqual(
+      [...root.querySelectorAll('.manager-recipe-browser-inspector-label')].map((label) =>
+        label.textContent.trim()
+      ),
+      ['Selected recipe', 'Requires', 'Produces']
+    );
+  });
+
+  // Exactly TWO chips on one line: what it is, and whether it is on. The third used to be
+  // "Unlocked" — a pill for a NON-state, which forced the row to wrap — and the status chip
+  // read "Active" while the row's switch inches away read "On".
+  it('shows the category and an On/Off status dot, and no chip for the absence of a state', async () => {
+    const on = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: 'r1', enabled: true, locked: false }),
+      recipeCount: 1,
+      showRecipeCategories: true
+    });
+
+    assert.equal(on.querySelectorAll('.manager-chip-row > *').length, 2, 'category + status, one line');
+    const status = on.querySelector('[data-status-pill="success"]');
+    assert.equal(status.textContent.trim(), 'On', 'the same state has the same name as the row switch');
+    assert.ok(status.querySelector('i.fa-circle'), 'the status pill leads with a dot');
+    assert.equal(on.textContent.includes('Unlocked'), false, 'unlocked is not a state to chip');
+    assert.equal(on.textContent.includes('Active'), false, 'the state is named On, as the row names it');
+    inspector.remount();
+
+    const off = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: 'r1', enabled: false, locked: true }),
+      recipeCount: 1,
+      showRecipeCategories: true
+    });
+    assert.equal(off.querySelector('[data-status-pill="subtle"]').textContent.trim(), 'Off');
+    assert.ok(off.querySelector('[data-status-pill="accent"]'), 'Locked IS a state and keeps its pill');
+  });
+
+  // The panel is the one surface with the room for the recipe's flavour text; it used to
+  // cut it at 160 characters anyway.
+  it('shows the flavour text whole', async () => {
+    const description = 'A classic arming sword. '.repeat(12).trim();
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: 'r1', description }),
+      recipeCount: 1
+    });
+    assert.equal(root.querySelector('.manager-recipe-browser-inspector-flavour').textContent.trim(), description);
+    assert.equal(root.textContent.includes('…'), false, 'nothing is truncated');
   });
 
   // The rows render `getRecipeCategoryLabel(...)`; the inspector rendered
@@ -589,7 +668,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(rows[2].textContent, /Fire/);
   });
 
-  it('lists what the recipe PRODUCES, with the group and a mono quantity', async () => {
+  it('lists what the recipe PRODUCES, with a success-toned group pill and a mono quantity', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
       recipeCount: 1,
@@ -598,8 +677,14 @@ describe('RecipeBrowserInspector (mounted)', () => {
 
     const rows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(rows.length, 1);
+    assert.equal(rows[0].dataset.recipeProduces, 'success');
     assert.match(rows[0].textContent, /Healing Potion/);
-    assert.match(rows[0].textContent, /On success/);
+    // The pill carries the GM-AUTHORED group name — Fabricate's outcome tiers are authored,
+    // so the name is the recipe's and never an invented crit/success/fail vocabulary. Its
+    // TONE is not the recipe's: it is the role the group plays.
+    const pill = rows[0].querySelector('.manager-recipe-flow-group');
+    assert.equal(pill.textContent.trim(), 'On success');
+    assert.ok(pill.classList.contains('is-success'));
     assert.match(rows[0].querySelector('.manager-recipe-flow-qty').textContent, /×3/);
     assert.equal(root.querySelector('[data-recipe-produces-empty]'), null);
   });
@@ -616,9 +701,14 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(empty.textContent, /a successful craft makes nothing/);
   });
 
-  it("never lists the reserved role: 'failure' group as something the recipe produces", async () => {
-    // The alchemy-Simple failure group is what a FAILED craft makes. Listing it under
-    // Produces would tell the GM the recipe makes something when a success makes nothing.
+  // The reserved alchemy-Simple failure group is what a FAILED craft makes. Filtering it out
+  // of Produces (as this used to) made an alchemy recipe's failure output INVISIBLE in the one
+  // surface whose job is to say what a recipe makes. It is shown, in danger, and the
+  // successful-craft-makes-nothing warning still fires — because it is still true.
+  //
+  // No failure row is ever INVENTED: it exists only where the model has one. The routed modes
+  // produce nothing at all on a failure and carry no such group.
+  it("shows the reserved role: 'failure' group in danger, and still says a success makes nothing", async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({
         id: 'r1',
@@ -636,8 +726,15 @@ describe('RecipeBrowserInspector (mounted)', () => {
       componentOptions: INSPECTOR_COMPONENTS
     });
 
-    assert.equal(root.querySelectorAll('[data-recipe-produces]').length, 0);
-    assert.ok(root.querySelector('[data-recipe-produces-empty]'));
+    const rows = [...root.querySelectorAll('[data-recipe-produces]')];
+    assert.equal(rows.length, 1, 'the failure output is not deleted from the panel');
+    assert.equal(rows[0].dataset.recipeProduces, 'failure');
+    assert.ok(rows[0].classList.contains('is-failure'), 'a failure output rings in danger');
+    assert.ok(rows[0].querySelector('.manager-recipe-flow-group.is-failure'), 'and its group pill does too');
+    assert.ok(
+      root.querySelector('[data-recipe-produces-empty]'),
+      'a recipe whose only group is the failure group still makes nothing on a success'
+    );
   });
 
   it("says a locked, incomplete, disabled recipe can't be enabled", async () => {
