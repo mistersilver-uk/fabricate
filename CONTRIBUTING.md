@@ -127,6 +127,65 @@ flowchart TD
   undraft --> registry["registry POST (irreversible, LAST)"]
 ```
 
+### Recovering from a failed publish
+
+This section explains; it does not specify.
+It MUST NOT restate a MUST from the spec; where a rule matters it states the consequence in plain language and links to the requirement by name.
+If the two ever disagree, the spec wins.
+
+A channel publish (`scripts/release-s3.js`, run by the reusable `release-s3.yml`) stages one build and, per target, writes a versioned zip and a manifest.
+It is guarded so a failed or repeated publish can never corrupt an already-distributed version — see the **Published artefact immutability** and **Publish completeness** requirements.
+
+#### What the guard decides
+
+The guard keys "same build" on recorded **build provenance** — the `(version, source sha, build profile)` triple stamped onto every versioned zip as S3 object metadata (`fabricate-version`, `fabricate-source-sha`, `fabricate-build-profile`).
+It never compares zip bytes, because the archive is not byte-reproducible across builds of one source tree, so byte-identity would read every re-run as a different build.
+
+| Situation at a target | Guard verdict |
+|---|---|
+| No manifest head and no zip yet | publish the target — it is new |
+| Head not newer, zip provenance matches this build | skip the zip upload and continue — the resume path |
+| Head not newer, zip provenance differs or is absent/`unknown` | fail closed as a same-version content swap unless `--overwrite` is given |
+| Head is Foundry-newer than the incoming version | fail closed as a downgrade unless `--allow-downgrade` is given |
+
+An absent or `unknown` provenance counts as an unidentified build and never satisfies the match — see the **Published artefact immutability** requirement.
+
+#### A publish failed — what now?
+
+Re-run it from the SAME commit.
+A target already written from this build is recognised by its provenance and skipped, and only the unwritten targets are completed — the resume path in the **Publish completeness** requirement.
+For a push-triggered stable release, re-dispatch `release.yml` via `workflow_dispatch` with `--ref` set to the branch that produced the tag and the already-minted `tag` supplied; for any channel, `release-s3.yml` can be dispatched directly with the same `tag` and `channel`.
+
+Do NOT reach for `--overwrite` to get past a failed publish.
+`--overwrite` replaces the bytes of a version a target already advertises, and a version's published artefacts are immutable — clients already on it never re-fetch, and any CDN holding the immutable zip pins the old bytes — so overwriting splits one version string across two different builds.
+`--overwrite` is legitimate ONLY for a version no client could yet have installed, such as re-staging a target that failed before any cohort read it, and is NEVER legitimate for a version already distributed to any channel or tester feed.
+The routine remedy for a failed publish is the resume above, not an override — the **Published artefact immutability** requirement forbids the override as the routine path.
+
+#### Provenance metadata and `--source-sha`
+
+Every versioned zip is uploaded with its provenance triple as S3 metadata, and the guard reads it back on the next publish.
+`release-s3.js` takes the commit explicitly via `--source-sha`, because `release-s3.yml` checks out the release tag before invoking the script, which leaves `GITHUB_SHA` naming the ref that triggered the run rather than the built commit — the workflow passes `--source-sha "$(git rev-parse HEAD)"`.
+A build profile defaults to `community`, and every target of one publish must share it, so a mixed-profile publish fails before writing anything (keyed to issue 345) — see the **One build per publish** requirement.
+
+#### Backfilling provenance onto older zips
+
+A zip published before provenance existed carries no metadata, so the guard reads its provenance as absent and fails closed, which would strand a version mid-promotion.
+Stamp the triple onto every existing versioned zip in a channel and its tester feeds with the one-shot backfill:
+
+```bash
+node scripts/release-s3.js --backfill-provenance --channel <channel> --dry-run   # preview first
+node scripts/release-s3.js --backfill-provenance --channel <channel>             # then stamp
+```
+
+Or dispatch the `backfill-provenance.yml` workflow for that channel, starting with `dry_run: true` to preview exactly which zips would be stamped and with which source sha.
+The backfill re-supplies `ContentType: application/zip` and the immutable `CacheControl` alongside the metadata — a metadata `REPLACE` drops system metadata too, so omitting them would downgrade an immutable-cached zip — and it never touches a manifest.
+Where a version's `v<version>` tag cannot be resolved it stamps `unknown`, which the guard still treats as absent.
+
+#### The zip name differs between GitHub and S3 — do not "fix" it
+
+The GitHub release attaches `fabricate-v<version>.zip` (with the `v`), matching the release tag, while the S3 versioned zip is `fabricate-<version>.zip` (no `v`).
+The divergence is deliberate, because the S3 manifest's `download` URL is baked from the S3 name, so renaming either to "match" the other breaks the other artefact's install URL — see the **Self-contained distribution targets** requirement.
+
 ## Release Workflow
 
 Fabricate uses a local release build script to assemble the final module distribution before publishing.

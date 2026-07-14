@@ -31,6 +31,9 @@ It has no tester group and no retained cohort: it exists so a hotfix can be publ
 - **release promotion** — moving an already-minted stable version to the next stage, minting nothing.
 - **forward-port** — merging the release line back into the prerelease line, so the prerelease line's next version is numbered above the released one.
 - **stable version** — a version with no prerelease identifier.
+- **build profile** — which variant of the module a build produced, such as the community build.
+It identifies the bytes, as distinct from the cohort that receives them.
+- **build provenance** — the recorded identity of the build an artefact came from: its version, its source commit, and its build profile.
 
 A release artefact exists, and is not publicly obtainable, from the moment its version is minted.
 It becomes publicly obtainable only at release promotion.
@@ -242,3 +245,57 @@ Registry publication follows it.
 
 - **WHEN** any step of a promotion fails before the release artefact is made public
 - **THEN** the registry is untouched, the version is still not publicly obtainable, and the promotion can be re-run
+
+### Requirement: Published artefact immutability
+
+A version's published artefacts are immutable: they are served with an immutable cache policy, and clients already on that version never re-fetch them.
+Re-publishing a version a target already advertises MUST therefore be permitted only when the artefact being written came from the same build as the artefact already published.
+Re-publishing the same version from a different build MUST fail, because the two cohorts would then run different bytes under one version string and no client would ever learn of the change.
+Sameness of build MUST be established by recorded build provenance, not by comparing bytes: the published archive is not byte-reproducible across builds of the same source tree.
+An artefact whose provenance is absent or unknown MUST be treated as being of an unidentified build, and MUST NOT satisfy the sameness test.
+An override that permits replacing a published version's artefacts MAY exist, but it MUST NOT be the routine remedy for a failed publish.
+
+#### Scenario: a same-version republish from a different build
+
+- **WHEN** a publish would replace an already-published version's artefacts with artefacts from a different build
+- **THEN** the publish fails, even though the version is unchanged
+
+#### Scenario: an artefact of unidentified provenance
+
+- **WHEN** a publish would replace an already-published artefact whose build cannot be identified
+- **THEN** the publish fails rather than assuming the builds match
+
+### Requirement: Publish completeness
+
+A publish either establishes every one of its targets at the published version, or it fails.
+Every manifest a publish writes MUST be read back and MUST be confirmed to advertise the published version.
+A publish that has written some targets and not others MUST be resumable: re-running it from the same build MUST complete the remaining targets without an override, and MUST NOT rewrite the artefacts it already published from that build.
+Concurrent publishes to one channel MUST NOT interleave, and a manifest write MUST fail rather than overwrite a head that changed after it was read.
+
+#### Scenario: a partially-completed publish reports its outcome
+
+- **WHEN** a publish writes some targets and then fails
+- **THEN** the run fails rather than reporting success
+
+#### Scenario: resuming a partially-completed publish
+
+- **WHEN** a publish previously failed after writing some targets but not others
+- **THEN** re-running it from the same build completes the remaining targets without an override
+- **AND** it does not rewrite the artefacts it already published from that build
+
+#### Scenario: a head that moved while the publish was building
+
+- **WHEN** a publish would write a manifest whose head has changed since the publish read it
+- **THEN** the write fails rather than overwriting the newer head
+
+### Requirement: One build per publish
+
+A publish MUST produce every one of its targets from a single build.
+A tester group is a cohort of the same build as its channel, distinguished only by an unguessable URL.
+Shipping different bytes to a cohort is a build-profile concern and MUST NOT be expressed as a tester group unless the one-build-per-publish invariant is first lifted.
+A publish whose targets do not all share one build profile MUST fail before any object is written.
+
+#### Scenario: a publish whose targets disagree
+
+- **WHEN** a publish's targets do not all share one build profile
+- **THEN** the publish fails and no object is written

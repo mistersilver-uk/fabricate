@@ -124,21 +124,16 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: git checkout "$RELEASE_TAG"
 
-      - uses: actions/setup-node@v6
+      # Shared Node + npm ci + OIDC preamble. npm ci runs AFTER the tag checkout above so it installs
+      # the TAG's dependencies (which is why this workflow keeps its own checkout/tag steps rather
+      # than letting the composite own checkout). OIDC credentials are needed for a real publish AND
+      # for a `--check-heads` read; they are skipped only on a dry-run that is NOT also reading heads
+      # (the script imports no AWS SDK and reaches no bucket when `--dry-run` is set alone).
+      # aws-role/aws-region are forwarded because the composite cannot read vars.* itself.
+      - uses: ./.github/actions/release-setup
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Configure AWS credentials via OIDC
-        # Credentials are needed for a real publish AND for a `--check-heads` read. They are skipped
-        # only on a dry-run that is NOT also reading heads: the script imports no AWS SDK and reaches
-        # no bucket when `--dry-run` is set alone.
-        if: ${{ !inputs.dry_run || inputs.check_heads }}
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          enable-oidc: ${{ !inputs.dry_run || inputs.check_heads }}
+          aws-role: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Publish to S3

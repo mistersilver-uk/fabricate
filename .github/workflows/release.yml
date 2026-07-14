@@ -72,11 +72,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      # Shared Node + npm ci preamble (no OIDC — this job touches no bucket).
+      - uses: ./.github/actions/release-setup
       - run: npx playwright install chromium --with-deps
       - run: npm test
       - run: npm run build
@@ -108,11 +105,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      # Shared Node + npm ci preamble (no OIDC — the S3 publish runs in the reusable release-s3.yml).
+      - uses: ./.github/actions/release-setup
 
       - name: Create the local branches semantic-release validates
         # semantic-release expands its configured branches against ORIGIN's branches, then runs
@@ -148,6 +142,33 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
+
+      - name: Assert the drafted release carries both assets
+        # Catch an ASSETLESS draft at PRODUCTION time (issue #628, task 2.3). @semantic-release/github's
+        # publish.js IGNORES an unreadable asset and publishes the draft anyway, so this job can go
+        # green with a draft missing its zip or module.json. The promotion pre-flight also asserts this
+        # (correctly — it must precede the irreversible un-draft), but that is days late, after a soak,
+        # when the remedy is a costly re-cut; catching it as the draft is created makes the promotion's
+        # check a backstop. Run in the SAME job that minted the draft: its GITHUB_TOKEN already has
+        # contents: write, which draft-release visibility requires. Skipped when nothing was minted.
+        if: ${{ steps.semrel.outputs.next_tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.semrel.outputs.next_tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          NAMES=$(gh release view "$RELEASE_TAG" --repo "$REPO" --json assets --jq '.assets[].name')
+          echo "Release $RELEASE_TAG assets:"
+          echo "$NAMES"
+          if ! printf '%s\n' "$NAMES" | grep -q '\.zip$'; then
+            echo "::error::Release $RELEASE_TAG has no .zip asset — @semantic-release/github may have skipped an unreadable asset."
+            exit 1
+          fi
+          if ! printf '%s\n' "$NAMES" | grep -qx 'module.json'; then
+            echo "::error::Release $RELEASE_TAG is missing module.json — @semantic-release/github may have skipped an unreadable asset."
+            exit 1
+          fi
+          echo "Release $RELEASE_TAG carries both the zip and module.json."
 
   publish-s3:
     needs: [guard, semantic-release]

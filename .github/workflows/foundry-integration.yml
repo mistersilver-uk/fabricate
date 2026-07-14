@@ -10,6 +10,15 @@ on:
         required: false
         type: boolean
         default: false
+      allowed_console_error_patterns:
+        # Comma-separated regex sources APPENDED to the harness's in-source ignoredErrorPatterns
+        # defaults — a per-run way to admit a known-benign Foundry console/pageerror artefact without
+        # a source edit. It NEVER waives a failed step, and it cannot reopen require_credentials: a
+        # run with missing credentials fails regardless of this input.
+        description: "Comma-separated console-error waiver patterns appended to the in-source defaults"
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:              # Manual trigger (allows testing on demand)
     inputs:
       require_credentials:
@@ -17,6 +26,11 @@ on:
         required: false
         type: boolean
         default: false
+      allowed_console_error_patterns:
+        description: "Comma-separated console-error waiver patterns appended to the in-source defaults"
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: foundry-integration-${{ github.ref }}
@@ -114,8 +128,11 @@ jobs:
         # The module is already built by the dedicated "Build module" step above
         # (cached layer + clearer log attribution), so skip the orchestrator's
         # own step-0 build to avoid building twice.
+        # allowed_console_error_patterns reaches foundry-test-run.mjs via this env var:
+        # foundry-test.mjs forwards process.env to the run script but not extra argv.
         env:
           FOUNDRY_SKIP_BUILD: '1'
+          FOUNDRY_ALLOWED_CONSOLE_ERROR_PATTERNS: ${{ inputs.allowed_console_error_patterns }}
         run: npm run test:foundry
 
       - name: Upload test artifacts
