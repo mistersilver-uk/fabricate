@@ -1,0 +1,178 @@
+name: "Release"
+
+# The SOLE producer of the private early-access channel (issue #627, task 3.3).
+#
+# Triggered by a push to `release` or a hotfix line (`N.N.x`). semantic-release mints the STABLE
+# version for the pushed commit (drafted GitHub release + assets), then the reusable release-s3.yml
+# publishes it to the channel:
+#   * on `release`  → the private `early-access` channel;
+#   * on a hotfix `N.N.x` → that line's OWN channel (`${{ github.ref_name }}`), NEVER early-access —
+#     a hotfix must not be offered to patrons.
+# NOTHING is made public here: the GitHub release is a DRAFT and only a private channel gets the
+# artefact. The public promotion (task 3.5) un-drafts it later.
+#
+# WHY push-triggered, not dispatched from `main`: GITHUB_REF_NAME / GITHUB_REF are RESERVED and a
+# step `env:` override is silently ignored. A push to `release` (or `N.N.x`) makes both naturally
+# equal to that branch, so release.config.js's classifyBranch and semantic-release's env-ci both see
+# the right line and mint a STABLE draft. A run dispatched from `main` would compute a `-beta.N` off
+# the wrong branch and create no draft.
+#
+# RE-ENTRY (workflow_dispatch with `tag`): a push run can succeed at semantic-release (the tag and
+# draft exist) yet fail the S3 publish — leaving the channel WITHOUT the version, which makes the
+# promotion guard refuse forever. Re-dispatch this workflow WITH THE REF SET TO THE BRANCH BEING
+# PUBLISHED (`--ref release` or `--ref N.N.x`) and pass the already-minted `tag`; it skips
+# tests/smoke/semantic-release and re-runs only the publish. The ref drives channel selection, so it
+# must match the line the tag came from.
+
+on:
+  push:
+    branches:
+      - release
+      - '[0-9]+.[0-9]+.x'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Re-entry only: an already-minted stable tag to (re)publish (e.g. v1.4.0). Dispatch with --ref set to the branch that produced it."
+        required: true
+        type: string
+
+concurrency:
+  # Do NOT cancel an in-progress release: a cancelled run can leave a minted tag unpublished. The
+  # re-entry path exists to recover that, but we avoid creating the situation in the first place.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  unit-tests:
+    # Push mode only. The re-entry re-publishes an already-tested, already-minted tag.
+    if: ${{ inputs.tag == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm test
+      - run: npm run build
+
+  smoke-test:
+    needs: unit-tests
+    if: ${{ inputs.tag == '' }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/foundry-integration.yml
+    # require_credentials: true makes the smoke job FAIL (not skip green) when Foundry credentials
+    # are unset — a stable release must never ship on a build whose smoke test silently did not run.
+    with:
+      require_credentials: true
+    secrets: inherit
+
+  semantic-release:
+    needs: smoke-test
+    if: ${{ inputs.tag == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      next_version: ${{ steps.semrel.outputs.next_version }}
+      next_tag: ${{ steps.semrel.outputs.next_tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Create the local branches semantic-release validates
+        # semantic-release expands its configured branches against ORIGIN's branches, then runs
+        # `git tag --merged <name>` per match. On a `release` (or `N.N.x`) checkout, `main` — and the
+        # other lines — are NOT local refs, so semantic-release dies with
+        # `fatal: malformed object name <name>` unless each exists locally. This is beta.yml's loop
+        # EXTENDED to include `main`: a release build validates `main`, `release`, AND every `N.N.x`
+        # hotfix line (the config glob is `+([0-9]).+([0-9]).x`, i.e. two numeric parts). The
+        # checked-out branch is already a local ref (it is HEAD), and force-updating a checked-out
+        # branch errors, so it is skipped.
+        run: |
+          CURRENT=$(git rev-parse --abbrev-ref HEAD)
+          git fetch origin --tags --force
+          for b in $(git ls-remote --heads origin \
+            | sed 's#.*refs/heads/##' \
+            | grep -E '^(main|release|[0-9]+\.[0-9]+\.x)$'); do
+            if [ "$b" = "$CURRENT" ]; then
+              echo "Skipping $b (checked out — already a local ref)"
+              continue
+            fi
+            echo "Creating local ref for origin/$b"
+            git fetch origin "+refs/heads/$b:refs/remotes/origin/$b" --force
+            git branch -f "$b" "origin/$b"
+          done
+
+      - name: Semantic Release
+        id: semrel
+        # GITHUB_REF_NAME / GITHUB_REF are reserved and cannot be overridden by a step `env:`; they
+        # are naturally `release` (or the hotfix `N.N.x`) here because this workflow is push-triggered
+        # on those branches, which is what keeps classifyBranch on the STABLE line and loads the
+        # (drafted) @semantic-release/github plugin. The config's successCmd writes
+        # next_version/next_tag to this step's $GITHUB_OUTPUT, but ONLY when a release is minted.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+  publish-s3:
+    needs: semantic-release
+    # Runs in BOTH modes. Push mode: publish the just-minted tag when semantic-release produced one.
+    # Re-entry: publish the supplied tag (semantic-release is skipped, so `always()` is required to
+    # get past the skipped need).
+    if: ${{ always() && (inputs.tag != '' || needs.semantic-release.outputs.next_version != '') }}
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/release-s3.yml
+    with:
+      # Re-entry supplies the tag; push mode reads it from semantic-release's output.
+      tag: ${{ inputs.tag != '' && inputs.tag || needs.semantic-release.outputs.next_tag }}
+      # early-access on `release`; the hotfix line's own channel on `N.N.x`. A hotfix MUST NEVER
+      # publish to early-access — github.ref_name is the hotfix branch name, which is its channel.
+      channel: ${{ github.ref_name == 'release' && 'early-access' || github.ref_name }}
+      check_heads: false
+      dry_run: false
+      overwrite: false
+    secrets:
+      # Reusable workflows do not inherit repo secrets. early-access derives its tester feed from
+      # S3_EARLY_ACCESS_PATH_SECRET; S3_TESTER_PATH_SECRET is forwarded because release-s3.yml
+      # declares it. A hotfix channel is undeclared and has no tester group, so it needs neither.
+      S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+      S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+
+  verify-publish:
+    needs: [semantic-release, publish-s3]
+    if: ${{ always() && (inputs.tag != '' || needs.semantic-release.outputs.next_version != '') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Assert the S3 publish succeeded
+        # The channel publish is the guarantee that the promotion's guard can later confirm the
+        # version. A minted-but-unpublished tag is the exact failure the re-entry path recovers.
+        env:
+          PUBLISH_RESULT: ${{ needs.publish-s3.result }}
+          RELEASE_TAG: ${{ inputs.tag != '' && inputs.tag || needs.semantic-release.outputs.next_tag }}
+        run: |
+          if [ "$PUBLISH_RESULT" != "success" ]; then
+            echo "::error::$RELEASE_TAG was minted/selected but the S3 publish did not succeed (result=$PUBLISH_RESULT)."
+            echo "::error::Re-run this workflow via workflow_dispatch with --ref set to this branch and tag=$RELEASE_TAG to recover."
+            exit 1
+          fi
+          echo "$RELEASE_TAG published to its channel; the channel head now advertises it."
