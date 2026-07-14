@@ -1,0 +1,677 @@
+name: "Promote to Public"
+
+# The RELEASE PROMOTION (issue #627, task 3.5): move an already-minted STABLE version to the public
+# channel and the Foundry package registry. It mints NOTHING and creates no tag — the version already
+# exists (semantic-release drafted it on `release` or a hotfix line and published it to a private
+# channel). This workflow is the ONLY thing that makes a version publicly obtainable, and the un-draft
+# (`gh release edit --draft=false`) is the single irreversible step.
+#
+# It promotes a release-line version AND a hotfix version — TOLD which by `source_channel`, never
+# inferring it. `source_channel: early-access` is a release-line promotion; `source_channel: N.N.x` is
+# a hotfix promotion. "The early-access head does not advertise this version, therefore it is a
+# hotfix" is exactly the inference that fails OPEN, so the guard VERIFIES the label instead.
+#
+# ── FOUR-JOB CHAIN ──────────────────────────────────────────────────────────────────────────────
+#   guard → forward-port → publish → readback-preflight-undraft-register
+#
+# Jobs 2 (forward-port) and 3 (publish) carry NO job-level `if:` — a *skipped* job leaves
+# `result == 'skipped'`, and job 4's strict `if:` (VERBATIM from the issue) rejects anything but
+# `success`. So both jobs ALWAYS run and gate their mutations at STEP level (`if: ${{ !inputs.dry_run }}`),
+# printing their plan otherwise. Job 4 also RUNS on a dry run: its read-back / asset / payload steps
+# run and print, but every MUTATING step in it — the un-draft and the registry POST — is step-gated
+# on `!dry_run`. Everything that can fail precedes the un-draft.
+#
+# ── RE-PUBLISH, NEVER AN S3 CopyObject ──────────────────────────────────────────────────────────
+# The public S3 write RE-STAGES from the built `dist` via scripts/release-s3.js. A COPY of a private
+# channel's zip/manifest into `public/` would bake the SECRET cohort URL into the public artefact:
+# Foundry's `sidegrade` rewrites an installed client's own `manifest`/`download` from the fetched
+# channel manifest, so a public installer would be silently re-pointed onto the private feed.
+#
+# ── HOW CI LEARNS THE REGISTRY-LEAD NUMBER (design decision, deferred by the plan) ───────────────
+# The registry-lead check reads the PRIVATE S3 heads (`beta`, `early-access`) with the existing S3
+# getObject reader and compares each to the version being promoted with `foundryIsNewerVersion`: a
+# private head Foundry-older than `version` is the defection risk, because once `version` is on the
+# registry that cohort would be offered a rewrite out of its private channel. This chunk adds NO live
+# foundryvtt.com reader. Instead it uses the `public` S3 head as a proxy for the registry version,
+# which is faithful because this workflow is the only thing that sets BOTH the public S3 head (job 3)
+# and the registry (job 4): a POST that failed after the public write is exactly the workflow_dispatch
+# re-run case. KNOWN LIMITATION: a true foundryvtt.com `/_api/packages/get` read is a later hardening;
+# until then the comparison operand is `version` itself (the about-to-be-published registry version),
+# not a number fetched from the registry.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable version to make public (e.g. 1.5.0). Its tag v<version> and draft must already exist."
+        required: true
+        type: string
+      source_channel:
+        description: "The private channel this version was published to: early-access (release line) or N.N.x (hotfix line)."
+        required: false
+        type: string
+        default: early-access
+      dry_run:
+        description: "Dry run: all four jobs run, but every mutating step no-ops and prints its plan (no push, no S3 write, no un-draft, no registry POST)."
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  # Never promote the same version twice at once. Do NOT cancel in progress — a half-run promotion is
+  # re-run to completion, not abandoned.
+  group: promote-public-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  # ── JOB 1: GUARD ────────────────────────────────────────────────────────────────────────────────
+  # Everything that can be checked cheaply, checked here, before anything is pushed or published.
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      # Armed only for a release-line promotion whose beta head lags `version`; job 3 does the catch-up.
+      catchup_beta: ${{ steps.checks.outputs.catchup_beta }}
+      # The public head BEFORE this promotion — the lower bound for aggregating superseded drafts'
+      # notes in job 4, and the re-run signal for job 3's public write (prev_public == version ⇒ skip).
+      prev_public: ${{ steps.checks.outputs.prev_public }}
+      is_hotfix: ${{ steps.checks.outputs.is_hotfix }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate the inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE_CHANNEL: ${{ inputs.source_channel }}
+        run: |
+          # A release promotion promotes a STABLE version only (no prerelease identifier).
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::version '$VERSION' is not a stable M.N.P version — a release promotion never promotes a prerelease."
+            exit 1
+          fi
+          # source_channel is either the release line's channel or a hotfix line (N.N.x). NOT beta:
+          # a version never jumps straight from beta to public.
+          if [ "$SOURCE_CHANNEL" != "early-access" ] && ! echo "$SOURCE_CHANNEL" | grep -qE '^[0-9]+\.[0-9]+\.x$'; then
+            echo "::error::source_channel '$SOURCE_CHANNEL' must be 'early-access' (release line) or an 'N.N.x' hotfix line."
+            exit 1
+          fi
+          echo "Promoting v$VERSION from source channel '$SOURCE_CHANNEL'."
+
+      - name: Assert the tag and its draft exist
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin --tags --force
+          if ! git tag -l "v$VERSION" | grep -q .; then
+            echo "::error::Tag 'v$VERSION' does not exist — a release promotion mints nothing, so the tag must already exist."
+            exit 1
+          fi
+          # The draft was created by semantic-release when the version's branch built it. Without it
+          # there is nothing to un-draft.
+          if ! gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::No GitHub release (draft) exists for 'v$VERSION'."
+            exit 1
+          fi
+          echo "Tag v$VERSION and its GitHub release exist."
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Configure AWS credentials via OIDC
+        # The guard reads private S3 heads (source channel + the registry-lead heads of beta and
+        # early-access), so it needs credentials on EVERY run, dry runs included.
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify source_channel, assert the source advertises the version, and read the registry-lead heads
+        id: checks
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE_CHANNEL: ${{ inputs.source_channel }}
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+          # Both tester secrets: the guard enumerates every private target of beta AND early-access,
+          # and each channel derives its tester manifest key from its OWN secret.
+          S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+          S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, appendFile } from 'node:fs/promises';
+          import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+          import { deriveS3Layout, resolveChannelConfig } from './scripts/release-s3.js';
+          import { foundryIsNewerVersion } from './scripts/lib/semver.js';
+
+          const version = process.env.VERSION;
+          const sourceChannel = process.env.SOURCE_CHANNEL;
+          const isHotfix = sourceChannel !== 'early-access';
+
+          const config = JSON.parse(await readFile('release.s3.config.json', 'utf8'));
+          const moduleId = config.moduleId;
+          const bucket = process.env.S3_RELEASE_BUCKET || config.bucket;
+          const baseUrl = process.env.RELEASE_BASE_URL || config.baseUrl;
+          const s3 = new S3Client({ region: process.env.AWS_REGION });
+
+          const fail = (msg) => {
+            console.error(`::error::${msg}`);
+            process.exit(1);
+          };
+
+          // Read one manifest's advertised version. NEVER prints the key — a tester key carries the
+          // secret path segment. A 404 is an absent head (null); any other failure is fatal.
+          const readHead = async (key, label) => {
+            try {
+              const res = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+              return JSON.parse(await res.Body.transformToString()).version ?? null;
+            } catch (error) {
+              const status =
+                error?.$metadata?.httpStatusCode ??
+                (error?.name === 'NoSuchKey' || error?.name === 'NotFound' ? 404 : null);
+              if (status === 404) return null;
+              fail(`could not read the head of ${label} (${error?.name || 'Error'}) — this is a storage error, not an absent head. Grant s3:GetObject/s3:ListBucket and re-run.`);
+            }
+          };
+
+          // Every private target of a channel: the channel manifest AND each tester manifest, derived
+          // the SAME way release-s3.js publishes them, so a partial publish cannot slip past a
+          // channel-only check.
+          const targetsFor = (channel) => {
+            const cc = resolveChannelConfig(config, channel);
+            const secretEnv = cc.testerSecretEnv;
+            const seg = (secretEnv ? process.env[secretEnv] || '' : '').replace(/^\/+|\/+$/g, '');
+            if (cc.testerGroups.length > 0 && !seg) {
+              fail(`channel "${channel}" declares ${cc.testerGroups.length} tester group(s) but ${secretEnv} is unset — cannot enumerate its private targets.`);
+            }
+            return deriveS3Layout({ moduleId, channel, version, baseUrl, testerGroups: cc.testerGroups, testerSegment: seg }).targets;
+          };
+
+          const channelHeadKey = (channel) =>
+            deriveS3Layout({ moduleId, channel, version, baseUrl, testerGroups: [], testerSegment: '' }).channelTarget.manifestKey;
+
+          // 1. VERIFY source_channel against the early-access head. A hotfix that early-access already
+          //    advertises is really a release-line version (mislabelled); an early-access promotion
+          //    whose version early-access does NOT advertise is mislabelled the other way.
+          const eaHead = await readHead(channelHeadKey('early-access'), 'channel-early-access');
+          const eaAdvertises = eaHead === version;
+          if (isHotfix && eaAdvertises) {
+            fail(`source_channel names the hotfix line '${sourceChannel}', but early-access already advertises v${version} — this is a release-line version. Re-run with source_channel=early-access.`);
+          }
+          if (!isHotfix && !eaAdvertises) {
+            fail(`source_channel=early-access, but early-access advertises v${eaHead ?? '(none)'}, not v${version}. Refusing to promote a version its named source channel has not received.`);
+          }
+
+          // 2. ASSERT the source channel advertises the version across EVERY private target.
+          for (const target of targetsFor(sourceChannel)) {
+            const head = await readHead(target.manifestKey, target.label);
+            if (head !== version) {
+              fail(`source target ${target.label} advertises v${head ?? '(none)'}, not v${version} — this version's publish to '${sourceChannel}' did not complete (stale head). Refusing to promote.`);
+            }
+            console.log(`source target ${target.label} advertises v${version} ✓`);
+          }
+
+          // 3. REGISTRY-LEAD read: no private target of beta OR early-access may end up Foundry-older
+          //    than the version about to reach the registry, or that cohort is offered a rewrite out
+          //    of its private channel. A lagging beta ARMS the catch-up for a release-line version;
+          //    a lagging private head on a HOTFIX has no catch-up (publishing the hotfix there would
+          //    move that head to a lower line) and HARD-FAILS before the POST.
+          let catchupBeta = false;
+          for (const channel of ['beta', 'early-access']) {
+            for (const target of targetsFor(channel)) {
+              const head = await readHead(target.manifestKey, target.label);
+              if (head === null) continue; // an absent private head advertises nothing older.
+              if (!foundryIsNewerVersion(version, head)) continue; // head is equal-or-newer: safe.
+              if (isHotfix) {
+                fail(`registry-lead: ${channel} target ${target.label} advertises v${head}, which Foundry considers OLDER than the hotfix v${version} being promoted to the registry. Its cohort would be offered a rewrite to public. Advance '${channel}' past v${version} first, then re-run.`);
+              } else if (channel === 'beta') {
+                catchupBeta = true;
+                console.log(`beta target ${target.label} advertises v${head}, older than v${version} — arming the beta catch-up.`);
+              } else {
+                fail(`registry-lead: early-access target ${target.label} advertises v${head}, older than v${version} on a release-line promotion whose source is early-access. This should be impossible after step 2 — refusing.`);
+              }
+            }
+          }
+
+          // 4. Current public head = the registry proxy and the lower bound for superseded notes.
+          const prevPublic = (await readHead(channelHeadKey('public'), 'channel-public')) ?? '';
+
+          await appendFile(
+            process.env.GITHUB_OUTPUT,
+            `catchup_beta=${catchupBeta}\nprev_public=${prevPublic}\nis_hotfix=${isHotfix}\n`
+          );
+          console.log(`Guard passed. catchup_beta=${catchupBeta} prev_public=${prevPublic || '(none)'} is_hotfix=${isHotfix}`);
+          NODE
+
+  # ── JOB 2: FORWARD-PORT ─────────────────────────────────────────────────────────────────────────
+  # ALWAYS runs (no job-level `if:`). For a release-line version it merges `release` into `main` via
+  # the bypass App token (release-line only), so `main`'s next beta is numbered above the released
+  # version. A hotfix no-ops at STEP level; a re-run no-ops (release already an ancestor of main).
+  forward-port:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Explain a step-level no-op
+        if: ${{ inputs.dry_run || inputs.source_channel != 'early-access' }}
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          SOURCE_CHANNEL: ${{ inputs.source_channel }}
+        run: |
+          if [ "$SOURCE_CHANNEL" != "early-access" ]; then
+            echo "::notice::forward-port is a no-op for the hotfix line '$SOURCE_CHANNEL' — a hotfix leaves its line by cherry-pick, never a release→main merge."
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::DRY RUN — would merge origin/release into main via the bypass App token (release-line only) unless already forward-ported."
+          fi
+
+      - uses: actions/checkout@v6
+        if: ${{ !inputs.dry_run && inputs.source_channel == 'early-access' }}
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Mint an App installation token (bypass actor + workflow trigger)
+        id: apptoken
+        if: ${{ !inputs.dry_run && inputs.source_channel == 'early-access' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_KEY }}
+
+      - name: Forward-port release into main
+        if: ${{ !inputs.dry_run && inputs.source_channel == 'early-access' }}
+        env:
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          git fetch origin main release --force
+          git checkout -B main origin/main
+          # Re-run safety: if release's tip is already an ancestor of main, the forward-port has
+          # already happened. No-op rather than create an empty merge.
+          if git merge-base --is-ancestor origin/release origin/main; then
+            echo "::notice::release is already an ancestor of main — forward-port already done, no-op."
+            exit 0
+          fi
+          git config user.name "fabricate-release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          # The push MUST use the App token, not the default GITHUB_TOKEN:
+          #   1. GITHUB_TOKEN pushes do not trigger downstream workflows (beta.yml on push:[main]).
+          #   2. The App token is the ruleset bypass actor, so required_linear_history on main (which
+          #      forbids the --no-ff merge commit this creates) still lets it push.
+          # actions/checkout left an http.extraheader carrying the default GITHUB_TOKEN; clear it or
+          # it overrides the App token in the remote URL.
+          git config --unset-all http.https://github.com/.extraheader || true
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # --no-ff, NEVER a squash: `release` carries semantic-release's tags and notes.
+          git merge --no-ff origin/release -m "chore: forward-port release into main after promoting v${VERSION}"
+          git push origin HEAD:main
+          echo "Merged release into main and pushed (triggers beta.yml)."
+
+  # ── JOB 3: PUBLISH ──────────────────────────────────────────────────────────────────────────────
+  # ALWAYS runs (no job-level `if:`). RE-STAGES from the built dist via release-s3.js, never an S3
+  # copy. The public write skips at STEP level when the public head already advertises the version
+  # (re-run safety, driven off guard.prev_public). NO early-access re-publish. The beta catch-up runs
+  # only when armed by the guard's fresh per-target read (which requires a strict backward gap, so an
+  # equal head is never armed).
+  publish:
+    # Linear chain: waits for forward-port so the release line is merged into main BEFORE the beta
+    # catch-up writes the (prerelease) beta channel — "forward-port before any prerelease channel is
+    # written" (Version authority and promotion mechanics). A failed/skipped forward-port skips this
+    # job, which then fails job 4's strict `if:` — the un-draft is never reached.
+    needs: [guard, forward-port]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Dry run — print the publish plan
+        if: ${{ inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          CATCHUP_BETA: ${{ needs.guard.outputs.catchup_beta }}
+          PREV_PUBLIC: ${{ needs.guard.outputs.prev_public }}
+        run: |
+          echo "::notice::DRY RUN — no S3 write."
+          if [ "$PREV_PUBLIC" = "$VERSION" ]; then
+            echo "Would SKIP the public write: the public head already advertises v$VERSION (re-run)."
+          else
+            echo "Would RE-STAGE v$VERSION from the built dist and publish it to the 'public' channel (node scripts/release-s3.js --version $VERSION --channel public)."
+          fi
+          if [ "$CATCHUP_BETA" = "true" ]; then
+            echo "Would run the beta catch-up: publish v$VERSION to 'beta' (it lags the version reaching the registry)."
+          else
+            echo "No beta catch-up (not armed)."
+          fi
+
+      - uses: actions/checkout@v6
+        if: ${{ !inputs.dry_run }}
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        if: ${{ !inputs.dry_run }}
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: ${{ !inputs.dry_run }}
+
+      - name: Configure AWS credentials via OIDC
+        if: ${{ !inputs.dry_run }}
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Public already advertises the version (re-run) — skip the write
+        if: ${{ !inputs.dry_run && needs.guard.outputs.prev_public == inputs.version }}
+        env:
+          VERSION: ${{ inputs.version }}
+        run: echo "::notice::The public head already advertises v$VERSION (guard reported prev_public == version) — skipping the public write for re-run safety."
+
+      - name: Re-stage and publish the version to the public channel
+        if: ${{ !inputs.dry_run && needs.guard.outputs.prev_public != inputs.version }}
+        env:
+          VERSION: ${{ inputs.version }}
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+        run: |
+          # Build from the tested commit, then re-stage per target (release-s3.js), NEVER an S3 copy.
+          # 'public' has no tester group, so this is exactly one target: the public sources feed.
+          git checkout "v$VERSION"
+          node scripts/release-s3.js --version "$VERSION" --channel public
+
+      - name: Beta catch-up (release-line only, armed by the guard)
+        if: ${{ !inputs.dry_run && needs.guard.outputs.catchup_beta == 'true' }}
+        env:
+          VERSION: ${{ inputs.version }}
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+          # beta derives its tester manifest from its OWN secret.
+          S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+        run: |
+          # Armed only when a fresh per-target read found beta strictly Foundry-older than v$VERSION,
+          # so this is a forward move; release-s3.js's own head guard still refuses any backward one.
+          git checkout "v$VERSION"
+          echo "Advancing the beta head to v$VERSION so it is not left behind the registry."
+          node scripts/release-s3.js --version "$VERSION" --channel beta
+
+  # ── JOB 4: READBACK → PREFLIGHT → UN-DRAFT → REGISTER ───────────────────────────────────────────
+  # The `if:` is VERBATIM from the issue: no `inputs.dry_run` disjunct, so a *skipped* job 2/3 (which
+  # never happens — they have no job-level `if:`) could not reach the irreversible step. Job 4 itself
+  # RUNS on a dry run; its read-back / asset / payload steps run and print, and only the un-draft and
+  # the registry POST are step-gated on `!dry_run`.
+  readback-preflight-undraft-register:
+    needs: [guard, forward-port, publish]
+    if: >-
+      always()
+      && needs.guard.result == 'success'
+      && needs.forward-port.result == 'success'
+      && needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: mkdir -p /tmp/promote
+
+      - name: Configure AWS credentials via OIDC
+        # Only the read-back reads S3, and it is a real-run verification of job 3's writes.
+        if: ${{ !inputs.dry_run }}
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Read back the public manifests written
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+          import { deriveS3Layout } from './scripts/release-s3.js';
+
+          const version = process.env.VERSION;
+          const config = JSON.parse(await readFile('release.s3.config.json', 'utf8'));
+          const bucket = process.env.S3_RELEASE_BUCKET || config.bucket;
+          const baseUrl = process.env.RELEASE_BASE_URL || config.baseUrl;
+          const s3 = new S3Client({ region: process.env.AWS_REGION });
+
+          // public has no tester group, so its only private-free target is the channel sources feed.
+          const { targets } = deriveS3Layout({ moduleId: config.moduleId, channel: 'public', version, baseUrl, testerGroups: [], testerSegment: '' });
+          for (const target of targets) {
+            const res = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: target.manifestKey }));
+            const advertised = JSON.parse(await res.Body.transformToString()).version;
+            if (advertised !== version) {
+              console.error(`::error::public target ${target.label} advertises v${advertised}, not v${version} after the publish. Refusing to un-draft.`);
+              process.exit(1);
+            }
+            console.log(`public target ${target.label} advertises v${version} ✓`);
+          }
+          NODE
+
+      - name: Download the promoted release's module.json asset
+        # Works on a draft for an authorised token, so it runs on a dry run too — validating the draft
+        # exists and carries the asset the payload is built from.
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v$VERSION" --pattern module.json --dir /tmp/promote --clobber
+          echo "Downloaded v$VERSION module.json:"
+          cat /tmp/promote/module.json
+
+      - name: Assert BOTH release assets exist
+        # @semantic-release/github ignores an unreadable asset and publishes anyway, so confirm the
+        # zip AND the module.json are both attached before making the release public.
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ASSETS=$(gh release view "v$VERSION" --json assets --jq '.assets[].name')
+          echo "Attached assets:"
+          echo "$ASSETS"
+          for expected in "module.json" "fabricate-v$VERSION.zip"; do
+            if ! echo "$ASSETS" | grep -Fqx "$expected"; then
+              echo "::error::release v$VERSION is missing the '$expected' asset. Refusing to un-draft."
+              exit 1
+            fi
+          done
+          echo "Both required assets are present."
+
+      - name: Aggregate superseded drafts' notes into this release's body
+        # BOUNDED predicate: only STABLE drafts, STRICTLY between the current public version and the
+        # version being promoted, and ON THE LINE being promoted. An unbounded sweep pulls an in-flight
+        # hotfix draft (a v1.4.2 minted but not promoted is a draft lower than a release-line v1.6.0)
+        # into an unrelated release and duplicates its notes when 1.4.2 is itself promoted. Consumed
+        # drafts are LEFT drafted; their tags remain the record.
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE_CHANNEL: ${{ inputs.source_channel }}
+          PREV_PUBLIC: ${{ needs.guard.outputs.prev_public }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          import { compareSemver, parseSemver } from './scripts/lib/semver.js';
+
+          const version = process.env.VERSION;
+          const sourceChannel = process.env.SOURCE_CHANNEL;
+          const isHotfix = sourceChannel !== 'early-access';
+          const prevPublic = process.env.PREV_PUBLIC || '';
+          const repo = process.env.GITHUB_REPOSITORY;
+
+          const releases = JSON.parse(execSync(`gh api repos/${repo}/releases --paginate`, { encoding: 'utf8' }));
+          const tagVersion = (tag) => (typeof tag === 'string' && tag.startsWith('v') ? tag.slice(1) : tag);
+          const majorMinor = (parsed) => `${parsed.major}.${parsed.minor}`;
+
+          // The promoted version's own release, and its own notes body.
+          const promoted = releases.find((r) => r.tag_name === `v${version}`);
+          const ownBody = (promoted?.body || '').trim();
+
+          const prevMM = prevPublic ? majorMinor(parseSemver(prevPublic) ?? { major: -1, minor: 0 }) : null;
+          const sourceMM = isHotfix ? sourceChannel.replace(/\.x$/, '') : null;
+
+          const onLine = (parsed) => {
+            if (isHotfix) return majorMinor(parsed) === sourceMM; // the hotfix line's own patches only.
+            // A release-line draft is a genuinely newer minor/major than the current public line — NOT
+            // a patch of an already-released line (which is a hotfix line). With no prior public
+            // version, every stable draft below `version` is release-line (no hotfix line can exist).
+            if (prevMM === null) return true;
+            return compareSemver(`${majorMinor(parsed)}.0`, `${prevMM}.0`) > 0;
+          };
+
+          const superseded = releases
+            .filter((r) => r.draft === true && typeof r.tag_name === 'string')
+            .map((r) => ({ release: r, parsed: parseSemver(tagVersion(r.tag_name)) }))
+            .filter(({ parsed }) => parsed && parsed.prerelease.length === 0) // STABLE only.
+            .filter(({ release }) => release.tag_name !== `v${version}`)
+            .filter(({ release }) => compareSemver(tagVersion(release.tag_name), version) < 0) // below the promoted version.
+            .filter(({ release }) => !prevPublic || compareSemver(tagVersion(release.tag_name), prevPublic) > 0) // strictly above current public.
+            .filter(({ parsed }) => onLine(parsed))
+            .sort((a, b) => compareSemver(tagVersion(a.release.tag_name), tagVersion(b.release.tag_name)) ?? 0);
+
+          let notes = ownBody;
+          for (const { release } of superseded) {
+            const body = (release.body || '').trim();
+            console.log(`Aggregating superseded draft ${release.tag_name} into v${version}'s notes.`);
+            notes += `\n\n## ${release.tag_name}\n\n${body || '(no notes)'}`;
+          }
+          if (superseded.length === 0) {
+            console.log('No superseded stable drafts to aggregate on this line.');
+          }
+          writeFileSync('/tmp/promote/release-notes.md', `${notes}\n`);
+          NODE
+          echo "----- Release notes (preview) -----"
+          cat /tmp/promote/release-notes.md
+
+      - name: Build and validate the registry payload
+        # NOT mutating — runs on a dry run and prints. The `manifest` is CONSTRUCTED from the version,
+        # NEVER read from the artefact's own `manifest` field (which is the latest-release URL). Only
+        # id/version/compatibility come from the artefact; minimum/verified must be non-empty; maximum
+        # is OMITTED when empty. Kept SEPARATE from the POST so a bad record fails here, before the
+        # un-draft, on every run.
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          MODJSON=/tmp/promote/module.json
+          ID=$(jq -r '.id' "$MODJSON")
+          BUILT_VERSION=$(jq -r '.version' "$MODJSON")
+          MIN=$(jq -r '.compatibility.minimum // ""' "$MODJSON")
+          VERIFIED=$(jq -r '.compatibility.verified // ""' "$MODJSON")
+          MAX=$(jq -r '.compatibility.maximum // ""' "$MODJSON")
+
+          if [ "$BUILT_VERSION" != "$VERSION" ]; then
+            echo "::error::artefact version '$BUILT_VERSION' does not match the version being promoted '$VERSION'."
+            exit 1
+          fi
+          if [ -z "$MIN" ] || [ -z "$VERIFIED" ]; then
+            echo "::error::registry compatibility requires a non-empty minimum AND verified (min='$MIN' verified='$VERIFIED')."
+            exit 1
+          fi
+
+          # Version-pinned, CONSTRUCTED from the version — not the artefact's latest-release manifest.
+          MANIFEST="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/module.json"
+          NOTES="https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
+
+          if [ -n "$MAX" ]; then
+            COMPAT=$(jq -n --arg min "$MIN" --arg verified "$VERIFIED" --arg max "$MAX" \
+              '{minimum: $min, verified: $verified, maximum: $max}')
+          else
+            # maximum OMITTED entirely: a set integer maximum renders the module unavailable on the
+            # next Foundry generation.
+            COMPAT=$(jq -n --arg min "$MIN" --arg verified "$VERIFIED" \
+              '{minimum: $min, verified: $verified}')
+          fi
+
+          jq -n \
+            --arg id "$ID" \
+            --arg version "$VERSION" \
+            --arg manifest "$MANIFEST" \
+            --arg notes "$NOTES" \
+            --argjson compatibility "$COMPAT" \
+            '{id: $id, "dry-run": false, release: {version: $version, manifest: $manifest, notes: $notes, compatibility: $compatibility}}' \
+            > /tmp/promote/payload.json
+
+          echo "Registry payload (validated):"
+          cat /tmp/promote/payload.json
+
+      - name: Un-draft the release (make it public — THE irreversible step)
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "v$VERSION" \
+            --draft=false \
+            --latest \
+            --verify-tag \
+            --notes-file /tmp/promote/release-notes.md
+          echo "::notice::Un-drafted v$VERSION and marked it latest. It is now publicly obtainable."
+
+      - name: Dry run — un-draft plan (skipped)
+        if: ${{ inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          echo "::notice::DRY RUN — would run the irreversible un-draft:"
+          echo "gh release edit v$VERSION --draft=false --latest --verify-tag --notes-file /tmp/promote/release-notes.md"
+
+      - name: Publish to the Foundry VTT package release API
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          FOUNDRY_RELEASE_TOKEN: ${{ secrets.FVTT_PKG_RELEASE_TOKEN }}
+        run: |
+          API="https://foundryvtt.com/_api/packages/release_version/"
+          if [ -z "${FOUNDRY_RELEASE_TOKEN:-}" ]; then
+            echo "::error::FVTT_PKG_RELEASE_TOKEN secret is not configured."
+            exit 1
+          fi
+          echo "Publishing v$VERSION to the Foundry package release API..."
+          HTTP=$(curl -sS -o /tmp/promote/fvtt-resp.json -w '%{http_code}' -X POST "$API" \
+            -H "Authorization: ${FOUNDRY_RELEASE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data @/tmp/promote/payload.json)
+          echo "HTTP ${HTTP}"
+          cat /tmp/promote/fvtt-resp.json 2>/dev/null || true
+          echo ""
+          STATUS=$(jq -r '.status // ""' /tmp/promote/fvtt-resp.json 2>/dev/null || echo "")
+          if [ "$HTTP" = "200" ] && [ "$STATUS" = "success" ]; then
+            echo "::notice::Published v$VERSION to the Foundry package registry."
+          else
+            echo "::error::Foundry publish failed (HTTP ${HTTP})."
+            exit 1
+          fi
+
+      - name: Dry run — registry POST plan (skipped)
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "::notice::DRY RUN — would POST the validated payload to https://foundryvtt.com/_api/packages/release_version/ (token in the Authorization header only):"
+          cat /tmp/promote/payload.json
