@@ -5356,13 +5356,21 @@ async function main() {
             delete payloadSystem.id; // copy mode strips ids anyway; be explicit
             const components = Array.isArray(payloadSystem.components) ? payloadSystem.components : [];
             const base = components[0] ? JSON.parse(JSON.stringify(components[0])) : {};
+            // The orphan is a CLONE of a real component, so it inherits that
+            // component's source references and MUST overwrite every one of them.
+            // These are the post-issue-560 names (`registeredItemUuid` /
+            // `originItemUuid` / `aliasItemUuids`); writing only the retired
+            // `sourceItemUuid` / `sourceUuid` / `fallbackItemIds` left the clone
+            // pointing at the SAME real Item as its base, so two components claimed
+            // one source, the import failed closed ("... is claimed by both ..."),
+            // and the report dialog this step waits for never rendered.
             const orphan = {
               ...base,
               id: 'smoke-import-report-orphan',
               name: 'Smoke Orphan Reagent',
-              sourceItemUuid: 'Item.fabricateSmokeMissing0001',
-              sourceUuid: 'Item.fabricateSmokeMissing0001',
-              fallbackItemIds: [],
+              registeredItemUuid: 'Item.fabricateSmokeMissing0001',
+              originItemUuid: 'Item.fabricateSmokeMissing0001',
+              aliasItemUuids: [],
             };
             payloadSystem.components = [...components, orphan];
             const payload = {
