@@ -43,6 +43,9 @@ The high-signal symptom is an entity stuck in a validation-error state the UI of
 - Confirm new tests are actually gated by `npm test`, not merely passing in isolation.
 The `test` script in `package.json` globs a fixed set of directories; a test in a directory the glob omits never runs in CI even though `node --test <file>` passes.
 When reviewing added tests, verify the directory is in the glob and that `npm test`'s total count rose — do not certify coverage by running a file directly.
+- Mutation-test the COMPOSITION, not only the pure helper.
+A suite can pin `f()`'s logic while the handler, `main()`, or `if (!dryRun)` branch that must CALL `f()` is never exercised — so mutate the call site (delete the call, invert its condition, swap its branches) and confirm a test flips to FAIL.
+A mutation that survives with the pure-helper tests still green is a test-gap finding: the logic is proven, the capability is not (e.g. a waiver predicate is unit-tested but the console/`pageerror` handler that must route through it is not, so making the handler ignore the predicate ships green).
 - For UI screenshots, check first visible state, clipping, spacing, alignment, image fidelity, scroll containment, button visibility, and responsive window sizes.
 - Flag a validation gap when an image UI screenshot only exercises fallback art but the feature depends on linked scene, item, or external imagery.
 - For UI-changing PRs, treat unrelated image markdown, artifact names, and file lists as missing normal evidence.
@@ -53,8 +56,8 @@ PR-scoped screenshots are collected under `tmp/pr-screenshots/<number>/` (local 
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster paths when previews need imagery; invented SVG preview art should be flagged.
 - Prefer pointer hit-testing over DOM presence for overlays, menus, disabled states, card bodies, and icon-only controls.
 - Treat port conflicts, Docker container-name conflicts, and Foundry launch reconnects as validation infrastructure unless a loaded app surface violates the spec.
-- Read a smoke `summary.json` `passed: false` carefully: it trips on a failed `steps[]` entry OR on any `consoleErrors[]`.
-Benign fixture-world `404 (Not Found)` asset misses populate `consoleErrors` and flip `passed` to false with zero failed steps.
+- Read a smoke `summary.json` carefully: `passed: false` trips on a failed `steps[]` entry OR on any un-waived `consoleErrors[]`, and the summary also carries the split counts `stepFailures` / `consoleErrorCount` (written in the harness `finally` block, so populated even on an early abort).
+Benign fixture-world `404 (Not Found)` asset misses populate `consoleErrors` and flip `passed` to false with zero failed steps; a known-benign console or `pageerror` line can be admitted per run via `--allowed-console-error-patterns` (appended to the in-source defaults, never replacing them), but a failing `steps[]` entry is never waivable and throws first.
 Distinguish that benign case (screenshots still valid, no regression) from a real failing step before flagging a defect or rejecting screenshot evidence.
 - If confidence is low, file a clarification or investigation issue instead of overstating the defect.
 - If `gh` is unavailable, provide ready-to-file issue drafts.
