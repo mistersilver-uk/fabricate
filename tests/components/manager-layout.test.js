@@ -624,6 +624,47 @@ test('manager recipe row collapses in the specified order and never drops its co
   );
 });
 
+// Two long-label regressions the shared switch caused, both confirmed on a real smoke
+// frame. `.manager-status-toggle` is a STATUS cell: it caps at 78px and ellipsises its
+// label, which is right for "On"/"Off" and wrong for anything the GM has to read.
+test('long-labelled switches escape the status cell geometry', () => {
+  // (1) The library's grouping switch rendered as "Grou…": 78px - 34px track - gap
+  // leaves ~36px. A filter-bar switch is sized by its label.
+  const groupToggleBlock = blockFor(
+    '.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle]'
+  );
+  assert.ok(
+    groupToggleBlock.includes('max-width: none;'),
+    'the group-by-category switch must not inherit the 78px status-cell cap that truncates its label'
+  );
+  const groupLabelBlock = blockFor(
+    '.fabricate-manager .manager-status-toggle[data-recipe-group-toggle] .manager-status-toggle-label'
+  );
+  assert.ok(
+    groupLabelBlock.includes('overflow: visible;') && groupLabelBlock.includes('text-overflow: clip;'),
+    'the filter switch label must not ellipsise'
+  );
+
+  // (2) The Overview Locked card has no image picker, so its switch + hint are a
+  // left-aligned row rather than the media column's centred, 14ch-clamped stack.
+  const toggleRowBlock = blockFor('.fabricate-manager .manager-recipe-toggle-row');
+  const toggleRowCopyBlock = blockFor('.fabricate-manager .manager-recipe-toggle-row p');
+  assert.ok(
+    toggleRowBlock.includes('display: flex;') && toggleRowBlock.includes('align-items: center;'),
+    'a switch with a sentence beside it is a row, not a centred stack'
+  );
+  assert.equal(
+    toggleRowCopyBlock.includes('max-width:'),
+    false,
+    'the hint beside a switch must not be clamped to the 96px media column width'
+  );
+  assert.equal(
+    toggleRowCopyBlock.includes('text-align: center;'),
+    false,
+    'the hint beside a switch reads left-aligned, not centred mid-card'
+  );
+});
+
 // Selection is an identity cue ("you are here"), never a status. Success/amber stay
 // reserved for enabled and warning states — a selected row tinted `--fab-success-soft`
 // wears the exact colour its own ON switch uses, inches away (issue 643).

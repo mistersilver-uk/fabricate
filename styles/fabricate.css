@@ -2921,8 +2921,9 @@
    row has no columns, so the retired recipe column-grid custom property and the
    table head are both gone. The class name is frozen — the smoke harness's overflow
    check pins it and FAILS OPEN, so a rename silently stops measuring the rows
-   instead of failing. */
-/* The recipe rows measure THEMSELVES (issue 643 §8). The row's collapse ladder used to
+   instead of failing.
+
+   The recipe rows measure THEMSELVES (issue 643 §8). The row's collapse ladder used to
    query `fabricate-manager` — the whole app — but `.manager-body` is
    `220px + 1fr + 300px` above 1120px and only collapses to one column at or below it.
    So the row is at its NARROWEST (~570-760px) in the 1121-1280px band, where not one
@@ -3173,6 +3174,23 @@
   background: var(--fab-accent-soft);
 }
 
+/* A switch + its helper line, side by side, in a card that has NO media column. The
+   media-column stack (`.manager-task-core-status`) centres its copy and clamps it to
+   14ch, which is right under a 96px image picker and wrong across a full-width card —
+   it strands the hint mid-card, three words to a line. */
+.fabricate-manager .manager-recipe-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-toggle-row p {
+  margin: 0;
+  min-width: 0;
+  line-height: 1.35;
+}
+
 /* The three-row filter bar: search + status/lock segments, then category + grouping
    + sort, then the active-filter chips and the result count. */
 .fabricate-manager .manager-recipe-toolbar {
@@ -3194,6 +3212,20 @@
 
 .fabricate-manager .manager-recipe-filter-row.is-chips {
   gap: var(--fab-space-1);
+}
+
+/* The grouping switch is a FILTER control, not a row's On/Off status cell. The shared
+   `.manager-status-toggle` caps itself at 78px because every other use of it carries a
+   two- or three-letter label; after the 34px track and the gap, that leaves ~36px and
+   ellipsises "Group by category" down to "Grou…". A filter-bar switch is sized by its
+   label, so it opts out of the cap and never truncates. */
+.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle] {
+  max-width: none;
+}
+
+.fabricate-manager .manager-status-toggle[data-recipe-group-toggle] .manager-status-toggle-label {
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .fabricate-manager .manager-recipe-filter-chip {

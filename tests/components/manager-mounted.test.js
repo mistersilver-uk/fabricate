@@ -3664,6 +3664,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the Locked card is not the recipe-item locked-image affordance'
     );
+    // The card has no media column, so its switch and hint are one left-aligned row.
+    // `.manager-task-core-status` is the 96px image-picker stack: centred copy clamped
+    // to 14ch, which strands this card's hint mid-card at three words to a line.
+    assert.ok(
+      card.querySelector('.manager-recipe-toggle-row [data-recipe-field="locked"]'),
+      'the Locked switch and its hint sit in a left-aligned toggle row'
+    );
+    assert.equal(
+      card.querySelector('.manager-task-core-status'),
+      null,
+      'a card with no image picker must not reuse the media column stack, which centres and 14ch-clamps its copy'
+    );
     const toggle = target.querySelector('[data-recipe-field="locked"]');
     assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'an unlocked recipe reads off');
     toggle.click();

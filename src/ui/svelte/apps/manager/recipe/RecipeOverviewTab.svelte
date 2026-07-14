@@ -178,7 +178,12 @@
         <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Locked.Hint', 'A locked recipe stays visible to players, but only a GM can craft it.')}</p>
       </div>
     </div>
-    <div class="manager-task-core-status">
+    <!-- NOT `.manager-task-core-status`: that block is the 96px media column's stack
+         (centred, 14ch-clamped copy under an image picker). Used as a full-width card
+         body it centres the hint and squeezes it to 14ch — "Players who can / see this
+         recipe / can craft it." This card has no image, so its switch and hint read as
+         one left-aligned row. -->
+    <div class="manager-recipe-toggle-row">
       <button
         type="button"
         class={`manager-status-toggle ${locked ? 'is-on' : 'is-off'}`}

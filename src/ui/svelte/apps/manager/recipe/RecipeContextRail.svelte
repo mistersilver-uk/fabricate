@@ -282,11 +282,11 @@
   <!-- RESTRICTED: who this recipe is granted to. Read-only — the Access tab is the
        canonical editor and this deep-links to it. -->
   <section class="manager-inspector-card" data-recipe-section="access">
-    <div class="manager-inspector-title-row">
-      <div class="manager-inspector-copy">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Rail.AccessTitle', 'Who can craft this')}</h3>
-      </div>
-    </div>
+    <!-- A bare card title, like every other card in this rail. NOT
+         `.manager-inspector-title-row`: that is a `44px | 1fr` grid built for a
+         medallion + copy pair, so a lone heading lands in the 44px column and wraps
+         one word per line ("WHO / CAN / CRAFT / THIS"). -->
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Rail.AccessTitle', 'Who can craft this')}</h3>
 
     {#if hasAccessGrants}
       {#if (accessPlayers || []).length > 0}

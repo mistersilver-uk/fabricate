@@ -3359,7 +3359,20 @@ describe('RecipeContextRail (mounted)', () => {
         ],
       })
     );
-    assert.ok(target.querySelector('[data-recipe-section="access"]'), 'access card renders');
+    const accessCard = target.querySelector('[data-recipe-section="access"]');
+    assert.ok(accessCard, 'access card renders');
+    // `.manager-inspector-title-row` is a `44px | 1fr` grid built for a medallion +
+    // copy pair. A lone heading in it lands in the 44px column and wraps one word per
+    // line ("WHO / CAN / CRAFT / THIS"), so this card must use a bare card title.
+    assert.equal(
+      accessCard.querySelector('.manager-inspector-title-row'),
+      null,
+      'the access heading must not sit in the medallion title grid, which would wrap it to one word per line'
+    );
+    assert.ok(
+      accessCard.querySelector(':scope > h3.manager-card-title'),
+      'the access card heading is a bare card title, like every other card in the rail'
+    );
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-item"]'),
       null,
