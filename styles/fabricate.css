@@ -2830,44 +2830,33 @@
   min-width: 0;
 }
 
+/* The recipe library is a list of CARD rows (issue 643), not a column grid: a card
+   row has no columns, so the retired recipe column-grid custom property and the
+   table head are both gone. The class name is frozen — the smoke harness's overflow
+   check pins it and FAILS OPEN, so a rename silently stops measuring the rows
+   instead of failing. */
 .fabricate-manager .manager-recipes-table {
-  --fab-mv2-recipe-grid: minmax(0, 1.35fr) minmax(0, 0.86fr) minmax(0, 0.86fr) minmax(0, 0.58fr) 118px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
 
+.fabricate-manager .manager-recipe-group {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipes-table.has-no-category {
-  --fab-mv2-recipe-grid: minmax(0, 1.45fr) minmax(0, 1.3fr) minmax(0, 0.58fr) 118px;
-}
-
-/* Incomplete flag pinned to the top-left, overlapping the row's top border, the
-   same affordance as the Tools library "Unsaved" chip (manager-tools-dirty-chip). */
-.fabricate-manager .manager-recipe-row {
-  position: relative;
-}
-
-.fabricate-manager .manager-recipe-row-flag-slot {
-  position: absolute;
-  top: 0;
-  left: 10px;
-  z-index: 4;
+.fabricate-manager .manager-recipe-group-list {
   display: flex;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.fabricate-manager .manager-recipe-incomplete-chip {
-  border-color: var(--fab-warning-border);
-  color: var(--fab-warning-text);
-  background: var(--fab-mv2-surface-1);
-  gap: var(--fab-space-1);
-  white-space: nowrap;
-  box-shadow:
-    inset 0 0 0 999px var(--fab-warning-soft),
-    0 2px 8px var(--fab-overlay-dark-28);
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .fabricate-manager .manager-components-table {
@@ -2966,19 +2955,202 @@
   text-transform: uppercase;
 }
 
-.fabricate-manager .manager-recipe-table-head,
+/* The card row: a shrinkable identity cell plus a fixed control cluster. The
+   `min-width: 0` / `flex-shrink: 0` pair is what keeps the row inside `.manager-main`
+   at the harness's 1280px width. */
 .fabricate-manager .manager-recipe-row {
-  display: grid;
-  grid-template-columns: var(--fab-mv2-recipe-grid);
-  gap: var(--fab-space-2);
+  display: flex;
+  gap: var(--fab-space-3);
   align-items: center;
-  align-content: center;
   min-width: 0;
 }
 
 .fabricate-manager .manager-recipes-table .manager-recipe-row .manager-action-group {
   flex-wrap: nowrap;
   gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-recipe-row.is-off {
+  opacity: 0.62;
+}
+
+.fabricate-manager .manager-recipe-cluster {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--fab-space-3);
+  align-items: center;
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-recipe-name-row {
+  display: flex;
+  gap: var(--fab-space-1);
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-name-row .manager-system-name {
+  overflow: hidden;
+  font-family: var(--fab-font-serif);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-io {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+  color: var(--fab-text-secondary);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-io.is-empty .manager-recipe-io-counts {
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-recipe-io-counts {
+  display: flex;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  font-family: var(--fab-font-mono);
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-io-routed {
+  color: var(--fab-info);
+  font-size: 0.6rem;
+}
+
+.fabricate-manager .manager-recipe-io-steps {
+  display: flex;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.62rem;
+}
+
+.fabricate-manager .manager-recipe-check {
+  gap: var(--fab-space-chip);
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-check.is-dc,
+.fabricate-manager .manager-recipe-check.is-dynamic {
+  border-color: var(--fab-info-border);
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-recipe-check.is-progressive {
+  border-color: var(--fab-border);
+  color: var(--fab-text-secondary);
+  background: var(--fab-surface-raised);
+}
+
+/* No usable crafting check (no authored roll formula): an em dash, never a DC the
+   engine would not roll. */
+.fabricate-manager .manager-recipe-check.is-none {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-recipe-lock.is-locked {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-mv2-accent);
+  background: var(--fab-accent-soft);
+}
+
+/* The three-row filter bar: search + status/lock segments, then category + grouping
+   + sort, then the active-filter chips and the result count. */
+.fabricate-manager .manager-recipe-toolbar {
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-filter-row.is-secondary {
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-recipe-filter-row.is-chips {
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-recipe-filter-chip {
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-recipe-chip-clear {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 0.58rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-count {
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-recipe-sort-direction {
+  gap: var(--fab-space-chip);
+}
+
+/* The blocked-enable flash: an ERROR the GM must be able to read and dismiss. It
+   REPLACES the Foundry notification (which the store suppresses while this owns the
+   message), so it never auto-hides out from under them. */
+.fabricate-manager .manager-recipe-flash {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  margin: 0 0 var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-danger-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-recipe-flash > i {
+  flex: 0 0 auto;
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-recipe-flash-message {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-flash-dismiss {
+  flex: 0 0 auto;
 }
 
 .fabricate-manager .manager-component-table-head,
@@ -3021,8 +3193,6 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-table-head > *,
-.fabricate-manager .manager-recipe-row > *,
 .fabricate-manager .manager-component-table-head > *,
 .fabricate-manager .manager-component-row > *,
 .fabricate-manager .manager-environment-table-head > *,
@@ -3050,10 +3220,17 @@
 }
 
 .fabricate-manager .manager-system-row .manager-status-cell,
-.fabricate-manager .manager-recipe-row .manager-status-cell,
 .fabricate-manager .manager-environment-row .manager-status-cell,
 .fabricate-manager .manager-gathering-task-row .manager-status-cell {
   justify-self: start;
+}
+
+/* The recipe row is a flex card, so its status slot is a flex item, not a grid
+   cell (`justify-self` would be inert). */
+.fabricate-manager .manager-recipe-row .manager-recipe-status {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 /* Center the selection-mode, tasks, and status column contents in environment rows */
@@ -3367,6 +3544,14 @@
   cursor: pointer;
 }
 
+/* Inside the flex card row the identity is the ONLY shrinkable cell (the control
+   cluster never shrinks), which is what keeps the row from overflowing. */
+.fabricate-manager .manager-recipe-row .manager-recipe-identity {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
 .fabricate-manager .manager-environment-identity {
   grid-template-columns: 64px minmax(0, 1fr);
   gap: var(--fab-space-3);
@@ -3642,6 +3827,13 @@
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
+}
+
+/* Informational tone — the recipe library's active-filter chips. */
+.fabricate-manager .manager-chip.is-info {
+  border-color: var(--fab-info-border);
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
 }
 
 .fabricate-manager .manager-chip.is-danger {
@@ -10055,7 +10247,6 @@
     align-items: stretch;
   }
 
-  .fabricate-manager .manager-recipe-row,
   .fabricate-manager .manager-component-row,
   .fabricate-manager .manager-environment-row,
   .fabricate-manager .manager-gathering-task-row,
@@ -10067,7 +10258,6 @@
   }
 
   .fabricate-manager .manager-system-row > *,
-  .fabricate-manager .manager-recipe-row > *,
   .fabricate-manager .manager-component-row > *,
   .fabricate-manager .manager-environment-row > *,
   .fabricate-manager .manager-gathering-task-row > *,
@@ -14302,4 +14492,32 @@
 .fabricate-roll-prompt-dialog select:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--fab-accent);
+}
+
+/* The recipe row's collapse ladder (issue 643 §8). Drop order is fixed:
+   (1) description, (2) I/O + steps readout, (3) check pill, (4) the toggle's On/Off
+   text — and NEVER the lock, enable or edit controls. The row keeps its switch and
+   its aria-label at every width, so nothing that can be operated disappears. */
+@container fabricate-manager (max-width: 960px) {
+  .fabricate-manager .manager-recipe-row .manager-recipe-description {
+    display: none;
+  }
+}
+
+@container fabricate-manager (max-width: 860px) {
+  .fabricate-manager .manager-recipe-row .manager-recipe-io {
+    display: none;
+  }
+}
+
+@container fabricate-manager (max-width: 760px) {
+  .fabricate-manager .manager-recipe-row .manager-recipe-check {
+    display: none;
+  }
+}
+
+@container fabricate-manager (max-width: 680px) {
+  .fabricate-manager .manager-recipe-row .manager-status-toggle-label {
+    display: none;
+  }
 }

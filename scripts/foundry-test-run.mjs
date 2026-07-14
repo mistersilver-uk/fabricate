@@ -4309,9 +4309,19 @@ async function main() {
         await openManagerCraftingSection(page, 'recipes', 'recipes');
         await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion")').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
-        await assertManagerLayoutStable(page, 'recipes normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-recipes-normal');
+        await captureStableManagerView(page, { layout: 'recipes normal', label: 'manager-recipes-normal' });
+
+        // The rich recipe row (issue 643) is the highest horizontal-overflow risk in the
+        // manager: identity + I/O readout + check pill + lock + toggle + three actions on
+        // one line. Drive it at the narrow width too — assertManagerLayoutStable only
+        // flags what it FINDS, so a width nobody measures is coverage nobody has.
+        await captureStableManagerView(page, {
+          width: 900,
+          height: 700,
+          layout: 'recipes narrow',
+          label: 'manager-recipes-narrow',
+        });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
 
         // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the
         // Books & Scrolls recipe-item surface + the Settings placeholder. Guarded so a

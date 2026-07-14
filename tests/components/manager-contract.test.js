@@ -15,6 +15,9 @@ const craftingSettingsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/Craft
 const resolutionModeOptionsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js');
 const systemsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
 const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+// The library inspector, extracted out of the root (issue 643). It sits under
+// `recipes/`, NOT `recipe/` — the latter is the recipe EDITOR's screenshot-map glob.
+const recipeBrowserInspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
 const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
 const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
 const environmentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
@@ -35,6 +38,7 @@ const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
 const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
 const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
+const recipeBrowserInspectorSource = readFileSync(recipeBrowserInspectorPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
@@ -46,7 +50,7 @@ const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerSource = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, craftingSettingsSource, resolutionModeOptionsSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
+const managerSource = [rootSource, recipeBrowserInspectorSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, craftingSettingsSource, resolutionModeOptionsSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
 
 function catalogValue(key) {
   return key.split('.').reduce((node, part) => node?.[part], lang);
@@ -420,15 +424,36 @@ describe('CraftingSystemManager source contract', () => {
     }
     assert.ok(
       recipesBrowserSource.includes('recipe.incomplete'),
-      'RecipesBrowserView should render the derived Incomplete chip'
+      'RecipesBrowserView should render the derived Incomplete state'
     );
     assert.ok(
       recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
-      'RecipesBrowserView should use the localized Incomplete chip label'
+      'RecipesBrowserView should use the localized Incomplete label'
+    );
+    // The four row states are one component (StatusPill) rather than four ad-hoc
+    // chips. The tones stay distinguishable: warning = incomplete-but-enabled,
+    // danger = incomplete AND off, i.e. enabling would be REFUSED (issue 643).
+    assert.ok(
+      recipesBrowserSource.includes("import StatusPill from '../../components/StatusPill.svelte'"),
+      'the row should render its states through the shared StatusPill'
     );
     assert.ok(
-      /recipe\.incomplete[\s\S]*?manager-chip is-warning/.test(recipesBrowserSource),
-      'Incomplete chip should use the is-warning tone to distinguish it from the locked chip'
+      /incomplete:\s*\['FABRICATE\.Admin\.Manager\.Recipe\.Incomplete'/.test(recipesBrowserSource),
+      'the Incomplete state should carry its localized label'
+    );
+    assert.ok(
+      recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.CantEnable'),
+      "an incomplete + disabled recipe should say enabling is refused, not merely 'incomplete'"
+    );
+    // A card row has no columns: the list is a real <ul role="list"> of <li> cards.
+    assert.ok(
+      recipesBrowserSource.includes('<ul class="manager-recipe-group-list" role="list"'),
+      'recipe rows should be a list, not a role="table"'
+    );
+    assert.equal(
+      recipesBrowserSource.includes('role="table"'),
+      false,
+      'the card row must not retain the table role'
     );
   });
 
@@ -670,10 +695,11 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(systemEditSource.includes('SystemOverviewView'), 'the Validation tab renders the overview list');
     assert.ok(systemEditSource.includes('manager-system-workspace'), 'the workspace mirrors the environment workspace');
 
-    // Recipe detail facts still use the shared inline fact-line/fact-label
-    // typography as the environment details card (the layout reference).
+    // Recipe detail facts still use the shared inline fact-line/fact-label typography
+    // as the environment details card (the layout reference) — they just live in the
+    // extracted library inspector now (issue 643) rather than inlined in the root.
     assert.ok(
-      rootSource.includes('<span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">'),
+      recipeBrowserInspectorSource.includes('<span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">'),
       'recipe details facts use the shared manager-fact-line/label styling'
     );
   });
@@ -787,10 +813,14 @@ describe('CraftingSystemManager source contract', () => {
       'Prepare event options that can be reused across your locations.'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
-    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/recipes'), 'empty recipes inspector should link to published recipe docs');
-    assert.ok(rootSource.includes('selectedCounts.components > 0'), 'empty recipes inspector should branch on selected-system component count');
-    assert.ok(rootSource.includes("setView('components')"), 'empty recipes inspector should route zero-component setup to Components');
+    // The empty-recipes setup card moved into the extracted library inspector with
+    // the rest of the aside (issue 643); the root still supplies the component count
+    // and the Components deep-link.
+    assert.ok(recipeBrowserInspectorSource.includes('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
+    assert.ok(recipeBrowserInspectorSource.includes('https://mistersilver-uk.github.io/fabricate/recipes'), 'empty recipes inspector should link to published recipe docs');
+    assert.ok(recipeBrowserInspectorSource.includes('componentCount > 0'), 'empty recipes inspector should branch on selected-system component count');
+    assert.ok(rootSource.includes('componentCount={selectedCounts.components}'), 'the root should feed the inspector its component count');
+    assert.ok(rootSource.includes("onAddComponents={() => setView('components')}"), 'empty recipes inspector should route zero-component setup to Components');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.Title, 'Set up recipes');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint,

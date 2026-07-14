@@ -11,6 +11,10 @@ const overviewPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/Recipe
 const inspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+const browserInspectorPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
+);
 const storePath = resolve(repoRoot, 'src/ui/svelte/stores/adminStore.js');
 const modelPath = resolve(repoRoot, 'src/models/Recipe.js');
 const managerPath = resolve(repoRoot, 'src/systems/RecipeManager.js');
@@ -27,6 +31,7 @@ const overviewSource = readFileSync(overviewPath, 'utf8');
 const inspectorSource = readFileSync(inspectorPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const browserSource = readFileSync(browserPath, 'utf8');
+const browserInspectorSource = readFileSync(browserInspectorPath, 'utf8');
 const storeSource = readFileSync(storePath, 'utf8');
 const modelSource = readFileSync(modelPath, 'utf8');
 const managerSource = readFileSync(managerPath, 'utf8');
@@ -514,14 +519,24 @@ describe('recipe image helpers prefer the linked recipe-item image', () => {
     assert.equal(browserSource.includes("recipe?.img || 'icons/svg/item-bag.svg'"), false, 'no bag-SVG row fallback');
   });
 
-  it('CraftingSystemManagerRoot recipe preview prefers recipeItemImg, then img, then the default', () => {
+  // The library inspector's hero image moved out of the root with the inspector
+  // (issue 643) and now uses the SAME shared resolver as the row, rather than a
+  // second, subtly different `img || DEFAULT_RECIPE_IMAGE` fallback chain.
+  it('the extracted library inspector resolves its hero image the same way the row does', () => {
     assert.ok(
-      rootSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
-      'root imports the constant'
+      browserInspectorSource.includes(
+        "import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js'"
+      ),
+      'the library inspector imports the shared resolver'
     );
     assert.ok(
-      rootSource.includes('recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE'),
-      'preview image prefers the linked item image'
+      browserInspectorSource.includes('recipe?.recipeItemImg || resolveRecipeImage(recipe)'),
+      'inspector hero image prefers the linked item image, then the shared resolver'
+    );
+    assert.equal(
+      rootSource.includes('DEFAULT_RECIPE_IMAGE'),
+      false,
+      'the root no longer owns a recipe image helper'
     );
   });
 });

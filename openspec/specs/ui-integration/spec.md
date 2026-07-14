@@ -454,20 +454,36 @@ Per-tool breakage editing is governed by the active authority; the two authoriti
 
 ### Recipes Tab
 
-List recipes for the selected crafting system.
+The recipe **library** for the selected crafting system: a filter bar, collapsible category groups, rich card rows, and a persistent inspector in the shared manager inspector column.
 
-In Manager, recipe browse status uses the same compact interactive on/off toggle pattern as systems and environment browse rows.
-The Status column remains a Status column, and each row exposes a keyboard-reachable toggle with On/Off copy and enabled/disabled color treatment.
+Rows are **cards, not table columns**.
+A card row has no columns, so the list is a real list (`ul` / `li`, `role="list"`), not a table/row/cell structure with column headers.
+Each row shows the recipe's image medallion (the resolved recipe image, falling back to a glyph), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle with On/Off copy, and the Edit / Duplicate / Delete action group.
 
-Columns:
+Row authoring-state pills — at most one authoring state applies to a row:
 
-- Name
-- Locked
-- Incomplete (a derived warning chip on the recipe identity, shown when the recipe is an incomplete shell — missing ingredient sets and/or result groups — distinct in tone from the Locked chip)
-- Visibility summary (player and knowledge list modes only; hidden in global mode)
-- Category (if enabled)
-- Step count (if multistep enabled)
-- Last modified (optional)
+- `Disabled` — the GM has switched the recipe off.
+- `Locked` — the recipe stays visible to players, but only a GM can craft it.
+- `Can't enable` — the recipe is an incomplete shell (missing ingredient sets and/or result groups) **and** is currently off, so enabling it would be refused.
+- `Incomplete` — an incomplete shell that is already on: unfinished, but nothing is being refused.
+
+The **I/O readout** always shows the ingredient count (`N in`).
+It shows an output item count (`N out`) **only** in the `simple` and `progressive` resolution modes.
+In `routedByIngredients`, `routedByCheck` and `alchemy` the results are tier- or set-keyed, so a single "outputs" number does not exist; those modes show the **result-group count** with a routing glyph instead, labelled as groups.
+
+The **check pill** resolves the recipe's `checkTierId` against the system check's tiers and shows that tier's DC, falling back to the check's static default DC.
+It shows a dynamic-DC pill when the check resolves its DC through a macro, a progressive pill for a progressive system, and an em dash when the system has **no usable check** — usable meaning an authored `rollFormula` exists, which is not the same as "checks enabled".
+
+The **filter bar** offers a name/description search, a status filter (all / on / off), a lock filter (all / unlocked / locked), a category filter, a group-by-category toggle, a sort key (name, needs attention, check DC, ingredients, results), and a sort direction.
+Every non-default filter surfaces a clearable active-filter chip beside the shown/total count.
+Category group headers are `aria-expanded` / `aria-controls` buttons and default to **expanded**, the status and lock filters default to **all**, and the pager's default page size exceeds a typical system's recipe count.
+These defaults are load-bearing: a default that hid rows would leave the GM staring at an empty library.
+
+The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
+The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).
+
+The **lock toggle** gives `recipe.locked` a real write path from the row.
+Unlike enable, locking is **never gated**, in either direction: a GM locks a recipe precisely while it is unfinished, so refusing the write on incompleteness would make the control useless exactly when it is wanted.
 
 Actions:
 

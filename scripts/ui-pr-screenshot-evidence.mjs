@@ -160,8 +160,15 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-recipes',
     label: 'Manager recipes',
-    smokeLabels: ['manager-recipes-normal'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/],
+    smokeLabels: ['manager-recipes-normal', 'manager-recipes-narrow'],
+    // The library inspector deliberately lives under `apps/manager/recipes/` and NOT
+    // `apps/manager/recipe/` (issue 643): the latter is RECIPE_EDIT_MATCHES, so a
+    // browser-side component placed there would republish the five recipe-EDITOR
+    // frames and never the browser frame.
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
+    ],
   },
   {
     id: 'manager-import-report',

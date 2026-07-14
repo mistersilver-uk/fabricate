@@ -510,42 +510,74 @@ test('manager gathering settings condition panels use a two-column responsive gr
   );
 });
 
-test('manager recipes browser defines compact responsive table geometry', () => {
+// The recipe library is a list of CARD rows (issue 643), not a column grid. The old
+// assertions pinned `--fab-mv2-recipe-grid`, the `has-no-category` grid variant and
+// the medium-query column stacking — none of which a card row has. What replaces them
+// is the pair that actually prevents horizontal overflow: the identity cell is the ONLY
+// shrinkable flex child, and the control cluster never shrinks.
+test('manager recipes browser defines a non-overflowing card row', () => {
   const tableBlock = blockFor('.fabricate-manager .manager-recipes-table');
-  const identityBlock = blockFor('.fabricate-manager .manager-recipe-identity');
-  const statusCellBlock = blockFor('.fabricate-manager .manager-system-row .manager-status-cell,\n.fabricate-manager .manager-recipe-row .manager-status-cell,\n.fabricate-manager .manager-environment-row .manager-status-cell,\n.fabricate-manager .manager-gathering-task-row .manager-status-cell');
-  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const rowBlock = blockFor('.fabricate-manager .manager-recipe-row');
+  const identityBlock = blockFor('.fabricate-manager .manager-recipe-row .manager-recipe-identity');
+  const clusterBlock = blockFor('.fabricate-manager .manager-recipe-cluster');
+  const groupListBlock = blockFor('.fabricate-manager .manager-recipe-group-list');
 
+  assert.ok(tableBlock.includes('display: flex;'), 'the recipes table stacks its category groups');
+  assert.equal(
+    css.includes('--fab-mv2-recipe-grid'),
+    false,
+    'the retired recipe column grid should be gone, not merely unused'
+  );
+  assert.equal(
+    css.includes('.fabricate-manager .manager-recipe-table-head'),
+    false,
+    'a card row has no column headers'
+  );
+  assert.ok(rowBlock.includes('display: flex;'), 'the recipe row is a flex card');
+  assert.ok(rowBlock.includes('min-width: 0;'), 'the recipe row may shrink inside the main column');
   assert.ok(
-    tableBlock.includes('--fab-mv2-recipe-grid: minmax(0, 1.35fr)'),
-    'recipes table should define shrinkable compact columns for normal Foundry manager widths'
+    identityBlock.includes('flex: 1 1 0;') && identityBlock.includes('min-width: 0;'),
+    'the identity cell is the row content that gives way'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-recipes-table.has-no-category'),
-    'recipes table should have a no-category grid variant'
+    clusterBlock.includes('flex-shrink: 0;'),
+    'the control cluster (lock / enable / edit) must never be squeezed'
   );
+  assert.ok(groupListBlock.includes('list-style: none;'), 'the rows render as a real, unstyled list');
+  // The rows still share the row-card geometry group with every other browser row.
   assert.ok(
     css.includes('.fabricate-manager .manager-recipe-row,\n.fabricate-manager .manager-component-row,\n.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row {\n  width: 100%;\n  min-height: 76px;'),
     'recipe, component, environment, gathering task, and essence rows should have stable row height'
   );
-  assert.ok(
-    identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
-      || css.includes('.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity'),
-    'recipe identity should reserve thumbnail space'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-recipe-row .manager-status-cell'),
-    'recipe status cells should use the shared compact status-toggle alignment'
-  );
-  assert.ok(statusCellBlock.includes('justify-self: start;'), 'shared status toggle cells should align compact toggles to the start');
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-recipe-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'medium manager layout should stack recipe rows before columns become cramped'
-  );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-labeled-cell::before') && mediumQuery.includes('content: attr(data-label);'),
-    'stacked recipe cells should expose visible labels after table headers are hidden'
-  );
+});
+
+// The collapse ladder (issue 643 §8). Drop order is fixed and monotonic, and the
+// lock / enable / edit controls are never in it.
+test('manager recipe row collapses in the specified order and never drops its controls', () => {
+  const LADDER = [
+    [960, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
+    [860, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
+    [760, '.fabricate-manager .manager-recipe-row .manager-recipe-check'],
+    [680, '.fabricate-manager .manager-recipe-row .manager-status-toggle-label']
+  ];
+
+  for (const [width, selector] of LADDER) {
+    const query = css.slice(css.indexOf(`@container fabricate-manager (max-width: ${width}px)`));
+    assert.ok(query.length > 0, `a ${width}px container query should exist`);
+    const rule = query.slice(query.indexOf(selector));
+    assert.ok(
+      query.includes(selector) && rule.slice(0, rule.indexOf('}')).includes('display: none;'),
+      `${selector} should drop at ${width}px`
+    );
+  }
+
+  for (const kept of ['.manager-recipe-lock', '.manager-recipe-status', '.manager-action-group']) {
+    assert.equal(
+      new RegExp(`\\.manager-recipe-row \\${kept} \\{\\n  display: none;`).test(css),
+      false,
+      `${kept} must survive every width — it is an operable control`
+    );
+  }
 });
 
 test('manager gathering task browser defines bounded toolbar and compact table geometry without reorder controls', () => {

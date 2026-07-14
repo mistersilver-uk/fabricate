@@ -5557,6 +5557,7 @@ describe('createAdminStore', () => {
           ingredientCount: 3,
           toolCount: 3,
           resultGroupCount: 2,
+          resultItemCount: 0,
           hasAlternatives: false,
           ingredientSetSummaries: [
             {
@@ -5574,6 +5575,7 @@ describe('createAdminStore', () => {
           ingredientCount: 2,
           toolCount: 3,
           resultGroupCount: 1,
+          resultItemCount: 0,
           hasAlternatives: false,
           ingredientSetSummaries: [
             {
@@ -5642,6 +5644,7 @@ describe('createAdminStore', () => {
           ingredientCount: 3,
           toolCount: 2,
           resultGroupCount: 2,
+          resultItemCount: 0,
           hasAlternatives: true,
           ingredientSetSummaries: [
             {

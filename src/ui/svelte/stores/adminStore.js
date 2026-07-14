@@ -322,13 +322,23 @@ function _buildRequirementPreviewStep(step, index, sharedRecipeToolIds = []) {
       ? Math.max(...ingredientSetSummaries.map((set) => set.toolCount))
       : 0;
 
+  const resultGroups = Array.isArray(step?.resultGroups) ? step.resultGroups : [];
+
   return {
     id: step?.id || `step-${index + 1}`,
     name: step?.name || `Step ${index + 1}`,
     ingredientSetCount: ingredientSets.length,
     ingredientCount: previewIngredientCount,
     toolCount: sharedRecipeToolIds.length + stepToolCount + previewSetToolCount,
-    resultGroupCount: Array.isArray(step?.resultGroups) ? step.resultGroups.length : 0,
+    resultGroupCount: resultGroups.length,
+    // The number of result ITEMS across the step's groups. Distinct from
+    // `resultGroupCount`: the browser row's "N out" half is only meaningful in
+    // `simple` / `progressive` (issue 643 §9); tier- and set-keyed modes render
+    // the GROUP count instead, so both numbers have to be projected.
+    resultItemCount: resultGroups.reduce(
+      (sum, group) => sum + (Array.isArray(group?.results) ? group.results.length : 0),
+      0
+    ),
     hasAlternatives: ingredientSetSummaries.length > 1,
     ingredientSetSummaries,
   };
@@ -404,12 +414,67 @@ function _buildRecipeBrowserDisplay(recipe) {
     description: String(recipe.description || '').trim(),
     stepCount: requirementsPreview.length,
     resultGroupCount: requirementsPreview.reduce((sum, step) => sum + step.resultGroupCount, 0),
+    resultItemCount: requirementsPreview.reduce((sum, step) => sum + step.resultItemCount, 0),
     ingredientCount: requirementsPreview.reduce((sum, step) => sum + step.ingredientCount, 0),
     toolCount: requirementsPreview.reduce((sum, step) => sum + step.toolCount, 0),
     ...structure,
     requirementsPreview,
     isSimple,
   };
+}
+
+/**
+ * The crafting check a recipe row's check pill resolves against, keyed off the
+ * SYSTEM's resolution mode. `routedByCheck` authors its check on the `routed`
+ * slot; `simple`, `alchemy` and `routedByIngredients` share the `simple`
+ * pass/fail slot; `progressive` has its own.
+ * @private
+ */
+function _recipeCheckConfig(system) {
+  const mode = system?.resolutionMode || 'simple';
+  if (mode === 'routedByCheck') return system?.craftingCheck?.routed || null;
+  if (mode === 'progressive') return system?.craftingCheck?.progressive || null;
+  return system?.craftingCheck?.simple || null;
+}
+
+/**
+ * The check pill the recipe row renders (issue 643 §9). The row cannot derive
+ * this — the DC lives on the SYSTEM's check, keyed by the recipe's `checkTierId`
+ * — so it is projected here.
+ *
+ * A check is USABLE only when it has an authored `rollFormula`; "checks enabled"
+ * is not the same thing, and an unusable check renders as an em dash rather than
+ * a DC the engine would never roll. The DC resolution mirrors
+ * `CraftingEngine._resolveSimpleCheckDc`: the recipe's selected tier wins, then
+ * the check's static default.
+ *
+ * @param {object} system the selected crafting system (raw, not projected).
+ * @param {object} recipe the Recipe model.
+ * @returns {{kind: 'none' | 'progressive' | 'dynamic' | 'dc', dc: number | null}}
+ * @private
+ */
+function _buildRecipeCheckSummary(system, recipe) {
+  const mode = system?.resolutionMode || 'simple';
+  // Alchemy's own check mode is system-level and independent of the crafting
+  // check; `none` means the recipe resolves with no check at all.
+  if (mode === 'alchemy' && (system?.alchemy?.checkMode || 'none') === 'none') {
+    return { kind: 'none', dc: null };
+  }
+
+  const config = _recipeCheckConfig(system);
+  const hasRollFormula = Boolean(String(config?.rollFormula ?? '').trim());
+  if (!config || !hasRollFormula) return { kind: 'none', dc: null };
+  if (mode === 'progressive') return { kind: 'progressive', dc: null };
+  // A dynamic DC is macro-resolved at craft time; there is no static number to show.
+  if (config.dcMode === 'dynamic') return { kind: 'dynamic', dc: null };
+
+  const tiers = Array.isArray(config.tiers) ? config.tiers : [];
+  const tier = recipe?.checkTierId ? tiers.find((entry) => entry?.id === recipe.checkTierId) : null;
+  const tierDc = Number(tier?.dc);
+  if (tier && Number.isFinite(tierDc)) return { kind: 'dc', dc: Math.trunc(tierDc) };
+
+  const defaultDc = Number(config.dc);
+  return { kind: 'dc', dc: Number.isFinite(defaultDc) ? Math.trunc(defaultDc) : 15 };
 }
 
 function _getManagedItems(system) {
@@ -1560,9 +1625,15 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       recipeItemName: recipeItemDefinition?.name || '',
       recipeItemImg: recipeItemDefinition?.img || '',
       recipeItemSourceUuid: recipeItemDefinition?.originItemUuid || '',
+      // The row's check pill: the system check's DC resolved through this recipe's
+      // `checkTierId`, or `{ kind: 'none' }` when the system has no USABLE check
+      // (usable iff an authored rollFormula exists — "checks enabled" is not the
+      // same thing). The row cannot derive this (issue 643 §9).
+      checkSummary: _buildRecipeCheckSummary(selectedSystem, recipe),
       isSimple: display.isSimple,
       stepCount: display.stepCount,
       resultGroupCount: display.resultGroupCount,
+      resultItemCount: display.resultItemCount,
       ingredientCount: display.ingredientCount,
       toolCount: display.toolCount,
       structureKey: display.structureKey,
@@ -7440,23 +7511,72 @@ export function createAdminStore(services) {
     }
   }
 
-  async function toggleRecipeEnabled(recipeId, enabled) {
+  /**
+   * Enable / disable a recipe. Disabling is always allowed; ENABLING an incomplete
+   * recipe (or one with a conflicting signature) is rejected by `updateRecipe` — so
+   * this is a GATED write, in explicit contrast to `toggleRecipeLocked` below.
+   *
+   * The refusal reason is localized once here and then surfaced ONCE. When the
+   * caller supplies `onBlocked` (the recipe library's in-window flash, issue 643),
+   * the flash OWNS the message and the Foundry notification is SUPPRESSED — the GM
+   * must not be told the same thing twice, in two places, one of which is easy to
+   * miss behind a maximised manager window. With no `onBlocked`, the notification
+   * remains the only channel and still fires.
+   *
+   * @param {string} recipeId
+   * @param {boolean} enabled
+   * @param {{onBlocked?: (message: string) => void}} [options]
+   * @returns {Promise<boolean>} whether the write landed.
+   */
+  async function toggleRecipeEnabled(recipeId, enabled, options = {}) {
     const recipeManager = services.getRecipeManager();
 
     try {
-      // Disabling is always allowed; enabling a recipe that is incomplete or has a conflicting
-      // signature is rejected by updateRecipe and surfaced as an error below.
       await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true });
       await refresh();
       return true;
     } catch (err) {
       console.error('Fabricate | Failed to toggle recipe enabled state:', err);
-      // An enable/save failure is surfaced as a localized, id-free toast:
+      // An enable/save failure is surfaced as a localized, id-free message:
       // RecipeActivationError (enable, issue 550) or RecipePersistenceError (save,
       // issue 595) each carry coded issues the localizer maps to lang copy.
-      services.notify?.error?.(
+      const message =
         localizeRecipeActivationError(err, services.localize) ||
-          localizeRecipePersistenceError(err, services.localize) ||
+        localizeRecipePersistenceError(err, services.localize) ||
+        err?.message ||
+        'Failed to update recipe';
+
+      if (typeof options?.onBlocked === 'function') options.onBlocked(message);
+      else services.notify?.error?.(message);
+      return false;
+    }
+  }
+
+  /**
+   * Lock / unlock a recipe. A locked recipe stays VISIBLE to players but only a GM
+   * can craft it (`CraftingEngine.guardCraftStart` → 'Recipe is locked').
+   *
+   * This write is NEVER gated, which is the whole point of it existing separately
+   * from `toggleRecipeEnabled`: locking is an authoring affordance a GM reaches for
+   * precisely while a recipe is unfinished, so refusing it on incompleteness would
+   * make it useless exactly when it is wanted. `allowIncomplete: true` therefore
+   * applies in BOTH directions, and there is no activation gate to catch.
+   *
+   * @param {string} recipeId
+   * @param {boolean} locked
+   * @returns {Promise<boolean>} whether the write landed.
+   */
+  async function toggleRecipeLocked(recipeId, locked) {
+    const recipeManager = services.getRecipeManager();
+
+    try {
+      await recipeManager.updateRecipe(recipeId, { locked: locked === true }, { allowIncomplete: true });
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to toggle recipe locked state:', err);
+      services.notify?.error?.(
+        localizeRecipePersistenceError(err, services.localize) ||
           err?.message ||
           'Failed to update recipe'
       );
@@ -7854,6 +7974,7 @@ export function createAdminStore(services) {
     deleteRecipe,
     duplicateRecipe,
     toggleRecipeEnabled,
+    toggleRecipeLocked,
     updateRecipe,
     getRecipeSignatureConflicts,
     getPcRoster,

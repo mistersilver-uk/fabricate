@@ -20,10 +20,18 @@ const css = readFileSync(cssPath, 'utf8');
 
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 
+// The three row actions (Edit / Duplicate / Delete). The row is a flex CARD now, so
+// the group is a plain `.manager-action-group` span inside the control cluster. The
+// lock toggle is a SIBLING of this group, never a member — which is exactly what
+// keeps the "not gated on recipe.locked" assertion below meaningful rather than
+// vacuous (issue 643: the lock control may reference `recipe.locked`; these three
+// buttons still may not).
 function actionGroupBlock() {
-  const start = browserSource.indexOf('class="manager-action-group manager-labeled-cell"');
+  const start = browserSource.indexOf('class="manager-action-group"');
   assert.ok(start >= 0, 'recipe action group should be present');
-  const end = browserSource.indexOf('</span>\n          </div>', start);
+  const lastButton = browserSource.indexOf('fa-trash', start);
+  assert.ok(lastButton > start, 'recipe action group should contain the delete button');
+  const end = browserSource.indexOf('</span>', lastButton);
   assert.ok(end > start, 'recipe action group should close before the row ends');
   return browserSource.slice(start, end);
 }
@@ -69,9 +77,20 @@ describe('recipe-edit action group spacing', () => {
     assert.ok(block.includes('gap: var(--fab-space-1)'), 'action group uses the tight token gap');
   });
 
-  it('keeps the recipe actions column at 118px', () => {
-    const matches = css.match(/--fab-mv2-recipe-grid:[^;]*118px;/g) || [];
-    assert.ok(matches.length >= 1, 'recipe grid last column should remain 118px');
+  // The row is a card, not a column grid, so there is no fixed 118px actions column
+  // any more. The invariant it protected — the row actions never get squeezed —
+  // now lives on the control cluster: it does not shrink, and the identity cell is
+  // the only thing that gives way.
+  it('never shrinks the row control cluster', () => {
+    const start = css.indexOf('.fabricate-manager .manager-recipe-cluster {');
+    assert.ok(start >= 0, 'the recipe row control cluster should own a rule');
+    const block = css.slice(start, css.indexOf('}', start));
+    assert.ok(block.includes('flex-shrink: 0'), 'the control cluster must not shrink');
+    assert.equal(
+      css.includes('--fab-mv2-recipe-grid'),
+      false,
+      'the card row must not resurrect the retired column grid'
+    );
   });
 
   it('adds a recipe-edit manager-main grid override', () => {

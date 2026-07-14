@@ -17,6 +17,12 @@ const sharedComponentNames = [
   'ManagerColorPopover',
   'EssenceSourceSelector',
   'Pagination',
+  // The Recipe Studio primitives (issue 643). They are import-free leaves, but they
+  // MUST still be compiled into this tree: a `.svelte` the mounted root renders but
+  // the allowlist omits does NOT fail — it hangs, reported as `# cancelled`.
+  'Medallion',
+  'StatusPill',
+  'CollapsibleGroupHeader',
 ];
 
 let tempRoot;
@@ -81,6 +87,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+  // The library inspector, extracted out of the root (issue 643). It lives under
+  // `recipes/` — NOT `recipe/`, which the screenshot map's RECIPE_EDIT_MATCHES globs.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingEffectPanel.svelte');
@@ -239,6 +248,9 @@ function compileManagerRoot() {
     'src/models/Result.js',
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
+    // The recipe library's pure list model (filter / group / sort / paginate + the
+    // per-row derivations). Imported by RecipesBrowserView (issue 643).
+    'src/utils/recipeBrowserModel.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
@@ -317,7 +329,10 @@ async function openRecipeEditor(calls, storeOptions = {}) {
   craftingParent().click();
   await tick();
   flushSync();
-  target.querySelector('[data-recipe-id="r1"] .manager-icon-button').click();
+  // Edit is the first button of the row's ACTION GROUP. Scope to the group: the
+  // row's first `.manager-icon-button` overall is now the lock toggle (issue 643),
+  // which sits beside the action group, not inside it.
+  target.querySelector('[data-recipe-id="r1"] .manager-action-group .manager-icon-button').click();
   await tick();
   flushSync();
   return target;
@@ -4075,16 +4090,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-id="r2"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Locked Elixir'));
     assert.ok(target.textContent.includes('Restricted (none selected)'));
-    const r2IncompleteChip = target.querySelector('[data-recipe-id="r2"] .manager-chip.is-warning');
-    assert.ok(
-      r2IncompleteChip,
-      'an incomplete recipe row should render the Incomplete warning chip'
-    );
-    assert.equal(r2IncompleteChip.textContent.trim(), 'Incomplete');
+    // r2 is incomplete AND off, so enabling it would be REFUSED — the row says that
+    // rather than merely "incomplete" (issue 643 §2's four row states, rendered
+    // through the shared StatusPill).
+    const r2Blocked = target.querySelector('[data-recipe-id="r2"] [data-status-pill="danger"]');
+    assert.ok(r2Blocked, "an incomplete, disabled recipe row should say it can't be enabled");
+    assert.equal(r2Blocked.textContent.trim(), "Can't enable");
     assert.equal(
-      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning'),
+      target.querySelector('[data-recipe-id="r1"] [data-status-pill="warning"]'),
       null,
-      'a complete recipe row should not render the Incomplete chip'
+      'a complete recipe row should not render an authoring-state pill'
     );
 
     assert.equal(
@@ -4093,29 +4108,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       'pagination should hide while filtered row count is below the page size'
     );
 
+    // The status filter is a segmented control (all / on / off), defaulting to `all`
+    // — a default that hid rows would break the smoke harness's visible-row wait.
     assert.equal(
-      target.querySelector('[data-clear-filters="recipes"]'),
+      target.querySelector('[data-recipe-filter-chip="status"]'),
       null,
-      'Clear filters should hide while no filter is active'
+      'no active-filter chip should show while every filter is at its default'
     );
-    const recipeStatusFilterSelect = target.querySelector(
-      '[aria-label="Filter recipes by status"]'
-    );
-    recipeStatusFilterSelect.value = 'disabled';
-    recipeStatusFilterSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    const offSegment = target.querySelector('[data-recipe-status-option="off"] input');
+    offSegment.checked = true;
+    offSegment.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    const recipeClearButton = target.querySelector('[data-clear-filters="recipes"]');
-    assert.ok(recipeClearButton, 'Clear filters should appear when a recipe filter is active');
-    recipeClearButton.click();
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 1, 'only the off recipe remains');
+    const statusChip = target.querySelector('[data-recipe-filter-chip="status"]');
+    assert.ok(statusChip, 'an active filter should surface a clearable chip');
+    statusChip.querySelector('.manager-recipe-chip-clear').click();
     await tick();
     flushSync();
     assert.equal(
-      target.querySelector('[data-clear-filters="recipes"]'),
+      target.querySelector('[data-recipe-filter-chip="status"]'),
       null,
-      'Clear filters should hide after resetting filters'
+      'clearing the chip should reset the filter'
     );
-    assert.equal(target.querySelector('[aria-label="Filter recipes by status"]').value, 'all');
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
 
     // The standalone Recipe Editor was removed, so the inspector no longer
     // offers Edit; duplicate/delete remain.
@@ -4142,9 +4158,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     const heroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
     assert.ok(heroRow, 'recipe inspector should use the prominent hero title row');
-    assert.ok(
-      heroRow.querySelector('.manager-recipe-preview'),
-      'recipe inspector hero should render the recipe preview image'
+    assert.equal(
+      heroRow.querySelector('[data-medallion]').dataset.medallion,
+      'image',
+      'recipe inspector hero should render the resolved recipe image, not only a glyph'
     );
 
     const search = target.querySelector('.manager-toolbar input[type="search"]');
@@ -4179,9 +4196,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       'recipes header should not call exportRecipes'
     );
 
-    // The first row action is Edit (fa-edit) and it navigates to the in-manager
-    // recipe-edit route rather than calling a service callback.
-    const editButton = target.querySelector('[data-recipe-id="r2"] .manager-icon-button');
+    // The first button of the row's ACTION GROUP is Edit (fa-edit) and it navigates
+    // to the in-manager recipe-edit route rather than calling a service callback.
+    // The `fa-edit` icon class is frozen — the smoke harness clicks
+    // `button:has(i.fa-edit)` to open the editor.
+    const editButton = target.querySelector(
+      '[data-recipe-id="r2"] .manager-action-group .manager-icon-button'
+    );
     assert.ok(editButton.querySelector('.fa-edit'), 'first row action should be the Edit icon');
     editButton.click();
     await tick();
@@ -4285,7 +4306,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button').click();
+    target
+      .querySelector('[data-recipe-id="r2"] .manager-action-group .manager-icon-button')
+      .click();
     await tick();
     flushSync();
 
