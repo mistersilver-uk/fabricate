@@ -82,6 +82,21 @@ Loop until both approve.
 - Hitting the 3-revision cap on any loop halts and surfaces to the user with the outstanding findings.
 - User intervention takes precedence; treat user guidance as the new entry condition for the next iteration.
 
+### Confirming work and resolving findings
+
+A subagent's report is a claim, not evidence — and a confident-but-wrong claim believed at face value ("gates green", "no findings", "N divergences") is the most expensive failure in the loop, because cheap-to-make claims cascade once trusted.
+Convert claims into evidence before acting on them:
+
+- Confirm gate results mechanically.
+The driver checks CI status (or re-runs the gate) and re-derives the facts a decision rests on — touched paths from `git diff`, test counts, the roster — rather than merging on a subagent's self-reported "tests pass".
+A subagent can mis-observe or overstate.
+- Resolve a disputed, surprising, or expensive finding by INVESTIGATION, not introspection.
+Gather the fact mechanically — read the real source, import and differential-test the real artifact, run the check — never by re-asking an agent "are you sure" (self-evaluation returns yes) and never by averaging votes.
+A credible dissent about a real defect gates until disproven by evidence; a finding that turns out to rest on a hand-reconstructed model of the code is dismissed only after reading the real code.
+- Match verification effort to the cost of being wrong.
+Before an irreversible or outward-facing step — publishing an artefact, deleting or overwriting, force-pushing, any one-way door — spend disproportionate verification: rehearse against a scratch target, add a dissenting check, or gate.
+Being wrong there costs far more than checking.
+
 ## Build & Test
 
 ### Prereqs
