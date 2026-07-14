@@ -143,6 +143,26 @@ describe('recipeBrowserModel — pagination boundaries', () => {
     assert.equal(page.pageIndex, 0);
   });
 
+  // The library's count reads "1–5 of 12". A bare "5 of 12" never told the GM WHICH page
+  // they were on, which is the whole job of a count above a paged list.
+  it('reports the page window as a 1-based inclusive range', () => {
+    assert.deepEqual(
+      [0, 1, 2]
+        .map((pageIndex) => paginateRecipes(rows, { pageIndex, pageSize: 3 }))
+        .map((page) => [page.rangeStart, page.rangeEnd]),
+      [
+        [1, 3],
+        [4, 6],
+        [7, 7],
+      ]
+    );
+  });
+
+  it('reports an empty range for an empty list rather than 1-0', () => {
+    const page = paginateRecipes([], { pageIndex: 0, pageSize: 10 });
+    assert.deepEqual([page.rangeStart, page.rangeEnd], [0, 0]);
+  });
+
   it('defaults to a page size that clears the smoke fixture recipe count', () => {
     // The smoke harness waits for a VISIBLE row and throws "Manager rendered no
     // table rows" on zero, so the default page must hold the fixture's recipes.

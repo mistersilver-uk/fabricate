@@ -266,6 +266,29 @@ describe('adminStore recipe check-pill projection', () => {
     assert.deepEqual(row.checkSummary, { kind: 'progressive', dc: null });
   });
 
+  // The two check-LESS kinds are not the same fact and the row must not tell the GM they
+  // are. A routedByIngredients craft resolves off the ingredient set that was used, so no
+  // check is a WORKING configuration — reported neutrally as `ingredients`. Every other
+  // mode with no usable check genuinely cannot be rolled for, and stays the `none` warning
+  // the GM can scan a library for.
+  it('reports a check-less routedByIngredients system as routed, not as a warning', async () => {
+    const row = await projectWith({
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: { simple: { dc: 12 } },
+    });
+    assert.deepEqual(row.checkSummary, { kind: 'ingredients', dc: null });
+  });
+
+  it('still resolves the DC of a routedByIngredients system that DOES have a usable check', async () => {
+    // The routed-by-ingredients pass/fail gate shares the `simple` check slot, so a usable
+    // one there is a real DC and must not be flattened into "By ingredients".
+    const row = await projectWith({
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: { simple: { ...USABLE_SIMPLE_CHECK, dc: 14 } },
+    });
+    assert.deepEqual(row.checkSummary, { kind: 'dc', dc: 14 });
+  });
+
   it('shows no check for an alchemy system whose alchemy check mode is none', async () => {
     const row = await projectWith({
       resolutionMode: 'alchemy',

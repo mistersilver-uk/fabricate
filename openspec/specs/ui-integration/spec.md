@@ -117,6 +117,25 @@ Header hierarchy:
 - The top bar shows breadcrumbs, the current page title, optional concise subtitle, and page actions.
 - The top bar must not render redundant eyebrow/kicker labels that merely repeat the current view name, such as `Systems View` above `Crafting Systems`.
 - Section headers inside the page may use short contextual labels when they add information, such as selected object state, but they must not duplicate adjacent title text.
+- A screen renders **one** page header.
+A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the titlebar's system badge already carry.
+- The page title is the manager's display type and carries the weight that buys; the page's single primary action (`Create …`) is taller than a row button.
+
+Selected-system rail:
+
+- The rail's crafting-system card is a **selector**, not a caption: an uppercase micro-label, a real `<select>` listing every crafting system, and an `All crafting systems` link back to the system library.
+The GM can switch system from the rail without a round trip through the system library.
+- The selected system's name is set in the display face wherever it is named, including as the select's own value.
+- The rail does not repeat the product name or a "workspace" caption; the rail's own `GM management` section label already says what the rail is.
+- Rail count badges are **bare mono numerals**, right-aligned in the nav row — not bordered pills.
+They carry tabular figures so a count changing width (9 → 10) cannot move the row beside it.
+- The 56px collapsed rail hides the crafting-system card, the section label and the count numerals, leaving only the icon gutter.
+
+Narrow (stacked) layout:
+
+- At or below the manager's stacked container width, the rail, main and inspector regions each keep **their own content height** and the body scrolls.
+They must not share the body's height between them: every region carries `min-height: 0` and clips its overflow, so an `auto` grid track would size each to a fraction of the body and silently render a browser's rows at full height inside a collapsed, invisible scroll box.
+- The stacked rail is bounded and scrolls its own navigation, rather than becoming a full-height wall of nav above the content it navigates to.
 
 Selected-system navigation:
 
@@ -470,9 +489,19 @@ Per-tool breakage editing is governed by the active authority; the two authoriti
 
 The recipe **library** for the selected crafting system: a filter bar, collapsible category groups, rich card rows, and a persistent inspector in the shared manager inspector column.
 
+The library renders **one** page header, and the shell owns it (breadcrumb, screen title, subtitle, Create).
+The library does not render a page header of its own.
+
 Rows are **cards, not table columns**.
 A card row has no columns, so the list is a real list (`ul` / `li`, `role="list"`), not a table/row/cell structure with column headers.
-Each row shows the recipe's image medallion (the resolved recipe image, falling back to a glyph), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle with On/Off copy, and the Edit / Duplicate / Delete action group.
+Each row shows the recipe's image medallion (the resolved recipe image, falling back to a glyph), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle, and the Edit / Duplicate / Delete action group.
+
+The row's on/off toggle carries **no On/Off text**.
+The track colour is the state, its `aria-label` names the state for assistive tech, and the `Disabled` pill states it in words — a third copy on every row only crowds the description out.
+The label is retained on every other `manager-status-toggle` in the manager, where the switch has no pill beside it.
+
+The row's three actions are **borderless ghost icons** that take a background on hover.
+Delete and Duplicate are preserved capabilities, but three bordered buttons beside a bordered lock, a switch and a pill make the row read as a toolbar rather than as a recipe.
 
 Row authoring-state pills — at most one authoring state applies to a row:
 
@@ -484,17 +513,33 @@ Row authoring-state pills — at most one authoring state applies to a row:
 The **I/O readout** always shows the ingredient count (`N in`).
 It shows an output item count (`N out`) **only** in the `simple` and `progressive` resolution modes.
 In `routedByIngredients`, `routedByCheck` and `alchemy` the results are tier- or set-keyed, so a single "outputs" number does not exist; those modes show the **result-group count** with a routing glyph instead, labelled as groups.
+The readout is a phrase, not a numeric, and stays in the UI face — the mono face marks a number, it does not decorate a readout.
 
 The **check pill** resolves the recipe's `checkTierId` against the system check's tiers and shows that tier's DC, falling back to the check's static default DC.
-It shows a dynamic-DC pill when the check resolves its DC through a macro, a progressive pill for a progressive system, and an em dash when the system has **no usable check** — usable meaning an authored `rollFormula` exists, which is not the same as "checks enabled".
+It shows a dynamic-DC pill when the check resolves its DC through a macro and a progressive pill for a progressive system.
+A check is **usable** only when an authored `rollFormula` exists, which is not the same as "checks enabled", and the two check-less states are distinct and must not be conflated:
 
-The **filter bar** offers a name/description search, a status filter (all / on / off), a lock filter (all / unlocked / locked), a category filter, a group-by-category toggle, a sort key (name, needs attention, check DC, ingredients, results), and a sort direction.
-Every non-default filter surfaces a clearable active-filter chip beside the shown/total count.
+- **`By ingredients`** (neutral) — a `routedByIngredients` system with no usable check.
+  Results route off the ingredient set that was used, so the recipe resolves with no roll; this is a working configuration.
+- **`No check`** (warning) — every other mode with no usable check.
+  The system cannot roll for this recipe, and a GM must be able to **scan** a library for that, which is why it is a warning that names the condition rather than an em dash.
+
+The **filter bar** has three rows.
+Row one carries every filter — a name/description search, a status filter (all / on / off), a lock filter (all / unlocked / locked) and a category filter (bare, named by its `aria-label`).
+Row two carries the two view controls, separated by a rule: the group-by-category switch and the sort key (name, needs attention, check DC, ingredients, results) plus its direction.
+Each view control is titled by an uppercase micro-label that **precedes** it and does not wrap.
+Row three carries the active-filter chips and the count.
+
+Every non-default filter surfaces a clearable active-filter chip.
+The **count** is quiet right-aligned metadata — not a chip — and reports the page **window** (`1–5 of 12`), because a bare shown/total never tells the GM which page they are on.
+
 Category group headers are `aria-expanded` / `aria-controls` buttons and default to **expanded**, the status and lock filters default to **all**, and the pager's default page size exceeds a typical system's recipe count.
 These defaults are load-bearing: a default that hid rows would leave the GM staring at an empty library.
+A group header is a tight left cluster — chevron, folder, name, count — not a full-width bar with the count flung to the far edge, which reads as a table header.
 
 The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
 The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).
+The flash **floats** over the list rather than sitting in flow above it: an in-flow banner shoves every row down the page as it appears, moving the row the GM just clicked out from under the cursor.
 
 The **lock toggle** gives `recipe.locked` a real write path from the row.
 Unlike enable, locking is **never gated**, in either direction: a GM locks a recipe precisely while it is unfinished, so refusing the write on incompleteness would make the control useless exactly when it is wanted.

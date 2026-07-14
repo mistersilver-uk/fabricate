@@ -183,6 +183,17 @@ describe('CollapsibleGroupHeader (mounted)', () => {
     assert.ok(header.textContent.includes('Alchemy'));
     assert.ok(header.textContent.includes('4 recipes'));
     assert.ok(header.querySelector('i.fa-chevron-down'), 'an expanded group shows the down chevron');
+
+    // A tight LEFT CLUSTER: chevron, folder, name, count — then empty bar. `flex: 1 1 auto`
+    // on the name grew it to fill the row and flung the count to the far right edge, which
+    // made the bar read as a table header with a column of counts. The trailing spacer is
+    // what keeps the bar full-bleed while the cluster stays left.
+    const children = [...header.children].map((child) => child.classList[0]);
+    assert.deepEqual(
+      children.slice(-2),
+      ['fab-group-count', 'fab-group-spacer'],
+      'the count sits beside the name, with the empty bar after it'
+    );
   });
 
   it('shows the collapsed chevron and toggles on activation', async () => {

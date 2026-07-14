@@ -27,7 +27,7 @@ const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 // vacuous (issue 643: the lock control may reference `recipe.locked`; these three
 // buttons still may not).
 function actionGroupBlock() {
-  const start = browserSource.indexOf('class="manager-action-group"');
+  const start = browserSource.indexOf('class="manager-action-group manager-recipe-actions"');
   assert.ok(start >= 0, 'recipe action group should be present');
   const lastButton = browserSource.indexOf('fa-trash', start);
   assert.ok(lastButton > start, 'recipe action group should contain the delete button');
@@ -53,6 +53,26 @@ describe('RecipesBrowserView Edit quick-action', () => {
     assert.ok(copyIdx < trashIdx, 'Duplicate should come before Delete');
   });
 
+  // The three buttons are CAPABILITIES and are kept. Their CHROME is not: three bordered
+  // buttons beside a bordered lock, a switch and a pill turned every row into a toolbar
+  // and truncated every description to ~28 characters. They are ghost icons — background
+  // on hover only — which is the whole point of preserving them without shouting them.
+  it('renders the three actions as ghost icons, not bordered buttons', () => {
+    const block = actionGroupBlock();
+    assert.equal(
+      (block.match(/manager-icon-button is-ghost/g) || []).length,
+      3,
+      'all three row actions are ghost icons'
+    );
+    const ghostBlock = css.slice(
+      css.indexOf('.fabricate-manager .manager-icon-button.is-ghost {'),
+      css.indexOf('}', css.indexOf('.fabricate-manager .manager-icon-button.is-ghost {'))
+    );
+    assert.ok(ghostBlock.includes('border-color: transparent;'), 'a ghost icon carries no resting border');
+    assert.ok(ghostBlock.includes('background: transparent;'), 'a ghost icon carries no resting fill');
+    assert.ok(ghostBlock.includes('width: 28px;'), 'a ghost icon is 28x28, not the 34px bordered button');
+  });
+
   it('wires the Edit button to onEditRecipe with localized aria-label and title', () => {
     const block = actionGroupBlock();
     assert.ok(block.includes('onEditRecipe(recipe.id)'), 'Edit button should call onEditRecipe');
@@ -74,7 +94,7 @@ describe('recipe-edit action group spacing', () => {
     const end = css.indexOf('}', start);
     const block = css.slice(start, end);
     assert.ok(block.includes('flex-wrap: nowrap'), 'action group should not wrap');
-    assert.ok(block.includes('gap: var(--fab-space-1)'), 'action group uses the tight token gap');
+    assert.ok(block.includes('gap: var(--fab-space-2xs)'), 'ghost icons sit tight against each other');
   });
 
   // The row is a card, not a column grid, so there is no fixed 118px actions column

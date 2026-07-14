@@ -150,9 +150,13 @@ export function groupRecipesByCategory(recipes) {
  * Slice one page out of the rows, clamping the page index into range so a filter
  * change that shrinks the list can never strand the pager on an empty page.
  *
+ * The window is reported as a 1-based, inclusive RANGE (`rangeStart`..`rangeEnd`),
+ * because the library's count reads "1–5 of 12": a bare "5 of 12" never tells the GM
+ * WHICH page they are looking at. An empty result reports `0..0`.
+ *
  * @param {object[]} recipes
  * @param {{pageIndex?: number, pageSize?: number}} [options]
- * @returns {{recipes: object[], pageIndex: number, pageCount: number, totalCount: number}}
+ * @returns {{recipes: object[], pageIndex: number, pageCount: number, totalCount: number, rangeStart: number, rangeEnd: number}}
  */
 export function paginateRecipes(recipes, options = {}) {
   const rows = Array.isArray(recipes) ? recipes : [];
@@ -160,12 +164,15 @@ export function paginateRecipes(recipes, options = {}) {
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const pageIndex = Math.min(Math.max(0, numeric(options.pageIndex)), pageCount - 1);
   const start = pageIndex * pageSize;
+  const page = rows.slice(start, start + pageSize);
 
   return {
-    recipes: rows.slice(start, start + pageSize),
+    recipes: page,
     pageIndex,
     pageCount,
     totalCount: rows.length,
+    rangeStart: page.length > 0 ? start + 1 : 0,
+    rangeEnd: page.length > 0 ? start + page.length : 0,
   };
 }
 
@@ -448,6 +455,7 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
  * @returns {{
  *   filtered: object[], page: object[], groups: {category: string, recipes: object[]}[],
  *   pageIndex: number, pageCount: number, totalCount: number,
+ *   rangeStart: number, rangeEnd: number,
  *   chips: {id: string, value: string}[]
  * }}
  */
@@ -468,6 +476,10 @@ export function buildRecipeBrowserModel(recipes, options = {}) {
     pageIndex: paged.pageIndex,
     pageCount: paged.pageCount,
     totalCount: paged.totalCount,
+    // The page WINDOW, so the count can read "1–5 of 12" rather than "5 of 12" — which
+    // never told the GM which page they were on.
+    rangeStart: paged.rangeStart,
+    rangeEnd: paged.rangeEnd,
     chips: describeActiveFilters(options),
   };
 }

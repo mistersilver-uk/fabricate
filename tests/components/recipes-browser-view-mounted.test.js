@@ -276,7 +276,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     assert.equal(/1 groups/.test(io), false);
   });
 
-  it('shows the projected check DC, and an em dash when the system has no usable check', async () => {
+  it('shows the projected check DC in the mono face', async () => {
     const withDc = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'dc', dc: 18 } })] });
     const dcPill = withDc.querySelector('[data-recipe-check]');
     assert.equal(dcPill.dataset.recipeCheck, 'dc');
@@ -286,13 +286,6 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     assert.ok(dcPill.classList.contains('is-mono'), 'a DC is a numeric and reads in the mono face');
     browser.remount();
 
-    const noCheck = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'none', dc: null } })] });
-    const pill = noCheck.querySelector('[data-recipe-check]');
-    assert.equal(pill.dataset.recipeCheck, 'none');
-    assert.match(pill.textContent, /—/);
-    assert.equal(pill.classList.contains('is-mono'), false, 'an em dash is not a number');
-    browser.remount();
-
     const dynamic = await browser.mount({
       recipes: [makeRecipe({ checkSummary: { kind: 'dynamic', dc: null } })]
     });
@@ -300,6 +293,68 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
       dynamic.querySelector('[data-recipe-check]').classList.contains('is-mono'),
       false,
       'a macro-resolved DC has no number to set'
+    );
+  });
+
+  // The two check-LESS states are not the same fact, and the row must not tell the GM they
+  // are. `none` means the system cannot roll for this recipe at all — a state a GM should
+  // be able to SCAN a library for, which an em dash behind a ban glyph never let them do.
+  // `ingredients` is its neutral sibling: a routedByIngredients craft resolves off the
+  // ingredient set that was used, so no check is a working configuration, not a gap.
+  it('warns when the system cannot roll for a recipe, and stays neutral when it need not', async () => {
+    const noCheck = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'none', dc: null } })]
+    });
+    const warning = noCheck.querySelector('[data-recipe-check]');
+    assert.equal(warning.dataset.recipeCheck, 'none');
+    assert.match(warning.textContent, /No check/, 'a warning that says nothing is not a warning');
+    assert.equal(/—/.test(warning.textContent), false, 'the em dash said nothing at all');
+    assert.ok(warning.querySelector('i.fa-triangle-exclamation'), 'it reads as a warning');
+    assert.equal(warning.querySelector('i.fa-ban'), null, 'the ban glyph is retired');
+    assert.equal(warning.classList.contains('is-mono'), false, 'a phrase is not a number');
+    browser.remount();
+
+    const byIngredients = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'ingredients', dc: null } })]
+    });
+    const neutral = byIngredients.querySelector('[data-recipe-check]');
+    assert.equal(neutral.dataset.recipeCheck, 'ingredients');
+    assert.match(neutral.textContent, /By ingredients/);
+    assert.ok(neutral.querySelector('i.fa-code-branch'), 'routing, not a roll');
+    assert.equal(
+      neutral.querySelector('i.fa-triangle-exclamation'),
+      null,
+      'a working configuration must not be reported as a problem'
+    );
+  });
+});
+
+// The count is quiet right-aligned METADATA and reports the page WINDOW. As a bordered
+// mono chip reading "6 of 6" it looked like a control and never told the GM which page
+// they were on.
+describe('RecipesBrowserView result count', () => {
+  it('reports the page window as a range, in plain muted text', async () => {
+    const many = Array.from({ length: 12 }, (_, index) =>
+      makeRecipe({ id: `r${index + 1}`, name: `Draught ${String(index + 1).padStart(2, '0')}` })
+    );
+    const root = await browser.mount({ recipes: many });
+
+    const count = root.querySelector('[data-recipe-count]');
+    assert.equal(count.textContent.trim(), '1–12 of 12');
+    assert.equal(count.classList.contains('manager-chip'), false, 'the count is not a chip to press');
+
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '10';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+    assert.equal(root.querySelector('[data-recipe-count]').textContent.trim(), '1–10 of 12');
+
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+    assert.equal(
+      root.querySelector('[data-recipe-count]').textContent.trim(),
+      '11–12 of 12',
+      'the count names the page the GM is actually looking at'
     );
   });
 });

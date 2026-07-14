@@ -570,10 +570,35 @@ test('manager recipes browser defines a non-overflowing card row', () => {
     'the control cluster (lock / enable / edit) must never be squeezed'
   );
   assert.ok(groupListBlock.includes('list-style: none;'), 'the rows render as a real, unstyled list');
-  // The rows still share the row-card geometry group with every other browser row.
+
+  // The recipe row LEFT the shared 76px row-card geometry group: it is a denser card at
+  // 11px/12px and radius 9 (~62px tall), so a page of recipes shows more of the library
+  // and less of the gaps between it. The other four browser rows keep the 76px group.
   assert.ok(
-    css.includes('.fabricate-manager .manager-recipe-row,\n.fabricate-manager .manager-component-row,\n.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row {\n  width: 100%;\n  min-height: 76px;'),
-    'recipe, component, environment, gathering task, and essence rows should have stable row height'
+    css.includes('.fabricate-manager .manager-component-row,\n.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row {\n  width: 100%;\n  min-height: 76px;'),
+    'component, environment, gathering task, and essence rows keep the shared 76px row height'
+  );
+  assert.equal(
+    /\.manager-recipe-row,\n[^{]*min-height: 76px/.test(css),
+    false,
+    'the recipe row must not still be in the 76px geometry group'
+  );
+  assert.ok(rowBlock.includes('min-height: 62px;'), 'the recipe row is the denser library card');
+  assert.ok(rowBlock.includes('padding: 11px 12px;'), 'the recipe row uses the library card padding');
+  assert.ok(rowBlock.includes('border-radius: 9px;'), 'the recipe row uses the library card radius');
+
+  // A disabled row reads at .55, not .62 — far enough back that a page of rows separates
+  // at a glance into what is live and what is not.
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipe-row.is-off').includes('opacity: 0.55;'),
+    'a disabled row recedes'
+  );
+
+  // Selection is the accent BORDER. A ring plus an inset left bar is the same statement
+  // made twice, and the bar bit into the row's medallion.
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipe-row.is-selected').includes('box-shadow: none;'),
+    'the selected recipe row rings in the accent and adds no left bar'
   );
 });
 
@@ -594,11 +619,14 @@ test('manager recipe row collapses in the specified order and never drops its co
     'the row ladder needs a container that measures the ROW, not the whole manager'
   );
 
+  // The ladder's old fourth rung dropped the switch's "On"/"Off" text at 440px. That text
+  // is no longer rendered in the row at all — the track colour is the state, the aria-label
+  // names it, and the Disabled pill says it in words — so the rung is gone rather than left
+  // as a rule matching nothing.
   const LADDER = [
     [680, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
     [600, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
-    [520, '.fabricate-manager .manager-recipe-row .manager-recipe-check'],
-    [440, '.fabricate-manager .manager-recipe-row .manager-status-toggle-label']
+    [520, '.fabricate-manager .manager-recipe-row .manager-recipe-check']
   ];
 
   for (const [width, selector] of LADDER) {
@@ -610,6 +638,12 @@ test('manager recipe row collapses in the specified order and never drops its co
       `${selector} should drop at ${width}px of ROW width`
     );
   }
+
+  assert.equal(
+    css.includes('.fabricate-manager .manager-recipe-row .manager-status-toggle-label'),
+    false,
+    'the row renders no On/Off text, so nothing should still be styled to hide it'
+  );
 
   for (const kept of ['.manager-recipe-lock', '.manager-recipe-status', '.manager-action-group']) {
     assert.equal(
@@ -634,22 +668,25 @@ test('manager recipe row collapses in the specified order and never drops its co
 // frame. `.manager-status-toggle` is a STATUS cell: it caps at 78px and ellipsises its
 // label, which is right for "On"/"Off" and wrong for anything the GM has to read.
 test('long-labelled switches escape the status cell geometry', () => {
-  // (1) The library's grouping switch rendered as "Grou…": 78px - 34px track - gap
-  // leaves ~36px. A filter-bar switch is sized by its label.
+  // (1) The library's grouping switch used to render as "Grou…": 78px - 34px track - gap
+  // leaves ~36px. It now carries NO label of its own — the uppercase micro-label beside it
+  // is its accessible name (`aria-labelledby`) — so it is track-only, and it opts out of
+  // the status-cell cap so the track is not squeezed either.
   const groupToggleBlock = blockFor(
     '.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle]'
   );
   assert.ok(
     groupToggleBlock.includes('max-width: none;'),
-    'the group-by-category switch must not inherit the 78px status-cell cap that truncates its label'
+    'the group-by-category switch must not inherit the 78px status-cell cap'
   );
-  const groupLabelBlock = blockFor(
-    '.fabricate-manager .manager-status-toggle[data-recipe-group-toggle] .manager-status-toggle-label'
-  );
-  assert.ok(
-    groupLabelBlock.includes('overflow: visible;') && groupLabelBlock.includes('text-overflow: clip;'),
-    'the filter switch label must not ellipsise'
-  );
+  assert.ok(groupToggleBlock.includes('width: auto;'), 'a track-only switch is sized by its track');
+
+  // The micro-label is what titles the control, and `white-space: nowrap` is the whole
+  // reason "Sort by" no longer breaks onto two lines in the flagship frame.
+  const filterLabelBlock = blockFor('.fabricate-manager .manager-recipe-filter-label');
+  assert.ok(filterLabelBlock.includes('white-space: nowrap;'), 'a filter micro-label never wraps');
+  assert.ok(filterLabelBlock.includes('text-transform: uppercase;'), 'a filter micro-label is a micro-label');
+  assert.ok(blockFor('.fabricate-manager .manager-recipe-filter-divider').includes('width: 1px;'), 'the view controls are ruled apart');
 
   // (2) The Overview Locked card has no image picker, so its switch + hint are a
   // left-aligned row rather than the media column's centred, 14ch-clamped stack.
@@ -726,7 +763,8 @@ test('the typographic contract sets names in the serif and numerics in the mono 
   const MONO = [
     '.fabricate-manager .manager-chip.is-mono',
     '.fabricate-manager .manager-editor-tab-badge',
-    '.fabricate-manager .manager-environment-comp-order'
+    '.fabricate-manager .manager-environment-comp-order',
+    '.fabricate-manager .manager-nav-count'
   ];
   for (const selector of MONO) {
     const block = blockFor(selector);
@@ -740,9 +778,14 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     );
   }
 
-  assert.ok(
+  // The last clause of the contract, applied: "a control whose text is words rather than
+  // a number stays in the UI face". "2 in · 1 out" is a PHRASE — the mono face marks a
+  // numeric (a quantity, a DC, a count badge), it does not decorate a readout, and the
+  // mono digits visibly widened this one.
+  assert.equal(
     blockFor('.fabricate-manager .manager-recipe-io-counts').includes('font-family: var(--fab-font-mono);'),
-    "the row's in/out counts are numerics"
+    false,
+    "the row's I/O readout is a phrase, not a numeric, and stays in the UI face"
   );
 });
 

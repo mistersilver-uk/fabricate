@@ -243,31 +243,41 @@
       : text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step');
   }
 
+  // The five check states. `none` is the one WARNING: a system that cannot roll for
+  // this recipe is a thing the GM must be able to scan a library for, and the old em
+  // dash + ban glyph said nothing at all. `ingredients` is its neutral sibling — a
+  // routedByIngredients system resolves off the ingredient set that was used, so no
+  // check is a working configuration, not a gap.
   const CHECK_PILLS = {
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
     progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive', 'fas fa-list-ol'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', '—', 'fas fa-ban']
+    ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients', 'fas fa-code-branch'],
+    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation']
   };
 
-  // The check pill is projected by the store (`recipe.checkSummary`) — the row
-  // cannot resolve `checkTierId` → a tier DC on its own, and a system with no
-  // USABLE check (no authored rollFormula) shows an em dash, not a DC the engine
-  // would never roll.
+  const CHECK_TOOLTIPS = {
+    ingredients: [
+      'FABRICATE.Admin.Manager.Recipe.CheckByIngredientsTooltip',
+      'This system routes results by the ingredient set used, with no crafting check.'
+    ],
+    none: [
+      'FABRICATE.Admin.Manager.Recipe.CheckNoneTooltip',
+      'This system has no usable crafting check.'
+    ]
+  };
+
+  // The check pill is projected by the store (`recipe.checkSummary`) — the row cannot
+  // resolve `checkTierId` → a tier DC, nor the system's mode, on its own.
   function checkPill(recipe) {
     const summary = recipe?.checkSummary || { kind: 'none', dc: null };
     const [labelKey, fallback, icon] = CHECK_PILLS[summary.kind] || CHECK_PILLS.none;
+    const tooltip = CHECK_TOOLTIPS[summary.kind];
     return {
       kind: summary.kind,
       icon,
       label: format(labelKey, fallback, { dc: summary.dc ?? '' }),
-      title:
-        summary.kind === 'none'
-          ? text(
-              'FABRICATE.Admin.Manager.Recipe.CheckNoneTooltip',
-              'This system has no usable crafting check.'
-            )
-          : ''
+      title: tooltip ? text(tooltip[0], tooltip[1]) : ''
     };
   }
 
@@ -313,50 +323,72 @@
         optionDataAttr="data-recipe-lock-option"
         onChange={(value) => { lockFilter = value; pageIndex = 0; }}
       />
+      <!--
+        The category select is a FILTER and belongs with the other filters, on row one.
+        It used to be demoted to row two behind a sentence-case "Category" label, which
+        put a filter below the grouping and sorting controls that act on its result.
+        Bare here: the `aria-label` is its accessible name.
+      -->
+      {#if showRecipeCategories}
+        <select
+          class="manager-recipe-category-filter"
+          data-recipe-category-filter
+          value={categoryFilter}
+          onchange={(event) => { categoryFilter = event.currentTarget.value; pageIndex = 0; }}
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel', 'Filter recipes by category')}
+        >
+          <option value="all">{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option>
+          {#each recipeCategories || [] as category (category.name)}
+            <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
+          {/each}
+        </select>
+      {/if}
     </div>
 
+    <!--
+      Row two is the two VIEW controls — how the list is grouped, and how it is ordered
+      — separated by a rule. Both are titled by an uppercase micro-label that precedes
+      its control (the grouping switch used to come BEFORE its own label) and never
+      wraps: "Sort by" broke onto two lines in the flagship frame, which is what a
+      `nowrap` micro-label exists to prevent.
+    -->
     <div class="manager-recipe-filter-row is-secondary">
       {#if showRecipeCategories}
-        <label class="manager-filter">
-          <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
-          <select value={categoryFilter} onchange={(event) => { categoryFilter = event.currentTarget.value; pageIndex = 0; }} aria-label={text('FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel', 'Filter recipes by category')}>
-            <option value="all">{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option>
-            {#each recipeCategories || [] as category (category.name)}
-              <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
-            {/each}
-          </select>
-        </label>
-        <button
-          type="button"
-          class={`manager-status-toggle ${groupByCategory ? 'is-on' : 'is-off'}`}
-          data-recipe-group-toggle
-          aria-pressed={groupByCategory}
-          onclick={() => groupByCategory = !groupByCategory}
-        >
-          <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-          <span class="manager-status-toggle-label">{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span>
-        </button>
+        <div class="manager-recipe-filter-field">
+          <span class="manager-recipe-filter-label" id="manager-recipe-group-label">{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span>
+          <button
+            type="button"
+            class={`manager-status-toggle ${groupByCategory ? 'is-on' : 'is-off'}`}
+            data-recipe-group-toggle
+            aria-pressed={groupByCategory}
+            aria-labelledby="manager-recipe-group-label"
+            onclick={() => groupByCategory = !groupByCategory}
+          >
+            <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+          </button>
+        </div>
+        <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
       {/if}
-      <label class="manager-filter">
-        <span>{text('FABRICATE.Admin.Manager.Recipe.SortBy', 'Sort by')}</span>
+      <div class="manager-recipe-filter-field">
+        <span class="manager-recipe-filter-label">{text('FABRICATE.Admin.Manager.Recipe.SortBy', 'Sort by')}</span>
         <select value={sortKey} data-recipe-sort onchange={(event) => sortKey = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}>
           {#each RECIPE_SORT_KEYS as key (key)}
             <option value={key}>{sortLabel(key)}</option>
           {/each}
         </select>
-      </label>
-      <button
-        type="button"
-        class="manager-button manager-recipe-sort-direction"
-        data-recipe-sort-direction={sortDirection}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.ToggleSortDirection', 'Toggle sort direction')}
-        onclick={() => sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'}
-      >
-        <i class={sortDirection === 'asc' ? 'fas fa-arrow-down-short-wide' : 'fas fa-arrow-down-wide-short'} aria-hidden="true"></i>
-        <span>{sortDirection === 'asc'
-          ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
-          : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span>
-      </button>
+        <button
+          type="button"
+          class="manager-button manager-recipe-sort-direction"
+          data-recipe-sort-direction={sortDirection}
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.ToggleSortDirection', 'Toggle sort direction')}
+          onclick={() => sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'}
+        >
+          <i class={sortDirection === 'asc' ? 'fas fa-arrow-down-short-wide' : 'fas fa-arrow-down-wide-short'} aria-hidden="true"></i>
+          <span>{sortDirection === 'asc'
+            ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
+            : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span>
+        </button>
+      </div>
     </div>
 
     <div class="manager-recipe-filter-row is-chips">
@@ -373,10 +405,16 @@
           </button>
         </span>
       {/each}
-      <span class="manager-chip is-mono manager-recipe-count" data-recipe-count>
-        {format('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}', {
-          shown: model.filtered.length,
-          total: (recipes || []).length
+      <!--
+        The count is quiet right-aligned metadata, not a control: a bordered mono chip
+        read as something to press. It reports the page WINDOW ("1–5 of 12"), because
+        "5 of 12" never told the GM which page they were looking at.
+      -->
+      <span class="manager-recipe-count" data-recipe-count>
+        {format('FABRICATE.Admin.Manager.Recipe.CountRange', '{start}–{end} of {total}', {
+          start: model.rangeStart,
+          end: model.rangeEnd,
+          total: model.totalCount
         })}
       </span>
     </div>
@@ -386,7 +424,11 @@
     <!-- The blocked-enable flash. It REPLACES the Foundry notification (the store
          suppresses it when this owns the message) so the GM is never told the same
          thing twice; it is an error, so it is a dismissible role="alert" that does
-         not auto-hide. -->
+         not auto-hide.
+
+         It FLOATS over the list (absolutely positioned against the recipes
+         `.manager-main`), rather than sitting in flow between the toolbar and the
+         first row, where its appearance shoved every row down the page. -->
     <div class="manager-recipe-flash" role="alert" data-recipe-flash>
       <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
       <span class="manager-recipe-flash-message">{flashMessage}</span>
@@ -412,11 +454,12 @@
         </div>
       </div>
     {:else if model.filtered.length === 0}
-      <div class="manager-empty">
+      <!-- A filtered-to-nothing library is not an error state and does not want the
+           full empty-panel apparatus: one dashed panel says it, and the Clear-filters
+           button is the way out. -->
+      <div class="manager-empty manager-recipe-empty-filtered">
         <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Recipe.EmptySearchHint', 'Clear search and filters to show all recipes in this system.')}</p>
+          <p>{text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match your filters.')}</p>
           <button type="button" class="manager-button" data-clear-filters="recipes" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
         </div>
       </div>
@@ -502,6 +545,13 @@
                         <i class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'} aria-hidden="true"></i>
                       </button>
 
+                      <!--
+                        No "On"/"Off" text IN THE ROW. The track colour already carries
+                        the state, the `aria-label` names it for assistive tech, and the
+                        row's Disabled pill says it in words — a third copy on every row
+                        cost ~30px of the description. (The label stays everywhere else
+                        in the manager, where a switch has no pill beside it.)
+                      -->
                       <span class="manager-recipe-status">
                         <button
                           type="button"
@@ -519,20 +569,27 @@
                           <span class="manager-status-toggle-track" aria-hidden="true">
                             <span class="manager-status-toggle-knob"></span>
                           </span>
-                          <span class="manager-status-toggle-label">
-                            {recipe.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-                          </span>
                         </button>
                       </span>
 
-                      <span class="manager-action-group">
-                        <button type="button" class="manager-icon-button" aria-label={format('FABRICATE.Admin.Manager.Recipe.EditNamed', 'Edit {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')} onclick={() => onEditRecipe(recipe.id)}>
+                      <!--
+                        Three GHOST icons. Duplicate and Delete are kept (they are real
+                        capabilities), but their CHROME is not: three bordered buttons
+                        beside a bordered lock, a switch and a pill turned every row into
+                        a toolbar and truncated every description to ~28 characters. The
+                        border arrives on hover, where it is needed.
+
+                        `i.fa-edit` is FROZEN — the smoke harness opens the editor with
+                        `button:has(i.fa-edit)`.
+                      -->
+                      <span class="manager-action-group manager-recipe-actions">
+                        <button type="button" class="manager-icon-button is-ghost" aria-label={format('FABRICATE.Admin.Manager.Recipe.EditNamed', 'Edit {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')} onclick={() => onEditRecipe(recipe.id)}>
                           <i class="fas fa-edit" aria-hidden="true"></i>
                         </button>
-                        <button type="button" class="manager-icon-button" aria-label={format('FABRICATE.Admin.Manager.Recipe.DuplicateNamed', 'Duplicate {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')} onclick={() => onDuplicateRecipe(recipe.id)}>
+                        <button type="button" class="manager-icon-button is-ghost" aria-label={format('FABRICATE.Admin.Manager.Recipe.DuplicateNamed', 'Duplicate {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')} onclick={() => onDuplicateRecipe(recipe.id)}>
                           <i class="fas fa-copy" aria-hidden="true"></i>
                         </button>
-                        <button type="button" class="manager-icon-button is-danger" aria-label={format('FABRICATE.Admin.Manager.Recipe.DeleteNamed', 'Delete {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')} onclick={() => onDeleteRecipe(recipe.id)}>
+                        <button type="button" class="manager-icon-button is-ghost is-danger" aria-label={format('FABRICATE.Admin.Manager.Recipe.DeleteNamed', 'Delete {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')} onclick={() => onDeleteRecipe(recipe.id)}>
                           <i class="fas fa-trash" aria-hidden="true"></i>
                         </button>
                       </span>

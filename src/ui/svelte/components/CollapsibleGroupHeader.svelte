@@ -40,6 +40,7 @@
   <i class="fas fa-folder-open fab-group-folder" aria-hidden="true"></i>
   <span class="fab-group-name">{name}</span>
   <span class="fab-group-count">{countText}</span>
+  <span class="fab-group-spacer" aria-hidden="true"></span>
 </button>
 
 <style>
@@ -86,10 +87,18 @@
     font-size: 0.7rem;
   }
 
+  /*
+    The header is a tight LEFT CLUSTER — chevron, folder, name, count — with the rest of
+    the bar empty. `flex: 1 1 auto` on the name grew it to fill the row and flung the
+    count to the far right edge, which made the bar read as a table header with a column
+    of counts rather than as a group label. `0 1 auto` lets the name shrink (ellipsising
+    a long category) without ever growing.
+  */
   .fab-group-name {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
+    color: var(--fab-text-secondary);
     font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -101,5 +110,12 @@
     font-family: var(--fab-font-mono);
     font-size: 0.66rem;
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Keeps the bar full-bleed while the cluster stays left. */
+  .fab-group-spacer {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 </style>

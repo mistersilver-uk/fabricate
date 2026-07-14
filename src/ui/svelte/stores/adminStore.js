@@ -444,14 +444,23 @@ function _recipeCheckConfig(system) {
  * — so it is projected here.
  *
  * A check is USABLE only when it has an authored `rollFormula`; "checks enabled"
- * is not the same thing, and an unusable check renders as an em dash rather than
- * a DC the engine would never roll. The DC resolution mirrors
+ * is not the same thing. The DC resolution mirrors
  * `CraftingEngine._resolveSimpleCheckDc`: the recipe's selected tier wins, then
  * the check's static default.
  *
+ * The two check-less kinds are NOT the same fact, and the row must not tell the GM
+ * they are:
+ *
+ *  - `ingredients` — a `routedByIngredients` system with no usable check. Results
+ *    route off the ingredient set that was used, so the recipe resolves perfectly
+ *    well with no roll. This is a working configuration, reported neutrally.
+ *  - `none` — every other mode with no usable check. The system cannot roll for this
+ *    recipe, which is a state the GM should be able to SCAN a library for, so it
+ *    carries a warning rather than an em dash that says nothing.
+ *
  * @param {object} system the selected crafting system (raw, not projected).
  * @param {object} recipe the Recipe model.
- * @returns {{kind: 'none' | 'progressive' | 'dynamic' | 'dc', dc: number | null}}
+ * @returns {{kind: 'none' | 'ingredients' | 'progressive' | 'dynamic' | 'dc', dc: number | null}}
  * @private
  */
 function _buildRecipeCheckSummary(system, recipe) {
@@ -464,7 +473,11 @@ function _buildRecipeCheckSummary(system, recipe) {
 
   const config = _recipeCheckConfig(system);
   const hasRollFormula = Boolean(String(config?.rollFormula ?? '').trim());
-  if (!config || !hasRollFormula) return { kind: 'none', dc: null };
+  if (!config || !hasRollFormula) {
+    return mode === 'routedByIngredients'
+      ? { kind: 'ingredients', dc: null }
+      : { kind: 'none', dc: null };
+  }
   if (mode === 'progressive') return { kind: 'progressive', dc: null };
   // A dynamic DC is macro-resolved at craft time; there is no static number to show.
   if (config.dcMode === 'dynamic') return { kind: 'dynamic', dc: null };

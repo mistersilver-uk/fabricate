@@ -4119,14 +4119,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(disabledRecipeToggle, 'disabled recipe row should render the shared status toggle');
     assert.equal(enabledRecipeToggle.getAttribute('aria-pressed'), 'true');
     assert.equal(disabledRecipeToggle.getAttribute('aria-pressed'), 'false');
-    assert.equal(
-      enabledRecipeToggle.querySelector('.manager-status-toggle-label').textContent.trim(),
-      'On'
-    );
-    assert.equal(
-      disabledRecipeToggle.querySelector('.manager-status-toggle-label').textContent.trim(),
-      'Off'
-    );
+    // No "On"/"Off" TEXT in the row (issue 643): the track colour is the state, the
+    // aria-label names it, and the Disabled pill says it in words. A third copy on every
+    // row cost ~30px of the description. The label survives everywhere else in the manager,
+    // where a switch has no pill beside it.
+    for (const toggle of [enabledRecipeToggle, disabledRecipeToggle]) {
+      assert.equal(
+        toggle.querySelector('.manager-status-toggle-label'),
+        null,
+        'the row switch carries no redundant On/Off text'
+      );
+      assert.ok(toggle.getAttribute('aria-label'), 'the switch is still named for assistive tech');
+    }
     assert.equal(
       target.querySelector('[data-recipe-id="r2"] .manager-toggle input[type="checkbox"]'),
       null

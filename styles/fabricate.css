@@ -3079,21 +3079,33 @@
 
 /* The card row: a shrinkable identity cell plus a fixed control cluster. The
    `min-width: 0` / `flex-shrink: 0` pair is what keeps the row inside `.manager-main`
-   at the harness's 1280px width. */
+   at the harness's 1280px width.
+
+   The recipe row leaves the shared 76px row-card geometry group (which the component,
+   environment, gathering-task and essence rows still share): it is a denser card at
+   11px/12px padding and radius 9, ~62px tall, so a page of recipes shows more of the
+   library and less of the gaps between it. */
 .fabricate-manager .manager-recipe-row {
   display: flex;
   gap: var(--fab-space-3);
   align-items: center;
+  width: 100%;
   min-width: 0;
+  min-height: 62px;
+  padding: 11px 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-recipes-table .manager-recipe-row .manager-action-group {
   flex-wrap: nowrap;
-  gap: var(--fab-space-1);
+  gap: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-recipe-row.is-off {
-  opacity: 0.62;
+  opacity: 0.55;
 }
 
 .fabricate-manager .manager-recipe-cluster {
@@ -3145,11 +3157,14 @@
   color: var(--fab-danger-text);
 }
 
+/* "2 in · 1 out" is a PHRASE, not a number, so it stays in the UI face — the mono face
+   marks a numeric (a quantity, a DC, a count badge), it does not decorate a readout, and
+   the mono digits visibly widened this one. */
 .fabricate-manager .manager-recipe-io-counts {
   display: flex;
   gap: var(--fab-space-chip);
   align-items: center;
-  font-family: var(--fab-font-mono);
+  font-size: 0.62rem;
   font-weight: 600;
 }
 
@@ -3162,12 +3177,17 @@
   display: flex;
   gap: var(--fab-space-chip);
   align-items: center;
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.62rem;
+  color: var(--fab-text-subtle);
+  font-size: 0.56rem;
+  font-weight: 400;
 }
 
 .fabricate-manager .manager-recipe-check {
+  min-height: 0;
+  padding: 3px var(--fab-space-1);
   gap: var(--fab-space-chip);
+  font-size: 0.6rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -3178,24 +3198,76 @@
   background: var(--fab-info-soft);
 }
 
-.fabricate-manager .manager-recipe-check.is-progressive {
+/* The two check-LESS states are not the same fact and must not look alike. */
+
+/* `progressive` and `ingredients` are working configurations that simply do not roll:
+   a progressive craft advances by stages, and a routedByIngredients craft resolves off
+   the ingredient set that was used. Neutral. */
+.fabricate-manager .manager-recipe-check.is-progressive,
+.fabricate-manager .manager-recipe-check.is-ingredients {
   border-color: var(--fab-border);
-  color: var(--fab-text-secondary);
+  color: var(--fab-text-subtle);
   background: var(--fab-surface-raised);
 }
 
-/* No usable crafting check (no authored roll formula): an em dash, never a DC the
-   engine would not roll. */
+/* `none` — the system cannot roll for this recipe at all (no authored roll formula).
+   That IS a warning, and it says so: an em dash behind a ban glyph told the GM nothing,
+   and the point of the pill is that a library can be SCANNED for it. */
 .fabricate-manager .manager-recipe-check.is-none {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
+/* The row's lock box: 28px, quiet until it is ON. */
+.fabricate-manager .manager-recipe-lock {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 7px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  font-size: 0.68rem;
+}
+
 .fabricate-manager .manager-recipe-lock.is-locked {
   border-color: var(--fab-accent-border);
   color: var(--fab-mv2-accent);
   background: var(--fab-accent-soft);
+}
+
+/*
+  The row's three actions are GHOST icons (issue 643). Duplicate and Delete are real
+  capabilities and are kept, but their CHROME is not: three bordered buttons beside a
+  bordered lock, a switch and a pill made every row read as a toolbar and squeezed the
+  cluster to ~420px, truncating every description to about 28 characters. The border and
+  fill arrive on hover, where they are needed.
+*/
+.fabricate-manager .manager-icon-button.is-ghost {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-color: transparent;
+  border-radius: 7px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  font-size: 0.68rem;
+}
+
+.fabricate-manager .manager-icon-button.is-ghost:not(:disabled):hover,
+.fabricate-manager .manager-icon-button.is-ghost:focus-visible {
+  color: var(--fab-mv2-text);
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-icon-button.is-ghost.is-danger {
+  color: var(--fab-text-subtle);
+}
+
+.fabricate-manager .manager-icon-button.is-ghost.is-danger:not(:disabled):hover,
+.fabricate-manager .manager-icon-button.is-ghost.is-danger:focus-visible {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
 }
 
 /* A switch + its helper line, side by side, in a card that has NO media column. The
@@ -3215,8 +3287,10 @@
   line-height: 1.35;
 }
 
-/* The three-row filter bar: search + status/lock segments, then category + grouping
-   + sort, then the active-filter chips and the result count. */
+/* The three-row filter bar. Row one is every FILTER (search, status, lock, category);
+   row two is the two VIEW controls (grouping, ordering), split by a rule; row three is
+   the active-filter chips and the count. Category used to sit on row two, below the
+   grouping and sorting controls that act on its result. */
 .fabricate-manager .manager-recipe-toolbar {
   gap: var(--fab-space-2);
 }
@@ -3238,18 +3312,58 @@
   gap: var(--fab-space-1);
 }
 
-/* The grouping switch is a FILTER control, not a row's On/Off status cell. The shared
-   `.manager-status-toggle` caps itself at 78px because every other use of it carries a
-   two- or three-letter label; after the 34px track and the gap, that leaves ~36px and
-   ellipsises "Group by category" down to "Grou…". A filter-bar switch is sized by its
-   label, so it opts out of the cap and never truncates. */
-.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle] {
-  max-width: none;
+/* The bare category select. It carries no visible label — the `aria-label` is its
+   accessible name — because a filter bar whose controls each announce themselves in
+   sentence case reads as a form, not a bar. */
+.fabricate-manager .manager-recipe-category-filter {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 180px;
+  height: 34px;
+  border-radius: 9px;
+  text-overflow: ellipsis;
 }
 
-.fabricate-manager .manager-status-toggle[data-recipe-group-toggle] .manager-status-toggle-label {
-  overflow: visible;
-  text-overflow: clip;
+/* A row-two field: its uppercase micro-label, then its control. */
+.fabricate-manager .manager-recipe-filter-field {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+/*
+  The micro-label TITLES its control and precedes it (the grouping switch used to come
+  before its own label). `white-space: nowrap` is the whole reason "Sort by" no longer
+  breaks onto two lines: as flowing sentence-case text in a wrapping flex row it was
+  free to fold, and in the flagship frame it did.
+*/
+.fabricate-manager .manager-recipe-filter-label {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Separates the grouping control from the ordering controls. */
+.fabricate-manager .manager-recipe-filter-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 20px;
+  background: var(--fab-mv2-border);
+}
+
+/* The grouping switch is a FILTER control, not a row's On/Off status cell, so it opts
+   out of the shared 78px status-cell cap. It carries no label of its own — the micro-
+   label beside it is its accessible name (`aria-labelledby`) — so it is track-only. */
+.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle] {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
 }
 
 .fabricate-manager .manager-recipe-filter-chip {
@@ -3274,8 +3388,15 @@
   cursor: pointer;
 }
 
+/* The count is quiet right-aligned METADATA, not a control. As a bordered mono chip it
+   read as something to press, and it reported "6 of 6" — a number that never told the GM
+   which page they were on. It now reports the page window, "1–5 of 12". */
 .fabricate-manager .manager-recipe-count {
   margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-size: 0.68rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-recipe-sort-direction {
@@ -3440,17 +3561,30 @@
 
 /* The blocked-enable flash: an ERROR the GM must be able to read and dismiss. It
    REPLACES the Foundry notification (which the store suppresses while this owns the
-   message), so it never auto-hides out from under them. */
+   message), so it never auto-hides out from under them.
+
+   It is a TOAST, not a banner. In flow between the toolbar and the list it shoved every
+   row down the page the instant it appeared — the GM's eye followed the movement, not the
+   message, and the row they had just clicked was no longer under the cursor. It now floats
+   bottom-centre over the list (the recipes `.manager-main` is its containing block), on
+   the opaque `--fab-bg-0` so the rows beneath it stay legible as rows. */
 .fabricate-manager .manager-recipe-flash {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  z-index: 40;
+  transform: translateX(-50%);
   display: flex;
   gap: var(--fab-space-2);
   align-items: center;
-  margin: 0 0 var(--fab-space-2);
+  max-width: calc(100% - (2 * var(--fab-space-4)));
+  margin: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-danger-border);
-  border-radius: 9px;
+  border-radius: 10px;
   color: var(--fab-mv2-text);
-  background: var(--fab-danger-soft);
+  background: var(--fab-bg-0);
+  box-shadow: 0 12px 40px var(--fab-overlay-dark-48);
 }
 
 .fabricate-manager .manager-recipe-flash > i {
@@ -3715,7 +3849,8 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-row,
+/* The shared row-card geometry. The recipe row LEFT this group (issue 643): it is a
+   denser card at 11px/12px and radius 9, declared with the rest of the library. */
 .fabricate-manager .manager-component-row,
 .fabricate-manager .manager-environment-row,
 .fabricate-manager .manager-gathering-task-row,
@@ -3743,7 +3878,10 @@
    not in success/amber, which stay reserved for enabled and warning states. The old
    `--fab-success-soft` tint put the selected row in the very colour its own switch
    uses for ON, inches apart. This matches the rail's active nav row, which already
-   moved to the accent for the same reason. */
+   moved to the accent for the same reason.
+
+   The accent BORDER is the cue. The recipe row carries no inset left bar: a ring plus
+   a bar is the same statement made twice, and the bar bit into the row's medallion. */
 .fabricate-manager .manager-recipe-row.is-selected,
 .fabricate-manager .manager-component-row.is-selected,
 .fabricate-manager .manager-environment-row.is-selected,
@@ -3752,6 +3890,10 @@
   border-color: var(--fab-accent-border);
   background: var(--fab-surface-soft);
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-recipe-row.is-selected {
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-system-identity,
@@ -10381,6 +10523,32 @@
   background: var(--fab-overlay-light-03);
 }
 
+/*
+  Filtered to nothing is not an error and does not want the full empty-panel apparatus
+  (a 46px icon, an <h3>, a paragraph). One dashed panel says it in a sentence, and the
+  Clear-filters button — which the prototype has no equivalent of, and which is kept —
+  is the way out of it.
+*/
+.fabricate-manager .manager-recipe-empty-filtered {
+  align-content: center;
+  min-height: 0;
+  padding: 40px;
+  border-color: var(--fab-mv2-border-strong);
+  border-radius: 12px;
+  background: transparent;
+}
+
+.fabricate-manager .manager-recipe-empty-filtered > div {
+  display: grid;
+  gap: var(--fab-space-3);
+  justify-items: center;
+}
+
+.fabricate-manager .manager-recipe-empty-filtered p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
 .fabricate-manager .manager-empty > div > i {
   display: inline-flex;
   align-items: center;
@@ -14971,14 +15139,19 @@
 }
 
 /* The recipe row's collapse ladder (issue 643 §8). Drop order is fixed:
-   (1) description, (2) I/O + steps readout, (3) check pill, (4) the toggle's On/Off
-   text — and NEVER the lock, enable or edit controls. The row keeps its switch and
-   its aria-label at every width, so nothing that can be operated disappears.
+   (1) description, (2) I/O + steps readout, (3) check pill — and NEVER the lock, enable
+   or edit controls. The row keeps its switch and its aria-label at every width, so
+   nothing that can be operated disappears.
+
+   The ladder's old fourth rung dropped the switch's "On"/"Off" text. That text is no
+   longer rendered in the row AT ALL — the track colour is the state, the aria-label names
+   it, and the Disabled pill says it in words — so the rung has no target and is gone
+   rather than left as a rule matching nothing.
 
    The steps query `fabricate-recipes` — the ROW's own container (`.manager-recipes-table`)
-   — not the whole manager. The control cluster needs roughly 420px and the identity cell
-   another 160 to stay legible, so the row starts giving things up around 680px of table
-   width, wherever the window happens to be. */
+   — not the whole manager. The ghost control cluster needs roughly 230px and the identity
+   cell another 160 to stay legible, so the row starts giving things up around 680px of
+   table width, wherever the window happens to be. */
 @container fabricate-recipes (max-width: 680px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-description {
     display: none;
@@ -14993,12 +15166,6 @@
 
 @container fabricate-recipes (max-width: 520px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-check {
-    display: none;
-  }
-}
-
-@container fabricate-recipes (max-width: 440px) {
-  .fabricate-manager .manager-recipe-row .manager-status-toggle-label {
     display: none;
   }
 }
