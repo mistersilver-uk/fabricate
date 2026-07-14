@@ -801,7 +801,7 @@ Ancestry alone is not enough: the tag is pushed before the beta publish job, so 
 
 ### Public promotion
 
-File: `promote-to-public.yml` (task 3.5, renamed from `.github/workflows/promote-release.yml`).
+File: `.github/workflows/promote-to-public.yml` (task 3.5, replacing the retired `promote-release.yml`).
 
 Trigger: `workflow_dispatch` with `version`, `source_channel` (default `early-access`), and `dry_run`.
 
