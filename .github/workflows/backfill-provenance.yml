@@ -1,0 +1,79 @@
+name: "Backfill S3 provenance"
+
+# One-shot maintenance: stamp build provenance (version, source sha, build profile) onto EXISTING
+# versioned zips in a channel and its tester feeds, so the publish guard's "provenance absent ⇒
+# fail closed" rule does not trip on artefacts that predate issue #628. It re-stamps every zip via
+# CopyObject with MetadataDirective:'REPLACE', re-supplying ContentType + CacheControl so an
+# immutable-cached zip is never silently downgraded. It touches no manifest.
+#
+# Run this against the live bucket BEFORE the guard rule reaches those artefacts (e.g. before a
+# resume or a promotion of a version published without provenance). Start with dry_run: true to
+# preview exactly which zips would be stamped and with which sha.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Channel whose existing zips to backfill"
+        required: true
+        type: choice
+        options:
+          - early-access
+          - beta
+          - public
+      dry_run:
+        description: "Preview only: list what would be stamped, write nothing"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Job-level permissions so this new workflow requests only what it needs: an OIDC token to
+    # assume the AWS role, and read access to the repo.
+    permissions:
+      id-token: write
+      contents: read
+    # Share the per-channel publish concurrency group so a backfill and a publish to the SAME
+    # channel never interleave their writes; never cancel an in-flight run mid-loop.
+    concurrency:
+      group: release-s3-${{ inputs.channel }}
+      cancel-in-progress: false
+    steps:
+      # fetch-depth: 0 brings the tags — the backfill derives each zip's source sha from its
+      # `v<version>` tag (`git rev-list -n 1 v<version>`); an unreachable tag stamps `unknown`,
+      # which the guard treats as absent.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Configure AWS credentials via OIDC
+        # Always needed: even a dry-run LISTS the bucket to enumerate the zips it would stamp.
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Backfill provenance
+        env:
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+          # The tester-path secret for whichever channel was chosen; the script reads the one its
+          # channel config names (S3_TESTER_PATH_SECRET for beta, S3_EARLY_ACCESS_PATH_SECRET for
+          # early-access) and ignores the rest. GitHub masks their values in logs.
+          S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+          S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          node scripts/release-s3.js \
+            --backfill-provenance \
+            --channel "$CHANNEL" \
+            ${{ inputs.dry_run == true && '--dry-run' || '' }}

@@ -707,6 +707,24 @@ test('main() --backfill-provenance stamps every existing zip via CopyObject, ide
   assert.deepEqual([...new Set(harness.copies.map((c) => c.destKey))].sort(), first);
 });
 
+test('main() --backfill-provenance --dry-run writes NOTHING but reports what it would stamp', async () => {
+  const CH_PREFIX = 'modules/fabricate/beta/versions/';
+  const TE_PREFIX = 'testers/closed-beta-2026/seg/fabricate/versions/';
+  const listing = {
+    [CH_PREFIX]: [`${CH_PREFIX}1.4.0/fabricate-1.4.0.zip`, `${CH_PREFIX}1.4.1/fabricate-1.4.1.zip`],
+    [TE_PREFIX]: [],
+  };
+  const harness = await makeMain({ listing, resolveSha: async () => 'shaA' });
+
+  const result = await harness.run('--backfill-provenance', '--dry-run');
+
+  // No CopyObject is issued — the maintainer previews before mutating immutable artefacts…
+  assert.equal(harness.copies.length, 0);
+  // …but the plan is reported: every zip that WOULD be stamped, marked dry-run.
+  assert.equal(result.stamped.length, 2);
+  assert.ok(result.stamped.every((s) => s.dryRun === true));
+});
+
 test('a zip backfilled with an "unknown" sha is treated by the guard as absent (fails closed)', async () => {
   // The metadata a backfill stamps where no tag maps.
   const body = { id: 'fabricate', version: '1.4.0' };

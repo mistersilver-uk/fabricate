@@ -1172,6 +1172,7 @@ export async function runBackfill({
   const s3 = await createClient({ bucket: plan.bucket, region: envResolved.AWS_REGION });
   const resolveSha = deps.resolveSha ?? defaultResolveSha;
 
+  const dryRun = Boolean(options.dryRun);
   const stamped = [];
   for (const target of plan.layout.targets) {
     const keys = await s3.listObjects(zipVersionsPrefix(target.zipKey));
@@ -1180,6 +1181,14 @@ export async function runBackfill({
       const version = versionFromZipKey(key);
       if (!version) continue;
       const sourceSha = (await resolveSha(version)) || 'unknown';
+      if (dryRun) {
+        // A dry-run still LISTS the bucket (so it needs read credentials) but writes nothing — the
+        // maintainer previews exactly which zips would be stamped, and with which sha, before the
+        // one-shot mutates production immutable artefacts.
+        log(`release-s3: [dry-run] would stamp ${target.label} v${version} (sha ${sourceSha})`);
+        stamped.push({ key, version, sourceSha, buildProfile: target.buildProfile, dryRun: true });
+        continue;
+      }
       await s3.copyObject({
         sourceKey: key,
         destKey: key,
@@ -1191,7 +1200,10 @@ export async function runBackfill({
       stamped.push({ key, version, sourceSha, buildProfile: target.buildProfile });
     }
   }
-  log(`release-s3: backfill complete — ${stamped.length} versioned zip(s) stamped`);
+  log(
+    `release-s3: backfill ${dryRun ? 'DRY-RUN — would stamp' : 'complete — stamped'} ` +
+      `${stamped.length} versioned zip(s)`
+  );
   return { channel, stamped };
 }
 
