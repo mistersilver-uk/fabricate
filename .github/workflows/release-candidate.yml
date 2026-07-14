@@ -1,9 +1,11 @@
 name: "Release Candidate"
 
+# DISABLED for the issue #627 cutover: with the new three-channel release.config.js on `main`,
+# this legacy RC pipeline would mint a stray `-beta.N` off the 149-commit history and never publish
+# it (its rc-tag detection does not match `-beta.N`). It is replaced by `beta.yml` in Phase 3
+# (task 3.2). Kept as workflow_dispatch-only so nothing fires on push.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch: {}
 
 concurrency:
   group: release-candidate-${{ github.ref }}
