@@ -89,13 +89,19 @@ jobs:
       - name: Validate release tag
         id: version
         env:
-          # `--kind any` accepts a beta/rc prerelease tag (beta channel) AND a stable tag
-          # (early-access/public channels), because this reusable workflow publishes every channel.
           RELEASE_TAG: ${{ inputs.tag }}
+          CHANNEL: ${{ inputs.channel }}
         run: |
-          VERSION=$(node scripts/validate-release-tag.mjs "$RELEASE_TAG" --kind any)
+          # Derive the required tag kind FROM the channel, never `--kind any`. The head guard in
+          # release-s3.js only refuses BACKWARD moves, so a stable tag on `channel: beta` would pass
+          # both validation and the guard (stable compares newer than beta = "forward") and pollute
+          # the beta head with a stable version. beta accepts a beta/rc prerelease tag (what
+          # BETA_TAG_RE matches); every other channel (early-access, public, a hotfix N.N.x) takes a
+          # stable tag.
+          KIND=$([ "$CHANNEL" = "beta" ] && echo beta || echo stable)
+          VERSION=$(node scripts/validate-release-tag.mjs "$RELEASE_TAG" --kind "$KIND")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing $RELEASE_TAG → version $VERSION (channel ${{ inputs.channel }})"
+          echo "Publishing $RELEASE_TAG → version $VERSION (channel $CHANNEL, kind $KIND)"
 
       - name: Validate tag exists
         run: |

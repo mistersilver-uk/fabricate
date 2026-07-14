@@ -72,14 +72,23 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Create the local release branch semantic-release validates
-        # semantic-release runs `git tag --merged <branch>` for EVERY configured branch
-        # (`main`, `release`, and the `N.N.x` glob). On a `main` checkout `main` is a local ref but
-        # `release` is NOT, so semantic-release dies with `fatal: malformed object name release`
-        # unless it exists locally. The maintenance glob matches no branch, so it is skipped.
+      - name: Create the local release/hotfix branches semantic-release validates
+        # semantic-release expands its configured branches against ORIGIN's branches, then runs
+        # `git tag --merged <name>` per match. On a `main` checkout `main` is a local ref but
+        # `release` and any `N.N.x` hotfix line are NOT, so semantic-release dies with
+        # `fatal: malformed object name <name>` unless each exists locally. Create a local ref for
+        # `release` AND every `N.N.x` branch on origin (the config glob is `+([0-9]).+([0-9]).x`,
+        # i.e. two numeric parts). Today no hotfix line exists so only `release` is created; the
+        # moment issue #627's model pushes a `1.4.x` line, this keeps every `main` push alive.
         run: |
-          git fetch origin +refs/heads/release:refs/remotes/origin/release --tags --force
-          git branch -f release origin/release
+          git fetch origin --tags --force
+          for b in $(git ls-remote --heads origin \
+            | sed 's#.*refs/heads/##' \
+            | grep -E '^(release|[0-9]+\.[0-9]+\.x)$'); do
+            echo "Creating local ref for origin/$b"
+            git fetch origin "+refs/heads/$b:refs/remotes/origin/$b" --force
+            git branch -f "$b" "origin/$b"
+          done
 
       - name: Semantic Release
         id: semrel
