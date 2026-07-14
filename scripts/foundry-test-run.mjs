@@ -35,9 +35,9 @@ import { fileURLToPath } from 'node:url';
 import { FABRICATE_THEME_IDS, FABRICATE_THEME_ATTRIBUTE, DEFAULT_FABRICATE_THEME } from '../src/ui/theme.js';
 import {
   appendAllowedConsoleErrorPatterns,
+  classifyCapturedError,
   computeSmokeSignal,
-  evaluateSmokeOutcome,
-  isConsoleErrorWaived
+  evaluateSmokeOutcome
 } from './lib/foundrySmokeSignal.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -2486,10 +2486,11 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
     const text = location ? `${msg.text()} (${location})` : msg.text();
     consoleLog.push(`[${msg.type()}] ${text}`);
     if (msg.type() === 'error') {
-      // A match against the waiver patterns (in-source defaults + any appended
-      // via --allowed-console-error-patterns) keeps the error out of the gating
-      // consoleErrors list; record it as waived so it can be audited.
-      if (isConsoleErrorWaived(text, ignoredErrorPatterns)) {
+      // Route through the SHARED classifier (the same seam the pageerror handler
+      // below uses): a match against the waiver patterns (in-source defaults +
+      // any appended via --allowed-console-error-patterns) is recorded as waived
+      // for audit only; anything else enters the gating consoleErrors list.
+      if (classifyCapturedError(text, ignoredErrorPatterns).waived) {
         waivedConsoleErrors.push(text);
       } else {
         consoleErrors.push(text);
@@ -2502,8 +2503,10 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
     consoleLog.push(entry);
     // pageerror waiving is a deliberate existing capability (the Foundry
     // canvas-artefact default filters pageerror entries too); an appended
-    // pattern extends it, it does not remove it.
-    if (isConsoleErrorWaived(err.message, ignoredErrorPatterns)) {
+    // pattern extends it, it does not remove it. Route through the SAME
+    // classifier as the console handler so pageerror stays waivable and a
+    // non-matching pageerror is never silently swallowed.
+    if (classifyCapturedError(err.message, ignoredErrorPatterns).waived) {
       waivedConsoleErrors.push(`pageerror: ${err.message}`);
     } else {
       consoleErrors.push(`pageerror: ${err.message}`);

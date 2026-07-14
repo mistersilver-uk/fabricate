@@ -16,8 +16,16 @@
  * defaults are written (e.g. `/reading 'OBJECTS'/`). Blank entries are dropped
  * so a trailing comma or an empty CSV yields no patterns.
  *
+ * The CSV splits on `,`, so a pattern containing a literal comma (e.g.
+ * `x{1,3}`) cannot be expressed — an accepted limitation of the flag format.
+ *
+ * An invalid regex source fails fast with a clear message naming the bad entry,
+ * rather than letting `new RegExp` throw its raw `SyntaxError` at harness
+ * startup where the offending pattern is not obvious.
+ *
  * @param {string | undefined | null} csv
  * @returns {RegExp[]}
+ * @throws {Error} when an entry is not a valid regular-expression source
  */
 export function parseAllowedConsoleErrorPatterns(csv) {
   if (!csv) return [];
@@ -25,7 +33,16 @@ export function parseAllowedConsoleErrorPatterns(csv) {
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean)
-    .map((source) => new RegExp(source, 'i'));
+    .map((source) => {
+      try {
+        return new RegExp(source, 'i');
+      } catch (error) {
+        throw new Error(
+          `invalid --allowed-console-error-patterns entry "${source}": ${error.message}`,
+          { cause: error }
+        );
+      }
+    });
 }
 
 /**
@@ -54,6 +71,24 @@ export function appendAllowedConsoleErrorPatterns(defaults, csv) {
  */
 export function isConsoleErrorWaived(text, patterns) {
   return patterns.some((pattern) => pattern.test(text));
+}
+
+/**
+ * Route a captured `console` error or `pageerror` message: it is either waived
+ * (matches a pattern → belongs in `waivedConsoleErrors`, never fails the run) or
+ * gating (→ belongs in `consoleErrors`).
+ *
+ * This is the single seam BOTH capture handlers in `foundry-test-run.mjs` route
+ * through, so a handler that ignores the predicate — waives a `pageerror`
+ * unconditionally, never waives one, or pushes a waived error into the gating
+ * list — cannot be expressed without diverging from `route.waived`.
+ *
+ * @param {string} text
+ * @param {RegExp[]} patterns
+ * @returns {{ waived: boolean }}
+ */
+export function classifyCapturedError(text, patterns) {
+  return { waived: isConsoleErrorWaived(text, patterns) };
 }
 
 /**
