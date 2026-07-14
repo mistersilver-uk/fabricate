@@ -13,9 +13,16 @@
     value        — id of the currently selected option (for aria-selected)
     triggerClass — class string for the trigger button (consumer-controlled)
     triggerIcon  — leading icon class on the trigger (optional)
+    triggerImg   — leading portrait image src on the trigger (optional; mirrors
+                   how list options render `option.img`), shown before the label
     triggerLabel — current-selection text on the trigger (omitted when empty)
     valueClass   — extra class on the trigger value span
     showChevron  — render the open/closed chevron on the trigger (default true)
+    triggerAddMarker — optional value for a `data-recipe-add` attribute on the
+                   trigger button (lets the recipe editor mark popover-backed add
+                   controls without wrapping the button)
+    triggerTitle — optional native `title` tooltip on the trigger button
+                   (backward-compatible; omitted when empty)
     *AriaLabel / searchPlaceholder / emptyHint — localized strings
     onChoose(id) — called with the chosen option id
 -->
@@ -30,9 +37,12 @@
     disabled = false,
     triggerClass = '',
     triggerIcon = '',
+    triggerImg = '',
     triggerLabel = '',
     valueClass = '',
     showChevron = true,
+    triggerAddMarker = '',
+    triggerTitle = '',
     triggerAriaLabel = '',
     dialogAriaLabel = '',
     searchPlaceholder = '',
@@ -155,11 +165,13 @@
     aria-haspopup="dialog"
     aria-expanded={open}
     {disabled}
+    data-recipe-add={triggerAddMarker || undefined}
+    title={triggerTitle || undefined}
     aria-label={triggerAriaLabel || undefined}
     onclick={toggle}
     onkeydown={stop}
   >
-    {#if triggerIcon}<i class={triggerIcon} aria-hidden="true"></i>{/if}
+    {#if triggerImg}<span class="manager-travel-portrait" aria-hidden="true"><img src={triggerImg} alt="" /></span>{:else if triggerIcon}<i class={triggerIcon} aria-hidden="true"></i>{/if}
     {#if triggerLabel}<span class={`manager-travel-picker-value ${valueClass}`}>{triggerLabel}</span>{/if}
     {#if showChevron}<i class={open ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>{/if}
   </button>

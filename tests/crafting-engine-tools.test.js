@@ -290,7 +290,6 @@ test('craft(): records usedTools on the success run record and increments toolUs
   engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
-  engine._runSuccessMacro = async () => {};
 
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem, toolItem] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
@@ -391,7 +390,6 @@ test('craft(): a tool absent from inventory but present as activeCanvasTool craf
   engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
-  engine._runSuccessMacro = async () => {};
 
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
@@ -422,4 +420,263 @@ test('craft(): missing required tool blocks the craft before consuming ingredien
   const result = await engine.craft(craftingActor, [sourceActor], fakeRecipe(ingredientSet), null, {});
   assert.equal(result.success, false);
   assert.match(result.message, /Missing required tool/);
+});
+
+// ---------------------------------------------------------------------------
+// _applyToolBreakage under checkDriven authority (issue 419)
+// ---------------------------------------------------------------------------
+
+const checkDrivenOpts = (overrides = {}) => ({ forceBreak: true, authority: 'checkDriven', reason: '1d20 group rolled 1', triggerId: 'natural1', ...overrides });
+
+test('_applyToolBreakage checkDriven: forceBreak breaks all required non-immune tools', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  // breakageChance-0 tool would never break on its own; checkDriven forces it.
+  const axe = new FakeItem('c-axe', { parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], checkDrivenOpts());
+  assert.equal(used[0].broken, true);
+  assert.equal(used[0].authority, 'checkDriven');
+  assert.equal(used[0].reason, '1d20 group rolled 1');
+  assert.equal(used[0].triggerId, 'natural1');
+  assert.equal(getPath(axe._flags.fabricate, 'fabricate.toolBroken'), true);
+});
+
+test('_applyToolBreakage checkDriven: immune tool is filtered out of the forced set and recorded skipped', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  const anvil = new FakeItem('c-anvil', { parent: actorRef });
+  const tool = { componentId: 'c-anvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: anvil }], checkDrivenOpts());
+  assert.equal(used[0].broken, false);
+  assert.equal(used[0].skippedImmune, true);
+  assert.equal(getPath(anvil._flags.fabricate, 'fabricate.toolBroken'), undefined);
+});
+
+test('_applyToolBreakage checkDriven: no forceBreak breaks nothing (per-tool mode ignored)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  // limitedUses past maxUses would break under toolSpecific; checkDriven ignores it.
+  const axe = new FakeItem('c-axe', { flags: { fabricate: { toolUsage: { timesUsed: 9 } } }, parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], { forceBreak: false, authority: 'checkDriven' });
+  assert.equal(used[0].broken, false);
+});
+
+test('_applyToolBreakage checkDriven: virtual-present tool recorded as skipped evidence (not mutated)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const tool = { componentId: 'c-station', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: null, virtual: true }], checkDrivenOpts());
+  assert.equal(used.length, 1);
+  assert.equal(used[0].virtual, true);
+  assert.equal(used[0].broken, false);
+});
+
+test('_applyToolBreakage toolSpecific: legacy forceBreak still breaks (superset of current behaviour)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  const axe = new FakeItem('c-axe', { parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], { forceBreak: true, authority: 'toolSpecific' });
+  assert.equal(used[0].broken, true);
+  assert.equal(used[0].authority, undefined, 'toolSpecific carries no authority evidence');
+});
+
+test('_applyToolBreakage toolSpecific: immune tool never breaks even with a legacy forceBreak', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  const anvil = new FakeItem('c-anvil', { parent: actorRef });
+  const tool = { componentId: 'c-anvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } };
+  // "An immune Tool never breaks under either authority" — a legacy crit/tier
+  // forceBreak must NOT break an immune tool under toolSpecific.
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: anvil }], { forceBreak: true, authority: 'toolSpecific' });
+  assert.equal(used[0].broken, false);
+  assert.equal(getPath(anvil._flags.fabricate, 'fabricate.toolBroken'), undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 10: a matched checkDriven trigger on a FAILED attempt breaks tools
+// only when consumption.breakToolsOnFail === true. This drives the full
+// craft() failure path (not _applyToolBreakage directly) so the policy gate that
+// wraps the shared seam is exercised end to end.
+// ---------------------------------------------------------------------------
+
+// A natural-1 checkDriven trigger on the simple crafting check. install* wires a
+// resolution-mode service that returns null, so _resolveCraftingCheckBreakage
+// falls back to system.resolutionMode and reads craftingCheck.simple.checkBreakage.
+const NATURAL_ONE_TRIGGER = {
+  triggers: [
+    {
+      id: 'natural1',
+      breakTools: true,
+      outcome: 'none',
+      condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+    },
+  ],
+};
+// An engine-evaluated, FAILED check result whose first dice group rolled a 1.
+const FAILED_NATURAL_ONE_CHECK = {
+  success: false,
+  message: 'failed',
+  outcome: null,
+  value: null,
+  engineEvaluated: true,
+  data: { total: 1, outcomeId: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }], breakTools: false },
+};
+
+function checkDrivenSystem({ breakToolsOnFail }) {
+  return {
+    id: 'sys-1',
+    components: [],
+    tools: [],
+    features: {},
+    resolutionMode: 'simple',
+    toolBreakage: { authority: 'checkDriven' },
+    craftingCheck: {
+      simple: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER },
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail },
+    },
+  };
+}
+
+function installCheckDrivenSystem(options) {
+  const system = checkDrivenSystem(options);
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: () => system }),
+      getResolutionModeService: () => null,
+    },
+    user: { id: 'user-1', isGM: true },
+    time: { worldTime: 0 },
+  };
+  return system;
+}
+
+function failingCraftEngine() {
+  const ingredientItem = new FakeItem('ing-1', { quantity: 2 });
+  const actorRef = { uuid: 'Actor.a1' };
+  const toolItem = new FakeItem('c-axe', { parent: actorRef });
+  const fakeTool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
+  const ingredientSet = fakeIngredientSet(ingredientItem);
+  const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem, fakeTool, ingredientSet });
+  let failurePayload = null;
+  const runManager = {
+    findActiveRunForRecipe: () => null,
+    getActiveRun: () => null,
+    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 }; },
+    canProceedTimeGate: () => true,
+    async markStepInProgress(_actor, run) { return run; },
+    async markStepWaitingForTime(_actor, run) { return run; },
+    async completeStepSuccess() { return {}; },
+    async completeStepFailure(_actor, run, _idx, _reason, payload) { failurePayload = payload; return { ...run, status: 'failed' }; },
+  };
+  const engine = new CraftingEngine(recipeManager, runManager, null);
+  // The check FAILS with an engine-evaluated natural-1 roll (so the checkDriven
+  // trigger matches) — the only thing under test is whether the failure path breaks.
+  engine._runCraftingCheck = async () => FAILED_NATURAL_ONE_CHECK;
+  engine._postCraftChatMessage = async () => {};
+  const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem, toolItem] };
+  const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
+  return {
+    engine,
+    toolItem,
+    run: () => engine.craft(craftingActor, [sourceActor], fakeRecipe(ingredientSet), null, {}),
+    failurePayload: () => failurePayload,
+  };
+}
+
+test('craft() checkDriven FAIL: a matched trigger breaks NO tools when breakToolsOnFail is false (criterion 10)', async () => {
+  installCheckDrivenSystem({ breakToolsOnFail: false });
+  const { toolItem, run, failurePayload } = failingCraftEngine();
+  const result = await run();
+  assert.equal(result.success, false);
+  assert.equal(getPath(toolItem._flags.fabricate, 'fabricate.toolBroken'), undefined, 'no break without the failure gate');
+  assert.deepEqual(failurePayload()?.usedTools ?? [], [], 'no usedTools breakage evidence on the gated failure path');
+});
+
+test('craft() checkDriven FAIL: a matched trigger breaks the non-immune tool when breakToolsOnFail is true (criterion 10)', async () => {
+  installCheckDrivenSystem({ breakToolsOnFail: true });
+  const { toolItem, run, failurePayload } = failingCraftEngine();
+  const result = await run();
+  assert.equal(result.success, false);
+  assert.equal(getPath(toolItem._flags.fabricate, 'fabricate.toolBroken'), true, 'the failure path breaks the required tool under the gate');
+  const used = failurePayload()?.usedTools ?? [];
+  assert.equal(used.length, 1);
+  assert.equal(used[0].broken, true);
+  assert.equal(used[0].authority, 'checkDriven');
+  assert.equal(used[0].triggerId, 'natural1');
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 9: salvage breaks required tools under checkDriven on both the
+// success path and the breakToolsOnFail failure path. Drives the REAL
+// _resolveSalvageBreakageDecision → _applyToolBreakage wiring (exactly how the
+// salvage success/failure paths apply breakage) so a tool actually breaks — not
+// just that the decision reports forceBreak.
+// ---------------------------------------------------------------------------
+
+function salvageCheckDrivenSystem() {
+  return {
+    id: 'sys-1',
+    salvageResolutionMode: 'simple',
+    toolBreakage: { authority: 'checkDriven' },
+    salvageCraftingCheck: { simple: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+  };
+}
+
+function applySalvageBreak(engine, system, checkResultSuccess) {
+  const actorRef = { uuid: 'Actor.s' };
+  const hammer = new FakeItem('c-hammer', { parent: actorRef });
+  // breakageChance-0 tool never breaks on its own; only checkDriven can break it.
+  const tool = { componentId: 'c-hammer', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
+  const checkResult = {
+    success: checkResultSuccess,
+    engineEvaluated: true,
+    outcome: null,
+    value: null,
+    data: { total: 1, outcomeId: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }], breakTools: false },
+  };
+  const decision = engine._resolveSalvageBreakageDecision(system, checkResult);
+  return { hammer, tool, decision };
+}
+
+test('salvage checkDriven: the success path resolver + apply actually breaks the required tool (criterion 9)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const system = salvageCheckDrivenSystem();
+  const { hammer, tool, decision } = applySalvageBreak(engine, system, true);
+  assert.equal(decision.forceBreak, true, 'the salvage success resolver forces the break');
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: hammer }], {
+    forceBreak: decision.forceBreak,
+    authority: decision.authority,
+    reason: decision.reason,
+    triggerId: decision.triggerId,
+  });
+  assert.equal(used[0].broken, true, 'the tool actually breaks on the salvage success path');
+  assert.equal(used[0].authority, 'checkDriven');
+  assert.equal(getPath(hammer._flags.fabricate, 'fabricate.toolBroken'), true);
+});
+
+test('salvage checkDriven: the failure path resolver + apply actually breaks the required tool (criterion 9)', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const system = salvageCheckDrivenSystem();
+  // The failure path is gated by breakToolsOnFail in salvage(); when the gate
+  // is open the same resolver+apply runs, so a failed salvage check still breaks.
+  const { hammer, tool, decision } = applySalvageBreak(engine, system, false);
+  assert.equal(decision.forceBreak, true, 'the salvage failure resolver forces the break on a matched trigger');
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: hammer }], {
+    forceBreak: decision.forceBreak,
+    authority: decision.authority,
+    reason: decision.reason,
+    triggerId: decision.triggerId,
+  });
+  assert.equal(used[0].broken, true, 'the tool actually breaks on the salvage failure path');
+  assert.equal(getPath(hammer._flags.fabricate, 'fabricate.toolBroken'), true);
 });

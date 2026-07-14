@@ -48,9 +48,15 @@ game.fabricate.getItemPilesIntegration()     // Item Piles integration facade
 game.fabricate.listGatheringForActor({ actor }) // Player-visible gathering listing
 game.fabricate.startGatheringAttempt({ actor, environmentId, taskId }) // Start gathering
 game.fabricate.getGatheringDropBreakdown({ environmentId, taskId }) // Task drop preview data
+game.fabricate.listAlchemyForActor({ actorId, craftingSystemId }) // Leak-safe player alchemy listing
+game.fabricate.submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds }) // Brew an alchemy attempt
+game.fabricate.getSelectedAlchemySystemId() // Persisted last-selected alchemy system id
+game.fabricate.setSelectedAlchemySystemId(id) // Persist the last-selected alchemy system id
 game.fabricate.listSelectableActors()       // Player-character actors for the actor-selection bar
 game.fabricate.getSelectedGatheringActorId() // Persisted remembered gathering actor id
 game.fabricate.setSelectedGatheringActorId(id) // Persist the remembered gathering actor id
+game.fabricate.getHideUnavailableEnvironments() // Player "hide unavailable environments" toggle (per client/device)
+game.fabricate.setHideUnavailableEnvironments(value) // Persist that toggle (per client/device)
 game.fabricate.getGatheringConditions()     // Current gathering weather/time and vocabularies
 game.fabricate.setGatheringWeather(weatherTag) // GM-only gathering weather update
 game.fabricate.setGatheringTimeOfDay(timeOfDayTag) // GM-only gathering time update
@@ -131,6 +137,52 @@ When `rememberedActorId` is omitted from `listGatheringForActor` options, it def
 Passing an explicit `rememberedActorId` always overrides that default.
 This includes an explicit `null`, which forces no remembered actor.
 
+### Alchemy Runtime Facade
+
+Use these public `game.fabricate` methods when macros or integrations need to list or brew alchemy for the current user.
+They back the player Alchemy Workbench and inject the current Foundry user as the viewer before delegating to runtime internals.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const actorId = game.user.character?.id;
+  const craftingSystemId = game.fabricate.getSelectedAlchemySystemId(); // '' when unset
+
+  // Leak-safe listing: learned recipes, owned components, and the COUNT of
+  // undiscovered recipes only. Undiscovered names, signatures, and results are
+  // never returned.
+  const listing = game.fabricate.listAlchemyForActor({ actorId, craftingSystemId });
+
+  // Brew a combination: one component id per placed unit (a stack of N appears N times).
+  const submittedComponentIds = listing.recipes[0]?.concrete
+    ? Object.entries(listing.recipes[0].concrete).flatMap(([id, qty]) => Array(qty).fill(id))
+    : [];
+  if (submittedComponentIds.length > 0) {
+    await game.fabricate.submitAlchemyAttempt({
+      actorId,
+      craftingSystemId,
+      submittedComponentIds,
+      interactive: true
+    });
+  }
+});
+```
+
+- `listAlchemyForActor({ actorId, craftingSystemId, componentSourceActorIds })` returns the leak-safe alchemy listing model for the resolved crafting actor, scoped to the chosen alchemy (crafting) system.
+  It is owner-scoped through the same gate as crafting, so a non-owner viewer receives a denied, empty listing rather than another user's inventory or fizzle memory.
+  A GM sees every enabled recipe as known.
+  `actorId` and `componentSourceActorIds` default to the persisted crafting selections when omitted.
+- `submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds, componentSourceActorIds, interactive })` brews the submitted components as an attempt for the resolved actor.
+  It is owner-scoped like `listAlchemyForActor` and delegates to the authoritative engine, which matches the submission against all enabled recipes in the system, known and undiscovered alike.
+  On a match the recipe is discovered and the ingredients are consumed.
+  The system's alchemy check mode decides the result: `none` always produces the success set, a `simple` check produces the success set on a pass and the reserved failure set on a fail, and a `tiered` check routes to the result set for the rolled outcome tier.
+  A failed `simple` check still counts as a match, so it consumes, produces the failure set, and discovers the recipe.
+  Otherwise the attempt fizzles with no check and no roll, consuming the components only when the system's Consume on Fail setting is on.
+  `interactive` prompts a roll on a matched brew in `simple` or `tiered` check mode, and defaults to `false` for macros and automation, so it never triggers a roll on the fizzle path.
+- `getSelectedAlchemySystemId()` reads the persisted last-selected alchemy system from the `fabricate.lastAlchemySystem` client setting, returning `''` when unset.
+- `setSelectedAlchemySystemId(id)` persists the selection to that same client setting.
+
+The `fabricate.lastAlchemySystem` setting is `scope: 'client'`, so the choice is remembered per client/device, not per user account.
+
 ### Actor Selection
 
 These methods back the unified Fabricate window's actor-selection bar and persist the remembered gathering actor:
@@ -153,6 +205,27 @@ Hooks.once('fabricate.ready', () => {
   An owned non-player-character actor stays attempt-authorized through `listGatheringForActor` / `startGatheringAttempt` but does not appear in the bar.
 - `getSelectedGatheringActorId()` reads the persisted remembered selection from the `fabricate.lastGatheringActor` client setting, returning `''` when unset.
 - `setSelectedGatheringActorId(id)` persists the remembered selection to that same client setting.
+
+### Hide Unavailable Environments Toggle
+
+These methods back the player-side **Hide unavailable** toggle in the Gathering app's Environments column.
+The toggle is a view-only presentation preference.
+It hides only listings the engine reports as `locked === true` (disabled environments, plus location-gated environments the party is not in).
+It never changes saved data, the engine listing, or GM configuration.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const hidden = game.fabricate.getHideUnavailableEnvironments(); // false by default
+  await game.fabricate.setHideUnavailableEnvironments(true);
+});
+```
+
+- `getHideUnavailableEnvironments()` reads the `fabricate.gatheringHideUnavailableEnvironments` client setting, returning `false` when unset.
+- `setHideUnavailableEnvironments(value)` persists the boolean preference to that same setting.
+
+The setting is `scope: 'client'`, so it persists in the browser's `localStorage`.
+The choice is remembered per client/device, not per user account.
+The same account opening Fabricate on a second device or browser starts from the default (off).
 
 ### Gathering Economy Block
 
@@ -247,7 +320,8 @@ The `attemptCompleted` payload is a cloned, JSON-serializable object:
 | `events` | The triggered encounters (also emitted individually as `eventTriggered`). |
 | `checkResult` | The normalized resolution detail. |
 
-**Where it fires.** The hook fires on the client that resolved the attempt. Immediate attempts fire on the acting user's client; matured timed runs fire once, on the primary GM client (so the `updateWorldTime` broadcast does not duplicate them across clients).
+**Where it fires.** The hook fires on the client that resolved the attempt.
+Immediate attempts fire on the acting user's client; matured timed runs fire once, on the primary GM client (so the `updateWorldTime` broadcast does not duplicate them across clients).
 
 For a **blind** task viewed by a non-GM, the payload is redacted to match what that client may see: `taskId`/`taskName`, `gatheredItems`, `usedTools`, `events`, and `checkResult` are omitted, and no `eventTriggered` hook fires.
 A subscriber that throws is caught and logged — it never breaks the gathering flow.
@@ -285,10 +359,11 @@ Fabricate stores data in Foundry's settings and flags:
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |
 | Client setting | `fabricate.lastManagedCraftingSystem` | Last viewed system in GM admin |
-| Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system for the planned Alchemy tab |
+| Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system (discipline) for the Alchemy Workbench tab |
 | Client setting | `fabricate.favouriteRecipes` | Favourite recipe IDs for the current client |
 | Client setting | `fabricate.recentlyCrafted` | Recently crafted recipe entries for the current client |
 | Client setting | `fabricate.progressiveResultOrder` | Per-recipe player reorder preferences for progressive mode results (Object, default `{}`) |
+| Client setting | `fabricate.gatheringHideUnavailableEnvironments` | Player "hide unavailable (locked) environments" toggle for the Gathering app Environments column (Boolean, default `false`, per client/device) |
 | Actor flag | `fabricate.craftingRuns.active` | In-progress crafting runs |
 | Actor flag | `fabricate.craftingRuns.history` | Completed crafting runs |
 | Actor flag | `fabricate.gatheringRuns.active` | In-progress gathering runs |

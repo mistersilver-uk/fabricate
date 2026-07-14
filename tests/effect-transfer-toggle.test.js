@@ -96,7 +96,6 @@ test('#102: an explicit multiStepRecipes wins over the legacy complexRecipes see
  */
 function setupGameWithEffectTransfer(effectTransferValue) {
   const system = {
-    advancedOptionsEnabled: true,
     features: {
       effectTransfer: effectTransferValue
     },
@@ -228,11 +227,10 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
   // Also inject the system with components so _createSingleResult can find it
   globalThis.game.fabricate.getCraftingSystemManager = () => ({
     getSystem: () => ({
-      advancedOptionsEnabled: true,
       features: { effectTransfer: effectTransferValue },
       craftingCheck: { enabled: false },
       components: [
-        { id: 'item-a', name: 'Item A', img: 'icons/svg/item-bag.svg', sourceUuid: null }
+        { id: 'item-a', name: 'Item A', img: 'icons/svg/item-bag.svg', registeredItemUuid: null }
       ]
     })
   });

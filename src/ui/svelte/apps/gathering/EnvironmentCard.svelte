@@ -24,6 +24,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
+  import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
 
   let {
     environment = null,
@@ -133,7 +134,7 @@
       <img
         class="gathering-env-card-thumb"
         class:is-fallback={!displayImg}
-        src={displayImg || 'icons/svg/door-closed.svg'}
+        src={displayImg || DEFAULT_GATHERING_ENVIRONMENT_IMG}
         alt=""
       />
       {#if locked}
@@ -395,13 +396,23 @@
   }
 
   .gathering-env-card-description {
-    /* Full-width copy beneath the main row, clamped to ~2 lines. */
+    /* Full-width copy beneath the main row, clamped to ~2 lines. The 1.5
+       line-height's bottom half-leading already contains the second line's
+       descenders (g, y, p) within the clamp box, and the card's own 10px
+       bottom padding supplies the whitespace below.
+
+       Deliberately NO padding-bottom here: on Chromium (Foundry's renderer)
+       a padding-bottom on a -webkit-line-clamp box makes the browser paint a
+       sliver of the clamped-away third line into that padding band, which
+       then bleeds under the card border — most visibly with Foundry's tall
+       Signika metrics. Dropping the padding removes the sliver without
+       shaving descenders (verified against Signika). */
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.5;
     color: var(--fab-text-muted);
   }
 

@@ -20,10 +20,14 @@ Handles recipe CRUD operations, filtering, and craftability checks.
 Creates a new recipe.
 GM only.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `recipeData` | `object` | Recipe data (see [Recipe model]({% link api/models.md %}#recipe)) |
 | `options.notify` | `boolean` | Optional. Set to `false` for batch callers that emit their own summary notification. Defaults to `true`. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Returns:** `Promise<Recipe>`
 
@@ -44,11 +48,15 @@ Updates an existing recipe.
 GM only.
 Merges `updates` into the current recipe data.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `recipeId` | `string` | Recipe ID |
 | `updates` | `object` | Partial recipe data to merge |
 | `options.notify` | `boolean` | Optional. Set to `false` for batch callers that emit their own summary notification. Defaults to `true`. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Returns:** `Promise<Recipe>`
 
@@ -58,10 +66,14 @@ Deletes a recipe.
 GM only.
 Also cleans up associated runs and learned entries.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `recipeId` | `string` | Recipe ID |
 | `options.notify` | `boolean` | Optional. Set to `false` for batch callers that emit their own summary notification. Defaults to `true`. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Returns:** `Promise<void>`
 
@@ -118,6 +130,7 @@ Checks if a recipe can be crafted and reports what's missing.
 **Returns:** `{ canCraft: boolean, satisfiableSet: IngredientSet | null, missing: object }`
 
 The `missing` object contains:
+
 - `missing.ingredients` is an array of `{ ingredient, need, have }`.
 - `missing.tools` is an array of unmet required Tool objects (resolved from `toolIds`).
 - `missing.essences` is an array of `{ essenceId, need, have }`.
@@ -145,7 +158,7 @@ Returns the component's `name` field if found.
 Falls back to the localised string `FABRICATE.Labels.UnknownComponent` ("Unknown Component") when the component does not exist or `componentId` is null.
 
 This is a synchronous method and does not fetch from Foundry's item database.
-Use `resolveComponentNameAsync` when the component has a `sourceUuid` and you need the linked item's name.
+Use `resolveComponentNameAsync` when the component has a `registeredItemUuid` and you need the linked item's name.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -163,7 +176,7 @@ console.log(name); // e.g. "Iron Ingot"
 ### resolveComponentNameAsync(recipe, componentId)
 
 Async variant of `resolveComponentName`.
-Attempts to resolve the component's `sourceUuid` via `fromUuid()` first and returns the linked item's name when found.
+Attempts to resolve the component's `registeredItemUuid` via `fromUuid()` first and returns the linked item's name when found.
 Falls back to the component's stored `name`, then to "Unknown Component" on broken references.
 
 | Parameter | Type | Description |
@@ -209,6 +222,7 @@ console.log(desc); // "2x Healing Potion"
 Returns a display icon path for the recipe (synchronous).
 
 Precedence:
+
 1. `recipe.img` when it is set and is not the system default bag icon.
 2. A fallback document icon otherwise.
 
@@ -225,6 +239,7 @@ For the full fallback chain including the linked recipe item's image, use `resol
 Returns a display icon path for the recipe, with full fallback chain (async).
 
 Precedence:
+
 1. `recipe.img` when it is set and is not the system default bag icon.
 2. The `img` of the item resolved from `recipe.linkedRecipeItemUuid` via `fromUuid()`.
 3. A fallback document icon.
@@ -255,7 +270,8 @@ Exports recipes as JSON-serialisable objects.
 
 ### importRecipes(recipesData, overwrite)
 
-Imports recipes from JSON. GM only.
+Imports recipes from JSON.
+GM only.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|

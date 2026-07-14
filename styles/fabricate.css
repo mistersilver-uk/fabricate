@@ -790,6 +790,124 @@
   --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
 }
 
+:root[data-fabricate-theme="sovereign"],
+.fabricate[data-fabricate-theme="sovereign"] {
+  --fab-bg-0: #0A0E1A;
+  --fab-bg-1: #101627;
+  --fab-bg-2: #182036;
+  --fab-bg-3: #2A3550;
+  --fab-surface: #101627;
+  --fab-surface-soft: rgb(228 192 102 / 5%);
+  --fab-surface-raised: rgb(228 192 102 / 8%);
+  --fab-surface-active: rgb(228 192 102 / 12%);
+  --fab-border: rgb(214 203 168 / 16%);
+  --fab-border-strong: rgb(214 203 168 / 28%);
+  --fab-border-soft: #2A3550;
+  --fab-text: #F2EAD6;
+  --fab-text-secondary: #CFC198;
+  --fab-text-muted: rgb(207 193 152 / 74%);
+  --fab-text-subtle: rgb(207 193 152 / 56%);
+  --fab-text-disabled: rgb(207 193 152 / 42%);
+  --fab-accent: #E4C066;
+  --fab-accent-hover: #EED592;
+  --fab-accent-strong: #C9A94E;
+  --fab-accent-soft: rgb(228 192 102 / 16%);
+  --fab-accent-border: rgb(228 192 102 / 46%);
+  --fab-on-accent: #161007;
+  --fab-on-info: #0A0E1A;
+  --fab-on-success: #0A0E1A;
+  --fab-biome-icon-foreground: #202124;
+  --fab-success: #81BE96;
+  --fab-success-strong: #97CBA8;
+  --fab-success-text: #D4EAD9;
+  --fab-success-soft: rgb(129 190 150 / 16%);
+  --fab-success-border: rgb(129 190 150 / 50%);
+  --fab-info: #8FB0D6;
+  --fab-info-strong: #7396BE;
+  --fab-info-text: #DCE9F3;
+  --fab-info-soft: rgb(143 176 214 / 14%);
+  --fab-info-border: rgb(143 176 214 / 46%);
+  --fab-warning: #E6D08A;
+  --fab-warning-text: #F1E4B8;
+  --fab-warning-soft: rgb(230 208 138 / 14%);
+  --fab-warning-border: rgb(230 208 138 / 46%);
+  --fab-danger: #C96E66;
+  --fab-danger-text: #EAB6AF;
+  --fab-danger-soft: rgb(201 110 102 / 16%);
+  --fab-danger-border: rgb(201 110 102 / 54%);
+  --fab-purple: #C4B6DE;
+  --fab-purple-soft: rgb(196 182 222 / 14%);
+  --fab-tag-sage: #B6CDBA;
+  --fab-tag-mist: #AFC6DC;
+  --fab-tag-lavender: #C4B6DE;
+  --fab-tag-rose: #DCB4BE;
+  --fab-tag-peach: #E6C39F;
+  --fab-tag-butter: #E6D08A;
+  --fab-tag-aqua: #A9CFCB;
+  --fab-tag-mauve: #CBB2C8;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
+  --fab-overlay-dark-05: rgb(10 14 26 / 5%);
+  --fab-overlay-dark-08: rgb(10 14 26 / 8%);
+  --fab-overlay-dark-10: rgb(10 14 26 / 10%);
+  --fab-overlay-dark-12: rgb(10 14 26 / 12%);
+  --fab-overlay-dark-14: rgb(10 14 26 / 14%);
+  --fab-overlay-dark-15: rgb(10 14 26 / 15%);
+  --fab-overlay-dark-16: rgb(10 14 26 / 16%);
+  --fab-overlay-dark-18: rgb(10 14 26 / 18%);
+  --fab-overlay-dark-20: rgb(10 14 26 / 20%);
+  --fab-overlay-dark-24: rgb(10 14 26 / 24%);
+  --fab-overlay-dark-25: rgb(10 14 26 / 25%);
+  --fab-overlay-dark-28: rgb(10 14 26 / 28%);
+  --fab-overlay-dark-32: rgb(10 14 26 / 32%);
+  --fab-overlay-dark-34: rgb(10 14 26 / 34%);
+  --fab-overlay-dark-35: rgb(10 14 26 / 35%);
+  --fab-overlay-dark-42: rgb(10 14 26 / 42%);
+  --fab-overlay-dark-48: rgb(10 14 26 / 48%);
+  --fab-overlay-dark-70: rgb(10 14 26 / 70%);
+  --fab-overlay-dark-78: rgb(10 14 26 / 78%);
+  --fab-overlay-dark-80: rgb(10 14 26 / 80%);
+  --fab-overlay-dark-84: rgb(10 14 26 / 84%);
+  --fab-overlay-light-02: rgb(228 192 102 / 2%);
+  --fab-overlay-light-025: rgb(228 192 102 / 2.5%);
+  --fab-overlay-light-03: rgb(228 192 102 / 3%);
+  --fab-overlay-light-035: rgb(228 192 102 / 3.5%);
+  --fab-overlay-light-04: rgb(228 192 102 / 4%);
+  --fab-overlay-light-05: rgb(228 192 102 / 5%);
+  --fab-overlay-light-06: rgb(228 192 102 / 6%);
+  --fab-overlay-light-07: rgb(228 192 102 / 7%);
+  --fab-overlay-light-08: rgb(228 192 102 / 8%);
+  --fab-overlay-light-10: rgb(228 192 102 / 10%);
+  --fab-overlay-light-12: rgb(228 192 102 / 12%);
+  --fab-overlay-light-14: rgb(228 192 102 / 14%);
+  --fab-overlay-light-16: rgb(228 192 102 / 16%);
+  --fab-overlay-light-18: rgb(228 192 102 / 18%);
+  --fab-overlay-light-20: rgb(228 192 102 / 20%);
+  --fab-overlay-light-22: rgb(228 192 102 / 22%);
+  --fab-overlay-light-24: rgb(228 192 102 / 24%);
+  --fab-overlay-light-28: rgb(228 192 102 / 28%);
+  --fab-overlay-light-50: rgb(228 192 102 / 50%);
+  --fab-overlay-light-60: rgb(228 192 102 / 60%);
+  --fab-overlay-light-68: rgb(228 192 102 / 68%);
+  --fab-overlay-light-70: rgb(228 192 102 / 70%);
+  --fab-overlay-light-72: rgb(228 192 102 / 72%);
+  --fab-overlay-light-96: rgb(228 192 102 / 96%);
+  --fab-blue-soft: var(--fab-info-soft);
+  --fab-blue-border: var(--fab-info-border);
+  --fab-danger-surface: rgb(201 110 102 / 24%);
+  --fab-danger-surface-strong: rgb(201 110 102 / 36%);
+  --fab-danger-focus: rgb(201 110 102 / 72%);
+  --fab-warning-focus: rgb(230 208 138 / 78%);
+  --fab-shadow-sm: 0 8px 18px rgb(10 14 26 / 24%);
+  --fab-shadow-md: 0 10px 24px rgb(10 14 26 / 32%);
+  --fab-shadow-lg: 0 14px 38px rgb(10 14 26 / 40%);
+}
+
 /* ==========================================
    Unified Fabricate shell (4-tab window)
    ========================================== */
@@ -798,6 +916,13 @@
   font-family: var(--font-primary);
   color: var(--fab-text);
   background: var(--fab-bg-1);
+
+  /* Every Fabricate theme is dark, so render native controls (and crucially the
+     browser-drawn <select> option popup, which CSS on the option only partially
+     reaches) in the dark UA scheme. Without this the native dropdown list paints
+     in the light UA scheme, so the player Journal sort dropdowns looked pale
+     where the GM selects render dark. */
+  color-scheme: dark;
 
   /* Minimum window size for the resizable Fabricate window (issue 330). The
      drag-resize handle cannot shrink the window below this floor, so the
@@ -837,6 +962,97 @@
 .fabricate-app [tabindex]:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* Focus ring for <select> controls. A select can sit flush against the edge of
+   an overflow-clipped container (the Journal left column's two 50% list halves),
+   where an OUTSET outline (offset 2px) is clipped on that side and reads as a
+   one-sided "flash" when the control gains :focus-visible after its popup closes;
+   an inset outline does not track the border-radius cleanly on the rounded
+   corners. An inset box-shadow ring follows the border-radius exactly and is
+   drawn entirely inside the border box, so it is never clipped and looks correct
+   on every edge and corner while staying accessible. */
+.fabricate-app select:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--fab-accent);
+}
+
+/* Theme player-app <select> controls (and their open option list) so they read
+   as Fabricate dropdowns instead of Foundry's default yellow-on-light text. The
+   solid --fab-bg-1 background matches the GM manager selects (which use
+   --fab-mv2-bg, itself --fab-bg-1); the option rule themes the popup list. The
+   app root's `color-scheme: dark` makes the native popup chrome + highlight dark
+   too. Tokenized; namespaced under .fabricate-app. */
+.fabricate-app select {
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+}
+
+.fabricate-app select option {
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+/* Journal "Trigger Next Step" primary button. The player app has no .is-primary
+   (that class is .fabricate-manager-only), so this is the player-scoped green
+   primary treatment. It mirrors the manager .is-primary success palette
+   (--fab-success / --fab-success-strong) and must override Foundry's global
+   `button` rules, which center content and pin a fixed height: height:auto +
+   min-height + flex justify-content keep the icon+label row laid out correctly.
+   Kept in the global stylesheet (not a scoped Svelte block) because the Foundry
+   core button override is unreliable from a component-scoped rule. */
+.fabricate-app .fabricate-app-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2);
+  height: auto;
+  min-height: 36px;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-success-border);
+  border-radius: 6px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--fab-on-success);
+  background: var(--fab-success);
+  cursor: pointer;
+}
+
+.fabricate-app .fabricate-app-primary-button:not(:disabled):hover {
+  border-color: var(--fab-success-border);
+  color: var(--fab-on-success);
+  background: var(--fab-success-strong);
+}
+
+.fabricate-app .fabricate-app-primary-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Active-run count badge on the Journal nav rail entry. The player nav rail is a
+   fixed-width column of square icon buttons (no collapsible rail, unlike the
+   manager's .manager-nav-count), so the badge floats in the button's top-right
+   corner. Tokenized green to match the run-ready/active semantics. */
+.fabricate-app .fabricate-app-nav-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 1px solid var(--fab-success-border);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--fab-on-success);
+  background: var(--fab-success);
 }
 
 
@@ -1188,8 +1404,363 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
-.fabricate-manager[data-manager-view="environment-edit"] .manager-main {
+.fabricate-manager[data-manager-view="environment-edit"] .manager-main,
+.fabricate-manager[data-manager-view="checks"] .manager-main,
+.fabricate-manager[data-manager-view="crafting-settings"] .manager-main,
+.fabricate-manager[data-manager-view="recipe-item-edit"] .manager-main,
+.fabricate-manager[data-manager-view="system-edit"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-checks-page {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-editor {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  margin-bottom: var(--fab-space-2);
+}
+
+/* The crafting check type selector reuses the resolution radio-option styling
+   but lays its two options side by side inside a normal inspector card (no
+   fieldset/legend), so it matches the other editor cards. */
+.fabricate-manager .manager-checks-type-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-dice {
+  display: grid;
+  gap: var(--fab-space-1);
+  margin-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-outcome-table {
+  display: grid;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-outcome-table.is-relative {
+  grid-template-columns: minmax(140px, 1fr) 84px 104px 124px 40px;
+}
+
+.fabricate-manager .manager-checks-outcome-table.is-fixed {
+  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
+}
+
+/* checkDriven authority drops the per-outcome break-tools column (tool breakage is
+   authored via the CheckBreakage editor instead). */
+.fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
+  grid-template-columns: minmax(140px, 1fr) 84px 104px 40px;
+}
+
+.fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
+  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 40px;
+}
+
+/* Simple-check recipe tiers: Name + DC + remove. */
+.fabricate-manager .manager-checks-outcome-table.is-tier {
+  grid-template-columns: minmax(140px, 1fr) 96px 40px;
+}
+
+/* Unified per-check trigger editor (issue 419 recombine). Each trigger is a
+   bordered, padded card split into two rows by a divider: the top row carries the
+   condition controls (When / Group / Measure / Is / Value) with the remove button
+   pinned to its top-right; the bottom row carries the Outcome three-way toggle and
+   the optional Break-tools pill. */
+.fabricate-manager .manager-checks-breakage-trigger {
+  display: grid;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-surface-soft);
+}
+
+/* Top row: condition fields take the available width and wrap; the remove button
+   sits at the top-right, aligned with the first field row. */
+.fabricate-manager .manager-checks-trigger-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-breakage-condition {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+/* Remove button: top-right of the card, not bottom-aligned with the fields. */
+.fabricate-manager .manager-checks-trigger-remove {
+  flex: 0 0 auto;
+}
+
+/* Hairline divider between the condition row and the effects row. */
+.fabricate-manager .manager-checks-trigger-divider {
+  width: 100%;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--fab-border);
+}
+
+/* Bottom row: the Outcome toggle and the Break-tools pill, bottom-aligned. */
+.fabricate-manager .manager-checks-trigger-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-checks-trigger-break {
+  flex: 0 0 auto;
+}
+
+/* Three-way Outcome toggle: a segmented control (success | no effect | failure)
+   mirroring `.manager-recipe-tag-match-toggle`, with the SELECTED segment carrying
+   a green / neutral / red tint so the forced outcome reads at a glance. */
+.fabricate-manager .manager-checks-outcome-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-2xs);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-checks-outcome-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-outcome-option:hover:not(.is-selected):not(:disabled) {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-checks-outcome-option:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.fabricate-manager .manager-checks-outcome-option.is-selected.is-success {
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-success-border);
+}
+
+.fabricate-manager .manager-checks-outcome-option.is-selected.is-danger {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-danger-border);
+}
+
+.fabricate-manager .manager-checks-outcome-option.is-selected.is-neutral {
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-checks-breakage-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-force-outcome {
+  display: flex;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-force-outcome .manager-checks-state-pill {
+  flex: 1 1 0;
+  width: auto;
+}
+
+.fabricate-manager .manager-checks-crit-group {
+  display: grid;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-crit-group-head {
+  margin-bottom: 0;
+}
+
+.fabricate-manager .manager-checks-crit-die {
+  font-weight: 700;
+}
+
+/* Per-group hint copy: the multi-die group-total explainer and the modified-pool
+   crit-ineligibility hint (see issue 443). Reuses the muted-copy treatment so it
+   wraps cleanly at narrow widths. */
+.fabricate-manager .manager-checks-crit-hint {
+  color: var(--fab-mv2-text-muted);
+}
+
+/* Formula + success threshold + comparison on one line. */
+.fabricate-manager .manager-checks-formula-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-formula-field {
+  flex: 1 1 220px;
+}
+
+.fabricate-manager .manager-checks-threshold-field {
+  flex: 0 0 120px;
+}
+
+.fabricate-manager .manager-checks-threshold-mode {
+  flex: 0 0 150px;
+}
+
+/* Dynamic-DC macro drop zone: reuse the dashed component-source drop look with a
+   compact inline layout for the linked-macro name + unlink control. */
+.fabricate-manager .manager-checks-macro-drop-zone {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-macro-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-macro-name.is-missing {
+  color: var(--fab-danger-text);
+}
+
+/* Tier state controls are red/green pills that flip on click: the label shows
+   the current state (Success/Failure, Break/Don't break) and the colour reflects
+   its valence (green = success / keeps tools, red = failure / breaks tools). */
+.fabricate-manager .manager-checks-state-pill {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-state-pill.is-positive {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-checks-state-pill.is-negative {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-checks-outcome-head,
+.fabricate-manager .manager-checks-outcome-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-outcome-head {
+  padding: 0 var(--fab-space-2) var(--fab-space-2xs);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-outcome-row {
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+}
+
+.fabricate-manager .manager-checks-outcome-row.is-invalid {
+  border-color: var(--fab-mv2-danger);
+}
+
+.fabricate-manager .manager-checks-outcome-row input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager .manager-checks-validation {
+  list-style: none;
+  margin: var(--fab-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-recipe-edit-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-4);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-inspector {
@@ -1237,6 +1808,166 @@
 
 .fabricate-manager .manager-character-modifier-empty {
   font-style: italic;
+}
+
+/* Character prerequisites accordion (issue 544) */
+.fabricate-manager .manager-prerequisite-empty {
+  font-style: italic;
+}
+
+.fabricate-manager .manager-prerequisite-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-prerequisite-item {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-1);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-prerequisite-item.is-open {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager .manager-prerequisite-header {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+.fabricate-manager .manager-prerequisite-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.fabricate-manager .manager-prerequisite-chevron {
+  flex: 0 0 auto;
+  width: 12px;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-prerequisite-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-prerequisite-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-prerequisite-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  color: var(--fab-mv2-text-muted);
+  font-family: var(--fab-font-mono, monospace);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-prerequisite-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: 0 var(--fab-space-3) var(--fab-space-3);
+}
+
+/* Name row: icon picker (issue 544) to the left of the name input */
+.fabricate-manager .manager-prerequisite-name-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-prerequisite-icon-field {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-prerequisite-name-row .manager-prerequisite-name-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-prerequisite-condition-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-prerequisite-condition {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-prerequisite-path {
+  flex: 2 1 200px;
+}
+
+.fabricate-manager .manager-prerequisite-operator {
+  flex: 1 1 160px;
+}
+
+.fabricate-manager .manager-prerequisite-value {
+  flex: 0 1 110px;
+}
+
+.fabricate-manager .manager-prerequisite-path-input {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  padding-left: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 5px;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager .manager-prerequisite-path-input input {
+  border: 0;
+  background: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-prerequisite-at {
+  color: var(--fab-mv2-text-muted);
+  font-family: var(--fab-font-mono, monospace);
+}
+
+.fabricate-manager .manager-prerequisite-note {
+  font-size: 0.75rem;
 }
 
 .fabricate-manager .manager-character-modifier-list {
@@ -1305,6 +2036,144 @@
   display: flex;
   gap: var(--fab-space-chip);
   justify-content: flex-end;
+}
+
+.fabricate-manager .manager-currency-unit-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-subunit-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--fab-space-2);
+  align-items: end;
+}
+
+/* Warning callout shown in place of the add-sub-unit control when no unit is eligible. */
+.fabricate-manager .manager-currency-subunit-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-warning-border);
+  border-left: 3px solid var(--fab-warning);
+  border-radius: 6px;
+  background: var(--fab-warning-soft);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-currency-subunit-warning i {
+  margin-top: var(--fab-space-2xs);
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-currency-subunit-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-currency-subunit-heading {
+  margin: 0;
+}
+
+.fabricate-manager .manager-availability-pill.is-currency {
+  min-height: 34px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border-color: color-mix(in srgb, var(--fab-info) 50%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--fab-info) 16%, var(--fab-mv2-surface-2));
+}
+
+.fabricate-manager .manager-availability-pill.is-currency > i {
+  color: var(--fab-info);
+}
+
+.fabricate-manager .manager-availability-pill-amount {
+  width: 56px;
+  min-width: 0;
+  height: 25px;
+  padding: 0 var(--fab-space-2xs);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 4px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Provider-managed (read-only) currency: the selected inventory provider owns the denomination
+   ladder, so units render as a compact static display with no edit/delete/add controls. */
+.fabricate-manager .manager-currency-provider-managed-callout {
+  margin-bottom: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-provider-managed-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-currency-provider-managed-list {
+  gap: var(--fab-space-2);
+}
+
+/* Provider-managed denominations (e.g. pf2e cp/sp/gp/pp) read better as a compact
+   two-column grid that stacks into a couple of rows rather than a full-width single
+   column, collapsing to one column on narrow widths. */
+.fabricate-manager .manager-currency-provider-managed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-3);
+}
+
+@media (width <= 720px) {
+  .fabricate-manager .manager-currency-provider-managed-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fabricate-manager .manager-currency-provider-managed-summary {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: center;
+}
+
+/* Read-only provider/macro units present label, abbreviation, and denomination as static
+   field/value pairs, mirroring how Label and Abbreviation are shown in the editable form. */
+.fabricate-manager .manager-currency-readonly-fields {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--fab-space-2) var(--fab-space-4);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-currency-readonly-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-currency-readonly-label {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-currency-readonly-value {
+  color: var(--fab-mv2-text);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .fabricate-manager .manager-drop-inspector-stack {
@@ -1875,7 +2744,7 @@
 }
 
 .fabricate-manager .manager-recipes-table {
-  --fab-mv2-recipe-grid: minmax(0, 1.35fr) minmax(0, 0.5fr) minmax(0, 0.48fr) minmax(0, 0.76fr) minmax(0, 0.58fr) 118px;
+  --fab-mv2-recipe-grid: minmax(0, 1.35fr) minmax(0, 0.86fr) minmax(0, 0.86fr) minmax(0, 0.58fr) 118px;
 
   display: flex;
   flex-direction: column;
@@ -1884,7 +2753,34 @@
 }
 
 .fabricate-manager .manager-recipes-table.has-no-category {
-  --fab-mv2-recipe-grid: minmax(0, 1.45fr) minmax(0, 0.52fr) minmax(0, 0.82fr) minmax(0, 0.58fr) 118px;
+  --fab-mv2-recipe-grid: minmax(0, 1.45fr) minmax(0, 1.3fr) minmax(0, 0.58fr) 118px;
+}
+
+/* Incomplete flag pinned to the top-left, overlapping the row's top border, the
+   same affordance as the Tools library "Unsaved" chip (manager-tools-dirty-chip). */
+.fabricate-manager .manager-recipe-row {
+  position: relative;
+}
+
+.fabricate-manager .manager-recipe-row-flag-slot {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  z-index: 4;
+  display: flex;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.fabricate-manager .manager-recipe-incomplete-chip {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-mv2-surface-1);
+  gap: var(--fab-space-1);
+  white-space: nowrap;
+  box-shadow:
+    inset 0 0 0 999px var(--fab-warning-soft),
+    0 2px 8px var(--fab-overlay-dark-28);
 }
 
 .fabricate-manager .manager-components-table {
@@ -1922,6 +2818,17 @@
 
 .fabricate-manager .manager-components-table.has-no-tags.has-no-essences.has-progressive-difficulty {
   --fab-mv2-component-grid: minmax(0, 1.58fr) minmax(0, 0.52fr) minmax(0, 0.58fr) 118px;
+}
+
+/* Progressive difficulty is a single value (like a name), not a chip/category:
+   render it borderless and centered in its column, with a centered header. */
+.fabricate-manager .manager-component-difficulty-head,
+.fabricate-manager .manager-component-difficulty-cell {
+  text-align: center;
+}
+
+.fabricate-manager .manager-component-difficulty-value {
+  font-variant-numeric: tabular-nums;
 }
 
 .fabricate-manager .manager-environments-table {
@@ -1980,6 +2887,11 @@
   align-items: center;
   align-content: center;
   min-width: 0;
+}
+
+.fabricate-manager .manager-recipes-table .manager-recipe-row .manager-action-group {
+  flex-wrap: nowrap;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-component-table-head,
@@ -3349,15 +4261,43 @@
   min-width: 0;
 }
 
-.fabricate-manager[data-manager-view="environment-edit"] .manager-body {
+.fabricate-manager[data-manager-view="environment-edit"] .manager-body,
+.fabricate-manager[data-manager-view="checks"] .manager-body,
+.fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
+.fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
+.fabricate-manager[data-manager-view="system-edit"] .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
-.fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed {
+.fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="checks"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
 .fabricate-manager .manager-environment-edit-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The System Overview page mirrors the environment editor's full-width tabbed
+   shell: a fixed tab bar above a bounded, scrollable workspace. Like the
+   environment editor, SystemEditView is wrapped by the parent in a
+   `<main class="manager-main manager-environment-edit-main">` (the
+   header-coloured `--fab-mv2-surface-1` band) and a
+   `.manager-environment-editor-shell` that owns the `var(--fab-space-3)` padding
+   around the whole editor. This view therefore carries NO padding of its own:
+   the tab bar (`.manager-environment-tabs`, `background: none`) fills the shell's
+   content box edge-to-edge and shows the surface-1 band through it, exactly like
+   the environment editor's tab bar, while the card breathing room comes from the
+   workspace/tab-panel gaps and the shared `.manager-environment-tab-panel`
+   right-edge buffer below the bar. */
+.fabricate-manager .manager-system-edit-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--fab-space-3);
@@ -3441,8 +4381,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-field.span-2,
-.fabricate-manager .manager-toggle-row.span-2 {
+.fabricate-manager .manager-field.span-2 {
   grid-column: 1 / -1;
 }
 
@@ -3994,6 +4933,306 @@
   grid-column: 1 / -1;
 }
 
+.fabricate-manager .manager-currency-edit-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fabricate-manager .manager-currency-detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+}
+
+.fabricate-manager .manager-currency-strategy {
+  display: grid;
+  gap: var(--fab-space-3);
+  margin-bottom: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-macro-zones {
+  display: grid;
+  gap: var(--fab-space-3);
+}
+
+/* The three custom-macro drop zones (canAfford / increment / decrement) sit side-by-side in a
+   single responsive row, collapsing to fewer columns on narrow widths. */
+.fabricate-manager .manager-currency-macro-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
+.fabricate-manager .manager-currency-macro-row .manager-currency-macro-field {
+  min-width: 0;
+}
+
+@media (width <= 720px) {
+  .fabricate-manager .manager-currency-macro-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fabricate-manager .manager-currency-macro-field {
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-currency-macro-note {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.82rem;
+}
+
+/* The resolution-mode card spans the full edit grid and is itself the selector: each mode is a
+   selectable radio row with its name and one-line description, the active row highlighted. It sits
+   beside the Identity / Optional Features cards, so it reuses their surface tokens, an uppercase
+   section kicker for the legend, and a top-of-card destructive-change note. */
+.fabricate-manager .manager-resolution-mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-resolution-mode-legend {
+  padding: 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Destructive-change note, hoisted above the options so the warning reads before the GM picks a
+   mode. Soft-warning surface keeps it integrated rather than alarming. */
+.fabricate-manager .manager-resolution-mode-note {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: start;
+  min-width: 0;
+  margin: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 6px;
+  color: var(--fab-warning-text);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-resolution-mode-note i {
+  margin-top: 0.1rem;
+  color: var(--fab-mv2-warning);
+}
+
+.fabricate-manager .manager-resolution-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-resolution-option {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: start;
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-resolution-option:hover {
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-resolution-option.is-active {
+  border-color: var(--fab-mv2-border);
+  background: var(--fab-accent-soft);
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+}
+
+/* Custom radio: strip Foundry's orange native control and draw a circular, themed control. The
+   unchecked state is a hollow ring on the border token; the checked state paints a green accent
+   ring plus a filled centre dot via an inset box-shadow (no gradients, no orange anywhere). The
+   inset spread fills the inner circle to the accent colour while the border stays the ring. */
+.fabricate-manager .manager-resolution-option input[type='radio'] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  margin: 0;
+  margin-top: 0.15rem;
+  padding: 0;
+  border: 1.5px solid var(--fab-mv2-border);
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Foundry's core stylesheet draws the native radio's inner chrome via ::before/::after, which
+   appearance: none does NOT remove — so it bleeds through over our themed control. Hide those
+   pseudo-elements here so only the themed ring + inset-box-shadow dot shows. Load-bearing: do not
+   "clean up" this rule. Scoped to the resolution-mode radios only, never radios globally. */
+.fabricate-manager .manager-resolution-option input[type='radio']::before,
+.fabricate-manager .manager-resolution-option input[type='radio']::after {
+  display: none;
+}
+
+.fabricate-manager .manager-resolution-option input[type='radio']:checked {
+  border-color: var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 3px var(--fab-mv2-bg), inset 0 0 0 16px var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-resolution-option input[type='radio']:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Keep the checked centre dot while the radio is focused — the bare :focus rule
+   above zeroes box-shadow, which is also what paints the dot, so a checked radio
+   loses its dot the moment it is clicked/focused without this restore. */
+.fabricate-manager .manager-resolution-option input[type='radio']:checked:focus {
+  box-shadow: inset 0 0 0 3px var(--fab-mv2-bg), inset 0 0 0 16px var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-resolution-option input[type='radio']:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+}
+
+/* Config-card variant (Crafting settings — recipe resolution, recipe visibility,
+   salvage resolution): an icon tile + 2-column card grid with the radio rendered
+   as a right-aligned dot. The host page renders its own section heading, so the
+   fieldset legend is visually hidden (kept for the fieldset's accessible name).
+   Opt-in only (variant="config-card"); the gathering surface keeps the compact
+   default rows. Issue 511. */
+.fabricate-manager .manager-resolution-mode-card.is-config-cards {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 10px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-overlay-light-08);
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
+  order: 1;
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  background: var(--fab-bg-3);
+  color: var(--fab-mv2-accent);
+  font-size: 0.95rem;
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-body {
+  order: 2;
+  flex: 1 1 auto;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio'] {
+  order: 3;
+  align-self: flex-start;
+  margin-top: 0.1rem;
+}
+
+@container (max-width: 620px) {
+  .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fabricate-manager .manager-resolution-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-resolution-option-name {
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-resolution-option-desc {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* A modelled-but-unimplemented option: dim the row and block the pointer while
+   keeping the name legible. The real `disabled` attribute on the radio already
+   removes it from the tab order; this is the visible affordance. */
+.fabricate-manager .manager-resolution-option.is-disabled {
+  cursor: not-allowed;
+}
+
+.fabricate-manager .manager-resolution-option.is-disabled .manager-resolution-option-desc {
+  opacity: 0.6;
+}
+
+.fabricate-manager .manager-resolution-option.is-disabled input[type='radio'] {
+  cursor: not-allowed;
+}
+
+/* "Coming soon" badge inline with the option name. Theme tokens only. */
+.fabricate-manager .manager-resolution-option-badge {
+  display: inline-block;
+  margin-left: var(--fab-space-2);
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 999px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  background: var(--fab-overlay-light-04);
+}
+
 .fabricate-manager .manager-field input,
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea {
@@ -4011,6 +5250,877 @@
   padding: 0 var(--fab-space-2);
 }
 
+.fabricate-manager .manager-field select:disabled {
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
+  opacity: 0.62;
+}
+
+.fabricate-manager .manager-recipe-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-steps-row {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-recipe-steps-row.is-expanded {
+  border-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-recipe-steps-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  min-width: 0;
+  cursor: grab;
+}
+
+.fabricate-manager .manager-recipe-steps-row-head:active {
+  cursor: grabbing;
+}
+
+.fabricate-manager .manager-recipe-steps-row-main {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-steps-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-recipe-steps-requirements {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-steps-requirements .manager-chip {
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+}
+
+.fabricate-manager .manager-recipe-steps-requirements .manager-chip.is-empty {
+  color: var(--fab-mv2-text-muted);
+  opacity: 0.75;
+}
+
+.fabricate-manager .manager-recipe-duration {
+  position: relative;
+  display: inline-flex;
+}
+
+.fabricate-manager .manager-recipe-duration-trigger {
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-duration-trigger.is-empty {
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-recipe-duration-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 4000;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: none;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: var(--fab-shadow-lg);
+}
+
+/* All five unit steppers sit on one line. The popover sizes to this row
+   (`width: max-content`), so the row is never wider than its container and never
+   needs horizontal scroll. */
+.fabricate-manager .manager-recipe-duration-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: var(--fab-space-2);
+}
+
+/* One unit column: the unit label header, then the up chevron / editable field /
+   down chevron fused into a single connected control (no gaps; the chevrons share
+   the field's border and are square where they meet it). Fixed, narrow width so
+   every column is uniform. */
+.fabricate-manager .manager-recipe-duration-stepper {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  width: 3.25rem;
+}
+
+.fabricate-manager .manager-recipe-duration-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  color: var(--fab-mv2-text);
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+/* Round only the outer corners; square where the chevron joins the field, and
+   drop the shared border edge so the join reads as a single line. */
+.fabricate-manager .manager-recipe-duration-step[data-recipe-duration-step='up'] {
+  border-radius: 6px 6px 0 0;
+  border-bottom: none;
+}
+
+.fabricate-manager .manager-recipe-duration-step[data-recipe-duration-step='down'] {
+  border-radius: 0 0 6px 6px;
+  border-top: none;
+}
+
+.fabricate-manager .manager-recipe-duration-step:hover {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-08);
+}
+
+/* The number-only field. Square corners so it sits flush between the two
+   chevrons. */
+.fabricate-manager .manager-recipe-duration-field {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 0;
+  background: var(--fab-mv2-bg);
+}
+
+/* The count fills the narrow field, centred (up to four digits). */
+.fabricate-manager .manager-recipe-duration-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fab-mv2-text);
+  text-align: center;
+  appearance: textfield;
+}
+
+/* Hide the native spinners — the custom up/down chevrons replace them. */
+.fabricate-manager .manager-recipe-duration-input::-webkit-outer-spin-button,
+.fabricate-manager .manager-recipe-duration-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* The unit label sits at the top of the column, above the connected stepper. */
+.fabricate-manager .manager-recipe-duration-unit {
+  margin-bottom: var(--fab-space-2xs);
+  overflow: hidden;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-steps-editor .manager-field textarea {
+  min-height: 46px;
+}
+
+.fabricate-manager .manager-recipe-steps-row-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-recipe-steps-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-recipe-steps-add {
+  list-style: none;
+}
+
+/* Requirement sections (Ingredients / Results / Tools) — empty-state scaffold. */
+.fabricate-manager .manager-recipe-section-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-section-empty-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-section-empty .manager-muted {
+  margin: 0;
+}
+
+.fabricate-manager .manager-recipe-req-rows,
+.fabricate-manager .manager-recipe-tool-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-req-row,
+.fabricate-manager .manager-recipe-tool-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-req-label,
+.fabricate-manager .manager-recipe-tool-label {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* A required-tool row leads with the backing component's image (a small rounded
+   thumbnail) so the tool is recognisable at a glance, matching the system Tools
+   library browser rather than a generic wrench glyph. */
+.fabricate-manager .manager-recipe-tool-thumb {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-recipe-tool-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Nested ingredient editor: sets -> groups -> options + per-set essences. */
+.fabricate-manager .manager-recipe-ingredient-sets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+/* Per-component salvage authoring (component editor). A result group reuses the
+   ingredient-set-item shell; its rows lay a component picker, a fixed-width
+   quantity, and a remove button onto one line, and the outcome-routing rows pair
+   an outcome name with its target-group select. */
+.fabricate-manager .manager-salvage-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-group-header .manager-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-salvage-result-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-result-row .manager-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-result-quantity {
+  flex: 0 0 5rem;
+  width: 5rem;
+}
+
+.fabricate-manager .manager-salvage-routing-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-routing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-routing-row > span {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-salvage-routing-row .manager-input {
+  flex: 0 1 14rem;
+  min-width: 0;
+}
+
+/* The set-level "OR", the within-requirement "OR", and the between-requirement
+   "AND" dividers share one label-flanked-by-rules treatment; only the label
+   differs. */
+.fabricate-manager .manager-recipe-ingredient-set-or,
+.fabricate-manager .manager-recipe-ingredient-or-separator,
+.fabricate-manager .manager-recipe-ingredient-and-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--fab-mv2-text-muted);
+}
+
+/* Flank the label with a faint rule so each alternative ("OR") or each AND'd
+   requirement reads as a visually separated unit. */
+.fabricate-manager .manager-recipe-ingredient-or-separator::before,
+.fabricate-manager .manager-recipe-ingredient-or-separator::after,
+.fabricate-manager .manager-recipe-ingredient-and-separator::before,
+.fabricate-manager .manager-recipe-ingredient-and-separator::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-recipe-ingredient-set {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-empty {
+  margin: 0;
+}
+
+/* Routed result-set routing: ingredient-set / outcome-tier chip multi-select that
+   replaces the result-set name input, plus the spacer that keeps the remove button
+   right-aligned when the ingredient-set name is hidden (check mode). */
+.fabricate-manager .manager-recipe-ingredient-set-name-spacer {
+  flex: 1 1 auto;
+}
+
+/* Read-only default set name shown in routed check mode (no editable input). */
+.fabricate-manager .manager-recipe-ingredient-set-name.is-readonly {
+  display: flex;
+  align-items: center;
+  border-color: transparent;
+  background: transparent;
+  opacity: 0.7;
+}
+
+.fabricate-manager .manager-recipe-routing-assignment {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fabricate-manager .manager-recipe-routing-assignment-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fab-mv2-text);
+  opacity: 0.7;
+}
+
+.fabricate-manager .manager-recipe-routing-assignment-empty {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.fabricate-manager .manager-recipe-routing-assignment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-routing-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fabricate-manager .manager-recipe-routing-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.fabricate-manager .manager-recipe-routing-chip-remove:hover {
+  opacity: 1;
+}
+
+.fabricate-manager .manager-recipe-ingredient-set-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+/* Progressive recipes award results in order, so each result row grows a leading
+   drag handle (reusing the shared .manager-environment-comp-handle grip + order
+   pip). The wrapper lays the handle beside the row and lets the option row fill
+   the rest; the handle's step-header translateY nudge is dropped so the grip
+   centres on this single-line row. Each row carries card chrome (border + raised
+   surface, mirroring .manager-recipe-tool-row) so an ordered result reads as a
+   discrete, draggable card. */
+.fabricate-manager .manager-recipe-result-row.is-reorderable {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+  cursor: grab;
+}
+
+.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-environment-comp-handle {
+  transform: none;
+}
+
+.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-ingredient-option-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Two-button add row: "Add component" (popover) + "Add tag requirement". */
+.fabricate-manager .manager-recipe-ingredient-set-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+/* A requirement is a flat container by default (a single alternative reads as a
+   bare row). When it holds two or more alternatives they read as one bracketed
+   unit, accented on the left so the "— or —" links are visually grouped. */
+.fabricate-manager .manager-recipe-ingredient-requirement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives {
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-left: 3px solid var(--fab-mv2-accent);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-recipe-ingredient-requirement-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+/* An alternative is a single flat row: the match editor grows on the left, the
+   quantity + per-row add/remove controls cluster on the right. */
+.fabricate-manager .manager-recipe-ingredient-option-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-target {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+/* The per-row alternative-add cluster is grouped on the right, visually distinct
+   from the within-option tag editor on the left. */
+.fabricate-manager .manager-recipe-option-alternative-adds {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+/* Square, icon-only add controls so they don't read as the labelled set-level
+   "Add component" / "Add tag requirement" buttons; sized to match the adjacent
+   remove (icon) button. */
+.fabricate-manager .manager-button.manager-recipe-add-alternative-trigger {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+}
+
+.fabricate-manager .manager-recipe-tag-match-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-2xs);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-recipe-tag-match-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-chip);
+  height: auto;
+  min-height: 30px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-tag-match-option:hover:not(.is-selected) {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-recipe-tag-match-option.is-selected {
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+}
+
+/* The component alternative's trigger is the image-only picker target, sized to
+   its thumbnail; the resolved component name renders as static text beside it.
+   The `.manager-button.…` selector raises specificity above the base
+   `.manager-button` padding (declared later in this file) so the horizontal
+   padding actually tightens to match the vertical breathing room. */
+.fabricate-manager .manager-button.manager-recipe-component-trigger {
+  justify-content: flex-start;
+  width: auto;
+  height: auto;
+  min-height: 34px;
+  padding: var(--fab-space-1);
+}
+
+/* The selected component's name, rendered beside the image-only picker trigger
+   (not inside the clickable button). */
+.fabricate-manager .manager-recipe-component-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The option's match editor lays the image trigger and the static name on one
+   row so the name reads beside the thumbnail. */
+.fabricate-manager .manager-recipe-option-component {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* The per-OR-group footer add cluster: one set of "Add component / Add tag
+   requirement" controls inside the requirement box instead of per row. */
+.fabricate-manager .manager-recipe-requirement-adds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait {
+  width: 24px;
+  height: 24px;
+}
+
+.fabricate-manager .manager-recipe-option-tags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-tags-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* The chosen tags sit in their own bordered area on a full-width line below the
+   match controls/quantity row; as a flex item with a 100% basis it always wraps
+   to its own line and fills the row. When empty it shows a muted "No tags set". */
+.fabricate-manager .manager-recipe-option-tags-list {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-recipe-tags-empty {
+  font-size: 0.85rem;
+}
+
+.fabricate-manager .manager-recipe-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Chips are <li>s. `margin: 0` zeroes a host list rule that gives non-last items
+   a margin-bottom (which inflated the first chip's box, e.g. 34px vs 30px). The
+   min-width floors short tags ("rare") so they don't collapse to a near-square
+   pill next to longer tags ("reagent"); space-between overrides the base chip's
+   centring so the label sits left and the remove button right regardless of tag
+   length; and the pinned height keeps every chip the same box despite tag glyphs
+   or sub-pixel rounding. */
+.fabricate-manager .manager-recipe-tag-chip {
+  gap: var(--fab-space-chip);
+  box-sizing: border-box;
+  margin: 0;
+  justify-content: space-between;
+  min-width: 4.5rem;
+  height: 28px;
+  min-height: 28px;
+}
+
+.fabricate-manager .manager-recipe-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-option-quantity {
+  flex: 0 0 auto;
+  width: 3.75rem;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-recipe-option-currency {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-currency-amount {
+  flex: 0 0 auto;
+  width: 3.75rem;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-recipe-currency-unit {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-essence-quantity {
+  width: 100%;
+}
+
+.fabricate-manager .manager-recipe-option-remove {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-button.is-subtle {
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-ingredient-essences {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-recipe-ingredient-essences-title {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.fabricate-manager .manager-recipe-essence-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-essence-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-essence-label {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-essence-quantity-field {
+  flex: 0 0 auto;
+  width: 6rem;
+}
+
+.fabricate-manager .manager-recipe-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 .fabricate-manager .manager-field textarea {
   min-height: 92px;
   padding: var(--fab-space-2) var(--fab-space-2);
@@ -4018,7 +6128,7 @@
 }
 
 .fabricate-manager .manager-field small,
-.fabricate-manager .manager-toggle-copy small {
+.fabricate-manager .manager-feature-tile small {
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
   font-weight: 500;
@@ -4032,33 +6142,26 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-toggle-row {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: flex-start;
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-dark-14);
-}
-
-.fabricate-manager .manager-toggle-row input {
-  width: 18px;
-  height: 18px;
-  margin: 1px 0 0;
-  accent-color: var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-toggle-copy {
+.fabricate-manager .manager-feature-tile {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-surface);
 }
 
-.fabricate-manager .manager-toggle-copy strong {
+.fabricate-manager .manager-feature-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-feature-tile-head strong {
   min-width: 0;
   font-size: 0.82rem;
   line-height: 1.25;
@@ -4474,6 +6577,25 @@
 .fabricate-manager .manager-button i {
   position: static;
   margin: 0;
+}
+
+/* Recipe-access rows are native <button>s, so Foundry core's fixed button height
+   would clamp them and overlap the stacked name + grant chip. Restore auto height
+   here in the global sheet (a component-scoped override is unreliable against the
+   Foundry core `button` rule) — issue 511. */
+.fabricate-manager .manager-access-row {
+  height: auto;
+  min-height: 56px;
+  line-height: normal;
+  align-items: center;
+}
+
+/* The shared .manager-search is `flex: 1 1 260px` for the horizontal filter bar;
+   inside the vertical Access roster column that flex-grow stretches the search box
+   tall (and floats its absolutely-positioned icon mid-gap). Pin it to its content
+   height in the roster context — issue 511. */
+.fabricate-manager .manager-access-roster .manager-search {
+  flex: 0 0 auto;
 }
 
 .fabricate-manager .manager-gathering-panel {
@@ -5203,20 +7325,29 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* When a scene is linked, the identity image mirrors the (muted) scene thumbnail and is
-   locked — it can't be edited until the scene is unlinked. */
-.fabricate-manager .manager-task-image-picker.is-scene-linked {
+/* When a scene (or recipe item) is linked, the identity image mirrors the
+   (muted) linked thumbnail and is locked — it can't be edited until the link
+   is removed. */
+.fabricate-manager .manager-task-image-picker.is-scene-linked,
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked,
+.fabricate-manager .manager-task-image-picker.is-source-linked {
   cursor: default;
 }
 
-.fabricate-manager .manager-task-image-picker.is-scene-linked img {
+.fabricate-manager .manager-task-image-picker.is-scene-linked img,
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked img,
+.fabricate-manager .manager-task-image-picker.is-source-linked img {
   object-fit: cover;
   padding: 0;
   filter: saturate(0.65) brightness(0.85);
 }
 
 .fabricate-manager .manager-task-image-picker.is-scene-linked .fa-pen,
-.fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock {
+.fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock,
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-pen,
+.fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-lock,
+.fabricate-manager .manager-task-image-picker.is-source-linked .fa-pen,
+.fabricate-manager .manager-task-image-picker.is-source-linked .fa-lock {
   color: var(--fab-mv2-text-muted);
 }
 
@@ -7360,6 +9491,170 @@
   text-align: center;
 }
 
+/* Recipe Visibility card: List mode and Knowledge-based are inline subheading
+   sections within the parent card; the knowledge OPTION cards share one
+   equal-height 3-column grid (align-items: stretch) below them. */
+.fabricate-manager .manager-recipe-visibility-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-subcard {
+  gap: var(--fab-space-2xs);
+}
+
+/* A labelled section (List mode / Knowledge-based) inside the parent card: an
+   uppercase subheading, its select, and a note — no bordered frame. */
+.fabricate-manager .manager-recipe-visibility-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-subheading {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Keep the section selects at a readable width rather than edge to edge. */
+.fabricate-manager
+  .manager-recipe-visibility-section
+  .manager-recipe-visibility-control
+  select {
+  max-width: 28rem;
+}
+
+/* The per-mode List mode note sits under the select. */
+.fabricate-manager .manager-recipe-visibility-list-mode-note {
+  margin-top: var(--fab-space-2);
+}
+
+/* The Limited-uses card stacks its toggle row above the Maximum-uses stepper,
+   which stays visible but faded and disabled until limited uses is enabled so
+   the card never changes size. */
+.fabricate-manager .manager-recipe-visibility-item-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2xs);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+/* Enabled + Delete-exhausted toggles share one row, splitting the width evenly. */
+.fabricate-manager .manager-recipe-visibility-item-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--fab-space-4);
+  min-width: 0;
+}
+
+.fabricate-manager
+  .manager-recipe-visibility-item-toggle-row
+  .manager-recipe-visibility-item-cell {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Learn-option cards pin their toggle to the top-right — the same head layout as
+   the Optional-features tiles — with the description below. An explicit two-column
+   grid (label | toggle) keeps a guaranteed gap so a wrapping legend never crowds
+   the pill: the legend wraps inside the first column and the toggle sits in its
+   own auto column. */
+.fabricate-manager .manager-recipe-visibility-toggle-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--fab-space-6);
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager
+  .manager-recipe-visibility-toggle-head
+  .manager-resolution-mode-legend {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-item-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-item-cell .manager-recipe-visibility-stepper {
+  min-width: 132px;
+}
+
+/* Faded, non-interactive gated inputs when limited uses is off. */
+.fabricate-manager .manager-recipe-visibility-item-cell.is-disabled {
+  opacity: 0.45;
+}
+
+.fabricate-manager .manager-status-toggle.is-disabled,
+.fabricate-manager .manager-status-toggle:disabled {
+  cursor: not-allowed;
+}
+
+.fabricate-manager .manager-recipe-visibility-subcard-desc {
+  margin: 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager .manager-recipe-visibility-control {
+  padding-top: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+/* Label above each stacked control inside the Limited-uses card. */
+.fabricate-manager .manager-recipe-visibility-nested-label {
+  color: var(--fab-mv2-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-recipe-visibility-control select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-weight: 400;
+}
+
+.fabricate-manager .manager-recipe-visibility-stepper {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-visibility-stepper input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-weight: 400;
+  text-align: center;
+}
+
 .fabricate-manager .manager-empty {
   display: grid;
   place-items: center;
@@ -7593,11 +9888,17 @@
     overflow: visible;
   }
 
-  .fabricate-manager[data-manager-view="environment-edit"] .manager-body {
+  .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
+  .fabricate-manager[data-manager-view="checks"] .manager-body,
+  .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
+  .fabricate-manager[data-manager-view="books-scrolls"] .manager-body,
+  .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
+  .fabricate-manager[data-manager-view="system-edit"] .manager-body {
     grid-template-columns: 1fr;
   }
 
-  .fabricate-manager .manager-environment-edit-view {
+  .fabricate-manager .manager-environment-edit-view,
+  .fabricate-manager .manager-system-edit-view {
     min-height: auto;
     overflow: visible;
   }
@@ -7661,6 +9962,12 @@
     align-items: center;
   }
 
+  /* In the stacked layout the difficulty cell gains a leading label, so keep its
+     value left-aligned beside it (the centered wide-layout rule does not apply). */
+  .fabricate-manager .manager-component-difficulty-cell {
+    text-align: start;
+  }
+
   .fabricate-manager .manager-labeled-cell::before {
     content: attr(data-label);
     color: var(--fab-mv2-text-muted);
@@ -7683,9 +9990,17 @@
   .fabricate-manager .manager-toggle-list {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .fabricate-manager .manager-recipe-visibility-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @container fabricate-manager (max-width: 680px) {
+  .fabricate-manager .manager-recipe-visibility-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .fabricate-manager .manager-header,
   .fabricate-manager .manager-section-header {
     align-items: stretch;
@@ -7789,159 +10104,46 @@
   overflow: auto;
 }
 
-.fabricate-manager .manager-component-edit-tabs {
-  display: flex;
-  gap: var(--fab-space-1);
-  min-width: 0;
-  padding: var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-03);
-}
-
-.fabricate-manager .manager-component-edit-tab {
-  flex: 0 1 auto;
-  padding: var(--fab-space-chip) var(--fab-space-3);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.84rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-component-edit-tab:hover,
-.fabricate-manager .manager-component-edit-tab:focus-visible {
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-05);
-}
-
-.fabricate-manager .manager-component-edit-tab.is-active {
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-08);
-  border-color: var(--fab-mv2-border);
-}
-
-.fabricate-manager .manager-component-identity-grid {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: var(--fab-space-3);
-  min-width: 0;
-  align-items: start;
-}
-
-.fabricate-manager .manager-component-identity-image {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-identity-image .manager-component-preview {
-  width: 96px;
-  height: 96px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-component-identity-image .manager-component-preview.is-empty {
+/* The component identity name + description mirror the recipe identity layout but
+   are NOT editable — they come from the linked Foundry item. They render in the same
+   bordered boxes as the editor fields, but with a leading lock badge and greyed-out
+   text, so they read as "provided, not editable" rather than clickable inputs. */
+.fabricate-manager .manager-component-readonly-label {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-component-readonly-label .fa-lock {
   color: var(--fab-mv2-text-muted);
-  font-size: 1.6rem;
+  font-size: 0.7rem;
+  opacity: 0.85;
 }
 
-.fabricate-manager .manager-component-identity-label {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.76rem;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.fabricate-manager .manager-component-identity-fields {
-  display: grid;
-  align-content: start;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-identity-fields textarea {
-  min-height: 90px;
-}
-
-.fabricate-manager .manager-component-identity-hint {
-  margin: 0;
-}
-
-.fabricate-manager .manager-component-source-stack {
-  display: grid;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-source-summary {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: var(--fab-space-2);
+.fabricate-manager .manager-component-readonly-value {
+  display: flex;
   align-items: center;
+  width: 100%;
   min-width: 0;
-}
-
-.fabricate-manager .manager-component-source-thumb {
-  width: 48px;
-  height: 48px;
+  min-height: 36px;
+  margin: 0;
+  padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-component-source-thumb.is-empty {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--fab-mv2-bg);
   color: var(--fab-mv2-text-muted);
-  background: var(--fab-overlay-light-04);
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  opacity: 0.8;
+  cursor: default;
 }
 
-.fabricate-manager .manager-component-source-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-source-copy strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fab-mv2-text);
-  font-size: 0.86rem;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-component-source-uuid {
-  margin: 0;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.74rem;
-  overflow-wrap: anywhere;
-}
-
-.fabricate-manager .manager-component-source-warning {
-  margin: 0;
-  color: var(--fab-mv2-warning);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.fabricate-manager .manager-component-source-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-chip);
-  min-width: 0;
+.fabricate-manager .manager-component-readonly-value.is-multiline {
+  display: block;
+  min-height: 92px;
+  white-space: pre-wrap;
 }
 
 .fabricate-manager .manager-component-source-drop-zone {
@@ -7964,28 +10166,12 @@
   color: var(--fab-mv2-text);
 }
 
-.fabricate-manager .manager-component-tag-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-tag-option {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-04);
-  font-size: 0.82rem;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-component-tag-option input {
-  margin: 0;
+/* The empty currency-macro drop zone must match the height of the linked-macro card
+   (.manager-environment-scene-linked) so dropping or selecting a macro does not resize
+   the zone. The linked card is a 40px thumb plus var(--fab-space-3) padding and a 1px
+   border on each side; mirror that as a min-height (border-box) and centre the hint. */
+.fabricate-manager .manager-currency-macro-drop-zone {
+  min-height: calc(40px + (2 * var(--fab-space-3)) + 2px);
 }
 
 .fabricate-manager .manager-component-essence-grid {
@@ -7997,7 +10183,7 @@
 
 .fabricate-manager .manager-component-essence-card {
   display: grid;
-  grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto auto auto minmax(0, 1fr);
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2) var(--fab-space-2);
@@ -8258,6 +10444,39 @@
   text-transform: uppercase;
   color: var(--fab-mv2-text-muted);
   padding: 0 var(--fab-space-1);
+}
+
+/* Tool breakage authority radios (issue 419): the option name is a distinct,
+   bold line above its muted description so the two never run together. The icon
+   aligns to the top of the two-line body (scoped here so single-line radios
+   elsewhere keep their centered alignment). The card header already frames this
+   group, so drop the fieldset's own bordered box (kept for the per-tool
+   fieldsets that still carry a visible legend). */
+.fabricate-manager [data-manager-tools-authority] .manager-tools-section {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.fabricate-manager [data-manager-tools-authority] .manager-radio-option {
+  align-items: flex-start;
+}
+
+.fabricate-manager .manager-radio-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-radio-option-name {
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-radio-option-desc {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--fab-mv2-text-muted);
 }
 
 .fabricate-manager .manager-tools-inline-field {
@@ -8554,7 +10773,7 @@
 
 .fabricate-manager .manager-environment-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
@@ -8696,6 +10915,28 @@
   line-height: 1.35;
 }
 
+/* A gated mode option (e.g. Complex on a single-set resolution mode) is shown
+   locked rather than hidden so authors can see it exists but cannot select it. */
+.fabricate-manager .manager-environment-mode-option.is-locked,
+.fabricate-manager .manager-environment-mode-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fabricate-manager .manager-environment-mode-option.is-locked:hover {
+  color: var(--fab-mv2-text-muted);
+}
+
+/* Simple mode renders a single chromeless ingredient/result set: no set-name
+   header or remove control, so it sits flush without the set list's spacing. */
+.fabricate-manager .manager-recipe-ingredient-set.is-chromeless {
+  margin: 0;
+}
+
+.fabricate-manager .manager-recipe-result-set-simple {
+  margin-top: var(--fab-space-2);
+}
+
 
 .fabricate-manager .manager-environment-composition {
   display: flex;
@@ -8821,6 +11062,119 @@
   min-width: 0;
 }
 
+/* Shared editor tab + validation primitives. Generic so the recipe editor reuses
+   the same tab strip and readiness/issue layout the environment editor pioneered
+   without duplicating the rules per editor. */
+.fabricate-manager .manager-editor-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--fab-space-1);
+  flex-wrap: wrap;
+  min-width: 0;
+  border-bottom: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-editor-tab-button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-height: 38px;
+  padding: 0 var(--fab-space-3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
+  color: var(--fab-mv2-text-muted);
+  background: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-editor-tab-button:hover {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-editor-tab-button.is-active {
+  color: var(--fab-mv2-text);
+  border-bottom-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-editor-tab-badge {
+  margin-left: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-editor-tab-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding-right: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-editor-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-chip) var(--fab-space-4);
+}
+
+.fabricate-manager .manager-editor-check {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-editor-check.is-satisfied > i {
+  color: var(--fab-success, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-editor-check.is-unsatisfied > i {
+  color: var(--fab-mv2-warning);
+}
+
+.fabricate-manager .manager-editor-issue {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+/* Recipe editor tab shell + validation helpers built on the shared primitives. */
+.fabricate-manager .manager-recipe-edit-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-recipe-issue-title {
+  flex: 1;
+  min-width: 0;
+}
+
 .fabricate-manager .manager-environment-inspector-facts {
   display: flex;
   gap: var(--fab-space-2);
@@ -8842,6 +11196,22 @@
   color: var(--fab-mv2-text);
 }
 
+/* Recipe-item inspector: the list of books teaching this recipe (issue 511
+   many-to-many). */
+.fabricate-manager .manager-recipe-item-links {
+  list-style: none;
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-environment-scene-dropzone.is-compact {
+  padding: var(--fab-space-2) var(--fab-space-3);
+  font-size: 0.8rem;
+}
+
 .fabricate-manager .manager-environment-scene-linked {
   display: flex;
   align-items: center;
@@ -8849,6 +11219,10 @@
   padding: var(--fab-space-3);
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 6px;
+
+  /* Allow the linked card to shrink below its content width inside the flex
+     inspector column so the name child can truncate instead of overflowing. */
+  min-width: 0;
 }
 
 .fabricate-manager .manager-environment-scene-linked.is-drop-active {
@@ -8871,8 +11245,14 @@
 }
 
 .fabricate-manager .manager-environment-scene-name {
-  flex: 1;
+  /* A flex item that is a `<button>` is inline-block by default; that intrinsic
+     min-content sizing defeats `text-overflow: ellipsis` for long unbroken
+     names (e.g. UUID fallbacks). Force block-level layout with a zero flex
+     basis and an explicit max so the name reliably shrinks and ellipsizes. */
+  display: block;
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 100%;
   text-align: left;
   background: none;
   border: none;
@@ -8924,6 +11304,74 @@
 .fabricate-manager .manager-environment-comp-callout i {
   color: var(--fab-mv2-accent);
   margin-top: var(--fab-space-2xs);
+}
+
+/* System overview view + the system-blocker callouts */
+.fabricate-manager .manager-system-overview-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-4);
+}
+
+.fabricate-manager .manager-system-overview-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-system-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-system-overview-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-system-overview-entity {
+  font-weight: 600;
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-system-overview-message {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-system-overview-link {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-system-overview-blocker {
+  border-left-color: var(--fab-mv2-danger, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-system-edit-blocker {
+  align-items: center;
+  border-left-color: var(--fab-mv2-danger, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-system-edit-blocker-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-system-edit-blocker-link {
+  flex: 0 0 auto;
 }
 
 /* Composition table */
@@ -9024,6 +11472,21 @@
   color: var(--fab-mv2-text-muted);
   cursor: grab;
   transform: translateY(3px);
+}
+
+/* Non-reorderable step rows (Ingredients / Results / Tools tabs) keep the order
+   pip but are not a drag handle, so they should not invite a grab. */
+.fabricate-manager .manager-environment-comp-handle.is-static {
+  cursor: default;
+}
+
+/* Heading above the per-step tools accordion on the Tools tab. */
+.fabricate-manager .manager-recipe-tools-steps-title {
+  margin: var(--fab-space-2) 0 0;
+  font-size: 0.95em;
+  color: var(--fab-mv2-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .fabricate-manager .manager-environment-comp-order {
@@ -9644,7 +12107,7 @@
 
 /* -------------------------------------------------------------------------- */
 
-/* Gathering result chat card                                                 */
+/* Gathering + crafting result chat cards                                     */
 
 /* Rendered inside the Foundry chat log (outside the Fabricate app shell), so  */
 
@@ -9654,8 +12117,12 @@
 
 /* Blends with Foundry's chat card: inherits the chat text colour (so it stays
    legible on parchment and on dark chat themes) and uses barely-there
-   translucent washes instead of a solid theme surface. */
-.fabricate-gather-chat {
+   translucent washes instead of a solid theme surface. The crafting result card
+   (.fabricate-craft-chat*, built by CraftingChatCard.js) shares this structure so
+   the two cards read as one system — the selectors below are comma-joined rather
+   than duplicated. */
+.fabricate-gather-chat,
+.fabricate-craft-chat {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -9667,21 +12134,25 @@
   background: var(--fab-overlay-dark-05);
 }
 
-.fabricate-gather-chat--success {
+.fabricate-gather-chat--success,
+.fabricate-craft-chat--success {
   border-left-color: var(--fab-success);
 }
 
-.fabricate-gather-chat--failure {
+.fabricate-gather-chat--failure,
+.fabricate-craft-chat--failure {
   border-left-color: var(--fab-danger);
 }
 
-.fabricate-gather-chat__header {
+.fabricate-gather-chat__header,
+.fabricate-craft-chat__header {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 
-.fabricate-gather-chat__title {
+.fabricate-gather-chat__title,
+.fabricate-craft-chat__title {
   margin: 0;
   border: none;
   font-size: 1.02em;
@@ -9689,19 +12160,22 @@
   line-height: 1.2;
 }
 
-.fabricate-gather-chat__subtitle {
+.fabricate-gather-chat__subtitle,
+.fabricate-craft-chat__subtitle {
   margin: 0;
   font-size: 0.85em;
   opacity: 0.72;
 }
 
-.fabricate-gather-chat__section {
+.fabricate-gather-chat__section,
+.fabricate-craft-chat__section {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-1);
 }
 
-.fabricate-gather-chat__heading {
+.fabricate-gather-chat__heading,
+.fabricate-craft-chat__heading {
   margin: 0;
   border: none;
   font-size: 0.74em;
@@ -9716,7 +12190,19 @@
   opacity: 0.95;
 }
 
-.fabricate-gather-chat__grid {
+/* Crafting failure reason — a short notice above the forfeited-items section. */
+.fabricate-craft-chat__notice {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.fabricate-craft-chat--failure .fabricate-craft-chat__notice {
+  color: var(--fab-danger);
+  opacity: 0.95;
+}
+
+.fabricate-gather-chat__grid,
+.fabricate-craft-chat__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: var(--fab-space-1);
@@ -9725,7 +12211,8 @@
   list-style: none;
 }
 
-.fabricate-gather-chat__item {
+.fabricate-gather-chat__item,
+.fabricate-craft-chat__item {
   display: flex;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -9736,7 +12223,8 @@
   background: var(--fab-overlay-dark-05);
 }
 
-.fabricate-gather-chat__icon {
+.fabricate-gather-chat__icon,
+.fabricate-craft-chat__icon {
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
@@ -9745,7 +12233,8 @@
   object-fit: cover;
 }
 
-.fabricate-gather-chat__label {
+.fabricate-gather-chat__label,
+.fabricate-craft-chat__label {
   min-width: 0;
   overflow: hidden;
   font-size: 0.85em;
@@ -11446,4 +13935,244 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-1);
+}
+
+/* ==========================================
+   Interactive roll prompt (DialogV2)
+   ==========================================
+   The check roll-config dialog (`promptCheckRoll`, rollPrompt.js) carries the
+   `.fabricate-roll-prompt-dialog` root class (+ `.fabricate-dialog`) so its body
+   and footer buttons are themeable, styled to resemble the dnd5e roll dialog:
+   a centered header (icon + activity title / subject subtitle), a die glyph, the
+   formula with a right-aligned "Formula" label, a DC chip, a situational-bonus
+   input, and a Configuration section with a Roll Mode picker. Tokens only (no
+   colour literals); every selector namespaced under `.fabricate`. */
+.fabricate-roll-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) 0;
+  color: var(--fab-text);
+}
+
+.fabricate-roll-prompt__header {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.fabricate-roll-prompt__icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--fab-bg-1);
+}
+
+.fabricate-roll-prompt__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-roll-prompt__title {
+  margin: 0;
+  border: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--fab-text);
+}
+
+.fabricate-roll-prompt__die {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--fab-accent);
+}
+
+.fabricate-roll-prompt__formula {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-roll-prompt__formula code {
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--fab-text);
+  background: none;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-roll-prompt__formula-meta {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2);
+  align-items: center;
+}
+
+.fabricate-roll-prompt__formula--dc-only {
+  justify-content: center;
+}
+
+.fabricate-roll-prompt__formula-label {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-roll-prompt__dc {
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-roll-prompt__bonus {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-roll-prompt__config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-border-soft);
+}
+
+.fabricate-roll-prompt__config-heading {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-roll-prompt__config label {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--fab-text);
+}
+
+.fabricate-roll-prompt select {
+  flex: 0 1 60%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-roll-prompt select option {
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+/* Footer buttons: three equal Advantage/Normal/Disadvantage (or a single Roll),
+   mirroring the .fabricate-dialog flex template + .manager-button fill/weight. */
+.fabricate-roll-prompt-dialog .form-footer button,
+.fabricate-roll-prompt-dialog .dialog-buttons button {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  min-height: 36px;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--fab-text);
+  background: var(--fab-overlay-light-06);
+  cursor: pointer;
+}
+
+.fabricate-roll-prompt-dialog .form-footer button:hover,
+.fabricate-roll-prompt-dialog .dialog-buttons button:hover {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-overlay-light-10);
+}
+
+.fabricate-roll-prompt-dialog .form-footer button[data-action='advantage'],
+.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='advantage'] {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-roll-prompt-dialog .form-footer button[data-action='disadvantage'],
+.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='disadvantage'] {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+/* Tinted buttons need their own hover (the neutral hover rule above has the same
+   specificity but is overridden by the later data-action fills, so without these
+   Advantage/Disadvantage would not react to hover). */
+.fabricate-roll-prompt-dialog .form-footer button[data-action='advantage']:hover,
+.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='advantage']:hover {
+  border-color: var(--fab-success-strong);
+  color: var(--fab-on-success);
+  background: var(--fab-success-strong);
+}
+
+.fabricate-roll-prompt-dialog .form-footer button[data-action='disadvantage']:hover,
+.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='disadvantage']:hover {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-surface-strong);
+}
+
+/* Keep Foundry core's orange focus ring off; use the Fabricate accent instead.
+   The app-scoped focus rules elsewhere don't match this DialogV2 root. */
+.fabricate-roll-prompt-dialog button:focus,
+.fabricate-roll-prompt-dialog input:focus,
+.fabricate-roll-prompt-dialog select:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-roll-prompt-dialog button:focus-visible,
+.fabricate-roll-prompt-dialog input:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-roll-prompt-dialog select:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--fab-accent);
 }

@@ -8,6 +8,8 @@ import {
   applyFabricateTheme,
 } from '../ui/theme.js';
 
+import { registerRepairComponentSourcesMenu } from './repairComponentSources.js';
+
 export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
 
 export const SETTING_KEYS = Object.freeze({
@@ -21,6 +23,7 @@ export const SETTING_KEYS = Object.freeze({
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
   LAST_MANAGED_CRAFTING_SYSTEM: 'lastManagedCraftingSystem',
   MANAGER_RAIL_COLLAPSED: 'managerRailCollapsed',
+  GATHERING_HIDE_UNAVAILABLE: 'gatheringHideUnavailableEnvironments',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
@@ -29,7 +32,48 @@ export const SETTING_KEYS = Object.freeze({
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
   INTERACTION_PROMPT_POSITION: 'interactionPromptPosition',
+  // Issue 555 (repurposed by issue 567): version stamp for the one-shot primary-GM
+  // recipe-item durable-flag backfill. Bumped past `RECIPE_ITEM_FLAG_STAMP_TARGET` once the
+  // pass has run so it never repeats. Target 2 backfills the per-system
+  // `roles[systemId].recipeItemDefinitionId` leaf (v1 stamped the retired scalar).
+  RECIPE_ITEM_FLAG_STAMP_VERSION: 'recipeItemFlagStampVersion',
+  // Issue 556: version stamp for the one-shot primary-GM component durable-flag backfill
+  // that writes `flags.fabricate.roles[systemId].componentId` on registered component
+  // sources. Bumped past `COMPONENT_FLAG_STAMP_TARGET` once the pass has run.
+  COMPONENT_FLAG_STAMP_VERSION: 'componentFlagStampVersion',
+  // Issue 561: version stamp for the one-shot primary-GM TOOL durable-flag backfill that
+  // writes `flags.fabricate.roles[systemId].toolId` on registered tool sources. Bumped past
+  // `TOOL_FLAG_STAMP_TARGET` once the pass has run.
+  TOOL_FLAG_STAMP_VERSION: 'toolFlagStampVersion',
+  // Issue 600 (#540 Phase 2): version stamp for the one-shot active-GM re-stamp that writes
+  // `flags.fabricate.roles[systemId].componentId` onto OWNED ACTOR items that currently
+  // resolve to a component by name ONLY. Bumped past `OWNED_ITEM_COMPONENT_STAMP_TARGET`
+  // once the pass has run so it never repeats.
+  OWNED_ITEM_COMPONENT_STAMP_VERSION: 'ownedItemComponentStampVersion',
 });
+
+// The target version for the one-shot recipe-item flag auto-stamp. When the stored
+// `RECIPE_ITEM_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once
+// on `ready` and writes this value back. Bumped 1 → 2 by issue 567: v1 stamped the retired
+// scalar `flags.fabricate.recipeItemDefinitionId`, v2 backfills the per-system
+// `roles[systemId].recipeItemDefinitionId` leaf, so a world stamped at v1 re-runs once.
+export const RECIPE_ITEM_FLAG_STAMP_TARGET = 2;
+
+// The target version for the one-shot component flag auto-stamp (issue 556). When the
+// stored `COMPONENT_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill
+// once on `ready` and writes this value back.
+export const COMPONENT_FLAG_STAMP_TARGET = 1;
+
+// The target version for the one-shot tool flag auto-stamp (issue 561). When the stored
+// `TOOL_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once on `ready`
+// (AFTER the 1.15.0 settings-data migration populates tool source refs) and writes it back.
+export const TOOL_FLAG_STAMP_TARGET = 1;
+
+// The target version for the one-shot owned-item component re-stamp (issue 600, #540 Phase
+// 2). When the stored `OWNED_ITEM_COMPONENT_STAMP_VERSION` is below this, the active GM runs
+// the name-fallback back-fill once on `ready` (AFTER the source-side component auto-stamp)
+// and writes this value back.
+export const OWNED_ITEM_COMPONENT_STAMP_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.RECIPES]: {
@@ -129,6 +173,19 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Boolean,
     default: false,
   },
+  // Player-side "hide unavailable (locked) environments" preference for the
+  // Gathering app's Environments column. `scope: 'client'` persists it in the
+  // browser's `localStorage`, so the choice is per client/device, not per user
+  // account, and does not follow the user to a second device. Hidden from the
+  // Foundry settings menu (`config: false`); toggled from the app UI. Defaults
+  // to false (show all).
+  [SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE]: {
+    name: 'Hide Unavailable Gathering Environments',
+    scope: 'client',
+    config: false,
+    type: Boolean,
+    default: false,
+  },
   [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER]: {
     name: 'Progressive Result Order Preferences',
     scope: 'client',
@@ -164,6 +221,34 @@ const BASE_DEFINITIONS = Object.freeze({
     type: String,
     default: '',
   },
+  [SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION]: {
+    name: 'Recipe Item Flag Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION]: {
+    name: 'Component Flag Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.TOOL_FLAG_STAMP_VERSION]: {
+    name: 'Tool Flag Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION]: {
+    name: 'Owned Item Component Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
 });
 
 const keys = Object.values(SETTING_KEYS);
@@ -173,6 +258,8 @@ export function registerFabricateSettings() {
     const definition = BASE_DEFINITIONS[key];
     game.settings.register(FABRICATE_SETTINGS_NAMESPACE, key, definition);
   }
+  // GM maintenance button, surfaced alongside the theme selector in module settings.
+  registerRepairComponentSourcesMenu();
 }
 
 export function getSetting(key) {

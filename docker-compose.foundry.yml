@@ -14,7 +14,12 @@
 #     (called automatically by foundry-test-up.mjs).
 #
 # The Foundry image is felddy/foundryvtt — a well-known community image that
-# handles license activation automatically via credentials.
+# activates the install from credentials and, when provided, FOUNDRY_LICENSE_KEY.
+# Credential-only activation can intermittently leave the instance unlicensed (it
+# then boots to the License Key Activation page and the smoke harness fails before
+# the EULA step), so the license key is forwarded as well for a deterministic
+# server-side activation. It is optional locally (defaults to empty, where
+# credential activation is used).
 #
 # Note on caching: foundry-test-down stops the container by default instead of
 # removing it, preserving the extracted Foundry application and avoiding repeat
@@ -35,6 +40,7 @@ services:
     environment:
       FOUNDRY_USERNAME: "${FOUNDRY_USERNAME}"
       FOUNDRY_PASSWORD: "${FOUNDRY_PASSWORD}"
+      FOUNDRY_LICENSE_KEY: "${FOUNDRY_LICENSE_KEY:-}"
       FOUNDRY_RELEASE_URL: "${FOUNDRY_RELEASE_URL:-}"
       FOUNDRY_ADMIN_KEY: "fabricate-test-admin"
       CONTAINER_PRESERVE_CONFIG: "true"

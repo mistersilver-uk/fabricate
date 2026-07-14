@@ -4,7 +4,7 @@
  * Covers:
  *   TC1: resolveComponentName — valid managed component returns component.name
  *   TC2: resolveComponentName — missing component returns localized fallback
- *   TC3: resolveComponentName — component with sourceUuid resolves via fromUuid
+ *   TC3: resolveComponentName — component with registeredItemUuid resolves via fromUuid
  *   TC4: resolveComponentImg — valid component with img returns component.img
  *   TC5: resolveComponentImg — missing component returns fallback icon
  *   TC6: Ingredient states return resolved component names (not "managed item")
@@ -13,8 +13,8 @@
  *   TC9: Recipe icon fallback — custom img passes through unchanged
  *   TC10: Recipe icon fallback — default bag icon falls back to linked item img
  *   TC11: Recipe icon fallback — no linked item falls back to document icon
- *   TC12: Graceful degradation for broken sourceUuid references
- *   TC13: resolveComponentName — component with no sourceUuid falls back to name match
+ *   TC12: Graceful degradation for broken registeredItemUuid references
+ *   TC13: resolveComponentName — component with no registeredItemUuid falls back to name match
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,7 +50,7 @@ globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 // ---------------------------------------------------------------------------
 
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
-const { Recipe } = await import('../src/models/Recipe.js');
+const { Recipe, DEFAULT_RECIPE_IMAGE } = await import('../src/models/Recipe.js');
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { Ingredient } = await import('../src/models/Ingredient.js');
 
@@ -61,15 +61,14 @@ const { Ingredient } = await import('../src/models/Ingredient.js');
 function makeSystem(components = [], tools = []) {
   return {
     id: 'sys-1',
-    advancedOptionsEnabled: false,
     features: {},
     components,
     tools
   };
 }
 
-function makeComponent(id, name, img = null, sourceUuid = null) {
-  return { id, name, img, sourceUuid };
+function makeComponent(id, name, img = null, registeredItemUuid = null) {
+  return { id, name, img, registeredItemUuid };
 }
 
 function makeRecipeWithSystem(systemId = 'sys-1', extras = {}) {
@@ -139,10 +138,10 @@ test('TC2: resolveComponentName returns fallback for unknown component', () => {
 });
 
 // ---------------------------------------------------------------------------
-// TC3: resolveComponentName — component with sourceUuid resolves via fromUuid
+// TC3: resolveComponentName — component with registeredItemUuid resolves via fromUuid
 // ---------------------------------------------------------------------------
 
-test('TC3: resolveComponentName uses fromUuid when component has sourceUuid', async () => {
+test('TC3: resolveComponentName uses fromUuid when component has registeredItemUuid', async () => {
   const component = makeComponent('comp-uuid-1', 'Fallback Name', null, 'World.Item.abc123');
   const system = makeSystem([component]);
   setupGame(system);
@@ -298,10 +297,10 @@ test('TC9: _resolveRecipeIcon returns custom recipe img unchanged', () => {
 // ---------------------------------------------------------------------------
 
 test('TC10: _resolveRecipeIcon falls back to linked item when img is default bag', async () => {
-  // Recipe uses the default bag icon but has a linked item
+  // Recipe uses the default (blueprint) icon but has a linked item
   const manager = new RecipeManager();
   const recipe = makeRecipeWithSystem('sys-1', {
-    img: 'icons/svg/item-bag.svg',
+    img: DEFAULT_RECIPE_IMAGE,
     linkedRecipeItemUuid: 'World.Item.linked123'
   });
 
@@ -323,17 +322,17 @@ test('TC10: _resolveRecipeIcon falls back to linked item when img is default bag
 test('TC11: _resolveRecipeIconAsync falls back to document icon when no linked item', async () => {
   const manager = new RecipeManager();
   const recipe = makeRecipeWithSystem('sys-1', {
-    img: 'icons/svg/item-bag.svg',
+    img: DEFAULT_RECIPE_IMAGE,
     linkedRecipeItemUuid: null
   });
 
   const icon = await manager.resolveRecipeIconAsync(recipe);
   assert.ok(typeof icon === 'string' && icon.length > 0);
-  assert.ok(icon !== 'icons/svg/item-bag.svg', 'Should not return default bag icon as final result');
+  assert.ok(icon !== DEFAULT_RECIPE_IMAGE, 'Should not return the default recipe image as final result');
 });
 
 // ---------------------------------------------------------------------------
-// TC12: Graceful degradation for broken sourceUuid references
+// TC12: Graceful degradation for broken registeredItemUuid references
 // ---------------------------------------------------------------------------
 
 test('TC12: resolveComponentNameAsync handles broken fromUuid gracefully', async () => {
@@ -357,10 +356,10 @@ test('TC12: resolveComponentNameAsync handles broken fromUuid gracefully', async
 });
 
 // ---------------------------------------------------------------------------
-// TC13: resolveComponentName — component with no sourceUuid returns component.name
+// TC13: resolveComponentName — component with no registeredItemUuid returns component.name
 // ---------------------------------------------------------------------------
 
-test('TC13: resolveComponentName returns component.name when no sourceUuid', () => {
+test('TC13: resolveComponentName returns component.name when no registeredItemUuid', () => {
   const component = makeComponent('comp-nosrc', 'Silver Ingot', null, null);
   const system = makeSystem([component]);
   setupGame(system);

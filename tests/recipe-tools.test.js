@@ -29,6 +29,7 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 const { Recipe } = await import('../src/models/Recipe.js');
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
+const { component, roleItem } = await import('./helpers/componentIdentityFixtures.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,7 +62,7 @@ function installSystem({ id = 'sys-1', components = [], tools = [] } = {}) {
 }
 
 function toolComponent(id, name) {
-  // A name-matched managed component (no sourceUuid) matches by item name.
+  // A name-matched managed component (no registeredItemUuid) matches by item name.
   return { id, name };
 }
 
@@ -271,4 +272,81 @@ test('canCraft passes through missing.tools', () => {
   const result = manager.canCraft([actor([item('Iron')])], recipe);
   assert.equal(result.canCraft, false);
   assert.equal(result.missing.tools.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// toolMatchesItemByIdentity — durable-identity gate for usage/breakage. Retargeted
+// onto the TOOL's own identity `roles[sys].toolId` (issue 561, superseding the #557
+// component-scoped gate). The tool is a first-class item carrying its own source refs.
+// ---------------------------------------------------------------------------
+
+const HAMMER_TOOL = {
+  id: 'tool-hammer',
+  componentId: 'c-hammer',
+  name: 'Hammer',
+  registeredItemUuid: 'Item.hammer-src',
+  originItemUuid: 'Item.hammer-src',
+  aliasItemUuids: []
+};
+
+function identitySystem() {
+  return installSystem({
+    id: 'sys-1',
+    components: [
+      component('c-hammer', { registeredItemUuid: 'Item.hammer-src', name: 'Hammer' }),
+      component('c-tongs', { registeredItemUuid: 'Item.tongs-src', name: 'Tongs' })
+    ],
+    tools: [HAMMER_TOOL]
+  });
+}
+
+test('toolMatchesItemByIdentity: durable roles-flag item matches its tool', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const durable = roleItem({ uuid: 'Item.h1', roles: { 'sys-1': { toolId: 'tool-hammer' } }, name: 'Hammer' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, HAMMER_TOOL, durable), true);
+});
+
+test('toolMatchesItemByIdentity: an own-compendiumSource item matches its tool', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const copy = roleItem({ uuid: 'Item.h2', compendiumSource: 'Item.hammer-src', name: 'Hammer' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, HAMMER_TOOL, copy), true);
+});
+
+test('toolMatchesItemByIdentity: a duplicateSource decoy does NOT match (but presence does)', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const decoy = roleItem({ uuid: 'Item.h3', duplicateSource: 'Item.hammer-src', name: 'Mallet' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, HAMMER_TOOL, decoy), false);
+  // The wide presence matcher still accepts it — proving this is narrower, not vacuous.
+  assert.equal(manager.toolMatchesItem(recipe, HAMMER_TOOL, decoy), true);
+});
+
+test('toolMatchesItemByIdentity: a same-name decoy does NOT match (but presence does)', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const decoy = roleItem({ uuid: 'Item.h4', name: 'Hammer' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, HAMMER_TOOL, decoy), false);
+  assert.equal(manager.toolMatchesItem(recipe, HAMMER_TOOL, decoy), true);
+});
+
+test('toolMatchesItemByIdentity: false when the tool has no id', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const durable = roleItem({ uuid: 'Item.h5', roles: { 'sys-1': { toolId: 'tool-hammer' } } });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, {}, durable), false);
+});
+
+test('toolMatchesItemByIdentity: false for an item that claims a different tool', () => {
+  identitySystem();
+  const manager = new RecipeManager();
+  const recipe = new Recipe({ craftingSystemId: 'sys-1' });
+  const durable = roleItem({ uuid: 'Item.h6', roles: { 'sys-1': { toolId: 'tool-other' } }, name: 'Hammer' });
+  assert.equal(manager.toolMatchesItemByIdentity(recipe, HAMMER_TOOL, durable), false);
 });

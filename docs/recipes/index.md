@@ -27,10 +27,11 @@ Every recipe brings together a few things.
 - Whether the recipe is locked, which lets players see it exists but stops anyone other than the GM from crafting it.
 - Who can see it, which is set by the crafting system's visibility settings.
 - For a recipe that teaches itself through an in-world item, the item that unlocks it for knowledge-based visibility.
-- For a routed recipe, how the result is chosen when more than one outcome is possible.
+- In a routed system, the result groups it can produce when more than one outcome is possible.
 
 {: .note }
-> For multi-step recipes, the ingredients and results are defined on each individual step rather than on the recipe as a whole. See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
+> For multi-step recipes, the ingredients and results are defined on each individual step rather than on the recipe as a whole.
+See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 
 ## Enabling and Disabling Recipes
 
@@ -74,12 +75,17 @@ Each ingredient option decides how it is matched against the items a player is c
 
 The resolution mode determines how ingredients map to results:
 
-| Mode                                             | Sets | Result Groups | Check Required     | Use When                                                      |
-|:-------------------------------------------------|:-----|:--------------|:-------------------|:--------------------------------------------------------------|
-| [Simple]({% link recipes/simple.md %})           | 1    | 1             | Optional           | Basic A + B = C crafting                                      |
-| [Routed]({% link recipes/routed.md %})           | 1+   | 1+            | Provider-dependent | Ingredient choice or skill check selects the result           |
-| [Progressive]({% link recipes/progressive.md %}) | 1    | 1 (ordered)   | **Yes**            | Skill check value "buys" results in order                     |
-| [Alchemy]({% link recipes/alchemy.md %})         | 1+   | 1+            | Optional           | Players experiment with ingredients. Recipe names are hidden  |
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Mode                                                          | Sets | Result Groups | Check Required | Use When                                                     |
+|:--------------------------------------------------------------|:-----|:--------------|:---------------|:-------------------------------------------------------------|
+| [Simple]({% link recipes/simple.md %})                        | 1    | 1             | Optional       | Basic A + B = C crafting                                     |
+| [Routed by ingredients]({% link recipes/routed.md %})         | 1+   | 1+            | Optional       | The ingredients used select the result                      |
+| [Routed by check]({% link recipes/routed.md %})               | 1+   | 1+            | **Yes**        | A skill-check outcome selects the result                    |
+| [Progressive]({% link recipes/progressive.md %})              | 1    | 1 (ordered)   | **Yes**        | Skill check value "buys" results in order                   |
+| [Alchemy]({% link recipes/alchemy.md %})                      | 1    | 1+            | Set by check mode | Players experiment with ingredients. Recipe names are hidden |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ## Multi-Step Recipes
 
@@ -99,10 +105,16 @@ See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage 
 
 ## Current Crafting Surface
 
-Recipes can be authored through the API only today.
-There is no GM recipe-editor UI.
-Runtime crafting is likewise available through the public API.
+Recipes are authored mainly through the API today.
+An early GM recipe editor is also available in the Crafting Admin panel.
+It can edit a recipe's identity (name, description, image, and whether it is on or off) and link a recipe item to it.
+When the system is in player mode, the editor's Overview tab can also restrict a recipe to specific players.
+When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
+See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
+Full recipe authoring through the editor, including ingredients, steps, and results, is still in progress.
+Runtime crafting is available through the public API.
 See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.
 
 {: .note }
-> A player-facing Crafting tab is planned and not yet available. Recipe crafting works through the API today.
+> A player-facing Crafting tab is planned and not yet available.
+Recipe crafting works through the API today.

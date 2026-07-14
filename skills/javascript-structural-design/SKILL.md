@@ -44,7 +44,7 @@ Use this skill when a change touches JavaScript module boundaries, collaborator 
    - Ask a module or object to do work or produce a representation.
    - Do not add getters and setters by default just to let outside code orchestrate internals.
 6. Confine mutation and global access.
-   - Prefer immutable inputs and return values when practical.
+   - Prefer immutable inputs and return values; accept mutation only at measured hot paths or where a Foundry API contract demands it.
    - Isolate Foundry globals, clocks, randomness, and third-party statics at thin edges that are easy to fake in tests.
 7. Test the seam, not the internals.
    - Write tests against public behavior and narrow collaborator contracts.
@@ -72,12 +72,15 @@ Flag or refactor these patterns when they create real risk:
 
 ## JavaScript Adaptation
 
-Elegant Objects is stricter than this codebase needs. Apply the direction, not dogma:
+Elegant Objects is stricter than this codebase needs.
+Apply the direction, not dogma:
 
 - Private module-scope pure helpers are fine when they support one cohesive module.
 - Exported helpers are acceptable only when they form a clear abstraction with a stable contract, not a generic `utils` bucket.
-- Not every boundary needs a class. Functions and closures are fine if dependencies stay explicit and the seam stays testable.
-- Foundry globals are unavoidable at runtime edges. Wrap or localize them instead of letting them leak through the whole call chain.
+- Not every boundary needs a class.
+Functions and closures are fine if dependencies stay explicit and the seam stays testable.
+- Foundry globals are unavoidable at runtime edges.
+Wrap or localize them instead of letting them leak through the whole call chain.
 
 ## Expected Output
 

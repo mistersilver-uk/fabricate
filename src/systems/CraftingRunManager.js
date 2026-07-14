@@ -1,4 +1,8 @@
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  getFabricateFlag,
+  setFabricateFlag,
+  deleteRemovedActiveRunFlags,
+} from '../config/flags.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -18,6 +22,18 @@ export class CraftingRunManager {
 
   _nowWorldTime() {
     return Number(game.time?.worldTime || 0);
+  }
+
+  /**
+   * Public accessor for the number of seconds a step's `timeRequirement`
+   * resolves to. The crafting engine uses this to decide whether a step is
+   * genuinely time-gated (> 0 seconds) BEFORE arming a gate, so it can consume
+   * components at START rather than at FINISH.
+   * @param {object|null} timeRequirement
+   * @returns {number} seconds (0 for an empty / instant requirement)
+   */
+  durationToSeconds(timeRequirement = null) {
+    return this._durationToSeconds(timeRequirement);
   }
 
   _durationToSeconds(timeRequirement = null) {
@@ -50,6 +66,12 @@ export class CraftingRunManager {
       updatedAt: this._nowWorldTime(),
       completedAt: undefined,
       timeGate: undefined,
+      // preparedConsumption: the START-phase snapshot for a time-gated step whose
+      // components (and currency) are consumed when the gate is ARMED. Populated
+      // by markStepPrepared; read by the engine at FINISH so the resume can
+      // transfer essences and build results/chat/history without re-reading the
+      // (now-deleted) source items. Undefined for non-timed / instant steps.
+      preparedConsumption: undefined,
       selectedIngredientSetId: undefined,
       lastCheckResult: undefined,
       consumedIngredients: [],
@@ -61,6 +83,9 @@ export class CraftingRunManager {
 
   async _persist(actor, container) {
     this._cache.set(actor.id, container);
+    // setFlag's recursive merge can't delete removed `active` keys; do it explicitly
+    // so completed/discarded runs don't resurrect on reload (see the shared helper).
+    await deleteRemovedActiveRunFlags(actor, 'craftingRuns', container);
     await setFabricateFlag(actor, 'craftingRuns', container);
   }
 
@@ -170,6 +195,40 @@ export class CraftingRunManager {
     return run;
   }
 
+  /**
+   * Persist the START-phase consumption snapshot for a time-gated step.
+   *
+   * A step whose time requirement resolves to > 0 seconds consumes its
+   * components (and currency) when its gate is ARMED, then resumes at maturity to
+   * run the crafting check and create results. This stores what was consumed so
+   * the resume can transfer essences and build the result / chat / history entry
+   * without re-reading the source items (which are already deleted).
+   *
+   * @param {Actor} actor
+   * @param {object} run
+   * @param {number} stepIndex
+   * @param {{ selectedIngredientSetId?: string|null, currencySpends?: Array,
+   *   resolvedEssences?: object, consumedSummary?: Array }} prepared
+   * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
+   */
+  async markStepPrepared(actor, run, stepIndex, prepared = {}) {
+    const step = run.steps?.[stepIndex];
+    if (!step) return null;
+    step.preparedConsumption = {
+      selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
+      currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],
+      resolvedEssences:
+        prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
+          ? prepared.resolvedEssences
+          : {},
+      consumedSummary: Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [],
+    };
+    step.selectedIngredientSetId = prepared.selectedIngredientSetId ?? step.selectedIngredientSetId;
+    step.updatedAt = this._nowWorldTime();
+    await this.updateRun(actor, run);
+    return run;
+  }
+
   canProceedTimeGate(run, stepIndex, worldTime = this._nowWorldTime()) {
     const step = run.steps?.[stepIndex];
     if (!step?.timeGate) return true;
@@ -183,7 +242,7 @@ export class CraftingRunManager {
     run.status = 'inProgress';
     run.currentStepIndex = stepIndex;
     step.status = 'inProgress';
-    step.startedAt = step.startedAt ?? worldTime;
+    step.startedAt ??= worldTime;
     step.updatedAt = worldTime;
     await this.updateRun(actor, run);
     return run;
@@ -213,7 +272,7 @@ export class CraftingRunManager {
     const nextStep = run.steps[nextIndex];
     if (nextStep) {
       nextStep.status = 'inProgress';
-      nextStep.startedAt = nextStep.startedAt ?? worldTime;
+      nextStep.startedAt ??= worldTime;
       nextStep.updatedAt = worldTime;
     }
     await this.updateRun(actor, run);
@@ -248,9 +307,20 @@ export class CraftingRunManager {
     run.finishedAt = this._nowWorldTime();
 
     delete container.active[run.id];
-    container.history.unshift(run);
-    if (container.history.length > HISTORY_LIMIT) {
-      container.history = container.history.slice(0, HISTORY_LIMIT);
+    // Never archive a run that already has a history entry: a duplicate id would
+    // crash the Journal's keyed each. This can happen if a run lingered in `active`
+    // (a legacy zombie) after a twin was already recorded in history.
+    const alreadyArchived =
+      Array.isArray(container.history) && container.history.some((entry) => entry?.id === run.id);
+    if (alreadyArchived) {
+      console.warn(
+        `Fabricate | Crafting run "${run.id}" is already in history; removing it from active without archiving a duplicate.`
+      );
+    } else {
+      container.history.unshift(run);
+      if (container.history.length > HISTORY_LIMIT) {
+        container.history = container.history.slice(0, HISTORY_LIMIT);
+      }
     }
     await this._persist(actor, container);
     return run;
@@ -260,6 +330,25 @@ export class CraftingRunManager {
     const run = this.getActiveRun(actor, runId);
     if (!run) return null;
     return this.completeRun(actor, run, 'cancelled');
+  }
+
+  /**
+   * Discard an active run WITHOUT recording it in history — for a run that was
+   * created but never legitimately started (e.g. a craft rejected before its check
+   * ran, such as insufficient components). Unlike {@link cancelRun}, which archives
+   * to history as `cancelled`, this leaves no trace: the attempt never began.
+   *
+   * @param {Actor} actor
+   * @param {string} runId
+   * @returns {Promise<object|null>} the discarded run, or null if not active
+   */
+  async discardRun(actor, runId) {
+    const container = this._getContainer(actor);
+    const run = container.active?.[runId];
+    if (!run) return null;
+    delete container.active[runId];
+    await this._persist(actor, container);
+    return run;
   }
 
   async processWorldTime(worldTime = this._nowWorldTime()) {
@@ -342,5 +431,44 @@ export class CraftingRunManager {
         await this._persist(actor, container);
       }
     }
+  }
+
+  /**
+   * Prune legacy phantom active runs: a crafting run whose recipe is single-step
+   * AND whose only step has no time requirement can never legitimately persist as
+   * active (it only ever rejects, fails, or succeeds atomically), so any such run
+   * left in the active container is a phantom stranded by an old pre-validation
+   * early-return. Multi-step recipes (persist between "Trigger Next Step") and
+   * single-step time-gated recipes (persist a waiting run) are excluded.
+   *
+   * Unknown recipes are left alone here — {@link cleanupInvalidRuns} owns those.
+   *
+   * @param {(recipeId: string) => (object|null)} resolveRecipe
+   * @returns {Promise<number>} the number of phantom runs pruned
+   */
+  async pruneInstantaneousActiveRuns(resolveRecipe) {
+    if (typeof resolveRecipe !== 'function') return 0;
+    let pruned = 0;
+    for (const actor of game.actors || []) {
+      const container = this._getContainer(actor);
+      let dirty = false;
+
+      for (const [runId, run] of Object.entries(container.active || {})) {
+        const recipe = run?.recipeId ? resolveRecipe(run.recipeId) : null;
+        if (!recipe) continue;
+        const steps =
+          typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
+        if (steps.length === 1 && !steps[0]?.timeRequirement) {
+          delete container.active[runId];
+          dirty = true;
+          pruned += 1;
+        }
+      }
+
+      if (dirty) {
+        await this._persist(actor, container);
+      }
+    }
+    return pruned;
   }
 }

@@ -82,6 +82,84 @@ export function renderDialog(options) {
  * @param {string} [options.defaultAction] - action whose button is the default
  * @returns {Promise<string>} the chosen action, or 'cancel'
  */
+function escapeDialogHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+/**
+ * Render a labelled, keyboard-operable single-selection dialog and resolve to the
+ * chosen option value (or `null` on cancel / when DialogV2 is unavailable). This
+ * is a distinct seam from `confirmDialog` (a yes/no primitive that cannot host a
+ * selection) — used by the capped-cookbook recipe learn picker (issue 511).
+ *
+ * @param {object} options
+ * @param {string} options.title
+ * @param {string} [options.content] - plain-text lead paragraph
+ * @param {Array<{value: string, label: string}>} [options.options]
+ * @param {string} [options.selectLabel]
+ * @param {string} [options.confirmLabel]
+ * @param {string} [options.cancelLabel]
+ * @returns {Promise<string|null>} the chosen option value, or null
+ */
+export function selectDialog({
+  title,
+  content = '',
+  options = [],
+  selectLabel = '',
+  confirmLabel = 'OK',
+  cancelLabel = 'Cancel'
+} = {}) {
+  const DialogV2 = foundry.applications?.api?.DialogV2;
+  if (!DialogV2 || options.length === 0) return Promise.resolve(null);
+
+  const selectId = 'fabricate-recipe-select';
+  const optionMarkup = options
+    .map((option, index) =>
+      `<option value="${escapeDialogHtml(option.value)}"${index === 0 ? ' selected' : ''}>${escapeDialogHtml(option.label)}</option>`
+    )
+    .join('');
+  const dialogContent = `
+    ${content ? `<p>${escapeDialogHtml(content)}</p>` : ''}
+    <div class="form-group">
+      <label for="${selectId}">${escapeDialogHtml(selectLabel)}</label>
+      <select id="${selectId}" name="recipe" aria-label="${escapeDialogHtml(selectLabel)}">${optionMarkup}</select>
+    </div>`;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const readSelection = (button, dialog) => {
+      const root = dialog?.element || button?.form || button?.closest?.('form');
+      const select = root?.querySelector?.(`#${selectId}`);
+      return select?.value ?? options[0]?.value ?? null;
+    };
+    const dialog = renderDialog({
+      window: { title },
+      content: dialogContent,
+      buttons: [
+        {
+          action: 'confirm',
+          label: confirmLabel,
+          default: true,
+          callback: (event, button, instance) => settle(readSelection(button, instance))
+        },
+        { action: 'cancel', label: cancelLabel, callback: () => settle(null) }
+      ],
+      close: () => settle(null)
+    });
+    if (!dialog) settle(null);
+  });
+}
+
 export function choiceDialog({ title, content, choices = [], defaultAction } = {}) {
   return new Promise((resolve) => {
     let settled = false;

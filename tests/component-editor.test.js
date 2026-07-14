@@ -11,7 +11,6 @@ import {
 
 function makeSystem(overrides = {}) {
   return {
-    advancedOptionsEnabled: true,
     features: {
       itemTags: false,
       essences: false,
@@ -124,10 +123,9 @@ test('buildComponentEditorState still refers to tags when legacy item tags flag 
   assert.deepEqual(state.tagOptions, [{ tag: 'water', checked: true }]);
 });
 
-test('buildComponentEditorState keeps tags editable when advanced options are disabled', () => {
+test('buildComponentEditorState keeps tags editable when the essences feature is disabled', () => {
   const system = makeSystem({
-    advancedOptionsEnabled: false,
-    features: { itemTags: true, essences: true },
+    features: { itemTags: true, essences: false },
     itemTags: ['fire'],
     essenceDefinitions: [{ id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' }]
   });
@@ -156,6 +154,67 @@ test('buildComponentEditorUpdates clamps quantities and omits disabled features'
     essences: {
       'ess-fire': 3
     }
+  });
+});
+
+test('buildComponentEditorState reads quantities from the item-card array essence shape', () => {
+  // The admin store's item cards carry essences as an array of { id, name, icon,
+  // quantity } entries (see adminStore._buildItemCards), not the persisted object
+  // map. The editor is fed those cards directly, so it must read their quantities
+  // rather than zeroing every field.
+  const system = makeSystem({
+    features: { itemTags: false, essences: true },
+    essenceDefinitions: [
+      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' },
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint' }
+    ]
+  });
+
+  const itemCard = makeItem({
+    essences: [
+      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 4 },
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint', quantity: 2 }
+    ]
+  });
+
+  const state = buildComponentEditorState(system, itemCard);
+
+  assert.deepEqual(
+    state.essenceOptions.map(option => ({ id: option.id, quantity: option.quantity })),
+    [
+      { id: 'ess-fire', quantity: 4 },
+      { id: 'ess-water', quantity: 2 }
+    ]
+  );
+});
+
+test('item-card essences round-trip through open then save without loss', () => {
+  // Regression for the silent data-loss bug: opening an item card and saving it
+  // back with no edits must preserve the stored essence quantities, not wipe them.
+  const system = makeSystem({
+    features: { itemTags: false, essences: true },
+    essenceDefinitions: [
+      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' },
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint' }
+    ]
+  });
+
+  const itemCard = makeItem({
+    essences: [
+      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 4 },
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint', quantity: 2 }
+    ]
+  });
+
+  const state = buildComponentEditorState(system, itemCard);
+  const updates = buildComponentEditorUpdates({
+    showEssences: true,
+    essenceOptions: state.essenceOptions
+  });
+
+  assert.deepEqual(updates.essences, {
+    'ess-fire': 4,
+    'ess-water': 2
   });
 });
 

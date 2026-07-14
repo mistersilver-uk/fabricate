@@ -36,9 +36,10 @@ function setPathValue(object, path, value) {
 }
 
 class FakeItem {
-  constructor(flags = {}) {
+  constructor(flags = {}, { name } = {}) {
     this._flags = { fabricate: flags };
     this.deleted = false;
+    if (name !== undefined) this.name = name;
   }
 
   getFlag(scope, key) {
@@ -52,9 +53,26 @@ class FakeItem {
     return value;
   }
 
+  async update(changes = {}) {
+    Object.assign(this, changes);
+    return this;
+  }
+
   async delete() {
     this.deleted = true;
   }
+}
+
+// A renamable item with a `name` and the FakeItem `update` method.
+function makeNamedItem(name, flags = {}) {
+  return new FakeItem(flags, { name });
+}
+
+// A headless item lacking `name`/`update` (e.g. the legacy fake / non-rename path).
+function makeUpdatelessItem(name, flags = {}) {
+  const item = new FakeItem(flags, { name });
+  item.update = undefined;
+  return item;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,9 +239,17 @@ test('Tool.validate - replaceWith requires replacementComponentId distinct from 
 // JSON round-trip
 // ---------------------------------------------------------------------------
 
-test('Tool.toJSON / fromJSON round-trip preserves shape', () => {
+test('Tool.toJSON / fromJSON round-trip preserves shape including snapshot + source refs + label', () => {
   const original = new Tool({
     componentId: 'comp-axe',
+    // Distinct user-authored label + the name/img display snapshot + own source refs
+    // (issue 561) — so a toJSON that DROPS any of them fails this round-trip (R2-N1).
+    label: 'GM Custom Axe',
+    name: 'Woodsman Axe',
+    img: 'icons/tools/axe.webp',
+    registeredItemUuid: 'Item.live-axe',
+    originItemUuid: 'Compendium.pack.axe',
+    aliasItemUuids: ['Item.old-axe'],
     requirement: { formula: '@flags.proficient' },
     breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 },
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe-broken' },
@@ -232,6 +258,34 @@ test('Tool.toJSON / fromJSON round-trip preserves shape', () => {
   const round = Tool.fromJSON(json);
 
   assert.deepEqual(round.toJSON(), json);
+  // The label + snapshot survive the round-trip unchanged.
+  assert.equal(round.label, 'GM Custom Axe');
+  assert.equal(round.name, 'Woodsman Axe');
+  assert.equal(round.img, 'icons/tools/axe.webp');
+  assert.equal(round.originItemUuid, 'Compendium.pack.axe');
+});
+
+test('Tool.validate accepts a source-refs-only tool with componentId null (issue 561, R2-N2)', () => {
+  // POSITIVE case: an un-relaxed validate() still requiring componentId would reject this.
+  const itemSourced = new Tool({
+    componentId: null,
+    name: 'Chisel',
+    registeredItemUuid: 'Item.chisel',
+    originItemUuid: 'Item.chisel',
+  }).validate();
+  assert.equal(itemSourced.valid, true);
+
+  // NEGATIVE case: neither a componentId nor any source ref is invalid.
+  const neither = new Tool({ componentId: null }).validate();
+  assert.equal(neither.valid, false);
+
+  // The onBreak.replaceWith differ-check does not throw / mis-fire when componentId is null.
+  const replaceOnItemSourced = new Tool({
+    componentId: null,
+    originItemUuid: 'Item.hammer',
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-broken' },
+  }).validate();
+  assert.equal(replaceOnItemSourced.valid, true);
 });
 
 test('Tool.fromJSON ignores unknown fields', () => {
@@ -397,6 +451,53 @@ test('applyBreakage flagBroken - sets toolBroken flag and does not delete', asyn
   assert.equal(result.action, 'flagged');
 });
 
+const flagBrokenTool = () => new Tool({ componentId: 'comp-axe', onBreak: { mode: 'flagBroken' } });
+
+test('applyBreakage flagBroken - appends " (broken)" suffix and flags a named item', async () => {
+  const item = makeNamedItem('Hammer');
+  const result = await flagBrokenTool().applyBreakage({ item });
+  assert.equal(item.name, 'Hammer (broken)');
+  assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+  assert.equal(item.deleted, false);
+  assert.equal(result.action, 'flagged');
+});
+
+test('applyBreakage flagBroken - idempotent on an already-suffixed name', async () => {
+  const item = makeNamedItem('Hammer (broken)');
+  await flagBrokenTool().applyBreakage({ item });
+  assert.equal(item.name, 'Hammer (broken)');
+  assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+});
+
+test('applyBreakage flagBroken - does not rename an item already flagged broken', async () => {
+  const item = makeNamedItem('Hammer', { fabricate: { toolBroken: true } });
+  await flagBrokenTool().applyBreakage({ item });
+  assert.equal(item.name, 'Hammer');
+  assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+});
+
+test('applyBreakage flagBroken - flags without renaming when item.update is absent', async () => {
+  const item = makeUpdatelessItem('Hammer');
+  const result = await flagBrokenTool().applyBreakage({ item });
+  assert.equal(item.name, 'Hammer');
+  assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+  assert.equal(result.action, 'flagged');
+});
+
+test('applyBreakage flagBroken - uses the localized suffix when game.i18n resolves it', async () => {
+  const priorGame = globalThis.game;
+  globalThis.game = { i18n: { localize: (key) => (key === 'FABRICATE.Tool.BrokenNameSuffix' ? ' [kaputt]' : key) } };
+  try {
+    const item = makeNamedItem('Hammer');
+    await flagBrokenTool().applyBreakage({ item });
+    assert.equal(item.name, 'Hammer [kaputt]');
+    assert.equal(item._flags.fabricate.fabricate.toolBroken, true);
+  } finally {
+    if (priorGame === undefined) delete globalThis.game;
+    else globalThis.game = priorGame;
+  }
+});
+
 test('applyBreakage replaceWith - deletes original and invokes createReplacement', async () => {
   const tool = new Tool({
     componentId: 'comp-axe',
@@ -412,4 +513,44 @@ test('applyBreakage replaceWith - deletes original and invokes createReplacement
   assert.equal(item.deleted, true);
   assert.equal(result.action, 'replaced');
   assert.deepEqual(calls, [{ actor: { id: 'actor-1' }, componentId: 'comp-axe-broken' }]);
+});
+
+// ---------------------------------------------------------------------------
+// immune breakage mode (issue 419)
+// ---------------------------------------------------------------------------
+
+test('immune: normalizes to { mode: "immune" } with no breakage fields', () => {
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune', maxUses: 5, breakageChance: 9 } });
+  assert.deepEqual(tool.breakage, { mode: 'immune' });
+});
+
+test('immune: validates with no breakage field checks', () => {
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
+  const { valid, errors } = tool.validate();
+  assert.equal(valid, true, errors.join(', '));
+});
+
+test('immune: evaluateBreakage never breaks', async () => {
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
+  const result = await tool.evaluateBreakage({ item: new FakeItem({}) });
+  assert.deepEqual(result, { broken: false, mode: 'immune', evidence: {} });
+});
+
+test('immune: applyUsage writes no toolUsage flag (limitedUses-only)', async () => {
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
+  const item = new FakeItem({});
+  await tool.applyUsage(item);
+  assert.equal(item._flags.fabricate.fabricate, undefined, 'no usage flag for immune tool');
+});
+
+test('validate: unknown mode error string lists immune', () => {
+  // normalizeBreakage coerces an unknown mode to limitedUses, so reach the
+  // validation else-branch by mutating the normalized mode to an invalid value.
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: null } });
+  tool.breakage.mode = 'bogus';
+  const { errors } = tool.validate();
+  assert.ok(
+    errors.some((e) => /immune/.test(e)),
+    'the breakage.mode error enumerates immune'
+  );
 });

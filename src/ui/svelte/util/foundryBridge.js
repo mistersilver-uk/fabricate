@@ -151,6 +151,105 @@ export function subscribeSceneChange(handler) {
 }
 
 /**
+ * Subscribe to world-time changes so callers can refresh time-gated views
+ * (Journal countdowns and run readiness, the player Crafting list's calendar-aware
+ * durations) when `game.time.worldTime` advances. Foundry's `updateWorldTime` is a
+ * synced hook firing on every connected client. This is a READ-only refresh
+ * subscription — the handler must not publish side effects (no GM-gating is applied
+ * here). Returns an unsubscribe function; no-ops gracefully when the Foundry `Hooks`
+ * global is absent (e.g. unit tests).
+ *
+ * @param {Function} handler Invoked (no args) on each world-time change.
+ * @returns {Function} Unsubscribe callback.
+ */
+export function subscribeWorldTime(handler) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const id = hooks.on('updateWorldTime', () => handler());
+  return () => { hooks.off?.('updateWorldTime', id); };
+}
+
+/**
+ * Subscribe to owned-item changes on the relevant actors so callers can refresh
+ * inventory-derived views (owned counts, recipe craftability, the Inventory tab)
+ * when a component is added, removed, or its quantity is edited. Registers Foundry's
+ * `createItem` / `updateItem` / `deleteItem` hooks — which fire on every connected
+ * client — and only invokes `handler` when the changed item is an EMBEDDED item on an
+ * actor the caller cares about (`isRelevantActor(actorId)`), skipping world/sidebar
+ * items (no actor parent) and unrelated actors.
+ *
+ * Item mutations arrive in BURSTS — crafting a recipe deletes N ingredients and
+ * creates the product (N+1 hook fires) — so the handler is debounced: every fire
+ * within `debounceMs` collapses into a single trailing `handler()` call. Returns an
+ * unsubscribe function that also cancels any pending debounced call; no-ops
+ * gracefully when the Foundry `Hooks` global is absent (e.g. unit tests).
+ *
+ * @param {Function} handler Invoked (no args) once a burst of relevant item changes settles.
+ * @param {object} [options]
+ * @param {(actorId: string|null) => boolean} [options.isRelevantActor] Predicate,
+ *   read at FIRE time so it tracks the current selection. Defaults to always-true.
+ * @param {number} [options.debounceMs=50] Burst-coalescing window in milliseconds.
+ * @returns {Function} Unsubscribe callback.
+ */
+export function subscribeInventoryChange(handler, { isRelevantActor, debounceMs = 50 } = {}) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const relevant = typeof isRelevantActor === 'function' ? isRelevantActor : () => true;
+  let timer = null;
+  const schedule = () => {
+    // Trailing debounce: the first fire arms the timer; subsequent fires within the
+    // window are absorbed, so a burst yields exactly one handler() call.
+    if (timer !== null) return;
+    timer = setTimeout(() => {
+      timer = null;
+      handler();
+    }, Math.max(0, debounceMs));
+  };
+  const onItemChange = (item) => {
+    // Embedded/owned items only: an owned item's `actor` (or `parent`) is the owning
+    // Actor. World items in the sidebar resolve to null here and are ignored.
+    const actorId = item?.actor?.id ?? item?.parent?.id ?? null;
+    if (actorId && relevant(actorId)) schedule();
+  };
+  const createId = hooks.on('createItem', onItemChange);
+  const updateId = hooks.on('updateItem', onItemChange);
+  const deleteId = hooks.on('deleteItem', onItemChange);
+  return () => {
+    hooks.off?.('createItem', createId);
+    hooks.off?.('updateItem', updateId);
+    hooks.off?.('deleteItem', deleteId);
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+}
+
+/**
+ * Subscribe to Fabricate crafting-data changes (a GM editing/saving a crafting system
+ * or recipe) so callers can reload definition-derived views. Registers the local
+ * Fabricate hooks `fabricate.craftingSystemsChanged` and `fabricate.recipesChanged`.
+ * Those fire directly on the writing client; on OTHER clients they are re-emitted by
+ * main.js's `updateSetting` bridge after the replicated world setting reloads the
+ * in-memory managers — so this single subscription covers both same-client and
+ * cross-client edits. Returns an unsubscribe function; no-ops gracefully when the
+ * Foundry `Hooks` global is absent (e.g. unit tests).
+ *
+ * @param {Function} handler Invoked (no args) on a systems OR recipes change.
+ * @returns {Function} Unsubscribe callback.
+ */
+export function subscribeCraftingDataChange(handler) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const systemsId = hooks.on('fabricate.craftingSystemsChanged', () => handler());
+  const recipesId = hooks.on('fabricate.recipesChanged', () => handler());
+  return () => {
+    hooks.off?.('fabricate.craftingSystemsChanged', systemsId);
+    hooks.off?.('fabricate.recipesChanged', recipesId);
+  };
+}
+
+/**
  * Subscribe to token movement (and token creation/removal) so callers can refresh
  * the live travel current-region view when a party's travel-marker token moves.
  * Fires `handler(actorUuid)` — the base Actor uuid of the moved token. `updateToken`

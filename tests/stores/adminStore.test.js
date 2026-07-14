@@ -5,6 +5,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
+import {
+  DEFAULT_GATHERING_EVENT_IMG,
+  DEFAULT_GATHERING_TASK_IMG,
+} from '../../src/gatheringImageDefaults.js';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -21,15 +25,17 @@ function makeSystem(overrides = {}) {
     description: overrides.description || '',
     resolutionMode: overrides.resolutionMode || 'simple',
     features: overrides.features || {},
-    advancedOptionsEnabled: overrides.advancedOptionsEnabled !== undefined ? overrides.advancedOptionsEnabled : true,
     categories: overrides.categories || [],
     itemTags: overrides.itemTags || [],
     essenceDefinitions: overrides.essenceDefinitions || [],
     items: overrides.items || [],
-    requirements: overrides.requirements || { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
+    requirements: overrides.requirements || {
+      time: { enabled: false },
+      currency: { enabled: false, units: [] },
+    },
     craftingCheck: overrides.craftingCheck || { mode: 'passFail', macroUuid: null, outcomes: [] },
     recipeVisibility: overrides.recipeVisibility || { listMode: 'global' },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -46,8 +52,13 @@ function makeRecipe(overrides = {}) {
     visibility: overrides.visibility || {},
     ingredientSets: overrides.ingredientSets || [],
     isSimpleRecipe: () => true,
-    toJSON: () => ({ id, name: overrides.name || `Recipe ${id}`, craftingSystemId: overrides.craftingSystemId || '' }),
-    ...overrides
+    toJSON: () => ({
+      id,
+      name: overrides.name || `Recipe ${id}`,
+      craftingSystemId: overrides.craftingSystemId || '',
+      visibility: overrides.visibility ?? null,
+    }),
+    ...overrides,
   };
 }
 
@@ -59,7 +70,7 @@ function makeItem(overrides = {}) {
     img: overrides.img || 'item.png',
     tags: overrides.tags || [],
     essences: overrides.essences || {},
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -68,7 +79,7 @@ function makeItem(overrides = {}) {
  */
 function createMockServices(overrides = {}) {
   const store = {
-    lastManagedCraftingSystem: ''
+    lastManagedCraftingSystem: '',
   };
 
   let systems = [makeSystem({ id: 'sys1', name: 'System One' })];
@@ -76,90 +87,100 @@ function createMockServices(overrides = {}) {
 
   const mockSystemManager = {
     getSystems: () => systems,
-    getSystem: (id) => systems.find(s => s.id === id) || null,
+    getSystem: (id) => systems.find((s) => s.id === id) || null,
     createSystem: async (data) => {
       const sys = makeSystem({ ...data, id: data.id || `sys-created-${Date.now()}` });
       systems.push(sys);
       return sys;
     },
     updateSystem: async (id, updates) => {
-      const idx = systems.findIndex(s => s.id === id);
+      const idx = systems.findIndex((s) => s.id === id);
       if (idx >= 0) {
         systems[idx] = { ...systems[idx], ...updates };
         // Merge features specially
         if (updates.features) {
           systems[idx].features = { ...(systems[idx - 0]?.features || {}), ...updates.features };
           // Re-merge since we overwrote
-          const base = systems.find(s => s.id === id) || {};
+          const base = systems.find((s) => s.id === id) || {};
           systems[idx].features = { ...(base.features || {}), ...updates.features };
         }
       }
     },
     deleteSystem: async (id) => {
-      systems = systems.filter(s => s.id !== id);
+      systems = systems.filter((s) => s.id !== id);
     },
     getItems: (systemId, searchTerm) => {
-      const sys = systems.find(s => s.id === systemId);
+      const sys = systems.find((s) => s.id === systemId);
       const items = sys?.components || sys?.items || [];
       if (!searchTerm) return items;
       const lower = searchTerm.toLowerCase();
-      return items.filter(i => i.name.toLowerCase().includes(lower));
+      return items.filter((i) => i.name.toLowerCase().includes(lower));
     },
     deleteItem: async (systemId, itemId) => {
-      const sys = systems.find(s => s.id === systemId);
+      const sys = systems.find((s) => s.id === systemId);
       if (sys) {
         if (Array.isArray(sys.items)) {
-          sys.items = sys.items.filter(i => i.id !== itemId);
+          sys.items = sys.items.filter((i) => i.id !== itemId);
         }
         if (Array.isArray(sys.components)) {
-          sys.components = sys.components.filter(i => i.id !== itemId);
+          sys.components = sys.components.filter((i) => i.id !== itemId);
         }
       }
-    }
+    },
+    deleteEssence: async (systemId, essenceId) => {
+      const sys = systems.find((s) => s.id === systemId);
+      if (!sys) return false;
+      const defs = Array.isArray(sys.essenceDefinitions) ? sys.essenceDefinitions : [];
+      if (!defs.some((d) => d.id === essenceId)) return false;
+      sys.essenceDefinitions = defs.filter((d) => d.id !== essenceId);
+      sys.essences = sys.essenceDefinitions.map((d) => d.id);
+      return true;
+    },
   };
 
   const mockRecipeManager = {
     getRecipes: (filter) => {
       if (filter?.craftingSystemId) {
-        return recipes.filter(r => r.craftingSystemId === filter.craftingSystemId);
+        return recipes.filter((r) => r.craftingSystemId === filter.craftingSystemId);
       }
       return recipes;
     },
-    getRecipe: (id) => recipes.find(r => r.id === id) || null,
+    getRecipe: (id) => recipes.find((r) => r.id === id) || null,
     createRecipe: async (data) => {
       const r = makeRecipe({ ...data, id: `r-new-${Date.now()}` });
       recipes.push(r);
       return r;
     },
     updateRecipe: async (id, updates) => {
-      const idx = recipes.findIndex(r => r.id === id);
+      const idx = recipes.findIndex((r) => r.id === id);
       if (idx >= 0) recipes[idx] = { ...recipes[idx], ...updates };
     },
     deleteRecipe: async (id) => {
-      recipes = recipes.filter(r => r.id !== id);
+      recipes = recipes.filter((r) => r.id !== id);
     },
     importRecipes: async (data, overwrite) => {},
-    exportRecipes: () => recipes.map(r => r.toJSON())
+    exportRecipes: () => recipes.map((r) => r.toJSON()),
   };
 
   const base = {
     getSetting: (key) => store[key] ?? '',
-    setSetting: async (key, value) => { store[key] = value; },
+    setSetting: async (key, value) => {
+      store[key] = value;
+    },
     getCraftingSystemManager: () => mockSystemManager,
     getRecipeManager: () => mockRecipeManager,
     getScriptMacros: () => [],
     getSceneOptions: () => [],
-    getRollTableOptions: () => [],
     notify: {
       info: () => {},
       warn: () => {},
-      error: () => {}
+      error: () => {},
     },
     confirmDialog: async () => true,
     localize: (key) => key,
     copyToClipboard: async () => {},
     openRecipeEditor: () => {},
-    renderImportDialog: async () => {}
+    renderImportDialog: async () => {},
   };
 
   const merged = { ...base, ...overrides };
@@ -176,13 +197,42 @@ function createMockServices(overrides = {}) {
 // ---------------------------------------------------------------------------
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 const { DEFAULT_ESSENCE_ICON } = await import('../../src/ui/svelte/util/essenceIcons.js');
+const { PF2E_CURRENCY_PRESETS } = await import('../../src/config/currencyPresets.js');
+
+/**
+ * Spin up an adminStore whose `updateSystem` calls are captured, select `sys1`,
+ * and expose readers for the captured payload. The currency setter/seed tests
+ * all share this exact setup (capture `updateSystem` → drive setters → read back
+ * `requirements.currency`), so it lives here instead of being inlined per test.
+ *
+ * @param {object} [overrides] forwarded to `createMockServices`
+ * @returns {Promise<{ store: object, currency: () => object, updateArgs: () => object|null }>}
+ */
+async function setupCurrencyStore(overrides = {}) {
+  let updateArgs = null;
+  const services = createMockServices(overrides);
+  const origManager = services.getCraftingSystemManager();
+  services.getCraftingSystemManager = () => ({
+    ...origManager,
+    updateSystem: async (id, updates) => {
+      updateArgs = { id, updates };
+      await origManager.updateSystem(id, updates);
+    },
+  });
+  const store = createAdminStore(services);
+  await store.selectSystem('sys1');
+  return {
+    store,
+    currency: () => updateArgs.updates.requirements.currency,
+    updateArgs: () => updateArgs,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe('createAdminStore', () => {
-
   // -------------------------------------------------------------------------
   // 1. Initialization
   // -------------------------------------------------------------------------
@@ -200,7 +250,7 @@ describe('createAdminStore', () => {
 
     it('defaults to first system when no saved system is set', async () => {
       const services = createMockServices({
-        getSetting: () => ''
+        getSetting: () => '',
       });
       const store = createAdminStore(services);
       await store.refresh();
@@ -212,7 +262,7 @@ describe('createAdminStore', () => {
 
     it('restores selected system from lastManagedCraftingSystem setting', () => {
       const services = createMockServices({
-        getSetting: (key) => key === 'lastManagedCraftingSystem' ? 'sys1' : ''
+        getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
       });
       const store = createAdminStore(services);
       assert.equal(get(store.selectedSystemId), 'sys1');
@@ -220,7 +270,7 @@ describe('createAdminStore', () => {
 
     it('falls back to first system when saved system no longer exists', async () => {
       const services = createMockServices({
-        getSetting: (key) => key === 'lastManagedCraftingSystem' ? 'sys-gone' : ''
+        getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys-gone' : ''),
       });
       const store = createAdminStore(services);
       await store.refresh();
@@ -245,11 +295,79 @@ describe('createAdminStore', () => {
       assert.equal(vs.systems[0].id, 'sys1');
       assert.equal(vs.hasSystem, true, 'phase-1 must mark a selected system as present');
       assert.equal(vs.selectedSystemName, 'System One');
-      assert.equal(vs.selectedSystem?.id, 'sys1', 'phase-1 must publish selected system details before yielding');
+      assert.equal(
+        vs.selectedSystem?.id,
+        'sys1',
+        'phase-1 must publish selected system details before yielding'
+      );
       assert.equal(vs.selectedSystem?.name, 'System One');
-      assert.equal(vs.recipes.length, 1, 'phase-1 must publish synchronous recipe browser data before yielding');
+      assert.equal(
+        vs.recipes.length,
+        1,
+        'phase-1 must publish synchronous recipe browser data before yielding'
+      );
       // Let phase-2 settle so the rest of the suite starts from a clean state.
       await store.refresh();
+    });
+
+    it('projects toolBreakage.authority and preserves per-check checkBreakage blocks (issue 419)', async () => {
+      const services = createMockServices();
+      // Seed the selected system with checkDriven authority and a checkBreakage
+      // block on every per-mode check sub-object the projection clones.
+      const checkBreakage = {
+        enabled: true,
+        triggers: [
+          {
+            id: 'trg1',
+            label: 'Natural 1',
+            condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+          },
+        ],
+      };
+      const systems = services._getSystemsMutable();
+      const sys = systems.find((s) => s.id === 'sys1');
+      sys.toolBreakage = { authority: 'checkDriven' };
+      sys.craftingCheck = {
+        mode: 'passFail',
+        simple: { rollFormula: '1d20', checkBreakage },
+        routed: { type: 'relative', rollFormula: '1d20', checkBreakage },
+        progressive: { rollFormula: '2d6', checkBreakage },
+      };
+
+      const store = createAdminStore(services);
+      await store.refresh();
+      const selected = get(store.viewState).selectedSystem;
+
+      // Authority is now visible in the projection (was previously unprojected).
+      assert.deepEqual(selected.toolBreakage, { authority: 'checkDriven' });
+
+      // The checkBreakage block survives the _clonePlain projection for every mode.
+      for (const mode of ['simple', 'routed', 'progressive']) {
+        assert.deepEqual(
+          selected.craftingCheck[mode].checkBreakage,
+          checkBreakage,
+          `craftingCheck.${mode}.checkBreakage survives the projection clone`
+        );
+        // It is a deep clone, not the same reference (the projection must not leak
+        // the live persisted object into the view state).
+        assert.notEqual(
+          selected.craftingCheck[mode].checkBreakage,
+          checkBreakage,
+          `craftingCheck.${mode}.checkBreakage is cloned, not shared`
+        );
+      }
+    });
+
+    it('projects toolBreakage.authority as toolSpecific when the system has none (issue 419)', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.refresh();
+      const selected = get(store.viewState).selectedSystem;
+      assert.deepEqual(
+        selected.toolBreakage,
+        { authority: 'toolSpecific' },
+        'a system with no toolBreakage projects the toolSpecific default'
+      );
     });
 
     it('publishes loading instead of a true empty state while managers are uninitialized', () => {
@@ -259,7 +377,7 @@ describe('createAdminStore', () => {
         onFabricateReady: (callback) => {
           readyCallback = callback;
           return () => {};
-        }
+        },
       });
       const store = createAdminStore(services);
       const vs = get(store.viewState);
@@ -279,7 +397,7 @@ describe('createAdminStore', () => {
         onFabricateReady: (callback) => {
           readyCallback = callback;
           return () => {};
-        }
+        },
       });
       const store = createAdminStore(services);
 
@@ -301,7 +419,7 @@ describe('createAdminStore', () => {
         isFabricateReady: () => false,
         onFabricateReady: () => () => {
           cleanupCalled = true;
-        }
+        },
       });
       const store = createAdminStore(services);
 
@@ -319,47 +437,51 @@ describe('createAdminStore', () => {
           return () => {
             cleanupCalled = true;
           };
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.refresh();
 
       assert.equal(get(store.viewState).recipes.length, 1);
-      services._getRecipesMutable().push(makeRecipe({
-        id: 'r-external',
-        name: 'External Recipe',
-        craftingSystemId: 'sys1'
-      }));
+      services._getRecipesMutable().push(
+        makeRecipe({
+          id: 'r-external',
+          name: 'External Recipe',
+          craftingSystemId: 'sys1',
+        })
+      );
 
       dataChangedCallback?.('recipes');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       assert.equal(get(store.viewState).recipes.length, 2);
 
       store.destroy();
       assert.equal(cleanupCalled, true);
 
-      services._getRecipesMutable().push(makeRecipe({
-        id: 'r-after-destroy',
-        name: 'After Destroy',
-        craftingSystemId: 'sys1'
-      }));
+      services._getRecipesMutable().push(
+        makeRecipe({
+          id: 'r-after-destroy',
+          name: 'After Destroy',
+          craftingSystemId: 'sys1',
+        })
+      );
       dataChangedCallback?.('recipes');
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       assert.equal(get(store.viewState).recipes.length, 2);
     });
 
     it('leaves selection empty when no systems exist', async () => {
       const services = createMockServices({
-        getSetting: () => ''
+        getSetting: () => '',
       });
       const originalManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...originalManager,
         getSystems: () => [],
         getSystem: () => null,
-        getItems: () => []
+        getItems: () => [],
       });
       const store = createAdminStore(services);
       await store.refresh();
@@ -378,7 +500,9 @@ describe('createAdminStore', () => {
     it('selectSystem updates selectedSystemId and persists setting', async () => {
       let persisted = null;
       const services = createMockServices({
-        setSetting: async (key, value) => { if (key === 'lastManagedCraftingSystem') persisted = value; }
+        setSetting: async (key, value) => {
+          if (key === 'lastManagedCraftingSystem') persisted = value;
+        },
       });
       services._getSystemsMutable().push(makeSystem({ id: 'sys2', name: 'System Two' }));
       const store = createAdminStore(services);
@@ -389,7 +513,7 @@ describe('createAdminStore', () => {
 
     it('selectSystem refreshes viewState with new system data', async () => {
       const services = createMockServices({
-        getSetting: () => ''
+        getSetting: () => '',
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -441,7 +565,7 @@ describe('createAdminStore', () => {
       const sysId = get(store.selectedSystemId);
       assert.ok(sysId, 'should have a selectedSystemId after createSystem');
       const vs = get(store.viewState);
-      assert.ok(vs.systems.some(s => s.id === sysId));
+      assert.ok(vs.systems.some((s) => s.id === sysId));
     });
 
     it('createSystem generates unique name when default already exists', async () => {
@@ -451,9 +575,15 @@ describe('createAdminStore', () => {
       // Second creation
       const store2 = createAdminStore(services);
       await store2.createSystem();
-      const allNames = services.getCraftingSystemManager().getSystems().map(s => s.name);
-      const newSystems = allNames.filter(n => n.startsWith('New Crafting System'));
-      assert.ok(newSystems.length >= 2, `Expected at least 2 "New Crafting System*" names, got: ${JSON.stringify(allNames)}`);
+      const allNames = services
+        .getCraftingSystemManager()
+        .getSystems()
+        .map((s) => s.name);
+      const newSystems = allNames.filter((n) => n.startsWith('New Crafting System'));
+      assert.ok(
+        newSystems.length >= 2,
+        `Expected at least 2 "New Crafting System*" names, got: ${JSON.stringify(allNames)}`
+      );
       // Ensure no duplicates
       assert.equal(new Set(allNames).size, allNames.length, 'All system names should be unique');
     });
@@ -469,7 +599,10 @@ describe('createAdminStore', () => {
     it('deleteSystem shows confirm dialog, calls deleteSystem, selects next system', async () => {
       let confirmCalled = false;
       const services = createMockServices({
-        confirmDialog: async () => { confirmCalled = true; return true; }
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
       });
       const systemManager = services.getCraftingSystemManager();
       // Add a second system so there's a fallback
@@ -481,20 +614,23 @@ describe('createAdminStore', () => {
 
       assert.ok(confirmCalled, 'should call confirmDialog');
       const remaining = systemManager.getSystems();
-      assert.ok(!remaining.some(s => s.id === 'sys1'), 'sys1 should be deleted');
+      assert.ok(!remaining.some((s) => s.id === 'sys1'), 'sys1 should be deleted');
     });
 
     it('deleteSystem does nothing when confirm is declined', async () => {
       const services = createMockServices({
-        confirmDialog: async () => false
+        confirmDialog: async () => false,
       });
       const store = createAdminStore(services);
       await store.deleteSystem('sys1');
       const remaining = services.getCraftingSystemManager().getSystems();
-      assert.ok(remaining.some(s => s.id === 'sys1'), 'sys1 should not be deleted when declined');
+      assert.ok(
+        remaining.some((s) => s.id === 'sys1'),
+        'sys1 should not be deleted when declined'
+      );
     });
 
-    it('saveSystemDetails calls systemManager.updateSystem with given name, description, advancedOptionsEnabled', async () => {
+    it('saveSystemDetails calls systemManager.updateSystem with given name and description', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -503,16 +639,15 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           updateArgs = { id, updates };
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveSystemDetails('Updated Name', 'Updated Desc', false);
+      await store.saveSystemDetails('Updated Name', 'Updated Desc');
       assert.ok(updateArgs !== null, 'updateSystem should be called');
       assert.equal(updateArgs.id, 'sys1');
       assert.equal(updateArgs.updates.name, 'Updated Name');
       assert.equal(updateArgs.updates.description, 'Updated Desc');
-      assert.equal(updateArgs.updates.advancedOptionsEnabled, false);
     });
 
     it('saveSystemDetails does nothing when no system is selected', async () => {
@@ -523,10 +658,12 @@ describe('createAdminStore', () => {
         ...origManager,
         getSystems: () => [],
         getSystem: () => null,
-        updateSystem: async () => { updateCalled = true; }
+        updateSystem: async () => {
+          updateCalled = true;
+        },
       });
       const store = createAdminStore(services);
-      await store.saveSystemDetails('Name', 'Desc', true);
+      await store.saveSystemDetails('Name', 'Desc');
       assert.ok(!updateCalled, 'updateSystem should not be called when no system is selected');
     });
 
@@ -539,7 +676,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           updateArgs = { id, updates };
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       const result = await store.toggleSystemEnabled('sys1', false);
@@ -553,7 +690,10 @@ describe('createAdminStore', () => {
       let confirmCalled = false;
       let updateArgs = null;
       const services = createMockServices({
-        confirmDialog: async () => { confirmCalled = true; return true; }
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
       });
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
@@ -561,36 +701,84 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           updateArgs = { id, updates };
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      const result = await store.setResolutionMode('tiered');
+      const result = await store.setResolutionMode('routed');
 
       assert.equal(result, true);
       assert.equal(confirmCalled, true);
       assert.equal(updateArgs?.id, 'sys1');
-      assert.equal(updateArgs?.updates?.resolutionMode, 'tiered');
+      assert.equal(updateArgs?.updates?.resolutionMode, 'routed');
     });
 
     it('setResolutionMode leaves the system unchanged when the confirmation is declined', async () => {
       let updateCalled = false;
       const services = createMockServices({
-        confirmDialog: async () => false
+        confirmDialog: async () => false,
       });
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async () => { updateCalled = true; }
+        updateSystem: async () => {
+          updateCalled = true;
+        },
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      const result = await store.setResolutionMode('tiered');
+      const result = await store.setResolutionMode('routed');
 
       assert.equal(result, false);
       assert.equal(updateCalled, false);
+    });
+
+    // Salvage mode change is non-destructive (updateSystem runs only the inline
+    // _disableInvalidSalvageConfigs cleanup), so the confirm is salvage-accurate.
+    // Both branches share this setup, parameterized on the confirm answer.
+    async function runSalvageMode(confirmAnswer) {
+      let confirmCalled = false;
+      let updateArgs = null;
+      const services = createMockServices({
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return confirmAnswer;
+        },
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setSalvageResolutionMode('routed');
+      return { store, result, confirmCalled, updateArgs: () => updateArgs };
+    }
+
+    it('setSalvageResolutionMode confirms and persists the new salvage mode', async () => {
+      const { result, confirmCalled, updateArgs } = await runSalvageMode(true);
+      assert.equal(result, true);
+      assert.equal(confirmCalled, true);
+      assert.equal(updateArgs()?.id, 'sys1');
+      assert.equal(updateArgs()?.updates?.salvageResolutionMode, 'routed');
+    });
+
+    it('setSalvageResolutionMode leaves the system unchanged when the confirmation is declined', async () => {
+      const { result, confirmCalled, updateArgs } = await runSalvageMode(false);
+      assert.equal(result, false);
+      assert.equal(confirmCalled, true);
+      assert.equal(updateArgs(), null);
+    });
+
+    it('exposes setSalvageResolutionMode on the store API', () => {
+      const store = createAdminStore(createMockServices());
+      assert.equal(typeof store.setSalvageResolutionMode, 'function');
     });
   });
 
@@ -608,7 +796,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           updateArgs = { id, updates };
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -625,7 +813,7 @@ describe('createAdminStore', () => {
         craftingChecks: 'craftingChecks',
         outcomeRouting: 'outcomeRouting',
         effectTransfer: 'effectTransfer',
-        gathering: 'gathering'
+        gathering: 'gathering',
       };
 
       for (const [featureName, expectedKey] of Object.entries(expectedMappings)) {
@@ -637,33 +825,17 @@ describe('createAdminStore', () => {
           updateSystem: async (id, updates) => {
             updateArgs = { id, updates };
             await origManager.updateSystem(id, updates);
-          }
+          },
         });
         const store = createAdminStore(services);
         await store.selectSystem('sys1');
         await store.toggleFeature(featureName, true);
         assert.ok(updateArgs, `updateSystem should be called for feature: ${featureName}`);
-        assert.ok(expectedKey in updateArgs.updates.features,
-          `Expected key "${expectedKey}" in features update for "${featureName}"`);
+        assert.ok(
+          expectedKey in updateArgs.updates.features,
+          `Expected key "${expectedKey}" in features update for "${featureName}"`
+        );
       }
-    });
-
-    it('toggleAdvancedOptions(false) calls updateSystem with advancedOptionsEnabled: false', async () => {
-      let updateArgs = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateArgs = { id, updates };
-          await origManager.updateSystem(id, updates);
-        }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.toggleAdvancedOptions(false);
-      assert.ok(updateArgs, 'updateSystem should be called');
-      assert.equal(updateArgs.updates.advancedOptionsEnabled, false);
     });
 
     it('toggleRequirement("currency", true) calls updateSystem with correct requirements shape', async () => {
@@ -675,14 +847,19 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           updateArgs = { id, updates };
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.toggleRequirement('currency', true);
       assert.ok(updateArgs, 'updateSystem should be called');
       assert.equal(updateArgs.updates.requirements.currency.enabled, true);
-      assert.ok('provider' in updateArgs.updates.requirements.currency, 'should preserve provider field');
+      assert.deepEqual(updateArgs.updates.requirements.currency.units, []);
+      assert.equal(
+        'provider' in updateArgs.updates.requirements.currency,
+        false,
+        'should not emit provider field'
+      );
     });
 
     it('toggleRequirement("time", true) calls updateSystem with time.enabled: true', async () => {
@@ -694,7 +871,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           updateArgs = { id, updates };
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -709,7 +886,9 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async () => { updateCalled = true; }
+        updateSystem: async () => {
+          updateCalled = true;
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -732,14 +911,14 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.categories) savedCategories = updates.categories;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.addCategory('Weapons');
       await store.addCategory('Weapons'); // duplicate
       assert.ok(savedCategories !== null);
-      assert.equal(savedCategories.filter(c => c === 'Weapons').length, 1);
+      assert.equal(savedCategories.filter((c) => c === 'Weapons').length, 1);
     });
 
     it('removeCategory filters out the category', async () => {
@@ -754,7 +933,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.categories) savedCategories = updates.categories;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -773,7 +952,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           updateCalled = true;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -787,12 +966,17 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async () => { updateCalled = true; }
+        updateSystem: async () => {
+          updateCalled = true;
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.addCategory('General');
-      assert.ok(!updateCalled, 'updateSystem should not be called for the reserved General category');
+      assert.ok(
+        !updateCalled,
+        'updateSystem should not be called for the reserved General category'
+      );
     });
 
     it('removeCategory does nothing for the reserved general category', async () => {
@@ -801,12 +985,17 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async () => { updateCalled = true; }
+        updateSystem: async () => {
+          updateCalled = true;
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.removeCategory('general');
-      assert.ok(!updateCalled, 'updateSystem should not be called for the reserved General category');
+      assert.ok(
+        !updateCalled,
+        'updateSystem should not be called for the reserved General category'
+      );
     });
   });
 
@@ -824,7 +1013,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.itemTags) savedTags = updates.itemTags;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -844,7 +1033,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.itemTags) savedTags = updates.itemTags;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -865,13 +1054,13 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.itemTags) savedTags = updates.itemTags;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.addTag('fire');
       assert.ok(savedTags !== null);
-      assert.equal(savedTags.filter(t => t === 'fire').length, 1);
+      assert.equal(savedTags.filter((t) => t === 'fire').length, 1);
     });
   });
 
@@ -889,14 +1078,14 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null);
       assert.ok(savedEssences !== null);
-      assert.ok(savedEssences.some(e => e.name === 'Fire'));
-      const newEssence = savedEssences.find(e => e.name === 'Fire');
+      assert.ok(savedEssences.some((e) => e.name === 'Fire'));
+      const newEssence = savedEssences.find((e) => e.name === 'Fire');
       assert.ok(newEssence.id, 'new essence should have an id');
       assert.equal(typeof newEssence.id, 'string');
     });
@@ -910,13 +1099,13 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.addEssence('Water', 'Flowing essence', '', null);
 
-      const newEssence = savedEssences?.find(e => e.name === 'Water');
+      const newEssence = savedEssences?.find((e) => e.name === 'Water');
       assert.ok(newEssence, 'new essence should be persisted');
       assert.equal(newEssence.icon, DEFAULT_ESSENCE_ICON);
     });
@@ -927,29 +1116,74 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.components = [makeItem({
-          id: 'comp-1',
-          name: 'Sunleaf',
-          img: 'sunleaf.png',
-          sourceItemUuid: 'Compendium.fabricate.items.sunleaf'
-        })];
+        sys.components = [
+          makeItem({
+            id: 'comp-1',
+            name: 'Sunleaf',
+            img: 'sunleaf.png',
+            originItemUuid: 'Compendium.fabricate.items.sunleaf',
+          }),
+        ];
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
         updateSystem: async (id, updates) => {
           if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.addEssence('Radiance', 'Bright essence', 'fas fa-sun', 'comp-1');
 
-      const newEssence = savedEssences?.find(e => e.name === 'Radiance');
+      const newEssence = savedEssences?.find((e) => e.name === 'Radiance');
       assert.ok(newEssence, 'new essence should be persisted');
       assert.equal(newEssence.sourceComponentId, 'comp-1');
       assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
       assert.equal(newEssence.associatedSystemItemId, 'comp-1');
+    });
+
+    it('issue 560 (asymmetric): a NEW-name-only component resolves the essence source link, while the essence keeps its OWN sourceItemUuid', async () => {
+      // Post-migration data: the linked component carries ONLY the renamed
+      // registeredItemUuid/originItemUuid (no legacy sourceUuid/sourceItemUuid). The
+      // essence source resolution must read the component's NEW field names, while the
+      // essence definition's OWN output key stays `sourceItemUuid` (out of scope, kept).
+      let savedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({
+            id: 'comp-1',
+            name: 'Sunleaf',
+            img: 'sunleaf.png',
+            registeredItemUuid: 'Item.sunleaf-live',
+            originItemUuid: 'Compendium.fabricate.items.sunleaf',
+          }),
+        ];
+        // Prove there are NO legacy keys on the component projection.
+        assert.ok(!('sourceUuid' in sys.components[0]));
+        assert.ok(!('sourceItemUuid' in sys.components[0]));
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Radiance', 'Bright essence', 'fas fa-sun', 'comp-1');
+
+      const newEssence = savedEssences?.find((e) => e.name === 'Radiance');
+      assert.ok(newEssence, 'new essence should be persisted');
+      // The essence resolved its source through the component's NEW field name.
+      assert.equal(newEssence.sourceComponentId, 'comp-1');
+      // The essence's OWN output key stays `sourceItemUuid` (kept).
+      assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
+      assert.ok(!('originItemUuid' in newEssence));
     });
 
     it('addEssence rejects duplicate name', async () => {
@@ -957,14 +1191,18 @@ describe('createAdminStore', () => {
       const services = createMockServices({
         notify: {
           info: () => {},
-          warn: (m) => { warnMsg = m; },
-          error: () => {}
-        }
+          warn: (m) => {
+            warnMsg = m;
+          },
+          error: () => {},
+        },
       });
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.essenceDefinitions = [{ id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null }];
+        sys.essenceDefinitions = [
+          { id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null },
+        ];
       }
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -981,7 +1219,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           updateCalled = true;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -989,30 +1227,60 @@ describe('createAdminStore', () => {
       assert.ok(!updateCalled, 'updateSystem should not be called for empty name');
     });
 
-    it('removeEssence filters out by essenceId', async () => {
-      let savedEssences = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
+    it('removeEssence shows confirm before deleting', async () => {
+      let confirmCalled = false;
+      const services = createMockServices({
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
+      });
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys)
         sys.essenceDefinitions = [
           { id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null },
-          { id: 'ess2', name: 'Ice', description: '', icon: '', sourceItemUuid: null }
         ];
-      }
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
-          await origManager.updateSystem(id, updates);
-        }
-      });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.removeEssence('ess1');
-      assert.ok(savedEssences !== null);
-      assert.ok(!savedEssences.some(e => e.id === 'ess1'));
-      assert.ok(savedEssences.some(e => e.id === 'ess2'));
+      assert.ok(confirmCalled, 'should call confirmDialog');
+      assert.ok(!manager.getSystem('sys1').essenceDefinitions.some((e) => e.id === 'ess1'));
+    });
+
+    it('removeEssence does nothing when confirm declined', async () => {
+      const services = createMockServices({ confirmDialog: async () => false });
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys)
+        sys.essenceDefinitions = [
+          { id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null },
+        ];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.removeEssence('ess1');
+      assert.ok(
+        manager.getSystem('sys1').essenceDefinitions.some((e) => e.id === 'ess1'),
+        'should not delete when declined'
+      );
+    });
+
+    it('removeEssence delegates to systemManager.deleteEssence', async () => {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) {
+        sys.essenceDefinitions = [
+          { id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null },
+          { id: 'ess2', name: 'Ice', description: '', icon: '', sourceItemUuid: null },
+        ];
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.removeEssence('ess1');
+      const remaining = manager.getSystem('sys1').essenceDefinitions;
+      assert.ok(!remaining.some((e) => e.id === 'ess1'));
+      assert.ok(remaining.some((e) => e.id === 'ess2'));
     });
 
     it('updateEssence renames and updates description and icon inline', async () => {
@@ -1028,8 +1296,8 @@ describe('createAdminStore', () => {
             description: 'Burning essence',
             icon: 'fas fa-fire',
             sourceItemUuid: 'item-1',
-            associatedSystemItemId: 'item-1'
-          }
+            associatedSystemItemId: 'item-1',
+          },
         ];
       }
       services.getCraftingSystemManager = () => ({
@@ -1037,7 +1305,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
 
       const store = createAdminStore(services);
@@ -1045,7 +1313,7 @@ describe('createAdminStore', () => {
       await store.updateEssence('ess1', {
         name: 'Volatile',
         description: 'Explosive energy',
-        icon: 'fas fa-bolt'
+        icon: 'fas fa-bolt',
       });
 
       assert.equal(savedEssences?.length, 1);
@@ -1055,7 +1323,7 @@ describe('createAdminStore', () => {
         description: 'Explosive energy',
         icon: 'fas fa-bolt',
         sourceItemUuid: 'item-1',
-        associatedSystemItemId: 'item-1'
+        associatedSystemItemId: 'item-1',
       });
     });
 
@@ -1073,8 +1341,8 @@ describe('createAdminStore', () => {
             description: 'Burning essence',
             icon: 'fas fa-fire',
             sourceItemUuid: 'Compendium.fabricate.items.fire-core',
-            associatedSystemItemId: 'legacy-component'
-          }
+            associatedSystemItemId: 'legacy-component',
+          },
         ];
       }
       services.getCraftingSystemManager = () => ({
@@ -1082,7 +1350,7 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
 
       const store = createAdminStore(services);
@@ -1090,7 +1358,7 @@ describe('createAdminStore', () => {
       await store.updateEssence('ess1', {
         name: 'Ember',
         description: 'Warmth',
-        icon: 'fas fa-fire-flame-curved'
+        icon: 'fas fa-fire-flame-curved',
       });
 
       assert.deepEqual(savedEssences?.[0], {
@@ -1099,7 +1367,7 @@ describe('createAdminStore', () => {
         description: 'Warmth',
         icon: 'fas fa-fire-flame-curved',
         sourceItemUuid: 'Compendium.fabricate.items.fire-core',
-        associatedSystemItemId: 'legacy-component'
+        associatedSystemItemId: 'legacy-component',
       });
     });
 
@@ -1109,11 +1377,13 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.components = [makeItem({
-          id: 'new-component',
-          name: 'New Component',
-          sourceItemUuid: 'Compendium.fabricate.items.new-component'
-        })];
+        sys.components = [
+          makeItem({
+            id: 'new-component',
+            name: 'New Component',
+            originItemUuid: 'Compendium.fabricate.items.new-component',
+          }),
+        ];
         sys.essenceDefinitions = [
           {
             id: 'ess1',
@@ -1121,8 +1391,8 @@ describe('createAdminStore', () => {
             description: 'Burning essence',
             icon: 'fas fa-fire',
             sourceItemUuid: 'old-component',
-            associatedSystemItemId: 'old-component'
-          }
+            associatedSystemItemId: 'old-component',
+          },
         ];
       }
       services.getCraftingSystemManager = () => ({
@@ -1130,14 +1400,14 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.updateEssence('ess1', {
         name: 'Fire',
-        sourceComponentId: 'new-component'
+        sourceComponentId: 'new-component',
       });
 
       assert.equal(savedEssences?.[0].sourceComponentId, 'new-component');
@@ -1159,8 +1429,8 @@ describe('createAdminStore', () => {
             icon: 'fas fa-fire',
             sourceComponentId: null,
             sourceItemUuid: 'Compendium.fabricate.items.stale-fire',
-            associatedSystemItemId: null
-          }
+            associatedSystemItemId: null,
+          },
         ];
       }
       services.getCraftingSystemManager = () => ({
@@ -1168,19 +1438,19 @@ describe('createAdminStore', () => {
         updateSystem: async (id, updates) => {
           if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.updateEssence('ess1', {
-        name: 'Ember'
+        name: 'Ember',
       });
 
       assert.equal(savedEssences?.[0].sourceItemUuid, 'Compendium.fabricate.items.stale-fire');
       await store.updateEssence('ess1', {
         name: 'Ember',
-        sourceComponentId: null
+        sourceComponentId: null,
       });
 
       assert.equal(savedEssences?.[0].sourceComponentId, null);
@@ -1194,30 +1464,32 @@ describe('createAdminStore', () => {
       const services = createMockServices({
         notify: {
           info: () => {},
-          warn: (message) => { warnMsg = message; },
-          error: () => {}
-        }
+          warn: (message) => {
+            warnMsg = message;
+          },
+          error: () => {},
+        },
       });
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.essenceDefinitions = [
           { id: 'ess1', name: 'Fire', description: '', icon: 'fas fa-fire', sourceItemUuid: null },
-          { id: 'ess2', name: 'Water', description: '', icon: 'fas fa-tint', sourceItemUuid: null }
+          { id: 'ess2', name: 'Water', description: '', icon: 'fas fa-tint', sourceItemUuid: null },
         ];
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
         updateSystem: async () => {
           updateCalled = true;
-        }
+        },
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const didSave = await store.updateEssence('ess2', {
         name: 'Fire',
-        description: 'Duplicate'
+        description: 'Duplicate',
       });
 
       assert.equal(didSave, false);
@@ -1240,17 +1512,21 @@ describe('createAdminStore', () => {
             if (s) s.essenceDefinitions = updates.essenceDefinitions;
           }
           await origManager.updateSystem(id, updates);
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.addEssence('Fire', 'Burning', 'fas fa-fire', null);
       assert.ok(lastSavedEssences !== null);
-      const addedEssence = lastSavedEssences.find(e => e.name === 'Fire');
+      const addedEssence = lastSavedEssences.find((e) => e.name === 'Fire');
       assert.ok(addedEssence, 'essence should exist after add');
       assert.ok(addedEssence.id, 'essence should have an id');
       await store.removeEssence(addedEssence.id);
-      assert.ok(!lastSavedEssences.some(e => e.id === addedEssence.id), 'essence should be removed after removeEssence');
+      const remaining = origManager.getSystem('sys1').essenceDefinitions;
+      assert.ok(
+        !remaining.some((e) => e.id === addedEssence.id),
+        'essence should be removed after removeEssence'
+      );
     });
   });
 
@@ -1263,12 +1539,18 @@ describe('createAdminStore', () => {
       let confirmCalled = false;
       let deletedId = null;
       const services = createMockServices({
-        confirmDialog: async () => { confirmCalled = true; return true; }
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
       });
       const origManager = services.getRecipeManager();
       services.getRecipeManager = () => ({
         ...origManager,
-        deleteRecipe: async (id) => { deletedId = id; await origManager.deleteRecipe(id); }
+        deleteRecipe: async (id) => {
+          deletedId = id;
+          await origManager.deleteRecipe(id);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -1280,12 +1562,14 @@ describe('createAdminStore', () => {
     it('deleteRecipe does nothing when confirm declined', async () => {
       let deletedId = null;
       const services = createMockServices({
-        confirmDialog: async () => false
+        confirmDialog: async () => false,
       });
       const origManager = services.getRecipeManager();
       services.getRecipeManager = () => ({
         ...origManager,
-        deleteRecipe: async (id) => { deletedId = id; }
+        deleteRecipe: async (id) => {
+          deletedId = id;
+        },
       });
       const store = createAdminStore(services);
       await store.deleteRecipe('r1');
@@ -1298,13 +1582,19 @@ describe('createAdminStore', () => {
       const origManager = services.getRecipeManager();
       services.getRecipeManager = () => ({
         ...origManager,
-        createRecipe: async (data) => { createdData = data; return origManager.createRecipe(data); }
+        createRecipe: async (data) => {
+          createdData = data;
+          return origManager.createRecipe(data);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.duplicateRecipe('r1');
       assert.ok(createdData !== null);
-      assert.ok(createdData.name.includes('(Copy)'), `Expected "(Copy)" in name: ${createdData.name}`);
+      assert.ok(
+        createdData.name.includes('(Copy)'),
+        `Expected "(Copy)" in name: ${createdData.name}`
+      );
       assert.ok(!createdData.id, 'duplicated recipe should not have an id');
     });
 
@@ -1314,7 +1604,10 @@ describe('createAdminStore', () => {
       const origManager = services.getRecipeManager();
       services.getRecipeManager = () => ({
         ...origManager,
-        updateRecipe: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateRecipe(id, updates); }
+        updateRecipe: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateRecipe(id, updates);
+        },
       });
       const store = createAdminStore(services);
       await store.toggleRecipeEnabled('r1', false);
@@ -1326,7 +1619,9 @@ describe('createAdminStore', () => {
     it('exportRecipes serializes recipes and calls copyToClipboard', async () => {
       let clipboardContent = null;
       const services = createMockServices({
-        copyToClipboard: async (text) => { clipboardContent = text; }
+        copyToClipboard: async (text) => {
+          clipboardContent = text;
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -1339,14 +1634,208 @@ describe('createAdminStore', () => {
     it('importRecipes delegates to services.renderImportDialog with selected system id', async () => {
       let importSystemId = null;
       const services = createMockServices({
-        renderImportDialog: async (sysId) => { importSystemId = sysId; }
+        renderImportDialog: async (sysId) => {
+          importSystemId = sysId;
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.importRecipes();
-      assert.equal(importSystemId, 'sys1', 'renderImportDialog should be called with the selected system id');
+      assert.equal(
+        importSystemId,
+        'sys1',
+        'renderImportDialog should be called with the selected system id'
+      );
     });
 
+    it('updateRecipe persists updates, refreshes, and returns true', async () => {
+      let updateArgs = null;
+      let refreshed = false;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateRecipe(id, updates);
+        },
+        getRecipes: (filter) => {
+          refreshed = true;
+          return origManager.getRecipes(filter);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.updateRecipe('r1', { name: 'Renamed' });
+      assert.equal(result, true);
+      assert.deepEqual(updateArgs, { id: 'r1', updates: { name: 'Renamed' } });
+      assert.ok(refreshed, 'updateRecipe should refresh projections');
+    });
+
+    it('updateRecipe returns false and notifies when recipeManager.updateRecipe rejects', async () => {
+      const errors = [];
+      const services = createMockServices({
+        notify: { info: () => {}, warn: () => {}, error: (msg) => errors.push(msg) },
+      });
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async () => {
+          throw new Error('recipe boom');
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.updateRecipe('r1', { name: 'Renamed' });
+      assert.equal(result, false);
+      assert.deepEqual(errors, ['recipe boom']);
+    });
+
+    it('confirmRecipeAction resolves true/false from services.confirmDialog (no persistence)', async () => {
+      let captured = null;
+      const services = createMockServices({
+        confirmDialog: async (opts) => {
+          captured = opts;
+          return true;
+        },
+      });
+      const store = createAdminStore(services);
+      const yes = await store.confirmRecipeAction({
+        title: 'Delete step?',
+        content: '<p>Remove it?</p>',
+      });
+      assert.equal(yes, true, 'returns true when the user confirms');
+      assert.equal(captured.title, 'Delete step?', 'forwards the title');
+      assert.equal(captured.content, '<p>Remove it?</p>', 'forwards the content');
+
+      const noServices = createMockServices({ confirmDialog: async () => false });
+      const noStore = createAdminStore(noServices);
+      const no = await noStore.confirmRecipeAction({ title: 't', content: 'c' });
+      assert.equal(no, false, 'returns false when the user declines');
+    });
+
+    it('createRecipe requests an incomplete shell via the allowIncomplete option', async () => {
+      let createArgs = null;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        createRecipe: async (data, options) => {
+          createArgs = { data, options };
+          return origManager.createRecipe(data, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const created = await store.createRecipe();
+      assert.ok(created?.id, 'createRecipe should return the created shell id');
+      assert.equal(createArgs.options?.allowIncomplete, true, 'shell create must allow incomplete');
+      assert.equal(createArgs.data.craftingSystemId, 'sys1');
+    });
+
+    it('updateRecipe requests allowIncomplete so identity-only shell edits are not blocked', async () => {
+      let updateOptions = null;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateOptions = options;
+          await origManager.updateRecipe(id, updates, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateRecipe('r1', { name: 'Renamed Shell' });
+      assert.equal(updateOptions?.allowIncomplete, true, 'editor save must allow incomplete');
+    });
+
+    it('updateRecipe forwards notify:false for quiet step edits and defaults to notify:true', async () => {
+      const optionsSeen = [];
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          optionsSeen.push(options);
+          await origManager.updateRecipe(id, updates, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateRecipe('r1', { name: 'Loud' });
+      await store.updateRecipe('r1', { steps: [] }, { notify: false });
+      assert.equal(optionsSeen[0]?.notify, true, 'a normal save notifies');
+      assert.equal(optionsSeen[1]?.notify, false, 'a quiet step save suppresses the toast');
+    });
+
+    it('viewState.recipes entries carry raw steps and top-level authoring data for the editor', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipe = makeRecipe({
+        id: 'r-steps',
+        name: 'Authored',
+        craftingSystemId: 'sys1',
+        toJSON: () => ({
+          id: 'r-steps',
+          name: 'Authored',
+          craftingSystemId: 'sys1',
+          steps: [{ id: 'sa', name: 'Step 1', description: 'first' }],
+          ingredientSets: [{ id: 'iset' }],
+          resultGroups: [{ id: 'rg' }],
+          toolIds: ['t1'],
+        }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [recipe].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-steps');
+      assert.ok(projected, 'recipe should be projected');
+      assert.equal(projected.steps.length, 1, 'raw steps survive projection');
+      assert.equal(projected.steps[0].name, 'Step 1', 'step data is intact');
+      assert.deepEqual(projected.toolIds, ['t1'], 'top-level toolIds projected for migration');
+      assert.equal(projected.ingredientSets.length, 1, 'top-level ingredientSets projected');
+      assert.equal(projected.resultGroups.length, 1, 'top-level resultGroups projected');
+    });
+
+    it('addRecipeItemFromUuid passes through the manager result', async () => {
+      const passthrough = { item: { id: 'item-x' }, action: 'created' };
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        addRecipeItemFromUuid: async () => passthrough,
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.addRecipeItemFromUuid('sys1', 'Item.abc');
+      assert.deepEqual(result, passthrough);
+    });
+
+    it('addRecipeItemFromUuid returns false and notifies when the manager rejects', async () => {
+      const errors = [];
+      const services = createMockServices({
+        notify: { info: () => {}, warn: () => {}, error: (msg) => errors.push(msg) },
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        addRecipeItemFromUuid: async () => {
+          throw new Error('link boom');
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.addRecipeItemFromUuid('sys1', 'Item.abc');
+      assert.equal(result, false);
+      assert.deepEqual(errors, ['link boom']);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1362,13 +1851,16 @@ describe('createAdminStore', () => {
         downloadFile: async (json, filename) => {
           downloadedJson = json;
           downloadedFilename = filename;
-        }
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.exportSystem();
       assert.ok(downloadedJson !== null, 'downloadFile should be called');
-      assert.ok(downloadedFilename.startsWith('fabricate-'), 'filename should start with fabricate-');
+      assert.ok(
+        downloadedFilename.startsWith('fabricate-'),
+        'filename should start with fabricate-'
+      );
       assert.ok(downloadedFilename.endsWith('.json'), 'filename should end with .json');
       const parsed = JSON.parse(downloadedJson);
       assert.equal(parsed.fabricateVersion, '1.0.0-rc.12');
@@ -1380,7 +1872,9 @@ describe('createAdminStore', () => {
       let downloadedJson = null;
       const services = createMockServices({
         getModuleVersion: () => '1.0.0',
-        downloadFile: async (json) => { downloadedJson = json; }
+        downloadFile: async (json) => {
+          downloadedJson = json;
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -1395,14 +1889,22 @@ describe('createAdminStore', () => {
       let warnMsg = null;
       let downloadCalled = false;
       const services = createMockServices({
-        notify: { info: () => {}, warn: (m) => { warnMsg = m; }, error: () => {} },
-        downloadFile: async () => { downloadCalled = true; }
+        notify: {
+          info: () => {},
+          warn: (m) => {
+            warnMsg = m;
+          },
+          error: () => {},
+        },
+        downloadFile: async () => {
+          downloadCalled = true;
+        },
       });
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
         getSystems: () => [],
-        getSystem: () => null
+        getSystem: () => null,
       });
       const store = createAdminStore(services);
       await store.exportSystem();
@@ -1414,7 +1916,9 @@ describe('createAdminStore', () => {
       let downloadedJson = null;
       const services = createMockServices({
         getModuleVersion: () => '1.0.0',
-        downloadFile: async (json) => { downloadedJson = json; }
+        downloadFile: async (json) => {
+          downloadedJson = json;
+        },
       });
       const store = createAdminStore(services);
       // Don't select — pass systemId directly
@@ -1427,7 +1931,9 @@ describe('createAdminStore', () => {
     it('importSystem delegates to services.renderSystemImportDialog', async () => {
       let dialogCalled = false;
       const services = createMockServices({
-        renderSystemImportDialog: async () => { dialogCalled = true; }
+        renderSystemImportDialog: async () => {
+          dialogCalled = true;
+        },
       });
       const store = createAdminStore(services);
       await store.importSystem();
@@ -1444,14 +1950,20 @@ describe('createAdminStore', () => {
       let confirmCalled = false;
       let deletedArgs = null;
       const services = createMockServices({
-        confirmDialog: async () => { confirmCalled = true; return true; }
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
       });
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) sys.items = [makeItem({ id: 'item1', name: 'Herb' })];
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        deleteItem: async (sysId, itemId) => { deletedArgs = { sysId, itemId }; await origManager.deleteItem(sysId, itemId); }
+        deleteItem: async (sysId, itemId) => {
+          deletedArgs = { sysId, itemId };
+          await origManager.deleteItem(sysId, itemId);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -1464,14 +1976,16 @@ describe('createAdminStore', () => {
     it('deleteComponent does nothing when confirm declined', async () => {
       let deletedArgs = null;
       const services = createMockServices({
-        confirmDialog: async () => false
+        confirmDialog: async () => false,
       });
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) sys.items = [makeItem({ id: 'item1', name: 'Herb' })];
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        deleteItem: async (sysId, itemId) => { deletedArgs = { sysId, itemId }; }
+        deleteItem: async (sysId, itemId) => {
+          deletedArgs = { sysId, itemId };
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -1490,7 +2004,9 @@ describe('createAdminStore', () => {
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        deleteItem: async (sysId, itemId) => { deletedArgs = { sysId, itemId }; }
+        deleteItem: async (sysId, itemId) => {
+          deletedArgs = { sysId, itemId };
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -1506,24 +2022,35 @@ describe('createAdminStore', () => {
       if (sys) sys.items = [makeItem({ id: 'item1', name: 'Herb' })];
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateItem: async (sysId, itemId, updates) => { updateArgs = { sysId, itemId, updates }; }
+        updateItem: async (sysId, itemId, updates) => {
+          updateArgs = { sysId, itemId, updates };
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      const result = await store.updateComponent('item1', { tags: ['herb'], essences: { earth: 2 } });
+      const result = await store.updateComponent('item1', {
+        tags: ['herb'],
+        essences: { earth: 2 },
+      });
       assert.equal(result, true);
-      assert.deepEqual(updateArgs, { sysId: 'sys1', itemId: 'item1', updates: { tags: ['herb'], essences: { earth: 2 } } });
+      assert.deepEqual(updateArgs, {
+        sysId: 'sys1',
+        itemId: 'item1',
+        updates: { tags: ['herb'], essences: { earth: 2 } },
+      });
     });
 
     it('updateComponent returns false when systemManager.updateItem rejects', async () => {
       const errors = [];
       const services = createMockServices({
-        notify: { info: () => {}, warn: () => {}, error: (msg) => errors.push(msg) }
+        notify: { info: () => {}, warn: () => {}, error: (msg) => errors.push(msg) },
       });
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateItem: async () => { throw new Error('boom'); }
+        updateItem: async () => {
+          throw new Error('boom');
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -1538,7 +2065,9 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateItem: async () => { updateCalled = true; }
+        updateItem: async () => {
+          updateCalled = true;
+        },
       });
       const store = createAdminStore(services);
       const result = await store.updateComponent('', { tags: [] });
@@ -1560,16 +2089,18 @@ describe('createAdminStore', () => {
         getRecipes: (filter) => {
           return [
             makeRecipe({ id: 'r1', name: 'Healing Potion', craftingSystemId: 'sys1' }),
-            makeRecipe({ id: 'r2', name: 'Fire Sword', craftingSystemId: 'sys1' })
-          ].filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId);
-        }
+            makeRecipe({ id: 'r2', name: 'Fire Sword', craftingSystemId: 'sys1' }),
+          ].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          );
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.setRecipeSearch('healing');
       const vs = get(store.viewState);
-      assert.ok(vs.recipes.every(r => r.name.toLowerCase().includes('healing')));
-      assert.ok(!vs.recipes.some(r => r.id === 'r2'));
+      assert.ok(vs.recipes.every((r) => r.name.toLowerCase().includes('healing')));
+      assert.ok(!vs.recipes.some((r) => r.id === 'r2'));
     });
 
     it('setItemSearch filters viewState item cards', async () => {
@@ -1579,15 +2110,15 @@ describe('createAdminStore', () => {
       if (sys) {
         sys.items = [
           makeItem({ id: 'item1', name: 'Iron Ore' }),
-          makeItem({ id: 'item2', name: 'Gold Nugget' })
+          makeItem({ id: 'item2', name: 'Gold Nugget' }),
         ];
       }
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.setItemSearch('iron');
       const vs = get(store.viewState);
-      assert.ok(vs.itemCards.every(i => i.name.toLowerCase().includes('iron')));
-      assert.ok(!vs.itemCards.some(i => i.id === 'item2'));
+      assert.ok(vs.itemCards.every((i) => i.name.toLowerCase().includes('iron')));
+      assert.ok(!vs.itemCards.some((i) => i.id === 'item2'));
     });
   });
 
@@ -1596,109 +2127,595 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('config save actions', () => {
-    it('saveCraftingCheckConfig parses outcomes text and calls updateSystem', async () => {
+    it('saveCraftingCheckRouted persists the routed config and preserves other check fields', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = { enabled: true, mode: 'passFail', outcomes: ['fail', 'pass'] };
+      }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveCraftingCheckConfig('namedOutcomes', 'macro-uuid', 'critical, success, failure');
+      const routed = {
+        type: 'relative',
+        rollExpression: '1d20+@attributes.con.mod',
+        relativeOutcomes: [{ id: 'o1', name: 'Botch', success: false, breakTools: true, dc: -5 }],
+        fixedOutcomes: [],
+      };
+      await store.saveCraftingCheckRouted(routed);
       assert.ok(updateArgs !== null);
-      assert.equal(updateArgs.updates.craftingCheck.mode, 'namedOutcomes');
-      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['critical', 'success', 'failure']);
+      assert.deepEqual(updateArgs.updates.craftingCheck.routed, routed);
+      // existing canonical fields are not lost
+      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['fail', 'pass']);
+      assert.equal(updateArgs.updates.craftingCheck.mode, 'passFail');
     });
 
-    it('saveCraftingCheckConfig treats empty outcomesText as empty outcomes array', async () => {
+    it('saveCraftingCheckRouted strips deleted tier ids from recipe result groups and notifies', async () => {
+      const infoMessages = [];
+      const services = createMockServices({
+        notify: { info: (m) => infoMessages.push(m), warn: () => {}, error: () => {} },
+      });
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      sys.craftingCheck = { enabled: true, mode: 'passFail', outcomes: [] };
+
+      // A recipe carrying a stale routed tier id ('t-deleted') alongside a surviving
+      // one ('t-good'), at both the recipe level and inside a step.
+      const recipeUpdates = [];
+      const recipeManager = services.getRecipeManager();
+      const recipeData = {
+        id: 'r-routed',
+        name: 'Routed Recipe',
+        craftingSystemId: 'sys1',
+        resultGroups: [
+          { id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] },
+          { id: 'g-stale', name: 'Stale', checkOutcomeIds: ['t-good', 't-deleted'] },
+        ],
+        steps: [
+          {
+            id: 'step-1',
+            resultGroups: [{ id: 'sg-stale', name: 'StepStale', checkOutcomeIds: ['t-deleted'] }],
+          },
+        ],
+      };
+      services._getRecipesMutable().push(
+        makeRecipe({
+          ...recipeData,
+          toJSON: () => recipeData,
+        })
+      );
+      const origUpdateRecipe = recipeManager.updateRecipe;
+      recipeManager.updateRecipe = async (id, updates, options) => {
+        recipeUpdates.push({ id, updates, options });
+        return origUpdateRecipe(id, updates, options);
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // The saved routed config keeps only 't-good' — 't-deleted' is gone.
+      await store.saveCraftingCheckRouted({
+        type: 'relative',
+        rollExpression: '1d20',
+        relativeOutcomes: [{ id: 't-good', name: 'Good', success: true, breakTools: false, dc: 0 }],
+        fixedOutcomes: [],
+      });
+
+      assert.equal(recipeUpdates.length, 1, 'the affected recipe is persisted once');
+      const persisted = recipeUpdates[0];
+      assert.equal(persisted.id, 'r-routed');
+      assert.equal(persisted.options.notify, false, 'batch update suppresses per-recipe toast');
+      assert.deepEqual(persisted.updates.resultGroups[0].checkOutcomeIds, ['t-good']);
+      assert.deepEqual(
+        persisted.updates.resultGroups[1].checkOutcomeIds,
+        ['t-good'],
+        'the deleted id is stripped, the surviving id stays'
+      );
+      assert.deepEqual(persisted.updates.steps[0].resultGroups[0].checkOutcomeIds, []);
+      // Two result groups (one recipe-level, one step-level) carried the deleted id.
+      assert.ok(
+        infoMessages.some((m) => m.includes('2 recipe result group')),
+        `expected a "2 recipe result group(s)" notification, got: ${JSON.stringify(infoMessages)}`
+      );
+    });
+
+    it('saveCraftingCheckRouted does not notify or persist when no recipe references a deleted tier', async () => {
+      const infoMessages = [];
+      const services = createMockServices({
+        notify: { info: (m) => infoMessages.push(m), warn: () => {}, error: () => {} },
+      });
+      const recipeManager = services.getRecipeManager();
+      const recipeData = {
+        id: 'r-clean',
+        name: 'Clean Recipe',
+        craftingSystemId: 'sys1',
+        resultGroups: [{ id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] }],
+        steps: [],
+      };
+      services._getRecipesMutable().push(
+        makeRecipe({ ...recipeData, toJSON: () => recipeData })
+      );
+      let updateCount = 0;
+      const origUpdateRecipe = recipeManager.updateRecipe;
+      recipeManager.updateRecipe = async (id, updates, options) => {
+        updateCount += 1;
+        return origUpdateRecipe(id, updates, options);
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveCraftingCheckRouted({
+        type: 'relative',
+        rollExpression: '1d20',
+        relativeOutcomes: [{ id: 't-good', name: 'Good', success: true, breakTools: false, dc: 0 }],
+        fixedOutcomes: [],
+      });
+
+      assert.equal(updateCount, 0, 'no recipe is rewritten when nothing is stale');
+      assert.equal(
+        infoMessages.some((m) => m.includes('recipe result group')),
+        false,
+        'no cleanup notification when nothing changed'
+      );
+    });
+
+    it('saveCraftingCheckSimple persists the simple config and preserves other check fields', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = { enabled: true, mode: 'passFail', outcomes: ['fail', 'pass'] };
+      }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveCraftingCheckConfig('passFail', null, '');
+      const simple = {
+        rollFormula: '1d20',
+        dc: 12,
+        thresholdMode: 'meet',
+        dcMode: 'static',
+        tiers: [{ id: 't1', name: 'Hard', dc: 18 }],
+        macroUuid: null,
+        diceCrits: [{ id: 'cr1', die: '1d20', raw: 20, success: true, breakTools: false }],
+      };
+      await store.saveCraftingCheckSimple(simple);
       assert.ok(updateArgs !== null);
-      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, []);
+      assert.deepEqual(updateArgs.updates.craftingCheck.simple, simple);
+      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['fail', 'pass']);
     });
 
-    it('saveCraftingCheckConfig preserves existing canonical check fields', async () => {
+    it('surfaces the simple crafting check config in the selected-system view state', async () => {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = {
+          enabled: true,
+          simple: {
+            rollFormula: '1d20',
+            dc: 14,
+            thresholdMode: 'meet',
+            dcMode: 'static',
+            tiers: [{ id: 't1', name: 'Hard', dc: 18 }],
+            macroUuid: null,
+          },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.ok(
+        vs.selectedSystem.craftingCheck.simple,
+        'simple config is projected into view state'
+      );
+      assert.equal(vs.selectedSystem.craftingCheck.simple.dc, 14);
+      assert.equal(vs.selectedSystem.craftingCheck.simple.tiers[0].name, 'Hard');
+    });
+
+    it('surfaces the routed crafting check config in the selected-system view state', async () => {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = {
+          enabled: true,
+          routed: {
+            type: 'fixed',
+            rollExpression: '1d20',
+            relativeOutcomes: [],
+            fixedOutcomes: [
+              { id: 'o1', name: 'Hit', success: true, breakTools: false, start: 1, end: 20 },
+            ],
+          },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.ok(
+        vs.selectedSystem.craftingCheck.routed,
+        'routed config is projected into view state'
+      );
+      assert.equal(vs.selectedSystem.craftingCheck.routed.rollExpression, '1d20');
+      assert.equal(vs.selectedSystem.craftingCheck.routed.fixedOutcomes[0].name, 'Hit');
+    });
+
+    it('saveCraftingCheckActive toggles enabled and preserves the rest of the check', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.craftingCheck = {
-          enabled: true,
+          enabled: false,
           mode: 'passFail',
-          macroUuid: 'macro-old',
-          successMacroUuid: 'macro-success',
-          failureMacroUuid: 'macro-failure',
-          consumption: {
-            consumeIngredientsOnFail: false,
-            consumeCatalystsOnFail: true
+          outcomes: ['fail', 'pass'],
+          routed: {
+            type: 'relative',
+            rollExpression: '1d20',
+            relativeOutcomes: [],
+            fixedOutcomes: [],
           },
-          progressive: {
-            awardMode: 'partial',
-            allowPlayerReorder: true
-          },
-          outcomes: ['fail', 'pass']
         };
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveCraftingCheckConfig('namedOutcomes', 'macro-new', 'critical, success');
-      assert.ok(updateArgs !== null);
-      assert.equal(updateArgs.updates.craftingCheck.successMacroUuid, 'macro-success');
-      assert.equal(updateArgs.updates.craftingCheck.failureMacroUuid, 'macro-failure');
-      assert.equal(updateArgs.updates.craftingCheck.consumption.consumeIngredientsOnFail, false);
-      assert.equal(updateArgs.updates.craftingCheck.progressive.awardMode, 'partial');
+      await store.saveCraftingCheckActive(true);
+      assert.equal(updateArgs.updates.craftingCheck.enabled, true);
+      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['fail', 'pass']);
+      assert.equal(updateArgs.updates.craftingCheck.routed.rollExpression, '1d20');
     });
 
-    it('saveCurrencyConfig builds correct requirements object with macro provider', async () => {
+    it('saveSalvageCheckActive toggles the salvage check enabled flag', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.salvageCraftingCheck = { enabled: true, outcomes: ['fail', 'pass'] };
+      }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveCurrencyConfig('macro', null, 'check-uuid', 'decrement-uuid', 'format-uuid');
-      assert.ok(updateArgs !== null);
-      const currency = updateArgs.updates.requirements.currency;
-      assert.equal(currency.provider, 'macro');
-      assert.equal(currency.checkCurrencyMacroUuid, 'check-uuid');
-      assert.equal(currency.decrementCurrencyMacroUuid, 'decrement-uuid');
-      assert.equal(currency.formatCurrencyMacroUuid, 'format-uuid');
+      await store.saveSalvageCheckActive(false);
+      assert.equal(updateArgs.updates.salvageCraftingCheck.enabled, false);
     });
 
-    it('saveCurrencyConfig with system provider sets systemAdapter and nulls macro UUIDs', async () => {
+    it('viewState.selectedSystem.gatheringCraftingCheck surfaces the progressive and routed config so editors read it back', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) {
+        sys.gatheringCraftingCheck = {
+          enabled: true,
+          progressive: {
+            rollFormula: '1d20',
+            awardMode: 'equal',
+            diceCrits: [],
+          },
+          routed: {
+            type: 'relative',
+            rollFormula: '1d20',
+            relativeOutcomes: [{ id: 'g1', name: 'Rich Vein', success: true, dc: 5 }],
+          },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      const gathering = vs.selectedSystem?.gatheringCraftingCheck;
+      assert.ok(gathering?.progressive, 'progressive gathering config should be surfaced, not dropped');
+      assert.equal(gathering.progressive.awardMode, 'equal');
+      assert.ok(gathering?.routed, 'routed gathering config should be surfaced, not dropped');
+      assert.equal(gathering.routed.relativeOutcomes?.[0]?.name, 'Rich Vein');
+    });
+
+    it('saveGatheringCheckProgressive persists the progressive config and preserves other check fields', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.gatheringCraftingCheck = { enabled: true, routed: { type: 'fixed', fixedOutcomes: [] } };
+      }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveCurrencyConfig('system', 'dnd5e', null, null, null);
+      const progressive = {
+        rollFormula: '2d6',
+        awardMode: 'partial',
+        diceCrits: [{ id: 'cr1', die: '1d6', raw: 6, success: true, breakTools: false }],
+      };
+      await store.saveGatheringCheckProgressive(progressive);
       assert.ok(updateArgs !== null);
-      const currency = updateArgs.updates.requirements.currency;
-      assert.equal(currency.provider, 'system');
-      assert.equal(currency.systemAdapter, 'dnd5e');
-      assert.equal(currency.checkCurrencyMacroUuid, null, 'macro UUIDs should be null for system provider');
+      assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.progressive, progressive);
+      // existing fields are preserved by the shallow merge
+      assert.equal(updateArgs.updates.gatheringCraftingCheck.enabled, true);
+      assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.routed, { type: 'fixed', fixedOutcomes: [] });
+    });
+
+    it('addCurrencyUnit and updateCurrencyUnit persist editable unit fields', async () => {
+      const { store, currency, updateArgs } = await setupCurrencyStore();
+      const created = await store.addCurrencyUnit('sys1', {
+        id: 'gp',
+        label: 'Gold',
+        abbreviation: 'gp',
+        icon: 'fa-solid fa-coins',
+        actorPath: 'system.currency.gp',
+      });
+      assert.equal(created.id, 'gp');
+      await store.updateCurrencyUnit('sys1', 'gp', {
+        label: 'Gold pieces',
+        actorPath: 'system.currency.gp.value',
+      });
+      assert.ok(updateArgs() !== null);
+      assert.equal(currency().units[0].id, 'gp');
+      assert.equal(currency().units[0].label, 'Gold pieces');
+      assert.equal(currency().units[0].actorPath, 'system.currency.gp.value');
+      assert.equal('provider' in currency(), false);
+    });
+
+    it('currency sub-unit actions add, update, and remove denomination breakdowns', async () => {
+      const { store, currency, updateArgs } = await setupCurrencyStore({
+        randomID: (() => {
+          const ids = ['cp', 'sp'];
+          let index = 0;
+          return () => ids[index++] || `id-${index}`;
+        })(),
+      });
+      await store.addCurrencyUnit('sys1', {
+        id: 'cp',
+        label: 'Copper',
+        abbreviation: 'cp',
+        actorPath: 'system.currency.cp',
+      });
+      await store.addCurrencyUnit('sys1', {
+        id: 'sp',
+        label: 'Silver',
+        abbreviation: 'sp',
+        actorPath: 'system.currency.sp',
+      });
+      await store.addCurrencySubUnit('sys1', 'sp', 'cp');
+      await store.updateCurrencySubUnit('sys1', 'sp', 'cp', 10);
+      assert.ok(updateArgs() !== null);
+      let silver = currency().units.find((unit) => unit.id === 'sp');
+      assert.deepEqual(silver.contains, [{ unitId: 'cp', amount: 10 }]);
+
+      await store.deleteCurrencySubUnit('sys1', 'sp', 'cp');
+      silver = currency().units.find((unit) => unit.id === 'sp');
+      assert.deepEqual(silver.contains, []);
+    });
+
+    it('seedCurrencyUnitPresets adds dnd5e units idempotently', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
+      const first = await store.seedCurrencyUnitPresets('sys1');
+      const second = await store.seedCurrencyUnitPresets('sys1');
+      assert.equal(first.unsupported, false);
+      assert.equal(first.added.length, 5);
+      assert.equal(second.added.length, 0);
+      assert.equal(second.skipped.length, 5);
+      assert.equal(
+        currency().units.some((unit) => unit.id === 'gp'),
+        true
+      );
+    });
+
+    it('seedCurrencyUnitPresets sets actorInventory spend strategy for pf2e worlds', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
+      const result = await store.seedCurrencyUnitPresets('sys1');
+      assert.equal(result.unsupported, false);
+      assert.equal(currency().spendStrategy, 'actorInventory');
+      const gp = currency().units.find((unit) => unit.id === 'gp');
+      assert.equal(gp.denomination, 'gp');
+    });
+
+    it('seedCurrencyUnitPresets seeds the actorInventory strategy for pf2e worlds', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
+      await store.seedCurrencyUnitPresets('sys1');
+      assert.equal('inventoryMode' in currency(), false);
+      assert.equal(currency().spendStrategy, 'actorInventory');
+      assert.equal(currency().providerId, 'pf2e-inventory');
+      // The actorInventory strategy is provider-owned, so the seeded units are the canonical ladder.
+      assert.deepEqual(
+        currency().units.map((unit) => unit.id),
+        PF2E_CURRENCY_PRESETS.map((unit) => unit.id)
+      );
+      assert.deepEqual(
+        currency().units.map((unit) => unit.denomination),
+        PF2E_CURRENCY_PRESETS.map((unit) => unit.denomination)
+      );
+    });
+
+    it('setCurrencySpendStrategy persists and defaults providerId for pf2e actorInventory', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
+      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
+      assert.equal(currency().spendStrategy, 'actorInventory');
+      assert.equal(currency().providerId, 'pf2e-inventory');
+    });
+
+    it('setCurrencySpendStrategy persists the macro strategy and preserves providerId', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
+      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
+      await store.setCurrencySpendStrategy('sys1', 'macro');
+      assert.equal(currency().spendStrategy, 'macro');
+      assert.equal('inventoryMode' in currency(), false);
+      // providerId is inert under macro but is preserved across the switch.
+      assert.equal(currency().providerId, 'pf2e-inventory');
+      await store.setCurrencyProvider('sys1', 'pf2e-inventory');
+      assert.equal(currency().providerId, 'pf2e-inventory');
+    });
+
+    it('setCurrencySpendStrategy("actorInventory") syncs units to the provider canonical ladder', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
+      // Seed a user-managed unit first, then switching to actorInventory overwrites it.
+      await store.addCurrencyUnit('sys1', {
+        id: 'junk',
+        label: 'Junk',
+        actorPath: 'system.currency.junk',
+      });
+      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
+      const units = currency().units;
+      assert.deepEqual(
+        units.map((unit) => unit.id),
+        PF2E_CURRENCY_PRESETS.map((unit) => unit.id)
+      );
+      assert.deepEqual(
+        units.map((unit) => unit.denomination),
+        PF2E_CURRENCY_PRESETS.map((unit) => unit.denomination)
+      );
+      assert.equal(
+        units.some((unit) => unit.id === 'junk'),
+        false,
+        'user-managed unit should be overwritten by canonical ladder'
+      );
+    });
+
+    it('setCurrencyProvider syncs canonical units while under the actorInventory strategy', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
+      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
+      await store.setCurrencyProvider('sys1', 'pf2e-inventory');
+      assert.deepEqual(
+        currency().units.map((unit) => unit.id),
+        PF2E_CURRENCY_PRESETS.map((unit) => unit.id)
+      );
+    });
+
+    it('switching to actorProperty or macro leaves user-managed units untouched', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
+      await store.addCurrencyUnit('sys1', {
+        id: 'mine',
+        label: 'Mine',
+        actorPath: 'system.currency.mine',
+      });
+      // macro strategy keeps the user's units.
+      await store.setCurrencySpendStrategy('sys1', 'macro');
+      assert.equal(
+        currency().units.some((unit) => unit.id === 'mine'),
+        true
+      );
+      // actorProperty strategy keeps the user's units too.
+      await store.setCurrencySpendStrategy('sys1', 'actorProperty');
+      assert.equal(
+        currency().units.some((unit) => unit.id === 'mine'),
+        true
+      );
+      // setCurrencyProvider outside the actorInventory strategy does not touch the user's units.
+      await store.setCurrencyProvider('sys1', 'pf2e-inventory');
+      assert.equal(
+        currency().units.some((unit) => unit.id === 'mine'),
+        true
+      );
+    });
+
+    it('actorInventory in a no-provider system (dnd5e) leaves configured units untouched', async () => {
+      // Regression: dnd5e has no registered provider, so getDefaultProviderId('dnd5e') === '' and
+      // getProviderCanonicalUnits('') is empty. The actorInventory strategy must NOT wipe the GM's
+      // units in that case.
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
+      await store.addCurrencyUnit('sys1', {
+        id: 'gp',
+        label: 'Gold',
+        actorPath: 'system.currency.gp',
+      });
+      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
+      assert.equal(
+        currency().units.some((unit) => unit.id === 'gp'),
+        true,
+        'no-provider system must not have its configured units wiped by the actorInventory strategy'
+      );
+      // setCurrencyProvider with an empty/unknown provider id also preserves the units.
+      await store.setCurrencyProvider('sys1', '');
+      assert.equal(
+        currency().units.some((unit) => unit.id === 'gp'),
+        true,
+        'selecting an empty provider id must not wipe configured units'
+      );
+    });
+
+    it('setCurrencyMacro and clearCurrencyMacro persist per-key macro UUIDs', async () => {
+      const { store, currency } = await setupCurrencyStore();
+      await store.setCurrencyMacro('sys1', 'canAfford', 'Macro.can');
+      assert.equal(currency().macros.canAfford, 'Macro.can');
+      await store.setCurrencyMacro('sys1', 'decrement', 'Macro.dec');
+      assert.equal(currency().macros.decrement, 'Macro.dec');
+      await store.clearCurrencyMacro('sys1', 'canAfford');
+      assert.equal(currency().macros.canAfford, '');
+      assert.equal(currency().macros.decrement, 'Macro.dec');
+    });
+
+    it('seedCurrencyUnitPresets does not overwrite a user-edited seeded unit', async () => {
+      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
+      await store.seedCurrencyUnitPresets('sys1');
+      await store.updateCurrencyUnit('sys1', 'gp', {
+        label: 'Custom Gold',
+        actorPath: 'system.currency.gp.value',
+      });
+      const second = await store.seedCurrencyUnitPresets('sys1');
+      assert.equal(second.added.length, 0);
+      const units = currency().units;
+      const gold = units.find((unit) => unit.id === 'gp');
+      assert.equal(gold.label, 'Custom Gold');
+      assert.equal(gold.actorPath, 'system.currency.gp.value');
+      // No duplicate gp unit was introduced by the second seed.
+      assert.equal(units.filter((unit) => unit.id === 'gp').length, 1);
+    });
+
+    it("deleteCurrencyUnit removes the unit and strips it from other units' sub-units", async () => {
+      const { store, currency } = await setupCurrencyStore();
+      await store.addCurrencyUnit('sys1', {
+        id: 'cp',
+        label: 'Copper',
+        abbreviation: 'cp',
+        actorPath: 'system.currency.cp',
+      });
+      await store.addCurrencyUnit('sys1', {
+        id: 'sp',
+        label: 'Silver',
+        abbreviation: 'sp',
+        actorPath: 'system.currency.sp',
+      });
+      await store.addCurrencySubUnit('sys1', 'sp', 'cp', 10);
+      await store.deleteCurrencyUnit('sys1', 'cp');
+      const units = currency().units;
+      assert.equal(
+        units.some((unit) => unit.id === 'cp'),
+        false
+      );
+      const silver = units.find((unit) => unit.id === 'sp');
+      assert.deepEqual(silver.contains, []);
     });
 
     it('saveAlchemyConfig persists canonical alchemy settings', async () => {
@@ -1711,19 +2728,22 @@ describe('createAdminStore', () => {
         sys.alchemy = {
           learnOnCraft: false,
           consumeOnFail: true,
-          showAttemptHistoryToPlayers: true
+          showAttemptHistoryToPlayers: true,
         };
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.saveAlchemyConfig({
         learnOnCraft: true,
         consumeOnFail: false,
-        showAttemptHistoryToPlayers: false
+        showAttemptHistoryToPlayers: false,
       });
       assert.ok(updateArgs !== null);
       assert.equal(updateArgs.updates.alchemy.learnOnCraft, true);
@@ -1731,70 +2751,44 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.alchemy.showAttemptHistoryToPlayers, false);
     });
 
-    it('saveVisibilityConfig merges with existing visibility config', async () => {
-      let updateArgs = null;
+    it('updateRecipeItemCaps delegates a caps patch to the manager for the selected system', async () => {
+      let updateCall = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.recipeVisibility = {
-          listMode: 'global',
-          knowledge: { mode: 'itemOrLearned', learn: { consumeOnLearn: true } }
-        };
-      }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateRecipeItemDefinition: async (systemId, recipeItemId, patch) => {
+          updateCall = { systemId, recipeItemId, patch };
+          return { item: { id: recipeItemId } };
+        },
       });
+
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveVisibilityConfig('knowledge', 'learned', false);
-      assert.ok(updateArgs !== null);
-      const rv = updateArgs.updates.recipeVisibility;
-      assert.equal(rv.listMode, 'knowledge');
-      assert.equal(rv.knowledge.mode, 'learned');
-      assert.equal(rv.knowledge.learn.consumeOnLearn, false);
+      await store.updateRecipeItemCaps('book-1', { learn: { limitRecipes: true, maxRecipes: 4 } });
+
+      assert.ok(updateCall !== null);
+      assert.equal(updateCall.systemId, 'sys1');
+      assert.equal(updateCall.recipeItemId, 'book-1');
+      assert.deepEqual(updateCall.patch, { caps: { learn: { limitRecipes: true, maxRecipes: 4 } } });
     });
 
-    it('saveVisibilityConfig accepts canonical knowledge item and learn fields', async () => {
-      let updateArgs = null;
+    it('updateRecipeItemCaps is a no-op without a recipe item id', async () => {
+      let called = false;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.recipeVisibility = {
-          listMode: 'knowledge',
-          knowledge: {
-            mode: 'itemOrLearned',
-            item: { limitUses: false, destroyWhenExhausted: false },
-            learn: { consumeOnLearn: true, dragDropEnabled: true }
-          }
-        };
-      }
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateRecipeItemDefinition: async () => {
+          called = true;
+        },
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveVisibilityConfig({
-        listMode: 'knowledge',
-        knowledgeMode: 'itemOrLearned',
-        consumeOnLearn: false,
-        limitUses: true,
-        maxUses: 3,
-        destroyWhenExhausted: true,
-        dragDropEnabled: false
-      });
+      await store.updateRecipeItemCaps('', { item: { limitUses: true } });
 
-      const rv = updateArgs.updates.recipeVisibility;
-      assert.equal(rv.listMode, 'knowledge');
-      assert.equal(rv.knowledge.item.limitUses, true);
-      assert.equal(rv.knowledge.item.maxUses, 3);
-      assert.equal(rv.knowledge.item.destroyWhenExhausted, true);
-      assert.equal(rv.knowledge.learn.consumeOnLearn, false);
-      assert.equal(rv.knowledge.learn.dragDropEnabled, false);
+      assert.equal(called, false);
     });
   });
 
@@ -1809,11 +2803,18 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
-        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      const teaserConfig = { enabled: true, discoveryMode: 'fragments', fragments: [{ id: 'f1', name: 'Shard', progressValue: 50 }] };
+      const teaserConfig = {
+        enabled: true,
+        discoveryMode: 'fragments',
+        fragments: [{ id: 'f1', name: 'Shard', progressValue: 50 }],
+      };
       await store.saveTeaserConfig(teaserConfig);
       assert.ok(updateArgs !== null);
       assert.deepStrictEqual(updateArgs.updates.teaserConfig, teaserConfig);
@@ -1861,21 +2862,50 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
 
       const expectedKeys = [
-        'selectedSystemId', 'activeTab', 'recipeSearch', 'itemSearch',
+        'selectedSystemId',
+        'activeTab',
+        'recipeSearch',
+        'itemSearch',
         'viewState',
-        'selectSystem', 'createSystem', 'deleteSystem', 'saveSystemDetails',
+        'selectSystem',
+        'createSystem',
+        'deleteSystem',
+        'saveSystemDetails',
         'setTab',
-        'toggleSystemEnabled', 'toggleFeature', 'toggleAdvancedOptions', 'toggleRequirement',
-        'addCategory', 'removeCategory',
-        'addTag', 'removeTag',
-        'addEssence', 'removeEssence',
-        'saveCraftingCheckConfig', 'saveCurrencyConfig', 'saveVisibilityConfig', 'saveTeaserConfig',
-        'deleteRecipe', 'duplicateRecipe', 'toggleRecipeEnabled',
-        'importRecipes', 'exportRecipes',
-        'exportSystem', 'importSystem',
-        'deleteComponent', 'updateComponent',
-        'setRecipeSearch', 'setItemSearch',
-        'refresh', 'destroy'
+        'toggleSystemEnabled',
+        'toggleFeature',
+        'toggleRequirement',
+        'addCategory',
+        'removeCategory',
+        'addTag',
+        'removeTag',
+        'addEssence',
+        'removeEssence',
+        'addCurrencyUnit',
+        'updateCurrencyUnit',
+        'deleteCurrencyUnit',
+        'addCurrencySubUnit',
+        'updateCurrencySubUnit',
+        'deleteCurrencySubUnit',
+        'setCurrencySpendStrategy',
+        'setCurrencyProvider',
+        'setCurrencyMacro',
+        'clearCurrencyMacro',
+        'seedCurrencyUnitPresets',
+        'saveTeaserConfig',
+        'deleteRecipe',
+        'duplicateRecipe',
+        'toggleRecipeEnabled',
+        'importRecipes',
+        'exportRecipes',
+        'exportSystem',
+        'importSystem',
+        'deleteComponent',
+        'updateComponent',
+        'setRecipeSearch',
+        'setItemSearch',
+        'refresh',
+        'destroy',
       ];
 
       for (const key of expectedKeys) {
@@ -1916,8 +2946,8 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
       assert.equal(vs.systems.length, 2, 'there should be 2 systems');
-      const selected = vs.systems.filter(s => s.selected === true);
-      const notSelected = vs.systems.filter(s => s.selected === false);
+      const selected = vs.systems.filter((s) => s.selected === true);
+      const notSelected = vs.systems.filter((s) => s.selected === false);
       assert.equal(selected.length, 1, 'exactly one system should be selected');
       assert.equal(selected[0].id, 'sys1', 'sys1 should be the selected system');
       assert.equal(notSelected.length, 1, 'the other system should have selected:false');
@@ -1931,11 +2961,25 @@ describe('createAdminStore', () => {
       const sys = vs.selectedSystem;
       assert.ok(sys !== null, 'selectedSystem should not be null');
       const requiredKeys = [
-        'id', 'name', 'description', 'enabled', 'advancedOptionsEnabled', 'features',
-        'categories', 'itemTags', 'essenceDefinitions', 'managedItemOptions',
-        'requirements', 'craftingCheck', 'recipeVisibility',
-        'showRecipeVisibilityKnowledgeOptions', 'showRecipeVisibilityPlayerNote',
-        'showTags', 'showEssences', 'availableScriptMacros', 'sceneOptions', 'rollTableOptions'
+        'id',
+        'name',
+        'description',
+        'enabled',
+        'features',
+        'categories',
+        'itemTags',
+        'essenceDefinitions',
+        'managedItemOptions',
+        'componentTagOptions',
+        'requirements',
+        'craftingCheck',
+        'recipeVisibility',
+        'showRecipeVisibilityKnowledgeOptions',
+        'showRecipeVisibilityPlayerNote',
+        'showTags',
+        'showEssences',
+        'availableScriptMacros',
+        'sceneOptions',
       ];
       for (const key of requiredKeys) {
         assert.ok(key in sys, `selectedSystem should have key: ${key}`);
@@ -1949,14 +2993,57 @@ describe('createAdminStore', () => {
       const vs = get(store.viewState);
       const features = vs.selectedSystem?.features;
       assert.ok(features, 'features should exist');
-      assert.ok(!('complexRecipes' in features), 'complexRecipes is no longer a normalized feature (#102)');
+      assert.ok(
+        !('complexRecipes' in features),
+        'complexRecipes is no longer a normalized feature (#102)'
+      );
       for (const key of [
-        'recipeCategories', 'itemTags', 'essences',
-        'multiStepRecipes', 'propertyMacros', 'craftingChecks',
-        'outcomeRouting', 'effectTransfer', 'gathering'
+        'recipeCategories',
+        'itemTags',
+        'essences',
+        'multiStepRecipes',
+        'propertyMacros',
+        'craftingChecks',
+        'outcomeRouting',
+        'effectTransfer',
+        'gathering',
+        'salvage',
       ]) {
         assert.ok(key in features, `features should have key: ${key}`);
       }
+    });
+
+    it('viewState.selectedSystem.features.salvage reflects the stored value (salvage is optional)', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      // Salvage is now an opt-out feature: an explicit salvage:false projects as off.
+      if (sys) sys.features = { ...sys.features, salvage: false };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.equal(vs.selectedSystem?.features.salvage, false);
+    });
+
+    it('viewState.selectedSystem.salvageCraftingCheck surfaces the routed config so editors read it back', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) {
+        sys.salvageResolutionMode = 'routed';
+        sys.salvageCraftingCheck = {
+          enabled: true,
+          routed: {
+            type: 'relative',
+            rollFormula: '1d20',
+            relativeOutcomes: [{ id: 'o1', name: 'Clean Salvage', success: true, dc: 5 }],
+          },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      const routed = vs.selectedSystem?.salvageCraftingCheck?.routed;
+      assert.ok(routed, 'routed salvage config should be surfaced, not dropped');
+      assert.equal(routed.relativeOutcomes?.[0]?.name, 'Clean Salvage');
     });
 
     it('viewState.selectedSystem.features preserves gathering when enabled', async () => {
@@ -1979,7 +3066,8 @@ describe('createAdminStore', () => {
           let id = 0;
           return () => `gid-${++id}`;
         })(),
-        localize: (key) => key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask' ? 'New Gathering Task' : key
+        localize: (key) =>
+          key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask' ? 'New Gathering Task' : key,
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -1995,13 +3083,13 @@ describe('createAdminStore', () => {
         biomes: ['forest'],
         weather: ['rain'],
         timeOfDay: ['night'],
-        dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 2, dropRate: 80 }]
+        dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 2, dropRate: 80 }],
       });
       const event = await store.addGatheringLibraryEvent('sys1');
       await store.updateGatheringLibraryEvent('sys1', event.id, {
         name: 'Thorns',
         dangerTags: ['hazardous'],
-        dropRate: 30
+        dropRate: 30,
       });
 
       const config = services._store.gatheringConfig;
@@ -2016,8 +3104,8 @@ describe('createAdminStore', () => {
           { id: 'storm', label: 'Storm', icon: 'fas fa-bolt' },
           { id: 'snow', label: 'Snow', icon: 'fas fa-snowflake' },
           { id: 'fog', label: 'Fog', icon: 'fas fa-smog' },
-          { id: 'wind', label: 'Wind', icon: 'fas fa-wind' }
-        ]
+          { id: 'wind', label: 'Wind', icon: 'fas fa-wind' },
+        ],
       });
       assert.deepEqual(config.systems.sys1.conditions.timeOfDay, {
         enabled: true,
@@ -2026,8 +3114,8 @@ describe('createAdminStore', () => {
           { id: 'dawn', label: 'Dawn', icon: 'fas fa-cloud-sun' },
           { id: 'day', label: 'Day', icon: 'fas fa-sun' },
           { id: 'dusk', label: 'Dusk', icon: 'fas fa-cloud-moon' },
-          { id: 'night', label: 'Night', icon: 'fas fa-moon' }
-        ]
+          { id: 'night', label: 'Night', icon: 'fas fa-moon' },
+        ],
       });
       // Region is no longer a composition vocabulary; it is geography (GatheringRegion).
       assert.equal('regions' in config.vocabularies, false);
@@ -2041,19 +3129,23 @@ describe('createAdminStore', () => {
         dropRate: 80,
         conditionModifiers: { timeOfDay: [], weather: [], biome: [] },
         characterModifiers: [],
-        enabled: true
+        enabled: true,
       });
       assert.equal(config.systems.sys1.events[0].name, 'Thorns');
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.events[0].dropRate, 30);
+      // An event with no custom image is stamped with the shared default.
+      assert.equal(config.systems.sys1.events[0].img, DEFAULT_GATHERING_EVENT_IMG);
     });
 
     it('auto-populates default task name and image when the first drop row receives a component', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask')
+            return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate')
+            return 'Gather {component}';
           return key;
-        }
+        },
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2064,7 +3156,7 @@ describe('createAdminStore', () => {
       const task = await store.addGatheringLibraryTask('sys1');
 
       await store.updateGatheringLibraryTask('sys1', task.id, {
-        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }],
       });
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
@@ -2075,10 +3167,12 @@ describe('createAdminStore', () => {
     it('does not auto-populate the task name and image when the task name has been customized', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask')
+            return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate')
+            return 'Gather {component}';
           return key;
-        }
+        },
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2090,12 +3184,12 @@ describe('createAdminStore', () => {
       await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Forage Roots' });
 
       await store.updateGatheringLibraryTask('sys1', task.id, {
-        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }],
       });
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(persisted.name, 'Forage Roots');
-      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+      assert.equal(persisted.img, DEFAULT_GATHERING_TASK_IMG);
     });
 
     it('normalizes defaultEnvironmentId (trimmed string or null) and round-trips it', async () => {
@@ -2107,15 +3201,46 @@ describe('createAdminStore', () => {
       const task = await store.addGatheringLibraryTask('sys1');
 
       // A fresh task defaults to null (ask on drop).
-      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId, null);
+      assert.equal(
+        services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId,
+        null
+      );
 
       // A trimmed id round-trips through persistence.
-      await store.updateGatheringLibraryTask('sys1', task.id, { defaultEnvironmentId: '  env-7  ' });
-      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId, 'env-7');
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        defaultEnvironmentId: '  env-7  ',
+      });
+      assert.equal(
+        services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId,
+        'env-7'
+      );
 
       // An empty/whitespace id normalizes back to null (not the empty string).
       await store.updateGatheringLibraryTask('sys1', task.id, { defaultEnvironmentId: '   ' });
-      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId, null);
+      assert.equal(
+        services._store.gatheringConfig.systems.sys1.tasks[0].defaultEnvironmentId,
+        null
+      );
+    });
+
+    it('persists a per-task gathering DC override (finite truncates, else null)', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      // A fresh task defaults to null (use the system-level default DC).
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dcOverride, null);
+
+      // A finite override round-trips, truncated to an integer.
+      await store.updateGatheringLibraryTask('sys1', task.id, { dcOverride: '17.9' });
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dcOverride, 17);
+
+      // A non-numeric override normalizes back to null.
+      await store.updateGatheringLibraryTask('sys1', task.id, { dcOverride: 'nope' });
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dcOverride, null);
     });
 
     it('persists depletedBehavior swap-image on the node config (legacy deleteToken dropped)', async () => {
@@ -2127,7 +3252,11 @@ describe('createAdminStore', () => {
       const task = await store.addGatheringLibraryTask('sys1');
 
       await store.updateGatheringLibraryTask('sys1', task.id, {
-        nodes: { enabled: true, max: 3, depletedBehavior: { swapImage: '  icons/x.webp ', postfixName: true } }
+        nodes: {
+          enabled: true,
+          max: 3,
+          depletedBehavior: { swapImage: '  icons/x.webp ', postfixName: true },
+        },
       });
       assert.deepEqual(
         services._store.gatheringConfig.systems.sys1.tasks[0].nodes.depletedBehavior,
@@ -2136,7 +3265,11 @@ describe('createAdminStore', () => {
 
       // The removed deleteToken flag is ignored; only the swap-image survives.
       await store.updateGatheringLibraryTask('sys1', task.id, {
-        nodes: { enabled: true, max: 3, depletedBehavior: { deleteToken: true, swapImage: 'icons/y.webp' } }
+        nodes: {
+          enabled: true,
+          max: 3,
+          depletedBehavior: { deleteToken: true, swapImage: 'icons/y.webp' },
+        },
       });
       assert.deepEqual(
         services._store.gatheringConfig.systems.sys1.tasks[0].nodes.depletedBehavior,
@@ -2147,10 +3280,12 @@ describe('createAdminStore', () => {
     it('does not auto-populate the task name and image when the task image has been customized', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask')
+            return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate')
+            return 'Gather {component}';
           return key;
-        }
+        },
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2162,7 +3297,7 @@ describe('createAdminStore', () => {
       await store.updateGatheringLibraryTask('sys1', task.id, { img: 'icons/svg/leaf.svg' });
 
       await store.updateGatheringLibraryTask('sys1', task.id, {
-        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }],
       });
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
@@ -2173,31 +3308,36 @@ describe('createAdminStore', () => {
     it('does not auto-populate the task name and image when a second drop row receives a component', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask')
+            return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate')
+            return 'Gather {component}';
           return key;
-        }
+        },
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
       sys.components = [
         { id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' },
-        { id: 'gem', name: 'Rough Gem', img: 'icons/gem.png' }
+        { id: 'gem', name: 'Rough Gem', img: 'icons/gem.png' },
       ];
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const task = await store.addGatheringLibraryTask('sys1');
-      await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Mining Run', img: 'icons/pickaxe.png' });
       await store.updateGatheringLibraryTask('sys1', task.id, {
-        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+        name: 'Mining Run',
+        img: 'icons/pickaxe.png',
+      });
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }],
       });
 
       await store.updateGatheringLibraryTask('sys1', task.id, {
         dropRows: [
           { id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 },
-          { id: 'drop-b', componentId: 'gem', quantity: 1, dropRate: 10 }
-        ]
+          { id: 'drop-b', componentId: 'gem', quantity: 1, dropRate: 10 },
+        ],
       });
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
@@ -2208,10 +3348,12 @@ describe('createAdminStore', () => {
     it('does not auto-populate the task name and image when an empty drop row is added', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask')
+            return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate')
+            return 'Gather {component}';
           return key;
-        }
+        },
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2222,12 +3364,12 @@ describe('createAdminStore', () => {
       const task = await store.addGatheringLibraryTask('sys1');
 
       await store.updateGatheringLibraryTask('sys1', task.id, {
-        dropRows: [{ id: 'drop-a', componentId: '', quantity: 1, dropRate: 50 }]
+        dropRows: [{ id: 'drop-a', componentId: '', quantity: 1, dropRate: 50 }],
       });
 
       const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(persisted.name, 'New Gathering Task');
-      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+      assert.equal(persisted.img, DEFAULT_GATHERING_TASK_IMG);
     });
 
     it('duplicates gathering tasks with fresh task and drop ids', async () => {
@@ -2236,35 +3378,53 @@ describe('createAdminStore', () => {
           let id = 0;
           return () => `copy-id-${++id}`;
         })(),
-        localize: (key) => key === 'FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix' ? 'Copy' : key
+        localize: (key) =>
+          key === 'FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix' ? 'Copy' : key,
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            tasks: [{
-              id: 'task-herbs',
-              name: 'Moon Herbs',
-              description: 'Gather under old trees.',
-              enabled: true,
-              region: 'north',
-              biomes: ['forest'],
-              weather: ['clear'],
-              timeOfDay: ['night'],
-              dropRows: [
-                { id: 'drop-a', componentId: 'herb', quantity: 2, dropRate: 80, conditionModifiers: { weather: [{ id: 'rain-bonus', conditionId: 'rain', value: 10 }] }, enabled: true },
-                { id: 'drop-b', itemUuid: 'Item.random', quantity: 1, dropRate: 20, enabled: false }
-              ],
-              staminaCost: 1,
-              gatheringModifier: { provider: 'macro', macroUuid: 'Macro.mod' },
-              timeRequirement: { hours: 1 }
-            }]
+            tasks: [
+              {
+                id: 'task-herbs',
+                name: 'Moon Herbs',
+                description: 'Gather under old trees.',
+                enabled: true,
+                region: 'north',
+                biomes: ['forest'],
+                weather: ['clear'],
+                timeOfDay: ['night'],
+                dropRows: [
+                  {
+                    id: 'drop-a',
+                    componentId: 'herb',
+                    quantity: 2,
+                    dropRate: 80,
+                    conditionModifiers: {
+                      weather: [{ id: 'rain-bonus', conditionId: 'rain', value: 10 }],
+                    },
+                    enabled: true,
+                  },
+                  {
+                    id: 'drop-b',
+                    itemUuid: 'Item.random',
+                    quantity: 1,
+                    dropRate: 20,
+                    enabled: false,
+                  },
+                ],
+                staminaCost: 1,
+                gatheringModifier: { provider: 'macro', macroUuid: 'Macro.mod' },
+                timeRequirement: { hours: 1 },
+              },
+            ],
           },
           sys2: {
-            tasks: [{ id: 'task-other', name: 'Other System', dropRows: [{ id: 'drop-other' }] }]
-          }
-        }
+            tasks: [{ id: 'task-other', name: 'Other System', dropRows: [{ id: 'drop-other' }] }],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -2274,7 +3434,10 @@ describe('createAdminStore', () => {
       const sys1Tasks = services._store.gatheringConfig.systems.sys1.tasks;
       assert.equal(duplicate.id, 'copy-id-1');
       assert.equal(duplicate.name, 'Moon Herbs (Copy)');
-      assert.deepEqual(duplicate.dropRows.map(row => row.id), ['copy-id-2', 'copy-id-3']);
+      assert.deepEqual(
+        duplicate.dropRows.map((row) => row.id),
+        ['copy-id-2', 'copy-id-3']
+      );
       // Region is no longer a composition axis: legacy `region`/`regions` input is
       // dropped by the task normalizer (not carried onto the record).
       assert.equal('regions' in duplicate, false);
@@ -2285,11 +3448,17 @@ describe('createAdminStore', () => {
       assert.deepEqual(duplicate.gatheringModifier, { provider: 'macro', macroUuid: 'Macro.mod' });
       assert.deepEqual(duplicate.timeRequirement, { hours: 1 });
       assert.equal(sys1Tasks.length, 2);
-      assert.deepEqual(sys1Tasks[0].dropRows.map(row => row.id), ['drop-a', 'drop-b']);
+      assert.deepEqual(
+        sys1Tasks[0].dropRows.map((row) => row.id),
+        ['drop-a', 'drop-b']
+      );
       assert.equal(services._store.gatheringConfig.systems.sys2.tasks.length, 1);
       assert.equal(services._store.gatheringConfig.systems.sys2.tasks[0].id, 'task-other');
       assert.equal(services._store.gatheringConfig.systems.sys2.tasks[0].name, 'Other System');
-      assert.deepEqual(services._store.gatheringConfig.systems.sys2.tasks[0].dropRows.map(row => row.id), ['drop-other']);
+      assert.deepEqual(
+        services._store.gatheringConfig.systems.sys2.tasks[0].dropRows.map((row) => row.id),
+        ['drop-other']
+      );
       duplicate.dropRows[0].quantity = 99;
       duplicate.dropRows[0].conditionModifiers.weather[0].value = 50;
       assert.equal(sys1Tasks[0].dropRows[0].quantity, 2);
@@ -2310,16 +3479,18 @@ describe('createAdminStore', () => {
       await store.updateGatheringLibraryTask('sys1', task.id, {
         weather: ['rain'],
         timeOfDay: [],
-        dropRows: [{
-          id: 'drop-zero',
-          componentId: 'herb',
-          quantity: 3,
-          dropRate: 0,
-          conditionModifiers: {
-            weather: [{ id: 'rain-bonus', conditionId: 'Rain', value: 15 }],
-            timeOfDay: [{ id: 'night-penalty', conditionId: 'night', value: -5 }]
-          }
-        }]
+        dropRows: [
+          {
+            id: 'drop-zero',
+            componentId: 'herb',
+            quantity: 3,
+            dropRate: 0,
+            conditionModifiers: {
+              weather: [{ id: 'rain-bonus', conditionId: 'Rain', value: 15 }],
+              timeOfDay: [{ id: 'night-penalty', conditionId: 'night', value: -5 }],
+            },
+          },
+        ],
       });
 
       const saved = services._store.gatheringConfig.systems.sys1.tasks[0];
@@ -2329,7 +3500,7 @@ describe('createAdminStore', () => {
       assert.deepEqual(saved.dropRows[0].conditionModifiers, {
         timeOfDay: [{ id: 'night-penalty', conditionId: 'night', operator: '-', value: 5 }],
         weather: [{ id: 'rain-bonus', conditionId: 'rain', operator: '+', value: 15 }],
-        biome: []
+        biome: [],
       });
     });
 
@@ -2358,25 +3529,36 @@ describe('createAdminStore', () => {
       const empty = store.validateGatheringLibraryTask({ id: 't1', name: 'Gather', dropRows: [] });
       assert.equal(empty.valid, false);
       assert.ok(
-        empty.errors.some(error => error.includes('requires at least one drop row')),
+        empty.errors.some((error) => error.includes('requires at least one drop row')),
         `expected "requires at least one drop row" in errors: ${empty.errors.join(' | ')}`
       );
 
       const unresolved = store.validateGatheringLibraryTask({
         id: 't2',
         name: 'Gather',
-        dropRows: [{ id: 'row-1', componentId: '', itemUuid: '', quantity: 1, dropRate: 50, enabled: true }]
+        dropRows: [
+          { id: 'row-1', componentId: '', itemUuid: '', quantity: 1, dropRate: 50, enabled: true },
+        ],
       });
       assert.equal(unresolved.valid, false);
       assert.ok(
-        unresolved.errors.some(error => error.includes('requires componentId or itemUuid')),
+        unresolved.errors.some((error) => error.includes('requires componentId or itemUuid')),
         `expected "requires componentId or itemUuid" in errors: ${unresolved.errors.join(' | ')}`
       );
 
       const resolved = store.validateGatheringLibraryTask({
         id: 't3',
         name: 'Gather',
-        dropRows: [{ id: 'row-1', componentId: 'herb', itemUuid: '', quantity: 1, dropRate: 50, enabled: true }]
+        dropRows: [
+          {
+            id: 'row-1',
+            componentId: 'herb',
+            itemUuid: '',
+            quantity: 1,
+            dropRate: 50,
+            enabled: true,
+          },
+        ],
       });
       assert.equal(resolved.valid, true);
       assert.deepEqual(resolved.errors, []);
@@ -2384,32 +3566,65 @@ describe('createAdminStore', () => {
       const staleComponent = store.validateGatheringLibraryTask({
         id: 't-stale',
         name: 'Gather',
-        dropRows: [{ id: 'row-stale', componentId: 'missing-herb', itemUuid: '', quantity: 1, dropRate: 50, enabled: true }]
+        dropRows: [
+          {
+            id: 'row-stale',
+            componentId: 'missing-herb',
+            itemUuid: '',
+            quantity: 1,
+            dropRate: 50,
+            enabled: true,
+          },
+        ],
       });
       assert.equal(staleComponent.valid, false);
       assert.ok(
-        staleComponent.errors.some(error => error.includes('missing-herb') && error.includes('unknown componentId')),
+        staleComponent.errors.some(
+          (error) => error.includes('missing-herb') && error.includes('unknown componentId')
+        ),
         `expected stale component to be rejected: ${staleComponent.errors.join(' | ')}`
       );
 
       const originalFromUuidSync = globalThis.fromUuidSync;
-      globalThis.fromUuidSync = (uuid) => uuid === 'Item.valid-reward' ? { documentName: 'Item' } : null;
+      globalThis.fromUuidSync = (uuid) =>
+        uuid === 'Item.valid-reward' ? { documentName: 'Item' } : null;
       try {
         const staleItem = store.validateGatheringLibraryTask({
           id: 't-stale-item',
           name: 'Gather',
-          dropRows: [{ id: 'row-item', componentId: '', itemUuid: 'Item.missing-reward', quantity: 1, dropRate: 50, enabled: true }]
+          dropRows: [
+            {
+              id: 'row-item',
+              componentId: '',
+              itemUuid: 'Item.missing-reward',
+              quantity: 1,
+              dropRate: 50,
+              enabled: true,
+            },
+          ],
         });
         assert.equal(staleItem.valid, false);
         assert.ok(
-          staleItem.errors.some(error => error.includes('Item.missing-reward') && error.includes('does not resolve to an Item')),
+          staleItem.errors.some(
+            (error) =>
+              error.includes('Item.missing-reward') && error.includes('does not resolve to an Item')
+          ),
           `expected stale item UUID to be rejected: ${staleItem.errors.join(' | ')}`
         );
 
         const validItem = store.validateGatheringLibraryTask({
           id: 't-valid-item',
           name: 'Gather',
-          dropRows: [{ id: 'row-item', componentId: '', itemUuid: 'Item.valid-reward', quantity: 1, dropRate: 50, enabled: true }]
+          dropRows: [
+            {
+              id: 'row-item',
+              componentId: '',
+              itemUuid: 'Item.valid-reward',
+              quantity: 1,
+              dropRate: 50,
+              enabled: true,
+            },
+          ],
         });
         assert.equal(validItem.valid, true);
       } finally {
@@ -2420,14 +3635,21 @@ describe('createAdminStore', () => {
         id: 't4',
         name: 'Gather',
         dropRows: [
-          { id: 'row-1', componentId: 'herb', itemUuid: '', quantity: 1, dropRate: 50, enabled: true },
-          { id: 'row-2', componentId: '', itemUuid: '', quantity: 1, dropRate: 25, enabled: false }
-        ]
+          {
+            id: 'row-1',
+            componentId: 'herb',
+            itemUuid: '',
+            quantity: 1,
+            dropRate: 50,
+            enabled: true,
+          },
+          { id: 'row-2', componentId: '', itemUuid: '', quantity: 1, dropRate: 25, enabled: false },
+        ],
       });
       assert.equal(enabledResolvedPlusDisabledUnresolved.valid, false);
       assert.ok(
-        enabledResolvedPlusDisabledUnresolved.errors.some(error =>
-          error.includes('row-2') && error.includes('requires componentId or itemUuid')
+        enabledResolvedPlusDisabledUnresolved.errors.some(
+          (error) => error.includes('row-2') && error.includes('requires componentId or itemUuid')
         ),
         `expected disabled unresolved row to be rejected: ${enabledResolvedPlusDisabledUnresolved.errors.join(' | ')}`
       );
@@ -2435,7 +3657,9 @@ describe('createAdminStore', () => {
 
     it('does not persist gathering library task drops with stale reward targets', async () => {
       const errors = [];
-      const services = createMockServices({ notify: { info: () => {}, warn: () => {}, error: (message) => errors.push(message) } });
+      const services = createMockServices({
+        notify: { info: () => {}, warn: () => {}, error: (message) => errors.push(message) },
+      });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
       sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
@@ -2444,12 +3668,12 @@ describe('createAdminStore', () => {
       const task = await store.addGatheringLibraryTask('sys1');
 
       const saved = await store.updateGatheringLibraryTask('sys1', task.id, {
-        dropRows: [{ id: 'row-stale', componentId: 'missing-herb', quantity: 1, dropRate: 50 }]
+        dropRows: [{ id: 'row-stale', componentId: 'missing-herb', quantity: 1, dropRate: 50 }],
       });
 
       assert.equal(saved, false);
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dropRows.length, 0);
-      assert.ok(errors.some(error => error.includes('missing-herb')));
+      assert.ok(errors.some((error) => error.includes('missing-herb')));
     });
 
     it('returns null when duplicating a missing gathering task', async () => {
@@ -2457,9 +3681,9 @@ describe('createAdminStore', () => {
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            tasks: [{ id: 'task-herbs', name: 'Moon Herbs', dropRows: [] }]
-          }
-        }
+            tasks: [{ id: 'task-herbs', name: 'Moon Herbs', dropRows: [] }],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -2475,32 +3699,35 @@ describe('createAdminStore', () => {
           let id = 0;
           return () => `event-copy-${++id}`;
         })(),
-        localize: (key) => key === 'FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix' ? 'Copy' : key
+        localize: (key) =>
+          key === 'FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix' ? 'Copy' : key,
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            events: [{
-              id: 'event-thorns',
-              name: 'Thornwall',
-              description: 'Vicious thicket.',
-              enabled: true,
-              dangerTags: ['hazardous'],
-              regions: ['north'],
-              biomes: ['forest'],
-              weather: ['rain'],
-              timeOfDay: ['night'],
-              dropRate: 35,
-              eventModifier: { provider: 'macro', macroUuid: 'Macro.thorn' },
-              characterModifiers: []
-            }]
+            events: [
+              {
+                id: 'event-thorns',
+                name: 'Thornwall',
+                description: 'Vicious thicket.',
+                enabled: true,
+                dangerTags: ['hazardous'],
+                regions: ['north'],
+                biomes: ['forest'],
+                weather: ['rain'],
+                timeOfDay: ['night'],
+                dropRate: 35,
+                eventModifier: { provider: 'macro', macroUuid: 'Macro.thorn' },
+                characterModifiers: [],
+              },
+            ],
           },
           sys2: {
-            events: [{ id: 'event-other', name: 'Other Event', dropRate: 10 }]
-          }
-        }
+            events: [{ id: 'event-other', name: 'Other Event', dropRate: 10 }],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -2529,15 +3756,18 @@ describe('createAdminStore', () => {
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            events: [{ id: 'event-thorns', name: 'Thornwall', dropRate: 25 }]
-          }
-        }
+            events: [{ id: 'event-thorns', name: 'Thornwall', dropRate: 25 }],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
       assert.equal(await store.duplicateGatheringLibraryEvent('sys1', 'missing'), null);
-      assert.equal(await store.duplicateGatheringLibraryEvent('missing-system', 'event-thorns'), null);
+      assert.equal(
+        await store.duplicateGatheringLibraryEvent('missing-system', 'event-thorns'),
+        null
+      );
       assert.equal(services._store.gatheringConfig.systems.sys1.events.length, 1);
     });
 
@@ -2550,20 +3780,52 @@ describe('createAdminStore', () => {
           sys1: {
             conditions: {
               weather: { enabled: true, current: 'rain', values: ['rain'] },
-              timeOfDay: { enabled: true, current: 'night', values: ['night', 'day'] }
+              timeOfDay: { enabled: true, current: 'night', values: ['night', 'day'] },
             },
-            tasks: [{ id: 'task-rain', name: 'Rain', weather: ['rain'], timeOfDay: ['night'], dropRows: [] }],
-            events: [{ id: 'event-rain', name: 'Rain Event', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
+            tasks: [
+              {
+                id: 'task-rain',
+                name: 'Rain',
+                weather: ['rain'],
+                timeOfDay: ['night'],
+                dropRows: [],
+              },
+            ],
+            events: [
+              {
+                id: 'event-rain',
+                name: 'Rain Event',
+                weather: ['rain'],
+                timeOfDay: ['night'],
+                dropRate: 50,
+              },
+            ],
           },
           sys2: {
             conditions: {
               weather: { enabled: true, current: 'rain', values: ['rain'] },
-              timeOfDay: { enabled: true, current: 'night', values: ['night'] }
+              timeOfDay: { enabled: true, current: 'night', values: ['night'] },
             },
-            tasks: [{ id: 'task-other', name: 'Other', weather: ['rain'], timeOfDay: ['night'], dropRows: [] }],
-            events: [{ id: 'event-other', name: 'Other Event', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
-          }
-        }
+            tasks: [
+              {
+                id: 'task-other',
+                name: 'Other',
+                weather: ['rain'],
+                timeOfDay: ['night'],
+                dropRows: [],
+              },
+            ],
+            events: [
+              {
+                id: 'event-other',
+                name: 'Other Event',
+                weather: ['rain'],
+                timeOfDay: ['night'],
+                dropRate: 50,
+              },
+            ],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -2573,7 +3835,12 @@ describe('createAdminStore', () => {
       assert.equal(await store.deleteGatheringConditionValue('weather', 'rain', 'sys1'), true);
       await store.addGatheringConditionValue('weather', 'Ash Fall', 'sys1');
       await store.addGatheringConditionValue('weather', 'ash fall', 'sys1');
-      await store.updateGatheringConditionValue('weather', 'ash-fall', { label: 'Ashfall', icon: 'fas fa-volcano' }, 'sys1');
+      await store.updateGatheringConditionValue(
+        'weather',
+        'ash-fall',
+        { label: 'Ashfall', icon: 'fas fa-volcano' },
+        'sys1'
+      );
       await store.updateGatheringConditions({ weather: 'ash-fall', systemId: 'sys1' });
 
       const sys1 = services._store.gatheringConfig.systems.sys1;
@@ -2581,7 +3848,7 @@ describe('createAdminStore', () => {
       assert.deepEqual(sys1.conditions.weather, {
         enabled: false,
         current: 'ash-fall',
-        values: [{ id: 'ash-fall', label: 'Ashfall', icon: 'fas fa-volcano' }]
+        values: [{ id: 'ash-fall', label: 'Ashfall', icon: 'fas fa-volcano' }],
       });
       assert.deepEqual(sys1.tasks[0].weather, []);
       assert.deepEqual(sys1.events[0].weather, []);
@@ -2600,58 +3867,120 @@ describe('createAdminStore', () => {
               weather: {
                 enabled: true,
                 current: 'heavy-rain',
-                values: [{ id: 'heavy-rain', label: 'Heavy Rain', icon: 'fas fa-cloud-showers-heavy' }]
+                values: [
+                  { id: 'heavy-rain', label: 'Heavy Rain', icon: 'fas fa-cloud-showers-heavy' },
+                ],
               },
               timeOfDay: {
                 enabled: true,
                 current: 'night',
-                values: [{ id: 'night', label: 'Night', icon: 'fas fa-moon' }]
-              }
+                values: [{ id: 'night', label: 'Night', icon: 'fas fa-moon' }],
+              },
             },
-            tasks: [{ id: 'task-rain', name: 'Rain', weather: ['heavy-rain'], timeOfDay: ['night'], dropRows: [] }],
-            events: [{ id: 'event-rain', name: 'Rain Event', weather: ['heavy-rain'], timeOfDay: ['night'], dropRate: 50 }]
+            tasks: [
+              {
+                id: 'task-rain',
+                name: 'Rain',
+                weather: ['heavy-rain'],
+                timeOfDay: ['night'],
+                dropRows: [],
+              },
+            ],
+            events: [
+              {
+                id: 'event-rain',
+                name: 'Rain Event',
+                weather: ['heavy-rain'],
+                timeOfDay: ['night'],
+                dropRate: 50,
+              },
+            ],
           },
           sys2: {
             conditions: {
               weather: {
                 enabled: true,
                 current: 'heavy-rain',
-                values: [{ id: 'heavy-rain', label: 'Heavy Rain', icon: 'fas fa-cloud-showers-heavy' }]
+                values: [
+                  { id: 'heavy-rain', label: 'Heavy Rain', icon: 'fas fa-cloud-showers-heavy' },
+                ],
               },
               timeOfDay: {
                 enabled: true,
                 current: 'night',
-                values: [{ id: 'night', label: 'Night', icon: 'fas fa-moon' }]
-              }
+                values: [{ id: 'night', label: 'Night', icon: 'fas fa-moon' }],
+              },
             },
-            tasks: [{ id: 'task-other', name: 'Other', weather: ['heavy-rain'], timeOfDay: ['night'], dropRows: [] }],
-            events: [{ id: 'event-other', name: 'Other Event', weather: ['heavy-rain'], timeOfDay: ['night'], dropRate: 50 }]
-          }
-        }
+            tasks: [
+              {
+                id: 'task-other',
+                name: 'Other',
+                weather: ['heavy-rain'],
+                timeOfDay: ['night'],
+                dropRows: [],
+              },
+            ],
+            events: [
+              {
+                id: 'event-other',
+                name: 'Other Event',
+                weather: ['heavy-rain'],
+                timeOfDay: ['night'],
+                dropRate: 50,
+              },
+            ],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      assert.equal(await store.updateGatheringConditionValue('weather', 'heavy-rain', { label: 'Storm Rain' }, 'sys1'), true);
-      assert.equal(await store.updateGatheringConditionValue('weather', 'heavy-rain', { label: '   ' }, 'sys1'), true);
+      assert.equal(
+        await store.updateGatheringConditionValue(
+          'weather',
+          'heavy-rain',
+          { label: 'Storm Rain' },
+          'sys1'
+        ),
+        true
+      );
+      assert.equal(
+        await store.updateGatheringConditionValue(
+          'weather',
+          'heavy-rain',
+          { label: '   ' },
+          'sys1'
+        ),
+        true
+      );
 
       const sys1 = services._store.gatheringConfig.systems.sys1;
       assert.deepEqual(sys1.conditions.weather, {
         enabled: true,
         current: 'heavy-rain',
-        values: [{ id: 'heavy-rain', label: 'Storm Rain', icon: 'fas fa-cloud-showers-heavy' }]
+        values: [{ id: 'heavy-rain', label: 'Storm Rain', icon: 'fas fa-cloud-showers-heavy' }],
       });
       assert.deepEqual(sys1.tasks[0].weather, ['heavy-rain']);
       assert.deepEqual(sys1.events[0].weather, ['heavy-rain']);
 
-      assert.equal(await store.deleteGatheringConditionValue('weather', 'heavy-rain', 'sys1'), false);
+      assert.equal(
+        await store.deleteGatheringConditionValue('weather', 'heavy-rain', 'sys1'),
+        false
+      );
       await store.toggleGatheringConditionEnabled('weather', false, 'sys1');
-      assert.equal(await store.deleteGatheringConditionValue('weather', 'heavy-rain', 'sys1'), true);
+      assert.equal(
+        await store.deleteGatheringConditionValue('weather', 'heavy-rain', 'sys1'),
+        true
+      );
 
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].weather, []);
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.events[0].weather, []);
-      assert.deepEqual(services._store.gatheringConfig.systems.sys2.tasks[0].weather, ['heavy-rain']);
-      assert.deepEqual(services._store.gatheringConfig.systems.sys2.events[0].weather, ['heavy-rain']);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys2.tasks[0].weather, [
+        'heavy-rain',
+      ]);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys2.events[0].weather, [
+        'heavy-rain',
+      ]);
     });
 
     it('normalizes and edits selected-system region and biome vocabularies', async () => {
@@ -2663,28 +3992,59 @@ describe('createAdminStore', () => {
           biomes: ['forest'],
           danger: ['safe'],
           weather: ['clear'],
-          timeOfDay: ['day']
+          timeOfDay: ['day'],
         },
         systems: {
           sys1: {
             tasks: [{ id: 'task-forest', name: 'Forest', biomes: ['forest'], dropRows: [] }],
-            events: [{ id: 'event-forest', name: 'Forest Event', biomes: ['forest'], dropRate: 50 }]
-          }
-        }
+            events: [
+              { id: 'event-forest', name: 'Forest Event', biomes: ['forest'], dropRate: 50 },
+            ],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
       // Region is no longer a composition vocabulary dimension.
-      assert.equal('regions' in get(store.viewState).gatheringConfig.systems.sys1.vocabularies, false);
-      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes.values, [
-        { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
-      ]);
+      assert.equal(
+        'regions' in get(store.viewState).gatheringConfig.systems.sys1.vocabularies,
+        false
+      );
+      assert.deepEqual(
+        get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes.values,
+        [
+          {
+            id: 'forest',
+            label: 'Forest',
+            icon: 'fas fa-tree',
+            colorToken: 'sage',
+            customColor: '',
+          },
+        ]
+      );
 
       // The regions dimension is rejected by the vocabulary actions.
-      assert.equal(await store.addGatheringVocabularyValue('regions', 'South Coast', 'sys1'), false);
-      await store.addGatheringVocabularyValue('biomes', { label: 'Crystal Cavern', icon: 'fas fa-gem', colorToken: 'mist', customColor: '#88aaff' }, 'sys1');
-      await store.updateGatheringVocabularyValue('biomes', 'crystal cavern', { label: 'Crystal Caves', icon: 'fas fa-mountain', colorToken: '--fab-tag-lavender', customColor: 'bad' }, 'sys1');
+      assert.equal(
+        await store.addGatheringVocabularyValue('regions', 'South Coast', 'sys1'),
+        false
+      );
+      await store.addGatheringVocabularyValue(
+        'biomes',
+        { label: 'Crystal Cavern', icon: 'fas fa-gem', colorToken: 'mist', customColor: '#88aaff' },
+        'sys1'
+      );
+      await store.updateGatheringVocabularyValue(
+        'biomes',
+        'crystal cavern',
+        {
+          label: 'Crystal Caves',
+          icon: 'fas fa-mountain',
+          colorToken: '--fab-tag-lavender',
+          customColor: 'bad',
+        },
+        'sys1'
+      );
 
       const vocabularies = services._store.gatheringConfig.systems.sys1.vocabularies;
       assert.equal('regions' in vocabularies, false);
@@ -2693,7 +4053,7 @@ describe('createAdminStore', () => {
         label: 'Crystal Caves',
         icon: 'fas fa-mountain',
         colorToken: 'lavender',
-        customColor: ''
+        customColor: '',
       });
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].biomes, ['forest']);
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.events[0].biomes, ['forest']);
@@ -2705,22 +4065,47 @@ describe('createAdminStore', () => {
       sys.features = { gathering: true };
       services._store.gatheringConfig = {
         vocabularies: {
-          biomes: ['forest', 'mountain', 'swamp']
-        }
+          biomes: ['forest', 'mountain', 'swamp'],
+        },
       };
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const config = get(store.viewState).gatheringConfig;
 
-      assert.equal('regions' in config.vocabularies, false,
-        'region is no longer a composition vocabulary dimension');
+      assert.equal(
+        'regions' in config.vocabularies,
+        false,
+        'region is no longer a composition vocabulary dimension'
+      );
 
-      assert.deepEqual(config.vocabularies.biomes, [
-        { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
-        { id: 'mountain', label: 'Mountain', icon: 'fas fa-mountain', colorToken: 'mist', customColor: '' },
-        { id: 'swamp', label: 'Swamp', icon: 'fas fa-frog', colorToken: 'mauve', customColor: '' }
-      ], 'each default biome gets its own colour token, not a single flat fallback');
+      assert.deepEqual(
+        config.vocabularies.biomes,
+        [
+          {
+            id: 'forest',
+            label: 'Forest',
+            icon: 'fas fa-tree',
+            colorToken: 'sage',
+            customColor: '',
+          },
+          {
+            id: 'mountain',
+            label: 'Mountain',
+            icon: 'fas fa-mountain',
+            colorToken: 'mist',
+            customColor: '',
+          },
+          {
+            id: 'swamp',
+            label: 'Swamp',
+            icon: 'fas fa-frog',
+            colorToken: 'mauve',
+            customColor: '',
+          },
+        ],
+        'each default biome gets its own colour token, not a single flat fallback'
+      );
     });
 
     it('seeds default biomes/weather/timeOfDay at the top level when the persisted setting has none', async () => {
@@ -2733,25 +4118,40 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const config = get(store.viewState).gatheringConfig;
 
-      assert.equal('regions' in config.vocabularies, false,
-        'region is no longer a composition vocabulary dimension');
+      assert.equal(
+        'regions' in config.vocabularies,
+        false,
+        'region is no longer a composition vocabulary dimension'
+      );
 
-      const biomeIds = config.vocabularies.biomes.map(b => b.id);
+      const biomeIds = config.vocabularies.biomes.map((b) => b.id);
       assert.deepEqual(biomeIds, [
-        'forest', 'grassland', 'mountain', 'cave', 'coastal',
-        'swamp', 'desert', 'urban', 'ruins', 'wasteland'
+        'forest',
+        'grassland',
+        'mountain',
+        'cave',
+        'coastal',
+        'swamp',
+        'desert',
+        'urban',
+        'ruins',
+        'wasteland',
       ]);
-      const distinctColorTokens = new Set(config.vocabularies.biomes.map(b => b.colorToken));
-      assert.ok(distinctColorTokens.size >= 6,
-        'default biomes use multiple distinct colour tokens, not a single fallback');
+      const distinctColorTokens = new Set(config.vocabularies.biomes.map((b) => b.colorToken));
+      assert.ok(
+        distinctColorTokens.size >= 6,
+        'default biomes use multiple distinct colour tokens, not a single fallback'
+      );
 
-      const weatherLabels = config.vocabularies.weather.map(w => w.label);
-      assert.ok(weatherLabels.every(label => /^[A-Z]/.test(label)),
-        'every weather label starts with an uppercase letter');
-      const weatherIds = config.vocabularies.weather.map(w => w.id);
+      const weatherLabels = config.vocabularies.weather.map((w) => w.label);
+      assert.ok(
+        weatherLabels.every((label) => /^[A-Z]/.test(label)),
+        'every weather label starts with an uppercase letter'
+      );
+      const weatherIds = config.vocabularies.weather.map((w) => w.id);
       assert.deepEqual(weatherIds, ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']);
 
-      const timeOfDayLabels = config.vocabularies.timeOfDay.map(t => t.label);
+      const timeOfDayLabels = config.vocabularies.timeOfDay.map((t) => t.label);
       assert.deepEqual(timeOfDayLabels, ['Dawn', 'Day', 'Dusk', 'Night']);
     });
 
@@ -2759,18 +4159,18 @@ describe('createAdminStore', () => {
       const environmentUpdates = [];
       const environments = [
         { id: 'env-sys1', craftingSystemId: 'sys1', biomes: ['forest', 'swamp'] },
-        { id: 'env-sys2', craftingSystemId: 'sys2', biomes: ['forest'] }
+        { id: 'env-sys2', craftingSystemId: 'sys2', biomes: ['forest'] },
       ];
       const services = createMockServices({
         getGatheringEnvironmentStore: () => ({
           list: () => environments,
           update: async (id, updates) => {
             environmentUpdates.push([id, updates]);
-            const index = environments.findIndex(environment => environment.id === id);
+            const index = environments.findIndex((environment) => environment.id === id);
             if (index >= 0) environments[index] = { ...environments[index], ...updates };
             return environments[index];
-          }
-        })
+          },
+        }),
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2778,19 +4178,29 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             vocabularies: {
-              biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
+              biomes: {
+                values: [
+                  { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' },
+                ],
+              },
             },
             tasks: [{ id: 'task-forest', name: 'Forest', biomes: ['forest'], dropRows: [] }],
-            events: [{ id: 'event-forest', name: 'Forest Event', biomes: ['forest'], dropRate: 50 }]
+            events: [
+              { id: 'event-forest', name: 'Forest Event', biomes: ['forest'], dropRate: 50 },
+            ],
           },
           sys2: {
             vocabularies: {
-              biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
+              biomes: {
+                values: [
+                  { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' },
+                ],
+              },
             },
             tasks: [{ id: 'task-other', name: 'Other', biomes: ['forest'], dropRows: [] }],
-            events: [{ id: 'event-other', name: 'Other Event', biomes: ['forest'], dropRate: 50 }]
-          }
-        }
+            events: [{ id: 'event-other', name: 'Other Event', biomes: ['forest'], dropRate: 50 }],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -2806,7 +4216,10 @@ describe('createAdminStore', () => {
       assert.deepEqual(sys1.tasks[0].biomes, []);
       assert.deepEqual(sys1.events[0].biomes, []);
       assert.deepEqual(sys2.tasks[0].biomes, ['forest']);
-      assert.deepEqual(environmentUpdates.map(update => update[0]), ['env-sys1']);
+      assert.deepEqual(
+        environmentUpdates.map((update) => update[0]),
+        ['env-sys1']
+      );
       assert.deepEqual(environments[0].biomes, ['swamp']);
       assert.deepEqual(environments[1].biomes, ['forest']);
     });
@@ -2828,12 +4241,12 @@ describe('createAdminStore', () => {
               blindCandidateGate: 'not-a-gate',
               revealPolicy: 'not-a-policy',
               revealScope: 'not-a-scope',
-              eventVisibility: 'not-a-visibility'
+              eventVisibility: 'not-a-visibility',
             },
             tasks: [],
-            events: []
-          }
-        }
+            events: [],
+          },
+        },
       };
 
       const store = createAdminStore(services);
@@ -2851,7 +4264,7 @@ describe('createAdminStore', () => {
         revealPolicy: 'never',
         revealScope: 'actor',
         eventVisibility: 'encounterChance',
-        dropModifierMode: 'additive'
+        dropModifierMode: 'additive',
       });
 
       await store.updateGatheringRules('sys1', {
@@ -2863,7 +4276,7 @@ describe('createAdminStore', () => {
         blindCandidateGate: 'allMatching',
         revealPolicy: 'onAttempt',
         revealScope: 'global',
-        eventVisibility: 'full'
+        eventVisibility: 'full',
       });
 
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.rules, {
@@ -2878,9 +4291,12 @@ describe('createAdminStore', () => {
         revealPolicy: 'onAttempt',
         revealScope: 'global',
         eventVisibility: 'full',
-        dropModifierMode: 'additive'
+        dropModifierMode: 'additive',
       });
-      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
+      assert.deepEqual(
+        get(store.viewState).gatheringConfig.systems.sys1.rules,
+        services._store.gatheringConfig.systems.sys1.rules
+      );
     });
 
     it('issue 299: normalizes the global dropModifierMode and strips any per-reference/per-entry mode (defaults, unknown fallback, valid preserved, legacy key)', async () => {
@@ -2894,34 +4310,69 @@ describe('createAdminStore', () => {
             // Unknown system mode falls back to the additive default.
             rules: { dropModifierMode: 'bogus' },
             characterModifiers: [
-              { id: 'str', label: 'Str', icon: '', expression: '@abilities.str.mod' }
+              { id: 'str', label: 'Str', icon: '', expression: '@abilities.str.mod' },
             ],
-            tasks: [{
-              id: 'task-iron',
-              name: 'Iron',
-              dropRows: [{
-                id: 'row-iron', componentId: 'iron', quantity: 1, dropRate: 50,
-                characterModifiers: [
-                  { id: 'ref-plain', modifierId: 'str', operator: '+' },                          // no mode
-                  { id: 'ref-mult', modifierId: 'str', operator: '-', mode: 'multiplicative' },    // stray mode stripped
-                  { id: 'ref-add', modifierId: 'str', operator: '+', mode: 'additive' }            // stray mode stripped
+            tasks: [
+              {
+                id: 'task-iron',
+                name: 'Iron',
+                dropRows: [
+                  {
+                    id: 'row-iron',
+                    componentId: 'iron',
+                    quantity: 1,
+                    dropRate: 50,
+                    characterModifiers: [
+                      { id: 'ref-plain', modifierId: 'str', operator: '+' }, // no mode
+                      { id: 'ref-mult', modifierId: 'str', operator: '-', mode: 'multiplicative' }, // stray mode stripped
+                      { id: 'ref-add', modifierId: 'str', operator: '+', mode: 'additive' }, // stray mode stripped
+                    ],
+                    conditionModifiers: {
+                      weather: [
+                        { id: 'w-plain', conditionId: 'rain', operator: '-', value: 10 }, // no mode
+                        {
+                          id: 'w-mult',
+                          conditionId: 'storm',
+                          operator: '-',
+                          value: 50,
+                          mode: 'multiplicative',
+                        }, // stray mode stripped
+                      ],
+                      timeOfDay: [
+                        {
+                          id: 't-bad',
+                          conditionId: 'night',
+                          operator: '+',
+                          value: 5,
+                          mode: 'bogus',
+                        },
+                      ], // stray mode stripped
+                      biome: [
+                        {
+                          id: 'b-add',
+                          conditionId: 'forest',
+                          operator: '+',
+                          value: 5,
+                          mode: 'additive',
+                        },
+                      ], // stray mode stripped
+                    },
+                  },
                 ],
-                conditionModifiers: {
-                  weather: [
-                    { id: 'w-plain', conditionId: 'rain', operator: '-', value: 10 },                       // no mode
-                    { id: 'w-mult', conditionId: 'storm', operator: '-', value: 50, mode: 'multiplicative' } // stray mode stripped
-                  ],
-                  timeOfDay: [{ id: 't-bad', conditionId: 'night', operator: '+', value: 5, mode: 'bogus' }], // stray mode stripped
-                  biome: [{ id: 'b-add', conditionId: 'forest', operator: '+', value: 5, mode: 'additive' }]  // stray mode stripped
-                }
-              }]
-            }],
-            events: [{
-              id: 'event-1', name: 'Trap', dropRate: 25,
-              characterModifiers: [{ id: 'eref', modifierId: 'str', operator: '-', mode: 'multiplicative' }]
-            }]
-          }
-        }
+              },
+            ],
+            events: [
+              {
+                id: 'event-1',
+                name: 'Trap',
+                dropRate: 25,
+                characterModifiers: [
+                  { id: 'eref', modifierId: 'str', operator: '-', mode: 'multiplicative' },
+                ],
+              },
+            ],
+          },
+        },
       };
 
       const store = createAdminStore(services);
@@ -2935,9 +4386,17 @@ describe('createAdminStore', () => {
       // stripped on normalization so it cannot subvert the global system mode.
       const refs = config.tasks[0].dropRows[0].characterModifiers;
       for (const ref of refs) {
-        assert.equal('mode' in ref, false, `character modifier reference ${ref.id} carries no mode`);
+        assert.equal(
+          'mode' in ref,
+          false,
+          `character modifier reference ${ref.id} carries no mode`
+        );
       }
-      assert.equal('mode' in config.events[0].characterModifiers[0], false, 'event ref carries no mode');
+      assert.equal(
+        'mode' in config.events[0].characterModifiers[0],
+        false,
+        'event ref carries no mode'
+      );
       const cm = config.tasks[0].dropRows[0].conditionModifiers;
       for (const list of [cm.weather, cm.timeOfDay, cm.biome]) {
         for (const entry of list) {
@@ -2947,8 +4406,14 @@ describe('createAdminStore', () => {
 
       // A valid system mode survives the round-trip and emits only the new key.
       await store.updateGatheringRules('sys1', { dropModifierMode: 'multiplicative' });
-      assert.equal(services._store.gatheringConfig.systems.sys1.rules.dropModifierMode, 'multiplicative');
-      assert.equal('characterModifierMode' in services._store.gatheringConfig.systems.sys1.rules, false);
+      assert.equal(
+        services._store.gatheringConfig.systems.sys1.rules.dropModifierMode,
+        'multiplicative'
+      );
+      assert.equal(
+        'characterModifierMode' in services._store.gatheringConfig.systems.sys1.rules,
+        false
+      );
     });
 
     it('issue 299: reads the legacy characterModifierMode rule key (read-time compat)', async () => {
@@ -2956,7 +4421,7 @@ describe('createAdminStore', () => {
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
       services._store.gatheringConfig = {
-        systems: { sys1: { rules: { characterModifierMode: 'multiplicative' } } }
+        systems: { sys1: { rules: { characterModifierMode: 'multiplicative' } } },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -2979,19 +4444,23 @@ describe('createAdminStore', () => {
               hazardSelectionMode: 'highestRankedDrop',
               hazardLimit: 4,
               hazardPolicy: 'failureWithHazard',
-              hazardVisibility: 'full'
+              hazardVisibility: 'full',
             },
             tasks: [],
-            events: []
-          }
-        }
+            events: [],
+          },
+        },
       };
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
       const rules = get(store.viewState).gatheringConfig.systems.sys1.rules;
-      assert.equal(rules.eventSelectionMode, 'highestRankedDrop', 'legacy hazardSelectionMode read');
+      assert.equal(
+        rules.eventSelectionMode,
+        'highestRankedDrop',
+        'legacy hazardSelectionMode read'
+      );
       assert.equal(rules.eventLimit, 4, 'legacy hazardLimit read');
       assert.equal(rules.eventPolicy, 'failureWithEvent', 'legacy policy value coerced');
       assert.equal(rules.eventVisibility, 'full', 'legacy hazardVisibility read');
@@ -3008,10 +4477,15 @@ describe('createAdminStore', () => {
             rules: {},
             tasks: [],
             hazards: [
-              { id: 'legacy-event', name: 'Wandering Pedlar', dropRate: 25, hazardModifier: { provider: 'macro', macroUuid: 'Macro.m' } }
-            ]
-          }
-        }
+              {
+                id: 'legacy-event',
+                name: 'Wandering Pedlar',
+                dropRate: 25,
+                hazardModifier: { provider: 'macro', macroUuid: 'Macro.m' },
+              },
+            ],
+          },
+        },
       };
 
       const store = createAdminStore(services);
@@ -3031,7 +4505,11 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       await store.createEnvironmentDraft();
 
-      store.updateEnvironmentDraft({ compositionMode: 'manual', taskOrder: ['t2', 't1', 't1'], eventOrder: ['h1'] });
+      store.updateEnvironmentDraft({
+        compositionMode: 'manual',
+        taskOrder: ['t2', 't1', 't1'],
+        eventOrder: ['h1'],
+      });
       const draft = get(store.viewState).environmentDraft;
       assert.equal(draft.compositionMode, 'manual');
       assert.deepEqual(draft.taskOrder, ['t2', 't1']);
@@ -3058,12 +4536,20 @@ describe('createAdminStore', () => {
     });
 
     it('environments list carries a composed availableTaskCount per environment', async () => {
-      const environments = [{ id: 'env-cave', craftingSystemId: 'sys1', name: 'Cave', biomes: ['cave'], compositionMode: 'automatic' }];
+      const environments = [
+        {
+          id: 'env-cave',
+          craftingSystemId: 'sys1',
+          name: 'Cave',
+          biomes: ['cave'],
+          compositionMode: 'automatic',
+        },
+      ];
       const services = createMockServices({
         getGatheringEnvironmentStore: () => ({
           list: () => environments,
-          listBySystem: async () => environments
-        })
+          listBySystem: async () => environments,
+        }),
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -3072,18 +4558,24 @@ describe('createAdminStore', () => {
           sys1: {
             tasks: [
               { id: 't-cave', name: 'Cave', biomes: ['cave'], dropRows: [] },
-              { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] }
+              { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] },
             ],
-            events: []
-          }
-        }
+            events: [],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const listed = get(store.viewState).environments.find(environment => environment.id === 'env-cave');
+      const listed = get(store.viewState).environments.find(
+        (environment) => environment.id === 'env-cave'
+      );
       assert.ok(listed, 'environment should be present in the view-state list');
-      assert.equal(listed.availableTaskCount, undefined, 'derived counts should not pollute the persisted environment object');
+      assert.equal(
+        listed.availableTaskCount,
+        undefined,
+        'derived counts should not pollute the persisted environment object'
+      );
       assert.equal(get(store.viewState).environmentTaskCounts['env-cave'].availableTaskCount, 1);
     });
 
@@ -3097,11 +4589,11 @@ describe('createAdminStore', () => {
             tasks: [
               { id: 't-cave', name: 'Cave', biomes: ['cave'], dropRows: [] },
               { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] },
-              { id: 't-off', name: 'Disabled', enabled: false, biomes: ['cave'], dropRows: [] }
+              { id: 't-off', name: 'Disabled', enabled: false, biomes: ['cave'], dropRows: [] },
             ],
-            events: []
-          }
-        }
+            events: [],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -3109,7 +4601,7 @@ describe('createAdminStore', () => {
       store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'automatic' });
 
       let composition = get(store.viewState).environmentComposition;
-      const byId = Object.fromEntries(composition.tasks.map(entry => [entry.id, entry]));
+      const byId = Object.fromEntries(composition.tasks.map((entry) => [entry.id, entry]));
       assert.equal(byId['t-cave'].compositionState, 'includedByMatch');
       assert.equal(byId['t-cave'].runtimeState, 'available');
       assert.equal(byId['t-desert'].compositionState, 'notMatching');
@@ -3122,7 +4614,10 @@ describe('createAdminStore', () => {
       const draft = get(store.viewState).environmentDraft;
       assert.ok(draft.disabledTaskIds.includes('t-cave'));
       composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.tasks.find(entry => entry.id === 't-cave').compositionState, 'excluded');
+      assert.equal(
+        composition.tasks.find((entry) => entry.id === 't-cave').compositionState,
+        'excluded'
+      );
       assert.equal(composition.counts.availableTasks, 0);
       assert.equal(composition.counts.excludedTasks, 1);
     });
@@ -3136,11 +4631,11 @@ describe('createAdminStore', () => {
           sys1: {
             tasks: [
               { id: 't-cave', name: 'Cave', biomes: ['cave'], dropRows: [] },
-              { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] }
+              { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] },
             ],
-            events: []
-          }
-        }
+            events: [],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -3148,14 +4643,17 @@ describe('createAdminStore', () => {
       store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'manual' });
 
       let composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.tasks.find(entry => entry.id === 't-cave').compositionState, 'candidate');
+      assert.equal(
+        composition.tasks.find((entry) => entry.id === 't-cave').compositionState,
+        'candidate'
+      );
 
       store.includeEnvironmentRecord('task', 't-cave');
       let draft = get(store.viewState).environmentDraft;
       assert.ok(draft.enabledTaskIds.includes('t-cave'));
       assert.ok(draft.taskOrder.includes('t-cave'));
       composition = get(store.viewState).environmentComposition;
-      const included = composition.tasks.find(entry => entry.id === 't-cave');
+      const included = composition.tasks.find((entry) => entry.id === 't-cave');
       assert.equal(included.compositionState, 'explicitlyIncluded');
       assert.equal(included.runtimeState, 'available');
 
@@ -3164,14 +4662,14 @@ describe('createAdminStore', () => {
       assert.ok(!draft.enabledTaskIds.includes('t-cave'));
       assert.ok(!draft.disabledTaskIds.includes('t-cave'));
       composition = get(store.viewState).environmentComposition;
-      const removed = composition.tasks.find(entry => entry.id === 't-cave');
+      const removed = composition.tasks.find((entry) => entry.id === 't-cave');
       assert.equal(removed.compositionState, 'candidate');
       assert.equal(removed.runtimeState, 'unavailable');
       assert.equal(composition.counts.excludedTasks, 0);
 
       store.updateEnvironmentDraft({ disabledTaskIds: ['t-cave'] });
       composition = get(store.viewState).environmentComposition;
-      const staleManualDisabled = composition.tasks.find(entry => entry.id === 't-cave');
+      const staleManualDisabled = composition.tasks.find((entry) => entry.id === 't-cave');
       assert.equal(staleManualDisabled.compositionState, 'candidate');
       assert.equal(staleManualDisabled.runtimeState, 'unavailable');
       assert.equal(composition.counts.excludedTasks, 0);
@@ -3180,14 +4678,17 @@ describe('createAdminStore', () => {
       draft = get(store.viewState).environmentDraft;
       assert.ok(draft.forcedTaskIds.includes('t-desert'));
       composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.tasks.find(entry => entry.id === 't-desert').compositionState, 'forceIncluded');
+      assert.equal(
+        composition.tasks.find((entry) => entry.id === 't-desert').compositionState,
+        'forceIncluded'
+      );
 
       store.excludeEnvironmentRecord('task', 't-desert');
       draft = get(store.viewState).environmentDraft;
       assert.ok(!draft.forcedTaskIds.includes('t-desert'));
       assert.ok(!draft.disabledTaskIds.includes('t-desert'));
       composition = get(store.viewState).environmentComposition;
-      const removedForced = composition.tasks.find(entry => entry.id === 't-desert');
+      const removedForced = composition.tasks.find((entry) => entry.id === 't-desert');
       assert.equal(removedForced.compositionState, 'notMatching');
       assert.equal(removedForced.runtimeState, 'unavailable');
     });
@@ -3202,10 +4703,10 @@ describe('createAdminStore', () => {
             tasks: [],
             events: [
               { id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dropRate: 25 },
-              { id: 'h-desert', name: 'Desert Event', biomes: ['desert'], dropRate: 25 }
-            ]
-          }
-        }
+              { id: 'h-desert', name: 'Desert Event', biomes: ['desert'], dropRate: 25 },
+            ],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -3219,12 +4720,18 @@ describe('createAdminStore', () => {
       assert.ok(!draft.enabledEventIds.includes('h-cave'));
       assert.ok(!draft.disabledEventIds.includes('h-cave'));
       let composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.events.find(entry => entry.id === 'h-cave').compositionState, 'candidate');
+      assert.equal(
+        composition.events.find((entry) => entry.id === 'h-cave').compositionState,
+        'candidate'
+      );
       assert.equal(composition.counts.excludedEvents, 0);
 
       store.updateEnvironmentDraft({ disabledEventIds: ['h-cave'] });
       composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.events.find(entry => entry.id === 'h-cave').compositionState, 'candidate');
+      assert.equal(
+        composition.events.find((entry) => entry.id === 'h-cave').compositionState,
+        'candidate'
+      );
       assert.equal(composition.counts.excludedEvents, 0);
 
       store.forceIncludeEnvironmentRecord('event', 'h-desert');
@@ -3233,7 +4740,10 @@ describe('createAdminStore', () => {
       assert.ok(!forcedDraft.forcedEventIds.includes('h-desert'));
       assert.ok(!forcedDraft.disabledEventIds.includes('h-desert'));
       composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.events.find(entry => entry.id === 'h-desert').compositionState, 'notMatching');
+      assert.equal(
+        composition.events.find((entry) => entry.id === 'h-desert').compositionState,
+        'notMatching'
+      );
     });
 
     it('reorders all included events including condition-blocked force-added events', async () => {
@@ -3245,18 +4755,48 @@ describe('createAdminStore', () => {
           sys1: {
             tasks: [],
             events: [
-              { id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
-              { id: 'h-gas', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
-              { id: 'h-storm', name: 'Storm Event', biomes: ['cave'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 25 },
-              { id: 'h-desert', name: 'Desert Storm', biomes: ['desert'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 25 }
-            ]
-          }
-        }
+              {
+                id: 'h-cave',
+                name: 'Cave Event',
+                biomes: ['cave'],
+                dangerTags: ['hazardous'],
+                dropRate: 25,
+              },
+              {
+                id: 'h-gas',
+                name: 'Gas Pocket',
+                biomes: ['cave'],
+                dangerTags: ['hazardous'],
+                dropRate: 25,
+              },
+              {
+                id: 'h-storm',
+                name: 'Storm Event',
+                biomes: ['cave'],
+                dangerTags: ['hazardous'],
+                weather: ['storm'],
+                dropRate: 25,
+              },
+              {
+                id: 'h-desert',
+                name: 'Desert Storm',
+                biomes: ['desert'],
+                dangerTags: ['hazardous'],
+                weather: ['storm'],
+                dropRate: 25,
+              },
+            ],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.createEnvironmentDraft();
-      store.updateEnvironmentDraft({ biomes: ['cave'], dangerLevel: 'hazardous', compositionMode: 'manual' });
+      store.updateEnvironmentDraft({
+        biomes: ['cave'],
+        dangerLevel: 'hazardous',
+        compositionMode: 'manual',
+      });
 
       store.includeEnvironmentRecord('event', 'h-cave');
       store.includeEnvironmentRecord('event', 'h-gas');
@@ -3266,14 +4806,16 @@ describe('createAdminStore', () => {
       let composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
         composition.events
-          .filter(entry => ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState))
-          .map(entry => entry.id),
+          .filter((entry) =>
+            ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState)
+          )
+          .map((entry) => entry.id),
         ['h-cave', 'h-gas', 'h-storm', 'h-desert']
       );
-      const conditionBlocked = composition.events.find(entry => entry.id === 'h-storm');
+      const conditionBlocked = composition.events.find((entry) => entry.id === 'h-storm');
       assert.equal(conditionBlocked.compositionState, 'explicitlyIncluded');
       assert.equal(conditionBlocked.runtimeState, 'unavailable');
-      const forced = composition.events.find(entry => entry.id === 'h-desert');
+      const forced = composition.events.find((entry) => entry.id === 'h-desert');
       assert.equal(forced.compositionState, 'forceIncluded');
       assert.equal(forced.runtimeState, 'unavailable');
 
@@ -3284,8 +4826,10 @@ describe('createAdminStore', () => {
       composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
         composition.events
-          .filter(entry => ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState))
-          .map(entry => entry.id),
+          .filter((entry) =>
+            ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState)
+          )
+          .map((entry) => entry.id),
         ['h-storm', 'h-cave', 'h-gas', 'h-desert']
       );
 
@@ -3303,23 +4847,39 @@ describe('createAdminStore', () => {
           sys1: {
             tasks: [],
             events: [
-              { id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
-              { id: 'h-desert', name: 'Desert Storm', biomes: ['desert'], dangerTags: ['hazardous'], dropRate: 25 }
-            ]
-          }
-        }
+              {
+                id: 'h-cave',
+                name: 'Cave Event',
+                biomes: ['cave'],
+                dangerTags: ['hazardous'],
+                dropRate: 25,
+              },
+              {
+                id: 'h-desert',
+                name: 'Desert Storm',
+                biomes: ['desert'],
+                dangerTags: ['hazardous'],
+                dropRate: 25,
+              },
+            ],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.createEnvironmentDraft();
-      store.updateEnvironmentDraft({ biomes: ['cave'], dangerLevel: 'hazardous', compositionMode: 'manual' });
+      store.updateEnvironmentDraft({
+        biomes: ['cave'],
+        dangerLevel: 'hazardous',
+        compositionMode: 'manual',
+      });
 
       store.includeEnvironmentRecord('event', 'h-cave');
       store.forceIncludeEnvironmentRecord('event', 'h-desert');
       store.updateEnvironmentDraft({ biomes: ['desert'] });
 
       let composition = get(store.viewState).environmentComposition;
-      const forced = composition.events.find(entry => entry.id === 'h-desert');
+      const forced = composition.events.find((entry) => entry.id === 'h-desert');
       assert.equal(forced.matches, true);
       assert.equal(forced.compositionState, 'forceIncluded');
       assert.equal(forced.runtimeState, 'available');
@@ -3330,8 +4890,15 @@ describe('createAdminStore', () => {
       composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
         composition.events
-          .filter(entry => ['includedByMatch', 'explicitlyIncluded', 'forceIncluded', 'includedButUnavailable'].includes(entry.compositionState))
-          .map(entry => entry.id),
+          .filter((entry) =>
+            [
+              'includedByMatch',
+              'explicitlyIncluded',
+              'forceIncluded',
+              'includedButUnavailable',
+            ].includes(entry.compositionState)
+          )
+          .map((entry) => entry.id),
         ['h-desert', 'h-cave']
       );
     });
@@ -3344,9 +4911,9 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             tasks: [],
-            events: [{ id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dropRate: 25 }]
-          }
-        }
+            events: [{ id: 'h-cave', name: 'Cave Event', biomes: ['cave'], dropRate: 25 }],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -3359,7 +4926,10 @@ describe('createAdminStore', () => {
       assert.ok(!draft.enabledEventIds.includes('h-cave'));
       assert.ok(draft.disabledEventIds.includes('h-cave'));
       const composition = get(store.viewState).environmentComposition;
-      assert.equal(composition.events.find(entry => entry.id === 'h-cave').compositionState, 'excluded');
+      assert.equal(
+        composition.events.find((entry) => entry.id === 'h-cave').compositionState,
+        'excluded'
+      );
       assert.equal(composition.counts.excludedEvents, 1);
     });
 
@@ -3371,17 +4941,19 @@ describe('createAdminStore', () => {
           return false;
         },
         getGatheringEnvironmentStore: () => ({
-          list: () => [{
-            id: 'env-used',
-            name: 'Used Grove',
-            craftingSystemId: 'sys1',
-            region: 'north',
-            biomes: ['forest'],
-            dangerTags: ['hazardous'],
-            enabledTaskIds: ['task-used'],
-            enabledEventIds: ['event-used']
-          }]
-        })
+          list: () => [
+            {
+              id: 'env-used',
+              name: 'Used Grove',
+              craftingSystemId: 'sys1',
+              region: 'north',
+              biomes: ['forest'],
+              dangerTags: ['hazardous'],
+              enabledTaskIds: ['task-used'],
+              enabledEventIds: ['event-used'],
+            },
+          ],
+        }),
       });
       services._store.gatheringConfig = {
         conditions: { weather: 'clear', timeOfDay: 'day' },
@@ -3390,14 +4962,31 @@ describe('createAdminStore', () => {
           biomes: ['forest'],
           danger: ['safe', 'hazardous'],
           weather: ['clear'],
-          timeOfDay: ['day']
+          timeOfDay: ['day'],
         },
         systems: {
           sys1: {
-            tasks: [{ id: 'task-used', name: 'Used Task', region: 'north', biomes: ['forest'], dropRows: [] }],
-            events: [{ id: 'event-used', name: 'Used Event', dangerTags: ['hazardous'], region: 'north', biomes: ['forest'], dropRate: 25 }]
-          }
-        }
+            tasks: [
+              {
+                id: 'task-used',
+                name: 'Used Task',
+                region: 'north',
+                biomes: ['forest'],
+                dropRows: [],
+              },
+            ],
+            events: [
+              {
+                id: 'event-used',
+                name: 'Used Event',
+                dangerTags: ['hazardous'],
+                region: 'north',
+                biomes: ['forest'],
+                dropRate: 25,
+              },
+            ],
+          },
+        },
       };
 
       const store = createAdminStore(services);
@@ -3421,15 +5010,15 @@ describe('createAdminStore', () => {
           confirmations.push(options);
           return false;
         },
-        getGatheringEnvironmentStore: () => ({ list: () => [] })
+        getGatheringEnvironmentStore: () => ({ list: () => [] }),
       });
       services._store.gatheringConfig = {
         systems: {
           sys1: {
             tasks: [{ id: 'task-unused', name: 'Lone Task', dropRows: [] }],
-            events: [{ id: 'event-unused', name: 'Lone Event', dropRate: 10 }]
-          }
-        }
+            events: [{ id: 'event-unused', name: 'Lone Event', dropRate: 10 }],
+          },
+        },
       };
 
       const store = createAdminStore(services);
@@ -3455,15 +5044,15 @@ describe('createAdminStore', () => {
           confirmationCount += 1;
           return true;
         },
-        getGatheringEnvironmentStore: () => ({ list: () => [] })
+        getGatheringEnvironmentStore: () => ({ list: () => [] }),
       });
       services._store.gatheringConfig = {
         systems: {
           sys1: {
             tasks: [{ id: 'task-unused', name: 'Lone Task', dropRows: [] }],
-            events: [{ id: 'event-unused', name: 'Lone Event', dropRate: 10 }]
-          }
-        }
+            events: [{ id: 'event-unused', name: 'Lone Event', dropRate: 10 }],
+          },
+        },
       };
 
       const store = createAdminStore(services);
@@ -3484,17 +5073,19 @@ describe('createAdminStore', () => {
           return true;
         },
         getGatheringEnvironmentStore: () => ({
-          list: () => [{
-            id: 'env-used',
-            name: 'Used Grove',
-            craftingSystemId: 'sys1',
-            region: 'north',
-            biomes: ['forest'],
-            dangerTags: ['hazardous'],
-            enabledTaskIds: ['task-used'],
-            enabledEventIds: ['event-used']
-          }]
-        })
+          list: () => [
+            {
+              id: 'env-used',
+              name: 'Used Grove',
+              craftingSystemId: 'sys1',
+              region: 'north',
+              biomes: ['forest'],
+              dangerTags: ['hazardous'],
+              enabledTaskIds: ['task-used'],
+              enabledEventIds: ['event-used'],
+            },
+          ],
+        }),
       });
       services._store.gatheringConfig = {
         conditions: { weather: 'clear', timeOfDay: 'day' },
@@ -3503,14 +5094,31 @@ describe('createAdminStore', () => {
           biomes: ['forest'],
           danger: ['safe', 'hazardous'],
           weather: ['clear'],
-          timeOfDay: ['day']
+          timeOfDay: ['day'],
         },
         systems: {
           sys1: {
-            tasks: [{ id: 'task-used', name: 'Used Task', region: 'north', biomes: ['forest'], dropRows: [] }],
-            events: [{ id: 'event-used', name: 'Used Event', dangerTags: ['hazardous'], region: 'north', biomes: ['forest'], dropRate: 25 }]
-          }
-        }
+            tasks: [
+              {
+                id: 'task-used',
+                name: 'Used Task',
+                region: 'north',
+                biomes: ['forest'],
+                dropRows: [],
+              },
+            ],
+            events: [
+              {
+                id: 'event-used',
+                name: 'Used Event',
+                dangerTags: ['hazardous'],
+                region: 'north',
+                biomes: ['forest'],
+                dropRate: 25,
+              },
+            ],
+          },
+        },
       };
 
       const store = createAdminStore(services);
@@ -3528,7 +5136,7 @@ describe('createAdminStore', () => {
         randomID: (() => {
           let id = 0;
           return () => `cmref-${++id}`;
-        })()
+        })(),
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -3536,76 +5144,123 @@ describe('createAdminStore', () => {
         systems: {
           sys1: {
             characterModifiers: [
-              { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' },
-              { id: 'dexterity', label: 'Dexterity', icon: 'fa-solid fa-running', expression: '@abilities.dex.mod' }
+              {
+                id: 'strength',
+                label: 'Strength',
+                icon: 'fa-solid fa-dumbbell',
+                expression: '@abilities.str.mod',
+              },
+              {
+                id: 'dexterity',
+                label: 'Dexterity',
+                icon: 'fa-solid fa-running',
+                expression: '@abilities.dex.mod',
+              },
             ],
-            tasks: [{
-              id: 'task-iron',
-              name: 'Iron Vein',
-              dropRows: [
-                { id: 'row-iron', componentId: 'iron', quantity: 1, dropRate: 50 }
-              ]
-            }],
-            events: [
-              { id: 'event-cave-in', name: 'Cave-in', dropRate: 25 }
-            ]
-          }
-        }
+            tasks: [
+              {
+                id: 'task-iron',
+                name: 'Iron Vein',
+                dropRows: [{ id: 'row-iron', componentId: 'iron', quantity: 1, dropRate: 50 }],
+              },
+            ],
+            events: [{ id: 'event-cave-in', name: 'Cave-in', dropRate: 25 }],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const dropRef = await store.addGatheringDropRowCharacterModifier('sys1', 'task-iron', 'row-iron');
+      const dropRef = await store.addGatheringDropRowCharacterModifier(
+        'sys1',
+        'task-iron',
+        'row-iron'
+      );
       assert.ok(dropRef, 'drop ref was created');
       assert.equal(dropRef.modifierId, 'strength');
       assert.equal(dropRef.operator, '+');
-      assert.equal('mode' in dropRef, false, 'new drop ref carries no per-reference mode (issue 299)');
+      assert.equal(
+        'mode' in dropRef,
+        false,
+        'new drop ref carries no per-reference mode (issue 299)'
+      );
       let task = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(task.dropRows[0].characterModifiers.length, 1);
       assert.equal(task.dropRows[0].characterModifiers[0].id, dropRef.id);
 
-      const updated = await store.updateGatheringDropRowCharacterModifier('sys1', 'task-iron', 'row-iron', dropRef.id, {
-        modifierId: 'dexterity',
-        operator: '-',
-        mode: 'multiplicative',
-        min: -2,
-        max: 5,
-        expressionOverride: '1d4 + @abilities.dex.mod'
-      });
+      const updated = await store.updateGatheringDropRowCharacterModifier(
+        'sys1',
+        'task-iron',
+        'row-iron',
+        dropRef.id,
+        {
+          modifierId: 'dexterity',
+          operator: '-',
+          mode: 'multiplicative',
+          min: -2,
+          max: 5,
+          expressionOverride: '1d4 + @abilities.dex.mod',
+        }
+      );
       assert.equal(updated, true);
       task = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(task.dropRows[0].characterModifiers[0].modifierId, 'dexterity');
       assert.equal(task.dropRows[0].characterModifiers[0].operator, '-');
-      assert.equal('mode' in task.dropRows[0].characterModifiers[0], false, 'a stray mode partial is dropped on normalization (issue 299)');
+      assert.equal(
+        'mode' in task.dropRows[0].characterModifiers[0],
+        false,
+        'a stray mode partial is dropped on normalization (issue 299)'
+      );
       assert.equal(task.dropRows[0].characterModifiers[0].min, -2);
       assert.equal(task.dropRows[0].characterModifiers[0].max, 5);
-      assert.equal(task.dropRows[0].characterModifiers[0].expressionOverride, '1d4 + @abilities.dex.mod');
+      assert.equal(
+        task.dropRows[0].characterModifiers[0].expressionOverride,
+        '1d4 + @abilities.dex.mod'
+      );
 
       const eventRef = await store.addGatheringEventCharacterModifier('sys1', 'event-cave-in', {
         modifierId: 'strength',
-        operator: '-'
+        operator: '-',
       });
       assert.ok(eventRef, 'event ref was created');
       assert.equal(eventRef.modifierId, 'strength');
       assert.equal(eventRef.operator, '-');
-      assert.equal('mode' in eventRef, false, 'new event ref carries no per-reference mode (issue 299)');
+      assert.equal(
+        'mode' in eventRef,
+        false,
+        'new event ref carries no per-reference mode (issue 299)'
+      );
       let event = services._store.gatheringConfig.systems.sys1.events[0];
       assert.equal(event.characterModifiers.length, 1);
       assert.equal(event.characterModifiers[0].id, eventRef.id);
 
-      const eventUpdated = await store.updateGatheringEventCharacterModifier('sys1', 'event-cave-in', eventRef.id, {
-        expressionOverride: '1d6 + @abilities.con.mod'
-      });
+      const eventUpdated = await store.updateGatheringEventCharacterModifier(
+        'sys1',
+        'event-cave-in',
+        eventRef.id,
+        {
+          expressionOverride: '1d6 + @abilities.con.mod',
+        }
+      );
       assert.equal(eventUpdated, true);
       event = services._store.gatheringConfig.systems.sys1.events[0];
       assert.equal(event.characterModifiers[0].expressionOverride, '1d6 + @abilities.con.mod');
 
-      const dropDeleted = await store.deleteGatheringDropRowCharacterModifier('sys1', 'task-iron', 'row-iron', dropRef.id);
+      const dropDeleted = await store.deleteGatheringDropRowCharacterModifier(
+        'sys1',
+        'task-iron',
+        'row-iron',
+        dropRef.id
+      );
       assert.equal(dropDeleted, true);
       task = services._store.gatheringConfig.systems.sys1.tasks[0];
       assert.equal(task.dropRows[0].characterModifiers.length, 0);
 
-      const eventDeleted = await store.deleteGatheringEventCharacterModifier('sys1', 'event-cave-in', eventRef.id);
+      const eventDeleted = await store.deleteGatheringEventCharacterModifier(
+        'sys1',
+        'event-cave-in',
+        eventRef.id
+      );
       assert.equal(eventDeleted, true);
       event = services._store.gatheringConfig.systems.sys1.events[0];
       assert.equal(event.characterModifiers.length, 0);
@@ -3618,16 +5273,26 @@ describe('createAdminStore', () => {
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            characterModifiers: [{ id: 'strength', label: 'Strength', icon: '', expression: '@abilities.str.mod' }],
-            tasks: [{ id: 'task-iron', name: 'Iron', dropRows: [{ id: 'row-iron', dropRate: 50 }] }],
-            events: []
-          }
-        }
+            characterModifiers: [
+              { id: 'strength', label: 'Strength', icon: '', expression: '@abilities.str.mod' },
+            ],
+            tasks: [
+              { id: 'task-iron', name: 'Iron', dropRows: [{ id: 'row-iron', dropRate: 50 }] },
+            ],
+            events: [],
+          },
+        },
       };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      assert.equal(await store.addGatheringDropRowCharacterModifier('sys1', 'unknown-task', 'row-iron'), null);
-      assert.equal(await store.addGatheringDropRowCharacterModifier('sys1', 'task-iron', 'unknown-row'), null);
+      assert.equal(
+        await store.addGatheringDropRowCharacterModifier('sys1', 'unknown-task', 'row-iron'),
+        null
+      );
+      assert.equal(
+        await store.addGatheringDropRowCharacterModifier('sys1', 'task-iron', 'unknown-row'),
+        null
+      );
       assert.equal(await store.addGatheringEventCharacterModifier('sys1', 'unknown-event'), null);
     });
 
@@ -3636,7 +5301,11 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.craftingCheck = { mode: 'namedOutcomes', macroUuid: 'uuid', outcomes: ['critical', 'success', 'failure'] };
+        sys.craftingCheck = {
+          mode: 'namedOutcomes',
+          macroUuid: 'uuid',
+          outcomes: ['critical', 'success', 'failure'],
+        };
       }
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -3645,9 +5314,12 @@ describe('createAdminStore', () => {
     });
 
     it('viewState.selectedSystem.availableScriptMacros reflects getScriptMacros()', async () => {
-      const macros = [{ uuid: 'm1', name: 'My Macro' }, { uuid: 'm2', name: 'Other' }];
+      const macros = [
+        { uuid: 'm1', name: 'My Macro' },
+        { uuid: 'm2', name: 'Other' },
+      ];
       const services = createMockServices({
-        getScriptMacros: () => macros
+        getScriptMacros: () => macros,
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -3655,12 +5327,10 @@ describe('createAdminStore', () => {
       assert.deepEqual(vs.selectedSystem?.availableScriptMacros, macros);
     });
 
-    it('viewState.selectedSystem exposes injected scene and roll-table picker options', async () => {
+    it('viewState.selectedSystem exposes injected scene picker options', async () => {
       const sceneOptions = [{ uuid: 'Scene.forest', name: 'Forest', img: 'forest.webp' }];
-      const rollTableOptions = [{ uuid: 'RollTable.forage', name: 'Forage', img: 'table.svg' }];
       const services = createMockServices({
         getSceneOptions: () => sceneOptions,
-        getRollTableOptions: () => rollTableOptions
       });
       const store = createAdminStore(services);
 
@@ -3668,15 +5338,13 @@ describe('createAdminStore', () => {
 
       const selectedSystem = get(store.viewState).selectedSystem;
       assert.deepEqual(selectedSystem?.sceneOptions, sceneOptions);
-      assert.deepEqual(selectedSystem?.rollTableOptions, rollTableOptions);
     });
 
-    it('viewState.selectedSystem.showTags and showEssences are true when features and advancedOptions are both enabled', async () => {
+    it('viewState.selectedSystem.showTags and showEssences are true when the essences feature is enabled', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.advancedOptionsEnabled = true;
         sys.features = { itemTags: true, essences: true };
       }
       const store = createAdminStore(services);
@@ -3686,13 +5354,12 @@ describe('createAdminStore', () => {
       assert.equal(vs.selectedSystem?.showEssences, true);
     });
 
-    it('viewState.selectedSystem.showTags remains true when advancedOptionsEnabled is false', async () => {
+    it('viewState.selectedSystem.showEssences is false when the essences feature is disabled', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.advancedOptionsEnabled = false;
-        sys.features = { itemTags: true, essences: true };
+        sys.features = { itemTags: true, essences: false };
       }
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -3709,21 +5376,99 @@ describe('createAdminStore', () => {
       assert.ok(vs.recipes.length > 0, 'should have at least one recipe');
       for (const recipe of vs.recipes) {
         for (const field of [
-          'id', 'name', 'img', 'description', 'category', 'enabled', 'locked',
-          'isSimple', 'visibilitySummary', 'stepCount', 'resultGroupCount',
-          'ingredientCount', 'toolCount', 'structureKey', 'structureLabel',
-          'requirementsPreview', 'ingredients', 'tools'
+          'id',
+          'name',
+          'img',
+          'description',
+          'category',
+          'enabled',
+          'locked',
+          'recipeItemId',
+          'isSimple',
+          'visibilitySummary',
+          'stepCount',
+          'resultGroupCount',
+          'ingredientCount',
+          'toolCount',
+          'structureKey',
+          'structureLabel',
+          'requirementsPreview',
+          'ingredients',
+          'tools',
         ]) {
           assert.ok(field in recipe, `recipe entry should have field: ${field}`);
         }
       }
     });
 
+    it('viewState.recipes entries project the raw visibility object for the restriction editor', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const visibility = { restricted: true, allowedUserIds: ['u1', 'u2'] };
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [makeRecipe({ id: 'r1', name: 'VIP', craftingSystemId: 'sys1', visibility })].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+        getRecipe: () => null,
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      const r = vs.recipes.find((row) => row.id === 'r1');
+      assert.ok(r, 'the recipe row is present');
+      assert.ok('visibility' in r, 'the row projects a visibility field');
+      assert.deepEqual(r.visibility, visibility, 'the raw visibility object flows through toJSON');
+    });
+
+    it('viewState.recipes visibility is null when the recipe has no visibility object', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.ok(vs.recipes.length > 0, 'at least one recipe');
+      assert.equal(vs.recipes[0].visibility, null, 'absent visibility projects as null');
+    });
+
+    it('viewState.worldUsers exposes non-GM users from the getWorldUsers service', async () => {
+      const worldUsers = [
+        { id: 'u1', name: 'Alice' },
+        { id: 'u2', name: 'Bob' },
+      ];
+      const services = createMockServices({ getWorldUsers: () => worldUsers });
+      const store = createAdminStore(services);
+      await store.refresh();
+      assert.deepEqual(get(store.viewState).worldUsers, worldUsers);
+    });
+
+    it('viewState.worldUsers defaults to an empty array when the service is absent', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.refresh();
+      assert.deepEqual(get(store.viewState).worldUsers, []);
+    });
+
+    it('refreshWorldUsers re-projects the allow-list without a full refresh', async () => {
+      let current = [{ id: 'u1', name: 'Alice' }];
+      const services = createMockServices({ getWorldUsers: () => current });
+      const store = createAdminStore(services);
+      await store.refresh();
+      assert.deepEqual(get(store.viewState).worldUsers, [{ id: 'u1', name: 'Alice' }]);
+
+      // A player is added while the manager is open; the user-CRUD hook calls
+      // refreshWorldUsers, which must surface the change without a full refresh().
+      current = [
+        { id: 'u1', name: 'Alice' },
+        { id: 'u2', name: 'Bob' },
+      ];
+      store.refreshWorldUsers();
+      assert.deepEqual(get(store.viewState).worldUsers, current);
+    });
+
     it('viewState.experimentalFeaturesEnabled mirrors the world setting', async () => {
       const services = createMockServices({
-        getSetting: (key) => key === 'experimentalFeatures'
-          ? true
-          : ''
+        getSetting: (key) => (key === 'experimentalFeatures' ? true : ''),
       });
       const store = createAdminStore(services);
       await store.refresh();
@@ -3747,43 +5492,49 @@ describe('createAdminStore', () => {
             id: 'step-mix',
             name: 'Mix',
             toolIds: ['stirring-rod'],
-            ingredientSets: [{
-              id: 'set-herbs',
-              ingredientGroups: [
-                { id: 'group-herb', options: [{ componentId: 'mint' }, { componentId: 'sage' }] },
-                { id: 'group-water', options: [{ componentId: 'water' }] }
-              ],
-              toolIds: ['mortar']
-            }],
-            resultGroups: [{ id: 'mix-success' }, { id: 'mix-critical' }]
+            ingredientSets: [
+              {
+                id: 'set-herbs',
+                ingredientGroups: [
+                  { id: 'group-herb', options: [{ componentId: 'mint' }, { componentId: 'sage' }] },
+                  { id: 'group-water', options: [{ componentId: 'water' }] },
+                ],
+                toolIds: ['mortar'],
+              },
+            ],
+            resultGroups: [{ id: 'mix-success' }, { id: 'mix-critical' }],
           },
           {
             id: 'step-finish',
             name: 'Finish',
-            ingredientSets: [{
-              id: 'set-finish',
-              ingredients: [{ componentId: 'ash' }, { componentId: 'salt' }],
-              toolIds: ['filter', 'vial']
-            }],
-            resultGroups: [{ id: 'finish-success' }]
-          }
+            ingredientSets: [
+              {
+                id: 'set-finish',
+                ingredients: [{ componentId: 'ash' }, { componentId: 'salt' }],
+                toolIds: ['filter', 'vial'],
+              },
+            ],
+            resultGroups: [{ id: 'finish-success' }],
+          },
         ],
         isSimpleRecipe: () => false,
         getExecutionSteps() {
           return this.steps;
-        }
+        },
       });
 
       services.getRecipeManager = () => ({
         ...origManager,
-        getRecipes: (filter) => [multiStepRecipe]
-          .filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId)
+        getRecipes: (filter) =>
+          [multiStepRecipe].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const recipe = get(store.viewState).recipes.find(r => r.id === 'r-multi');
+      const recipe = get(store.viewState).recipes.find((r) => r.id === 'r-multi');
       assert.ok(recipe, 'multi-step recipe should be present');
       assert.equal(recipe.description, 'Brew in two phases.');
       assert.equal(recipe.stepCount, 2);
@@ -3792,7 +5543,11 @@ describe('createAdminStore', () => {
       assert.equal(recipe.toolCount, 6);
       assert.equal(recipe.structureKey, 'multiStep');
       assert.equal(recipe.structureLabel, 'Multi-step');
-      assert.equal(recipe.ingredients.length, 5, 'legacy ingredients array should track derived count');
+      assert.equal(
+        recipe.ingredients.length,
+        5,
+        'legacy ingredients array should track derived count'
+      );
       assert.equal(recipe.tools.length, 6, 'tools array should track derived count');
       assert.deepEqual(recipe.requirementsPreview, [
         {
@@ -3803,12 +5558,14 @@ describe('createAdminStore', () => {
           toolCount: 3,
           resultGroupCount: 2,
           hasAlternatives: false,
-          ingredientSetSummaries: [{
-            id: 'set-herbs',
-            name: 'Set 1',
-            ingredientCount: 3,
-            toolCount: 1
-          }]
+          ingredientSetSummaries: [
+            {
+              id: 'set-herbs',
+              name: 'Set 1',
+              ingredientCount: 3,
+              toolCount: 1,
+            },
+          ],
         },
         {
           id: 'step-finish',
@@ -3818,13 +5575,15 @@ describe('createAdminStore', () => {
           toolCount: 3,
           resultGroupCount: 1,
           hasAlternatives: false,
-          ingredientSetSummaries: [{
-            id: 'set-finish',
-            name: 'Set 1',
-            ingredientCount: 2,
-            toolCount: 2
-          }]
-        }
+          ingredientSetSummaries: [
+            {
+              id: 'set-finish',
+              name: 'Set 1',
+              ingredientCount: 2,
+              toolCount: 2,
+            },
+          ],
+        },
       ]);
     });
 
@@ -3835,60 +5594,111 @@ describe('createAdminStore', () => {
         id: 'r-single',
         name: 'Fallback Stew',
         craftingSystemId: 'sys1',
-        ingredientSets: [{
-          id: 'set-main',
-          ingredientGroups: [
-            { id: 'group-main', options: [{ componentId: 'root' }, { componentId: 'mushroom' }] }
-          ],
-          toolIds: ['pot']
-        }, {
-          id: 'set-alt',
-          ingredients: [{ componentId: 'fish' }, { componentId: 'salt' }, { componentId: 'herb' }],
-          toolIds: []
-        }],
+        ingredientSets: [
+          {
+            id: 'set-main',
+            ingredientGroups: [
+              { id: 'group-main', options: [{ componentId: 'root' }, { componentId: 'mushroom' }] },
+            ],
+            toolIds: ['pot'],
+          },
+          {
+            id: 'set-alt',
+            ingredients: [
+              { componentId: 'fish' },
+              { componentId: 'salt' },
+              { componentId: 'herb' },
+            ],
+            toolIds: [],
+          },
+        ],
         resultGroups: [{ id: 'success' }, { id: 'bonus' }],
-        toolIds: ['ladle']
+        toolIds: ['ladle'],
       });
 
       services.getRecipeManager = () => ({
         ...origManager,
-        getRecipes: (filter) => [fallbackRecipe]
-          .filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId)
+        getRecipes: (filter) =>
+          [fallbackRecipe].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
       });
 
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const recipe = get(store.viewState).recipes.find(r => r.id === 'r-single');
+      const recipe = get(store.viewState).recipes.find((r) => r.id === 'r-single');
       assert.ok(recipe, 'fallback recipe should be present');
       assert.equal(recipe.stepCount, 1);
       assert.equal(recipe.resultGroupCount, 2);
       assert.equal(recipe.ingredientCount, 3);
       assert.equal(recipe.toolCount, 2);
       assert.equal(recipe.structureKey, 'simple');
-      assert.deepEqual(recipe.requirementsPreview, [{
-        id: 'implicit-step',
-        name: 'Step 1',
-        ingredientSetCount: 2,
-        ingredientCount: 3,
-        toolCount: 2,
-        resultGroupCount: 2,
-        hasAlternatives: true,
-        ingredientSetSummaries: [
-          {
-            id: 'set-main',
-            name: 'Set 1',
-            ingredientCount: 2,
-            toolCount: 1
-          },
-          {
-            id: 'set-alt',
-            name: 'Set 2',
-            ingredientCount: 3,
-            toolCount: 0
-          }
-        ]
-      }]);
+      assert.deepEqual(recipe.requirementsPreview, [
+        {
+          id: 'implicit-step',
+          name: 'Step 1',
+          ingredientSetCount: 2,
+          ingredientCount: 3,
+          toolCount: 2,
+          resultGroupCount: 2,
+          hasAlternatives: true,
+          ingredientSetSummaries: [
+            {
+              id: 'set-main',
+              name: 'Set 1',
+              ingredientCount: 2,
+              toolCount: 1,
+            },
+            {
+              id: 'set-alt',
+              name: 'Set 2',
+              ingredientCount: 3,
+              toolCount: 0,
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('surfaces recipe routing fields (resultSelection, checkTierId, checkOutcomeIds) in the view state', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const routedRecipe = makeRecipe({
+        id: 'r-routed',
+        craftingSystemId: 'sys1',
+        // The routing mode and check-tier live at the top level; the projection
+        // must carry them through or the editor loses them on reload.
+        toJSON: () => ({
+          id: 'r-routed',
+          name: 'Routed',
+          craftingSystemId: 'sys1',
+          resultSelection: { provider: 'check', macroUuid: null, rollTableUuid: null },
+          checkTierId: 'tier-x',
+          resultGroups: [{ id: 'g1', name: 'G1', checkOutcomeIds: ['t-a'], results: [] }],
+          ingredientSets: [],
+        }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [routedRecipe].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const recipe = get(store.viewState).recipes.find((r) => r.id === 'r-routed');
+      assert.ok(recipe, 'routed recipe should be present');
+      assert.equal(
+        recipe.resultSelection.provider,
+        'check',
+        'routing mode survives the projection'
+      );
+      assert.equal(recipe.checkTierId, 'tier-x');
+      assert.deepEqual(recipe.resultGroups[0].checkOutcomeIds, ['t-a']);
     });
 
     it('viewState.recipeCategories groups recipes by category with counts', async () => {
@@ -3898,18 +5708,35 @@ describe('createAdminStore', () => {
         ...origManager,
         getRecipes: (filter) => {
           const all = [
-            makeRecipe({ id: 'r1', name: 'Healing Potion', category: 'potions', craftingSystemId: 'sys1' }),
-            makeRecipe({ id: 'r2', name: 'Mana Potion', category: 'potions', craftingSystemId: 'sys1' }),
-            makeRecipe({ id: 'r3', name: 'Iron Sword', category: 'weapons', craftingSystemId: 'sys1' })
+            makeRecipe({
+              id: 'r1',
+              name: 'Healing Potion',
+              category: 'potions',
+              craftingSystemId: 'sys1',
+            }),
+            makeRecipe({
+              id: 'r2',
+              name: 'Mana Potion',
+              category: 'potions',
+              craftingSystemId: 'sys1',
+            }),
+            makeRecipe({
+              id: 'r3',
+              name: 'Iron Sword',
+              category: 'weapons',
+              craftingSystemId: 'sys1',
+            }),
           ];
-          return filter?.craftingSystemId ? all.filter(r => r.craftingSystemId === filter.craftingSystemId) : all;
-        }
+          return filter?.craftingSystemId
+            ? all.filter((r) => r.craftingSystemId === filter.craftingSystemId)
+            : all;
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
-      const potions = vs.recipeCategories.find(c => c.name === 'potions');
-      const weapons = vs.recipeCategories.find(c => c.name === 'weapons');
+      const potions = vs.recipeCategories.find((c) => c.name === 'potions');
+      const weapons = vs.recipeCategories.find((c) => c.name === 'weapons');
       assert.ok(potions, 'potions category should exist');
       assert.equal(potions.count, 2);
       assert.ok(weapons, 'weapons category should exist');
@@ -3921,17 +5748,31 @@ describe('createAdminStore', () => {
       const origManager = services.getRecipeManager();
       services.getRecipeManager = () => ({
         ...origManager,
-        getRecipes: (filter) => [
-          makeRecipe({ id: 'r1', name: 'Open', craftingSystemId: 'sys1', visibility: { restricted: false } })
-        ].filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId),
-        getRecipe: (id) => id === 'r1'
-          ? makeRecipe({ id: 'r1', name: 'Open', craftingSystemId: 'sys1', visibility: { restricted: false } })
-          : null
+        getRecipes: (filter) =>
+          [
+            makeRecipe({
+              id: 'r1',
+              name: 'Open',
+              craftingSystemId: 'sys1',
+              visibility: { restricted: false },
+            }),
+          ].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+        getRecipe: (id) =>
+          id === 'r1'
+            ? makeRecipe({
+                id: 'r1',
+                name: 'Open',
+                craftingSystemId: 'sys1',
+                visibility: { restricted: false },
+              })
+            : null,
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
-      const r = vs.recipes.find(r => r.id === 'r1');
+      const r = vs.recipes.find((r) => r.id === 'r1');
       assert.equal(r?.visibilitySummary, 'All players');
     });
 
@@ -3940,15 +5781,23 @@ describe('createAdminStore', () => {
       const origManager = services.getRecipeManager();
       services.getRecipeManager = () => ({
         ...origManager,
-        getRecipes: (filter) => [
-          makeRecipe({ id: 'r1', name: 'VIP', craftingSystemId: 'sys1', visibility: { restricted: true, allowedUserIds: [] } })
-        ].filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId),
-        getRecipe: () => null
+        getRecipes: (filter) =>
+          [
+            makeRecipe({
+              id: 'r1',
+              name: 'VIP',
+              craftingSystemId: 'sys1',
+              visibility: { restricted: true, allowedUserIds: [] },
+            }),
+          ].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+        getRecipe: () => null,
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
-      const r = vs.recipes.find(r => r.id === 'r1');
+      const r = vs.recipes.find((r) => r.id === 'r1');
       assert.equal(r?.visibilitySummary, 'Restricted (none selected)');
     });
 
@@ -3957,16 +5806,23 @@ describe('createAdminStore', () => {
       const origManager = services.getRecipeManager();
       services.getRecipeManager = () => ({
         ...origManager,
-        getRecipes: (filter) => [
-          makeRecipe({ id: 'r1', name: 'VIP', craftingSystemId: 'sys1',
-            visibility: { restricted: true, allowedUserIds: ['u1', 'u2'] } })
-        ].filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId),
-        getRecipe: () => null
+        getRecipes: (filter) =>
+          [
+            makeRecipe({
+              id: 'r1',
+              name: 'VIP',
+              craftingSystemId: 'sys1',
+              visibility: { restricted: true, allowedUserIds: ['u1', 'u2'] },
+            }),
+          ].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+        getRecipe: () => null,
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
-      const r = vs.recipes.find(r => r.id === 'r1');
+      const r = vs.recipes.find((r) => r.id === 'r1');
       assert.equal(r?.visibilitySummary, 'Restricted (2)');
     });
 
@@ -3977,7 +5833,7 @@ describe('createAdminStore', () => {
         ...origManager,
         getSystems: () => [],
         getSystem: () => null,
-        getItems: () => []
+        getItems: () => [],
       });
       const store = createAdminStore(services);
       await store.refresh();
@@ -3990,7 +5846,8 @@ describe('createAdminStore', () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
-      if (sys) sys.items = [makeItem({ id: 'i1', name: 'Herb' }), makeItem({ id: 'i2', name: 'Salt' })];
+      if (sys)
+        sys.items = [makeItem({ id: 'i1', name: 'Herb' }), makeItem({ id: 'i2', name: 'Salt' })];
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
@@ -4004,18 +5861,23 @@ describe('createAdminStore', () => {
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.features = { salvage: true, itemTags: true, essences: true };
-        sys.advancedOptionsEnabled = true;
         sys.essenceDefinitions = [
-          { id: 'ess-fire', name: 'Fire', description: '', icon: 'fas fa-fire', sourceItemUuid: null },
-          { id: 'ess-shadow', name: 'Shadow', description: '', icon: '', sourceItemUuid: null }
+          {
+            id: 'ess-fire',
+            name: 'Fire',
+            description: '',
+            icon: 'fas fa-fire',
+            sourceItemUuid: null,
+          },
+          { id: 'ess-shadow', name: 'Shadow', description: '', icon: '', sourceItemUuid: null },
         ];
         sys.components = [
           makeItem({
             id: 'comp-1',
             name: 'Blazing Herb',
             description: ' Hot enough to scorch your fingers. ',
-            sourceUuid: 'Item.live-123',
-            sourceItemUuid: 'Compendium.source.items.blazing-herb',
+            registeredItemUuid: 'Item.live-123',
+            originItemUuid: 'Compendium.source.items.blazing-herb',
             tags: ['fire'],
             essences: { 'ess-fire': 2, 'ess-shadow': 1 },
             salvage: {
@@ -4025,9 +5887,9 @@ describe('createAdminStore', () => {
               resultGroups: [{ id: 'grp-1', results: [] }],
               timeRequirement: { seconds: 60 },
               currencyRequirement: { amount: 5 },
-              outcomeRouting: { success: 'grp-1' }
-            }
-          })
+              outcomeRouting: { success: 'grp-1' },
+            },
+          }),
         ];
         delete sys.items;
       }
@@ -4038,15 +5900,15 @@ describe('createAdminStore', () => {
 
       assert.equal(card.description, 'Hot enough to scorch your fingers.');
       assert.equal(card.hasDescription, true);
-      assert.equal(card.sourceUuidDisplay, 'Compendium.source.items.blazing-herb');
-      assert.equal(card.hasSourceUuid, true);
+      assert.equal(card.registeredItemUuidDisplay, 'Compendium.source.items.blazing-herb');
+      assert.equal(card.hasRegisteredItemUuid, true);
       assert.equal(card.sourceOrigin, 'compendium');
       assert.equal(card.sourceOriginLabel, 'Compendium');
       assert.equal(card.sourceMissing, false);
       assert.deepEqual(card.tags, ['fire']);
       assert.deepEqual(card.essences, [
         { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },
-        { id: 'ess-shadow', name: 'Shadow', icon: 'fas fa-mortar-pestle', quantity: 1 }
+        { id: 'ess-shadow', name: 'Shadow', icon: 'fas fa-mortar-pestle', quantity: 1 },
       ]);
       assert.deepEqual(card.salvageSummary, {
         quantityRequired: 3,
@@ -4054,7 +5916,7 @@ describe('createAdminStore', () => {
         resultGroupCount: 1,
         hasTimeRequirement: true,
         hasCurrencyRequirement: true,
-        outcomeCount: 1
+        outcomeCount: 1,
       });
     });
 
@@ -4067,13 +5929,13 @@ describe('createAdminStore', () => {
           makeItem({
             id: 'comp-object-description',
             name: 'Silverweed',
-            description: { value: '<p>Bright <strong>moonlit</strong> leaves.</p>' }
+            description: { value: '<p>Bright <strong>moonlit</strong> leaves.</p>' },
           }),
           makeItem({
             id: 'comp-unknown-description',
             name: 'Voidbloom',
-            description: { unexpected: 'shape' }
-          })
+            description: { unexpected: 'shape' },
+          }),
         ];
         delete sys.items;
       }
@@ -4095,20 +5957,19 @@ describe('createAdminStore', () => {
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.features = { essences: true };
-        sys.advancedOptionsEnabled = true;
         sys.components = [
           makeItem({
             id: 'comp-1',
             name: 'Blazing Herb',
             img: 'blazing-herb.png',
-            description: { value: '<p>Bright <strong>ember</strong> leaf.</p>' }
+            description: { value: '<p>Bright <strong>ember</strong> leaf.</p>' },
           }),
           makeItem({
             id: 'comp-2',
             name: 'Moon Salt',
             img: '',
-            description: { unexpected: 'shape' }
-          })
+            description: { unexpected: 'shape' },
+          }),
         ];
         sys.essenceDefinitions = [
           {
@@ -4117,7 +5978,7 @@ describe('createAdminStore', () => {
             description: 'Hot stuff',
             icon: 'fas fa-fire',
             sourceItemUuid: 'comp-1',
-            associatedSystemItemId: 'comp-1'
+            associatedSystemItemId: 'comp-1',
           },
           {
             id: 'ess-moon',
@@ -4125,8 +5986,8 @@ describe('createAdminStore', () => {
             description: '',
             icon: 'fas fa-moon',
             sourceItemUuid: null,
-            associatedSystemItemId: null
-          }
+            associatedSystemItemId: null,
+          },
         ];
       }
 
@@ -4136,17 +5997,54 @@ describe('createAdminStore', () => {
       const [linkedEssence, unlinkedEssence] = vs.selectedSystem.essenceDefinitions;
 
       assert.deepEqual(vs.selectedSystem.managedItemOptions, [
-        { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png', description: 'Bright ember leaf.' },
-        { id: 'comp-2', name: 'Moon Salt', img: 'icons/svg/item-bag.svg', description: '' }
+        {
+          id: 'comp-1',
+          name: 'Blazing Herb',
+          img: 'blazing-herb.png',
+          description: 'Bright ember leaf.',
+        },
+        { id: 'comp-2', name: 'Moon Salt', img: 'icons/svg/item-bag.svg', description: '' },
       ]);
       assert.deepEqual(linkedEssence.associatedItem, {
         id: 'comp-1',
         name: 'Blazing Herb',
-        img: 'blazing-herb.png'
+        img: 'blazing-herb.png',
       });
       assert.equal(linkedEssence.associatedItemName, 'Blazing Herb');
       assert.equal(unlinkedEssence.associatedItem, null);
       assert.equal(unlinkedEssence.associatedItemName, null);
+    });
+
+    it('viewState.selectedSystem.componentTagOptions is an { id, tags } projection separate from managedItemOptions', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({ id: 'comp-1', name: 'Iron Ore', tags: [' metal ', 'ore', ''] }),
+          makeItem({ id: 'comp-2', name: 'Herb', tags: ['plant'] }),
+          makeItem({ id: 'comp-3', name: 'Untagged' }),
+        ];
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+
+      // Built as { id, tags } from managed items, with tags trim-normalized to
+      // line up with how the tags-match handler stores match tags.
+      assert.deepEqual(vs.selectedSystem.componentTagOptions, [
+        { id: 'comp-1', tags: ['metal', 'ore'] },
+        { id: 'comp-2', tags: ['plant'] },
+        { id: 'comp-3', tags: [] },
+      ]);
+
+      // The managedItemOptions contract shape is unchanged (no tags leak in).
+      assert.deepEqual(vs.selectedSystem.managedItemOptions, [
+        { id: 'comp-1', name: 'Iron Ore', img: 'item.png', description: '' },
+        { id: 'comp-2', name: 'Herb', img: 'item.png', description: '' },
+        { id: 'comp-3', name: 'Untagged', img: 'item.png', description: '' },
+      ]);
     });
 
     it('viewState.essenceCards expose source state and component usage for manager', async () => {
@@ -4155,21 +6053,20 @@ describe('createAdminStore', () => {
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.features = { essences: true };
-        sys.advancedOptionsEnabled = true;
         sys.components = [
           makeItem({
             id: 'comp-1',
             name: 'Blazing Herb',
             img: 'blazing-herb.png',
-            sourceItemUuid: 'Compendium.fabricate.items.blazing-herb',
-            essences: { 'ess-fire': 2 }
+            originItemUuid: 'Compendium.fabricate.items.blazing-herb',
+            essences: { 'ess-fire': 2 },
           }),
           makeItem({
             id: 'comp-2',
             name: 'Moon Salt',
             img: '',
-            essences: {}
-          })
+            essences: {},
+          }),
         ];
         sys.essenceDefinitions = [
           {
@@ -4179,7 +6076,7 @@ describe('createAdminStore', () => {
             icon: 'fas fa-fire',
             sourceComponentId: 'comp-1',
             sourceItemUuid: 'comp-1',
-            associatedSystemItemId: 'comp-1'
+            associatedSystemItemId: 'comp-1',
           },
           {
             id: 'ess-moon',
@@ -4188,8 +6085,8 @@ describe('createAdminStore', () => {
             icon: '',
             sourceComponentId: null,
             sourceItemUuid: null,
-            associatedSystemItemId: null
-          }
+            associatedSystemItemId: null,
+          },
         ];
       }
 
@@ -4203,7 +6100,7 @@ describe('createAdminStore', () => {
       assert.equal(cards[0].sourceState, 'linked');
       assert.equal(cards[0].componentUsageCount, 1);
       assert.deepEqual(cards[0].componentUsageItems, [
-        { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' }
+        { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' },
       ]);
       assert.equal(cards[0].deleteBlocked, true);
       assert.equal(cards[1].sourceState, 'none');
@@ -4241,19 +6138,33 @@ describe('createAdminStore', () => {
 
     it('passes Save as the default action to the choiceDialog', async () => {
       let captured = null;
-      const services = createMockServices({ choiceDialog: async (opts) => { captured = opts; return 'cancel'; } });
+      const services = createMockServices({
+        choiceDialog: async (opts) => {
+          captured = opts;
+          return 'cancel';
+        },
+      });
       const store = createAdminStore(services);
       await store.confirmDiscardDirtyComponentDraft();
       assert.equal(captured.defaultAction, 'save');
-      assert.deepEqual(captured.choices.map(c => c.action), ['save', 'discard', 'cancel']);
+      assert.deepEqual(
+        captured.choices.map((c) => c.action),
+        ['save', 'discard', 'cancel']
+      );
     });
 
     it('falls back to the two-way confirm when no choiceDialog is available', async () => {
-      const confirmTrue = createMockServices({ choiceDialog: undefined, confirmDialog: async () => true });
+      const confirmTrue = createMockServices({
+        choiceDialog: undefined,
+        confirmDialog: async () => true,
+      });
       const storeTrue = createAdminStore(confirmTrue);
       assert.equal(await storeTrue.confirmDiscardDirtyComponentDraft(), 'discard');
 
-      const confirmFalse = createMockServices({ choiceDialog: undefined, confirmDialog: async () => false });
+      const confirmFalse = createMockServices({
+        choiceDialog: undefined,
+        confirmDialog: async () => false,
+      });
       const storeFalse = createAdminStore(confirmFalse);
       assert.equal(await storeFalse.confirmDiscardDirtyComponentDraft(), 'cancel');
     });
@@ -4264,15 +6175,30 @@ describe('createAdminStore', () => {
       assert.equal(await store.confirmDiscardDirtyComponentDraft(), 'cancel');
     });
   });
-
 });
 
 describe('createAdminStore — gathering economy', () => {
   it('preserves the per-system economy block (two flags) in the normalized gathering config', async () => {
     // Regression: the normalizer used to drop systems[id].economy, so the task
     // editor (which reads the limitation flags reactively) lost its gating.
-    const gatheringConfig = { systems: { sys1: { economy: { stamina: { enabled: true, max: '40', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } } } } };
-    const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
+    const gatheringConfig = {
+      systems: {
+        sys1: {
+          economy: {
+            stamina: {
+              enabled: true,
+              max: '40',
+              start: '',
+              regen: { policy: 'none', unit: 'hours', amount: '' },
+            },
+            nodes: { enabled: false },
+          },
+        },
+      },
+    };
+    const services = createMockServices({
+      getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : ''),
+    });
     const store = createAdminStore(services);
     await store.refresh();
     const vs = get(store.viewState);
@@ -4283,8 +6209,29 @@ describe('createAdminStore — gathering economy', () => {
   });
 
   it('preserves a library task node config through normalization (so it survives save)', async () => {
-    const gatheringConfig = { systems: { sys1: { economy: { nodes: { enabled: true } }, tasks: [{ id: 't1', name: 'Mine', nodes: { enabled: true, max: 4, current: 4, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 3600 } } }] } } };
-    const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
+    const gatheringConfig = {
+      systems: {
+        sys1: {
+          economy: { nodes: { enabled: true } },
+          tasks: [
+            {
+              id: 't1',
+              name: 'Mine',
+              nodes: {
+                enabled: true,
+                max: 4,
+                current: 4,
+                depletionTiming: 'onStart',
+                respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: 3600 },
+              },
+            },
+          ],
+        },
+      },
+    };
+    const services = createMockServices({
+      getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : ''),
+    });
     const store = createAdminStore(services);
     await store.refresh();
     const node = get(store.viewState).gatheringConfig.systems.sys1.tasks[0].nodes;
@@ -4297,14 +6244,34 @@ describe('createAdminStore — gathering economy', () => {
   it('refreshGatheringConfig re-reads the setting so a flag change reflects without reopening', async () => {
     // The economy panel persists via the game service, not the store, so the
     // store's viewState would otherwise stay stale until the app reopens.
-    let gatheringConfig = { systems: { sys1: { economy: { stamina: { enabled: true, regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } } } } };
-    const services = createMockServices({ getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : '') });
+    let gatheringConfig = {
+      systems: {
+        sys1: {
+          economy: {
+            stamina: { enabled: true, regen: { policy: 'none', unit: 'hours', amount: '' } },
+            nodes: { enabled: false },
+          },
+        },
+      },
+    };
+    const services = createMockServices({
+      getSetting: (key) => (key === 'gatheringConfig' ? gatheringConfig : ''),
+    });
     const store = createAdminStore(services);
     await store.refresh();
     assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.stamina.enabled, true);
 
     // External write disables stamina; refresh pulls the new flags into viewState.
-    gatheringConfig = { systems: { sys1: { economy: { stamina: { enabled: false, regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } } } } };
+    gatheringConfig = {
+      systems: {
+        sys1: {
+          economy: {
+            stamina: { enabled: false, regen: { policy: 'none', unit: 'hours', amount: '' } },
+            nodes: { enabled: false },
+          },
+        },
+      },
+    };
     store.refreshGatheringConfig();
     assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.stamina.enabled, false);
   });

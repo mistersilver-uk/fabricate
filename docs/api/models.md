@@ -42,19 +42,20 @@ new Recipe({
   resultGroups,          // object[]
   toolIds,               // string[] (library Tool ids required for crafting)
   transferEffects,       // boolean (default false)
-  resultSelection: {     // object (routed mode only)
-    provider,            // "ingredientSet" | "macroOutcome" | "rollTableOutcome"
-    macroUuid,           // string | null (macroOutcome provider)
-    rollTableUuid        // string | null (rollTableOutcome provider)
+  resultSelection: {     // object (legacy, retired — round-trip only)
+    provider             // "ingredientSet" | "check"
   },
   metadata               // object (created, modified, author, version)
 })
 ```
 
 {: .note }
-> The legacy `outcomeRouting` field and the legacy `mapped`/`tiered` modes have been replaced by `resultSelection` with a `provider` field.
-> Legacy recipes are automatically normalised on load.
-> Use `resultSelection` for all new routed recipes.
+> The per-recipe `resultSelection.provider` is retired (issue 554).
+> No live resolution mode reads it: alchemy routing moved to the system-level alchemy check mode (`system.alchemy.checkMode`), and the two routed crafting modes (`routedByIngredients` and `routedByCheck`) derive their routing basis from the system mode.
+> The field is still normalised so a legacy recipe round-trips until migration strips it, but authoring no longer sets it.
+> `routedByIngredients` routes by each `IngredientSet.resultGroupId`, and `routedByCheck` routes by the system's routed crafting-check outcome.
+> The legacy `outcomeRouting` field and the legacy `mapped`/`tiered` and single `routed` modes are normalised on load.
+> `mapped` becomes `routedByIngredients` and `tiered` becomes `routedByCheck`.
 
 **Key methods:**
 
@@ -79,7 +80,7 @@ new Recipe({
   ingredientGroups,  // IngredientGroup[] -- all must be satisfied (AND)
   essences,          // { [essenceId]: quantity }
   toolIds,           // string[] (library Tool ids required for this set)
-  resultGroupId      // string | null (routed ingredientSet provider routing)
+  resultGroupId      // string | null (routedByIngredients routing target)
 }
 ```
 
@@ -147,20 +148,32 @@ A Tool entry stored under `system.tools` (the `craftingSystems` setting) has thi
 
 ```javascript
 {
-  id,           // string (library id, referenced by toolIds)
-  componentId,  // string (required managed component reference)
-  label,        // string (optional display label)
-  requirement,  // null | { formula } (a Foundry roll expression; required when set)
-  breakage,     // { mode: 'limitedUses', maxUses } |
-                // { mode: 'breakageChance', breakageChance } |
-                // { mode: 'diceExpression', formula, threshold }
-  onBreak       // { mode: 'destroy' } | { mode: 'flagBroken' } |
-                // { mode: 'replaceWith', replacementComponentId }
+  id,             // string (library id, referenced by toolIds)
+  componentId,    // string | null (optional managed-component link; null for an item-sourced tool)
+  name,           // string | null (display snapshot captured at registration/migration)
+  img,            // string | null (display snapshot image)
+  registeredItemUuid, // string | null (the tool's own registered source item uuid)
+  originItemUuid,     // string | null (the tool's own canonical/compendium source uuid)
+  aliasItemUuids,     // string[] (additional source references for matching)
+  label,          // string (optional user-authored display label, distinct from the snapshot)
+  requirement,    // null | { formula } (a Foundry roll expression; required when set)
+  breakage,       // { mode: 'limitedUses', maxUses } |
+                  // { mode: 'breakageChance', breakageChance } |
+                  // { mode: 'diceExpression', formula, threshold } |
+                  // { mode: 'immune' }
+  onBreak         // { mode: 'destroy' } | { mode: 'flagBroken' } |
+                  // { mode: 'replaceWith', replacementComponentId }
 }
 ```
 
+A Tool is first-class as of issue 561: it carries its own source references (`registeredItemUuid` / `originItemUuid` / `aliasItemUuids`, renamed in issue 560) and a `name` / `img` display snapshot, so it can be registered directly from an Item without importing that Item as a component.
+`componentId` is optional.
+It is `null` for an item-sourced tool and populated only for a tool that is also a managed component (a whetstone) or one migrated from a legacy component-linked tool.
+A valid Tool carries either a `componentId` or its own source references.
+
 Per-item usage for `limitedUses` tools is tracked under `Item.flags.fabricate.toolUsage = { timesUsed }`.
 The `flagBroken` on-break action sets `Item.flags.fabricate.toolBroken = true`.
+A tool's durable identity is stamped on its source Item as `Item.flags.fabricate.roles[systemId].toolId`, a sibling of the component role flag, so the same Item can be both a component and a tool.
 
 ---
 

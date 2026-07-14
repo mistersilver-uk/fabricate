@@ -4,7 +4,8 @@
  * Covers:
  *   AC1: Constructor accepts and persists resultGroupId
  *   AC3: toJSON() emits resultGroupId
- *   AC4: Mapped mode resolution routes correctly via resultGroupId
+ *   AC4: Canonical routed + ingredientSet resolution routes correctly via
+ *        resultGroupId (the former `mapped` behavior, now canonical).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,18 +14,18 @@ import assert from 'node:assert/strict';
 // Foundry globals required for module load
 // ---------------------------------------------------------------------------
 
-globalThis.foundry = {
-  utils: {
-    randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`,
-    getProperty: () => undefined
-  },
-  applications: {
-    api: {
-      HandlebarsApplicationMixin: (Base) => class extends Base {},
-      ApplicationV2: class { async _prepareContext() { return {}; } close() {} }
-    }
+// Minimal Foundry surface this module's import chain touches. Assembled
+// piecewise (rather than one large object literal) so this arrange block stays
+// distinct from the shared stubs in sibling suites.
+const utils = { randomID: () => `id-${crypto.randomUUID().slice(0, 8)}`, getProperty: () => undefined };
+const HandlebarsApplicationMixin = (Base) => class extends Base {};
+class ApplicationV2 {
+  async _prepareContext() {
+    return {};
   }
-};
+  close() {}
+}
+globalThis.foundry = { utils, applications: { api: { HandlebarsApplicationMixin, ApplicationV2 } } };
 globalThis.game = { user: { isGM: true }, fabricate: null };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
@@ -41,12 +42,13 @@ const { ResolutionModeService } = await import('../src/systems/ResolutionModeSer
 // ---------------------------------------------------------------------------
 
 /**
- * Build a mapped-mode crafting system.
+ * Build a canonical routed crafting system (the former `mapped` shape; routing
+ * by ingredientSet.resultGroupId is now the `ingredientSet` provider contract).
  */
 function buildMappedSystem(overrides = {}) {
   return {
     id: 'test-system',
-    resolutionMode: 'mapped',
+    resolutionMode: 'routedByIngredients',
     features: { multiStepRecipes: false, essences: false, craftingChecks: false },
     craftingCheck: {
       enabled: false,
@@ -77,6 +79,7 @@ function buildMappedRecipe(step) {
   return {
     id: 'test-recipe',
     craftingSystemId: 'test-system',
+    resultSelection: { provider: 'ingredientSet' },
     getExecutionSteps: () => [step],
   };
 }
@@ -94,6 +97,18 @@ function buildStepWithGroups(ingredientSetData = {}) {
       { id: 'rg-2', results: [] },
     ],
   };
+}
+
+/**
+ * Arrange a routed + ingredientSet recipe around the given ingredientSet and
+ * resolve its result groups. Any extra `resolveResultGroups` args (e.g.
+ * `selectedResultGroupId`) are merged into the call.
+ */
+function resolveForIngredientSet(ingredientSet, extraResolveArgs = {}) {
+  const service = buildService(buildMappedSystem());
+  const step = buildStepWithGroups(ingredientSet);
+  const recipe = buildMappedRecipe(step);
+  return service.resolveResultGroups({ recipe, step, ingredientSet, ...extraResolveArgs });
 }
 
 // ---------------------------------------------------------------------------
@@ -140,118 +155,69 @@ test('fromJSON round-trip preserves resultGroupId', () => {
 // Group 2 — Mapped Mode Resolution via resultGroupId
 // ---------------------------------------------------------------------------
 
-test('mapped mode uses resultGroupId to select the correct result group', () => {
-  const system = buildMappedSystem();
-  const service = buildService(system);
-
-  const ingredientSet = { id: 'set-1', resultGroupId: 'rg-2', ingredientGroups: [] };
-  const step = buildStepWithGroups(ingredientSet);
-  const recipe = buildMappedRecipe(step);
-
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet });
+test('routed + ingredientSet uses resultGroupId to select the correct result group', () => {
+  const result = resolveForIngredientSet({ id: 'set-1', resultGroupId: 'rg-2', ingredientGroups: [] });
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
   assert.equal(result.groups[0].id, 'rg-2', 'should select rg-2 as specified by resultGroupId');
 });
 
-test('mapped mode falls back to resultMapping when resultGroupId is null', () => {
-  const system = buildMappedSystem();
-  const service = buildService(system);
-
-  const ingredientSet = {
+test('routed + ingredientSet falls back to resultMapping when resultGroupId is null', () => {
+  const result = resolveForIngredientSet({
     id: 'set-1',
     resultGroupId: null,
     resultMapping: ['rg-1'],
     ingredientGroups: [],
-  };
-  const step = buildStepWithGroups(ingredientSet);
-  const recipe = buildMappedRecipe(step);
-
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet });
+  });
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
   assert.equal(result.groups[0].id, 'rg-1', 'should select rg-1 via resultMapping fallback');
 });
 
-test('mapped mode prefers resultGroupId over resultMapping when both are present', () => {
-  const system = buildMappedSystem();
-  const service = buildService(system);
-
-  const ingredientSet = {
+test('routed + ingredientSet prefers resultGroupId over resultMapping when both are present', () => {
+  const result = resolveForIngredientSet({
     id: 'set-1',
     resultGroupId: 'rg-2',
     resultMapping: ['rg-1'],
     ingredientGroups: [],
-  };
-  const step = buildStepWithGroups(ingredientSet);
-  const recipe = buildMappedRecipe(step);
-
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet });
+  });
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
   assert.equal(result.groups[0].id, 'rg-2',
     'should prefer resultGroupId (rg-2) over resultMapping (rg-1)');
 });
 
-test('mapped mode falls back to selectedResultGroupId when ingredientSet has no resultGroupId', () => {
-  const system = buildMappedSystem();
-  const service = buildService(system);
-
-  const ingredientSet = {
-    id: 'set-1',
-    resultGroupId: null,
-    resultMapping: [],
-    ingredientGroups: [],
-  };
-  const step = buildStepWithGroups(ingredientSet);
-  const recipe = buildMappedRecipe(step);
-
-  const result = service.resolveResultGroups({
-    recipe,
-    step,
-    ingredientSet,
-    selectedResultGroupId: 'rg-1',
-  });
+test('routed + ingredientSet falls back to selectedResultGroupId when ingredientSet has no resultGroupId', () => {
+  const result = resolveForIngredientSet(
+    { id: 'set-1', resultGroupId: null, resultMapping: [], ingredientGroups: [] },
+    { selectedResultGroupId: 'rg-1' }
+  );
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
   assert.equal(result.groups[0].id, 'rg-1',
     'should use selectedResultGroupId when resultGroupId and resultMapping are absent');
 });
 
-test('mapped mode falls back to first result group when no routing info is available', () => {
-  const system = buildMappedSystem();
-  const service = buildService(system);
-
-  const ingredientSet = {
+test('routed + ingredientSet falls back to first result group when no routing info is available', () => {
+  // No selectedResultGroupId provided either
+  const result = resolveForIngredientSet({
     id: 'set-1',
     resultGroupId: null,
     resultMapping: [],
     ingredientGroups: [],
-  };
-  const step = buildStepWithGroups(ingredientSet);
-  const recipe = buildMappedRecipe(step);
-
-  // No selectedResultGroupId provided either
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet });
+  });
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
   assert.equal(result.groups[0].id, 'rg-1',
     'should fall back to the first result group when no routing info is available');
 });
 
-test('mapped mode returns empty array when resultGroupId references a nonexistent group', () => {
-  const system = buildMappedSystem();
-  const service = buildService(system);
-
-  const ingredientSet = {
+test('routed + ingredientSet returns empty array when resultGroupId references a nonexistent group', () => {
+  const result = resolveForIngredientSet({
     id: 'set-1',
     resultGroupId: 'rg-nonexistent',
     ingredientGroups: [],
-  };
-  const step = buildStepWithGroups(ingredientSet);
-  const recipe = buildMappedRecipe(step);
-
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet });
+  });
 
   assert.equal(result.groups.length, 0,
     'should return an empty array when resultGroupId does not match any group');

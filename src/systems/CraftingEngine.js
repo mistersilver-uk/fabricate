@@ -1,16 +1,91 @@
-import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
-import { Tool } from '../models/Tool.js';
-import { applyToolUsageAndBreakage } from '../toolBreakageRuntime.js';
-import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
-import { MacroExecutor } from '../utils/MacroExecutor.js';
 import {
-  getItemSourceReferences,
-  getComponentSourceReferences,
-  itemMatchesComponentSource,
-} from '../utils/sourceUuid.js';
+  FABRICATE_FLAG_NAMESPACE,
+  getFabricateFlag,
+  isSafeFlagKeySegment,
+  setFabricateFlag,
+} from '../config/flags.js';
+import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
+import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
+import { Tool } from '../models/Tool.js';
+import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakageRuntime.js';
+import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
+import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
+import { matchComponentByName } from '../utils/componentNameMatch.js';
+import {
+  accumulateSubmissionEssences,
+  findMatchingComponent,
+  resolveItemEssences,
+} from '../utils/essenceResolver.js';
+import { MacroExecutor } from '../utils/MacroExecutor.js';
+import { resolveProgressiveAward } from '../utils/progressiveAward.js';
+import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
-import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
+import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { buildCraftingChatContent } from './CraftingChatCard.js';
+import {
+  buildCurrencyAffordProbe,
+  checkCurrencySpends,
+  spendCurrencySpends,
+} from './currencyAffordance.js';
 import { SignatureValidator } from './SignatureValidator.js';
+
+/**
+ * A human-readable reference for a Tool in a missing-tool diagnostic (issue 561). A tool
+ * with a managed-component link keeps the historical `componentId: X` form; an item-sourced
+ * tool (`componentId: null`) falls back to its user-authored `label`, then its display-
+ * snapshot `name`, then its `id`, so the message never reads `componentId: null`. Display
+ * read only — no snapshot is written.
+ *
+ * @param {object|null} tool
+ * @returns {string}
+ */
+function toolDisplayReference(tool) {
+  const componentId = tool?.componentId || tool?.systemItemId;
+  if (componentId) return `componentId: ${componentId}`;
+  return tool?.label || tool?.name || tool?.id || 'unknown';
+}
+
+/**
+ * Stamp the durable per-system component identity on a crafted OUTPUT item's data,
+ * BEFORE creation, so the inventory matcher attributes it to its OWN component
+ * regardless of naming collisions or Foundry's transitive `_stats.duplicateSource`
+ * chain (issue 539). A crafted item built from `sourceItem.toObject()` inherits the
+ * source's `duplicateSource`, which — for a component whose source was itself
+ * duplicated from a SIBLING component's item — points at the sibling and mis-attributes
+ * the output through the raw-reference fall-through.
+ *
+ * The stamp keys the SAME location the canonical reader `resolveComponentForItem` reads
+ * FIRST for an owned item — its tier-1 durable-flag identity
+ * (`durableClaimedComponent` → `claimedRoleId` → `flags.fabricate.roles[systemId].componentId`
+ * in `src/utils/sourceUuid.js`) — so a freshly crafted item resolves to its own component
+ * by identity and never reaches the source-ref tier. Mirrors the source-side stamp
+ * {@link CraftingSystemManager#autoStampComponentSources} writes via
+ * `setFabricateFlag(source, 'roles.<systemId>.componentId', id)`: the roles map lives at
+ * the doubly-nested `flags.fabricate.fabricate.roles` path (`normalizeFlagKey` prefixes
+ * `fabricate.`, then `expandObject` nests it under the `fabricate` scope), so on a plain
+ * item-data object that same path is written directly.
+ *
+ * A dotted/unsafe `systemId` can never be a `roles` map key (every stamp/repair site skips
+ * it), so it is skipped here too and the item resolves via the raw-reference fall-through.
+ *
+ * @param {object} itemData - The plain item-data object about to be created.
+ * @param {string|null|undefined} systemId - The crafting system's id.
+ * @param {string|null|undefined} componentId - The result component's id.
+ */
+function stampCraftedComponentIdentity(itemData, systemId, componentId) {
+  if (!itemData || !componentId || !isSafeFlagKeySegment(systemId)) return;
+  // Build the doubly-nested `flags.fabricate.fabricate.roles[systemId]` container in
+  // place without depending on `foundry.utils.setProperty` (the source-side stamp goes
+  // through `setFlag`; here the item is unsaved data), preserving any sibling flags and
+  // any existing `roles` leaves for other systems.
+  const flags = (itemData.flags ||= {});
+  const namespace = (flags[FABRICATE_FLAG_NAMESPACE] ||= {});
+  const nested = (namespace[FABRICATE_FLAG_NAMESPACE] ||= {});
+  const roles = (nested.roles ||= {});
+  const perSystem = (roles[systemId] ||= {});
+  perSystem.componentId = componentId;
+}
 
 /**
  * Handles the actual crafting process
@@ -22,13 +97,68 @@ export class CraftingEngine {
     craftingRunManager = null,
     resolutionModeService = null,
     itemPilesIntegration = null,
-    salvageRunManager = null
+    salvageRunManager = null,
+    actorInventoryCoinSpender = null,
+    actorPropertyCoinSpender = null
   ) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
     this.resolutionModeService = resolutionModeService;
     this.itemPilesIntegration = itemPilesIntegration;
     this.salvageRunManager = salvageRunManager;
+    // Stubbable spend seams: the actorInventory spender is injected by tests (and wired in
+    // main.js) so they can assert which path ran; the actorProperty spender defaults to the
+    // generic implementation and needs no system-specific wiring. They flow through to the
+    // shared currency-affordance resolver as the spend-strategy → spender seams.
+    this.actorInventoryCoinSpender = actorInventoryCoinSpender;
+    this.actorPropertyCoinSpender = actorPropertyCoinSpender;
+  }
+
+  /**
+   * The spend seams handed to the shared currency-affordance helpers
+   * ({@link buildCurrencyAffordProbe}, {@link checkCurrencySpends}, {@link spendCurrencySpends}).
+   * @private
+   */
+  _currencySeams() {
+    return {
+      actorInventoryCoinSpender: this.actorInventoryCoinSpender,
+      actorPropertyCoinSpender: this.actorPropertyCoinSpender,
+    };
+  }
+
+  /**
+   * The component resolver to inject through the craftability, selection, and
+   * essence-context paths for THIS craft (issue 578). Only an alchemy attempt
+   * supplies the tier-4-aware {@link resolveAlchemySubmissionComponent} — the same
+   * resolver the submission collector/palette bucketed with — so a purely-tier-4
+   * submission (bare top-level `registeredItemUuid`) resolves to the same component
+   * everywhere on the brew path. Every other craft (and every display caller) gets
+   * `undefined`, which each threaded callee defaults to the shared standard-craft
+   * resolvers — byte-for-byte unchanged, so standard crafting never gains tier 4.
+   *
+   * @private
+   * @param {object|null} options - The craft options bag.
+   * @returns {Function|undefined} The injected resolver, or undefined for standard crafting.
+   */
+  _alchemyComponentResolver(options) {
+    return options?.isAlchemyAttempt === true ? resolveAlchemySubmissionComponent : undefined;
+  }
+
+  /**
+   * A resolution `meta.disposition` that represents a crafting-system MISCONFIGURATION
+   * (issue 85): a matched signature whose awarded result group cannot be resolved. This
+   * is a GM-side authoring gap, not a rolled player failure — the craft must abort with
+   * ZERO mutation (no ingredient, currency, or tool consumption) and report failure, not
+   * a silent empty success. Covers an unrecognized routed/tiered check outcome
+   * (`misconfiguration`), a resolved-but-unassigned outcome tier (`unrouted-tier`), and an
+   * unknown resolution mode (`error`).
+   *
+   * @private
+   * @param {string|null|undefined} disposition
+   * @returns {boolean}
+   */
+  _isMisconfigurationDisposition(disposition) {
+    return ['misconfiguration', 'unrouted-tier', 'error'].includes(disposition);
   }
 
   /**
@@ -38,7 +168,25 @@ export class CraftingEngine {
    * @param {Recipe} recipe - The recipe to use
    * @param {string} ingredientSetId - Which ingredient set to use (optional, uses first satisfiable if not provided)
    * @param {Object} options - Additional options
-   * @returns {Promise<{success: boolean, results: Item[]|null, message: string}>}
+   * @param {object|null} [options.ingredientOptionOverrides] Per-group player option
+   *   overrides (issue 552), keyed by `group.id` → `{ optionIndex, heldItemId? }`.
+   *   Threaded to the craftability gate and the single selection source so the
+   *   consumed plan matches what the player chose in the UI (and an insufficient
+   *   choice blocks with the missing-materials message). For a time-gated step the
+   *   override is applied at START, so the consumed-item snapshot the FINISH resume
+   *   replays already encodes the chosen option/stack.
+   * @param {boolean} [options.interactive] When true, the crafting check prompts the
+   *   player with the confirm-roll dialog (optional situational modifier) and posts
+   *   the roll to chat so Dice So Nice animates it. Defaults to false so automation
+   *   and macros stay silent. A dismissed prompt returns
+   *   `{ success: false, cancelled: true, results: null }` with zero mutation (no
+   *   ingredients, currency, or tools consumed, no run created). Note there is no
+   *   silent world-time roll for crafting: the initial time-gate-ARMING call
+   *   returns before the check runs (nothing to prompt), but a timed step's RESUME
+   *   is always a player click (Crafting-tab craft or the Journal "Trigger Next
+   *   Step") and DOES prompt when `interactive` is passed. (Only gathering has a
+   *   GM-gated world-time maturation path that resolves silently.)
+   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, cancelled?: boolean}>}
    */
   async craft(craftingActor, componentSourceActors, recipe, ingredientSetId = null, options = {}) {
     const resolutionService =
@@ -50,6 +198,14 @@ export class CraftingEngine {
     // per-system id, so a tool from system A must not satisfy a system-B recipe.
     const presentTools =
       options?.presentTools && !Array.isArray(options.presentTools) ? options.presentTools : null;
+    // Per-group player option overrides (issue 552): a `{ [groupId]: {optionIndex,
+    // heldItemId?} }` map from the crafting UI. Threaded to BOTH the craftability
+    // gate and the single selection source so the display and the consumed plan
+    // resolve the same chosen option/stack.
+    const ingredientOptionOverrides =
+      options?.ingredientOptionOverrides && typeof options.ingredientOptionOverrides === 'object'
+        ? options.ingredientOptionOverrides
+        : null;
     // Validate inputs
     if (!craftingActor) {
       return {
@@ -79,6 +235,13 @@ export class CraftingEngine {
 
     const runManager = this.craftingRunManager || game.fabricate?.getCraftingRunManager?.();
     let run = null;
+    // Track whether THIS call created the run (vs reused an existing one) and whether
+    // it reached a legitimate persisted state (armed a time gate, or completed a
+    // step). A run created here but never resolved — e.g. rejected by a pre-check
+    // validation gate below — is a phantom and is discarded in the `finally`, so a
+    // failed or never-started craft never lingers as an "in progress" active run.
+    let createdThisCall = false;
+    let resolved = false;
     if (runManager) {
       run = options?.runId
         ? runManager.getActiveRun(craftingActor, options.runId)
@@ -90,128 +253,699 @@ export class CraftingEngine {
           componentSourceActors,
           game.user?.id || null
         );
+        createdThisCall = true;
       }
     }
 
-    const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
-    if (visibilityService) {
-      const guard = visibilityService.guardCraftStart({
-        viewer: game.user,
-        recipe,
+    try {
+      const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
+      if (visibilityService) {
+        const guard = visibilityService.guardCraftStart({
+          viewer: game.user,
+          recipe,
+          craftingActor,
+          componentSourceActors,
+        });
+        if (!guard.craftable) {
+          const reasonMap = {
+            'missing-system': 'Crafting system not found',
+            visibility: 'Recipe is not visible to this user',
+            knowledge: 'Missing recipe knowledge',
+            locked: 'Recipe is locked',
+          };
+          return {
+            success: false,
+            results: null,
+            message: reasonMap[guard.reason] || 'Crafting is blocked by recipe access rules',
+          };
+        }
+      }
+
+      const executionSteps =
+        typeof recipe.getExecutionSteps === 'function'
+          ? recipe.getExecutionSteps()
+          : [
+              {
+                id: 'implicit-step',
+                name: 'Step 1',
+                ingredientSets: recipe.ingredientSets || [],
+                resultGroups: recipe.resultGroups || [],
+                toolIds: recipe.toolIds || [],
+                timeRequirement: null,
+                outcomeRouting: recipe.outcomeRouting || null,
+              },
+            ];
+
+      let stepIndex = Number(run?.currentStepIndex);
+      if (!Number.isFinite(stepIndex) || stepIndex < 0) stepIndex = 0;
+      const step = executionSteps[stepIndex];
+      if (!step) {
+        return {
+          success: false,
+          results: null,
+          message: 'No active crafting step available',
+        };
+      }
+      if (resolutionService) {
+        const modeValidation = resolutionService.validateRecipe(recipe);
+        if (!modeValidation.valid) {
+          return {
+            success: false,
+            results: null,
+            message: `Mode validation failed: ${modeValidation.errors.join(', ')}`,
+          };
+        }
+      }
+
+      // Time-gated step handling. A step whose time requirement resolves to > 0
+      // seconds consumes its components (and currency) at START — the call that
+      // ARMS the gate — then resumes at maturity (FINISH) to run the crafting
+      // check and create results. Instant (0-second) timed steps and non-timed
+      // steps fall through to the normal consume-at-finish path below unchanged.
+      const timeGateSeconds =
+        runManager && run && step.timeRequirement
+          ? runManager.durationToSeconds(step.timeRequirement)
+          : 0;
+      if (timeGateSeconds > 0) {
+        const existingGate = run.steps?.[stepIndex]?.timeGate;
+        if (!existingGate) {
+          // START: consume now, snapshot, then arm the gate.
+          const startOutcome = await this._startTimedStep({
+            craftingActor,
+            componentSourceActors,
+            recipe,
+            step,
+            stepIndex,
+            ingredientSetId,
+            ingredientOptionOverrides,
+            presentTools,
+            options,
+            runManager,
+            run,
+            createdThisCall,
+          });
+          resolved = startOutcome.resolved;
+          return startOutcome.result;
+        }
+        if (!runManager.canProceedTimeGate(run, stepIndex, Number(game.time?.worldTime || 0))) {
+          const remaining = Math.max(
+            0,
+            Math.ceil(Number(existingGate.availableAt || 0) - Number(game.time?.worldTime || 0))
+          );
+          // Components were already consumed at START; the run legitimately stays
+          // active while its gate matures — not a phantom.
+          resolved = true;
+          const stepLabel = step.name || `Step ${stepIndex + 1}`;
+          return {
+            success: false,
+            results: null,
+            message: `Step "${stepLabel}" is still in progress (${remaining}s remaining)`,
+          };
+        }
+        // FINISH: gate matured. Run the check and create results WITHOUT
+        // re-consuming (components/currency were already spent at START).
+        run = await runManager.markStepInProgress(craftingActor, run, stepIndex);
+        const finishOutcome = await this._finishTimedStep({
+          craftingActor,
+          componentSourceActors,
+          recipe,
+          step,
+          stepIndex,
+          options,
+          presentTools,
+          runManager,
+          run,
+        });
+        resolved = finishOutcome.resolved;
+        return finishOutcome.result;
+      }
+
+      const executionRecipe = this._buildStepRecipeView(recipe, step);
+
+      // Alchemy attempts inject the tier-4-aware submission resolver through the
+      // craftability, selection, and essence-context paths (issue 578); standard
+      // crafting gets `undefined` → the shared resolvers, byte-for-byte unchanged.
+      const resolveComponent = this._alchemyComponentResolver(options);
+
+      // Check if recipe step can be crafted. Thread the crafting actor so a currency
+      // alternative is craftable exactly when this actor can afford it — display and
+      // execution agree on the same currency-aware decision.
+      const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, {
+        presentTools,
+        craftingActor,
+        resolveComponent,
+        optionOverrides: ingredientOptionOverrides,
+      });
+      if (!canCraftCheck.canCraft) {
+        const missingMsg = this._formatMissingItems(canCraftCheck.missing, executionRecipe);
+        return {
+          success: false,
+          results: null,
+          message: `Missing required items:\n${missingMsg}`,
+        };
+      }
+
+      // Determine which ingredient set to use
+      let ingredientSet;
+      if (ingredientSetId) {
+        ingredientSet = executionRecipe.ingredientSets.find((s) => s.id === ingredientSetId);
+        if (!ingredientSet) {
+          return {
+            success: false,
+            results: null,
+            message: `Invalid ingredient set ID: ${ingredientSetId}`,
+          };
+        }
+      } else {
+        // Use the satisfiable set from canCraftCheck
+        ingredientSet = canCraftCheck.satisfiableSet;
+      }
+
+      // SINGLE SELECTION SOURCE: compute the widened selection exactly once here, with
+      // the currency probe bound to the crafting actor + system currency profile. Both
+      // consumption (its item `plan`) and the currency gate/spend (its `currencySpends`)
+      // read THIS selection — never a recompute — so item mutation mid-craft can never
+      // diverge the gated spend from the consumed plan.
+      const craftSelection = this._resolveCraftSelection(
+        componentSourceActors,
+        ingredientSet,
+        executionRecipe,
+        craftingActor,
+        resolveComponent,
+        ingredientOptionOverrides
+      );
+      const currencySpends = craftSelection.currencySpends || [];
+
+      // Validate tools: the recipe's resolved library Tools must be present
+      // (a matching, non-broken item) on the component source actors.
+      const toolsForSet =
+        typeof this.recipeManager.getToolsForSet === 'function'
+          ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
+          : [];
+      const toolValidation = await this._validateTools(
+        componentSourceActors,
+        executionRecipe,
+        toolsForSet,
+        presentTools
+      );
+      if (!toolValidation.valid) {
+        return {
+          success: false,
+          results: null,
+          message: toolValidation.message,
+        };
+      }
+
+      // Currency afford gate: every chosen currency spend must be affordable (aggregated
+      // cross-unit on the common ladder) BEFORE any item/currency mutation or the
+      // Item-Piles deduct. On a shortfall we abort here with zero mutation and never fall
+      // back to an unselected item plan.
+      const currencyAffordCheck = await checkCurrencySpends(
+        craftingActor,
+        executionRecipe,
+        currencySpends,
+        this._currencySeams()
+      );
+      if (!currencyAffordCheck.valid) {
+        return {
+          success: false,
+          results: null,
+          message: currencyAffordCheck.message,
+        };
+      }
+
+      const itemPilesAffordCheck = await this._checkItemPilesCurrencyCost(craftingActor, recipe);
+      if (!itemPilesAffordCheck.valid) {
+        return {
+          success: false,
+          results: null,
+          message: itemPilesAffordCheck.message,
+        };
+      }
+
+      // Run optional system-level crafting check before consuming ingredients.
+      // `interactive` (opt-in, from a UI-triggered craft) surfaces a confirm/roll
+      // dialog and posts the roll to chat; automation/macros omit it and stay silent.
+      const checkResult = await this._runCraftingCheck(
+        executionRecipe,
         craftingActor,
         componentSourceActors,
-      });
-      if (!guard.craftable) {
-        const reasonMap = {
-          'missing-system': 'Crafting system not found',
-          visibility: 'Recipe is not visible to this user',
-          knowledge: 'Missing recipe knowledge',
-          locked: 'Recipe is locked',
-        };
+        ingredientSet,
+        step,
+        { interactive: options?.interactive === true }
+      );
+      // A misconfigured required check (no authored roll formula for the active mode)
+      // is a GM-side system gap, not a rolled failure: abort with ZERO mutation so the
+      // player's ingredients/currency/tools are never consumed or broken. The
+      // failure-consumption policy below applies only to genuine rolled failures.
+      if (checkResult.misconfigured) {
         return {
           success: false,
           results: null,
-          message: reasonMap[guard.reason] || 'Crafting is blocked by recipe access rules',
+          message: checkResult.message,
         };
       }
-    }
-
-    const executionSteps =
-      typeof recipe.getExecutionSteps === 'function'
-        ? recipe.getExecutionSteps()
-        : [
+      // The player dismissed the interactive roll dialog: a user choice, not a
+      // failure. Abort with ZERO mutation (no consumption, no breakage, no chat)
+      // before the failure-consumption path below.
+      if (checkResult.cancelled) {
+        return { success: false, cancelled: true, results: null, message: 'Crafting cancelled' };
+      }
+      if (!checkResult.success) {
+        // Matched Simple alchemy attempt: a failed check is a genuine outcome, not a
+        // fizzle. Consume per `alchemy.consumeOnFail`, produce the reserved failure
+        // result group (when non-empty), learn on match, and post a DISTINCT
+        // failure-result banner. Tiered alchemy failure fizzles via the generic path
+        // below (routedByCheck short-circuit, no failure group).
+        if (
+          options?.isAlchemyAttempt === true &&
+          this._getAlchemyCheckMode(executionRecipe) === 'simple'
+        ) {
+          const outcome = await this._resolveAlchemySimpleFailure({
+            craftingActor,
+            componentSourceActors,
+            recipe,
+            executionRecipe,
+            step,
+            stepIndex,
+            ingredientSet,
+            craftSelection,
+            currencySpends,
+            toolValidation,
+            checkResult,
+            options,
+            runManager,
+            run,
+          });
+          resolved = outcome.resolved;
+          return outcome.result;
+        }
+        const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
+        let consumedOnFail = [];
+        let usedToolPairs = [];
+        let usedToolsOnFail = [];
+        try {
+          if (failurePolicy.consumeIngredientsOnFail) {
+            consumedOnFail = await this._consumeIngredients(craftSelection.plan);
+            // Currency is consumed alongside items on the failure path only when the
+            // policy consumes ingredients on failure (it is a chosen ingredient).
+            await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+          }
+          if (failurePolicy.breakToolsOnFail) {
+            usedToolPairs = toolValidation.tools;
+            // The single shared `evaluateCheckBreakage` seam decides forced breakage
+            // on the check-failure path too (gated by `breakToolsOnFail`, as
+            // today). Under `toolSpecific` an engine-evaluated crit/tier
+            // `data.breakTools` force-break applies; under `checkDriven` the active
+            // check's `checkBreakage` triggers decide. The no-check passthrough
+            // result is not engine-evaluated, so it never force-breaks (the
+            // `engineEvaluated` guard lives inside the seam).
+            const breakDecision = this._resolveCraftingBreakageDecision(
+              this._getRecipeSystem(executionRecipe),
+              executionRecipe,
+              checkResult
+            );
+            usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+              forceBreak: breakDecision.forceBreak,
+              authority: breakDecision.authority,
+              reason: breakDecision.reason,
+              triggerId: breakDecision.triggerId,
+            });
+          }
+        } catch (consumptionError) {
+          console.error('Fabricate | Error during failure-path consumption:', consumptionError);
+        }
+        if (runManager && run) {
+          await runManager.completeStepFailure(
+            craftingActor,
+            run,
+            stepIndex,
+            checkResult.message || 'Crafting check failed',
             {
-              id: 'implicit-step',
-              name: 'Step 1',
-              ingredientSets: recipe.ingredientSets || [],
-              resultGroups: recipe.resultGroups || [],
-              toolIds: recipe.toolIds || [],
-              timeRequirement: null,
-              outcomeRouting: recipe.outcomeRouting || null,
+              selectedIngredientSetId: ingredientSet.id,
+              lastCheckResult: {
+                success: false,
+                reason: checkResult.message || 'Crafting check failed',
+                outcome: checkResult.outcome ?? undefined,
+                value: checkResult.value ?? undefined,
+                data: checkResult.data || {},
+              },
+              consumedIngredients: consumedOnFail.map(({ item, quantity }) => ({
+                actorUuid: item.parent?.uuid || null,
+                itemUuid: item.uuid,
+                quantity,
+              })),
+              usedTools: usedToolsOnFail,
+            }
+          );
+        }
+        await this._postCraftChatMessage({
+          success: false,
+          craftingActor,
+          recipe,
+          consumedIngredients: consumedOnFail,
+          tools: usedToolPairs,
+          createdResults: [],
+          failureReason: checkResult.message || 'Crafting check failed',
+        });
+        return {
+          success: false,
+          results: null,
+          message: checkResult.message || 'Crafting check failed',
+        };
+      }
+      if (
+        resolutionService &&
+        !resolutionService.validateCheckResult({ recipe: executionRecipe, checkResult })
+      ) {
+        const message =
+          'Crafting check result does not satisfy current resolution mode requirements';
+        const validationFailurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
+        let consumedOnValidationFail = [];
+        let usedToolPairsOnValidationFail = [];
+        let usedToolsOnValidationFail = [];
+        try {
+          if (validationFailurePolicy.consumeIngredientsOnFail) {
+            consumedOnValidationFail = await this._consumeIngredients(craftSelection.plan);
+            await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+          }
+          if (validationFailurePolicy.breakToolsOnFail) {
+            usedToolPairsOnValidationFail = toolValidation.tools;
+            // Resolution-mode validation failure: route through the shared seam so the
+            // breakage authority (and immune handling) stay consistent. The check
+            // itself succeeded, so a checkDriven trigger may still force breakage.
+            const validationBreakDecision = this._resolveCraftingBreakageDecision(
+              this._getRecipeSystem(executionRecipe),
+              executionRecipe,
+              checkResult
+            );
+            usedToolsOnValidationFail = await this._applyToolBreakage(
+              executionRecipe,
+              toolValidation.tools,
+              {
+                forceBreak: validationBreakDecision.forceBreak,
+                authority: validationBreakDecision.authority,
+                reason: validationBreakDecision.reason,
+                triggerId: validationBreakDecision.triggerId,
+              }
+            );
+          }
+        } catch (consumptionError) {
+          console.error('Fabricate | Error during failure-path consumption:', consumptionError);
+        }
+        if (runManager && run) {
+          await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+            selectedIngredientSetId: ingredientSet.id,
+            lastCheckResult: {
+              success: false,
+              reason: message,
+              outcome: checkResult.outcome ?? undefined,
+              value: checkResult.value ?? undefined,
+              data: checkResult.data || {},
             },
-          ];
-
-    let stepIndex = Number(run?.currentStepIndex);
-    if (!Number.isFinite(stepIndex) || stepIndex < 0) stepIndex = 0;
-    const step = executionSteps[stepIndex];
-    if (!step) {
-      return {
-        success: false,
-        results: null,
-        message: 'No active crafting step available',
-      };
-    }
-    if (resolutionService) {
-      const modeValidation = resolutionService.validateRecipe(recipe);
-      if (!modeValidation.valid) {
+            consumedIngredients: consumedOnValidationFail.map(({ item, quantity }) => ({
+              actorUuid: item.parent?.uuid || null,
+              itemUuid: item.uuid,
+              quantity,
+            })),
+            usedTools: usedToolsOnValidationFail,
+          });
+        }
+        await this._postCraftChatMessage({
+          success: false,
+          craftingActor,
+          recipe,
+          consumedIngredients: consumedOnValidationFail,
+          tools: usedToolPairsOnValidationFail,
+          createdResults: [],
+          failureReason: message,
+        });
         return {
           success: false,
           results: null,
-          message: `Mode validation failed: ${modeValidation.errors.join(', ')}`,
+          message,
         };
       }
-    }
 
-    if (runManager && run && step.timeRequirement) {
-      run = await runManager.markStepWaitingForTime(
+      // PRE-CONSUMPTION MISCONFIGURATION GATE (issue 85). Resolve the awarded result
+      // group(s) BEFORE consuming anything. A matched signature whose routed/tiered
+      // check outcome resolves to no valid result group (an unrecognized outcome, an
+      // unrouted tier, or an unknown mode) is a crafting-system misconfiguration — a
+      // GM-side authoring gap, not a player success or a rolled failure. Abort here with
+      // ZERO mutation so ingredients, currency, and tools are never consumed or broken,
+      // record the run as a step failure, and surface the actionable GM diagnostic
+      // (spec `resolution-modes` §Alchemy Mode and `recipes-and-steps` §Alchemy Execution
+      // Lifecycle). Resolution is a pure, deterministic read of the recipe/step/ingredient
+      // set/check result, so it agrees with the resolution `_createResultItems` performs
+      // after consumption — this simply moves detection ahead of any mutation.
+      if (typeof resolutionService?.resolveResultGroups === 'function') {
+        const preflightResolution = resolutionService.resolveResultGroups({
+          recipe: executionRecipe,
+          step,
+          ingredientSet,
+          checkResult,
+          selectedResultGroupId: options?.resultGroupId || null,
+        });
+        if (this._isMisconfigurationDisposition(preflightResolution?.meta?.disposition)) {
+          const message = preflightResolution.meta.error || 'Crafting resolution failed';
+          if (runManager && run) {
+            await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+              selectedIngredientSetId: ingredientSet.id,
+              lastCheckResult: {
+                success: false,
+                reason: message,
+                outcome: checkResult.outcome ?? undefined,
+                value: checkResult.value ?? undefined,
+                data: checkResult.data || {},
+              },
+              consumedIngredients: [],
+              usedTools: [],
+            });
+          }
+          await this._postCraftChatMessage({
+            success: false,
+            craftingActor,
+            recipe,
+            consumedIngredients: [],
+            tools: [],
+            createdResults: [],
+            failureReason: message,
+          });
+          return {
+            success: false,
+            results: null,
+            message,
+            disposition: preflightResolution.meta.disposition,
+          };
+        }
+      }
+
+      // Consume ingredients from the single craft selection's item plan.
+      const consumedItems = await this._consumeIngredients(craftSelection.plan);
+
+      // For alchemy attempts: also consume submitted items that weren't handled
+      // by standard ingredient matching (e.g. items used only for essences).
+      await this._consumeAlchemyExtraItems(consumedItems, componentSourceActors, options);
+
+      // Deduct the chosen currency spends after item consumption (the afford gate above
+      // already confirmed every spend is affordable). A mid-loop spend failure is logged
+      // like the Item-Piles deduct error below — not refunded.
+      await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+
+      // Apply tool usage/breakage for the recipe's resolved library Tools via the
+      // single shared `evaluateCheckBreakage` seam. Under `toolSpecific` an
+      // engine-evaluated crit/tier `breakTools` forces every matched tool to break (the
+      // no-check passthrough result is not engine-evaluated, so it does not); under
+      // `checkDriven` the active
+      // check's `checkBreakage` triggers decide whether all required non-immune tools
+      // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
+      // gate exists here).
+      const successBreakDecision = this._resolveCraftingBreakageDecision(
+        this._getRecipeSystem(executionRecipe),
+        executionRecipe,
+        checkResult
+      );
+      const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+        forceBreak: successBreakDecision.forceBreak,
+        authority: successBreakDecision.authority,
+        reason: successBreakDecision.reason,
+        triggerId: successBreakDecision.triggerId,
+      });
+
+      // Deduct Item Piles currency cost after ingredients are consumed to avoid
+      // losing currency if ingredient consumption throws.
+      await this._deductItemPilesCurrencyCost(craftingActor, recipe);
+
+      // Create the result item(s). The awarded result group was already resolved and
+      // validated by the pre-consumption misconfiguration gate above (a matched signature
+      // that could not resolve to a valid result group aborted before any consumption),
+      // so this deterministic re-resolution inside `_createResultItems` yields real groups.
+      const { items: resultItems } = await this._createResultItems(
         craftingActor,
-        run,
-        stepIndex,
-        step.timeRequirement
+        executionRecipe,
+        step,
+        ingredientSet,
+        consumedItems,
+        toolValidation.tools,
+        checkResult,
+        options?.resultGroupId || null,
+        null,
+        resolveComponent
       );
-      const canProceed = runManager.canProceedTimeGate(
-        run,
-        stepIndex,
-        Number(game.time?.worldTime || 0)
-      );
-      if (!canProceed) {
-        const gate = run.steps?.[stepIndex]?.timeGate;
-        const remaining = Math.max(
-          0,
-          Math.ceil(Number(gate?.availableAt || 0) - Number(game.time?.worldTime || 0))
-        );
-        return {
-          success: false,
-          results: null,
-          message: `Step "${step.name || `Step ${stepIndex + 1}`}" is still in progress (${remaining}s remaining)`,
-        };
-      }
-      run = await runManager.markStepInProgress(craftingActor, run, stepIndex);
-    }
 
+      if (runManager && run) {
+        run = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
+          selectedIngredientSetId: ingredientSet.id,
+          lastCheckResult: {
+            success: true,
+            reason: checkResult.message || 'Success',
+            outcome: checkResult.outcome ?? undefined,
+            value: checkResult.value ?? undefined,
+            data: checkResult.data || {},
+          },
+          consumedIngredients: consumedItems.map(({ item, quantity }) => ({
+            actorUuid: item.parent?.uuid || null,
+            itemUuid: item.uuid,
+            quantity,
+          })),
+          usedTools,
+          createdResults: (resultItems || []).map((item) => ({
+            actorUuid: craftingActor.uuid,
+            itemUuid: item.uuid,
+            quantity: Number(item.system?.quantity || 1),
+            name: item.name ?? null,
+            img: item.img ?? null,
+          })),
+        });
+      }
+      // Step resolved: a multi-step recipe keeps an active run for the next step; a
+      // final step is already moved to history. Either way it is not a phantom.
+      resolved = true;
+
+      if (visibilityService) {
+        await visibilityService.applyRecipeItemUseOnCraft({
+          recipe,
+          craftingActor,
+          componentSourceActors,
+        });
+        if (options?.isAlchemyAttempt === true) {
+          await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
+        }
+      }
+
+      await this._postCraftChatMessage({
+        success: true,
+        craftingActor,
+        recipe,
+        consumedIngredients: consumedItems,
+        tools: toolValidation.tools,
+        createdResults: resultItems,
+      });
+
+      return {
+        success: true,
+        results: resultItems,
+        message:
+          run?.status === 'succeeded'
+            ? `Successfully crafted ${recipe.name}`
+            : `Completed ${step.name || `step ${stepIndex + 1}`} for ${recipe.name}`,
+      };
+    } finally {
+      // A run created this call that never armed a time gate or completed a step is a
+      // phantom stranded by a pre-check early-return (or a mid-execution throw).
+      // Discard it with no history entry — the attempt never began and the caller
+      // already surfaced the failure message. Completed runs are already moved to
+      // history (getActiveRun → null), and a reused pre-existing run
+      // (createdThisCall=false) is never touched.
+      if (createdThisCall && !resolved && run && runManager?.getActiveRun(craftingActor, run.id)) {
+        await runManager.discardRun(craftingActor, run.id);
+      }
+    }
+  }
+
+  /**
+   * START phase of a time-gated step: validate craftability, resolve the single
+   * craft selection, run the afford / tool gates, then CONSUME the components and
+   * currency NOW (before the gate is armed). Snapshots the resolved essences and a
+   * lightweight consumed-item summary onto the run step (via
+   * {@link CraftingRunManager#markStepPrepared}) so the FINISH resume can build
+   * results without re-reading the deleted source items, then arms the gate.
+   *
+   * Any pre-arm failure removes the run so no zombie "Ready to finish" run lingers:
+   * a run this call created is discarded (no history); a reused run is cancelled.
+   * Tool BREAKAGE is intentionally NOT applied here — it is tied to the crafting
+   * check outcome, which happens at FINISH.
+   *
+   * @private
+   * @returns {Promise<{ resolved: boolean, result: object }>}
+   */
+  async _startTimedStep({
+    craftingActor,
+    componentSourceActors,
+    recipe,
+    step,
+    stepIndex,
+    ingredientSetId,
+    ingredientOptionOverrides = null,
+    presentTools,
+    options,
+    runManager,
+    run,
+    createdThisCall,
+  }) {
     const executionRecipe = this._buildStepRecipeView(recipe, step);
 
-    // Check if recipe step can be crafted
+    // A timed alchemy attempt reaches canCraft/selection/essence-context here too
+    // (issue 578): inject the tier-4-aware submission resolver so a purely-tier-4
+    // submission STARTS (passes craftability, is consumed) and its component's
+    // essences are snapshotted for the FINISH effect transfer. Standard timed
+    // crafting gets `undefined` → the shared resolvers, byte-for-byte unchanged.
+    const resolveComponent = this._alchemyComponentResolver(options);
+
+    // Remove the never-armed run on any pre-arm failure so no zombie lingers: a
+    // run this call created is discarded (no history); a reused run is cancelled.
+    const abort = async (message) => {
+      await (createdThisCall
+        ? runManager.discardRun(craftingActor, run.id)
+        : runManager.cancelRun(craftingActor, run.id));
+      return { resolved: true, result: { success: false, results: null, message } };
+    };
+
     const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe, {
       presentTools,
+      craftingActor,
+      resolveComponent,
+      optionOverrides: ingredientOptionOverrides,
     });
     if (!canCraftCheck.canCraft) {
-      const missingMsg = this._formatMissingItems(canCraftCheck.missing);
-      return {
-        success: false,
-        results: null,
-        message: `Missing required items:\n${missingMsg}`,
-      };
+      return abort(
+        `Missing required items:\n${this._formatMissingItems(canCraftCheck.missing, executionRecipe)}`
+      );
     }
 
-    // Determine which ingredient set to use
     let ingredientSet;
     if (ingredientSetId) {
       ingredientSet = executionRecipe.ingredientSets.find((s) => s.id === ingredientSetId);
       if (!ingredientSet) {
-        return {
-          success: false,
-          results: null,
-          message: `Invalid ingredient set ID: ${ingredientSetId}`,
-        };
+        return abort(`Invalid ingredient set ID: ${ingredientSetId}`);
       }
     } else {
-      // Use the satisfiable set from canCraftCheck
       ingredientSet = canCraftCheck.satisfiableSet;
     }
 
-    // Validate tools: the recipe's resolved library Tools must be present
-    // (a matching, non-broken item) on the component source actors.
+    // SINGLE SELECTION SOURCE (mirrors craft()): the item plan and currencySpends
+    // both come from ONE _resolveCraftSelection call so consumption never diverges
+    // from the gated/spent currency.
+    const craftSelection = this._resolveCraftSelection(
+      componentSourceActors,
+      ingredientSet,
+      executionRecipe,
+      craftingActor,
+      resolveComponent,
+      ingredientOptionOverrides
+    );
+    const currencySpends = craftSelection.currencySpends || [];
+
     const toolsForSet =
       typeof this.recipeManager.getToolsForSet === 'function'
         ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
@@ -223,357 +957,368 @@ export class CraftingEngine {
       presentTools
     );
     if (!toolValidation.valid) {
-      return {
-        success: false,
-        results: null,
-        message: toolValidation.message,
-      };
+      return abort(toolValidation.message);
     }
 
-    const currencyCheck = await this._checkCurrencyRequirement(craftingActor, recipe, step);
-    if (!currencyCheck.valid) {
-      return {
-        success: false,
-        results: null,
-        message: currencyCheck.message,
-      };
+    const currencyAffordCheck = await checkCurrencySpends(
+      craftingActor,
+      executionRecipe,
+      currencySpends,
+      this._currencySeams()
+    );
+    if (!currencyAffordCheck.valid) {
+      return abort(currencyAffordCheck.message);
     }
 
     const itemPilesAffordCheck = await this._checkItemPilesCurrencyCost(craftingActor, recipe);
     if (!itemPilesAffordCheck.valid) {
-      return {
-        success: false,
-        results: null,
-        message: itemPilesAffordCheck.message,
-      };
+      return abort(itemPilesAffordCheck.message);
     }
 
-    // Run optional system-level crafting check before consuming ingredients.
+    // Consume NOW (at START): items first, then currency (both gates passed).
+    const consumedItems = await this._consumeIngredients(craftSelection.plan);
+    await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+    await this._deductItemPilesCurrencyCost(craftingActor, recipe);
+
+    // Snapshot for the FINISH resume: essence quantities are precomputed here
+    // because the source items are deleted before the check runs; the consumed
+    // summary carries only what chat / history / property-macro ingredientPool need.
+    const { resolvedEssences } = this._buildEssenceContext(
+      consumedItems,
+      executionRecipe,
+      null,
+      resolveComponent
+    );
+    const consumedSummary = consumedItems.map(({ item, quantity, ingredient }) => ({
+      itemUuid: item.uuid ?? null,
+      actorUuid: item.parent?.uuid ?? null,
+      quantity,
+      name: item.name ?? null,
+      img: item.img ?? null,
+      componentId:
+        ingredient?.match?.componentId ??
+        ingredient?.componentId ??
+        ingredient?.systemItemId ??
+        null,
+    }));
+
+    await runManager.markStepPrepared(craftingActor, run, stepIndex, {
+      selectedIngredientSetId: ingredientSet.id,
+      currencySpends,
+      resolvedEssences,
+      consumedSummary,
+    });
+
+    // Arm the gate now that the components are secured.
+    const armedRun = await runManager.markStepWaitingForTime(
+      craftingActor,
+      run,
+      stepIndex,
+      step.timeRequirement
+    );
+    const gate = armedRun.steps?.[stepIndex]?.timeGate;
+    const remaining = Math.max(
+      0,
+      Math.ceil(Number(gate?.availableAt || 0) - Number(game.time?.worldTime || 0))
+    );
+    const stepLabel = step.name || `Step ${stepIndex + 1}`;
+    return {
+      resolved: true,
+      result: {
+        success: false,
+        results: null,
+        message: `Step "${stepLabel}" is still in progress (${remaining}s remaining)`,
+      },
+    };
+  }
+
+  /**
+   * FINISH phase of a time-gated step: the gate has matured. Runs the crafting
+   * check and creates results using the START-phase snapshot — components and
+   * currency were already consumed at START, so this NEVER re-consumes, re-spends,
+   * or refunds. Essence transfer uses the precomputed `resolvedEssences` snapshot
+   * because the source items are already deleted. Property macros receive the
+   * lightweight snapshot summaries rather than live Foundry item docs.
+   *
+   * On a rolled failure (Fix 3) the components are already gone with no refund;
+   * this only breaks tools per the failure policy, records the failed run, and
+   * posts the failure chat. A misconfigured or cancelled check leaves the run
+   * active and resumable (no refund).
+   *
+   * @private
+   * @returns {Promise<{ resolved: boolean, result: object }>}
+   */
+  async _finishTimedStep({
+    craftingActor,
+    componentSourceActors,
+    recipe,
+    step,
+    stepIndex,
+    options,
+    presentTools,
+    runManager,
+    run,
+  }) {
+    const executionRecipe = this._buildStepRecipeView(recipe, step);
+    const prepared = run.steps?.[stepIndex]?.preparedConsumption || {};
+    const ingredientSet =
+      executionRecipe.ingredientSets.find((s) => s.id === prepared.selectedIngredientSetId) || null;
+    const resolvedEssences =
+      prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
+        ? prepared.resolvedEssences
+        : {};
+    const summary = Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [];
+
+    // Reconstruct lightweight consumed-item snapshots. The real Foundry items were
+    // deleted at START, so these carry only what chat / history / property-macro
+    // ingredientPool and essence transfer need.
+    const consumedItems = summary.map((entry) => ({
+      item: {
+        uuid: entry.itemUuid ?? null,
+        name: entry.name ?? null,
+        img: entry.img ?? null,
+        system: { quantity: entry.quantity },
+        parent: entry.actorUuid ? { uuid: entry.actorUuid } : null,
+      },
+      quantity: entry.quantity,
+      ingredient: entry.componentId
+        ? { componentId: entry.componentId, systemItemId: entry.componentId }
+        : null,
+    }));
+    const consumedRunRefs = summary.map((entry) => ({
+      actorUuid: entry.actorUuid ?? null,
+      itemUuid: entry.itemUuid ?? null,
+      quantity: entry.quantity,
+    }));
+
+    // Tools are reusable and were NOT consumed at START, so re-resolve them here
+    // for breakage (tied to the check outcome). A tool that went missing since
+    // START simply yields no breakable pairs — the components are already spent.
+    const toolsForSet =
+      typeof this.recipeManager.getToolsForSet === 'function'
+        ? this.recipeManager.getToolsForSet(executionRecipe, ingredientSet)
+        : [];
+    const toolValidation = await this._validateTools(
+      componentSourceActors,
+      executionRecipe,
+      toolsForSet,
+      presentTools
+    );
+    const toolItems = toolValidation.valid ? toolValidation.tools || [] : [];
+
+    const resolutionService =
+      this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+
     const checkResult = await this._runCraftingCheck(
       executionRecipe,
       craftingActor,
       componentSourceActors,
       ingredientSet,
-      step
+      step,
+      { interactive: options?.interactive === true }
     );
-    if (!checkResult.success) {
+
+    if (checkResult.misconfigured) {
+      // GM-side gap: components stay consumed (no refund), but the run remains
+      // active/resumable so a fixed check completes it later.
+      return {
+        resolved: true,
+        result: { success: false, results: null, message: checkResult.message },
+      };
+    }
+    if (checkResult.cancelled) {
+      // Player dismissed the roll: retryable. Components stay consumed (no refund);
+      // the run remains active so a later Finish can resolve it.
+      return {
+        resolved: true,
+        result: { success: false, cancelled: true, results: null, message: 'Crafting cancelled' },
+      };
+    }
+
+    // Shared timed-step failure recorder: components are already gone (consumed at
+    // START), so NEVER re-consume or refund — only break tools per the failure
+    // policy, archive the failed run, and post the failure chat.
+    const recordFailure = async (message) => {
       const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
-      let consumedOnFail = [];
       let usedToolPairs = [];
-      let usedToolsOnFail = [];
+      let usedTools = [];
       try {
-        if (failurePolicy.consumeIngredientsOnFail) {
-          consumedOnFail = await this._consumeIngredients(
-            componentSourceActors,
-            ingredientSet,
-            executionRecipe
+        if (failurePolicy.breakToolsOnFail && toolItems.length > 0) {
+          usedToolPairs = toolItems;
+          const breakDecision = this._resolveCraftingBreakageDecision(
+            this._getRecipeSystem(executionRecipe),
+            executionRecipe,
+            checkResult
           );
+          usedTools = await this._applyToolBreakage(executionRecipe, toolItems, {
+            forceBreak: breakDecision.forceBreak,
+            authority: breakDecision.authority,
+            reason: breakDecision.reason,
+            triggerId: breakDecision.triggerId,
+          });
         }
-        if (failurePolicy.consumeCatalystsOnFail) {
-          usedToolPairs = toolValidation.tools;
-          usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
-        }
-      } catch (consumptionError) {
-        console.error('Fabricate | Error during failure-path consumption:', consumptionError);
+      } catch (breakageError) {
+        console.error('Fabricate | Error during timed-step failure tool breakage:', breakageError);
       }
-      if (runManager && run) {
-        await runManager.completeStepFailure(
-          craftingActor,
-          run,
-          stepIndex,
-          checkResult.message || 'Crafting check failed',
-          {
-            selectedIngredientSetId: ingredientSet.id,
-            lastCheckResult: {
-              success: false,
-              reason: checkResult.message || 'Crafting check failed',
-              outcome: checkResult.outcome ?? undefined,
-              value: checkResult.value ?? undefined,
-              data: checkResult.data || {},
-            },
-            consumedIngredients: consumedOnFail.map(({ item, quantity }) => ({
-              actorUuid: item.parent?.uuid || null,
-              itemUuid: item.uuid,
-              quantity,
-            })),
-            usedTools: usedToolsOnFail,
-          }
-        );
-      }
-      // Execute failure macro (spec 002 Failure Macro Contract)
-      {
-        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
-        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
-        await this._runFailureMacro(recipe, {
-          recipe: recipe?.toJSON?.() || recipe,
-          craftingSystem: _craftingSystem,
-          craftingActor,
-          componentSourceActors,
-          step,
-          selectedIngredientSet: ingredientSet,
-          failureReason: checkResult.message || 'Crafting check failed',
-          checkResult,
-          consumedIngredients: consumedOnFail,
-          consumedTools: usedToolPairs,
-        });
-      }
+      await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+        selectedIngredientSetId: ingredientSet?.id,
+        lastCheckResult: {
+          success: false,
+          reason: message,
+          outcome: checkResult.outcome ?? undefined,
+          value: checkResult.value ?? undefined,
+          data: checkResult.data || {},
+        },
+        consumedIngredients: consumedRunRefs,
+        usedTools,
+      });
       await this._postCraftChatMessage({
         success: false,
         craftingActor,
         recipe,
-        consumedIngredients: consumedOnFail,
+        consumedIngredients: consumedItems,
         tools: usedToolPairs,
         createdResults: [],
-        failureReason: checkResult.message || 'Crafting check failed',
+        failureReason: message,
       });
-      return {
-        success: false,
-        results: null,
-        message: checkResult.message || 'Crafting check failed',
-      };
+      return { resolved: true, result: { success: false, results: null, message } };
+    };
+
+    if (!checkResult.success) {
+      // Matched Simple alchemy attempt (timed twin): produce the reserved failure
+      // group + learn WITHOUT re-consuming (components were spent at START). Tiered
+      // alchemy failure still fizzles via `recordFailure` (routedByCheck).
+      if (
+        options?.isAlchemyAttempt === true &&
+        this._getAlchemyCheckMode(executionRecipe) === 'simple'
+      ) {
+        return this._finishAlchemySimpleFailure({
+          craftingActor,
+          componentSourceActors,
+          recipe,
+          executionRecipe,
+          step,
+          stepIndex,
+          ingredientSet,
+          consumedItems,
+          consumedRunRefs,
+          toolItems,
+          resolvedEssences,
+          checkResult,
+          runManager,
+          run,
+        });
+      }
+      return recordFailure(checkResult.message || 'Crafting check failed');
     }
     if (
       resolutionService &&
       !resolutionService.validateCheckResult({ recipe: executionRecipe, checkResult })
     ) {
-      const message = 'Crafting check result does not satisfy current resolution mode requirements';
-      const validationFailurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
-      let consumedOnValidationFail = [];
-      let usedToolPairsOnValidationFail = [];
-      let usedToolsOnValidationFail = [];
-      try {
-        if (validationFailurePolicy.consumeIngredientsOnFail) {
-          consumedOnValidationFail = await this._consumeIngredients(
-            componentSourceActors,
-            ingredientSet,
-            executionRecipe
-          );
-        }
-        if (validationFailurePolicy.consumeCatalystsOnFail) {
-          usedToolPairsOnValidationFail = toolValidation.tools;
-          usedToolsOnValidationFail = await this._applyToolBreakage(
-            executionRecipe,
-            toolValidation.tools
-          );
-        }
-      } catch (consumptionError) {
-        console.error('Fabricate | Error during failure-path consumption:', consumptionError);
-      }
-      if (runManager && run) {
-        await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
-          selectedIngredientSetId: ingredientSet.id,
-          lastCheckResult: {
-            success: false,
-            reason: message,
-            outcome: checkResult.outcome ?? undefined,
-            value: checkResult.value ?? undefined,
-            data: checkResult.data || {},
-          },
-          consumedIngredients: consumedOnValidationFail.map(({ item, quantity }) => ({
-            actorUuid: item.parent?.uuid || null,
-            itemUuid: item.uuid,
-            quantity,
-          })),
-          usedTools: usedToolsOnValidationFail,
-        });
-      }
-      // Execute failure macro (spec 002 Failure Macro Contract)
-      {
-        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
-        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
-        await this._runFailureMacro(recipe, {
-          recipe: recipe?.toJSON?.() || recipe,
-          craftingSystem: _craftingSystem,
-          craftingActor,
-          componentSourceActors,
-          step,
-          selectedIngredientSet: ingredientSet,
-          failureReason: message,
-          checkResult,
-          consumedIngredients: consumedOnValidationFail,
-          consumedTools: usedToolPairsOnValidationFail,
-        });
-      }
-      await this._postCraftChatMessage({
-        success: false,
-        craftingActor,
-        recipe,
-        consumedIngredients: consumedOnValidationFail,
-        tools: usedToolPairsOnValidationFail,
-        createdResults: [],
-        failureReason: message,
-      });
-      return {
-        success: false,
-        results: null,
-        message,
-      };
+      return recordFailure(
+        'Crafting check result does not satisfy current resolution mode requirements'
+      );
     }
 
-    const currencyDecrement = await this._decrementCurrencyRequirement(craftingActor, recipe, step);
-    if (!currencyDecrement.valid) {
-      return {
-        success: false,
-        results: null,
-        message: currencyDecrement.message,
-      };
-    }
-
-    // Consume ingredients from component source actors
-    const consumedItems = await this._consumeIngredients(
-      componentSourceActors,
-      ingredientSet,
-      executionRecipe
+    // SUCCESS tool breakage (tied to the check outcome, applied here at FINISH).
+    const successBreakDecision = this._resolveCraftingBreakageDecision(
+      this._getRecipeSystem(executionRecipe),
+      executionRecipe,
+      checkResult
     );
+    const usedTools = await this._applyToolBreakage(executionRecipe, toolItems, {
+      forceBreak: successBreakDecision.forceBreak,
+      authority: successBreakDecision.authority,
+      reason: successBreakDecision.reason,
+      triggerId: successBreakDecision.triggerId,
+    });
 
-    // For alchemy attempts: also consume submitted items that weren't handled
-    // by standard ingredient matching (e.g. items used only for essences).
-    if (options?.isAlchemyAttempt && Array.isArray(options?.alchemySubmittedItems)) {
-      const alreadyConsumedUuids = new Set(consumedItems.map((c) => c.item.uuid));
-      const essenceConsumeCounts = new Map();
-      for (const item of options.alchemySubmittedItems) {
-        if (item.uuid && !alreadyConsumedUuids.has(item.uuid)) {
-          essenceConsumeCounts.set(item.uuid, (essenceConsumeCounts.get(item.uuid) || 0) + 1);
-        }
-      }
-      for (const actor of componentSourceActors) {
-        for (const item of actor.items || []) {
-          const count = essenceConsumeCounts.get(item.uuid);
-          if (!count) continue;
-          const qty = Number(item.system?.quantity ?? 1);
-          await (count >= qty ? item.delete() : item.update({ 'system.quantity': qty - count }));
-          consumedItems.push({ item, quantity: count, ingredient: null });
-        }
-      }
-    }
-
-    // Apply tool usage/breakage for the recipe's resolved library Tools.
-    const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools);
-
-    // Deduct Item Piles currency cost after ingredients are consumed to avoid
-    // losing currency if ingredient consumption throws.
-    await this._deductItemPilesCurrencyCost(craftingActor, recipe);
-
-    // Create the result item(s)
-    const {
-      items: resultItems,
-      rollTableMeta,
-      resolutionMeta,
-    } = await this._createResultItems(
+    // Create results from the snapshot: essence transfer uses the precomputed
+    // resolvedEssences (source items are deleted); chat/history/property-macro use
+    // the snapshot consumedItems.
+    const { items: resultItems, resolutionMeta } = await this._createResultItems(
       craftingActor,
       executionRecipe,
       step,
       ingredientSet,
       consumedItems,
-      toolValidation.tools,
+      toolItems,
       checkResult,
-      options?.resultGroupId || null
+      options?.resultGroupId || null,
+      resolvedEssences
     );
 
-    if (
-      resolutionMeta?.disposition === 'error' ||
-      resolutionMeta?.disposition === 'misconfiguration'
-    ) {
+    // Timed misconfiguration (issue 85). Unlike the immediate path, a timed step
+    // consumed its inputs at START, so a routing misconfiguration only surfaces here at
+    // FINISH (the check outcome is unknowable until the gate matures): it can only record
+    // a failure with NO refund, never a true zero-mutation abort. Route through the shared
+    // `_isMisconfigurationDisposition` predicate so this matches the immediate path and
+    // covers `unrouted-tier` too — a tier-routed recipe whose matured outcome resolves to
+    // an authored success tier no group lists would otherwise fall through to
+    // `completeStepSuccess` with empty results (a false success with lost inputs).
+    if (this._isMisconfigurationDisposition(resolutionMeta?.disposition)) {
       const message = resolutionMeta.error || 'Crafting resolution failed';
-      if (runManager && run) {
-        await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
-          selectedIngredientSetId: ingredientSet.id,
-          lastCheckResult: {
-            success: false,
-            reason: message,
-            outcome: checkResult.outcome ?? undefined,
-            value: checkResult.value ?? undefined,
-            data: checkResult.data || {},
-          },
-          consumedIngredients: consumedItems.map(({ item, quantity }) => ({
-            actorUuid: item.parent?.uuid || null,
-            itemUuid: item.uuid,
-            quantity,
-          })),
-          usedTools,
-        });
-      }
-      {
-        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
-        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
-        await this._runFailureMacro(recipe, {
-          recipe: recipe?.toJSON?.() || recipe,
-          craftingSystem: _craftingSystem,
-          craftingActor,
-          componentSourceActors,
-          step,
-          selectedIngredientSet: ingredientSet,
-          failureReason: message,
-          checkResult,
-          consumedIngredients: consumedItems,
-          consumedTools: toolValidation.tools,
-        });
-      }
+      await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+        selectedIngredientSetId: ingredientSet?.id,
+        lastCheckResult: {
+          success: false,
+          reason: message,
+          outcome: checkResult.outcome ?? undefined,
+          value: checkResult.value ?? undefined,
+          data: checkResult.data || {},
+        },
+        consumedIngredients: consumedRunRefs,
+        usedTools,
+      });
       await this._postCraftChatMessage({
         success: false,
         craftingActor,
         recipe,
         consumedIngredients: consumedItems,
-        tools: toolValidation.tools,
+        tools: toolItems,
         createdResults: [],
         failureReason: message,
-        rollTableMeta,
       });
       return {
-        success: false,
-        results: null,
-        message,
+        resolved: true,
+        result: {
+          success: false,
+          results: null,
+          message,
+          disposition: resolutionMeta.disposition,
+        },
       };
     }
 
-    if (runManager && run) {
-      run = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
-        selectedIngredientSetId: ingredientSet.id,
-        lastCheckResult: {
-          success: true,
-          reason: checkResult.message || 'Success',
-          outcome: checkResult.outcome ?? undefined,
-          value: checkResult.value ?? undefined,
-          data: checkResult.data || {},
-        },
-        consumedIngredients: consumedItems.map(({ item, quantity }) => ({
-          actorUuid: item.parent?.uuid || null,
-          itemUuid: item.uuid,
-          quantity,
-        })),
-        usedTools,
-        createdResults: (resultItems || []).map((item) => ({
-          actorUuid: craftingActor.uuid,
-          itemUuid: item.uuid,
-          quantity: Number(item.system?.quantity || 1),
-        })),
-      });
-    }
+    const completedRun = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
+      selectedIngredientSetId: ingredientSet?.id,
+      lastCheckResult: {
+        success: true,
+        reason: checkResult.message || 'Success',
+        outcome: checkResult.outcome ?? undefined,
+        value: checkResult.value ?? undefined,
+        data: checkResult.data || {},
+      },
+      consumedIngredients: consumedRunRefs,
+      usedTools,
+      createdResults: (resultItems || []).map((item) => ({
+        actorUuid: craftingActor.uuid,
+        itemUuid: item.uuid,
+        quantity: Number(item.system?.quantity || 1),
+        name: item.name ?? null,
+        img: item.img ?? null,
+      })),
+    });
 
-    // Execute success macro (spec 002 Success Macro Contract)
-    {
-      const _systemManager = game.fabricate?.getCraftingSystemManager?.();
-      const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
-      await this._runSuccessMacro(recipe, {
-        recipe: recipe?.toJSON?.() || recipe,
-        craftingSystem: _craftingSystem,
-        craftingActor,
-        componentSourceActors,
-        step,
-        selectedIngredientSet: ingredientSet,
-        consumedIngredients: consumedItems,
-        consumedTools: toolValidation.tools,
-        createdResults: resultItems || [],
-        checkResult,
-      });
-    }
-
+    const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
     if (visibilityService) {
       await visibilityService.applyRecipeItemUseOnCraft({
         recipe,
         craftingActor,
         componentSourceActors,
       });
+      // Learn on match for a matured timed alchemy brew too (gated inside
+      // `learnRecipeOnCraft` on `alchemy.learnOnCraft === true`).
       if (options?.isAlchemyAttempt === true) {
         await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
       }
@@ -584,19 +1329,280 @@ export class CraftingEngine {
       craftingActor,
       recipe,
       consumedIngredients: consumedItems,
-      tools: toolValidation.tools,
+      tools: toolItems,
       createdResults: resultItems,
-      rollTableMeta,
+    });
+
+    const stepLabel = step.name || `step ${stepIndex + 1}`;
+    return {
+      resolved: true,
+      result: {
+        success: true,
+        results: resultItems,
+        message:
+          completedRun?.status === 'succeeded'
+            ? `Successfully crafted ${recipe.name}`
+            : `Completed ${stepLabel} for ${recipe.name}`,
+      },
+    };
+  }
+
+  /**
+   * Shared tail for a matched Simple alchemy FAILURE (both the immediate `craft()`
+   * path and the timed `_finishTimedStep` twin): apply tool breakage (unless the
+   * caller already applied it and passed `usedTools`), produce the reserved
+   * `role: 'failure'` result group via the REAL `_createResultItems` (nothing when
+   * empty/absent), record the run as a failure, learn on match (gated inside
+   * `learnRecipeOnCraft`), post the distinct failure-result banner, and return the
+   * `produced-on-failure` result. Consumption differs per caller (immediate consumes
+   * per `alchemy.consumeOnFail`; timed already consumed at START), so it is done by
+   * the caller and passed in as `consumedItems`/`consumedRunRefs`.
+   * @private
+   */
+  async _produceAlchemyFailureResults({
+    craftingActor,
+    componentSourceActors,
+    recipe,
+    executionRecipe,
+    step,
+    stepIndex,
+    ingredientSet,
+    consumedItems,
+    consumedRunRefs,
+    toolItems,
+    usedTools = null,
+    resolvedEssences,
+    resultGroupId = null,
+    checkResult,
+    runManager,
+    run,
+  }) {
+    let appliedTools = usedTools;
+    if (appliedTools === null) {
+      try {
+        const breakDecision = this._resolveCraftingBreakageDecision(
+          this._getRecipeSystem(executionRecipe),
+          executionRecipe,
+          checkResult
+        );
+        appliedTools = await this._applyToolBreakage(executionRecipe, toolItems, {
+          forceBreak: breakDecision.forceBreak,
+          authority: breakDecision.authority,
+          reason: breakDecision.reason,
+          triggerId: breakDecision.triggerId,
+        });
+      } catch (breakageError) {
+        console.error(
+          'Fabricate | Error during alchemy failure-result tool breakage:',
+          breakageError
+        );
+        appliedTools = [];
+      }
+    }
+
+    // Route to + produce the reserved failure group (the failed checkResult routes
+    // `_resolveAlchemyResultGroups` there); empty/absent yields no items.
+    const { items: resultItems } = await this._createResultItems(
+      craftingActor,
+      executionRecipe,
+      step,
+      ingredientSet,
+      consumedItems,
+      toolItems,
+      checkResult,
+      resultGroupId,
+      resolvedEssences
+    );
+
+    if (runManager && run) {
+      await runManager.completeStepFailure(
+        craftingActor,
+        run,
+        stepIndex,
+        checkResult.message || 'Crafting check failed',
+        {
+          selectedIngredientSetId: ingredientSet?.id,
+          lastCheckResult: {
+            success: false,
+            reason: checkResult.message || 'Crafting check failed',
+            outcome: checkResult.outcome ?? undefined,
+            value: checkResult.value ?? undefined,
+            data: checkResult.data || {},
+          },
+          consumedIngredients: consumedRunRefs,
+          usedTools: appliedTools,
+        }
+      );
+    }
+
+    // Learn on MATCH regardless of pass/fail; `learnRecipeOnCraft` internally gates
+    // on `alchemy.learnOnCraft === true`. Mirror the success path's recipe-item use.
+    const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
+    if (visibilityService) {
+      await visibilityService.applyRecipeItemUseOnCraft({
+        recipe,
+        craftingActor,
+        componentSourceActors,
+      });
+      await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
+    }
+
+    await this._postCraftChatMessage({
+      success: false,
+      craftingActor,
+      recipe,
+      consumedIngredients: consumedItems,
+      tools: appliedTools,
+      createdResults: resultItems,
+      failureReason: checkResult.message || 'Crafting check failed',
     });
 
     return {
-      success: true,
-      results: resultItems,
-      message:
-        run?.status === 'succeeded'
-          ? `Successfully crafted ${recipe.name}`
-          : `Completed ${step.name || `step ${stepIndex + 1}`} for ${recipe.name}`,
+      resolved: true,
+      result: {
+        success: false,
+        results: resultItems.length > 0 ? resultItems : null,
+        message: checkResult.message || 'FABRICATE.Alchemy.FailureResult',
+        disposition: 'produced-on-failure',
+      },
     };
+  }
+
+  /**
+   * Timed twin of {@link _resolveAlchemySimpleFailure}: produce the reserved failure
+   * result group + learn for a matured timed Simple alchemy brew whose check FAILED.
+   * Components were already consumed at START, so this NEVER re-consumes — it defers
+   * to {@link _produceAlchemyFailureResults} for breakage/production/learn using the
+   * START snapshot (`resolvedEssences`). Returns `{ resolved, result }`.
+   * @private
+   */
+  async _finishAlchemySimpleFailure({
+    craftingActor,
+    componentSourceActors,
+    recipe,
+    executionRecipe,
+    step,
+    stepIndex,
+    ingredientSet,
+    consumedItems,
+    consumedRunRefs,
+    toolItems,
+    resolvedEssences,
+    checkResult,
+    runManager,
+    run,
+  }) {
+    return this._produceAlchemyFailureResults({
+      craftingActor,
+      componentSourceActors,
+      recipe,
+      executionRecipe,
+      step,
+      stepIndex,
+      ingredientSet,
+      consumedItems,
+      consumedRunRefs,
+      toolItems,
+      usedTools: null,
+      resolvedEssences,
+      resultGroupId: null,
+      checkResult,
+      runManager,
+      run,
+    });
+  }
+
+  /**
+   * Produce the reserved failure result group for a matched Simple alchemy attempt
+   * whose crafting check FAILED (the immediate, non-timed `craft()` path). Consumes
+   * per `alchemy.consumeOnFail` (NOT the generic `_getFailureConsumptionPolicy`),
+   * mirrors the essence/extra-submitted-item consumption, then defers to
+   * {@link _produceAlchemyFailureResults} for production/learn/banner.
+   * Returns `{ resolved, result }` for the caller.
+   * @private
+   */
+  async _resolveAlchemySimpleFailure({
+    craftingActor,
+    componentSourceActors,
+    recipe,
+    executionRecipe,
+    step,
+    stepIndex,
+    ingredientSet,
+    craftSelection,
+    currencySpends,
+    toolValidation,
+    checkResult,
+    options,
+    runManager,
+    run,
+  }) {
+    const system = this._getRecipeSystem(executionRecipe);
+    const consumeOnFail = system?.alchemy?.consumeOnFail !== false;
+
+    let consumedItems = [];
+    let usedTools = [];
+    try {
+      if (consumeOnFail) {
+        consumedItems = await this._consumeIngredients(craftSelection.plan);
+        await this._consumeAlchemyExtraItems(consumedItems, componentSourceActors, options);
+        await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+      }
+      const breakDecision = this._resolveCraftingBreakageDecision(
+        system,
+        executionRecipe,
+        checkResult
+      );
+      usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+        forceBreak: breakDecision.forceBreak,
+        authority: breakDecision.authority,
+        reason: breakDecision.reason,
+        triggerId: breakDecision.triggerId,
+      });
+    } catch (consumptionError) {
+      console.error(
+        'Fabricate | Error during alchemy failure-result consumption:',
+        consumptionError
+      );
+    }
+
+    const consumedRunRefs = consumedItems.map(({ item, quantity }) => ({
+      actorUuid: item.parent?.uuid || null,
+      itemUuid: item.uuid,
+      quantity,
+    }));
+
+    // Build a tier-4-aware essence snapshot over the consumed items (issue 578) so the
+    // reserved Simple-failure result group's essence-sourced effect transfer /
+    // property-macro context credits a purely-tier-4 submission its component's
+    // essences — mirroring how the timed twin forwards the START snapshot. Absent the
+    // injected resolver (never — this path is always an alchemy attempt) this degrades
+    // to the shared standard-craft resolver.
+    const { resolvedEssences } = this._buildEssenceContext(
+      consumedItems,
+      executionRecipe,
+      null,
+      this._alchemyComponentResolver(options)
+    );
+
+    return this._produceAlchemyFailureResults({
+      craftingActor,
+      componentSourceActors,
+      recipe,
+      executionRecipe,
+      step,
+      stepIndex,
+      ingredientSet,
+      consumedItems,
+      consumedRunRefs,
+      toolItems: toolValidation.tools,
+      usedTools,
+      resolvedEssences,
+      resultGroupId: options?.resultGroupId || null,
+      checkResult,
+      runManager,
+      run,
+    });
   }
 
   /**
@@ -609,8 +1615,12 @@ export class CraftingEngine {
    *
    * @param {Actor} craftingActor - The actor that will receive crafted results.
    * @param {Actor[]} componentSourceActors - The actors whose inventories are checked for submitted items.
-   * @param {object[]} submittedItems - Items dragged in by the player. Each must include at minimum
-   *   `{ uuid, name }` so signature matching and consumption can identify them.
+   * @param {Array<{item: object, componentId: string}>} submittedItems - Pre-bucketed
+   *   submission records from {@link resolveAlchemySubmissions} (issue 572): each pairs the
+   *   REAL owned item (`{ uuid, name, ... }`, for essence accumulation and consumption)
+   *   with the `componentId` it was bucketed to ONCE by the shared alchemy resolver. The
+   *   engine CONSUMES `componentId` for signature matching and the dead-end multiset rather
+   *   than re-deriving component identity, so the palette, collector, and engine agree.
    * @param {object} options - Additional options.
    * @param {string} [options.craftingSystemId] - ID of the crafting system to match against.
    * @param {object} [options.signatureValidator] - Optional override for the {@link SignatureValidator}
@@ -676,6 +1686,9 @@ export class CraftingEngine {
 
     const components = system.components || [];
     const recipes = systemRecipes;
+    // The bare owned items, for the uuid/essence-keyed paths (consumption and essence
+    // accumulation) that must key on the item, not its bucketed component id.
+    const submissionItems = submittedItems.map((record) => record.item);
     const matchResult = this._matchAlchemySignature(
       submittedItems,
       recipes,
@@ -688,8 +1701,14 @@ export class CraftingEngine {
     const shouldConsume = alchemyCfg.consumeOnFail !== false;
 
     if (!matchResult.matched) {
+      // Fizzle: this concrete submitted multiset matches NO enabled recipe. Record
+      // a per-character x system dead-end key (gated by showAttemptHistoryToPlayers)
+      // so the workbench can flip this exact set from `untried` -> `no-reaction` on a
+      // re-brew. The fizzle branch runs NO check and returns `disposition:'no-match'`
+      // with no roll, so the UI must not show a roll animation on this path.
+      await this._recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg);
       if (shouldConsume) {
-        await this._consumeSubmittedAlchemyItems(componentSourceActors, submittedItems);
+        await this._consumeSubmittedAlchemyItems(componentSourceActors, submissionItems);
       }
       return {
         success: false,
@@ -705,31 +1724,79 @@ export class CraftingEngine {
     return this.craft(craftingActor, componentSourceActors, recipe, ingredientSetId, {
       ...options,
       isAlchemyAttempt: true,
-      alchemySubmittedItems: submittedItems,
+      alchemySubmittedItems: submissionItems,
     });
   }
 
   /**
-   * Match submitted item UUIDs against all recipe signatures in the system.
+   * Match submitted items against all recipe signatures in the system.
+   *
+   * Matching is quantity-aware: an ingredient group is satisfied only when one
+   * of its options has its required quantity met. Each submission counts as one
+   * unit toward a group, because the workbench expands a stack into one
+   * submission per unit. Available units are counted by occurrence (how many
+   * submissions match an option's component IDs), NOT by reading each item's
+   * `system.quantity`. This per-unit occurrence model matches how essences are
+   * accumulated and how {@link _consumeSubmittedAlchemyItems} consumes items. It
+   * is deliberately different from {@link IngredientSet#resolveIngredientSelection},
+   * which sums `system.quantity` per item.
+   *
+   * A submission contributes at most one unit per option even if several of the
+   * option's components share its source-reference chain. Essence requirements,
+   * when the system supports essences, must also be met for a set to match.
+   *
+   * Component identity is NOT resolved here (issue 572): each submission record
+   * arrives ALREADY bucketed to its `componentId` by the shared alchemy resolver
+   * {@link resolveAlchemySubmissionComponent} at the collector
+   * ({@link resolveAlchemySubmissions}) — the SAME resolver the workbench palette
+   * uses — so the palette, collector, and matcher can never disagree. This method
+   * CONSUMES `record.componentId` and never re-derives identity from raw source
+   * references. Because each record carries exactly one component id, the
+   * one-unit-per-group semantics hold by construction (a submission is counted at
+   * most once per group even when several of a group's components share its
+   * reference chain).
+   *
    * Returns { matched: true, recipe, ingredientSetId } or { matched: false }.
+   * @param {Array<{item: object, componentId: string}>} submittedItems - Pre-bucketed records.
    * @private
    */
   _matchAlchemySignature(submittedItems, recipes, components, signatureValidator, options = {}) {
-    const submittedRefs = new Set();
-    for (const item of submittedItems) {
-      for (const ref of getItemSourceReferences(item)) submittedRefs.add(ref);
-      if (item?.sourceUuid) submittedRefs.add(item.sourceUuid);
-    }
+    const system = options?.system;
+
+    // Consume the component id each submission was bucketed to ONCE at the collector
+    // (issue 572), never re-deriving identity here. `null` for a submission that
+    // resolved to no component. Do NOT re-resolve per candidate component: that would
+    // double-count a submission matching several components of one group.
+    const resolvedComponentIds = submittedItems.map((record) => record?.componentId ?? null);
+
+    // Count submissions whose resolved component id is one of the given component
+    // IDs. Each submission resolved to exactly one component, so it contributes at
+    // most one unit toward a group even when several of the group's components
+    // share its reference chain.
+    const availableForComponentIds = (componentIds) => {
+      const idSet = componentIds instanceof Set ? componentIds : new Set(componentIds);
+      let available = 0;
+      for (const resolvedId of resolvedComponentIds) {
+        if (resolvedId != null && idSet.has(resolvedId)) available += 1;
+      }
+      return available;
+    };
 
     // Check whether the system supports essences
-    const system = options?.system;
-    const essencesEnabled =
-      system?.features?.essences === true && system?.advancedOptionsEnabled !== false;
+    const essencesEnabled = system?.features?.essences === true;
 
-    // Accumulate essences from ALL submitted items (duplicates count multiple times)
+    // Accumulate essences from the PRE-BUCKETED submission records (duplicates count
+    // multiple times). True bucket-once (issue 578): read the `componentId` each
+    // submission was bucketed to at the collector rather than re-resolving via the
+    // tier-4-blind `findMatchingComponent`, so essence attribution reads the exact
+    // same id group counting reads and a purely-tier-4 submission is credited its
+    // component's essences.
     let submittedEssences = null;
     if (essencesEnabled) {
-      submittedEssences = accumulateItemEssences(submittedItems, { components });
+      submittedEssences = accumulateSubmissionEssences(submittedItems, {
+        components,
+        systemId: system?.id,
+      });
     }
 
     for (const recipe of recipes) {
@@ -743,15 +1810,31 @@ export class CraftingEngine {
         // Skip sets that have neither ingredient groups nor essence requirements
         if (signature.length === 0 && !hasEssences) continue;
 
-        // Check ingredient groups (existing logic)
-        const allGroupsSatisfied = signature.every((groupComponentIds) => {
-          for (const componentId of groupComponentIds) {
-            const comp = components.find((c) => c.id === componentId);
-            if (!comp) continue;
-            if (getComponentSourceReferences(comp).some((ref) => submittedRefs.has(ref)))
-              return true;
+        // Check ingredient groups: a group is satisfied only when one of its
+        // options has its required quantity met by the available submissions
+        // matching that option's component IDs. Options are alternatives, so any
+        // single satisfied option satisfies the group. Only that option-as-
+        // alternative semantics is shared with
+        // IngredientSet.resolveIngredientSelection; the counting differs (that
+        // method sums each item's system.quantity, whereas this counts
+        // submission occurrences per unit). The signature is computed 1:1 from
+        // `set.ingredientGroups`, so they align by index.
+        const allGroupsSatisfied = signature.every((groupComponentIds, groupIndex) => {
+          const group = set.ingredientGroups?.[groupIndex];
+          const groupOptions = Array.isArray(group?.options) ? group.options : [];
+          if (groupOptions.length === 0) {
+            // No structured options (defensive): fall back to mere presence in
+            // the merged component-ID set for this group.
+            return availableForComponentIds(groupComponentIds) > 0;
           }
-          return false;
+          return groupOptions.some((option) => {
+            const optionComponentIds = signatureValidator.expandIngredientToComponentIds(
+              option,
+              components
+            );
+            const required = Math.max(1, Number(option?.quantity) || 1);
+            return availableForComponentIds(optionComponentIds) >= required;
+          });
         });
 
         // Check essences
@@ -771,6 +1854,35 @@ export class CraftingEngine {
       }
     }
     return { matched: false };
+  }
+
+  /**
+   * For a matched alchemy attempt, consume any submitted items that standard
+   * ingredient matching did not already consume (e.g. items supplied only for
+   * essence requirements). Mutates `consumedItems` in place with `{ item, quantity,
+   * ingredient: null }` entries. Shared by the success path AND the Simple
+   * failure path so a matched fail consumes the same submitted multiset as a pass.
+   * No-op unless this is an alchemy attempt carrying `alchemySubmittedItems`.
+   * @private
+   */
+  async _consumeAlchemyExtraItems(consumedItems, componentSourceActors, options) {
+    if (!options?.isAlchemyAttempt || !Array.isArray(options?.alchemySubmittedItems)) return;
+    const alreadyConsumedUuids = new Set(consumedItems.map((c) => c.item.uuid));
+    const essenceConsumeCounts = new Map();
+    for (const item of options.alchemySubmittedItems) {
+      if (item.uuid && !alreadyConsumedUuids.has(item.uuid)) {
+        essenceConsumeCounts.set(item.uuid, (essenceConsumeCounts.get(item.uuid) || 0) + 1);
+      }
+    }
+    for (const actor of componentSourceActors) {
+      for (const item of actor.items || []) {
+        const count = essenceConsumeCounts.get(item.uuid);
+        if (!count) continue;
+        const qty = Number(item.system?.quantity ?? 1);
+        await (count >= qty ? item.delete() : item.update({ 'system.quantity': qty - count }));
+        consumedItems.push({ item, quantity: count, ingredient: null });
+      }
+    }
   }
 
   /**
@@ -801,19 +1913,130 @@ export class CraftingEngine {
   }
 
   /**
-   * Consume ingredients from component source actors
+   * Map submission records to a plain-component multiset `{ componentId: units }`
+   * from the SAME `componentId` each was bucketed to at the collector (issue 572),
+   * so the dead-end key can never drift from the signature {@link _matchAlchemySignature}
+   * matched against. Each record contributes at most one unit; a record with no
+   * component id is skipped.
+   *
+   * @param {Array<{item: object, componentId: string}>} submittedItems - Pre-bucketed records.
    * @private
    */
-  async _consumeIngredients(componentSourceActors, ingredientSet, recipe) {
-    const consumedItems = [];
+  _submittedComponentMultiset(submittedItems) {
+    const multiset = {};
+    for (const record of Array.isArray(submittedItems) ? submittedItems : []) {
+      const componentId = record?.componentId;
+      if (!componentId) continue;
+      multiset[componentId] = (multiset[componentId] || 0) + 1;
+    }
+    return multiset;
+  }
 
-    // Aggregate all items from component source actors
+  /**
+   * Record a fizzled alchemy attempt's canonical signature key on the crafting
+   * actor, under a per-system append-only, deduped array
+   * (`alchemyDeadEnds[craftingSystemId] = [signatureKey]`). Written ONLY when the
+   * system's `showAttemptHistoryToPlayers` is true, via `getFabricateFlag` /
+   * `setFabricateFlag` (the effective stored path is doubly-nested under
+   * `flags.fabricate.fabricate.alchemyDeadEnds`). No-ops on an empty key, a
+   * duplicate key, or an actor without flag support.
+   * @private
+   */
+  async _recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg) {
+    if (alchemyCfg?.showAttemptHistoryToPlayers !== true) return;
+    if (!systemId || typeof craftingActor?.setFlag !== 'function') return;
+    const key = canonicalSignatureKey(this._submittedComponentMultiset(submittedItems));
+    if (!key) return;
+    const deadEnds = getFabricateFlag(craftingActor, 'alchemyDeadEnds', {});
+    const current = deadEnds && typeof deadEnds === 'object' ? deadEnds : {};
+    const forSystem = Array.isArray(current[systemId]) ? current[systemId] : [];
+    if (forSystem.includes(key)) return;
+    await setFabricateFlag(craftingActor, 'alchemyDeadEnds', {
+      ...current,
+      [systemId]: [...forSystem, key],
+    });
+  }
+
+  /**
+   * Deduct the chosen currency spends for a craft. The afford gate in {@link craft}
+   * already confirmed affordability, so this runs after item consumption. A spend
+   * failure here is logged (mirroring the Item-Piles deduct-error handling) and never
+   * refunded — it does not abort the craft, matching the no-refund policy.
+   * @private
+   */
+  async _spendCraftCurrency(craftingActor, recipe, currencySpends) {
+    if (!currencySpends?.length) return;
+    try {
+      const result = await spendCurrencySpends(
+        craftingActor,
+        recipe,
+        currencySpends,
+        this._currencySeams()
+      );
+      if (!result?.valid) {
+        console.error('Fabricate | Currency deduction reported failure', result?.message);
+      }
+    } catch (error) {
+      console.error('Fabricate | Currency deduction error', error);
+    }
+  }
+
+  /**
+   * Resolve the single craft selection for a step: the widened ingredient-set
+   * selection with the currency afford probe bound to the crafting actor. The
+   * returned object carries the item `plan` (consumed by {@link _consumeIngredients})
+   * and the `currencySpends` (gated/spent by the engine). Computed ONCE in
+   * {@link craft} so consumption and the currency spend never diverge.
+   *
+   * @private
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only submission is selected as its
+   *   component's ingredient for consumption; defaults (undefined) to the shared
+   *   standard-craft resolver via {@link RecipeManager#ingredientMatchesItem}.
+   * @param {object|null} [optionOverrides] - Per-group player option overrides
+   *   (issue 552) forwarded to the resolver so consumption matches the chosen option.
+   * @returns {{ success: boolean, plan: Array, currencySpends: Array, missingGroups: Array }}
+   */
+  _resolveCraftSelection(
+    componentSourceActors,
+    ingredientSet,
+    recipe,
+    craftingActor,
+    resolveComponent,
+    optionOverrides = null
+  ) {
     const availableItems = componentSourceActors.flatMap((actor) => [...actor.items]);
+    const matcher = (ingredient, item) =>
+      this.recipeManager.ingredientMatchesItem(recipe, ingredient, item, resolveComponent);
+    if (typeof ingredientSet?.resolveIngredientSelection === 'function') {
+      const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
+      return ingredientSet.resolveIngredientSelection(availableItems, matcher, {
+        affordCurrency,
+        optionOverrides,
+      });
+    }
+    // Back-compat: an ingredient set exposing only matchIngredients (older duck-typed
+    // shapes) yields an item-only plan with no currency spends.
+    if (typeof ingredientSet?.matchIngredients === 'function') {
+      return {
+        success: true,
+        plan: ingredientSet.matchIngredients(availableItems, matcher),
+        currencySpends: [],
+        missingGroups: [],
+      };
+    }
+    return { success: true, plan: [], currencySpends: [], missingGroups: [] };
+  }
 
-    // Match ingredients to items
-    const consumptionPlan = ingredientSet.matchIngredients(availableItems, (ingredient, item) =>
-      this.recipeManager.ingredientMatchesItem(recipe, ingredient, item)
-    );
+  /**
+   * Consume the item plan from the single craft selection. The plan is computed once
+   * in {@link craft} (via {@link _resolveCraftSelection}) and passed in, so this never
+   * recomputes the match against possibly-mutated items.
+   * @private
+   * @param {Array<{item: Item, quantity: number, ingredient: object}>} consumptionPlan
+   */
+  async _consumeIngredients(consumptionPlan = []) {
+    const consumedItems = [];
 
     // Execute consumption
     for (const { item, quantity, ingredient } of consumptionPlan) {
@@ -839,8 +2062,15 @@ export class CraftingEngine {
    * Validate that all required library Tools resolved for this recipe/step are
    * present (a matching, non-broken item) on the component source actors.
    *
-   * Returns the matched `{ tool, item }` pairs so the caller can apply
+   * Returns the matched `{ tool, item, breakable }` pairs so the caller can apply
    * usage/breakage on the success and failure-consumption paths.
+   *
+   * Durable-identity selection (issue 557): the item PREFERRED for each tool is one
+   * that matches by durable identity (the only kind that may be consumed or
+   * destroyed). A presence-only (wide) match is used solely to satisfy the presence
+   * gate and is returned with `breakable: false` so {@link _applyToolBreakage}
+   * spares it. When the manager exposes no identity matcher (legacy/test managers) a
+   * presence match is treated as breakable, preserving prior behaviour.
    *
    * Virtual-present injection (Phase 4): a tool whose `componentId` is in the
    * active canvas Tool's `presentTools` payload AND whose recipe crafting system
@@ -856,7 +2086,7 @@ export class CraftingEngine {
    * @param {Recipe} recipe
    * @param {Array<object>} tools - resolved library Tool objects
    * @param {{ systemId?: string|null, componentIds?: string[] }|null} [presentTools] - virtual-present payload
-   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean}> }>}
+   * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean, breakable?: boolean}> }>}
    */
   async _validateTools(actors, recipe, tools = [], presentTools = null) {
     const toolItems = [];
@@ -866,26 +2096,48 @@ export class CraftingEngine {
     });
 
     for (const tool of tools) {
-      let found = null;
+      // Durable-identity selection (issue 557): PREFER an owned item that matches the
+      // tool by durable identity (the only kind that may be consumed/destroyed), and
+      // fall back to a presence-only (wide) match ONLY to satisfy the presence gate —
+      // tagging that pair `breakable: false` so `_applyToolBreakage` spares it. When
+      // an actor owns both the real durably-identified tool and a decoy, the durable
+      // tool is the one carried into breakage even if the decoy sorts earlier.
+      const hasIdentityMatcher =
+        typeof this.recipeManager?.toolMatchesItemByIdentity === 'function';
+      let identityItem = null;
+      let presenceItem = null;
       for (const actor of actors) {
-        const matching = [...(actor?.items ?? [])].find(
-          (item) => !isToolBroken(item) && this.recipeManager.toolMatchesItem(recipe, tool, item)
-        );
-        if (matching) {
-          found = matching;
-          break;
+        for (const item of actor?.items ?? []) {
+          if (isToolBroken(item)) continue;
+          if (!presenceItem && this.recipeManager.toolMatchesItem(recipe, tool, item)) {
+            presenceItem = item;
+          }
+          if (
+            hasIdentityMatcher &&
+            !identityItem &&
+            this.recipeManager.toolMatchesItemByIdentity(recipe, tool, item) === true
+          ) {
+            identityItem = item;
+          }
+          if (identityItem) break;
         }
+        if (identityItem) break;
       }
 
+      const found = identityItem ?? presenceItem;
       if (found) {
-        toolItems.push({ tool, item: found });
+        // When the manager exposes no identity matcher (legacy/test managers) preserve
+        // prior behaviour and treat a presence match as breakable; otherwise only a
+        // durable-identity match is breakable.
+        const breakable = hasIdentityMatcher ? identityItem != null : true;
+        toolItems.push({ tool, item: found, breakable });
       } else if (presentSet.has(tool?.componentId)) {
         // Virtual-present: satisfied by the active canvas Tool, no owned item.
         toolItems.push({ tool, item: null, virtual: true });
       } else {
         return {
           valid: false,
-          message: `Missing required tool (componentId: ${tool?.componentId || tool?.systemItemId})`,
+          message: `Missing required tool (${toolDisplayReference(tool)})`,
         };
       }
     }
@@ -899,23 +2151,125 @@ export class CraftingEngine {
    * gathering tool breakage uses). Returns `usedTools` evidence in the
    * run-record item-ref shape.
    *
+   * When `forceBreak` is true, every matched tool is broken regardless of its own
+   * per-tool breakage chance: a `planned: { mode: 'forced', broken: true }` override
+   * is passed to {@link applyToolUsageAndBreakage}, which uses it verbatim instead of
+   * evaluating the tool's own breakage.
+   *
+   * Authority (issue 419): under `checkDriven` authority an `immune` tool is filtered
+   * OUT of the forced set (it never breaks) and recorded as `skippedImmune` evidence;
+   * virtual-present tools are recorded as skipped evidence (not mutated); a forced
+   * break attaches the `authority`/`reason`/`triggerId` decision to each entry. Under
+   * `toolSpecific` (default) behaviour is unchanged: each tool's own mode decides and
+   * a legacy `breakTools` force-break still applies on top.
+   *
+   * Durable-identity gate (issue 557): an owned item is used OR broken only when it
+   * matches the tool by durable identity, re-checked authoritatively here via the
+   * identity matcher so a presence-only item can never reach `delete()`. A spared
+   * (non-breakable) item is left untouched and recorded as skipped evidence under
+   * `checkDriven`, mirroring the virtual-present skip. When the manager exposes no
+   * identity matcher (legacy/test managers) the selection `breakable` tag is honored,
+   * defaulting to breakable to preserve prior behaviour.
+   *
    * @private
    * @param {Recipe} recipe
-   * @param {Array<{tool: object, item: Item}>} toolItems
+   * @param {Array<{tool: object, item: Item, virtual?: boolean, breakable?: boolean}>} toolItems
+   * @param {{ forceBreak?: boolean, authority?: string, reason?: string|null, triggerId?: string|null, checkId?: string|null }} [options]
    * @returns {Promise<Array<{ actorUuid: string|null, itemUuid: string|null, quantity: number, componentId: string|null, broken: boolean }>>}
    */
-  async _applyToolBreakage(recipe, toolItems = []) {
+  async _applyToolBreakage(
+    recipe,
+    toolItems = [],
+    {
+      forceBreak = false,
+      authority = 'toolSpecific',
+      reason = null,
+      triggerId = null,
+      checkId = null,
+    } = {}
+  ) {
+    const checkDriven = authority === 'checkDriven';
     const evidence = [];
-    for (const { tool: toolData, item, virtual } of toolItems) {
-      // Virtual-present (canvas-tool) matches have no owned item to use/break,
-      // and must not produce a consuming usedTools run-record entry.
-      if (virtual || !item) continue;
+    for (const { tool: toolData, item, virtual, breakable: selectedBreakable } of toolItems) {
       const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
+      // Virtual-present (canvas-tool) matches have no owned item to use/break.
+      // Under checkDriven they are recorded as skipped evidence (not mutated);
+      // under toolSpecific they are silent (today's behaviour).
+      if (virtual || !item) {
+        if (checkDriven) {
+          evidence.push({
+            actorUuid: null,
+            itemUuid: null,
+            quantity: 1,
+            componentId: tool.componentId ?? null,
+            broken: false,
+            authority,
+            virtual: true,
+          });
+        }
+        continue;
+      }
+      // Durable-identity gate (issue 557): an owned item is used OR broken only when
+      // it matches the tool by durable identity. Re-check authoritatively via the
+      // identity matcher so a mis-tagged, presence-only item can never reach delete();
+      // when the manager exposes no identity matcher (legacy/test managers) fall back
+      // to the selection tag, defaulting to breakable to preserve prior behaviour. A
+      // spared item is left untouched — recorded as skipped evidence under checkDriven
+      // (consistent with the virtual skip), silent under toolSpecific.
+      const identityMatcher = this.recipeManager?.toolMatchesItemByIdentity;
+      const breakable =
+        typeof identityMatcher === 'function'
+          ? identityMatcher.call(this.recipeManager, recipe, toolData, item) === true
+          : selectedBreakable !== false;
+      if (!breakable) {
+        if (checkDriven) {
+          evidence.push({
+            actorUuid: item?.parent?.uuid ?? null,
+            itemUuid: item?.uuid ?? null,
+            quantity: 1,
+            componentId: tool.componentId ?? null,
+            broken: false,
+            authority,
+            spared: true,
+          });
+        }
+        continue;
+      }
       const actor = item?.parent ?? null;
+      const isImmune = tool.breakage?.mode === 'immune';
+      // checkDriven: immune tools are filtered out of the forced set (never break);
+      // every other required tool breaks when forceBreak. toolSpecific: the legacy
+      // forceBreak override applies, else the tool's own mode decides.
+      let planned;
+      const extra = {};
+      if (checkDriven) {
+        if (isImmune) {
+          planned = { mode: 'immune', broken: false, evidence: { authority } };
+          extra.authority = authority;
+          extra.skippedImmune = true;
+        } else if (forceBreak) {
+          planned = { mode: 'forced', broken: true, evidence: { authority } };
+          extra.authority = authority;
+          extra.reason = reason;
+          extra.triggerId = triggerId;
+          extra.checkId = checkId;
+        } else {
+          planned = { mode: 'forced', broken: false, evidence: { authority } };
+          extra.authority = authority;
+        }
+      } else if (isImmune) {
+        // An immune tool never breaks under EITHER authority — a legacy crit/tier
+        // forceBreak must not break it either. Defer to the tool's own (never-break)
+        // evaluation rather than forcing it.
+        planned = undefined;
+      } else {
+        planned = forceBreak ? { mode: 'forced', broken: true, evidence: {} } : undefined;
+      }
       const entry = await applyToolUsageAndBreakage({
         tool,
         actor,
         item,
+        planned,
         buildItemRef: (_actor, breakItem) => ({
           actorUuid: breakItem?.parent?.uuid || null,
           itemUuid: breakItem?.uuid || null,
@@ -929,6 +2283,7 @@ export class CraftingEngine {
         quantity: entry.itemRef?.quantity ?? 1,
         componentId: entry.componentId ?? null,
         broken: entry.broken === true,
+        ...extra,
       });
     }
     return evidence;
@@ -947,9 +2302,9 @@ export class CraftingEngine {
         (system?.components || []).find((entry) => entry.id === componentId) || null;
       if (!component || typeof actor?.createEmbeddedDocuments !== 'function') return;
       let source = component;
-      if (component.sourceUuid && typeof globalThis.fromUuidSync === 'function') {
+      if (component.registeredItemUuid && typeof globalThis.fromUuidSync === 'function') {
         try {
-          source = globalThis.fromUuidSync(component.sourceUuid) ?? component;
+          source = globalThis.fromUuidSync(component.registeredItemUuid) ?? component;
         } catch {
           source = component;
         }
@@ -983,40 +2338,12 @@ export class CraftingEngine {
     consumedItems,
     toolItems,
     checkResult = null,
-    selectedResultGroupId = null
+    selectedResultGroupId = null,
+    precomputedEssences = null,
+    resolveComponent = findMatchingComponent
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
-
-    // Pre-resolve rollTableOutcome before calling resolveResultGroups
-    let rollTableResult = null;
-    if (recipe?.resultSelection?.provider === 'rollTableOutcome' && resolutionService) {
-      const allGroups =
-        Array.isArray(step?.resultGroups) && step.resultGroups.length > 0
-          ? step.resultGroups
-          : Array.isArray(recipe?.resultGroups)
-            ? recipe.resultGroups
-            : [];
-      rollTableResult = await resolutionService.resolveByRollTable(recipe, step, allGroups);
-      if (rollTableResult.meta?.error && !rollTableResult.meta?.disposition) {
-        console.error(`Fabricate | rollTableOutcome error: ${rollTableResult.meta.error}`);
-        return {
-          items: [],
-          rollTableMeta: { error: rollTableResult.meta.error, disposition: 'error' },
-          resolutionMeta: { error: rollTableResult.meta.error, disposition: 'error' },
-        };
-      }
-      if (rollTableResult.meta?.disposition === 'misconfiguration') {
-        console.error(
-          `Fabricate | rollTableOutcome misconfiguration: ${rollTableResult.meta.error}`
-        );
-        return {
-          items: [],
-          rollTableMeta: { error: rollTableResult.meta.error, disposition: 'misconfiguration' },
-          resolutionMeta: { error: rollTableResult.meta.error, disposition: 'misconfiguration' },
-        };
-      }
-    }
 
     const resolved = resolutionService
       ? resolutionService.resolveResultGroups({
@@ -1025,7 +2352,6 @@ export class CraftingEngine {
           ingredientSet,
           checkResult,
           selectedResultGroupId,
-          rollTableResult,
         })
       : {
           groups: Array.isArray(step?.resultGroups) ? step.resultGroups : [],
@@ -1047,7 +2373,7 @@ export class CraftingEngine {
             ...checkResult,
             resolutionMeta: resolved?.meta || {},
           },
-          step
+          { step, precomputedEssences, resolveComponent }
         );
 
         if (resultItem) {
@@ -1058,7 +2384,6 @@ export class CraftingEngine {
 
     return {
       items: createdItems,
-      rollTableMeta: rollTableResult?.meta || null,
       resolutionMeta: resolved?.meta || null,
     };
   }
@@ -1074,7 +2399,7 @@ export class CraftingEngine {
     toolItems,
     recipe,
     checkResult = null,
-    step = null
+    { step = null, precomputedEssences = null, resolveComponent } = {}
   ) {
     // Get the source item
     let sourceItem;
@@ -1085,8 +2410,8 @@ export class CraftingEngine {
       const managedItems = system?.components || [];
       managedItem =
         managedItems.find((i) => i.id === (result.componentId || result.systemItemId)) || null;
-      if (managedItem?.sourceUuid) {
-        sourceItem = await fromUuid(managedItem.sourceUuid);
+      if (managedItem?.registeredItemUuid) {
+        sourceItem = await fromUuid(managedItem.registeredItemUuid);
       }
     }
 
@@ -1128,13 +2453,23 @@ export class CraftingEngine {
       consumedItems,
       toolItems,
       checkResult,
-      step
+      step,
+      precomputedEssences,
+      resolveComponent
     );
     if (propertyUpdates && typeof propertyUpdates === 'object') {
       for (const [path, value] of Object.entries(propertyUpdates)) {
         foundry.utils.setProperty(itemData, path, value);
       }
     }
+
+    // Stamp the durable component identity on the crafted output so the inventory
+    // matcher attributes it to its OWN component and not a sibling reached through a
+    // transitive `_stats.duplicateSource` (issue 539). Keyed on the result's managed
+    // component id + the recipe's crafting system id; a result with no managed component
+    // (a bare `itemUuid` output) or an unsafe system id is left unstamped and resolves
+    // via the raw-reference fall-through.
+    stampCraftedComponentIdentity(itemData, recipe.craftingSystemId, managedItem?.id);
 
     // Create the item in crafting actor's inventory
     const [createdItem] = await craftingActor.createEmbeddedDocuments('Item', [itemData]);
@@ -1144,7 +2479,13 @@ export class CraftingEngine {
       const systemManager = game.fabricate?.getCraftingSystemManager?.();
       const system = systemManager?.getSystem(recipe.craftingSystemId);
       if (system?.features?.effectTransfer === true) {
-        await this._transferEffects(createdItem, consumedItems, recipe);
+        await this._transferEffects(
+          createdItem,
+          consumedItems,
+          recipe,
+          precomputedEssences,
+          resolveComponent
+        );
       }
     }
 
@@ -1163,14 +2504,26 @@ export class CraftingEngine {
    * The old ingredient-level extractEffects / effectFilter path has been removed.
    * @private
    */
-  async _transferEffects(resultItem, consumedItems, recipe) {
+  async _transferEffects(
+    resultItem,
+    consumedItems,
+    recipe,
+    precomputedEssences = null,
+    resolveComponent = findMatchingComponent
+  ) {
     // 1. Get the crafting system and verify essences are enabled
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe.craftingSystemId);
     if (!system?.features?.essences) return;
 
-    // 2. Build essence context — resolvedEssences maps essenceId -> total quantity contributed
-    const { resolvedEssences } = this._buildEssenceContext(consumedItems, recipe);
+    // 2. Build essence context — resolvedEssences maps essenceId -> total quantity
+    // contributed (or the precomputed snapshot on the time-gated FINISH path).
+    const { resolvedEssences } = this._buildEssenceContext(
+      consumedItems,
+      recipe,
+      precomputedEssences,
+      resolveComponent
+    );
     const contributingEssenceIds = Object.keys(resolvedEssences);
     if (contributingEssenceIds.length === 0) return;
 
@@ -1208,192 +2561,32 @@ export class CraftingEngine {
           ? system.items
           : [];
       const component = components.find((item) => item?.id === sourceComponentId) || null;
-      if (component?.sourceItemUuid || component?.sourceUuid) {
-        return component.sourceItemUuid || component.sourceUuid;
+      if (component?.originItemUuid || component?.registeredItemUuid) {
+        return component.originItemUuid || component.registeredItemUuid;
       }
       return null;
     }
     return definition.sourceItemUuid || null;
   }
 
-  _getCurrencyRequirementConfig(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) return null;
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(systemId);
-    if (!system) return null;
-
-    const advancedEnabled = system.advancedOptionsEnabled !== false;
-    const currency = system?.requirements?.currency || {};
-    return {
-      enabled: advancedEnabled && currency.enabled === true,
-      provider: currency.provider === 'system' ? 'system' : 'macro',
-      systemAdapter: currency.systemAdapter || null,
-      checkCurrencyMacroUuid: currency.checkCurrencyMacroUuid || null,
-      decrementCurrencyMacroUuid: currency.decrementCurrencyMacroUuid || null,
-      formatCurrencyMacroUuid: currency.formatCurrencyMacroUuid || null,
-      system,
-    };
-  }
-
   _getFailureConsumptionPolicy(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false };
+      return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
     }
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
-      return { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false };
+      return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
     }
     const consumption = system.craftingCheck?.consumption || {};
     return {
       consumeIngredientsOnFail: consumption.consumeIngredientsOnFail !== false,
-      consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true,
+      // Normalized systems carry `breakToolsOnFail`; tolerate the legacy
+      // `consumeCatalystsOnFail` defensively for any un-normalized path.
+      breakToolsOnFail:
+        (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
-  }
-
-  _getSuccessFailureMacroUuids(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) return { successMacroUuid: null, failureMacroUuid: null };
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(systemId);
-    if (!system) return { successMacroUuid: null, failureMacroUuid: null };
-    return {
-      successMacroUuid: system.craftingCheck?.successMacroUuid || null,
-      failureMacroUuid: system.craftingCheck?.failureMacroUuid || null,
-    };
-  }
-
-  async _runSuccessMacro(recipe, context) {
-    const { successMacroUuid } = this._getSuccessFailureMacroUuids(recipe);
-    if (!successMacroUuid) return;
-    try {
-      await MacroExecutor.run(successMacroUuid, context);
-    } catch (error) {
-      console.error(`Fabricate | Success macro failed (${successMacroUuid}):`, error);
-    }
-  }
-
-  async _runFailureMacro(recipe, context) {
-    const { failureMacroUuid } = this._getSuccessFailureMacroUuids(recipe);
-    if (!failureMacroUuid) return;
-    try {
-      await MacroExecutor.run(failureMacroUuid, context);
-    } catch (error) {
-      console.error(`Fabricate | Failure macro failed (${failureMacroUuid}):`, error);
-    }
-  }
-
-  _getStepCurrencyRequirement(step) {
-    if (!step?.currencyRequirement || typeof step.currencyRequirement !== 'object') return null;
-    const unit = String(step.currencyRequirement.unit || '').trim();
-    const amount = Math.max(0, Number(step.currencyRequirement.amount || 0) || 0);
-    if (!unit || amount <= 0) return null;
-    return { unit, amount };
-  }
-
-  _getActorCurrencyBucket(actor, unit) {
-    const pool = actor?.system?.currency;
-    if (!pool || typeof pool !== 'object') return null;
-
-    const key =
-      Object.keys(pool).find((k) => String(k).toLowerCase() === String(unit).toLowerCase()) || unit;
-    const raw = pool[key];
-    if (raw == null) return null;
-
-    if (typeof raw === 'number' || typeof raw === 'string') {
-      const value = Number(raw);
-      if (!Number.isFinite(value)) return null;
-      return { key, value, path: `system.currency.${key}` };
-    }
-
-    if (typeof raw === 'object') {
-      const valueFromValue = Number(raw.value);
-      if (Number.isFinite(valueFromValue)) {
-        return { key, value: valueFromValue, path: `system.currency.${key}.value` };
-      }
-      const valueFromAmount = Number(raw.amount);
-      if (Number.isFinite(valueFromAmount)) {
-        return { key, value: valueFromAmount, path: `system.currency.${key}.amount` };
-      }
-    }
-
-    return null;
-  }
-
-  _normalizeCurrencyUnit(unit, adapter = null) {
-    const raw = String(unit || '')
-      .trim()
-      .toLowerCase();
-    if (!raw) return raw;
-    const aliases = {
-      copper: 'cp',
-      silver: 'sp',
-      electrum: 'ep',
-      gold: 'gp',
-      platinum: 'pp',
-      credits: 'credits',
-      credit: 'credits',
-    };
-    if (aliases[raw]) return aliases[raw];
-    if (['dnd5e', 'pf2e'].includes(adapter || '') && ['cp', 'sp', 'ep', 'gp', 'pp'].includes(raw))
-      return raw;
-    return raw;
-  }
-
-  _getDnd5eCurrencyBucket(actor, unit) {
-    const normalizedUnit = this._normalizeCurrencyUnit(unit, 'dnd5e');
-    return this._getActorCurrencyBucket(actor, normalizedUnit);
-  }
-
-  _getPf2eCurrencyBucket(actor, unit) {
-    const normalizedUnit = this._normalizeCurrencyUnit(unit, 'pf2e');
-    const pool = actor?.system?.currency;
-    if (!pool || typeof pool !== 'object') {
-      return this._getActorCurrencyBucket(actor, normalizedUnit);
-    }
-
-    // PF2e usually stores denomination objects under system.currency (cp/sp/gp/pp).
-    const key =
-      Object.keys(pool).find((k) => String(k).toLowerCase() === normalizedUnit) || normalizedUnit;
-    const valuePath = `system.currency.${key}.value`;
-    const value = Number(foundry.utils.getProperty(actor, valuePath));
-    if (Number.isFinite(value)) {
-      return { key, value, path: valuePath };
-    }
-
-    return this._getActorCurrencyBucket(actor, normalizedUnit);
-  }
-
-  _getSystemCurrencyBucket(actor, requirement, config = {}) {
-    const adapter = String(config.systemAdapter || '').trim();
-    if (adapter === 'dnd5e') return this._getDnd5eCurrencyBucket(actor, requirement.unit);
-    if (adapter === 'pf2e') return this._getPf2eCurrencyBucket(actor, requirement.unit);
-    return this._getActorCurrencyBucket(actor, requirement.unit);
-  }
-
-  async _formatCurrencyRequirement(config, requirement, craftingActor, recipe, step) {
-    const fallback = `${requirement.amount} ${requirement.unit}`;
-    const macroUuid = config?.formatCurrencyMacroUuid;
-    if (!macroUuid) return fallback;
-    try {
-      const value = await MacroExecutor.run(macroUuid, {
-        craftingActor,
-        actor: craftingActor,
-        recipe: recipe?.toJSON?.() || recipe,
-        step,
-        requirement,
-        amount: requirement.amount,
-        unit: requirement.unit,
-        craftingSystem: config.system,
-      });
-      if (typeof value === 'string' && value.trim()) return value.trim();
-      if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-    } catch (error) {
-      console.error(`Fabricate | Currency format macro failed (${macroUuid})`, error);
-    }
-    return fallback;
   }
 
   /**
@@ -1449,169 +2642,39 @@ export class CraftingEngine {
     }
   }
 
-  async _checkCurrencyRequirement(craftingActor, recipe, step) {
-    const requirement = this._getStepCurrencyRequirement(step);
-    if (!requirement) return { valid: true };
-
-    const config = this._getCurrencyRequirementConfig(recipe);
-    if (!config?.enabled) return { valid: true };
-
-    const formatted = await this._formatCurrencyRequirement(
-      config,
-      requirement,
-      craftingActor,
-      recipe,
-      step
-    );
-
-    if (config.provider === 'macro') {
-      if (!config.checkCurrencyMacroUuid) {
-        return { valid: false, message: 'Currency requirement check macro is not configured.' };
-      }
-      try {
-        const result = await MacroExecutor.run(config.checkCurrencyMacroUuid, {
-          craftingActor,
-          actor: craftingActor,
-          recipe: recipe?.toJSON?.() || recipe,
-          step,
-          requirement,
-          amount: requirement.amount,
-          unit: requirement.unit,
-          requiredAmount: requirement.amount,
-          requiredUnit: requirement.unit,
-          craftingSystem: config.system,
-        });
-        const allowed =
-          typeof result === 'boolean'
-            ? result
-            : result && typeof result === 'object'
-              ? result.allowed !== false && result.success !== false && result.canAfford !== false
-              : false;
-        if (!allowed) {
-          const message =
-            result && typeof result === 'object' && result.message
-              ? String(result.message)
-              : `Insufficient currency. Requires ${formatted}.`;
-          return { valid: false, message };
-        }
-        return { valid: true };
-      } catch (error) {
-        console.error(
-          `Fabricate | Currency check macro failed (${config.checkCurrencyMacroUuid})`,
-          error
-        );
-        return {
-          valid: false,
-          message: `Currency check failed: ${error.message || config.checkCurrencyMacroUuid}`,
-        };
-      }
-    }
-
-    if (config.provider === 'system') {
-      const bucket = this._getSystemCurrencyBucket(craftingActor, requirement, config);
-      if (!bucket) {
-        return {
-          valid: false,
-          message: `Currency unit "${requirement.unit}" is not available on ${craftingActor.name}.`,
-        };
-      }
-      if (bucket.value < requirement.amount) {
-        return { valid: false, message: `Insufficient currency. Requires ${formatted}.` };
-      }
-      return { valid: true };
-    }
-
-    return { valid: false, message: 'Unsupported currency requirement provider.' };
-  }
-
-  async _decrementCurrencyRequirement(craftingActor, recipe, step) {
-    const requirement = this._getStepCurrencyRequirement(step);
-    if (!requirement) return { valid: true };
-
-    const config = this._getCurrencyRequirementConfig(recipe);
-    if (!config?.enabled) return { valid: true };
-
-    const formatted = await this._formatCurrencyRequirement(
-      config,
-      requirement,
-      craftingActor,
-      recipe,
-      step
-    );
-
-    if (config.provider === 'macro') {
-      if (!config.decrementCurrencyMacroUuid) {
-        return { valid: false, message: 'Currency decrement macro is not configured.' };
-      }
-      try {
-        const result = await MacroExecutor.run(config.decrementCurrencyMacroUuid, {
-          craftingActor,
-          actor: craftingActor,
-          recipe: recipe?.toJSON?.() || recipe,
-          step,
-          requirement,
-          amount: requirement.amount,
-          unit: requirement.unit,
-          craftingSystem: config.system,
-        });
-        const ok =
-          result === undefined || result === null
-            ? true
-            : typeof result === 'boolean'
-              ? result
-              : result && typeof result === 'object'
-                ? result.success !== false && result.decremented !== false
-                : false;
-        if (!ok) {
-          const message =
-            result && typeof result === 'object' && result.message
-              ? String(result.message)
-              : `Could not spend currency. Requires ${formatted}.`;
-          return { valid: false, message };
-        }
-        return { valid: true };
-      } catch (error) {
-        console.error(
-          `Fabricate | Currency decrement macro failed (${config.decrementCurrencyMacroUuid})`,
-          error
-        );
-        return {
-          valid: false,
-          message: `Currency decrement failed: ${error.message || config.decrementCurrencyMacroUuid}`,
-        };
-      }
-    }
-
-    if (config.provider === 'system') {
-      const bucket = this._getSystemCurrencyBucket(craftingActor, requirement, config);
-      if (!bucket) {
-        return {
-          valid: false,
-          message: `Currency unit "${requirement.unit}" is not available on ${craftingActor.name}.`,
-        };
-      }
-      if (bucket.value < requirement.amount) {
-        return { valid: false, message: `Insufficient currency. Requires ${formatted}.` };
-      }
-      const next = Math.max(0, bucket.value - requirement.amount);
-      try {
-        await craftingActor.update({ [bucket.path]: next });
-      } catch (error) {
-        console.error('Fabricate | Failed to decrement system currency', error);
-        return { valid: false, message: `Could not spend currency (${formatted}).` };
-      }
-      return { valid: true };
-    }
-
-    return { valid: false, message: 'Unsupported currency requirement provider.' };
-  }
-
+  /**
+   * Run the crafting check for an attempt, if one is required or enabled.
+   *
+   * A check is REQUIRED (run even when the system has crafting checks disabled)
+   * when the recipe needs a check outcome to select its result:
+   *  - `progressive` mode, or
+   *  - `routedByCheck` mode.
+   *
+   * `routedByIngredients` does not need a check outcome to route: it selects by
+   * the chosen ingredient set, so its check is the SAME optional pass/fail check as
+   * `simple`/`alchemy`, read from the shared `craftingCheck.simple` slot (runs only
+   * when a `simple.rollFormula` is authored). For `simple` the check honours the
+   * crafting-checks enabled toggle; alchemy and `routedByIngredients` run their
+   * simple pass/fail check on an authored roll formula alone (see `useSimpleCheck`
+   * below). There is no legacy `tiered` branch — `tiered` is gone, replaced by the
+   * two routed modes.
+   *
+   * @private
+   * @returns {Promise<{success: boolean, outcome: ?string, value?: *, data: object}>}
+   */
   async _runCraftingCheck(
     recipe,
     craftingActor,
     componentSourceActors,
     ingredientSet,
-    step = null
+    // The routing basis is now a property of the system MODE, so the check no
+    // longer reads the step's `resultSelection`; the param is retained for the
+    // positional call signature.
+    _step = null,
+    // Interactive-roll options threaded from `craft()`. `{ interactive }` opts a
+    // UI-triggered craft into the confirm-roll dialog + chat post; defaults to
+    // non-interactive so the programmatic API stays silent.
+    { interactive = false } = {}
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -1626,147 +2689,488 @@ export class CraftingEngine {
     }
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
-    const selection =
-      resolutionService?.getResultSelection?.(recipe, step) || recipe?.resultSelection || null;
-    const checkRequired =
-      mode === 'tiered' ||
-      mode === 'progressive' ||
-      (mode === 'routed' && selection?.provider === 'macroOutcome');
-    const advancedEnabled = system.advancedOptionsEnabled !== false;
-    const features = system.features || {};
-    const checksEnabled =
-      advancedEnabled &&
-      (features.craftingChecks === true || system?.craftingCheck?.enabled === true);
-    if (!checksEnabled && !checkRequired) {
-      return { success: true, outcome: null, data: {} };
-    }
 
-    const config = system.craftingCheck || {};
-    const checkSource = config.checkSource || 'macro';
-
-    if (checkSource === 'builtIn') {
-      const gameSystemId = typeof game === 'undefined' ? null : game.system?.id;
-      const adapter = CraftingCheckAdapterRegistry.get(gameSystemId);
-      if (!adapter) {
+    // Alchemy: routing + check-ness are driven by the SYSTEM-level `alchemy.checkMode`
+    // (the retired per-recipe provider is gone), NOT the generic `checksEnabled`
+    // master toggle. Dispatch alchemy entirely here so the shared non-alchemy logic
+    // below never applies to it.
+    //  - `none`   → unconditional no-op success (ignore any stray simple.rollFormula
+    //               and checksEnabled): a matched brew always succeeds.
+    //  - `simple` → the mandatory pass/fail check, run whenever a formula exists
+    //               (ungated by checksEnabled); a MISSING formula is a
+    //               misconfiguration so craft() aborts with zero mutation.
+    //  - `tiered` → the mandatory routed check (identical to routedByCheck); a
+    //               missing routed formula is likewise a misconfiguration.
+    if (mode === 'alchemy') {
+      const alchemyCheckMode = system?.alchemy?.checkMode || 'none';
+      if (alchemyCheckMode === 'none') {
+        return { success: true, outcome: null, value: null, data: {} };
+      }
+      if (alchemyCheckMode === 'simple') {
+        if (!this._hasCheckFormula(system?.craftingCheck?.simple)) {
+          return {
+            success: false,
+            misconfigured: true,
+            outcome: null,
+            value: null,
+            data: {},
+            message: 'alchemy simple check mode requires a configured crafting check roll formula',
+          };
+        }
+        return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+      }
+      // tiered
+      if (!this._hasCheckFormula(system?.craftingCheck?.routed)) {
         return {
           success: false,
+          misconfigured: true,
           outcome: null,
           value: null,
           data: {},
           message:
-            'No system adapter available for built-in checks. Switch to macro mode or install a compatible game system.',
+            'alchemy tiered check mode requires a configured routed crafting check roll formula',
         };
       }
-      let adapterResult;
+      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+    }
+
+    const checkRequired = mode === 'progressive' || mode === 'routedByCheck';
+    const features = system.features || {};
+    const checksEnabled =
+      features.craftingChecks === true || system?.craftingCheck?.enabled === true;
+
+    // Simple pass/fail check (Checks editor) for the simple AND routedByIngredients
+    // modes: used when a roll formula is configured. (Alchemy is dispatched
+    // separately above on `alchemy.checkMode` and never reaches here.) The
+    // `craftingCheck.simple` slot is the shared optional pass/fail crafting-check
+    // slot (it backs both modes), NOT a simple-mode-only slot. Optional in simple
+    // (gated by the `checksEnabled` master toggle, so a configured formula only rolls
+    // while checks are enabled) and in routedByIngredients (which routes result groups
+    // by ingredient set, so its check never gates routing — it stays an optional
+    // pass/fail layer that runs on an authored formula alone, with no `checksEnabled`
+    // requirement).
+    const simpleConfig = system?.craftingCheck?.simple;
+    // With an EMPTY `simple.rollFormula` the simple pass/fail check is not usable,
+    // so `useSimpleCheck` is false and (in optional simple / routedByIngredients
+    // mode) the attempt proceeds with no check.
+    const useSimpleCheck =
+      ['simple', 'routedByIngredients'].includes(mode) &&
+      !!simpleConfig?.rollFormula &&
+      (mode === 'routedByIngredients' || checksEnabled);
+
+    // Progressive check (Checks editor) for progressive mode: rolls a formula
+    // whose total becomes the numeric `value` the progressive result-awarding
+    // spends against result difficulties. Usable only when a roll formula is
+    // configured; with no formula the required-check guard below fails the attempt.
+    const progressiveConfig = system?.craftingCheck?.progressive;
+    const useProgressiveCheck = mode === 'progressive' && !!progressiveConfig?.rollFormula;
+
+    // Routed check (Checks editor) for `routedByCheck` ONLY: rolls the routed
+    // formula and maps the total to an outcome tier whose NAME drives the
+    // `routedByCheck` routing. Usable only when a routed formula is configured; the
+    // check is required, so a missing formula fails via the required-check guard
+    // below. `routedByIngredients` no longer reads `craftingCheck.routed` — its
+    // optional pass/fail check lives on `craftingCheck.simple` (see `useSimpleCheck`).
+    const routedConfig = system?.craftingCheck?.routed;
+    const useRoutedCheck = mode === 'routedByCheck' && !!routedConfig?.rollFormula;
+
+    if (
+      !checksEnabled &&
+      !checkRequired &&
+      !useSimpleCheck &&
+      !useProgressiveCheck &&
+      !useRoutedCheck
+    ) {
+      return { success: true, outcome: null, data: {} };
+    }
+
+    if (useSimpleCheck) {
+      return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+    }
+
+    if (useProgressiveCheck) {
+      return this._runProgressiveCheck(system, recipe, craftingActor, { interactive });
+    }
+
+    if (useRoutedCheck) {
+      // Only `routedByCheck` uses the tier-routing path (its check total maps to an
+      // outcome tier whose name drives routing). `routedByIngredients` routes result
+      // groups by the chosen ingredient set and runs its optional pass/fail check
+      // through `useSimpleCheck` above against `craftingCheck.simple`.
+      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+    }
+
+    // No usable roll-formula check path applied. A check is only "usable" when its
+    // resolution mode has an authored roll formula (handled above). When a check is
+    // REQUIRED (progressive, or routedByCheck) but no roll formula is configured,
+    // fail loudly so the misconfiguration is visible; otherwise this is an optional
+    // check with nothing to run, so treat it as a no-op success.
+    if (checkRequired) {
+      return {
+        success: false,
+        misconfigured: true,
+        outcome: null,
+        value: null,
+        data: {},
+        message: `${mode} mode requires a configured crafting check roll formula`,
+      };
+    }
+    return { success: true, outcome: null, value: null, data: {} };
+  }
+
+  /**
+   * Evaluate the simple pass/fail crafting check: roll the formula, resolve the
+   * DC (static default, the recipe's selected tier, or a dynamic macro), and
+   * compare (meet-or-exceed / exceed). A configured critical raw roll on any die
+   * in the formula auto-fails or auto-succeeds, overriding the comparison.
+   *
+   * @returns {Promise<{success: boolean, outcome: string, value: number|null, data: object, message: string|null}>}
+   */
+  async _runSimpleCheck(
+    system,
+    recipe,
+    ingredientSet,
+    craftingActor,
+    { interactive = false } = {}
+  ) {
+    return this._runPassFailCheck(
+      system,
+      system?.craftingCheck?.simple || {},
+      recipe,
+      ingredientSet,
+      craftingActor,
+      { interactive }
+    );
+  }
+
+  /**
+   * Evaluate a pass/fail crafting check against an arbitrary check sub-config
+   * (the shared `simple` slot, which backs `simple`/`routedByIngredients` and the
+   * alchemy `simple` check mode): resolve the DC
+   * (static default, recipe tier, or dynamic macro) via {@link _resolveSimpleCheckDc}
+   * — parameterized over `config`, so a recipe `checkTierId` / dynamic-DC macro still
+   * applies — then roll and compare (meet-or-exceed / exceed) via the shared
+   * {@link runFormulaPassFail}. Forced-outcome triggers and interactive cancel are
+   * honoured inside that runner.
+   *
+   * Used by `simple` mode, `routedByIngredients` (whose check is an optional pass/fail
+   * gate — that mode routes result groups by the chosen ingredient set, NOT by check
+   * outcome tiers — see {@link ResolutionModeService#resolveResultGroups}), and the
+   * alchemy `simple` check mode (dispatched from {@link _runCraftingCheck}). Only
+   * `routedByCheck` and the alchemy `tiered` mode use the tier-routing {@link _runRoutedCheck}.
+   *
+   * @returns {Promise<{success: boolean, outcome: string, value: number|null, data: object, message: string|null}>}
+   */
+  async _runPassFailCheck(
+    system,
+    config,
+    recipe,
+    ingredientSet,
+    craftingActor,
+    { interactive = false } = {}
+  ) {
+    const checkConfig = config || {};
+    const dc = await this._resolveSimpleCheckDc(
+      system,
+      checkConfig,
+      recipe,
+      ingredientSet,
+      craftingActor
+    );
+    const result = await runFormulaPassFail({
+      formula: checkConfig.rollFormula,
+      dc,
+      thresholdMode: checkConfig.thresholdMode,
+      triggers: checkConfig.checkBreakage?.triggers,
+      actor: craftingActor,
+      label: 'Crafting',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor: craftingActor,
+        name: recipe?.name,
+        activity: 'Crafting',
+        img: this._resolveRecipePromptImg(recipe),
+        dc,
+      }),
+    });
+    return this._markEngineEvaluated(result);
+  }
+
+  /**
+   * Evaluate the authored routed crafting check: roll the routed formula and map
+   * its total onto one of the configured outcome tiers, returning the matched
+   * tier's NAME as `outcome` for the routed `check`-provider routing
+   * (`ResolutionModeService._routeByTierAssignment` → `checkOutcomeIds`, else the
+   * outcome-name fallback). Mirrors {@link _runSalvageRoutedCheck} for the
+   * roll / tier / crit handling, but — unlike recipe-less salvage / gathering,
+   * which pass the flat `routed.dc` — the base DC resolves via the SAME
+   * recipe-tier / dynamic-macro path as {@link _runSimpleCheck}
+   * ({@link _resolveSimpleCheckDc} parameterized over `routed`), because routed
+   * crafting carries `recipe.checkTierId` and a dynamic-DC macro. For relative
+   * tiers each threshold shifts by `dc + outcome.dc`, so a flat DC would silently
+   * drop the recipe tier / dynamic DC.
+   *
+   * When no routed `rollFormula` is configured this method is NOT reached: the
+   * caller only dispatches here when one is set, and otherwise its required-check
+   * guard fails loudly. There is no macro / adapter fallback (removed).
+   *
+   * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
+   */
+  async _runRoutedCheck(
+    system,
+    recipe,
+    ingredientSet,
+    craftingActor,
+    { interactive = false } = {}
+  ) {
+    const routed = system?.craftingCheck?.routed || {};
+    const dc = await this._resolveSimpleCheckDc(
+      system,
+      routed,
+      recipe,
+      ingredientSet,
+      craftingActor
+    );
+    const result = await runFormulaRouted({
+      formula: routed.rollFormula,
+      dc,
+      thresholdMode: routed.thresholdMode,
+      type: routed.type,
+      relativeOutcomes: routed.relativeOutcomes,
+      fixedOutcomes: routed.fixedOutcomes,
+      triggers: routed.checkBreakage?.triggers,
+      actor: craftingActor,
+      label: 'Crafting',
+      // A total below every relative threshold clamps to the lowest tier, so a
+      // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
+      clampToNearest: true,
+      // Fixed-type only: a recipe may require a minimum success tier; a roll below it
+      // fails the craft outright. Null for relative / unset recipes (no-op).
+      minOutcomeId: recipe?.minSuccessOutcomeId ?? null,
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor: craftingActor,
+        name: recipe?.name,
+        activity: 'Crafting',
+        img: this._resolveRecipePromptImg(recipe),
+        // Fixed-type routed checks match by value range, not DC, so the prompt must
+        // not advertise a (meaningless) DC. Undefined suppresses the chip + flavor.
+        dc: routed.type === 'fixed' ? undefined : dc,
+      }),
+    });
+    return this._markEngineEvaluated(result);
+  }
+
+  /**
+   * Tag a check result as engine-evaluated so the craft seam knows its
+   * `data.breakTools` is an authored-crit / authored-tier signal it can honour for
+   * forced tool breakage. The no-check passthrough success (when no usable roll
+   * formula applies) is NOT tagged, so its `data` cannot force breakage; only an
+   * engine-rolled crit/tier result carries the `engineEvaluated` flag.
+   * @private
+   */
+  _markEngineEvaluated(result) {
+    return { ...result, engineEvaluated: true };
+  }
+
+  /**
+   * Resolve the recipe icon for the interactive roll prompt with the SAME
+   * precedence the GM editor and player listings use — the recipe-item
+   * definition's image wins over the recipe's own `img` (which is itself
+   * model-defaulted to `DEFAULT_RECIPE_IMAGE`, so it already supplies the trailing
+   * default). Raw `recipe.img` alone shows the generic blueprint for a
+   * recipe-item-backed recipe; mirror `CraftingListingBuilder`'s precedence here.
+   * @private
+   */
+  _resolveRecipePromptImg(recipe) {
+    const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
+    const recipeItemImg = recipe?.recipeItemId
+      ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)
+          ?.img || ''
+      : '';
+    // The final fallback is ALWAYS the recipe default (blueprint), matching the GM
+    // editor — never a generic item bag. `recipe.img` is itself model-defaulted to
+    // DEFAULT_RECIPE_IMAGE, so this is belt-and-braces for a plain-object recipe.
+    return recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
+  }
+
+  /**
+   * Run the progressive crafting check: roll the configured formula and return its
+   * total as the numeric `value` that the progressive result-awarding spends
+   * against result difficulties (see the `progressive` branch of
+   * {@link ResolutionModeService#resolveResultGroups}). There is no DC — the craft
+   * always proceeds; the value decides how many results are awarded.
+   *
+   * Per-die crits (shared shape with the simple check) force the award: a matched
+   * SUCCESS crit awards everything (`value = MAX_SAFE_INTEGER`), a matched FAILURE
+   * crit awards nothing (`value = 0`), and either may break tools (forced failure
+   * wins). Delegates to the shared {@link runFormulaProgressive}.
+   */
+  async _runProgressiveCheck(system, recipe, craftingActor, { interactive = false } = {}) {
+    const progressive = system?.craftingCheck?.progressive || {};
+    const result = await runFormulaProgressive({
+      formula: progressive.rollFormula,
+      triggers: progressive.checkBreakage?.triggers,
+      actor: craftingActor,
+      label: 'Crafting',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor: craftingActor,
+        name: recipe?.name,
+        activity: 'Crafting',
+        img: this._resolveRecipePromptImg(recipe),
+      }),
+    });
+    return this._markEngineEvaluated(result);
+  }
+
+  /**
+   * Resolve the active crafting check's `checkBreakage` block for the system's
+   * resolution mode (issue 419). The simple/routedByIngredients modes author on the
+   * shared simple check, routedByCheck on the routed check, progressive on the
+   * progressive check. Alchemy authors per `alchemy.checkMode`: tiered on the routed
+   * check, none/simple on the shared simple check.
+   * @private
+   */
+  _resolveCraftingCheckBreakage(system, recipe) {
+    const resolutionService =
+      this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+    const mode = resolutionService?.getMode?.(recipe) || system?.resolutionMode || 'simple';
+    const check = system?.craftingCheck || {};
+    if (mode === 'routedByCheck') return check.routed?.checkBreakage ?? null;
+    if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
+    if (mode === 'alchemy' && (system?.alchemy?.checkMode || 'none') === 'tiered') {
+      return check.routed?.checkBreakage ?? null;
+    }
+    return check.simple?.checkBreakage ?? null;
+  }
+
+  /**
+   * Resolve the active salvage check's `checkBreakage` block for the system's
+   * salvage resolution mode (issue 419).
+   * @private
+   */
+  _resolveSalvageCheckBreakage(system) {
+    const mode = system?.salvageResolutionMode || 'simple';
+    const check = system?.salvageCraftingCheck || {};
+    if (mode === 'routed') return check.routed?.checkBreakage ?? null;
+    if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
+    return check.simple?.checkBreakage ?? null;
+  }
+
+  /**
+   * Resolve the salvage breakage decision via the shared {@link evaluateCheckBreakage}
+   * seam, bringing salvage to parity with crafting (issue 419). Returns
+   * `{ forceBreak, triggerId, reason, authority }`.
+   * @private
+   */
+  _resolveSalvageBreakageDecision(system, checkResult) {
+    const authority =
+      system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    // Either-or authority (issue 419): a check can only break tools under
+    // `checkDriven`. Under `toolSpecific` tools break solely by their own modes, so
+    // the check-driven force-break (and the routed per-tier legacy bridge) is not
+    // consulted.
+    if (authority !== 'checkDriven') {
+      return { forceBreak: false, triggerId: null, reason: null, authority };
+    }
+    const checkBreakage = this._resolveSalvageCheckBreakage(system);
+    const decision = evaluateCheckBreakage({ checkBreakage, checkResult });
+    return { ...decision, authority };
+  }
+
+  /**
+   * Resolve the breakage decision for a crafting attempt via the single shared
+   * {@link evaluateCheckBreakage} seam (issue 419). Returns the `{ forceBreak,
+   * triggerId, reason }` decision plus the system's breakage `authority`. Authority
+   * is strictly either-or: under `toolSpecific` a check NEVER breaks tools (each
+   * Tool's own mode decides, so the seam is not consulted); under `checkDriven` the
+   * active check's `checkBreakage` triggers (those opting in via `breakTools`, plus
+   * the implicit routed per-tier `data.breakTools` bridge) decide whether all
+   * required tools break. Only engine-evaluated roll-formula check results can
+   * force-break (the `engineEvaluated` guard is preserved inside `evaluateCheckBreakage`).
+   * @private
+   */
+  _resolveCraftingBreakageDecision(system, recipe, checkResult) {
+    const authority =
+      system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    // Either-or authority (issue 419): a check can only break tools under
+    // `checkDriven`. Under `toolSpecific` tools break solely by their own modes, so
+    // the check-driven force-break (and the routed per-tier legacy bridge) is not
+    // consulted.
+    if (authority !== 'checkDriven') {
+      return { forceBreak: false, triggerId: null, reason: null, authority };
+    }
+    const checkBreakage = this._resolveCraftingCheckBreakage(system, recipe);
+    const decision = evaluateCheckBreakage({ checkBreakage, checkResult });
+    return { ...decision, authority };
+  }
+
+  /**
+   * Resolve the system for a recipe (or salvage synthetic recipe) from the manager.
+   * @private
+   */
+  _getRecipeSystem(recipe) {
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    return systemManager?.getSystem(recipe?.craftingSystemId) ?? null;
+  }
+
+  /**
+   * True when a check sub-config carries an authored, non-empty roll formula — the
+   * single notion of a "usable" check (matches `ResolutionModeService._hasRollFormula`).
+   * @private
+   */
+  _hasCheckFormula(config) {
+    return typeof config?.rollFormula === 'string' && config.rollFormula.trim().length > 0;
+  }
+
+  /**
+   * The system-level alchemy check mode for a recipe (`none` | `simple` | `tiered`),
+   * defaulting to `none`. Non-alchemy systems return `null`.
+   * @private
+   */
+  _getAlchemyCheckMode(recipe) {
+    const system = this._getRecipeSystem(recipe);
+    if (system?.resolutionMode !== 'alchemy') return null;
+    return system?.alchemy?.checkMode || 'none';
+  }
+
+  /**
+   * Resolve the engine check's DC: a dynamic macro's returned number, the recipe's
+   * selected static tier, or the static default. Any failure falls back to the
+   * default DC so a misconfiguration never throws mid-craft. Parameterized over the
+   * check config (`simple` or `routed`) so the routed check resolves its base DC via
+   * the SAME recipe-tier / dynamic path as the simple check, not the flat config DC.
+   */
+  async _resolveSimpleCheckDc(system, simple, recipe, ingredientSet, craftingActor) {
+    const fallback = Number.isFinite(Number(simple.dc)) ? Math.trunc(Number(simple.dc)) : 15;
+    if (simple.dcMode === 'dynamic') {
+      if (!simple.macroUuid) return fallback;
       try {
-        adapterResult = await adapter.executeCheck(craftingActor, config.builtIn || {});
+        const value = await MacroExecutor.run(simple.macroUuid, {
+          recipe: recipe?.toJSON?.() || recipe,
+          craftingSystem: system,
+          craftingActor,
+          candidateIngredientSet: ingredientSet,
+        });
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? Math.trunc(numeric) : fallback;
       } catch (error) {
-        console.error('Fabricate | Built-in crafting check failed', error);
-        return {
-          success: false,
-          outcome: null,
-          value: null,
-          data: {},
-          message: `Built-in crafting check failed: ${error.message}`,
-        };
+        console.error(
+          `Fabricate | Simple crafting check DC macro failed (${simple.macroUuid})`,
+          error
+        );
+        return fallback;
       }
-      const success = adapterResult.success !== false;
-      return {
-        success,
-        outcome: adapterResult.outcome ?? null,
-        value: adapterResult.value ?? null,
-        data: adapterResult.data || {},
-        message: success ? null : adapterResult.message || 'Built-in crafting check failed',
-      };
     }
-
-    if (!config.macroUuid) {
-      if (checkRequired) {
-        return {
-          success: false,
-          outcome: null,
-          value: null,
-          data: {},
-          message: `${mode} mode requires a crafting check macro`,
-        };
-      }
-      return { success: true, outcome: null, value: null, data: {} };
+    const tierId = recipe?.checkTierId;
+    if (tierId) {
+      const tiers = Array.isArray(simple.tiers) ? simple.tiers : [];
+      const tier = tiers.find((entry) => entry.id === tierId);
+      const tierDc = Number(tier?.dc);
+      if (tier && Number.isFinite(tierDc)) return Math.trunc(tierDc);
     }
-
-    const ingredientPool = componentSourceActors.flatMap((actor) =>
-      [...actor.items].map((item) => ({
-        actorId: actor.id,
-        actorName: actor.name,
-        item,
-      }))
-    );
-    const resolvedEssences = this._accumulateEssencesFromItems(
-      ingredientPool.map((entry) => entry.item),
-      recipe
-    );
-
-    let result;
-    try {
-      result = await MacroExecutor.run(config.macroUuid, {
-        recipe: recipe?.toJSON?.() || recipe,
-        craftingSystem: system,
-        craftingActor,
-        componentSourceActors,
-        ingredientPool,
-        candidateIngredientSet: ingredientSet,
-        resolvedEssences,
-        step,
-      });
-    } catch (error) {
-      console.error(`Fabricate | Crafting check macro failed (${config.macroUuid})`, error);
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: {},
-        message: `Crafting check macro failed: ${error.message || config.macroUuid}`,
-      };
-    }
-
-    if (!result || typeof result !== 'object') {
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: {},
-        message: 'Crafting check macro must return an object',
-      };
-    }
-
-    const outcome = result.outcome == null ? null : String(result.outcome);
-    const value = Number.isFinite(Number(result.value)) ? Number(result.value) : null;
-    const allowed = Array.isArray(config.outcomes) ? config.outcomes : [];
-    const normalizedOutcome = outcome?.trim().toLowerCase();
-    const normalizedAllowed = allowed
-      .map((entry) =>
-        String(entry || '')
-          .trim()
-          .toLowerCase()
-      )
-      .filter(Boolean);
-    if (outcome && normalizedAllowed.length > 0 && !normalizedAllowed.includes(normalizedOutcome)) {
-      return {
-        success: false,
-        outcome,
-        value,
-        data: result.data || {},
-        message: `Crafting check returned invalid outcome "${outcome}"`,
-      };
-    }
-
-    const success = result.success !== false;
-    return {
-      success,
-      outcome,
-      value,
-      data: result.data || {},
-      message: success ? null : result.message || 'Crafting check failed',
-    };
+    return fallback;
   }
 
   /**
@@ -1794,76 +3198,59 @@ export class CraftingEngine {
     tools,
     createdResults,
     failureReason,
-    rollTableMeta = null,
   }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
     if (!system || system.features?.chatOutput !== true) return;
 
-    const loc = (key) => game.i18n?.localize?.(key) ?? key;
+    const localize = (key) => game.i18n?.localize?.(key) ?? key;
 
-    let content;
-    if (success) {
-      const lines = [
-        `<h3>${loc('FABRICATE.Chat.CraftSuccess')}: ${recipe.name}</h3>`,
-        `<p><strong>${loc('FABRICATE.Chat.Actor')}:</strong> ${craftingActor?.name || ''}</p>`,
-      ];
-
-      if (rollTableMeta?.drawnName) {
-        lines.push(
-          `<p><strong>${loc('FABRICATE.Chat.RollTableResult') || 'Roll Table Result'}:</strong> ${rollTableMeta.drawnName}</p>`
-        );
-      }
-
-      if (createdResults && createdResults.length > 0) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.Results')}</strong></p><ul>`);
-        for (const item of createdResults) {
-          const qty = Number(item?.system?.quantity || 1);
-          lines.push(`<li>${qty}x ${item?.name || ''}</li>`);
-        }
-        lines.push('</ul>');
-      }
-
-      if (consumedIngredients && consumedIngredients.length > 0) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.Consumed')}</strong></p><ul>`);
-        for (const { item, quantity } of consumedIngredients) {
-          lines.push(`<li>${quantity}x ${item?.name || ''}</li>`);
-        }
-        lines.push('</ul>');
-      }
-
-      if (tools && tools.length > 0) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.Tools')}</strong></p><ul>`);
-        for (const { item } of tools) {
-          lines.push(`<li>${item?.name || ''}</li>`);
-        }
-        lines.push('</ul>');
-      }
-
-      content = lines.join('\n');
-    } else {
-      const lines = [
-        `<h3>${loc('FABRICATE.Chat.CraftFailure')}: ${recipe.name}</h3>`,
-        `<p><strong>${loc('FABRICATE.Chat.Actor')}:</strong> ${craftingActor?.name || ''}</p>`,
-        `<p><strong>${loc('FABRICATE.Chat.FailureReason')}:</strong> ${failureReason || ''}</p>`,
-      ];
-
-      const hasConsumed =
-        (consumedIngredients && consumedIngredients.length > 0) || (tools && tools.length > 0);
-
-      if (hasConsumed) {
-        lines.push(`<p><strong>${loc('FABRICATE.Chat.ConsumedOnFailure')}</strong></p><ul>`);
-        for (const { item, quantity } of consumedIngredients || []) {
-          lines.push(`<li>${quantity}x ${item?.name || ''}</li>`);
-        }
-        for (const { item } of tools || []) {
-          lines.push(`<li>${item?.name || ''}</li>`);
-        }
-        lines.push('</ul>');
-      }
-
-      content = lines.join('\n');
+    // Tools render by their AUTHORED name (the referenced component), not the
+    // matched item's name: a single owned item can satisfy more than one tool
+    // slot (source/name collision), which would otherwise print the same item
+    // name twice. Fall back to the matched item's name when the component can't
+    // be resolved. De-dupe by component id so a tool is never listed twice.
+    const componentById = new Map(
+      (system.components || []).map((component) => [component?.id, component])
+    );
+    const toolEntries = [];
+    const seenToolKeys = new Set();
+    for (const pair of tools || []) {
+      // Skip virtual-present canvas tools (no owned item) — no chip to render.
+      if (!pair?.item) continue;
+      const componentId = pair.tool?.componentId || pair.tool?.systemItemId || null;
+      const component = componentId ? componentById.get(componentId) : null;
+      const key = componentId || pair.item?.uuid || pair.item?.name || null;
+      if (key && seenToolKeys.has(key)) continue;
+      if (key) seenToolKeys.add(key);
+      toolEntries.push({
+        name: component?.name || pair.item?.name || '',
+        img: component?.img || pair.item?.img || '',
+      });
     }
+
+    // Resolve to a plain, Foundry-free model, then render via the shared pure
+    // builder (mirrors the gathering card: resolve names/images here, format there).
+    const content = buildCraftingChatContent(
+      {
+        status: success ? 'succeeded' : 'failed',
+        actorName: craftingActor?.name || '',
+        recipeName: recipe?.name || '',
+        results: (createdResults || []).map((item) => ({
+          name: item?.name || '',
+          img: item?.img || '',
+          quantity: Number(item?.system?.quantity || 1),
+        })),
+        consumed: (consumedIngredients || []).map(({ item, quantity }) => ({
+          name: item?.name || '',
+          img: item?.img || '',
+          quantity: Number(quantity || 1),
+        })),
+        tools: toolEntries,
+        failureReason: failureReason || '',
+      },
+      localize
+    );
 
     try {
       await ChatMessage.create({
@@ -1884,7 +3271,9 @@ export class CraftingEngine {
     consumedItems,
     toolItems,
     checkResult = null,
-    step = null
+    step = null,
+    precomputedEssences = null,
+    resolveComponent = findMatchingComponent
   ) {
     if (!macroUuid) return null;
 
@@ -1892,12 +3281,16 @@ export class CraftingEngine {
     const craftingSystem = recipe?.craftingSystemId
       ? systemManager?.getSystem(recipe.craftingSystemId)
       : null;
-    const advancedEnabled = craftingSystem?.advancedOptionsEnabled !== false;
     const features = craftingSystem?.features || {};
-    const enabled = advancedEnabled && features.propertyMacros === true;
+    const enabled = features.propertyMacros === true;
     if (!enabled) return null;
 
-    const essenceContext = this._buildEssenceContext(consumedItems, recipe);
+    const essenceContext = this._buildEssenceContext(
+      consumedItems,
+      recipe,
+      precomputedEssences,
+      resolveComponent
+    );
     const context = {
       recipe: recipe?.toJSON?.() || recipe,
       craftingSystem,
@@ -1938,19 +3331,49 @@ export class CraftingEngine {
     }
   }
 
-  _buildEssenceContext(consumedItems, recipe = null) {
+  /**
+   * Build the essence context from consumed items.
+   *
+   * @param {Array} consumedItems
+   * @param {object|null} [recipe]
+   * @param {object|null} [precomputedEssences] - a precomputed
+   *   `resolvedEssences` map (essenceId -> total quantity). Supplied by the
+   *   time-gated FINISH path, whose source items are already deleted, so essence
+   *   quantities cannot be re-resolved and were snapshotted at START. When
+   *   provided it is used verbatim (with no per-item `essenceSources`); otherwise
+   *   essences are resolved live from the consumed items.
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only consumed item contributes its
+   *   component's essences to effect transfer / property-macro context; defaults
+   *   to the shared standard-craft resolver {@link findMatchingComponent} via {@link resolveItemEssences}.
+   * @private
+   */
+  _buildEssenceContext(
+    consumedItems,
+    recipe = null,
+    precomputedEssences = null,
+    resolveComponent = findMatchingComponent
+  ) {
+    if (precomputedEssences && typeof precomputedEssences === 'object') {
+      return { resolvedEssences: { ...precomputedEssences }, essenceSources: {} };
+    }
     const resolvedEssences = {};
     const essenceSources = {};
     const components = this._getSystemComponents(recipe);
 
     for (const { item, quantity } of consumedItems) {
-      const itemEssences = resolveItemEssences(item, components);
+      const itemEssences = resolveItemEssences(
+        item,
+        components,
+        recipe?.craftingSystemId,
+        resolveComponent
+      );
       for (const [essenceId, perUnit] of Object.entries(itemEssences)) {
         const value = Number(perUnit);
         if (!Number.isFinite(value) || value <= 0) continue;
         const total = value * (Number(quantity) || 1);
         resolvedEssences[essenceId] = (resolvedEssences[essenceId] || 0) + total;
-        essenceSources[essenceId] = essenceSources[essenceId] || [];
+        essenceSources[essenceId] ||= [];
         essenceSources[essenceId].push({
           itemId: item.id,
           itemName: item.name,
@@ -1964,13 +3387,6 @@ export class CraftingEngine {
     return { resolvedEssences, essenceSources };
   }
 
-  _accumulateEssencesFromItems(items, recipe = null) {
-    return accumulateItemEssences(items, {
-      components: this._getSystemComponents(recipe),
-      multiplyByQuantity: true,
-    });
-  }
-
   _getSystemComponents(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return [];
@@ -1980,18 +3396,43 @@ export class CraftingEngine {
   }
 
   /**
-   * Format missing items message
+   * Format a human-readable "missing required items" message.
+   *
+   * When a `recipe` is supplied, a component-match ingredient
+   * (`ingredient.match.type === 'component'`) is rendered with the component's
+   * display name resolved from the system's `components` list — e.g.
+   * `"2x Iron Rivet: have 0, need 2"` — instead of the generic
+   * `ingredient.getDescription()` fallback (which renders a nameless
+   * `"2x component"`). Essence and tool lines are unchanged.
+   *
    * @private
+   * @param {{ ingredients: Array, essences: Array, tools?: Array }} missing
+   * @param {object|null} [recipe] - the (step) recipe view, used to resolve
+   *   component display names via {@link _getSystemComponents}
+   * @returns {string}
    */
-  _formatMissingItems(missing) {
+  _formatMissingItems(missing, recipe = null) {
+    const components = this._getSystemComponents(recipe);
     const lines = [];
 
     for (const { ingredient, have, need } of missing.ingredients) {
-      const description =
-        typeof ingredient?.getDescription === 'function'
-          ? ingredient.getDescription()
-          : 'Ingredient';
-      lines.push(`${description}: have ${have}, need ${need}`);
+      let line = null;
+      const componentId =
+        ingredient?.match?.type === 'component' ? ingredient.match.componentId : null;
+      if (componentId) {
+        const name = components.find((component) => component?.id === componentId)?.name;
+        if (name) {
+          line = `${need}x ${name}: have ${have}, need ${need}`;
+        }
+      }
+      if (!line) {
+        const description =
+          typeof ingredient?.getDescription === 'function'
+            ? ingredient.getDescription()
+            : 'Ingredient';
+        line = `${description}: have ${have}, need ${need}`;
+      }
+      lines.push(line);
     }
 
     for (const { type, have, need } of missing.essences) {
@@ -1999,7 +3440,7 @@ export class CraftingEngine {
     }
 
     for (const tool of missing.tools || []) {
-      lines.push(`Tool (componentId: ${tool.componentId || tool.systemItemId}): missing`);
+      lines.push(`Tool (${toolDisplayReference(tool)}): missing`);
     }
 
     return lines.join('\n');
@@ -2053,7 +3494,14 @@ export class CraftingEngine {
    * @param {string} craftingSystemId - ID of the crafting system.
    * @param {string} componentId - ID of the component to salvage.
    * @param {Object} [options={}] - Optional overrides.
-   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null}>}
+   * @param {boolean} [options.interactive] When true, the salvage check prompts the
+   *   player with the confirm-roll dialog (optional situational modifier) and posts
+   *   the roll to chat so Dice So Nice animates it. Defaults to false so automation
+   *   and macros stay silent. A dismissed prompt returns
+   *   `{ success: false, cancelled: true, results: null }` with zero mutation (no
+   *   component consumed, no tool breakage) and discards a run created by this call.
+   *   No current UI surface triggers salvage, so this is API/engine-level only today.
+   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null, cancelled?: boolean}>}
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
     const actor = await fromUuid(actorUuid);
@@ -2117,6 +3565,10 @@ export class CraftingEngine {
 
     const salvageRunManager = this._getSalvageRunManager();
     let salvageRun = null;
+    // Track whether THIS call created the salvage run (vs reused an existing one),
+    // so a cancelled interactive salvage can discard its phantom run and net ZERO
+    // run mutation — mirroring the crafting `createdThisCall` phantom-discard.
+    let salvageRunCreatedThisCall = false;
     if (salvageRunManager) {
       salvageRun = options?.runId
         ? salvageRunManager.getActiveRun(actor, options.runId)
@@ -2177,6 +3629,7 @@ export class CraftingEngine {
         startedAt: now,
         usedTools: [],
       });
+      salvageRunCreatedThisCall = true;
     }
 
     if (salvageRunManager && timeRequirement && !options?.skipTimeGate) {
@@ -2204,17 +3657,44 @@ export class CraftingEngine {
       salvageRun = await salvageRunManager.markRunInProgress(actor, salvageRun);
     }
 
-    const checkResult = await this._runSalvageCraftingCheck(
-      component,
-      system,
-      actor,
-      toolValidation.tools
-    );
+    const checkResult = await this._runSalvageCraftingCheck(component, system, actor, {
+      interactive: options?.interactive === true,
+    });
     const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
+
+    // A misconfigured required salvage check (routed/progressive with no authored
+    // roll formula) is a GM-side system gap, not a rolled failure: abort with ZERO
+    // mutation so the component is never consumed and no tools are broken. The
+    // failure-consumption policy below applies only to genuine rolled failures.
+    if (checkResult.misconfigured) {
+      return {
+        success: false,
+        results: null,
+        message: checkResult.message,
+        salvageRun,
+      };
+    }
+
+    // The player dismissed the interactive roll dialog: a user choice, not a
+    // failure. Abort with ZERO mutation (no component consumption, no tool
+    // breakage) before the failure/consumption paths below. Discard a run created
+    // by THIS call so a cancel leaves no orphaned `inProgress` run — parity with
+    // `craft()`'s phantom-discard. A reused pre-existing run is left untouched.
+    if (checkResult.cancelled) {
+      if (salvageRunManager && salvageRun && salvageRunCreatedThisCall) {
+        await salvageRunManager.discardRun(actor, salvageRun.id);
+      }
+      return {
+        success: false,
+        cancelled: true,
+        results: null,
+        message: 'Salvage cancelled',
+        salvageRun: salvageRunCreatedThisCall ? null : salvageRun,
+      };
+    }
 
     if (!checkResult.success) {
       let consumedOnFail = [];
-      let usedToolPairs = [];
       let usedTools = [];
       try {
         if (failurePolicy.consumeComponentOnFail) {
@@ -2224,9 +3704,16 @@ export class CraftingEngine {
             ingredientQuantity
           );
         }
-        if (failurePolicy.consumeCatalystsOnFail) {
-          usedToolPairs = toolValidation.tools;
-          usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools);
+        if (failurePolicy.breakToolsOnFail) {
+          // Salvage parity (issue 419): the FAILURE path breaks required tools only
+          // when `breakToolsOnFail === true` (this gate), matching crafting.
+          const salvageFailBreak = this._resolveSalvageBreakageDecision(system, checkResult);
+          usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
+            forceBreak: salvageFailBreak.forceBreak,
+            authority: salvageFailBreak.authority,
+            reason: salvageFailBreak.reason,
+            triggerId: salvageFailBreak.triggerId,
+          });
         }
       } catch (error) {
         console.error('Fabricate | Error during salvage failure-path consumption:', error);
@@ -2250,18 +3737,6 @@ export class CraftingEngine {
         });
       }
 
-      await this._runSalvageFailureMacro(component, system, {
-        component,
-        craftingSystem: system,
-        craftingActor: actor,
-        salvageInput: { componentId, quantity: ingredientQuantity },
-        consumedComponents: consumedOnFail,
-        consumedTools: usedToolPairs,
-        createdResults: [],
-        checkResult,
-        failureReason: checkResult.message || 'Salvage check failed',
-      });
-
       return {
         success: false,
         results: null,
@@ -2276,7 +3751,15 @@ export class CraftingEngine {
       componentItems,
       ingredientQuantity
     );
-    const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools);
+    // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
+    // `breakToolsOnFail` gate exists here), via the shared seam.
+    const salvageSuccessBreak = this._resolveSalvageBreakageDecision(system, checkResult);
+    const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
+      forceBreak: salvageSuccessBreak.forceBreak,
+      authority: salvageSuccessBreak.authority,
+      reason: salvageSuccessBreak.reason,
+      triggerId: salvageSuccessBreak.triggerId,
+    });
 
     const salvageRecipeView = this._buildSalvageRecipeView(component, system);
     const resultItems = [];
@@ -2288,8 +3771,7 @@ export class CraftingEngine {
           consumedItems,
           toolValidation.tools,
           salvageRecipeView,
-          checkResult,
-          null
+          checkResult
         );
         if (created) resultItems.push(created);
       }
@@ -2317,17 +3799,6 @@ export class CraftingEngine {
       });
     }
 
-    await this._runSalvageSuccessMacro(component, system, {
-      component,
-      craftingSystem: system,
-      craftingActor: actor,
-      salvageInput: { componentId, quantity: ingredientQuantity },
-      consumedComponents: consumedItems,
-      consumedTools: toolValidation.tools,
-      createdResults: resultItems,
-      checkResult,
-    });
-
     return {
       success: true,
       results: resultItems,
@@ -2338,21 +3809,33 @@ export class CraftingEngine {
 
   /**
    * Find items on actor that match a managed component.
-   * Matches against the component's full source-reference chain: live `sourceUuid`,
-   * canonical `sourceItemUuid`, and any recorded `fallbackItemIds`. Falls back to
-   * name matching only when the component has no source references.
+   * Resolves each owned item to the single component it IS through the shared,
+   * list-aware, system-scoped resolver (durable `roles[systemId].componentId` /
+   * legacy scalar / raw source-reference chain), keeping those that resolve to the
+   * target component. When none resolve, falls back to a case-SENSITIVE exact-name
+   * match — a compatibility path whose closure is deferred to issue 557.
    * @private
    */
-  _findComponentItems(actor, component, _system) {
+  _findComponentItems(actor, component, system) {
     const items = [...actor.items];
-    if (component.sourceUuid || component.sourceItemUuid || component.fallbackItemIds?.length) {
-      const byUuid = items.filter((item) => itemMatchesComponentSource(item, component));
+    const components = Array.isArray(system?.components) ? system.components : [];
+    if (
+      component.registeredItemUuid ||
+      component.originItemUuid ||
+      component.aliasItemUuids?.length
+    ) {
+      const byUuid = items.filter((item) =>
+        itemResolvesToComponent(item, component, components, system?.id)
+      );
       if (byUuid.length > 0) return byUuid;
     }
-    // Name fallback
-    const name = component.name;
-    if (name) {
-      return items.filter((item) => item.name === name);
+    // Name fallback (issue 557). Shared, telemetry-bearing helper (issue 540); this
+    // salvage path stays case-SENSITIVE (`item.name === component.name`), unlike the
+    // three case-insensitive read/craft sites.
+    if (component.name) {
+      return items.filter((item) =>
+        matchComponentByName(item, component, { caseSensitive: true, systemId: system?.id })
+      );
     }
     return [];
   }
@@ -2383,42 +3866,17 @@ export class CraftingEngine {
 
   /**
    * Get the salvage failure consumption policy from the system.
-   * Defaults: consumeComponentOnFail=true, consumeCatalystsOnFail=false.
+   * Defaults: consumeComponentOnFail=true, breakToolsOnFail=false.
    * @private
    */
   _getSalvageFailureConsumptionPolicy(system) {
     const consumption = system?.salvageCraftingCheck?.consumption || {};
     return {
       consumeComponentOnFail: consumption.consumeComponentOnFail !== false,
-      consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true,
+      // Normalized systems carry `breakToolsOnFail`; tolerate the legacy key defensively.
+      breakToolsOnFail:
+        (consumption.breakToolsOnFail ?? consumption.consumeCatalystsOnFail) === true,
     };
-  }
-
-  _getSalvageSuccessFailureMacroUuids(system) {
-    return {
-      successMacroUuid: system?.salvageCraftingCheck?.successMacroUuid || null,
-      failureMacroUuid: system?.salvageCraftingCheck?.failureMacroUuid || null,
-    };
-  }
-
-  async _runSalvageSuccessMacro(component, system, context) {
-    const { successMacroUuid } = this._getSalvageSuccessFailureMacroUuids(system);
-    if (!successMacroUuid) return;
-    try {
-      await MacroExecutor.run(successMacroUuid, context);
-    } catch (error) {
-      console.error(`Fabricate | Salvage success macro failed (${successMacroUuid}):`, error);
-    }
-  }
-
-  async _runSalvageFailureMacro(component, system, context) {
-    const { failureMacroUuid } = this._getSalvageSuccessFailureMacroUuids(system);
-    if (!failureMacroUuid) return;
-    try {
-      await MacroExecutor.run(failureMacroUuid, context);
-    } catch (error) {
-      console.error(`Fabricate | Salvage failure macro failed (${failureMacroUuid}):`, error);
-    }
   }
 
   /**
@@ -2426,8 +3884,9 @@ export class CraftingEngine {
    * @private
    */
   _resolveSalvageResultGroups(component, system, checkResult) {
-    const rawMode = system?.salvageResolutionMode || 'simple';
-    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
+    // Legacy salvage tokens are normalized to canonical values by the manager
+    // (salvage token normalizer) and the 1.4.0 migration before reaching here.
+    const mode = system?.salvageResolutionMode || 'simple';
     const allGroups = Array.isArray(component.salvage?.resultGroups)
       ? component.salvage.resultGroups
       : [];
@@ -2448,43 +3907,24 @@ export class CraftingEngine {
       const group = allGroups[0];
       if (!group) return [];
 
-      const value = Number(checkResult?.value || 0);
-      const awardMode = system?.salvageCraftingCheck?.progressive?.awardMode || 'equal';
-      const awarded = [];
-      let remaining = value;
-
-      for (const result of group.results || []) {
-        const managedItems = system?.components || [];
-        const managedItem = managedItems.find(
-          (e) => e.id === (result.componentId || result.systemItemId)
-        );
-        const cost = Number(managedItem?.difficulty);
-        if (!Number.isFinite(cost) || cost < 1) continue;
-
-        if (awardMode === 'exceed') {
-          if (remaining > cost) {
-            awarded.push(result);
-            remaining -= cost;
-          } else break;
-          continue;
-        }
-        if (awardMode === 'partial') {
-          if (remaining >= cost) {
-            awarded.push(result);
-            remaining -= cost;
-            continue;
-          }
-          if (remaining > 0) {
-            awarded.push(result);
-          }
-          break;
-        }
-        // equal (default)
-        if (remaining >= cost) {
-          awarded.push(result);
-          remaining -= cost;
-        } else break;
-      }
+      // Salvage normalizes the budget with `Number(value || 0)` (divergence 4) and
+      // skips invalid-cost results (divergence 1: `invalidCost: 'skip'`). It does
+      // NOT zero the budget after a `partial` tail award (divergence 2:
+      // `zeroRemainingOnPartial: false`) — that divergence is latent because the
+      // salvage return shape never exposes `remaining`; see #431.
+      const managedItems = system?.components || [];
+      const { awarded } = resolveProgressiveAward({
+        results: group.results || [],
+        initialRemaining: Number(checkResult?.value || 0),
+        costFor: (result) =>
+          Number(
+            managedItems.find((e) => e.id === (result.componentId || result.systemItemId))
+              ?.difficulty
+          ),
+        awardMode: system?.salvageCraftingCheck?.progressive?.awardMode || 'equal',
+        invalidCost: 'skip',
+        zeroRemainingOnPartial: false,
+      });
 
       return [{ ...group, results: awarded }];
     }
@@ -2517,57 +3957,139 @@ export class CraftingEngine {
   }
 
   /**
-   * Run the salvage crafting check macro when configured.
+   * Run the salvage crafting check for the active salvage resolution mode.
+   *
+   * A salvage check is usable only when its mode has an authored roll formula
+   * (simple/routed/progressive). Routed maps the rolled total onto a named outcome
+   * tier that `_resolveSalvageResultGroups` routes through
+   * `component.salvage.outcomeRouting`. When the routed mode needs a check outcome
+   * to route but no roll formula is configured, the attempt fails loudly; every
+   * other mode with no usable formula is a no-op success.
    * @private
    */
-  async _runSalvageCraftingCheck(component, system, actor, toolItems) {
-    const check = system?.salvageCraftingCheck;
-    if (!check?.enabled && !check?.macroUuid) {
-      return { success: true, outcome: null, value: null, data: {} };
+  async _runSalvageCraftingCheck(component, system, actor, { interactive = false } = {}) {
+    const check = system?.salvageCraftingCheck || {};
+    const mode = system?.salvageResolutionMode || 'simple';
+
+    if (mode === 'progressive' && check.progressive?.rollFormula) {
+      return this._runSalvageProgressiveCheck(check.progressive, component, actor, { interactive });
     }
-    if (!check.macroUuid) {
-      return { success: true, outcome: null, value: null, data: {} };
+    if (mode === 'simple' && check.simple?.rollFormula) {
+      return this._runSalvageSimpleCheck(check.simple, component, actor, { interactive });
+    }
+    if (mode === 'routed' && check.routed?.rollFormula) {
+      return this._runSalvageRoutedCheck(check.routed, component, actor, { interactive });
     }
 
-    let result;
-    try {
-      result = await MacroExecutor.run(check.macroUuid, {
-        component,
-        craftingSystem: system,
-        craftingActor: actor,
-        toolItems,
-      });
-    } catch (error) {
-      console.error(`Fabricate | Salvage check macro failed (${check.macroUuid})`, error);
+    // A salvage check is REQUIRED to produce an outcome in progressive mode and in
+    // routed mode (the routed result-group routing keys off the outcome tier name).
+    if (mode === 'progressive' || mode === 'routed') {
       return {
         success: false,
+        misconfigured: true,
         outcome: null,
         value: null,
         data: {},
-        message: `Salvage check macro failed: ${error.message || check.macroUuid}`,
+        message: `${mode} salvage mode requires a configured salvage check roll formula`,
       };
     }
 
-    if (!result || typeof result !== 'object') {
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: {},
-        message: 'Salvage check macro must return an object',
-      };
-    }
+    return { success: true, outcome: null, value: null, data: {} };
+  }
 
-    const outcome = result.outcome == null ? null : String(result.outcome);
-    const value = Number.isFinite(Number(result.value)) ? Number(result.value) : null;
-    const success = result.success !== false;
-    return {
-      success,
-      outcome,
-      value,
-      data: result.data || {},
-      message: success ? null : result.message || 'Salvage check failed',
-    };
+  /**
+   * Resolve the salvage check DC: the per-component override when set, else the
+   * check sub-object's default DC (fallback 15).
+   */
+  _resolveSalvageDc(checkMode, component) {
+    const override = component?.salvage?.dcOverride;
+    if (Number.isFinite(override)) return Math.trunc(override);
+    const dc = Number(checkMode?.dc);
+    return Number.isFinite(dc) ? Math.trunc(dc) : 15;
+  }
+
+  /**
+   * Salvage simple pass/fail check: compare the rolled total against the resolved DC
+   * (per-component override ?? default), honouring per-die crits. Delegates the roll
+   * to the shared {@link runFormulaPassFail}.
+   */
+  async _runSalvageSimpleCheck(simple, component, actor, { interactive = false } = {}) {
+    const dc = this._resolveSalvageDc(simple, component);
+    const result = await runFormulaPassFail({
+      formula: simple.rollFormula,
+      dc,
+      thresholdMode: simple.thresholdMode,
+      triggers: simple.checkBreakage?.triggers,
+      actor,
+      label: 'Salvage',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: component?.name,
+        activity: 'Salvage',
+        img: component?.img,
+        dc,
+      }),
+    });
+    return this._markEngineEvaluated(result);
+  }
+
+  /**
+   * Salvage progressive check: the rolled total becomes the numeric `value` the
+   * progressive salvage awarding spends against result difficulties. Delegates to the
+   * shared {@link runFormulaProgressive}.
+   */
+  async _runSalvageProgressiveCheck(progressive, component, actor, { interactive = false } = {}) {
+    const result = await runFormulaProgressive({
+      formula: progressive.rollFormula,
+      triggers: progressive.checkBreakage?.triggers,
+      actor,
+      label: 'Salvage',
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: component?.name,
+        activity: 'Salvage',
+        img: component?.img,
+      }),
+    });
+    return this._markEngineEvaluated(result);
+  }
+
+  /**
+   * Salvage routed check: roll the routed formula and map its total onto one of the
+   * configured outcome tiers (relative DC deltas or fixed value ranges). The matched
+   * tier's NAME becomes the `outcome` that {@link _resolveSalvageResultGroups} feeds
+   * through `component.salvage.outcomeRouting` to pick a result group. The base DC is
+   * the resolved salvage DC (per-component override ?? routed default), so a per-
+   * component `dcOverride` shifts every relative threshold. Delegates to the shared
+   * {@link runFormulaRouted}.
+   */
+  async _runSalvageRoutedCheck(routed, component, actor, { interactive = false } = {}) {
+    const dc = this._resolveSalvageDc(routed, component);
+    const result = await runFormulaRouted({
+      formula: routed.rollFormula,
+      dc,
+      thresholdMode: routed.thresholdMode,
+      type: routed.type,
+      relativeOutcomes: routed.relativeOutcomes,
+      fixedOutcomes: routed.fixedOutcomes,
+      triggers: routed.checkBreakage?.triggers,
+      actor,
+      label: 'Salvage',
+      // Clamp a below-lowest total to the closest tier (mirrors crafting); a per-
+      // component dcOverride never opens a null-outcome dead zone.
+      clampToNearest: true,
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: component?.name,
+        activity: 'Salvage',
+        img: component?.img,
+        dc,
+      }),
+    });
+    return this._markEngineEvaluated(result);
   }
 
   /**

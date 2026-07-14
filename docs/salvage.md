@@ -22,13 +22,22 @@ See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 The salvage resolution mode controls how result groups are awarded when a component is salvaged.
 It is set at the system level.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Mode        | Description                                                                                                                          |
 |:------------|:-------------------------------------------------------------------------------------------------------------------------------------|
 | Simple      | Always awards exactly one result group. No check required. This is the default.                                                      |
 | Routed      | Awards a result group based on the outcome of a salvage check. Each outcome (such as critical, pass, or fail) is mapped to a result group on the component. |
 | Progressive | Awards results sequentially as the check value exceeds each result's difficulty threshold.                                           |
 
-The salvage resolution mode is set through the API today.
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The salvage resolution mode is set on the system's **Salvage resolution mode** card in the Crafting Admin panel.
+The card offers Simple, Progressive, and Routed by check, with Simple selected by default.
+A salvaged component has a single ingredient, so it cannot route by ingredient set, which is why ingredient-set routing (and Alchemy) is not offered here.
+Changing the mode is not destructive, but any component whose salvage setup is incompatible with the new mode has its salvage disabled until you reconfigure it.
+
+You can also set the salvage resolution mode through the API.
 See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 
 ## Salvage Crafting Check
@@ -41,6 +50,10 @@ A system can have both.
 
 ## See Also
 
-- [Crafting Systems]({% link crafting-systems.md %}). Enable the salvage feature and set the resolution mode for your system.
-- [Crafting Checks]({% link crafting-checks.md %}). The recipe crafting check works similarly to salvage checks. See also consumption-on-failure policies.
-- [Tools]({% link tools.md %}). Configure the requirement, breakage, and on-break behaviour of tools required during salvage.
+- [Crafting Systems]({% link crafting-systems.md %}).
+Enable the salvage feature and set the resolution mode for your system.
+- [Crafting Checks]({% link crafting-checks.md %}).
+The recipe crafting check works similarly to salvage checks.
+See also consumption-on-failure policies.
+- [Tools]({% link tools.md %}).
+Configure the requirement, breakage, and on-break behaviour of tools required during salvage.

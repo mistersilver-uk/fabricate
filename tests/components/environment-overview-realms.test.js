@@ -56,6 +56,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    writeRawModule('src/gatheringImageDefaults.js');
     writeRawModule('src/ui/svelte/util/gatheringFormat.js');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/CompositionModeControl.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte');

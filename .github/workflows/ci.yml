@@ -74,6 +74,9 @@ jobs:
       - name: Check formatting (Prettier)
         run: npm run format:check
 
+      - name: Lint markdown (markdownlint)
+        run: npm run lint:md
+
   validate-bindings:
     # Pure-Node consistency check for the agent role bindings (skills <-> Codex
     # <-> Claude <-> AGENTS.md table). No install needed — the script has no deps.

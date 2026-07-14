@@ -4,7 +4,11 @@
  * All 46 paths are FoundryVTT document icons from the icons/sundries/documents/ directory.
  */
 
-export const DEFAULT_RECIPE_IMAGE = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
+import { DEFAULT_RECIPE_IMAGE } from '../../../models/Recipe.js';
+
+// Re-exported from the model so the canonical default lives in a single low-layer
+// source of truth; existing UI importers keep working unchanged.
+export { DEFAULT_RECIPE_IMAGE };
 
 const BASE_PATH = 'icons/sundries/documents/';
 

@@ -1,6 +1,7 @@
 import { getFabricateFlag } from '../config/flags.js';
 
 import { IngredientGroup } from './IngredientGroup.js';
+import { getMatchHandler } from './match/matchTypes.js';
 
 /**
  * Represents a set of ingredients that can satisfy a recipe's input requirements
@@ -67,29 +68,43 @@ export class IngredientSet {
 
   /**
    * Validate that this ingredient set has all required data
+   * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
+   *   false, the completeness check (must have at least one ingredient group or
+   *   essence requirement) is waived; structural checks still fire.
    * @returns {{valid: boolean, errors: string[]}}
    */
-  validate() {
+  validate({ requireComplete = true } = {}) {
     const errors = [];
 
-    if (this.ingredientGroups.length === 0 && Object.keys(this.essences).length === 0) {
+    if (
+      requireComplete &&
+      this.ingredientGroups.length === 0 &&
+      Object.keys(this.essences).length === 0
+    ) {
       errors.push('Ingredient set must have at least one ingredient group or essence requirement');
     }
 
-    // Validate ingredient groups/options
-    for (const group of this.ingredientGroups) {
-      const groupValidation = group.validate();
+    // Validate ingredient groups/options. Name the group by author-name or 1-based
+    // position (never its internal id) so this detail — surfaced through the recipe's
+    // `ingredientSetInvalid` issue — cannot leak an id on save (issue 595).
+    for (const [groupIndex, group] of this.ingredientGroups.entries()) {
+      const groupValidation = group.validate({ requireComplete });
       if (!groupValidation.valid) {
-        errors.push(
-          `Ingredient group "${group.name || group.id}": ${groupValidation.errors.join(', ')}`
-        );
+        const groupLabel =
+          typeof group.name === 'string' && group.name.trim()
+            ? group.name.trim()
+            : String(groupIndex + 1);
+        errors.push(`Ingredient group "${groupLabel}": ${groupValidation.errors.join(', ')}`);
       }
     }
 
-    // Validate essence requirements
-    for (const [essenceType, quantity] of Object.entries(this.essences)) {
+    // Validate essence requirements. The set is mode/system-unaware here, so it
+    // cannot resolve an essence NAME; a bad quantity is reported name-free rather
+    // than echoing the raw essence id (issue 595). RecipeManager's essence-reference
+    // validator surfaces the same failure with a resolved essence name when it can.
+    for (const quantity of Object.values(this.essences)) {
       if (typeof quantity !== 'number' || quantity <= 0) {
-        errors.push(`Essence "${essenceType}" must have a positive quantity`);
+        errors.push('An essence requirement must have a positive quantity');
       }
     }
 
@@ -145,14 +160,61 @@ export class IngredientSet {
   /**
    * Match ingredients to available items and return consumption plan
    * @param {Item[]} availableItems - Items from actor(s)
+   * @param {Function|null} [matcher] - `(ingredient, item) => boolean` override
+   * @param {{ affordCurrency?: (match: object) => boolean }} [opts] - forwarded to
+   *   {@link resolveIngredientSelection}; the `currencySpends` it returns are NOT
+   *   part of the item plan this method returns (currency is spent separately).
    * @returns {Array<{item: Item, quantity: number, ingredient: Ingredient}>}
    */
-  matchIngredients(availableItems, matcher = null) {
-    const selection = this.resolveIngredientSelection(availableItems, matcher);
+  matchIngredients(availableItems, matcher = null, opts = {}) {
+    const selection = this.resolveIngredientSelection(availableItems, matcher, opts);
     return selection.success ? selection.plan : [];
   }
 
-  resolveIngredientSelection(availableItems, matcher = null) {
+  /**
+   * Resolve which option satisfies each ingredient group, building the item
+   * consumption plan and (when a currency probe is supplied) the currency spends.
+   *
+   * Per group the resolution is items-first, currency-fallback: every NON-currency
+   * option is tried first and the first item-satisfiable one wins, even if a
+   * currency option is authored earlier — items strictly beat currency. Only if no
+   * item option satisfies does the resolver choose the first AFFORDABLE currency
+   * option (author order among currency options). A satisfied currency group adds a
+   * `{ unit, amount, ingredient }` entry to `currencySpends`; the item `plan` stays
+   * item-only.
+   *
+   * With no `affordCurrency` probe (the default), currency is NEVER chosen, so the
+   * result is byte-for-byte the legacy item-only behavior that `canBeCraftedWith`
+   * and the display path rely on.
+   *
+   * A per-group `optionOverrides` map (keyed by `group.id` — an Ingredient has no
+   * stable id) lets a caller (the player-facing per-slot selector, issue 552) pick
+   * a SPECIFIC option for a group instead of the first-satisfiable default. Each
+   * entry is `{ optionIndex, heldItemId? }`. When an override names a valid option
+   * index, THAT option is resolved (never the author-order fallback), honoured
+   * whether satisfiable or not: a satisfiable option wins; a short option reports
+   * the group missing with THAT option's have/need (the caller still blocks the
+   * craft with the usual missing-materials message). A `heldItemId` restricts a tag
+   * option to one specific held stack so the player can choose which of several
+   * matching held items to consume. An explicit currency override routes to
+   * `currencySpends` when affordable (an EXPLICIT player choice may pick a currency
+   * option over an available item — the default items-first rule is unchanged). A
+   * group with no override keeps the byte-for-byte default resolution.
+   *
+   * @param {Item[]} availableItems
+   * @param {Function|null} [matcher]
+   * @param {{ affordCurrency?: (match: object) => boolean,
+   *   optionOverrides?: Record<string, {optionIndex: number, heldItemId?: string|null}> }} [options]
+   * @returns {{ success: boolean, selectedIngredients: Ingredient[],
+   *   plan: Array<{item: Item, quantity: number, ingredient: Ingredient}>,
+   *   currencySpends: Array<{unit: string, amount: number, ingredient: Ingredient}>,
+   *   missingGroups: Array<object> }}
+   */
+  resolveIngredientSelection(
+    availableItems,
+    matcher = null,
+    { affordCurrency, optionOverrides } = {}
+  ) {
     const remaining = new Map();
     for (const item of availableItems) {
       remaining.set(this._itemKey(item), Number(item.system?.quantity || 1));
@@ -160,13 +222,54 @@ export class IngredientSet {
 
     const selectedIngredients = [];
     const plan = [];
+    const currencySpends = [];
     const missingGroups = [];
 
     for (const group of this.ingredientGroups) {
+      const options = group.options || [];
+
+      // Player override (issue 552): resolve the explicitly chosen option instead
+      // of the first-satisfiable default. Honoured whether satisfiable or not.
+      const override = this._resolveGroupOverride(optionOverrides, group, options);
+      if (override) {
+        const option = options[override.optionIndex];
+        if (option?.match?.type === 'currency') {
+          const spend = this._currencySpendFor(option, affordCurrency);
+          if (spend) {
+            selectedIngredients.push(option);
+            currencySpends.push({ unit: spend.unit, amount: spend.amount, ingredient: option });
+          } else {
+            missingGroups.push({ group, ingredient: option, have: 0, need: option.quantity });
+          }
+          continue;
+        }
+        const candidate = this._buildPlanForIngredient(
+          option,
+          availableItems,
+          remaining,
+          matcher,
+          override.heldItemId
+        );
+        if (candidate.ok) {
+          selectedIngredients.push(option);
+          this._commitItemPlan(candidate.plan, plan, remaining);
+        } else {
+          missingGroups.push({
+            group,
+            ingredient: option,
+            have: candidate.have,
+            need: option.quantity,
+          });
+        }
+        continue;
+      }
+
       let chosen = null;
       let bestMissing = null;
 
-      for (const option of group.options || []) {
+      // Items-first: try every non-currency option; first item-satisfiable wins.
+      for (const option of options) {
+        if (option?.match?.type === 'currency') continue;
         const candidate = this._buildPlanForIngredient(option, availableItems, remaining, matcher);
         if (candidate.ok) {
           chosen = { option, plan: candidate.plan };
@@ -175,6 +278,36 @@ export class IngredientSet {
         if (!bestMissing || candidate.have > bestMissing.have) {
           bestMissing = { ingredient: option, have: candidate.have, need: option.quantity };
         }
+      }
+
+      // Currency-fallback: only if no item option satisfied, choose the first
+      // AFFORDABLE currency option (author order among currency options).
+      let chosenCurrency = null;
+      if (!chosen) {
+        for (const option of options) {
+          if (option?.match?.type !== 'currency') continue;
+          const handler = getMatchHandler(option.match);
+          if (handler.affords(option.match, { affordCurrency })) {
+            chosenCurrency = { option, spend: handler.getCurrencySpend(option.match) };
+            break;
+          }
+          // Track an unaffordable currency option as the missing representative
+          // when the group has no item option at all (so the missing entry can
+          // surface the currency requirement).
+          if (!bestMissing) {
+            bestMissing = { ingredient: option, have: 0, need: option.quantity };
+          }
+        }
+      }
+
+      if (chosenCurrency?.spend) {
+        selectedIngredients.push(chosenCurrency.option);
+        currencySpends.push({
+          unit: chosenCurrency.spend.unit,
+          amount: chosenCurrency.spend.amount,
+          ingredient: chosenCurrency.option,
+        });
+        continue;
       }
 
       if (!chosen) {
@@ -186,30 +319,83 @@ export class IngredientSet {
       }
 
       selectedIngredients.push(chosen.option);
-      for (const entry of chosen.plan) {
-        plan.push(entry);
-        const key = this._itemKey(entry.item);
-        const next = (remaining.get(key) || 0) - entry.quantity;
-        remaining.set(key, Math.max(0, next));
-      }
+      this._commitItemPlan(chosen.plan, plan, remaining);
     }
 
     return {
       success: missingGroups.length === 0,
       selectedIngredients,
       plan,
+      currencySpends,
       missingGroups,
     };
   }
 
-  _buildPlanForIngredient(ingredient, availableItems, remaining, matcher = null) {
+  /**
+   * Resolve a validated `{ optionIndex, heldItemId }` override for a group, or null
+   * when there is no override (or it names an out-of-range option, in which case the
+   * default author-order resolution applies). Keyed by `group.id`.
+   * @private
+   */
+  _resolveGroupOverride(optionOverrides, group, options) {
+    const raw = optionOverrides?.[group?.id];
+    if (!raw) return null;
+    const idx = Number(raw.optionIndex);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= options.length) return null;
+    return { optionIndex: idx, heldItemId: raw.heldItemId ?? null };
+  }
+
+  /**
+   * The affordable currency spend for a currency option, or null when the option is
+   * not currency or the actor cannot afford it.
+   * @private
+   */
+  _currencySpendFor(option, affordCurrency) {
+    if (option?.match?.type !== 'currency') return null;
+    const handler = getMatchHandler(option.match);
+    if (!handler.affords(option.match, { affordCurrency })) return null;
+    return handler.getCurrencySpend(option.match);
+  }
+
+  /**
+   * Append a chosen option's item plan entries to the running plan and deduct their
+   * quantities from the remaining pool (shared by the default and override paths so
+   * the remaining-quantity bookkeeping stays identical).
+   * @private
+   */
+  _commitItemPlan(candidatePlan, plan, remaining) {
+    for (const entry of candidatePlan) {
+      plan.push(entry);
+      const key = this._itemKey(entry.item);
+      const next = (remaining.get(key) || 0) - entry.quantity;
+      remaining.set(key, Math.max(0, next));
+    }
+  }
+
+  _buildPlanForIngredient(
+    ingredient,
+    availableItems,
+    remaining,
+    matcher = null,
+    restrictItemId = null
+  ) {
+    // A currency option is never item-satisfiable: short-circuit to not-satisfiable
+    // so the resolver never item-matches it (currency is chosen by the affordability
+    // probe in the fallback pass, not here).
+    if (ingredient?.match?.type === 'currency') {
+      return { ok: false, plan: [], have: 0 };
+    }
+
     let neededQuantity = ingredient.quantity;
     const optionPlan = [];
     let totalAvailable = 0;
 
-    const matchingItems = availableItems.filter((item) =>
-      matcher ? matcher(ingredient, item) : ingredient.matches(item)
-    );
+    // `restrictItemId` (issue 552 tag-stack choice) narrows a tag option to one
+    // specific held stack the player picked, so the craft consumes THAT item.
+    const matchingItems = availableItems.filter((item) => {
+      if (restrictItemId && this._itemKey(item) !== restrictItemId) return false;
+      return matcher ? matcher(ingredient, item) : ingredient.matches(item);
+    });
 
     for (const item of matchingItems) {
       const key = this._itemKey(item);

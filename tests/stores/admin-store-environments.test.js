@@ -23,13 +23,12 @@ function makeSystem(overrides = {}) {
     description: '',
     resolutionMode: 'simple',
     features: {},
-    advancedOptionsEnabled: true,
     categories: [],
     itemTags: [],
     essenceDefinitions: [],
     items: [],
     components: [],
-    requirements: { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
+    requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
     craftingCheck: { mode: 'passFail', macroUuid: null, outcomes: [] },
     recipeVisibility: { listMode: 'global' },
     ...overrides
@@ -120,12 +119,8 @@ function validateEnvironmentForFakeCreate(environment) {
       }
     }
     if (task.resolutionMode === 'progressive') {
-      if (!task.progressive?.awardMode || !['partial', 'equal', 'exceed'].includes(task.progressive.awardMode)) {
-        errors.push(`Task "${task.name}" progressive.awardMode must be partial, equal, or exceed`);
-      }
-      if (!task.check || !task.check.formula) {
-        errors.push(`Task "${task.name}" gathering check requires formula`);
-      }
+      // The gathering check is system-level now, so a progressive task no longer
+      // requires a per-task check or award mode (mirrors the production validator).
       if (!Array.isArray(task.resultGroups) || task.resultGroups.length !== 1) {
         errors.push(`Task "${task.name}" progressive resolution requires exactly one result group`);
       } else if (!Array.isArray(task.resultGroups[0]?.results) || task.resultGroups[0].results.length < 1) {
@@ -176,8 +171,7 @@ function createServices({
   gatheringConfig = {},
   updateError = null,
   confirmResult = true,
-  sceneOptions = [],
-  rollTableOptions = []
+  sceneOptions = []
 } = {}) {
   const settings = { lastManagedCraftingSystem: '', gatheringConfig };
   const listCalls = [];
@@ -291,7 +285,6 @@ function createServices({
     getGatheringEnvironmentStore: () => gatheringEnvironmentStore,
     getScriptMacros: () => [],
     getSceneOptions: () => sceneOptions,
-    getRollTableOptions: () => rollTableOptions,
     notify: {
       info: (msg) => { notifyCalls.info.push(msg); },
       warn: (msg) => { notifyCalls.warn.push(msg); },
@@ -345,14 +338,12 @@ function createServices({
 }
 
 describe('adminStore gathering environments tab state', () => {
-  it('injects scene and roll-table picker options into the selected system view state', async () => {
+  it('injects scene picker options into the selected system view state', async () => {
     const sceneOptions = [{ uuid: 'Scene.forest', name: 'Forest', img: 'forest.webp' }];
-    const rollTableOptions = [{ uuid: 'RollTable.forage', name: 'Forage Table', img: 'icons/svg/d20-grey.svg' }];
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [makeEnvironment()],
-      sceneOptions,
-      rollTableOptions
+      sceneOptions
     });
     const store = createAdminStore(services);
 
@@ -360,7 +351,6 @@ describe('adminStore gathering environments tab state', () => {
 
     const selectedSystem = get(store.viewState).selectedSystem;
     assert.deepEqual(selectedSystem.sceneOptions, sceneOptions);
-    assert.deepEqual(selectedSystem.rollTableOptions, rollTableOptions);
   });
 
   it('exposes canShowEnvironmentsTab only when the selected system enables gathering', async () => {
@@ -1523,5 +1513,66 @@ describe('adminStore gathering library match-loss handling', () => {
     await store.updateGatheringLibraryTask('system-a', 'lib-task', { enabled: true }); // re-enable → silent
 
     assert.equal(services._notify.warn.length, 0);
+  });
+
+  // Regression guard for the "Broken Workshop" smoke fixture (issue 429 PR-2):
+  // the GM system-overview view must render populated rows for a system seeded
+  // with BOTH a live system-blocker AND a task-kind issue. This mirrors the smoke
+  // config exactly so the screenshot capture cannot silently go empty:
+  //   - progressive resolution mode with the crafting check DISABLED and no
+  //     progressive rollFormula → a `progressiveNoCheck` system-blocker; and
+  //   - a manual environment that explicitly includes a non-matching library task
+  //     (biome mismatch) → an `includedButUnavailable` record → a `staleIncluded`
+  //     task-kind issue that deep-links to the owning environment.
+  it('builds a populated system-validation report for the broken-system fixture', async () => {
+    const brokenGatheringConfig = {
+      systems: {
+        'system-a': {
+          tasks: [{ id: 'broken-stale-task', name: 'Phantom Harvest', description: 'x', enabled: true, biomes: ['tundra'], regions: [], dropRows: [] }],
+          events: []
+        }
+      }
+    };
+    const services = createServices({
+      systems: [makeSystem({
+        id: 'system-a',
+        name: 'Broken Workshop',
+        resolutionMode: 'progressive',
+        features: { gathering: true },
+        // The crafting check is disabled and there is no progressive rollFormula,
+        // so `checksEnabled` is false and `progressiveNoCheck` fires (this is the
+        // default a freshly-created system normalizes to).
+        craftingCheck: { enabled: false, mode: 'passFail', macroUuid: null, outcomes: [], progressive: { rollFormula: '' } }
+      })],
+      environments: [makeEnvironment({
+        id: 'forsaken-hollow',
+        name: 'Forsaken Hollow',
+        compositionMode: 'manual',
+        biomes: ['forest'],
+        enabledTaskIds: ['broken-stale-task'],
+        // No inline tasks: composition reads the library task from gatheringConfig.
+        tasks: []
+      })],
+      gatheringConfig: brokenGatheringConfig
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+
+    const report = get(store.viewState).systemValidation;
+    assert.ok(report, 'a system-validation report is published on the view state');
+
+    const systemBlocker = report.issues.find(issue => issue.blocks === 'system');
+    assert.ok(systemBlocker, 'the report carries at least one system-blocker issue');
+    assert.equal(systemBlocker.kind, 'system');
+    assert.equal(systemBlocker.code, 'progressiveNoCheck');
+    assert.equal(report.blocksSystem, true, 'blocksSystem is set for the broken system');
+
+    const taskIssue = report.issues.find(issue => issue.kind === 'task');
+    assert.ok(taskIssue, 'the report carries a task-kind issue from the stale environment record');
+    assert.equal(taskIssue.code, 'staleIncluded');
+    // The deep-link must resolve to the OWNING environment id (not the task record id).
+    assert.equal(taskIssue.environmentId, 'forsaken-hollow', 'the task issue carries the owning environment id');
+    assert.equal(taskIssue.entityId, 'broken-stale-task', 'the task issue keeps the record id for identity');
   });
 });

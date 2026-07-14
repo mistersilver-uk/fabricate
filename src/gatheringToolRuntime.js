@@ -88,6 +88,7 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
   const missing = [];
   const syntheticRecipe = syntheticToolRecipe({ system, task });
   const matcher = resolveToolMatcher(craftingSystemManager);
+  const identityMatcher = resolveToolIdentityMatcher(craftingSystemManager);
   const items = normalizeFoundryCollection(actor?.items);
   const presentSet = resolvePresentComponentIds({
     presentTools,
@@ -96,9 +97,16 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
 
   for (const tool of tools) {
     // Attempt validation: a broken tool counts as unavailable (missing).
-    const item = items.find(candidate => !isToolBroken(candidate) && matcher(syntheticRecipe, tool, candidate));
+    const available = items.filter(candidate => !isToolBroken(candidate));
+    // Durable-identity selection (issue 557): PREFER an owned item that matches the
+    // tool by durable identity (the only kind that may be consumed/destroyed); fall
+    // back to a presence-only (wide) match to satisfy the presence gate, tagging that
+    // pair `breakable: false` so the shared breakage runtime spares it. The runtime is
+    // matcher-agnostic, so this selection layer is its single identity source.
+    const identityItem = available.find(candidate => identityMatcher(syntheticRecipe, tool, candidate)) || null;
+    const item = identityItem || available.find(candidate => matcher(syntheticRecipe, tool, candidate)) || null;
     if (item) {
-      matchedItems.push({ tool, item });
+      matchedItems.push({ tool, item, breakable: identityItem != null });
     } else if (presentSet.has(tool?.componentId)) {
       // Virtual-present: satisfied by the active canvas Tool, no owned item.
       matchedItems.push({ tool, item: null, virtual: true });
@@ -200,6 +208,30 @@ function resolveToolMatcher(craftingSystemManager) {
   const recipeManager = craftingSystemManager?.recipeManager;
   if (typeof recipeManager?.toolMatchesItem === 'function') {
     return (recipe, tool, candidate) => recipeManager.toolMatchesItem(recipe, tool, candidate);
+  }
+  return () => false;
+}
+
+/**
+ * Resolve the durable-identity tool/item matcher used to decide which owned item
+ * may be CONSUMED or DESTROYED (issue 557), mirroring {@link resolveToolMatcher}
+ * but binding `toolMatchesItemByIdentity`.
+ *
+ * Fail-SAFE: when no identity matcher is resolvable (the manager exposes neither
+ * `toolMatchesItemByIdentity` nor a `recipeManager` that does), this returns
+ * `() => false` so every candidate is treated as non-durable and SPARED from
+ * breakage/usage — an unknown or missing matcher must never destroy an item. This
+ * is a deliberate default, not an incidental one: the shared breakage runtime has
+ * no component set of its own, so a missing matcher here is its only signal and the
+ * safe direction is to spare.
+ */
+function resolveToolIdentityMatcher(craftingSystemManager) {
+  if (typeof craftingSystemManager?.toolMatchesItemByIdentity === 'function') {
+    return (recipe, tool, candidate) => craftingSystemManager.toolMatchesItemByIdentity(recipe, tool, candidate);
+  }
+  const recipeManager = craftingSystemManager?.recipeManager;
+  if (typeof recipeManager?.toolMatchesItemByIdentity === 'function') {
+    return (recipe, tool, candidate) => recipeManager.toolMatchesItemByIdentity(recipe, tool, candidate);
   }
   return () => false;
 }

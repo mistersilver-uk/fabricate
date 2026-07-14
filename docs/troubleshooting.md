@@ -10,7 +10,7 @@ This guide covers common issues GMs and players encounter when setting up or usi
 
 ---
 
-### Recipes Not Appearing in the Crafting App
+## Recipes Not Appearing in the Crafting App
 
 **Symptom:** A recipe exists in the GM admin panel but does not appear in the player crafting app.
 
@@ -21,61 +21,122 @@ This guide covers common issues GMs and players encounter when setting up or usi
 - The recipe is restricted to specific users and the current player is not on the allow-list.
 - The system uses knowledge mode and the player has not learned the recipe or does not own a matching recipe item.
 - The recipe belongs to a crafting system that no longer exists.
+- The crafting system has a blocker, or this individual recipe is broken.
+  Fabricate hides recipes that players could not use because of a setup problem, while still showing them to the GM.
 
 **Step-by-step checks:**
 
-1. Open the Crafting Admin panel and go to the **Recipes** tab.
+1. Open the Crafting Admin panel, select the system, and open the **Overview**.
+   A blocker means players see none of the system's recipes until you fix it.
+   An issue listed against the recipe itself hides only that recipe.
+   Use the **Open** button on an issue to jump to the editor that owns it.
+2. Go to the **Recipes** tab.
    Is the recipe's enable toggle (checkbox) in the Actions column checked?
    Disabled recipes show reduced opacity and a grey "Disabled" badge.
-2. Check the **Visibility** column in the recipe list.
+3. Check the **Visibility** column in the recipe list.
    Does it show "Restricted" with a user count?
    If so, make sure the affected player is in the allow-list.
-3. Check the **Recipe Visibility** card on the Systems tab.
+4. Check the **Recipe Visibility** card on the Systems tab.
    If the system is set to knowledge mode:
    - Does the player's actor own the item linked to the recipe?
    - Has the player learned the recipe? Confirm this in the player's knowledge list.
-4. Confirm the recipe still belongs to an existing crafting system.
+5. Confirm the recipe still belongs to an existing crafting system.
    If its system was deleted, the recipe will not show for players.
 
 **See also:** [Recipes]({% link recipes/index.md %}) for enabling and disabling recipes.
 [Visibility & Knowledge]({% link visibility.md %}) for list modes and knowledge access.
-[Crafting Systems]({% link crafting-systems.md %}) for recipe visibility configuration.
+[Crafting Systems]({% link crafting-systems.md %}#system-overview) for the System Overview and how broken systems and recipes are hidden.
 
 ---
 
-### Crafting Check Macro Not Running
+### Recipes Disappeared After Changing the Resolution Mode
 
-**Symptom:** The crafting check macro never fires.
-Recipes resolve immediately with no skill check, even though the Routed mode (with the macro-outcome option) or Progressive mode is configured.
+**Symptom:** After changing a crafting system's recipe resolution mode, some or all recipes are no longer present.
+
+**What to expect:** Changing the resolution mode is no longer delete-all.
+Fabricate migrates each recipe to the new mode wherever it can, and only deletes a recipe whose structure cannot be made to fit.
+The confirmation prompt runs a dry run first and tells you exactly what will happen: how many recipes will be migrated, and, only when some cannot be migrated, how many will be deleted and their names.
+
+**Likely causes for a recipe being deleted:**
+
+- You narrowed into Simple or Progressive mode (which each expect exactly one ingredient set and one result group) from a recipe that had more than one of either.
+- You moved a multi-step recipe into Alchemy mode, which does not support multi-step recipes.
+
+**Step-by-step checks:**
+
+1. Read the confirmation prompt before confirming.
+   It names the recipes that cannot be migrated and will be deleted.
+   Cancel if you are not ready to lose them.
+2. Export the system first to keep a backup if you are unsure.
+   You can re-import it to recover deleted recipes.
+3. If a recipe simply vanished from players but is still in the admin panel, the cause is a system or recipe problem, not deletion.
+   Open the **Overview** to find and fix it.
+
+**See also:** [Crafting Systems]({% link crafting-systems.md %}#system-settings) for the migration-first mode change and the System Overview.
+
+---
+
+## Crafting Check Not Running
+
+**Symptom:** The crafting check never fires.
+Recipes resolve immediately with no skill check, even though the Routed by check mode or Progressive mode is configured.
 
 **Likely causes:**
 
-- The crafting check is turned off and no macro is set.
-  When both are absent, the check is skipped entirely.
-- The configured macro has been deleted or no longer exists.
-- The resolution mode is Simple, or Routed with the ingredient-set or roll-table option.
+- The crafting check has no roll formula authored for the system's active resolution mode.
+  Routed by check mode and Progressive mode each need a roll formula before their check can run.
+  A required check with no roll formula now fails loudly with a validation error rather than being silently skipped.
+- The resolution mode is Simple, or Routed by ingredients.
   In these configurations a crafting check is **optional**.
-  The check runs if configured but is not required for success.
-- The macro returns something the current mode does not understand (for example, no named outcome for the macro-outcome option, or a missing numeric value for Progressive mode).
+  The check runs if a roll formula is configured but is not required for success.
+- For an optional Simple check, the check is turned off.
+  When it is off, the check is skipped entirely.
+- The check returns something the current mode does not understand (for example, no named outcome in Routed by check mode, or a missing numeric value for Progressive mode).
 
 **Step-by-step checks:**
 
 1. Open the Crafting Admin panel, go to the **Systems** tab, and check the **Crafting Checks** section.
-   Is the crafting check turned on?
-2. Is a macro selected?
-   Open Foundry's macro directory and confirm that macro still exists.
-3. Check the system's **Resolution Mode**.
-   If the resolution mode is **Routed** with the macro-outcome option, or **Progressive**, a crafting check is required.
-   Fabricate reports a validation error if one is missing.
-   For **Simple** mode or Routed with the ingredient-set or roll-table options, the check is optional and simply does not run if unconfigured.
-4. Attempt a craft and watch for any error or warning notifications from Fabricate about the macro.
-5. If a developer set up a custom macro, confirm it returns the result the current mode expects (a named outcome for the macro-outcome option, or a numeric value for Progressive mode). See the API reference for the expected setup.
+   Is a roll formula configured for the system's resolution mode?
+2. Check the system's **Resolution Mode**.
+   If the resolution mode is **Routed by check** or **Progressive**, a crafting check is required.
+   Fabricate reports a validation error when its roll formula is missing.
+   For **Simple** mode or **Routed by ingredients**, the check is optional and simply does not run when no roll formula is configured.
+3. For an optional **Simple** check, confirm the check is turned on.
+   When it is off, the check is skipped.
+4. Attempt a craft and watch for any error or warning notifications from Fabricate about the check.
 
 **See also:** [Crafting Checks]({% link crafting-checks.md %}) for crafting check configuration.
 
 ---
 
-### Tools Not Breaking or Tracking Usage
+## Routed Recipe Produces Nothing on a Successful Check
+
+**Symptom:** A recipe that routes by skill-check outcome rolls a success, but no result is produced.
+
+**Likely causes:**
+
+- A success outcome tier is not wired to any result set.
+  When the check rolls that tier, there is nothing to produce.
+- A result set is assigned only to an outcome tier that was later deleted from the routed crafting check.
+  The stale assignment no longer points at a real outcome, so that result set can never be selected.
+- The recipe mixes explicit outcome assignment with name matching, and the rolled outcome's name does not match any result set name.
+
+**Step-by-step checks:**
+
+1. Open the recipe in the recipe editor and go to the **Validation** tab.
+   Look for the warning that a result set is not assigned to any check outcome, and the warning that a check success outcome produces no result set.
+2. On the **Results** tab, check each result set's **Produced on outcome** assignment.
+   Make sure every success outcome tier you expect to use is assigned to a result set, and that every result set is assigned to an outcome that still exists.
+3. If you removed an outcome tier from the routed crafting check, Fabricate strips that tier from any recipe result set that referenced it and posts a notification saying how many result sets were updated.
+   Re-open the affected recipes and assign the result sets to a current outcome tier.
+4. If you rely on name matching instead of explicit assignment, confirm each result set name matches the outcome tier name once case and surrounding spaces are ignored.
+
+**See also:** [Routed Modes]({% link recipes/routed.md %}) for how outcomes match results, including explicit outcome assignment and name matching.
+[Crafting Checks]({% link crafting-checks.md %}) for how a routed check rolls and resolves its difficulty.
+
+---
+
+## Tools Not Breaking or Tracking Usage
 
 {: .note }
 > The standalone **Catalyst** concept was retired in version 0.6.0.
@@ -94,6 +155,10 @@ Recipes resolve immediately with no skill check, even though the Routed mode (wi
 - The tool's on-break action is set to flag the tool as broken (the default for migrated tools), so it is marked broken rather than destroyed.
   This may be intentional (for example, a forge that needs repair rather than replacement).
 - On a failed crafting or salvage check, tools are **not** broken or degraded by default.
+- The owned tool item cannot be identified as the Tool by a durable link.
+  Presence is matched broadly, but breakage and usage are not.
+  In a world that has not been repaired, a copy that was duplicated from another item, or that merely shares the Tool's name, is recognised as present but is never consumed, broken, or usage-counted.
+  Fabricate spares it deliberately, so it never destroys the wrong item.
 
 **Step-by-step checks:**
 
@@ -105,13 +170,16 @@ Recipes resolve immediately with no skill check, even though the Routed mode (wi
 4. If a broken tool should be removed instead of flagged, set its on-break action to **Destroy item** (or **Replace with...**).
    A tool that has been flagged as broken cannot be used again until a GM clears that broken state.
 5. If tools should break even on a failed check, open the system settings and enable the option to consume tools on failure (there are separate options for recipes and for salvage).
+6. If the tool is present but never breaks or tracks usage, and the owned copy was duplicated from another item or shares its name with another item, run **Repair Item Data** from the Fabricate module settings, or delete the copy and re-issue the tool from its source item.
+   This gives the item a durable identity link, after which it breaks and tracks usage normally.
 
 **See also:** [Tools]({% link tools.md %}) covers the system-owned Tool model, including the requirement gate, breakage modes, and on-break actions.
 [Crafting Checks]({% link crafting-checks.md %}#consumption-on-failure) covers consumption on failure settings.
+[Repairing Item Data](#repairing-item-data) covers the maintenance action that gives duplicated copies a durable identity link.
 
 ---
 
-### Effect Transfer Not Applying
+## Effect Transfer Not Applying
 
 **Symptom:** Crafting completes successfully but the result item does not receive active effects from essence source items.
 
@@ -153,7 +221,7 @@ Additional causes:
 
 ---
 
-### Salvage Configuration Rejected
+## Salvage Configuration Rejected
 
 **Symptom:** Salvage fails with a validation error, or attempting to salvage a component produces an error instead of results.
 
@@ -162,11 +230,11 @@ Additional causes:
 - The salvage resolution mode is set to a mode that is not valid for salvage.
   Only Simple, Routed, and Progressive are valid.
 - **Routed salvage mode** requires:
-  - a salvage check is configured (turned on or with a macro set)
+  - a salvage check roll formula is configured
   - at least one outcome is declared (such as critical, pass, and fail)
   - the component maps every declared outcome to an existing result group
 - **Progressive salvage mode** requires:
-  - a progressive salvage check is configured
+  - a progressive salvage check roll formula is configured
   - every result component has a valid positive difficulty value
 - **Simple salvage mode** requires exactly one result group per component.
   Having none, or two or more, is rejected.
@@ -177,7 +245,7 @@ Additional causes:
 1. Check the system's salvage resolution mode.
    If it is not Simple, Routed, or Progressive, change it to one of those.
 2. For **Routed** mode:
-   - Is a salvage check macro selected?
+   - Is a routed salvage check roll formula configured?
    - Are the outcomes defined (such as critical, pass, and fail)?
    - Does the component map every declared outcome to an existing result group?
 3. For **Simple** mode: does the component have exactly one salvage result group?
@@ -189,7 +257,7 @@ Additional causes:
 
 ---
 
-### Recipe Appears Uncraftable Despite Owning Recipe Item or Components
+## Recipe Appears Uncraftable Despite Owning Recipe Item or Components
 
 **Symptom:** A recipe shows as "Cannot craft" or is excluded from the "Craftable only" filter even though the player's actor owns a copy of the linked recipe item and all required components.
 This is most common after upgrading to Foundry v12 or after importing items from a compendium.
@@ -221,7 +289,55 @@ The "Craftable only" filter will include the recipe once all required items are 
 
 ---
 
-### Crafting App Fails to Open
+## Repairing Item Data
+
+Fabricate can reconcile the items behind your crafting components and recipe items so copies in players' inventories match reliably.
+This is the **Repair Item Data** maintenance action.
+
+**Where to find it:** Open Foundry's **Game Settings**, choose **Configure Settings**, and open the **Fabricate** module settings (the same panel as the theme selector).
+Click **Repair Item Data** and confirm.
+The action is available to GMs only.
+
+**What it does:**
+
+- It scans your world items, your unlocked compendiums, and every actor's inventory.
+- It tags each component and each recipe item (book or scroll) source with a durable identity link, so future copies always resolve to the right one.
+- It clears misleading duplicate-source metadata that a copied item inherited from the item it was copied from.
+- It re-points an owned copy that a duplicate mislabelled, but only when the copy's name clearly identifies a single book or scroll.
+- Locked (system and module) compendiums are skipped, because Fabricate cannot write to them.
+- It never teaches or removes a recipe.
+  It only repairs how items are identified.
+
+After it runs, Fabricate reports how many items were tagged, cleaned, unlinked, and re-pointed.
+When a copy's name matched more than one book or scroll, it is left as-is and counted separately, with a note to fix it by hand.
+
+**When to run it:**
+
+- After updating to a version of Fabricate that added durable item identity, if players hold copies that were duplicated in an older world.
+- When a player's duplicated copy of a book or scroll shows the wrong title in their inventory, or auto-learned the wrong recipes when it was dropped on the actor.
+- When a duplicated component is confused with the item it was copied from.
+- After you duplicate items to author new content in a world that predates the durable identity.
+
+**What it cannot fix:**
+
+- **A copy that can no longer be identified.**
+  If a copy was duplicated before the fix, and its only remaining link points at a different book or scroll, Fabricate can re-point it only when its name uniquely matches one book or scroll.
+  When the name matches more than one, or matches none, the copy is left untouched.
+  Delete that copy and drag a fresh one from the correct source item to restore it.
+- **A book, scroll, or component whose original details were already overwritten.**
+  In older versions, registering a duplicate of a compendium-linked item could overwrite the original entry's own name, image, and description with the duplicate's.
+  Those original details are gone and cannot be reconstructed.
+  The repair flags the affected entry so you can spot it, but you must restore its name, image, description, and linked recipes by hand, or re-import it from a backup or its compendium.
+
+The repair scans the actors in your world's Actors directory.
+It does not reach unlinked token copies that were never saved as world actors, or actors stored inside a compendium.
+
+**See also:** [Visibility & Knowledge]({% link visibility.md %}#duplicating-a-book-or-scroll) covers duplicating books and scrolls as an authoring workflow.
+[Crafting Systems]({% link crafting-systems.md %}#adding-components) covers duplicating items to author components.
+
+---
+
+## Crafting App Fails to Open
 
 **Symptom:** Clicking **Craft Item** from the Items sidebar does nothing, or the Crafting App opens briefly then closes.
 
@@ -241,7 +357,7 @@ Ask your GM to clear that actor's crafting run history (this removes the run his
 
 ---
 
-### Completed Simple Craft Still Shows as In-Progress
+## Completed Simple Craft Still Shows as In-Progress
 
 **Symptom:** After a single-step (simple) craft completes successfully or fails, the Crafting App still shows the recipe as in-progress.
 Reloading the page clears the stale state, but it reappears on the next craft.
@@ -261,7 +377,7 @@ Ask your GM to clear that actor's crafting run history (this removes the run his
 
 ---
 
-### Dropping an Actor, Folder, or Non-Item Document onto the Items Tab Shows a Warning
+## Dropping an Actor, Folder, or Non-Item Document onto the Items Tab Shows a Warning
 
 **Symptom:** Dragging something onto the **Items** tab drop zone in the Crafting Admin panel produces a warning notification such as "Only Item documents can be added as crafting components" or "Folder contains no Item documents", and nothing is added.
 
@@ -277,11 +393,15 @@ If the folder holds no Items (for example, it contains only Actors), a notificat
 
 **What each notification means:**
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Notification | Meaning |
 |:-------------|:--------|
 | "Only Item documents can be added as crafting components. Dropped: Actor." | You dragged a character or NPC sheet onto the drop zone. Use an Item from the sidebar or a compendium instead. |
 | "Folder contains no Item documents." | The folder you dropped holds no Items. It may contain Actors, JournalEntries, or other document types. |
 | "Drop an Item document from sidebar or compendium." | The drag data could not be resolved to any UUID. This can happen when dragging something that does not emit standard Foundry drag data. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Step-by-step checks:**
 
@@ -298,7 +418,7 @@ If the folder holds no Items (for example, it contains only Actors), a notificat
 
 ---
 
-### Dropping Items onto the Recipe Manager or Crafting App Does Nothing
+## Dropping Items onto the Recipe Manager or Crafting App Does Nothing
 
 **Symptom:** Dragging an item from the sidebar or a compendium and dropping it onto a Fabricate drop zone (such as the Items tab in the Recipe Manager) produces no result.
 The item is not added, no error or notification appears from Fabricate, and in some cases Foundry displays its own "Drop an Item document from sidebar or compendium." message.

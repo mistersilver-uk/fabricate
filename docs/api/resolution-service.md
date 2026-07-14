@@ -20,18 +20,22 @@ Validates recipes against their resolution mode rules and resolves which result 
 Returns the resolution mode for a recipe (derived from its crafting system).
 
 **Returns:** `string`.
-One of "simple", "routed", or "progressive".
+One of "simple", "routedByIngredients", "routedByCheck", "progressive", or "alchemy".
 
 {: .note }
-> The legacy modes "mapped" and "tiered" are normalised to "routed" on load.
-> `getMode()` always returns "routed" for recipes that were previously "mapped" or "tiered".
+> The legacy modes "mapped" and "tiered" are normalised on load.
+> "mapped" becomes "routedByIngredients" and "tiered" becomes "routedByCheck".
+> The single legacy "routed" token is also retired.
+> A persisted "routed" system is migrated to one of the two routed modes by the data migration, and an un-migrated "routed" token read at runtime falls back to "routedByIngredients".
 
 ### getProvider(recipe)
 
-Returns the result-selection provider for a routed recipe.
+Returns a recipe's legacy `resultSelection.provider`, or `null` when it has none.
 
-**Returns:** `string`.
-One of "ingredientSet", "macroOutcome", or "rollTableOutcome", or `null` for non-routed recipes.
+{: .note }
+> The per-recipe result-selection provider is retired.
+> Alchemy routing moved to the system-level alchemy check mode (`system.alchemy.checkMode`), and the routed crafting modes derive their routing basis from the system mode.
+> No live resolution mode carries a `resultSelection.provider`, so this returns `null` for current recipes.
 
 ### validateRecipe(recipe)
 
@@ -51,13 +55,27 @@ Hooks.once('fabricate.ready', () => {
 
 **Validation rules by mode:**
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Mode | Rules |
 |:-----|:------|
 | Simple | Exactly 1 ingredient set, exactly 1 result group |
-| Routed (`ingredientSet`) | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid, and result group names must be unique (case-insensitive) |
-| Routed (`macroOutcome`) | 1+ ingredient sets, 1+ result groups, checks enabled, `resultSelection.macroUuid` present or system fallback set, result group names are unique and do not use reserved keywords |
-| Routed (`rollTableOutcome`) | 1+ ingredient sets, 1+ result groups, `resultSelection.rollTableUuid` present, result group names are unique and do not use reserved keywords |
+| `routedByIngredients` | 1+ ingredient sets, 1+ result groups, each `IngredientSet.resultGroupId` references a real result group. The crafting check is optional. |
+| `routedByCheck` | 1+ ingredient sets, 1+ result groups, result group names are unique (case-insensitive) and do not use reserved keywords. The routed crafting check roll formula is required at the system level, surfaced as a system blocker rather than a per-recipe error. |
 | Progressive | Exactly 1 ingredient set, exactly 1 result group, checks enabled, progressive config exists, all result difficulties >= 1 |
+| Alchemy | Exactly 1 ingredient set. Result groups follow the system's `alchemy.checkMode`: `none` needs one success group; `simple` needs a success group plus the reserved failure group (`role: 'failure'`), whose absence is tolerated; `tiered` needs 1+ groups with valid outcome-tier assignment. Both mandatory check modes require an authored roll formula at the system level, surfaced as an `alchemyCheckNoFormula` system blocker: `simple` requires `craftingCheck.simple.rollFormula` and `tiered` requires `craftingCheck.routed.rollFormula`. `none` needs no check. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The routing basis is a property of the mode, not a per-recipe provider.
+`routedByIngredients` routes by `IngredientSet.resultGroupId`, and `routedByCheck` routes by the system's routed crafting-check outcome.
+The unique-name and reserved-keyword rules apply under `routedByCheck` (and alchemy in `tiered` check mode), which route by result group name.
+Reserved keywords cover three families.
+The fail family is `fail`, `failed`, `failure`, `f`.
+The hazard family is `hazard`, `danger`, `complication`, `trap`, `oops`, and it also routes a check outcome to the failure path.
+The miss family is `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`.
+A `routedByCheck` recipe (or step) with exactly one result group needs no outcome mapping.
+The single group is produced on any non-failure outcome and yields nothing on a reserved failure keyword.
 
 ### validateSalvage(component, system)
 
@@ -67,10 +85,14 @@ Analogous to `validateRecipe` but operates on salvage-specific data shapes.
 Returns early as valid when the component has no `salvage` data or when `system` is `null`.
 Rejects "mapped" mode immediately, as mapped mode is not supported for salvage.
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Parameter | Type | Required | Description |
 |:----------|:-----|:---------|:------------|
 | `component` | `object` | Yes | The component whose salvage configuration to validate. Must have a `salvage.resultGroups` array for validation to proceed. |
 | `system` | `object` | Yes | The crafting system that owns the component. Supplies `salvageResolutionMode` and `salvageCraftingCheck`. Pass `null` to skip validation entirely. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 **Returns:** `{ valid: boolean, errors: string[] }`
 
@@ -93,8 +115,8 @@ Hooks.once('fabricate.ready', () => {
 | Mode | Rules |
 |:-----|:------|
 | Simple | Exactly 1 result group required. |
-| Routed | Crafting checks must be enabled (via `salvageCraftingCheck.enabled: true` or a non-null `macroUuid`), at least 1 outcome declared, at least 1 result group present, and every declared outcome must map to a valid result group ID in `component.salvage.outcomeRouting`. |
-| Progressive | Crafting checks must be enabled, `salvageCraftingCheck.progressive` config must be present, exactly 1 result group required, the group must contain at least 1 ordered result, and every result must reference a component with `difficulty >= 1`. |
+| Routed | At least 1 result group present, and (when the routed salvage check declares outcome tiers) every success tier name must map to a valid result group ID in `component.salvage.outcomeRouting` with no routes pointing at a missing group, since routing keys on the routed check's outcome-tier names. |
+| Progressive | A progressive salvage check roll formula must be configured (`salvageCraftingCheck.progressive.rollFormula`), exactly 1 result group required, the group must contain at least 1 ordered result, and every result must reference a component with `difficulty >= 1`. |
 
 **Error message examples:**
 
@@ -111,7 +133,10 @@ Hooks.once('fabricate.ready', () => {
 ### resolveResultGroups(params)
 
 Determines which result groups to create based on the resolution mode and crafting check result.
-For routed recipes, this dispatches on `recipe.resultSelection.provider`.
+This dispatches on the system's resolution mode.
+`routedByIngredients` routes by the chosen ingredient set's `resultGroupId`, and `routedByCheck` routes by the crafting-check outcome.
+Alchemy dispatches on the system-level `alchemy.checkMode`.
+`none` and a passed `simple` check route to the success group, a failed `simple` check routes to the reserved `role: 'failure'` group (nothing when it is empty or absent), and `tiered` routes by the routed-check outcome exactly like `routedByCheck`.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -119,13 +144,16 @@ For routed recipes, this dispatches on `recipe.resultSelection.provider`.
 | `params.step` | `object` | The current step |
 | `params.ingredientSet` | `IngredientSet` | The selected ingredient set |
 | `params.checkResult` | `object` | The crafting check result |
-| `params.selectedResultGroupId` | `string` | Player-selected result group (routed `ingredientSet` provider only) |
+| `params.selectedResultGroupId` | `string` | Player-selected result group (`routedByIngredients` mode only) |
 
 **Returns:** `{ groups: object[], meta: object }`
 
 ### validateCheckResult(params)
 
 Validates that a crafting check result has the correct shape for the recipe's mode.
+`routedByCheck` requires a non-empty outcome to route by.
+Alchemy requires a non-empty outcome only when the system's `alchemy.checkMode` is `tiered`; `none` and `simple` always validate.
+Progressive requires a finite numeric value.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|

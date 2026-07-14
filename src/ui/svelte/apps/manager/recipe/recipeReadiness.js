@@ -1,0 +1,548 @@
+/**
+ * Pure recipe readiness + issue evaluation for the recipe editor's Validation
+ * tab. Consumes the projected plain recipe (the same shape the admin store
+ * builds: `name`, `enabled`, `ingredientSets`, `resultGroups`, `steps`,
+ * `toolIds`, `incomplete`, `structureKey`) and returns structured checks/issues
+ * with stable ids; the UI layer maps ids to localized copy. No Svelte, Foundry,
+ * or store dependencies so it stays unit-testable.
+ *
+ * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
+ * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', stepId?: string, stepName?: string }} ReadinessIssue
+ * @typedef {{ id: string, name: string }} RoutedOutcomeTier
+ */
+
+import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
+
+function trimmed(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
+ * Compute a stable match signature for an alternative (option). Used to detect
+ * exact-duplicate matches within an OR group or set. Returns null for options
+ * with no usable match (an empty component slot or a tags match with no tags).
+ *
+ * @param {object} option One alternative inside a requirement.
+ * @returns {string | null}
+ */
+function optionSignature(option) {
+  return getMatchHandler(option?.match).signature(option?.match);
+}
+
+/**
+ * Resolve the recipe's execution steps exactly like the admin store's
+ * `_getRecipeExecutionSteps`: explicit `recipe.steps` when non-empty, otherwise
+ * one implicit step built from the recipe-level sets/groups/tools.
+ *
+ * @param {object} recipe Projected plain recipe.
+ * @returns {{ id: string, name: string, ingredientSets: object[], resultGroups: object[], toolIds: string[], explicit: boolean }[]}
+ */
+function getExecutionSteps(recipe) {
+  const steps = asArray(recipe?.steps);
+  if (steps.length > 0) {
+    return steps.map((step, index) => ({
+      id: step?.id || `step-${index + 1}`,
+      name: trimmed(step?.name),
+      ingredientSets: asArray(step?.ingredientSets),
+      resultGroups: asArray(step?.resultGroups),
+      toolIds: asArray(step?.toolIds),
+      explicit: true,
+    }));
+  }
+
+  return [
+    {
+      id: 'implicit-step',
+      name: '',
+      ingredientSets: asArray(recipe?.ingredientSets),
+      resultGroups: asArray(recipe?.resultGroups),
+      toolIds: asArray(recipe?.toolIds),
+      explicit: false,
+    },
+  ];
+}
+
+/**
+ * Build the `{ stepId, stepName }` tag spread carried by per-step issues. Empty
+ * for single-step recipes so their issues stay step-agnostic.
+ *
+ * @param {{ id: string, name: string }} step
+ * @param {boolean} isMultiStep
+ * @returns {{ stepId: string, stepName: string } | {}}
+ */
+function stepTag(step, isMultiStep) {
+  return isMultiStep ? { stepId: step.id, stepName: step.name } : {};
+}
+
+/**
+ * Missing-ingredient-set and missing-result-group issues, one per offending
+ * step. Surfaced as blocking, critical issues against their editor tab.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectMissingRequirementIssues(executionSteps, isMultiStep) {
+  const issues = [];
+  for (const step of executionSteps) {
+    if (step.ingredientSets.length === 0) {
+      issues.push({
+        id: 'noIngredientSet',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'ingredients',
+        ...stepTag(step, isMultiStep),
+      });
+    }
+  }
+  for (const step of executionSteps) {
+    if (step.resultGroups.length === 0) {
+      issues.push({
+        id: 'noResultGroup',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'results',
+        ...stepTag(step, isMultiStep),
+      });
+    }
+  }
+  return issues;
+}
+
+/**
+ * Compute a requirement (group) signature: the sorted, `&&`-joined option
+ * signatures of the group. Two requirements with the same signature are exact
+ * duplicates. Returns null when the group has no usable option signature.
+ *
+ * @param {object} group One requirement (OR group) inside a set.
+ * @returns {string | null}
+ */
+function requirementSignature(group) {
+  const signatures = asArray(group?.options).map(optionSignature).filter(Boolean);
+  if (signatures.length === 0) return null;
+  return [...signatures].sort((a, b) => a.localeCompare(b)).join('&&');
+}
+
+/**
+ * Duplicate-match issues for a single ingredient set: a `duplicateAlternative`
+ * per OR group that repeats an option signature, plus one `duplicateRequirement`
+ * when two requirements in the set share a requirement signature.
+ *
+ * @param {object} set One ingredient set.
+ * @param {object} step Owning execution step.
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectSetDuplicateIssues(set, step, isMultiStep) {
+  const issues = [];
+  const requirementSignatures = [];
+
+  for (const group of asArray(set?.ingredientGroups)) {
+    const signatures = asArray(group?.options).map(optionSignature).filter(Boolean);
+
+    // Within an OR group: any repeated option signature is a duplicate.
+    if (new Set(signatures).size !== signatures.length) {
+      issues.push({
+        id: 'duplicateAlternative',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'ingredients',
+        ...stepTag(step, isMultiStep),
+      });
+    }
+
+    const signature = requirementSignature(group);
+    if (signature !== null) {
+      requirementSignatures.push(signature);
+    }
+  }
+
+  // Within a set: two requirements sharing a requirement signature duplicate.
+  if (new Set(requirementSignatures).size !== requirementSignatures.length) {
+    issues.push({
+      id: 'duplicateRequirement',
+      severity: 'critical',
+      blocks: 'enable',
+      target: 'ingredients',
+      ...stepTag(step, isMultiStep),
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Union of component ids the group's options expand to, against the system
+ * component catalogue. A component option expands to its own id; a tag option
+ * expands to the ids of components whose tags match; a currency option expands
+ * to nothing.
+ *
+ * @param {object} group One requirement (OR group) inside a set.
+ * @param {object[]} systemComponents `{ id, tags }` per managed component.
+ * @returns {Set<string>}
+ */
+function requirementComponentIds(group, systemComponents) {
+  const ids = new Set();
+  for (const option of asArray(group?.options)) {
+    const expanded = getMatchHandler(option?.match).expandToComponentIds(
+      option?.match,
+      systemComponents
+    );
+    for (const id of expanded) ids.add(id);
+  }
+  return ids;
+}
+
+function setsIntersect(a, b) {
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  for (const value of small) {
+    if (large.has(value)) return true;
+  }
+  return false;
+}
+
+/**
+ * Overlapping-requirement detection for a single ingredient set. Two DISTINCT
+ * requirements (different requirement signatures, so NOT an exact
+ * `duplicateRequirement`) whose options expand to intersecting component-id sets
+ * are ambiguous: a single component could satisfy both AND'd requirements. Emits
+ * at most one `requirementOverlap` warning per set.
+ *
+ * @param {object} set One ingredient set.
+ * @param {object} step Owning execution step.
+ * @param {boolean} isMultiStep
+ * @param {object[]} systemComponents `{ id, tags }` per managed component.
+ * @returns {ReadinessIssue[]}
+ */
+function collectSetOverlapIssues(set, step, isMultiStep, systemComponents) {
+  if (systemComponents.length === 0) return [];
+
+  const groups = [];
+  for (const group of asArray(set?.ingredientGroups)) {
+    const ids = requirementComponentIds(group, systemComponents);
+    if (ids.size === 0) continue;
+    groups.push({ ids, signature: requirementSignature(group) });
+  }
+
+  for (let i = 0; i < groups.length; i += 1) {
+    for (let j = i + 1; j < groups.length; j += 1) {
+      // Skip exact duplicates — those are flagged as duplicateRequirement; don't
+      // double-flag them as an overlap.
+      if (groups[i].signature !== null && groups[i].signature === groups[j].signature) continue;
+      if (setsIntersect(groups[i].ids, groups[j].ids)) {
+        return [
+          {
+            id: 'requirementOverlap',
+            severity: 'warning',
+            target: 'ingredients',
+            ...stepTag(step, isMultiStep),
+          },
+        ];
+      }
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Duplicate-match detection across every step/set: a recipe must not repeat the
+ * same component or an identical tag/currency match twice inside one OR group,
+ * nor as duplicate requirements within a set.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @returns {ReadinessIssue[]}
+ */
+function collectDuplicateMatchIssues(executionSteps, isMultiStep) {
+  const issues = [];
+  for (const step of executionSteps) {
+    for (const set of asArray(step.ingredientSets)) {
+      issues.push(...collectSetDuplicateIssues(set, step, isMultiStep));
+    }
+  }
+  return issues;
+}
+
+/**
+ * Overlapping-requirement detection across every step/set. Requires the system
+ * component catalogue (`{ id, tags }`); with no catalogue (a one-arg evaluator
+ * call) tag-vs-component expansion can't be resolved, so it returns nothing.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @param {object[]} systemComponents
+ * @returns {ReadinessIssue[]}
+ */
+function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComponents) {
+  const issues = [];
+  for (const step of executionSteps) {
+    for (const set of asArray(step.ingredientSets)) {
+      issues.push(...collectSetOverlapIssues(set, step, isMultiStep, systemComponents));
+    }
+  }
+  return issues;
+}
+
+/**
+ * Routed check-mode authoring warnings. Only meaningful for a recipe whose result
+ * routing is the routed `check` provider: the result groups route by the system's
+ * routed-check outcome tiers via `ResultGroup.checkOutcomeIds`. Two soft (warning)
+ * misconfigurations are surfaced, BUT only for steps with MULTIPLE result groups —
+ * a step with exactly one result group needs no mapping (the single-group exemption,
+ * mirroring routedByIngredients), so it raises neither warning:
+ *  - a result group that lists no VALID assigned outcome tier (empty or only
+ *    references to since-deleted tiers) — it can never be routed to, so a check
+ *    success silently produces nothing;
+ *  - an authored success tier that no result group produces — that outcome resolves
+ *    to the distinct `unrouted-tier` misconfiguration at craft time.
+ * Both deep-link to the results tab (`target: 'results'`), mirroring the soft
+ * `requirementOverlap` warning rather than blocking enable.
+ *
+ * @param {object[]} executionSteps
+ * @param {boolean} isMultiStep
+ * @param {RoutedOutcomeTier[]} routedOutcomeTierOptions Success-filtered `{id,name}`.
+ * @returns {{ issues: ReadinessIssue[], checks: ReadinessCheck[] }}
+ */
+function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions) {
+  const validTierIds = new Set(
+    routedOutcomeTierOptions.map((tier) => tier?.id).filter((id) => typeof id === 'string' && id)
+  );
+  const issues = [];
+
+  // A step with exactly one result group needs no outcome/tier mapping (mirrors
+  // routedByIngredients): the single group is produced on any non-failure outcome,
+  // so it is never "unrouted" and never demands a tier be produced.
+  const isMultiGroupStep = (step) => asArray(step.resultGroups).length > 1;
+
+  // An unrouted check-mode group: a group whose `checkOutcomeIds` contains no
+  // currently-valid tier id (empty, or only stale references to deleted tiers).
+  // Only multi-result-group steps need mapping, so single-group steps are skipped.
+  let hasUnroutedGroup = false;
+  for (const step of executionSteps) {
+    if (!isMultiGroupStep(step)) continue;
+    const stepHasUnroutedGroup = asArray(step.resultGroups).some((group) => {
+      const assigned = asArray(group?.checkOutcomeIds).filter((id) => validTierIds.has(id));
+      return assigned.length === 0;
+    });
+    if (stepHasUnroutedGroup) {
+      hasUnroutedGroup = true;
+      issues.push({
+        id: 'unroutedResultGroup',
+        severity: 'warning',
+        target: 'results',
+        ...stepTag(step, isMultiStep),
+      });
+    }
+  }
+
+  // An unproduced success tier: an authored success tier id that no result group
+  // lists in its `checkOutcomeIds`. Only required when at least one step has
+  // MULTIPLE result groups — a recipe whose every step has a single result group
+  // routes on the single-group exemption and needs no tiers produced.
+  const producedTierIds = new Set();
+  for (const step of executionSteps) {
+    for (const group of asArray(step.resultGroups)) {
+      for (const id of asArray(group?.checkOutcomeIds)) {
+        if (validTierIds.has(id)) producedTierIds.add(id);
+      }
+    }
+  }
+  const hasMultiGroupStep = executionSteps.some(isMultiGroupStep);
+  const hasUnproducedTier =
+    hasMultiGroupStep && [...validTierIds].some((id) => !producedTierIds.has(id));
+  if (hasUnproducedTier) {
+    issues.push({ id: 'unproducedOutcomeTier', severity: 'warning', target: 'results' });
+  }
+
+  const checks = [
+    { id: 'routedResultGroupsRouted', satisfied: !hasUnroutedGroup },
+    { id: 'routedOutcomeTiersProduced', satisfied: !hasUnproducedTier },
+  ];
+
+  return { issues, checks };
+}
+
+/**
+ * Alchemy-only enable blockers (issue 549). An alchemy system enables a recipe
+ * through {@link RecipeManager#_validateRecipeForActivation}; two of its checks are
+ * invisible to the generic readiness list and used to throw only on the enable
+ * click:
+ *
+ *  - the alchemy RESULT-SELECTION rule (the retired `resultSelection.provider`
+ *    analog): None/Simple check modes must resolve to exactly one SUCCESS result
+ *    set (the reserved `role: 'failure'` group is not a selectable outcome), so an
+ *    all-failure or multi-success configuration cannot be enabled. Tiered routes by
+ *    the crafting-check outcome, so its result-set cardinality is unconstrained here
+ *    (its routing warnings ride the `routingProvider === 'check'` path). Mirrors
+ *    `ResolutionModeService.validateRecipe`'s alchemy branch, changing nothing about
+ *    what passes/fails — the empty-result-set case stays `noResultGroup`.
+ *  - the cross-recipe SIGNATURE-COLLISION rule (issue 547): each conflict is a
+ *    reason the alchemy runtime cannot tell this recipe apart from another. The
+ *    conflicts are precomputed by the caller via `SignatureValidator` (the same
+ *    validator the enable path and `systemValidation` use — no duplication) and
+ *    passed in as coded `{ code, params, message }` so the tab can localize them
+ *    without leaking ids (issue 550).
+ *
+ * Both are critical, enable-blocking issues. With no alchemy context (every
+ * non-alchemy system) this returns nothing, so those systems see no new checks.
+ *
+ * @param {object} recipe Projected plain recipe.
+ * @param {{ checkMode?: string }|null} alchemy Alchemy context, or null for a
+ *   non-alchemy system.
+ * @param {{ code?: string, params?: object, message?: string }[]} signatureConflicts
+ * @returns {{ issues: ReadinessIssue[], checks: ReadinessCheck[] }}
+ */
+function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
+  const issues = [];
+  const checks = [];
+  if (!alchemy) return { issues, checks };
+
+  // None/Simple result-selection cardinality (Tiered routes by check outcome).
+  if ((alchemy.checkMode || 'none') !== 'tiered') {
+    const resultGroups = asArray(recipe?.resultGroups);
+    const successGroups = resultGroups.filter((group) => group?.role !== 'failure');
+    // The empty case is already spoken to by `hasResultGroup`/`noResultGroup`, so
+    // this check stays silent there (a vacuously-satisfied row next to the failing
+    // `hasResultGroup` row reads contradictory). It only speaks to a PRESENT result
+    // set that does not resolve to a single success group.
+    if (resultGroups.length > 0) {
+      const invalid = successGroups.length !== 1;
+      if (invalid) {
+        issues.push({
+          id: 'alchemyResultSelection',
+          severity: 'critical',
+          blocks: 'enable',
+          target: 'results',
+        });
+      }
+      checks.push({ id: 'alchemyResultSelection', satisfied: !invalid });
+    }
+  }
+
+  const conflicts = asArray(signatureConflicts);
+  for (const conflict of conflicts) {
+    issues.push({
+      id: 'signatureCollision',
+      severity: 'critical',
+      blocks: 'enable',
+      target: 'ingredients',
+      code: conflict?.code || 'signatureCollision',
+      params: conflict?.params || {},
+      message: conflict?.message || '',
+    });
+  }
+  checks.push({ id: 'noSignatureCollision', satisfied: conflicts.length === 0 });
+
+  return { issues, checks };
+}
+
+/**
+ * @param {object} recipe Projected plain recipe.
+ * @param {object} [options]
+ * @param {object[]} [options.systemComponents] Managed components (`{ id, tags }`)
+ *   used to expand tag/component matches for overlap detection. Absent (the
+ *   one-arg call) → overlap detection no-ops.
+ * @param {string|null} [options.routingProvider] The recipe's result-routing
+ *   provider (`'check'` for routed check-mode); the routed warnings only fire when
+ *   it is `'check'`.
+ * @param {RoutedOutcomeTier[]} [options.routedOutcomeTierOptions] The system's
+ *   success-filtered routed-check outcome tiers (`{id,name}`), used to flag
+ *   unrouted groups and unproduced tiers.
+ * @param {{ checkMode?: string }|null} [options.alchemy] Alchemy context for an
+ *   alchemy system (`{ checkMode }`); null/absent for every other mode. Drives the
+ *   alchemy result-selection and signature-collision enable blockers (issue 549).
+ * @param {{ code?: string, params?: object, message?: string }[]} [options.signatureConflicts]
+ *   Cross-recipe ingredient-signature conflicts touching this recipe, precomputed by
+ *   the caller via `SignatureValidator`. Only surfaced when `alchemy` is present.
+ * @returns {{ checks: ReadinessCheck[], issues: ReadinessIssue[] }}
+ */
+export function evaluateRecipeReadiness(recipe = {}, options = {}) {
+  const systemComponents = Array.isArray(options.systemComponents) ? options.systemComponents : [];
+  const routingProvider = options.routingProvider || null;
+  const routedOutcomeTierOptions = Array.isArray(options.routedOutcomeTierOptions)
+    ? options.routedOutcomeTierOptions
+    : [];
+  const alchemy =
+    options.alchemy && typeof options.alchemy === 'object' ? options.alchemy : null;
+  const signatureConflicts = Array.isArray(options.signatureConflicts)
+    ? options.signatureConflicts
+    : [];
+  const executionSteps = getExecutionSteps(recipe);
+  const isMultiStep = executionSteps.length > 0 && executionSteps[0].explicit;
+  const active = recipe?.enabled !== false;
+
+  const hasName = Boolean(trimmed(recipe?.name));
+  const hasIngredientSet = executionSteps.every((step) => step.ingredientSets.length > 0);
+  const hasResultGroup = executionSteps.every((step) => step.resultGroups.length > 0);
+  const stepsNamed = executionSteps.every((step) => Boolean(step.name));
+
+  const checks = [
+    { id: 'hasName', satisfied: hasName },
+    { id: 'hasIngredientSet', satisfied: hasIngredientSet },
+    { id: 'hasResultGroup', satisfied: hasResultGroup },
+  ];
+  if (isMultiStep) {
+    checks.push({ id: 'stepsNamed', satisfied: stepsNamed });
+  }
+
+  const issues = [];
+
+  if (!hasName) {
+    issues.push({ id: 'noName', severity: 'critical', blocks: 'enable', target: 'overview' });
+  }
+
+  issues.push(...collectMissingRequirementIssues(executionSteps, isMultiStep));
+
+  const duplicateIssues = collectDuplicateMatchIssues(executionSteps, isMultiStep);
+  issues.push(...duplicateIssues);
+  checks.push({ id: 'noDuplicateMatches', satisfied: duplicateIssues.length === 0 });
+
+  const overlapIssues = collectRequirementOverlapIssues(
+    executionSteps,
+    isMultiStep,
+    systemComponents
+  );
+  issues.push(...overlapIssues);
+  checks.push({ id: 'noRequirementOverlap', satisfied: overlapIssues.length === 0 });
+
+  // Routed check-mode authoring warnings: only meaningful when the recipe routes
+  // its results by the routed `check` provider.
+  if (routingProvider === 'check') {
+    const routed = collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions);
+    issues.push(...routed.issues);
+    checks.push(...routed.checks);
+  }
+
+  // Alchemy-only enable blockers: the result-selection cardinality rule and the
+  // cross-recipe signature collisions the enable path enforces but the generic
+  // readiness checks never inspect (issue 549).
+  const alchemyReadiness = collectAlchemyReadiness(recipe, alchemy, signatureConflicts);
+  issues.push(...alchemyReadiness.issues);
+  checks.push(...alchemyReadiness.checks);
+
+  // A disabled recipe still saves, but flag that it cannot be enabled until the
+  // critical requirements above are met. The store/model projects `incomplete`;
+  // fall back to the locally computed gaps when the flag is absent.
+  const incomplete =
+    typeof recipe?.incomplete === 'boolean'
+      ? recipe.incomplete
+      : !hasName || !hasIngredientSet || !hasResultGroup;
+  if (!active && incomplete) {
+    issues.push({ id: 'disabledIncomplete', severity: 'warning', target: 'overview' });
+  }
+
+  return { checks, issues };
+}
+
+export function countIssues(severity, issues = []) {
+  return issues.filter((issue) => issue.severity === severity).length;
+}
+
+export function blocksEnable(issues = []) {
+  return issues.some((issue) => issue.blocks === 'enable');
+}

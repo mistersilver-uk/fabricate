@@ -4,6 +4,8 @@
  */
 import { getFabricateFlag } from '../config/flags.js';
 
+import { getMatchHandler, normalizeMatch } from './match/matchTypes.js';
+
 export class Ingredient {
   constructor(data = {}) {
     this.quantity = data.quantity || 1;
@@ -26,51 +28,7 @@ export class Ingredient {
   }
 
   _normalizeMatch(data = {}) {
-    const raw = data.match && typeof data.match === 'object' ? data.match : null;
-    if (raw) {
-      if (raw.type === 'tags') {
-        const tags = Array.isArray(raw.tags)
-          ? raw.tags.map((t) => String(t || '').trim()).filter(Boolean)
-          : [];
-        return {
-          type: 'tags',
-          tags,
-          tagMatch: raw.tagMatch === 'all' ? 'all' : 'any',
-        };
-      }
-
-      // Accept both 'component' (primary) and 'systemItem' (legacy fallback)
-      const componentId =
-        raw.componentId || raw.systemItemId || data.componentId || data.systemItemId || null;
-      return {
-        type: 'component',
-        componentId,
-      };
-    }
-
-    // Bare componentId or systemItemId field
-    const bareComponentId = data.componentId || data.systemItemId || null;
-    if (bareComponentId) {
-      return {
-        type: 'component',
-        componentId: bareComponentId,
-      };
-    }
-
-    const tags = Array.isArray(data.tags)
-      ? data.tags.map((t) => String(t || '').trim()).filter(Boolean)
-      : data.tag
-        ? [String(data.tag).trim()]
-        : [];
-    if (tags.length > 0) {
-      return {
-        type: 'tags',
-        tags,
-        tagMatch: data.tagMatch === 'all' ? 'all' : 'any',
-      };
-    }
-
-    return null;
+    return normalizeMatch(data);
   }
 
   /**
@@ -103,30 +61,39 @@ export class Ingredient {
    * Validate that this ingredient has all required data
    * @returns {{valid: boolean, errors: string[]}}
    */
-  validate() {
+  /**
+   * Validate that this ingredient has all required data.
+   * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
+   *   false, the completeness checks (must carry a match rule / a tag) are waived
+   *   so an unfinished authoring option still persists; structural checks (a
+   *   positive quantity) always fire.
+   * @returns {{valid: boolean, errors: string[]}}
+   */
+  validate({ requireComplete = true } = {}) {
     const errors = [];
-    const hasComponentMatch = this.match?.type === 'component' && !!this.match.componentId;
-    const hasTagMatch =
-      this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0;
 
-    if (!hasComponentMatch && !hasTagMatch && !this.itemUuid) {
+    // Completeness is computed INDEPENDENTLY of the per-type validation: the
+    // shared "must include a match rule" error and the per-type tag/currency
+    // errors STACK for an incomplete tags/currency match (an empty-tags option
+    // yields BOTH messages). They are not mutually exclusive.
+    const handler = getMatchHandler(this.match);
+    const isComplete = handler.isComplete(this.match);
+
+    if (requireComplete && !isComplete && !this.itemUuid) {
       errors.push('Ingredient must include a match rule or specific item UUID');
     }
 
-    if (
-      this.match?.type === 'tags' &&
-      (!Array.isArray(this.match.tags) || this.match.tags.length === 0)
-    ) {
-      errors.push('Tag-based ingredient match requires at least one tag');
-    }
+    errors.push(...handler.validate(this.match, { requireComplete }));
 
+    // A currency option carries its amount on the match, not the option quantity,
+    // so quantity stays the default 1 and never needs validating for currency.
     if (typeof this.quantity !== 'number' || this.quantity <= 0) {
       errors.push('Ingredient quantity must be a positive number');
     }
 
     // Validate alternatives
     for (const alt of this.alternatives) {
-      const altValidation = alt.validate();
+      const altValidation = alt.validate({ requireComplete });
       if (!altValidation.valid) {
         errors.push(`Alternative ingredient: ${altValidation.errors.join(', ')}`);
       }
@@ -143,22 +110,29 @@ export class Ingredient {
    * @returns {string}
    */
   getDescription() {
+    const quantity = this.quantity;
     if (this.match?.type === 'component' && this.match.componentId) {
-      return `${this.quantity}x component`;
+      return getMatchHandler(this.match).describe(this.match, { quantity });
     }
     if (this.itemUuid) {
-      return `${this.quantity}x specific item`;
+      return `${quantity}x specific item`;
     }
     if (
       this.match?.type === 'tags' &&
       Array.isArray(this.match.tags) &&
       this.match.tags.length > 0
     ) {
-      const joined = this.match.tags.join(this.match.tagMatch === 'all' ? ' & ' : ' | ');
-      return `${this.quantity}x ${joined}`;
+      return getMatchHandler(this.match).describe(this.match, { quantity });
+    }
+    // A currency alternative ("100 gp") describes its cost as an insufficient-currency
+    // requirement so it surfaces sensibly in the engine's missing-items list and the
+    // craftability display when it is the unaffordable representative of a group.
+    if (this.match?.type === 'currency' && getMatchHandler(this.match).isComplete(this.match)) {
+      const spend = getMatchHandler(this.match).getCurrencySpend(this.match);
+      return `Insufficient currency. Requires ${spend.amount} ${spend.unit}.`;
     }
     if (this.alternatives.length > 0) {
-      return `${this.quantity}x (${this.alternatives.length} alternatives)`;
+      return `${quantity}x (${this.alternatives.length} alternatives)`;
     }
     return 'Unknown ingredient';
   }

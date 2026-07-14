@@ -11,6 +11,7 @@
   tier), an optional per-event ChanceBar (event scale), and a short clamped description.
 -->
 <script>
+  import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { riskClass, riskLabel, descriptionOrDefault } from '../../util/gatheringFormat.js';
   import ChanceBar from './ChanceBar.svelte';
@@ -65,7 +66,7 @@
   >
     <div class="gathering-event-main">
       <span class="gathering-event-thumb-wrap">
-        <img class="gathering-event-thumb" class:is-fallback={!img} src={img || 'icons/svg/mystery-man.svg'} alt="" />
+        <img class="gathering-event-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_EVENT_IMG} alt="" />
       </span>
 
       <span class="gathering-event-copy">
@@ -115,6 +116,13 @@
   .gathering-event-summary {
     display: flex;
     flex-direction: column;
+    /* Bottom whitespace for the row lives here, NOT as a padding-bottom on the
+       clamped description below: a padding-bottom on a -webkit-line-clamp box
+       makes Chromium paint a sliver of the clamped-away third line into that
+       padding band, which then bleeds under the row border (most visible with
+       Foundry's tall Signika metrics). Keeping the gap on the summary wrapper
+       preserves the whitespace without the sliver. */
+    padding-bottom: var(--fab-space-2);
   }
 
   .gathering-event-summary.is-toggle {
@@ -213,13 +221,17 @@
   /* Short, always-visible description, mirroring the task row's clamp. */
   .gathering-event-description {
     margin: 0;
-    padding: 0 var(--fab-space-2) var(--fab-space-2);
+    /* No padding-bottom here — it would reintroduce the line-clamp sliver (see
+       .gathering-event-summary). The bottom gap is owned by the summary. */
+    padding: 0 var(--fab-space-2);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    /* 1.5 line-height keeps the second line's descenders inside the clamp box
+       so overflow: hidden no longer shaves g/y/p (issue 401). */
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.5;
     color: var(--fab-text-muted);
   }
 

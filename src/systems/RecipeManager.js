@@ -1,15 +1,32 @@
 import { getFabricateFlag } from '../config/flags.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { matchGatheringTools } from '../gatheringToolRuntime.js';
-import { Recipe } from '../models/Recipe.js';
-import { accumulateItemEssences } from '../utils/essenceResolver.js';
-import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
+import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
+import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
+import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
+import { matchComponentByName } from '../utils/componentNameMatch.js';
+import { accumulateItemEssences, findMatchingComponent } from '../utils/essenceResolver.js';
+import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
+import {
+  itemResolvesToComponent,
+  itemResolvesToTool,
+  itemIsToolByDurableIdentity,
+} from '../utils/sourceUuid.js';
 
+import { buildCurrencyAffordProbe } from './currencyAffordance.js';
+import { RecipeActivationError } from './RecipeActivationError.js';
+import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { computeSystemVisibility } from './systemValidation.js';
 
-const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg';
+const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
 const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
+// Match-kind fallback icons for ingredient tiles whose match carries no managed
+// component id (issue 551). A tag match falls back to a generic item icon when
+// nothing in inventory currently satisfies it; a currency match — which never
+// resolves to an inventory item — always shows a coin icon.
+const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
+const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -56,6 +73,32 @@ export class RecipeManager {
     await setSetting(SETTING_KEYS.RECIPES, recipesArray);
   }
 
+  /**
+   * Re-read the persisted recipes setting into the in-memory map. Unlike
+   * `initialize()` (which early-returns once initialized), this is the un-guarded
+   * refresh path used when the replicated world setting changes on ANOTHER client —
+   * the GM's save updates their own map directly, but a player's in-memory map only
+   * catches up here. Does NOT persist, so it is safe to call from a settings hook
+   * without a write loop.
+   *
+   * @returns {boolean} `true` only when the serialized recipes actually changed, so
+   *   callers can skip re-emitting a change hook (and avoid a redundant refresh on
+   *   the writing client, whose map already holds the saved data).
+   */
+  reload() {
+    const serialize = (map) => JSON.stringify([...map.values()].map((r) => r.toJSON()));
+    const before = serialize(this.recipes);
+    const savedRecipes = getSetting(SETTING_KEYS.RECIPES) || [];
+    const next = new Map();
+    for (const recipeData of savedRecipes) {
+      const recipe = Recipe.fromJSON(recipeData);
+      next.set(recipe.id, recipe);
+    }
+    this.recipes = next;
+    this.initialized = true;
+    return before !== serialize(this.recipes);
+  }
+
   _notifyRecipesChanged(action, details = {}) {
     globalThis.Hooks?.callAll?.('fabricate.recipesChanged', {
       action,
@@ -71,17 +114,39 @@ export class RecipeManager {
   /**
    * Create a new recipe
    * @param {Object} recipeData - Recipe configuration
-   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
-   * @returns {Recipe}
+   * @param {{notify?: boolean, allowIncomplete?: boolean}} [options] - Set notify=false for batch
+   *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
+   *   valid but incomplete authoring shell (missing ingredient sets / result groups); such a
+   *   shell stays non-craftable because the engine gates on the full completeness contract.
+   * @returns {Promise<Recipe>}
    */
   async createRecipe(recipeData, options = {}) {
     this._assertGM('create recipe');
 
     const recipe = new Recipe(recipeData);
-    const validation = this._validateRecipeForCreateOrUpdate(recipe);
+    const validation = this._validateRecipeForPersistence(recipe, {
+      requireComplete: !options.allowIncomplete,
+    });
 
     if (!validation.valid) {
-      throw new Error(`Invalid recipe: ${validation.errors.join(', ')}`);
+      // A structural/reference save failure carries coded, id-free issues so the UI
+      // can localize it (issue 595); the `.message` keeps the headless English
+      // aggregate for console/non-UI callers.
+      throw new RecipePersistenceError('create', recipe.name, validation.issues);
+    }
+
+    // A recipe may only be created active when fully valid. A drafting create (allowIncomplete) is
+    // not an enable action, so an invalid draft is born disabled; a strict create that explicitly
+    // asks for an active recipe is rejected so the caller fixes it first.
+    if (recipe.enabled === true) {
+      const activation = this._validateRecipeForActivation(recipe);
+      if (!activation.valid) {
+        if (options.allowIncomplete) {
+          recipe.enabled = false;
+        } else {
+          throw new RecipeActivationError(recipe.name, activation.issues);
+        }
+      }
     }
 
     this.recipes.set(recipe.id, recipe);
@@ -101,8 +166,11 @@ export class RecipeManager {
    * Update an existing recipe
    * @param {string} recipeId - Recipe ID to update
    * @param {Object} updates - Properties to update
-   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
-   * @returns {Recipe}
+   * @param {{notify?: boolean, allowIncomplete?: boolean}} [options] - Set notify=false for batch
+   *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
+   *   valid but incomplete authoring shell (e.g. identity-only edits to a recipe whose
+   *   ingredients/results are still empty); such a shell stays non-craftable.
+   * @returns {Promise<Recipe>}
    */
   async updateRecipe(recipeId, updates, options = {}) {
     this._assertGM('update recipe');
@@ -118,10 +186,25 @@ export class RecipeManager {
       id: recipeId,
     };
     const updatedRecipe = Recipe.fromJSON(merged);
-    const validation = this._validateRecipeForCreateOrUpdate(updatedRecipe);
+    const validation = this._validateRecipeForPersistence(updatedRecipe, {
+      requireComplete: !options.allowIncomplete,
+    });
 
     if (!validation.valid) {
-      throw new Error(`Invalid recipe update: ${validation.errors.join(', ')}`);
+      // See createRecipe: a coded, id-free persistence error the UI can localize
+      // (issue 595) — e.g. an ingredient set mapping to a missing result group on an
+      // ordinary save no longer leaks the set/group id into the toast.
+      throw new RecipePersistenceError('update', updatedRecipe.name, validation.issues);
+    }
+
+    // Only an explicit transition into the enabled state requires full validity. Edits to an
+    // already-enabled recipe (and any disable) persist on structural validity alone; the engine
+    // still gates craftability and the alchemy signature re-check disables conflicts after deletes.
+    if (updatedRecipe.enabled === true && recipe.enabled !== true) {
+      const activation = this._validateRecipeForActivation(updatedRecipe);
+      if (!activation.valid) {
+        throw new RecipeActivationError(updatedRecipe.name, activation.issues);
+      }
     }
 
     this.recipes.set(recipeId, updatedRecipe);
@@ -139,7 +222,12 @@ export class RecipeManager {
   /**
    * Delete a recipe
    * @param {string} recipeId - Recipe ID to delete
-   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
+   * @param {{notify?: boolean, emitChange?: boolean, cleanupFlags?: boolean}} [options]
+   *   Set `notify=false` for batch callers that emit their own summary. Set
+   *   `cleanupFlags=false` when a batch caller (e.g. `CraftingSystemManager.deleteSystem`)
+   *   deletes many recipes and then runs its OWN single bulk actor-flag cleanup pass,
+   *   so the per-recipe `_cleanupFlagsAfterRecipeMutation` fan-out (N recipes × M actors
+   *   flag scans) is not repeated once per recipe.
    */
   async deleteRecipe(recipeId, options = {}) {
     this._assertGM('delete recipe');
@@ -151,7 +239,9 @@ export class RecipeManager {
 
     this.recipes.delete(recipeId);
     await this.save();
-    await this._cleanupFlagsAfterRecipeMutation();
+    if (options.cleanupFlags !== false) {
+      await this._cleanupFlagsAfterRecipeMutation();
+    }
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${recipe.name}" deleted`);
     }
@@ -230,13 +320,56 @@ export class RecipeManager {
     const recipes = this.getRecipes({ enabled: true });
     const available = [];
 
+    // System-validity gate: a system with a `blocks: 'system'` issue exposes NO
+    // recipes to non-GM users (the crafting guard then has nothing to start). GMs
+    // bypass the gate so they can still reach a broken system to fix it. The
+    // per-system blocker decision is computed at most once per listing call
+    // (cached by system id), NOT a full overview rebuild — this is a synchronous
+    // per-render read.
+    const isGM = game.user?.isGM === true;
+    const blockedSystemCache = new Map();
+
     for (const recipe of recipes) {
+      if (!isGM && this._isSystemBlockedForRecipes(recipe.craftingSystemId, blockedSystemCache)) {
+        continue;
+      }
       if (this.canCraft(sourceActors, recipe).canCraft) {
         available.push(recipe);
       }
     }
 
     return available;
+  }
+
+  /**
+   * Whether a system is hidden by a `blocks: 'system'` validation issue. Cached
+   * per listing call so a multi-recipe system is evaluated once. Returns false
+   * (fail-open) when the system or validation collaborators are unavailable, so a
+   * missing manager never blanks a player's recipe list. GM bypass is the
+   * caller's concern.
+   *
+   * @param {string|null|undefined} systemId
+   * @param {Map<string, boolean>} cache Per-call blocker cache, keyed by system id.
+   * @returns {boolean}
+   * @private
+   */
+  _isSystemBlockedForRecipes(systemId, cache) {
+    if (!systemId) return false;
+    if (cache.has(systemId)) return cache.get(systemId);
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem?.(systemId);
+    if (!system) {
+      cache.set(systemId, false);
+      return false;
+    }
+
+    const { blocksSystem } = computeSystemVisibility(system, {
+      recipes: this.getRecipes({ craftingSystemId: systemId }),
+      components: system.components || [],
+    });
+    cache.set(systemId, blocksSystem === true);
+    return blocksSystem === true;
   }
 
   /**
@@ -259,16 +392,35 @@ export class RecipeManager {
    *   is marked `{ available: true, virtual: true }` so the caller excludes it
    *   from breakage/usage. componentId is per-system, so the system scope prevents
    *   a tool from system A satisfying a system-B recipe.
+   * @param {object|null} [options.craftingActor] - the actor whose currency funds a
+   *   currency-alternative group. The display probe is bound to this actor so the
+   *   craftability shown to a player agrees with what the engine spends. Defaults to
+   *   `null`, which makes every currency option show as missing (no crash).
+   * @param {Function} [options.resolveComponent] - Optional component resolver injected
+   *   on the alchemy craft path (issue 578) so a tier-4-only submission satisfies the
+   *   ingredient and essence checks against the same component the collector bucketed it
+   *   to. Defaults (undefined) to the shared resolvers used by standard crafting and
+   *   every display caller — byte-for-byte unchanged.
+   * @param {object|null} [options.optionOverrides] - Per-group player option overrides
+   *   (issue 552), keyed by `group.id` → `{ optionIndex, heldItemId? }`. Threaded to
+   *   `resolveIngredientSelection` so both this display path and the engine's
+   *   consumption resolve the SAME chosen option/stack. Null (the default) keeps the
+   *   first-satisfiable behaviour byte-for-byte unchanged.
    * @returns {{
    *   canCraft: boolean,
    *   satisfiableSet: IngredientSet|null,
    *   missing: { ingredients: Array, essences: Array, tools: Array },
-   *   ingredientStates: Array<{ description: string, need: number, have: number, satisfied: boolean }>,
+   *   ingredientStates: Array<{ groupId: string|null, description: string, need: number, have: number, satisfied: boolean, hasChoice: boolean, choiceCount: number }>,
+   *   ingredientChoices: Array<object>,
    *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean }>,
-   *   toolStates: Array<{ name: string, available: boolean, virtual?: boolean }>
+   *   toolStates: Array<{ name: string, img: string|null, available: boolean, virtual?: boolean }>
    * }}
    */
-  evaluateCraftability(componentSourceActors, recipe, { presentTools = null } = {}) {
+  evaluateCraftability(
+    componentSourceActors,
+    recipe,
+    { presentTools = null, craftingActor = null, resolveComponent, optionOverrides = null } = {}
+  ) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
       : componentSourceActors
@@ -298,6 +450,11 @@ export class RecipeManager {
 
     const features = this._getSystemFeatures(recipe);
 
+    // Bind the currency affordability probe to the crafting actor so a currency
+    // alternative is selectable in the display exactly when the engine could spend
+    // it. A null actor yields a probe that is always false (currency shows missing).
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+
     // Attempt to find a satisfiable ingredient set.
     // We capture both the satisfiable set (if any) and the first-set result for
     // the fallback display path.
@@ -311,10 +468,19 @@ export class RecipeManager {
     for (const ingredientSet of recipe.ingredientSets) {
       const selection =
         typeof ingredientSet.resolveIngredientSelection === 'function'
-          ? ingredientSet.resolveIngredientSelection(availableItems, (ingredient, item) =>
-              this.ingredientMatchesItem(recipe, ingredient, item)
+          ? ingredientSet.resolveIngredientSelection(
+              availableItems,
+              (ingredient, item) =>
+                this.ingredientMatchesItem(recipe, ingredient, item, resolveComponent),
+              { affordCurrency, optionOverrides }
             )
-          : { success: true, missingGroups: [], selectedIngredients: [], plan: [] };
+          : {
+              success: true,
+              missingGroups: [],
+              selectedIngredients: [],
+              plan: [],
+              currencySpends: [],
+            };
 
       // Track the first set's selection for the unsatisfied fallback display.
       if (firstSetSelection === null) {
@@ -324,7 +490,11 @@ export class RecipeManager {
       // Check essences for this set.
       let essencesMet = true;
       if (features.enableEssences && Object.keys(ingredientSet.essences || {}).length > 0) {
-        const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
+        const accumulatedEssences = this._accumulateEssences(
+          availableItems,
+          recipe,
+          resolveComponent
+        );
         for (const [essenceType, requiredQty] of Object.entries(ingredientSet.essences)) {
           if ((accumulatedEssences[essenceType] || 0) < requiredQty) {
             essencesMet = false;
@@ -367,7 +537,36 @@ export class RecipeManager {
       availableItems
     );
 
-    // Build essence states from the display set.
+    // Per-group player-facing option/stack choices (issue 552). Empty unless a group
+    // offers a real choice (multiple authored options, or a tag option matching more
+    // than one held stack), so the common single-option case renders no selector.
+    const ingredientChoices = this._buildIngredientChoices(
+      recipe,
+      displayIngredientSet,
+      displaySelection,
+      availableItems,
+      optionOverrides,
+      affordCurrency
+    );
+    // Tag each ingredient state with whether its group has a choice + how many
+    // alternatives, so the tile can show a discoverability badge next to it.
+    const choiceCountByGroup = new Map();
+    for (const choice of ingredientChoices) {
+      const count = choice.kind === 'option' ? choice.options.length : choice.stacks.length;
+      choiceCountByGroup.set(
+        choice.groupId,
+        Math.max(choiceCountByGroup.get(choice.groupId) ?? 0, count)
+      );
+    }
+    for (const state of ingredientStates) {
+      state.hasChoice = choiceCountByGroup.has(state.groupId);
+      state.choiceCount = choiceCountByGroup.get(state.groupId) ?? 0;
+    }
+
+    // Build essence states from the display set. This readout is display-only and is
+    // intentionally NOT threaded with the alchemy tier-4 resolver (issue 578): it is
+    // harmless because `missing.essences` below is forced empty whenever canCraft is
+    // true, and the alchemy workbench does not render this per-type essence-state list.
     const essenceStates = this._buildEssenceStates(
       recipe,
       displayIngredientSet,
@@ -403,9 +602,108 @@ export class RecipeManager {
         tools: missingTools,
       },
       ingredientStates,
+      ingredientChoices,
       essenceStates,
       toolStates,
     };
+  }
+
+  /**
+   * The material requirement to craft a recipe ONCE via ANY ingredient set, for the
+   * shopping list. Unlike {@link evaluateCraftability} (which reports a single
+   * chosen set), this unions every set: per component / per essence the `need` is
+   * the MAXIMUM across sets, and tools are the union of every set's tools. That is
+   * exactly enough to craft the recipe once whichever set the player picks — NOT
+   * enough to craft every set at once.
+   *
+   * Same `{ ingredientStates, essenceStates, toolStates }` shape as
+   * evaluateCraftability (with `have` re-derived against the merged max `need`), so
+   * the shopping aggregator consumes it identically.
+   *
+   * @param {Actor[]} componentSourceActors
+   * @param {Recipe} recipe
+   * @param {object} [options]
+   * @param {object|null} [options.craftingActor]
+   * @returns {{ ingredientStates: Array, essenceStates: Array, toolStates: Array }}
+   */
+  evaluateShoppingRequirement(componentSourceActors, recipe, { craftingActor = null } = {}) {
+    const sourceActors = Array.isArray(componentSourceActors)
+      ? componentSourceActors
+      : componentSourceActors
+        ? [componentSourceActors]
+        : [];
+
+    const empty = { ingredientStates: [], essenceStates: [], toolStates: [] };
+    if (sourceActors.length === 0 || !Array.isArray(recipe?.ingredientSets)) return empty;
+    if (recipe.ingredientSets.length === 0) return empty;
+
+    const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
+    const features = this._getSystemFeatures(recipe);
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+
+    const ingredientByKey = new Map();
+    const essenceByType = new Map();
+    const toolByKey = new Map();
+
+    for (const set of recipe.ingredientSets) {
+      const selection =
+        typeof set.resolveIngredientSelection === 'function'
+          ? set.resolveIngredientSelection(
+              availableItems,
+              (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item),
+              { affordCurrency }
+            )
+          : {
+              success: true,
+              missingGroups: [],
+              selectedIngredients: [],
+              plan: [],
+              currencySpends: [],
+            };
+
+      // Keep the highest-need state per component (need = worst-case single set).
+      for (const state of this._buildIngredientStates(recipe, set, selection, availableItems)) {
+        const key = state.componentId ?? state.description ?? state.name;
+        const existing = ingredientByKey.get(key);
+        if (!existing || (state.need ?? 0) > (existing.need ?? 0)) {
+          ingredientByKey.set(key, { ...state });
+        }
+      }
+
+      for (const essence of this._buildEssenceStates(recipe, set, availableItems, features)) {
+        const existing = essenceByType.get(essence.type);
+        if (!existing || (essence.need ?? 0) > (existing.need ?? 0)) {
+          essenceByType.set(essence.type, { ...essence });
+        }
+      }
+
+      // A tool is needed if ANY set requires it; prefer an unavailable/repair reading.
+      const toolStates = this._buildToolStates(
+        recipe,
+        this.getToolsForSet(recipe, set),
+        availableItems,
+        null
+      );
+      for (const tool of toolStates) {
+        const key = tool.componentId ?? tool.name;
+        const existing = toolByKey.get(key);
+        if (!existing || (existing.available === true && tool.available !== true)) {
+          toolByKey.set(key, tool);
+        }
+      }
+    }
+
+    // Re-derive satisfaction against the merged max need.
+    const ingredientStates = [...ingredientByKey.values()].map((state) => ({
+      ...state,
+      satisfied: (state.have ?? 0) >= (state.need ?? 0),
+    }));
+    const essenceStates = [...essenceByType.values()].map((essence) => ({
+      ...essence,
+      satisfied: (essence.have ?? 0) >= (essence.need ?? 0),
+    }));
+
+    return { ingredientStates, essenceStates, toolStates: [...toolByKey.values()] };
   }
 
   /**
@@ -426,23 +724,33 @@ export class RecipeManager {
     // `matchGatheringTools` scopes the virtual-present set to the system passed
     // here (the recipe's crafting system), so a present tool from a different
     // system never satisfies this recipe's tool prerequisites.
-    const matched = matchGatheringTools({
+    const matchArgs = {
       actor: { items: availableItems },
       system: { id: recipe?.craftingSystemId ?? null },
       task: { id: recipe?.id ?? null, craftingSystemId: recipe?.craftingSystemId ?? null },
       tools,
       craftingSystemManager: { recipeManager: this },
       presentTools,
-    });
+    };
+    const matched = matchGatheringTools(matchArgs);
+    // The same matcher, split into present/damaged/missing so the UI can show
+    // "Repair" (present-but-broken) vs "Acquire" (absent) — `matched` alone
+    // collapses both broken and absent into unavailable.
+    const stateByTool = new Map(
+      classifyGatheringToolStates(matchArgs).map((entry) => [entry.tool, entry.state])
+    );
     // Index by tool so the per-tool state can carry the virtual flag (a
     // virtual-present match has no owned item and must be excluded from
     // breakage/usage by the caller).
     const matchedByTool = new Map(matched.items.map((entry) => [entry.tool, entry]));
     return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
+      const toolId = tool?.componentId || tool?.systemItemId;
       const state = {
-        name: this.resolveComponentName(recipe, tool?.componentId || tool?.systemItemId),
+        name: this.resolveComponentName(recipe, toolId),
+        img: this.resolveComponentImg(recipe, toolId),
         available: entry !== null,
+        needsRepair: stateByTool.get(tool) === 'damaged',
       };
       if (entry?.virtual === true) state.virtual = true;
       return state;
@@ -458,7 +766,7 @@ export class RecipeManager {
    * @param {IngredientSet} ingredientSet
    * @param {Object} selection - result from resolveIngredientSelection
    * @param {Item[]} availableItems
-   * @returns {Array<{ description: string, need: number, have: number, satisfied: boolean }>}
+   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have: number, satisfied: boolean }>}
    * @private
    */
   _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
@@ -474,62 +782,243 @@ export class RecipeManager {
       (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
     );
 
+    // The option the engine chose per group (issue 553), so the tile always mirrors
+    // the option/stack the craft consumes.
+    const chosenByGroup = this._chosenOptionByGroup(ingredientSet, selection);
+
     return groups.map((group) => {
       const options = group.options || [];
-
-      // Check whether any option in this group is satisfied.
-      // We use the selectedIngredients from the selection to determine which option was chosen,
-      // then compute have/need from the actual available items using the same matcher.
-      //
-      // For missing groups, report the best-effort have/need from the missingGroups data.
       const isMissing = missingGroupIds.has(group.id);
+      const chosenOption = chosenByGroup.get(group?.id) ?? options[0] ?? null;
+      // Show ONLY the chosen option's description (issue 552) instead of OR-joining
+      // every option's name against a single unlabelled have/need pip — the tile now
+      // names the specific option the craft will consume.
+      const description =
+        this._resolveIngredientDescription(recipe, chosenOption) ||
+        options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
 
       if (isMissing) {
-        // Find this group's missing data.
         const missingEntry = (selection?.missingGroups || []).find(
           (mg) => mg?.group?.id === group.id
         );
-        const ingredient = missingEntry?.ingredient || options[0] || null;
-        const description =
-          this._resolveIngredientDescription(recipe, ingredient) ||
-          options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
+        const visual = this._resolveIngredientVisual(recipe, chosenOption, availableItems);
         return {
+          ...visual,
+          groupId: group?.id ?? null,
           description,
-          need: Number(missingEntry?.need || ingredient?.quantity || 1),
+          need: Number(missingEntry?.need || chosenOption?.quantity || 1),
           have: Number(missingEntry?.have || 0),
           satisfied: false,
         };
       }
 
-      // This group is satisfied — find which option was selected.
-      // The selectedIngredients array holds the chosen option objects in group order.
-      // We match by position: selected options appear in the same order as groups
-      // (groups are iterated in order; selectedIngredients are appended in order).
-      //
-      // To avoid positional assumptions we instead compute have/need for each option
-      // using the availableItems (no remaining-quantity deduction here — we only need
-      // display values, and the group is already known to be satisfied).
-      const optionStates = options.map((ing) => {
-        const matchingItems = availableItems.filter((item) =>
-          this.ingredientMatchesItem(recipe, ing, item)
-        );
-        const totalQty = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
-        return {
-          description: this._resolveIngredientDescription(recipe, ing) || '',
-          need: ing.quantity,
-          have: totalQty,
-          satisfied: totalQty >= ing.quantity,
-        };
-      });
+      // The specific inventory item the engine will consume for this option, from the
+      // same consumption plan, so a shared tag/component tile shows the CONSUMED item
+      // rather than the first inventory item that merely matches (issue 553).
+      const consumedItem =
+        (selection?.plan || []).find((entry) => entry.ingredient === chosenOption)?.item || null;
 
-      const satisfiedOption = optionStates.find((s) => s.satisfied) || optionStates[0];
+      const matchingItems = availableItems.filter((item) =>
+        this.ingredientMatchesItem(recipe, chosenOption, item)
+      );
+      const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
+      const visual = this._resolveIngredientVisual(
+        recipe,
+        chosenOption,
+        availableItems,
+        consumedItem
+      );
       return {
-        description: optionStates.map((s) => s.description).join(' OR '),
-        need: satisfiedOption?.need || 1,
-        have: satisfiedOption?.have || 0,
+        ...visual,
+        groupId: group?.id ?? null,
+        description,
+        need: Number(chosenOption?.quantity || 1),
+        have,
         satisfied: true,
       };
     });
+  }
+
+  /**
+   * Map each group id to the option the resolver chose for it. For a satisfied group
+   * that is the pushed `selectedIngredients` entry (item or currency); for a missing
+   * group it is the `missingGroups` representative option (the overridden or
+   * best-effort short option). resolveIngredientSelection appends exactly ONE entry
+   * to `selectedIngredients` per NON-missing group in group order, so satisfied
+   * groups read their option by running index.
+   * @private
+   * @returns {Map<string, Ingredient|null>}
+   */
+  _chosenOptionByGroup(ingredientSet, selection) {
+    const map = new Map();
+    const groups = Array.isArray(ingredientSet?.ingredientGroups)
+      ? ingredientSet.ingredientGroups
+      : [];
+    const missingIds = new Set(
+      (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
+    );
+    let satisfiedIndex = 0;
+    for (const group of groups) {
+      if (missingIds.has(group?.id)) {
+        const entry = (selection?.missingGroups || []).find((mg) => mg?.group?.id === group?.id);
+        map.set(group?.id, entry?.ingredient ?? group?.options?.[0] ?? null);
+      } else {
+        map.set(
+          group?.id,
+          selection?.selectedIngredients?.[satisfiedIndex] ?? group?.options?.[0] ?? null
+        );
+        satisfiedIndex += 1;
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Build the player-facing per-group option/stack choices (issue 552). Only groups
+   * that offer a real choice appear: a MULTI-option group emits an `option`
+   * radiogroup, and when the currently-chosen option is a tag matching MORE THAN ONE
+   * held stack it also emits a `stack` radiogroup so the player can pick which held
+   * item to consume. Single-option groups with no multi-stack tag emit nothing, so
+   * the common case shows no selector.
+   *
+   * Each `option` carries `{ optionIndex, name, img, need, have, satisfied,
+   * isCurrency, costLabel, affordable }` — an insufficient option is included
+   * (selectable but flagged `satisfied: false`), matching the resolver, which
+   * honours it and lets the craft block with the missing-materials message.
+   *
+   * @private
+   * @returns {Array<object>}
+   */
+  _buildIngredientChoices(
+    recipe,
+    ingredientSet,
+    selection,
+    availableItems,
+    optionOverrides,
+    affordCurrency
+  ) {
+    const groups = Array.isArray(ingredientSet?.ingredientGroups)
+      ? ingredientSet.ingredientGroups
+      : [];
+    if (groups.length === 0) return [];
+
+    const chosenByGroup = this._chosenOptionByGroup(ingredientSet, selection);
+    const choices = [];
+
+    for (const group of groups) {
+      const options = group.options || [];
+      if (options.length === 0) continue;
+      const groupName =
+        (typeof group.name === 'string' && group.name.trim()) ||
+        this._defaultGroupName(recipe, options);
+      const chosenOption = chosenByGroup.get(group?.id) ?? options[0] ?? null;
+      let selectedOptionIndex = options.indexOf(chosenOption);
+      if (selectedOptionIndex < 0) selectedOptionIndex = 0;
+
+      if (options.length > 1) {
+        choices.push({
+          kind: 'option',
+          groupId: group?.id ?? null,
+          groupName,
+          selectedOptionIndex,
+          options: options.map((option, idx) =>
+            this._buildOptionChoice(recipe, option, idx, availableItems, affordCurrency)
+          ),
+        });
+      }
+
+      // Tag-stack sub-choice for the currently-selected option only.
+      const selectedOption = options[selectedOptionIndex] ?? null;
+      const stacks = this._heldStacksForTagOption(recipe, selectedOption, availableItems);
+      if (stacks.length > 1) {
+        const consumedItem =
+          (selection?.plan || []).find((entry) => entry.ingredient === selectedOption)?.item ||
+          null;
+        const overrideHeldId = optionOverrides?.[group?.id]?.heldItemId ?? null;
+        const selectedHeldItemId =
+          overrideHeldId ?? (consumedItem?.uuid || consumedItem?.id) ?? stacks[0].itemId;
+        choices.push({
+          kind: 'stack',
+          groupId: group?.id ?? null,
+          groupName,
+          optionIndex: selectedOptionIndex,
+          selectedHeldItemId,
+          stacks,
+        });
+      }
+    }
+
+    return choices;
+  }
+
+  /** Fallback group label when a group has no authored name. @private */
+  _defaultGroupName(recipe, options) {
+    const first = options?.[0] ?? null;
+    return this._resolveIngredientDescription(recipe, first) || 'Alternatives';
+  }
+
+  /**
+   * Build one option descriptor for the choices model. `have` is the raw total held
+   * quantity matching the option across the full inventory (an isolated affordability
+   * indicator per alternative, independent of the shared remaining-quantity pool).
+   * @private
+   */
+  _buildOptionChoice(recipe, option, optionIndex, availableItems, affordCurrency) {
+    const visual = this._resolveIngredientVisual(recipe, option, availableItems);
+    const isCurrency = option?.match?.type === 'currency';
+    if (isCurrency) {
+      const handler = getMatchHandler(option.match);
+      const spend = handler.isComplete(option.match)
+        ? handler.getCurrencySpend(option.match)
+        : null;
+      const affordable = handler.affords(option.match, { affordCurrency });
+      return {
+        optionIndex,
+        name: visual.name || this._resolveIngredientDescription(recipe, option),
+        img: visual.img,
+        need: spend?.amount ?? 0,
+        have: 0,
+        satisfied: affordable,
+        isCurrency: true,
+        costLabel: spend ? `${spend.amount} ${spend.unit}` : '',
+        affordable,
+      };
+    }
+    const matchingItems = availableItems.filter((item) =>
+      this.ingredientMatchesItem(recipe, option, item)
+    );
+    const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
+    const need = Number(option?.quantity || 1);
+    return {
+      optionIndex,
+      name: visual.name || this._resolveIngredientDescription(recipe, option),
+      img: visual.img,
+      need,
+      have,
+      satisfied: have >= need,
+      isCurrency: false,
+      costLabel: '',
+      affordable: true,
+    };
+  }
+
+  /**
+   * The distinct held stacks a tag option matches, or `[]` when the option is not a
+   * tag option (component/currency/exact-item options resolve to a single item and
+   * offer no held-stack choice).
+   * @private
+   * @returns {Array<{ itemId: string, name: string, img: string|null, have: number }>}
+   */
+  _heldStacksForTagOption(recipe, option, availableItems) {
+    if (option?.match?.type !== 'tags') return [];
+    return (availableItems || [])
+      .filter((item) => this.ingredientMatchesItem(recipe, option, item))
+      .map((item) => ({
+        itemId: item.uuid || item.id,
+        name: item.name ?? '',
+        img: item.img ?? null,
+        have: Number(item.system?.quantity || 1),
+      }));
   }
 
   /**
@@ -552,6 +1041,55 @@ export class RecipeManager {
   }
 
   /**
+   * Resolve the tile visuals (component id, display name, icon image) for an
+   * ingredient, so the player detail can render an image grid. Component-typed
+   * matches resolve through the managed component library. Tag- and currency-typed
+   * matches carry no managed component id, so their image is resolved from a live
+   * inventory item that satisfies the match (issue 551): a tag tile shows the img
+   * of the first held item matching the tag, falling back to a generic tag icon
+   * when nothing in inventory matches; a currency tile always shows a coin icon (currency never
+   * resolves to an inventory item). Anything else falls back to a null image (the
+   * UI thumbnail then shows its default) and the ingredient's own description.
+   *
+   * @param {Recipe} recipe
+   * @param {Ingredient|null} ingredient
+   * @param {Item[]} [availableItems] - live inventory used to resolve a tag tile's
+   *   image from a satisfying item; defaults to none.
+   * @param {Item|null} [consumedItem] - the specific inventory item the engine will
+   *   actually consume for this option (from the resolved consumption plan). When
+   *   supplied, a tag tile borrows THIS item's image so the tile matches the item
+   *   the craft spends, not merely the first inventory item that shares the tag
+   *   (issue 553). Falls back to the first tag-matching held item (issue 551).
+   * @returns {{ componentId: string|null, name: string, img: string|null }}
+   * @private
+   */
+  _resolveIngredientVisual(recipe, ingredient, availableItems = [], consumedItem = null) {
+    const match = ingredient?.match || null;
+    if (match?.type === 'component' && match.componentId) {
+      return {
+        componentId: match.componentId,
+        name: this.resolveComponentName(recipe, match.componentId),
+        img: this.resolveComponentImg(recipe, match.componentId),
+      };
+    }
+
+    const name = ingredient?.getDescription?.() || '';
+
+    if (match?.type === 'tags') {
+      const matchingItem =
+        consumedItem ||
+        (availableItems || []).find((item) => this.ingredientMatchesItem(recipe, ingredient, item));
+      return { componentId: null, name, img: matchingItem?.img || FALLBACK_TAG_IMG };
+    }
+
+    if (match?.type === 'currency') {
+      return { componentId: null, name, img: FALLBACK_CURRENCY_IMG };
+    }
+
+    return { componentId: null, name, img: null };
+  }
+
+  /**
    * Build essence display states for the given ingredient set.
    * @param {Recipe} recipe
    * @param {IngredientSet} ingredientSet
@@ -568,8 +1106,42 @@ export class RecipeManager {
     const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
     return Object.entries(essences).map(([type, need]) => {
       const have = accumulatedEssences[type] || 0;
-      return { type, need, have, satisfied: have >= need };
+      const definition = this._resolveEssenceDefinition(recipe, type);
+      const name = definition?.name;
+      const icon = definition?.icon;
+      return {
+        type,
+        name: typeof name === 'string' && name.trim() ? name : String(type ?? ''),
+        icon: typeof icon === 'string' && icon.trim() ? icon : null,
+        need,
+        have,
+        satisfied: have >= need,
+      };
     });
+  }
+
+  /**
+   * Resolve an essence's definition (`{ id, name, icon, … }`) from its system's
+   * essence library, or null when no definition matches.
+   * @private
+   */
+  _resolveEssenceDefinition(recipe, type) {
+    const systemId = recipe?.craftingSystemId;
+    const system = systemId
+      ? game.fabricate?.getCraftingSystemManager?.()?.getSystem(systemId)
+      : null;
+    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    return definitions.find((def) => def?.id === type) ?? null;
+  }
+
+  /**
+   * Resolve an essence's display label from the system's essence definitions,
+   * falling back to the raw type id when no definition/name is configured.
+   * @private
+   */
+  _resolveEssenceName(recipe, type) {
+    const name = this._resolveEssenceDefinition(recipe, type)?.name;
+    return typeof name === 'string' && name.trim() ? name : String(type ?? '');
   }
 
   /**
@@ -583,9 +1155,21 @@ export class RecipeManager {
    * @param {{ systemId?: string|null, componentIds?: string[] }|null} [options.presentTools] -
    *   Virtual-present payload from an active canvas Tool station (see
    *   evaluateCraftability for the system-scoping semantics).
+   * @param {object|null} [options.craftingActor] - actor whose currency funds a
+   *   currency-alternative group (see evaluateCraftability). Defaults to `null`.
+   * @param {Function} [options.resolveComponent] - Optional component resolver injected
+   *   on the alchemy craft path (issue 578); defaults (undefined) to the standard-craft
+   *   resolvers (see evaluateCraftability).
+   * @param {object|null} [options.optionOverrides] - Per-group player option overrides
+   *   (issue 552), keyed by group id, forwarded to the resolver so the craftability
+   *   decision honours the chosen option/stack (an insufficient choice blocks).
    * @returns {{canCraft: boolean, satisfiableSet: IngredientSet|null, missing: Object}}
    */
-  canCraft(componentSourceActors, recipe, { presentTools = null } = {}) {
+  canCraft(
+    componentSourceActors,
+    recipe,
+    { presentTools = null, craftingActor = null, resolveComponent, optionOverrides = null } = {}
+  ) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
       : componentSourceActors
@@ -602,12 +1186,22 @@ export class RecipeManager {
 
     const { canCraft, satisfiableSet, missing } = this.evaluateCraftability(sourceActors, recipe, {
       presentTools,
+      craftingActor,
+      resolveComponent,
+      optionOverrides,
     });
     return { canCraft, satisfiableSet, missing };
   }
 
   /**
-   * Check if an ingredient set can be satisfied with available items
+   * Check if an ingredient set can be satisfied with available items.
+   *
+   * Deliberately currency-BLIND: it passes no `affordCurrency` probe, so a currency
+   * alternative never satisfies a group here. This helper does not feed the
+   * craftability decision (that runs through {@link evaluateCraftability}, which is
+   * actor-bound and currency-aware); it is an item/essence-only completeness check,
+   * so threading the actor probe through it would add nothing.
+   *
    * @param {IngredientSet} ingredientSet - The ingredient set to check
    * @param {Item[]} availableItems - Items available for crafting
    * @returns {{ingredients: Array, essences: Array}}
@@ -703,26 +1297,46 @@ export class RecipeManager {
    * @param {Recipe} recipe
    * @param {Ingredient} ingredient
    * @param {Item} item
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only submission resolves to the same
+   *   component the collector bucketed it to. Defaults (undefined) to the shared
+   *   {@link resolveComponentForItem} used by standard crafting — byte-for-byte unchanged.
    * @returns {boolean}
    */
-  ingredientMatchesItem(recipe, ingredient, item) {
+  ingredientMatchesItem(recipe, ingredient, item, resolveComponent) {
     const features = this._getSystemFeatures(recipe);
-    const match = ingredient.match || null;
-    const componentId =
-      match?.type === 'component' || match?.type === 'systemItem'
-        ? match.componentId || match.systemItemId || null
-        : ingredient.componentId || ingredient.systemItemId || null;
+    // A component (or legacy systemItem) match resolves its id via the handler;
+    // tags/currency/no-match return null and fall to the bare-field fallback,
+    // then on to `_matchesIngredient`.
+    const componentId = getIngredientComponentId(ingredient);
 
     if (componentId) {
       const managedItem = this._getComponent(recipe, componentId);
       if (!managedItem) return false;
 
-      if (itemMatchesComponentSource(item, managedItem)) return true;
+      if (
+        itemResolvesToComponent(
+          item,
+          managedItem,
+          this._getSystemComponents(recipe),
+          recipe?.craftingSystemId,
+          resolveComponent
+        )
+      )
+        return true;
 
-      const byName =
-        !managedItem.sourceUuid && managedItem.name
-          ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
-          : false;
+      // Source-UUID matching failed — fall back to an exact (case-insensitive) name
+      // match, even when the component carries a registeredItemUuid. Foundry's transitive
+      // `_stats.duplicateSource` points at the ORIGINAL template rather than the
+      // component's own source item, so an inventory copy of a component that was
+      // built by copying another item as a template (a common GM workflow) has no
+      // ref back to the component's source and would otherwise never match despite
+      // being the right, identically-named component. Shared, telemetry-bearing helper
+      // (issue 540); case-INSENSITIVE, exactly as before.
+      const byName = matchComponentByName(item, managedItem, {
+        caseSensitive: false,
+        systemId: recipe?.craftingSystemId,
+      });
       if (!byName) return false;
     } else if (!this._matchesIngredient(ingredient, item, features)) {
       return false;
@@ -732,49 +1346,75 @@ export class RecipeManager {
   }
 
   /**
-   * Check whether a concrete item satisfies a Tool's component reference.
-   *
-   * A Tool references a managed component by id; an item satisfies the tool when
-   * it matches that component's source reference chain (or, for sourceless
-   * components, by name). This is the primary generic component matcher reused by
-   * both recipe crafting and gathering tool validation.
+   * Check whether a concrete item satisfies a Tool's PRESENCE requirement — the wide,
+   * non-destructive gate (issue 561). A first-class Tool carries its OWN source references,
+   * so the owned item is resolved against the system's Tools library directly (durable
+   * `roles[systemId].toolId` first, then source-ref intersection) — NOT through a managed
+   * component. It falls back to an exact, case-insensitive match on the tool's snapshot name
+   * (the linked component's name for a migrated componentId-tool), so an un-restamped
+   * template copy still satisfies presence.
    *
    * @param {Recipe} recipe
-   * @param {{componentId?: string, systemItemId?: string}} tool
+   * @param {object} tool - A first-class library Tool
    * @param {Item} item
    * @returns {boolean}
    */
   toolMatchesItem(recipe, tool, item) {
-    if (tool.componentId || tool.systemItemId) {
-      const managedItem = this._getComponent(recipe, tool.componentId || tool.systemItemId);
-      if (!managedItem) return false;
-      if (
-        managedItem.sourceUuid ||
-        managedItem.sourceItemUuid ||
-        managedItem.fallbackItemIds?.length
-      ) {
-        if (itemMatchesComponentSource(item, managedItem)) return true;
-        return false;
-      }
-      return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
-    }
-    // No componentId means the tool cannot be matched; treat as no match.
-    return false;
+    if (!tool) return false;
+    const tools = this._getSystemTools(recipe);
+    if (itemResolvesToTool(item, tool, tools, recipe?.craftingSystemId)) return true;
+    // Snapshot-name fallback (presence only, never destructive): the item-sourced tool's
+    // own snapshot name, or the linked component's name for a migrated componentId-tool.
+    // Shared, telemetry-bearing helper (issue 540); case-INSENSITIVE, exactly as before.
+    const fallbackName =
+      tool.name || this._getComponent(recipe, tool.componentId || tool.systemItemId)?.name || '';
+    if (!fallbackName) return false;
+    return matchComponentByName(
+      item,
+      { name: fallbackName, id: tool.id },
+      { caseSensitive: false, systemId: recipe?.craftingSystemId }
+    );
+  }
+
+  /**
+   * Whether an owned item may be selected for a Tool's **usage or breakage** — the narrow
+   * durable-identity gate (issue 561, superseding the component-scoped #557 gate). Delegates
+   * to {@link itemIsToolByDurableIdentity}, which accepts ONLY the tool's own durable
+   * identity (`roles[systemId].toolId`) or the item's own uuid/compendium source — never a
+   * transitive `_stats.duplicateSource` reference and never a name fallback.
+   *
+   * This is the destructive-path counterpart to the wide {@link toolMatchesItem} presence
+   * matcher: an item that satisfies presence only by duplicate-source or name is NOT
+   * selected to be consumed or destroyed.
+   *
+   * @param {Recipe} recipe
+   * @param {object} tool - A first-class library Tool
+   * @param {Item} item
+   * @returns {boolean}
+   */
+  toolMatchesItemByIdentity(recipe, tool, item) {
+    if (!tool || tool.id == null) return false;
+    return itemIsToolByDurableIdentity(
+      item,
+      tool,
+      this._getSystemTools(recipe),
+      recipe?.craftingSystemId
+    );
   }
 
   _matchesIngredient(ingredient, item, features) {
     if (ingredient.itemUuid && item.uuid === ingredient.itemUuid) return true;
 
-    if (ingredient.match?.type === 'tags') {
-      if (!features.enableTags) return false;
-      const requiredTags = Array.isArray(ingredient.match.tags) ? ingredient.match.tags : [];
-      const itemTags = getFabricateFlag(item, 'tags', []);
-      const matched =
-        ingredient.match.tagMatch === 'all'
-          ? requiredTags.every((tag) => itemTags.includes(tag))
-          : requiredTags.some((tag) => itemTags.includes(tag));
-      if (!matched) return false;
-      return true;
+    // Dispatch ONLY for terminal match types — they fully decide the result off
+    // the match object. A `component`/null/unknown match is non-terminal and
+    // falls through to the legacy bare-field `ingredient.tag` block and the
+    // `ingredient.alternatives` recursion below, which key off bare
+    // `ingredient.*` fields, not the match (so a `{type:'component'}` ingredient
+    // with `alternatives` still recurses into them). The handler declares its own
+    // terminality (tags/currency → true; component/unknown → false).
+    const handler = getMatchHandler(ingredient.match);
+    if (handler.isTerminalInventoryMatch) {
+      return handler.matchesItem(ingredient.match, item, { features });
     }
 
     if (ingredient.tag) {
@@ -801,7 +1441,7 @@ export class RecipeManager {
     const features = system?.features || {};
     return {
       enableTags: !!system,
-      enableEssences: system?.advancedOptionsEnabled !== false && features.essences === true,
+      enableEssences: features.essences === true,
     };
   }
 
@@ -841,7 +1481,7 @@ export class RecipeManager {
   }
 
   /**
-   * Resolve the display name for a managed component, resolving sourceUuid via fromUuid()
+   * Resolve the display name for a managed component, resolving registeredItemUuid via fromUuid()
    * when the component has one. Falls back gracefully on broken references.
    *
    * @param {Recipe} recipe
@@ -854,9 +1494,9 @@ export class RecipeManager {
     const component = this._getComponent(recipe, componentId);
     if (!component)
       return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
-    if (component.sourceUuid && typeof fromUuid === 'function') {
+    if (component.registeredItemUuid && typeof fromUuid === 'function') {
       try {
-        const item = await fromUuid(component.sourceUuid);
+        const item = await fromUuid(component.registeredItemUuid);
         if (item?.name) return item.name;
       } catch {
         // Broken reference — fall through to component.name
@@ -932,7 +1572,7 @@ export class RecipeManager {
     const systemManager = game?.fabricate?.getCraftingSystemManager?.();
     const recipeItemUuid = recipe?.recipeItemId
       ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)
-          ?.sourceItemUuid
+          ?.originItemUuid
       : null;
     const fallbackUuid = recipeItemUuid || recipe?.linkedRecipeItemUuid;
 
@@ -951,13 +1591,21 @@ export class RecipeManager {
   /**
    * Accumulate essences from all available items
    * @param {Item[]} items - Items to check
+   * @param {Recipe|null} [recipe] - Recipe whose system supplies the candidate
+   *   components and system id for essence resolution.
+   * @param {Function} [resolveComponent] - Optional component resolver injected on the
+   *   alchemy craft path (issue 578) so a tier-4-only item contributes its component's
+   *   essences. Defaults to the shared {@link findMatchingComponent} via
+   *   {@link accumulateItemEssences} used by standard crafting — byte-for-byte unchanged.
    * @returns {Object} - Accumulated essences { 'light': 3, 'fire': 2 }
    * @private
    */
-  _accumulateEssences(items, recipe = null) {
+  _accumulateEssences(items, recipe = null, resolveComponent = findMatchingComponent) {
     return accumulateItemEssences(items, {
       components: this._getSystemComponents(recipe),
+      systemId: recipe?.craftingSystemId,
       multiplyByQuantity: true,
+      resolveComponent,
     });
   }
 
@@ -967,6 +1615,20 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     return Array.isArray(system?.components) ? system.components : [];
+  }
+
+  /**
+   * Resolve the first-class Tools library for a recipe's crafting system (issue 561),
+   * mirroring {@link _getSystemComponents}. The single source of truth the tool matchers
+   * resolve owned items against.
+   * @private
+   */
+  _getSystemTools(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) return [];
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    return Array.isArray(system?.tools) ? system.tools : [];
   }
 
   /**
@@ -982,7 +1644,7 @@ export class RecipeManager {
 
     for (const recipeData of recipesData) {
       const recipe = Recipe.fromJSON(recipeData);
-      const validation = this._validateRecipeForCreateOrUpdate(recipe);
+      const validation = this._validateRecipeForActivation(recipe);
 
       if (!validation.valid) {
         console.warn(`Fabricate | Skipping invalid recipe: ${recipe.name}`, validation.errors);
@@ -1027,22 +1689,75 @@ export class RecipeManager {
    * @returns {{valid: boolean, errors: string[]}}
    * @private
    */
-  _validateRecipeForCreateOrUpdate(recipe) {
-    const baseValidation = recipe.validate();
-    const errors = [...(baseValidation.errors || [])];
+  /**
+   * Validation required to *persist* a recipe. Structural/completeness integrity (per
+   * {@link Recipe#validate}/{@link Recipe#validateStructure}) plus essence, tag-placeholder, and
+   * resolution-mode reference checks. Signature uniqueness is intentionally excluded — a signature
+   * conflict never blocks persistence; it only blocks activation (see
+   * {@link RecipeManager#_validateRecipeForActivation}).
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[]}}
+   * @private
+   */
+  _validateRecipeForPersistence(recipe, { requireComplete = true } = {}) {
+    const baseValidation = requireComplete ? recipe.validate() : recipe.validateStructure();
+    // Collect structured issues in the same order as the raw error strings (base,
+    // essence, tag, resolution mode). The base/essence/tag validators still emit
+    // plain English strings, so they ride as UNCODED issues (the localizer passes
+    // their message through). Resolution-mode failures now carry a stable `code` +
+    // id-free params so the UI can localize them (issue 595).
+    const issues = [];
+    const pushPlain = (list) => {
+      for (const message of list || []) issues.push({ code: null, params: {}, message });
+    };
+    // A sub-validator that supplies structured `issues` (coded + id-free, issue 595)
+    // contributes them directly; a legacy string-only validator rides as UNCODED
+    // issues (English passthrough). Every recipe-save validator here — base
+    // (Recipe.validate/validateStructure), essence references, tag placeholders, and
+    // resolution mode — now supplies coded, id-free issues.
+    const pushValidation = (validation) => {
+      if (Array.isArray(validation?.issues)) issues.push(...validation.issues);
+      else pushPlain(validation?.errors);
+    };
+    pushValidation(baseValidation);
+    pushValidation(this._validateEssenceReferences(recipe));
+    pushValidation(this._validateTagPlaceholders(recipe));
+    pushValidation(this._validateResolutionMode(recipe, { requireComplete }));
 
-    const systemValidation = this._validateEssenceReferences(recipe);
-    errors.push(...systemValidation.errors);
-    const tagValidation = this._validateTagPlaceholders(recipe);
-    errors.push(...tagValidation.errors);
-    const modeValidation = this._validateResolutionMode(recipe);
-    errors.push(...modeValidation.errors);
+    const errors = issues.map((issue) => issue.message);
+    return {
+      valid: errors.length === 0,
+      errors,
+      issues,
+    };
+  }
+
+  /**
+   * Full validity required to *activate* a recipe (set `enabled === true`): completeness plus all
+   * persistence checks plus signature uniqueness. A recipe may be persisted while invalid, but may
+   * only be enabled when this passes.
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[], issues: {code: string|null, params: object, message: string}[]}}
+   *   `issues` mirrors `errors` with a stable `code` + params so the UI can
+   *   localize the enable failure (issue 550); `errors` stays the raw English list.
+   * @private
+   */
+  _validateRecipeForActivation(recipe) {
+    const persistence = this._validateRecipeForPersistence(recipe, { requireComplete: true });
+    const errors = [...persistence.errors];
+    // Structured, coded issues run in parallel with the raw `errors` strings so a
+    // UI caller can localize them (issue 550). Persistence now supplies its own
+    // structured issues — coded + id-free for resolution-mode failures (issue 595),
+    // uncoded (English passthrough) for the remaining base/essence/tag strings.
+    const issues = [...persistence.issues];
     const signatureValidation = this._validateSignatures(recipe);
     errors.push(...signatureValidation.errors);
+    issues.push(...(signatureValidation.issues || []));
 
     return {
       valid: errors.length === 0,
       errors,
+      issues,
     };
   }
 
@@ -1083,7 +1798,56 @@ export class RecipeManager {
     const validator = new SignatureValidator(csm);
     const result = validator.validateRecipe(recipe, systemId);
     const errors = result.conflicts.map((c) => c.message);
-    return { valid: errors.length === 0, errors };
+    const issues = result.conflicts.map((c) => ({
+      code: c.code,
+      params: c.params,
+      message: c.message,
+    }));
+    return { valid: errors.length === 0, errors, issues };
+  }
+
+  /**
+   * In an alchemy system, disable every currently-enabled recipe that participates in any ingredient
+   * signature conflict. Used to reconcile recipes after an essence/component deletion changes
+   * signatures. No-op for non-alchemy systems.
+   * @param {string} systemId
+   * @returns {Promise<Array<{id: string, name: string}>>} the recipes that were disabled
+   */
+  async disableSignatureConflicts(systemId) {
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (system?.resolutionMode !== 'alchemy') return [];
+
+    const validator = new SignatureValidator({
+      getSystem: (id) => systemManager.getSystem(id),
+      getRecipesForSystem: (id) => this.getRecipes({ craftingSystemId: id }),
+      getComponentsForSystem: (id) => systemManager.getSystem(id)?.components || [],
+    });
+
+    const { conflicts } = validator.validateSystem(systemId);
+    const conflictIds = new Set();
+    for (const conflict of conflicts) {
+      conflictIds.add(conflict.recipeA.id);
+      conflictIds.add(conflict.recipeB.id);
+    }
+
+    const disabled = [];
+    for (const id of conflictIds) {
+      const recipe = this.recipes.get(id);
+      if (recipe?.enabled === true) {
+        recipe.enabled = false;
+        disabled.push({ id, name: recipe.name });
+      }
+    }
+
+    if (disabled.length > 0) {
+      await this.save();
+      this._notifyRecipesChanged('update', {
+        disabledForSignatureConflict: disabled.map((d) => d.id),
+      });
+    }
+
+    return disabled;
   }
 
   /**
@@ -1093,70 +1857,82 @@ export class RecipeManager {
    * @private
    */
   _validateEssenceReferences(recipe) {
-    const errors = [];
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
-    const advancedEnabled = system.advancedOptionsEnabled !== false;
     const features = system.features || {};
-    const essencesEnabled =
-      advancedEnabled && (features.essences === true || system.enableEssences === true);
+    const essencesEnabled = features.essences === true || system.enableEssences === true;
     if (!essencesEnabled) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
     const validEssenceIds = new Set(definitions.map((def) => def.id));
+    // Resolve an essence's display NAME from the system's definitions (issue 595) so
+    // a message never surfaces the raw essence id. An UNKNOWN essence has no
+    // definition and therefore no name, so its message omits it entirely.
+    const essenceNames = new Map(
+      definitions
+        .filter((def) => typeof def?.name === 'string' && def.name.trim())
+        .map((def) => [def.id, def.name.trim()])
+    );
 
-    for (const set of recipe.ingredientSets || []) {
+    const issues = [];
+    for (const [setIndex, set] of (recipe.ingredientSets || []).entries()) {
+      const setLabel =
+        typeof set?.name === 'string' && set.name.trim() ? set.name.trim() : String(setIndex + 1);
       for (const [essenceId, qty] of Object.entries(set.essences || {})) {
         if (!validEssenceIds.has(essenceId)) {
-          errors.push(
-            `Ingredient set "${set.name || set.id}" references unknown essence "${essenceId}"`
-          );
+          issues.push(buildRecipeActivationIssue('ingredientSetUnknownEssence', { set: setLabel }));
         }
         const num = Number(qty);
         if (!Number.isFinite(num) || num <= 0) {
-          errors.push(
-            `Ingredient set "${set.name || set.id}" has invalid quantity for essence "${essenceId}"`
+          const essenceName = essenceNames.get(essenceId);
+          issues.push(
+            essenceName
+              ? buildRecipeActivationIssue('ingredientSetEssenceQuantityNamed', {
+                  set: setLabel,
+                  essence: essenceName,
+                })
+              : buildRecipeActivationIssue('ingredientSetEssenceQuantity', { set: setLabel })
           );
         }
       }
     }
 
     return {
-      valid: errors.length === 0,
-      errors,
+      valid: issues.length === 0,
+      errors: issues.map((issue) => issue.message),
+      issues,
     };
   }
 
-  _validateResolutionMode(recipe) {
+  _validateResolutionMode(recipe, { requireComplete = true } = {}) {
     const modeService = game.fabricate?.getResolutionModeService?.();
     if (!modeService) {
       return { valid: true, errors: [] };
     }
-    return modeService.validateRecipe(recipe);
+    return modeService.validateRecipe(recipe, { requireComplete });
   }
 
   _validateTagPlaceholders(recipe) {
-    const errors = [];
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
-      return { valid: true, errors };
+      return { valid: true, errors: [], issues: [] };
     }
 
     const validTags = new Set(
@@ -1166,6 +1942,7 @@ export class RecipeManager {
       ].filter(Boolean)
     );
 
+    const issues = [];
     const steps =
       typeof recipe.getExecutionSteps === 'function'
         ? recipe.getExecutionSteps()
@@ -1177,19 +1954,26 @@ export class RecipeManager {
             ? ingredientSet.ingredientGroups
             : (ingredientSet.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
 
-        for (const group of groups) {
+        for (const [groupIndex, group] of groups.entries()) {
+          // Name the group by author-name or 1-based position, never its id (595).
+          const groupLabel =
+            typeof group?.name === 'string' && group.name.trim()
+              ? group.name.trim()
+              : String(groupIndex + 1);
           for (const option of group.options || []) {
             const match = option.match || null;
-            const isTagPlaceholder = match?.type === 'tags';
-            if (!isTagPlaceholder) continue;
+            if (getMatchHandler(match).type !== 'tags') continue;
             const tagIds = Array.isArray(match.tags) ? match.tags : [];
 
             for (const tagId of tagIds) {
               const normalized = String(tagId || '').trim();
               if (!normalized) continue;
               if (validTags.has(normalized)) continue;
-              errors.push(
-                `Ingredient group "${group.name || group.id}" references unknown tag "${normalized}"`
+              issues.push(
+                buildRecipeActivationIssue('ingredientGroupUnknownTag', {
+                  group: groupLabel,
+                  tag: normalized,
+                })
               );
             }
           }
@@ -1198,8 +1982,9 @@ export class RecipeManager {
     }
 
     return {
-      valid: errors.length === 0,
-      errors,
+      valid: issues.length === 0,
+      errors: issues.map((issue) => issue.message),
+      issues,
     };
   }
 

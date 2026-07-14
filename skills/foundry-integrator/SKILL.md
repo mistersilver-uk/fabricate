@@ -31,9 +31,15 @@ The driver auto-spawns this role from the routing table in `AGENTS.md` whenever 
 Establish the real shape and behaviour of Foundry before judging Fabricate's use of it.
 Prefer the most authoritative source available and always cite which one a claim rests on, pinned to the target Foundry version.
 
-1. **Foundry VTT sources first.** The actual client/server source (a local Foundry install's `resources/app/`, or the version-matched source) is authoritative for real signatures, return shapes, hook timing, and side effects. Cite the file and symbol.
-2. **Official API documentation second.** Use the version-matched API docs at `foundryvtt.com/api` when source is not to hand, or to confirm a documented contract. Cite the page/symbol.
-3. **Community discussions third.** The community wiki (`foundryvtt.wiki`), the official Discord `#dev`/`#api` channels, GitHub issues/discussions, and forum/Reddit threads surface undocumented behaviour, gotchas, and cross-version migrations. Treat these as leads to verify against source or docs, never as the final word; cite the thread and note it is community-sourced.
+1. **Foundry VTT sources first.** The actual client/server source is authoritative for real signatures, return shapes, hook timing, and side effects; cite the file and symbol.
+Locate it with this probe ladder — one probe per rung, then fall through; never stall waiting for a source that is not present:
+   - Probe a local Foundry install's `resources/app` (on Windows typically `C:\Program Files\Foundry Virtual Tabletop\resources\app`, or the path the user supplies).
+   - Otherwise probe the repo's smoke-test container, which exists after any `npm run test:foundry` run: `docker exec fabricate-foundry-test ls /home/foundry/resources/app` (start it first with `npm run test:foundry:up` only when the task already warrants a smoke environment; do not boot Docker solely to read source).
+   - If neither probe succeeds, proceed directly to rung 2 and say which rung your claims rest on.
+2. **Official API documentation second.** Use the version-matched API docs at `foundryvtt.com/api` when source is not to hand, or to confirm a documented contract.
+Cite the page/symbol.
+3. **Community discussions third.** The community wiki (`foundryvtt.wiki`), the official Discord `#dev`/`#api` channels, GitHub issues/discussions, and forum/Reddit threads surface undocumented behaviour, gotchas, and cross-version migrations.
+Treat these as leads to verify against source or docs, never as the final word; cite the thread and note it is community-sourced.
 
 When behaviour changed across Foundry versions, say so explicitly and pin the claim to the version `module.json` targets.
 
@@ -68,7 +74,8 @@ Check the branch diff's Foundry-facing code against the real Foundry behaviour y
 
 - Read-only and advisory: do not edit `src/`, `tests/`, `openspec/specs/`, or docs, and do not implement features.
 - Cite the authoritative source for every behavioural claim (source file/symbol, doc URL, or community thread) and pin it to the target Foundry version; prefer source over docs over community, in that order.
-- Never invent an API shape. When you cannot verify a behaviour, say so and mark it as a risk rather than asserting it.
+- Never invent an API shape.
+When you cannot verify a behaviour, say so and mark it as a risk rather than asserting it.
 - When a finding is durable Foundry knowledge worth keeping, recommend capturing it in `AGENTS.md` and hand it to `fabricate_docs_writer` / `fabricate_domain_expert`; do not author the note yourself.
 
 ## Expected output

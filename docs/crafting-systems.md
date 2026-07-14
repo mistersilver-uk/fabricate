@@ -21,21 +21,33 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 
 ### System Settings
 
-| Setting             | Description                                                                                                                                        |
-|:--------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Name**            | Display name shown in the UI                                                                                                                       |
-| **Description**     | Optional flavour text                                                                                                                              |
-| **Resolution Mode** | How recipes produce results: Simple, Routed, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Setting                      | Description                                                                                                                                        |
+|:-----------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Name**                     | Display name shown in the UI                                                                                                                       |
+| **Description**              | Optional flavour text                                                                                                                              |
+| **Recipe resolution mode**   | How recipes produce results: Simple, Routed by ingredients, Routed by check, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
+| **Salvage resolution mode**  | How salvaging a component awards results: Simple (default), Progressive, or Routed by check. See [Salvage]({% link salvage.md %}#salvage-resolution-mode) |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ### Tags And Categories
 
 Custom recipe categories organize recipe browsing and authoring, and item tags allow component labeling plus tag-based ingredient matching.
 The reserved **General** recipe category is always present and is not stored in the custom category list.
 
+In the player recipe browser, each recipe that belongs to a custom category shows that category as a small label on its row.
+Recipes in the reserved **General** category show no label, so the default bucket does not tag every row.
+A **Category** filter, placed above the crafting-system filter, lets players narrow the list to a single category.
+The filter offers only the categories that appear in the player's visible recipes, sorted alphabetically with **General** pinned last, and its default **All categories** option shows the full list.
+
 ### Feature Toggles
 
 Each system can independently enable or disable optional features.
 Most optional features are off by default and must be explicitly enabled by a GM.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Feature             | Default | Description                                                                                                                                               |
 |:--------------------|:--------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -45,11 +57,46 @@ Most optional features are off by default and must be explicitly enabled by a GM
 | Multi-step recipes  | Off     | Allow recipes with multiple sequential steps                                                                                                              |
 | Gathering           | Off     | Show the Environments tab for authoring gathering locations and tasks. Any enabled system also exposes the player Gathering action in the Items Directory |
 
-Toggle optional features in the **Features** card on the System tab of the Crafting Admin panel. 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Toggle optional features in the **Features** card on the System tab of the Crafting Admin panel.
 Each toggle takes effect immediately for all future crafting attempts in that system.
 
-{: .warning }
-> Changing the **resolution mode** is a destructive operation. All recipes in the system will be deleted because they may be invalid under the new mode. You will be asked to confirm.
+You set the recipe and salvage resolution modes on the **Settings** page of the **Crafting** menu, not on the main System settings page.
+The Crafting menu is an experimental feature, so these cards are reachable only when **Experimental Features** is turned on for the world.
+See [The Crafting Menu](#the-crafting-menu).
+
+Changing the **recipe resolution mode** migrates your recipes to the new mode wherever it can, instead of deleting them all.
+Fabricate reshapes each recipe so it fits the new mode, and only removes a recipe when its structure cannot be made to fit.
+You will be asked to confirm before anything changes.
+
+{: .note }
+> The confirmation runs a dry run first and reports accurate counts: how many recipes will be migrated to the new mode and, only when some cannot be migrated, how many will be deleted and their names.
+When no recipe needs deleting, the confirmation does not mention deletion at all.
+
+A recipe is only deleted when its shape cannot fit the new mode.
+This happens in two cases: narrowing into Simple or Progressive mode (which each expect exactly one ingredient set and one result group) from a recipe that has more than one of either, and moving a multi-step recipe into Alchemy mode (which does not support multi-step recipes).
+Every other recipe is kept and adjusted to suit the new mode.
+
+A missing setup at the system level never deletes a recipe.
+For example, switching to Progressive mode without a progressive crafting check, or to Routed by check mode without a roll formula, does not remove recipes.
+Those gaps are reported in the System Overview instead, and they hide recipes from players until you fix them rather than deleting anything.
+See [System Overview](#system-overview).
+
+When the new mode is Alchemy, a recipe that has more than one ingredient set is kept and collapsed to its first set, because an alchemy recipe has a single ingredient set.
+The system's Alchemy check starts at No check, and you can change it under Recipe resolution afterwards.
+Fabricate also re-checks recipe ingredient signatures so any overlap that would make alchemy attempts ambiguous is surfaced rather than silently broken.
+
+After the change, Fabricate shows a summary of how many recipes were migrated, and a separate warning listing any recipes it had to delete.
+
+Changing the **salvage resolution mode** is not destructive.
+No recipes or runs are deleted.
+Any component whose salvage setup is incompatible with the new mode simply has its salvage disabled, and can be re-enabled once it is reconfigured.
+You will be asked to confirm.
+
+The **Salvage resolution mode** card offers Simple (the default), Progressive, and Routed by check.
+A salvaged component has a single ingredient, so ingredient-set routing (and Alchemy) does not apply and is not offered.
+Simple returns one result group with an optional pass/fail salvage check.
 
 ### Chat Output
 
@@ -76,9 +123,12 @@ Chat messages appear as if spoken by the crafting actor.
 Early validation failures do not post a chat message, because the craft never started.
 These failures include a missing actor, missing ingredients, missing or unsatisfied tools, and invalid recipe configuration.
 
+**Interactive check rolls.** When a player crafts or gathers from the UI, Fabricate also posts the check's dice roll to chat so a dice-animation module like Dice So Nice can animate it.
+See [Rolling a check from the UI]({% link crafting-checks.md %}#rolling-a-check-from-the-ui) for the prompt, the situational-modifier field, and which rolls do not prompt.
+
 ### Crafting Checks
 
-If your system uses Routed mode with a macro-driven outcome, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.
+If your system uses Routed by check mode, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.
 See [Crafting Checks]({% link crafting-checks.md %}) for the settings, consumption-on-failure policies, and worked examples.
 
 ### Effect Transfer
@@ -89,25 +139,119 @@ See [Effect Transfer]({% link effect-transfer.md %}) for how the feature is enab
 ### Recipe Visibility
 
 Recipe visibility controls which players can see and access recipes through the visibility service and planned player Crafting UI.
-You configure this per crafting system in the **Recipe Visibility** feature card on the System tab of the Crafting Admin panel.
+You configure this per crafting system in the **Recipe Visibility** card on the **Settings** page of the **Crafting** menu.
+The Crafting menu is an experimental feature, so this card is reachable only when **Experimental Features** is turned on for the world.
+See [The Crafting Menu](#the-crafting-menu).
 
-Fabricate supports three list modes:
+Each system uses one of four visibility modes:
 
-| List mode           | Description                                                      |
-|:--------------------|:-----------------------------------------------------------------|
-| Global (default)    | All recipes visible to all users                                 |
-| Player              | GM restricts individual recipes to named players                 |
-| Knowledge           | Recipes discovered through gameplay via recipe items or learning |
+| Visibility mode  | Description                                                                 |
+|:-----------------|:---------------------------------------------------------------------------|
+| Global (default) | All recipes visible to all users                                           |
+| Restricted       | GM grants individual recipes to specific characters and players            |
+| Item             | Players craft a recipe only while holding a book or scroll linked to it    |
+| Knowledge        | Players learn a recipe from a book or scroll before they can craft it      |
 
-For full details on each mode, knowledge sub-options, recipe items, the learn flow, and configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
+Selecting a mode applies at once and never rewrites your recipes.
+The mode you choose decides which extra surfaces appear in the **Crafting** menu, such as the **Access** section for Restricted mode or **Books & Scrolls** limits for Item and Knowledge modes.
+
+For full details on each mode, recipe items, the learn flow, and configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
 
 ### Alchemy Mode
 
 Alchemy mode is a special resolution mode where recipe names and ingredient lists are hidden from players.
 Macros and integrations can submit selected items to the alchemy engine.
-Fabricate matches the combination against known recipe signatures. 
-Set the resolution mode of a system to Alchemy to enable this. 
-See [Alchemy Mode]({% link recipes/alchemy.md %}) for current usage, configuration, signature matching, consume-on-fail, and learn-on-craft options.
+Fabricate matches the combination against known recipe signatures.
+Set the resolution mode of a system to Alchemy to enable this.
+See [Alchemy Mode]({% link recipes/alchemy.md %}) for current usage, the Alchemy check setting, signature matching, consume-on-fail, and learn-on-craft options.
+
+---
+
+## System Overview
+
+{: .gm }
+> The System Overview is GM-only.
+> The whole crafting manager is GM-scoped.
+
+The **Overview** is a single place to see every validation issue across a crafting system and jump straight to whatever owns each one.
+Open it from the **Overview** button in the manager rail when a system is selected.
+The button shows a count badge of the open critical and warning issues, so you can tell at a glance whether a system needs attention.
+
+The Overview lists each issue with a severity chip (critical, warning, or note), the name of the thing it affects, and a short description of the problem.
+Issues are grouped by what they affect:
+
+- **System blockers** are problems that make the whole system unusable.
+  They have no deep-link of their own because the Overview is where you resolve them.
+- **Recipes** lists per-recipe problems, such as a recipe with no name or a result set that is not assigned to any check outcome.
+- **Gathering environments**, **Gathering tasks**, and **Gathering events** list problems with your gathering setup.
+- **Component salvage** lists components whose salvage setup is invalid for the current salvage mode.
+
+Each issue that affects an editable thing has an **Open** button (such as **Open recipe**, **Open environment**, or **Open component**) that takes you straight to that editor, with the right tab selected, so you can fix the problem without hunting for it.
+
+When a system has no issues, the Overview says everything is ready to use.
+
+### System Blockers
+
+A **system blocker** is a problem serious enough to make the entire system unusable until you fix it.
+Examples include:
+
+- The system is in Routed by check mode but has no routed crafting check, so no recipe can resolve.
+- Progressive mode with no progressive crafting check, or no component with a difficulty of 1 or more.
+- Multi-step recipes are still enabled while the system is in Alchemy mode.
+- Two recipes share an ingredient signature in Alchemy mode, so attempts are ambiguous.
+
+When a system has a blocker, the System Overview shows a banner at the top.
+The **System settings** page shows a matching banner with an **Open system overview** link, so you are warned wherever you are working.
+
+While a blocker is present, players cannot see or use any of the system's recipes.
+See [How Players See a Broken System](#how-players-see-a-broken-system).
+
+Blockers are worked out live and are never stored.
+The moment you fix the underlying gap, the blocker clears and the system becomes usable again on its own.
+You never have to re-enable recipes by hand.
+
+### How Players See a Broken System
+
+Fabricate keeps players from running into broken setups, while still letting GMs see everything so they can fix them.
+
+- **A system blocker hides the whole system.**
+  While a system has a blocker, players see none of its recipes or gathering, and any attempt to craft in it is refused.
+  GMs still see the system and all of its recipes.
+- **A per-entity problem hides only that entity.**
+  When a single recipe or component is broken but the system as a whole is fine, only that one recipe or component is hidden from players.
+  The rest of the system stays visible and usable.
+- **GMs always see everything.**
+  A GM is never hidden from a broken system or a broken recipe, so you can always reach what needs fixing.
+
+Because these checks run live, hidden recipes reappear for players the moment you resolve the problem.
+Nothing is permanently disabled behind the scenes.
+
+---
+
+## The Crafting Menu
+
+{: .gm }
+> The Crafting Admin panel is GM-only.
+
+The **Crafting** menu is an experimental grouping of the recipe-focused sections in the Crafting Admin panel.
+It only appears when **Experimental Features** is turned on for the world in Fabricate's module settings.
+While it is off, the panel's left menu shows **Recipes** as a disabled **Soon** item and does not show the Crafting group or Books & Scrolls.
+
+When Experimental Features is on, that single entry becomes an expandable **Crafting** group in the left menu, in the same style as the **Gathering** group.
+Expand it to reveal its sections.
+**Settings** and **Recipes** are always present, and the system's [visibility mode](#recipe-visibility) decides which of the other two sections appear.
+
+- **Settings** hosts the system-level crafting rules: the recipe resolution mode, the salvage resolution mode, and the **Recipe Visibility** card.
+  These cards used to live on the System settings page and moved here.
+  Because the whole Crafting group is experimental, they are reachable only while Experimental Features is on.
+- **Recipes** is the existing recipe browser and editor.
+- **Access** appears only in **Restricted** visibility mode.
+  It is where you grant individual recipes to specific characters and players.
+  See [Restricted Mode]({% link visibility.md %}#restricted-mode).
+- **Books & Scrolls** appears only in **Item** and **Knowledge** visibility modes.
+  It lists every recipe item in the system with its linked recipes and each item's own use and learn caps.
+  Open a recipe item to set that item's caps and its recipe list on its own page.
+  See [Books & Scrolls]({% link visibility.md %}#books--scrolls).
 
 ---
 
@@ -130,8 +274,8 @@ Salvaging can also be used to harvest monster corpses and world resources for us
 
 ## Gathering
 
-When the gathering feature is enabled, GMs can author environments and gathering tasks for the system's managed components. 
-If at least one crafting system has gathering enabled, players see a separate **Gathering** action in the Items Directory that opens the player Gathering app. 
+When the gathering feature is enabled, GMs can author environments and gathering tasks for the system's managed components.
+If at least one crafting system has gathering enabled, players see a separate **Gathering** action in the Items Directory that opens the player Gathering app.
 The action is removed again when no systems have gathering enabled.
 
 See [Gathering Environments]({% link gathering-environments.md %}) for the current GM editor fields, task authoring, player app behavior, active/history surfaces, required-tool references, and validation behavior.
@@ -164,7 +308,7 @@ The cleanup leaves things alone when nothing is stale, so nothing is written unl
 
 ## Components
 
-Components are the building blocks of recipes. 
+Components are the building blocks of recipes.
 Instead of pointing at a single specific world item, recipes refer to a component, and any matching item can satisfy it.
 This means:
 
@@ -174,12 +318,12 @@ This means:
 
 ### Adding Components
 
-Open the **Items** tab of the GM admin panel. 
+Open the **Items** tab of the GM admin panel.
 You can add items one at a time or import an entire compendium pack at once.
 
 #### Single-item drop
 
-Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the components list. 
+Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the components list.
 
 1. Open the Items sidebar or the compendium browser
 2. Drag the item onto the **Items** tab drop zone in the Crafting Admin panel
@@ -190,15 +334,23 @@ If the stored name, image, or linked item is out of date, Fabricate updates the 
 
 If Foundry reports an original compendium source but that source no longer exists, Fabricate links to the item you dropped instead, remembers the broken source link as a fallback, and warns the GM.
 
+{: .note }
+> **Duplicating an item to author another component is fully supported.**
+> Each component you register is given its own durable identity, so a player's owned copies always resolve back to the right component.
+> You can right-click an item in the Items sidebar, choose **Duplicate**, change the copy's name, art, and setup, and register that copy as a separate component.
+> The copy becomes its own component and does not collide with, or overwrite, the original.
+> This holds even when the original was imported from a compendium.
+> A copy that was distributed to players before you updated Fabricate can be reconciled with [Repair Item Data]({% link troubleshooting.md %}#repairing-item-data).
+
 After import, Fabricate also listens for linked Foundry Item updates from a GM client.
 When a linked item changes its name, image, or description, matching components refresh their stored name, image, and display-safe plain-text description automatically.
 
-If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported. 
+If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported.
 If the drag data cannot be resolved to any UUID, the same warning is shown.
 
 #### Bulk compendium pack drop
 
-To import all Item documents from a compendium pack at once, drag the **compendium pack header** (the title row in the compendium directory sidebar, not an individual entry within it) onto the drop zone. 
+To import all Item documents from a compendium pack at once, drag the **compendium pack header** (the title row in the compendium directory sidebar, not an individual entry within it) onto the drop zone.
 Fabricate iterates over every Item document in the pack and adds each one.
 
 - Items not yet in the system are added as new components.
@@ -209,15 +361,39 @@ Fabricate iterates over every Item document in the pack and adds each one.
 - If an item's recorded original source link is broken, Fabricate links to the imported item instead, remembers the broken link as a fallback, and warns once for the bulk import.
 - Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
 
+#### Import from the Compendium Directory
+
+You can also import an entire Item compendium without opening the admin panel.
+As a GM, right-click an Item compendium in Foundry's **Compendium Directory** sidebar and choose **Import Items into Crafting System**.
+
+1. Right-click the Item compendium in the Compendium Directory sidebar
+2. Choose **Import Items into Crafting System**
+3. Pick the target crafting system in the picker dialog and confirm with **Import**
+
+The picker always opens so the import is a deliberate choice rather than a single click, even when only one crafting system exists.
+If no crafting system exists yet, Fabricate tells you to create one in the Crafting System Manager first, and nothing is imported.
+
+This action is offered only to GMs, and only on compendiums that hold Item documents.
+It runs the same import as the bulk pack drop, so it adds new components, updates registered ones in place, skips items already up to date, and reports the same added, updated, and skipped summary.
+Broken original source links fall back to the imported item and warn once for the whole import, exactly as the drop-based bulk import does.
+
 #### Folder drop
 
-Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder. 
-Fabricate expands the folder, applies the same source-chain deduplication logic as single-item drops, and shows a summary notification with the number of items added. 
-If any imported item has a broken original source link, Fabricate warns once with the affected count. 
+Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder.
+Fabricate expands the folder, applies the same source-chain deduplication logic as single-item drops, and shows a summary notification with the number of items added.
+If any imported item has a broken original source link, Fabricate warns once with the affected count.
 If the folder contains no Item documents, a notification says so and nothing is written.
 
 {: .note }
-> Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row. If your Foundry version does not support this drag shape, use single-item drops instead, or import the pack through the [API]({% link api/system-manager.md %}).
+> Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row.
+If your Foundry version does not support this drag shape, use single-item drops instead, or import the pack through the [API]({% link api/system-manager.md %}).
+
+### Editing Components
+
+Open a component in the **Items** tab to edit it.
+The editor lets you change a component's tags, essences, and salvage setup, and replace its linked source item from the right-hand inspector.
+When the system's recipe resolution mode is Progressive, the inspector also shows a **Progressive difficulty** card for setting the value spent against the crafting roll.
+See [Setting Component Difficulty]({% link recipes/progressive.md %}#setting-component-difficulty).
 
 ---
 
@@ -227,7 +403,7 @@ Systems can optionally require time or currency for crafting.
 
 ### Time Requirements
 
-When enabled, individual recipe steps can require an amount of time, given in minutes, hours, days, months, or years. 
+When enabled, individual recipe steps can require an amount of time, given in minutes, hours, days, months, or years.
 The step is blocked until world time advances past the required duration.
 
 Time gates are checked:
@@ -238,7 +414,62 @@ Time gates are checked:
 
 ### Currency Requirements
 
-Currency can be handled by:
+When you enable currency requirements, a recipe step can cost an amount of a currency unit you define.
+Fabricate checks whether the crafting actor can afford the step before the craft begins, then spends the cost when the step is taken.
+If the actor cannot pay, the step is blocked and the craft is stopped before any ingredients are consumed.
 
-- **System adapter**. Uses the game system's built-in currency (e.g. D&D 5e gold)
-- **Custom macro**. A macro that checks and deducts currency however you define it
+You configure currency in the system settings editor, in the **Currency units** card.
+
+#### Choosing a spend strategy
+
+The **Spend strategy** selector decides how Fabricate reads and spends an actor's money.
+It offers three strategies, and you can pick any of them in any world, regardless of game system.
+A short hint under the selector describes the strategy you have chosen.
+
+- **Actor data path** reads each currency unit from a numeric field on the actor sheet, such as a Dungeons & Dragons 5e character's gold.
+  Fabricate makes its own change across the denominations you define, so a step priced in silver can be paid from gold and the difference returned in smaller coins.
+- **Actor inventory** treats coins as items the actor carries, read and spent through a preconfigured provider.
+  This is the right choice for game systems such as Pathfinder 2e, where coins live in the inventory rather than in a single sheet field.
+- **Macro** drives currency with macros you write, for any game system.
+  The macro receives the actor and does whatever it needs, so this strategy is not tied to the inventory.
+
+#### The provider (Actor inventory)
+
+When you choose **Actor inventory**, a **Provider** selector appears.
+
+A provider is a built-in adapter that already knows how to read and spend coins from your game system's inventory.
+Pathfinder 2e ships with one.
+When a provider is selected, it manages the denominations for you, so the unit list becomes a read-only **Provider-managed denominations** list.
+You can still reference those denominations by their abbreviation in a step's currency cost, but you cannot edit them here.
+In a world whose game system has no provider, Fabricate shows a note steering you to the **Macro** strategy instead, and leaves your own units untouched.
+
+#### The currency macros (Macro)
+
+The **Macro** strategy has three drop zones.
+You link each macro by dragging it from the Foundry macro directory onto a drop zone, and right-click a linked macro to unlink it.
+
+- **Can afford macro** runs before the craft to decide whether the actor can pay.
+  Return a success result to allow the craft, or a failure result to block it.
+- **Decrement macro** runs after a successful craft to spend the cost.
+- **Increment macro** is reserved for a future refund flow.
+  You can link it now, but Fabricate does not run it yet.
+
+Each macro receives the step's cost, keyed by the abbreviation you gave each currency unit, so your macro can match coins by the same abbreviation you configured.
+If a macro reports failure or stops with an error, Fabricate blocks the step and the craft is stopped before any ingredients are consumed.
+
+#### Defining currency units
+
+When you use the **Actor data path** or **Macro** strategy, you define your own currency units.
+Each unit has a label, an abbreviation, and an icon.
+
+- Under **Actor data path**, each unit also names the field on the actor sheet that holds its balance.
+- Under **Macro**, units have no path or denomination.
+  Your macros match coins by abbreviation, so a note reminds you that conversion between units is handled by your macros.
+
+You can also describe how units break down into smaller ones, such as one gold breaking down into ten silver.
+A unit with no breakdown is treated as a base denomination.
+
+To get started quickly, use **Seed presets** to add the standard coin ladder for your world.
+Seeding in a Dungeons & Dragons 5e world adds units on the actor data path strategy.
+Seeding in a Pathfinder 2e world adds inventory units and selects the Pathfinder 2e provider.
+Preset seeding is only available in Dungeons & Dragons 5e or Pathfinder 2e worlds.

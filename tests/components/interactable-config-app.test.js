@@ -72,7 +72,9 @@ describe('InteractableConfigApp shell', () => {
     assert.ok(appSource.includes('recreateLinkedDrawing(behavior'), 'create-drawing-marker uses recreateLinkedDrawing');
     assert.ok(appSource.includes('planClearVisualLink('), 'remove clears the visual link');
     assert.ok(appSource.includes('planSetEnabled(') && appSource.includes('planSetLocked('), 'enable/lock toggles use the pure planners');
-    assert.ok(appSource.includes('region.delete?.()'), 'delete removes the region');
+    assert.ok(appSource.includes('planInteractableDeletion(region'), 'delete decides scope via the pure ownership plan (issue 533)');
+    assert.ok(appSource.includes('executeInteractableDeletion(region, plan)'), 'delete applies the plan (region vs behaviour-only)');
+    assert.ok(!appSource.includes('region.delete?.()'), 'never wholesale-deletes a promoted user region');
     assert.ok(appSource.includes('applyMissingPolicy('), 'missing-visual recovery reuses applyMissingPolicy');
   });
 
@@ -294,6 +296,18 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes('disabled={!canApplyIdentity}'), 'Apply is disabled until the selection is complete');
     // The unconfigured state uses theme tokens only (no literal colours).
     assert.ok(/\.fab-ic-identity\.is-unconfigured\s*\{[\s\S]*?var\(--fab-accent/.test(rootSource), 'unconfigured treatment uses themed accent token');
+  });
+
+  it('disambiguates same-named systems in the source picker (issue 346)', () => {
+    assert.ok(
+      rootSource.includes("import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js'"),
+      'uses the shared system-disambiguation helper'
+    );
+    assert.ok(rootSource.includes('buildSystemLabelMap(systemOptions)'), 'builds the disambiguated label map');
+    assert.ok(
+      rootSource.includes('systemDisplayLabel(option, systemLabels)'),
+      'renders the disambiguated label in the system picker'
+    );
   });
 
   it('rewords the prompt placeholder away from "toast" jargon', () => {

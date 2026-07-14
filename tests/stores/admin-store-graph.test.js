@@ -18,12 +18,11 @@ function makeSystem(overrides = {}) {
     name: overrides.name || `System ${id}`,
     description: '',
     features: {},
-    advancedOptionsEnabled: true,
     categories: [],
     itemTags: [],
     essenceDefinitions: [],
     items: overrides.items || [],
-    requirements: { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
+    requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
     craftingCheck: { mode: 'passFail', macroUuid: null, outcomes: [] },
     recipeVisibility: { listMode: 'global' },
     ...overrides

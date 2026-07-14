@@ -1,4 +1,8 @@
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  getFabricateFlag,
+  setFabricateFlag,
+  deleteRemovedActiveRunFlags,
+} from '../config/flags.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -41,6 +45,9 @@ export class SalvageRunManager {
 
   async _persist(actor, container) {
     this._cache.set(actor.id, container);
+    // setFlag's recursive merge can't delete removed `active` keys; do it explicitly
+    // so completed/cleared runs don't resurrect on reload (see the shared helper).
+    await deleteRemovedActiveRunFlags(actor, 'salvageRuns', container);
     await setFabricateFlag(actor, 'salvageRuns', container);
   }
 
@@ -199,6 +206,26 @@ export class SalvageRunManager {
     return this.completeRun(actor, run, 'cancelled', {
       failureReason: run.failureReason || reason,
     });
+  }
+
+  /**
+   * Discard an active salvage run WITHOUT recording it in history — for a run that
+   * was created but never legitimately resolved (e.g. the player dismissed the
+   * interactive roll dialog before the check ran). Unlike {@link cancelRun}, which
+   * archives to history as `cancelled`, this leaves no trace: the attempt never
+   * began. Mirrors `CraftingRunManager#discardRun`.
+   *
+   * @param {Actor} actor
+   * @param {string} runId
+   * @returns {Promise<object|null>} the discarded run, or null if not active
+   */
+  async discardRun(actor, runId) {
+    const container = this._getContainer(actor);
+    const run = container.active?.[runId];
+    if (!run) return null;
+    delete container.active[runId];
+    await this._persist(actor, container);
+    return run;
   }
 
   async processWorldTime(worldTime = this._nowWorldTime(), onReadyRun = null) {

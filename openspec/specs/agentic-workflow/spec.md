@@ -18,7 +18,8 @@ The repository MUST treat files under `openspec/specs/*/spec.md` as the canonica
 
 ### Requirement: Per-change planning
 
-Non-trivial changes MUST be planned as an OpenSpec change delta in the work's GitHub issue before implementation starts. The delta is NOT versioned as files in the repository; it lives in a managed block (`openspec-delta:start` … `openspec-delta:end`) in the issue body and consolidates the proposal, design, tasks, any per-domain spec deltas, the resolved roster, and acceptance/verification.
+Non-trivial changes MUST be planned as an OpenSpec change delta in the work's GitHub issue before implementation starts.
+The delta is NOT versioned as files in the repository; it lives in a managed block (`openspec-delta:start` … `openspec-delta:end`) in the issue body and consolidates the proposal, design, tasks, any per-domain spec deltas, the resolved roster, and acceptance/verification.
 
 #### Scenario: planning issue work
 
@@ -80,7 +81,8 @@ Shared reusable skills MUST live under the repository `skills/` directory.
 
 ### Requirement: Role persona bindings
 
-Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`. Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.md` for Claude) MUST be thin bindings that point at the canonical skill and MUST NOT carry divergent persona behavior.
+Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`.
+Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.md` for Claude) MUST be thin bindings that point at the canonical skill and MUST NOT carry divergent persona behavior.
 
 #### Scenario: resolving a routing token
 
@@ -100,6 +102,24 @@ Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`. 
 - **WHEN** role agents are spawned for a change
 - **THEN** the workflow driver (the provider's top-level loop — Codex's depth-0 prompt agent or Claude's main loop) owns routing and the plan, implementation, and docs iteration loops
 - **AND** scoped role agents execute their role and return without spawning or routing further agents
+
+### Requirement: Harness reference integrity
+
+Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `skills/README.md`, `skills/*/SKILL.md`, `skills/*/references/*.md`, `.claude/agents/*.md`, `.codex/agents/*.toml`, and `.github/prompts/*.md` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
+
+#### Scenario: validating harness references
+
+- **WHEN** `npm run validate:agents` runs
+- **THEN** it verifies every conservatively path-shaped backtick reference in the harness documents resolves to an existing file or directory, allowing only entries in an explicit, commented allow-missing set
+- **AND** it rejects line-number-based code citations (such as `file.js:NNN` or approximate line references) in the harness documents
+- **AND** it verifies every skill-backed role's Claude binding declares a `model:` and its Codex binding declares a `model =`
+- **AND** it verifies the AGENTS.md shared-skills list equals the set of `skills/` subdirectories containing a `SKILL.md` minus the role directories derived from the bindings table
+- **AND** it exits non-zero on any violation
+
+#### Scenario: citing code from harness documents
+
+- **WHEN** a harness document cites a location in the codebase
+- **THEN** it names the symbol and the file path (locatable with `grep -n`) instead of a line number
 
 ### Requirement: Product contracts stay in specs
 
@@ -145,7 +165,7 @@ Pull requests that change UI files MUST include smoke-run screenshot evidence fo
 
 #### Scenario: UI files changed
 
-- **WHEN** a PR changes files under `src/ui/`, `styles/`, `lang/`, or files ending in `.svelte` or `.css`
+- **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
 - **THEN** the agent runs the Foundry smoke harness locally (the `full` profile via `npm run test:foundry`) and collects the relevant smoke screenshots for the changed views
 - **AND** the full smoke profile is not run on a GitHub Actions runner
 - **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence

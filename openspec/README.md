@@ -5,7 +5,8 @@ non-trivial work.
 
 ## Layout
 
-- `openspec/specs/*/spec.md` — canonical product and workflow specifications. These
+- `openspec/specs/*/spec.md` — canonical product and workflow specifications.
+These
   are the **only** versioned spec source of truth.
 
 Per-change planning **deltas are no longer versioned in git.** They live in the
@@ -15,7 +16,8 @@ GitHub issue for the work (see below), not under `openspec/changes/`.
 
 The per-change OpenSpec delta — what used to be
 `openspec/changes/<change>/{proposal,design,tasks}.md` plus optional
-`specs/<domain>/spec.md` deltas — is now a managed block in the **issue body**. It is
+`specs/<domain>/spec.md` deltas — is now a managed block in the **issue body**.
+It is
 the artefact planning agents author and iterate on, and it is what implementation
 reconciles the canonical specs against.
 
@@ -52,8 +54,10 @@ Rules:
   driver/user — there is no longer a versioned file to drop it in.
 
 > **Two separate managed-block conventions exist.** This `openspec-delta` block lives in
-> the **issue** body. The UI-screenshot managed block (patched by
-> `npm run screenshots:ui:publish`) lives in the **PR** body. They are unrelated; do not
+> the **issue** body.
+The UI-screenshot managed block (patched by
+> `npm run screenshots:ui:publish`) lives in the **PR** body.
+They are unrelated; do not
 > conflate them.
 
 ## Implementation and reconciliation
@@ -70,5 +74,6 @@ Rules:
 
 - Edit canonical specifications in `openspec/specs/`.
 - Capture the per-change delta in the issue, not in versioned files.
-- Treat only `openspec/specs/` paths as canonical. Do not rely on repo-level
+- Treat only `openspec/specs/` paths as canonical.
+Do not rely on repo-level
   compatibility aliases.

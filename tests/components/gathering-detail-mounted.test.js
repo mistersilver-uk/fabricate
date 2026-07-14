@@ -157,6 +157,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(utilDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
 
+    const imageDefaultsDestination = join(tempRoot, 'src/gatheringImageDefaults.js');
+    mkdirSync(dirname(imageDefaultsDestination), { recursive: true });
+    writeFileSync(imageDefaultsDestination, readFileSync(resolve(repoRoot, 'src/gatheringImageDefaults.js'), 'utf8'));
+
     const conditionIconsDestination = join(tempRoot, 'src/ui/svelte/util/gatheringConditionIcons.js');
     writeFileSync(conditionIconsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringConditionIcons.js'), 'utf8'));
 
@@ -622,8 +626,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(calls.attempts.length, 1, 'startGatheringAttempt called once');
     assert.deepEqual(
       calls.attempts[0],
-      { environmentId: 'env-meadow', taskId: 'task-1', rememberedActorId: null },
-      'called with env + task id (+ remembered actor; null with no actor bar)'
+      { environmentId: 'env-meadow', taskId: 'task-1', rememberedActorId: null, interactive: true },
+      'called with env + task id (+ remembered actor; null with no actor bar) and interactive roll'
     );
     assert.equal(calls.list, 2, 'listing re-fetched after the attempt');
   });
@@ -747,8 +751,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(calls.attempts.length, 1, 'blind attempt fires once');
     assert.deepEqual(
       calls.attempts[0],
-      { environmentId: 'env-blind', taskId: null, rememberedActorId: null },
-      'blind attempt omits the task id (remembered actor null with no actor bar)'
+      { environmentId: 'env-blind', taskId: null, rememberedActorId: null, interactive: true },
+      'blind attempt omits the task id (remembered actor null with no actor bar) and rolls interactively'
     );
   });
 

@@ -7,7 +7,7 @@
  * references (`tool.componentId`), we want the drop to spawn a TOOL tile — the
  * same outcome as dragging the Tool row from the browser.
  *
- * The matching reuses the shared {@link itemMatchesComponentSource} +
+ * The matching reuses the shared {@link resolveComponentForItem} +
  * source-ref helpers (`src/utils/sourceUuid.js`) so the source-uuid chain is
  * resolved identically to crafting award/stacking logic — no duplicated matching.
  *
@@ -23,7 +23,7 @@
  * real Foundry edges in {@link InteractableManager#_resolutionDeps}.
  */
 
-import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
+import { resolveToolForItem } from '../utils/sourceUuid.js';
 
 /**
  * @param {string} uuid  The dropped Item uuid.
@@ -82,26 +82,23 @@ function orderByPreferredSystem(systems, preferredSystemId) {
 }
 
 /**
- * The id of the first Tool in `system` whose managed component matches `item`.
+ * The id of the first Tool in `system` the dropped `item` resolves to (issue 561).
+ *
+ * Now that a Tool is a first-class registered kind carrying its OWN source references, the
+ * dropped item is resolved DIRECTLY against the system's Tools library (durable
+ * `roles[systemId].toolId` first, then source-ref intersection, list-aware and scoped by
+ * this system's id) — so an item-sourced Tool that is NOT a component still resolves, and an
+ * item whose durable identity names a DIFFERENT tool is never mis-resolved via an inherited
+ * transitive `_stats.duplicateSource` (issue 559).
  *
  * @param {object} item   The resolved Foundry item.
- * @param {object} system A crafting system (`tools[]` + `components[]`).
+ * @param {object} system A crafting system (`tools[]`).
  * @returns {string|null}
  */
 function firstToolMatch(item, system) {
   const tools = Array.isArray(system?.tools) ? system.tools : [];
-  const components = Array.isArray(system?.components) ? system.components : [];
-  for (const tool of tools) {
-    const componentId = tool?.componentId;
-    if (!componentId) continue;
-    const component = components.find(
-      (candidate) => String(candidate?.id ?? '') === String(componentId)
-    );
-    if (!component) continue;
-    if (itemMatchesComponentSource(item, component)) {
-      const toolId = String(tool?.id ?? '');
-      if (toolId) return toolId;
-    }
-  }
-  return null;
+  const resolved = resolveToolForItem(item, tools, system?.id);
+  if (!resolved?.id) return null;
+  const toolId = String(resolved.id);
+  return toolId || null;
 }

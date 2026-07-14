@@ -5,6 +5,7 @@ import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
+import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
 
 const viewer = { id: 'user-1', isGM: false };
 
@@ -57,10 +58,10 @@ function timedTask(overrides = {}) {
       name: 'Iron',
       results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }]
     }],
-    resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.outcome' },
     ...overrides
   };
 }
+
 
 const LIBRARY_TOOLS = [
   { id: 'tool-pick', componentId: 'pick', enabled: true },
@@ -92,6 +93,11 @@ function system(overrides = {}) {
     enabled: true,
     features: { gathering: true },
     components: [{ id: 'comp-a', difficulty: 1 }],
+    // Include a failure tier so a below-success roll resolves to a genuine failure:
+    // routed gathering now clamps a below-lowest relative roll to the closest tier, so
+    // a success-only check would clamp a miss up to success. With the failure tier the
+    // fixture's sub-threshold behaviour matches the pre-clamp "no match → failure".
+    gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
     ...overrides
   };
 }
@@ -101,14 +107,12 @@ function makeEngine({
   actingActor = actor,
   environments = [environment()],
   systems = [system()],
-  routedOutcome = null,
   createdResults = [],
   usedTools = [],
   calls = {},
   getRunViewer = null,
   richState = null
 } = {}) {
-  calls.resolveRouted = [];
   calls.evaluateCheck = [];
   calls.planResults = [];
   calls.createResults = [];
@@ -138,14 +142,6 @@ function makeEngine({
     sceneAccess: { canAttempt: () => ({ allowed: true }) },
     toolAvailability: { check: () => ({ available: true, missing: [], failedRequirements: [] }) },
     resultResolver: {
-      resolveRouted: async (payload) => {
-        calls.resolveRouted.push(payload);
-        return routedOutcome ?? {
-          status: 'succeeded',
-          resultGroups: [payload.task.resultGroups[0]],
-          checkResult: { outcome: payload.task.resultGroups[0].name, provider: payload.provider }
-        };
-      },
       resolveProgressive: async (payload) => ({
         status: 'succeeded',
         resultGroups: [payload.task.resultGroups[0]],
@@ -240,19 +236,25 @@ test('processWorldTime completes matured waitingTime run as succeeded and moves 
   await createWaitingRun(runManager);
   worldTime = 1060;
   const calls = {};
-  const engine = makeEngine({ runManager, createdResults, calls });
+  routedRoll(true);
+  try {
+    const engine = makeEngine({ runManager, createdResults, calls });
 
-  const result = await engine.processWorldTime(worldTime);
+    const result = await engine.processWorldTime(worldTime);
 
-  assert.equal(result.completed.length, 1);
-  assert.equal(result.completed[0].state, 'succeeded');
-  assert.deepEqual(runManager.getActiveRuns(actor), []);
-  const history = runManager.getRunHistory(actor);
-  assert.equal(history.length, 1);
-  assert.equal(history[0].status, 'succeeded');
-  assert.deepEqual(history[0].createdResults, createdResults);
-  assert.deepEqual(history[0].checkResult, { outcome: 'Iron', provider: 'macroOutcome' });
-  assert.equal(calls.createResults.length, 1);
+    assert.equal(result.completed.length, 1);
+    assert.equal(result.completed[0].state, 'succeeded');
+    assert.deepEqual(runManager.getActiveRuns(actor), []);
+    const history = runManager.getRunHistory(actor);
+    assert.equal(history.length, 1);
+    assert.equal(history[0].status, 'succeeded');
+    assert.deepEqual(history[0].createdResults, createdResults);
+    assert.equal(history[0].checkResult.outcome, 'Iron');
+    assert.equal(history[0].checkResult.success, true);
+    assert.equal(calls.createResults.length, 1);
+  } finally {
+    delete globalThis.Roll;
+  }
 });
 
 test('processWorldTime completes matured failure without results and applies feedback after history persistence', async () => {
@@ -277,27 +279,31 @@ test('processWorldTime completes matured failure without results and applies fee
     toolIds: ['tool-pick'],
     failureOutcome: { mode: 'text', text: 'The vein is exhausted.' }
   });
-  const engine = makeEngine({
-    runManager,
-    environments: [environment(task)],
-    routedOutcome: { status: 'failed', checkResult: { outcome: 'fail', provider: 'macroOutcome' } },
-    usedTools,
-    calls
-  });
+  routedRoll(false); // miss the success tier → routed failure
+  try {
+    const engine = makeEngine({
+      runManager,
+      environments: [environment(task)],
+      usedTools,
+      calls
+    });
 
-  const result = await engine.processWorldTime(worldTime);
+    const result = await engine.processWorldTime(worldTime);
 
-  assert.equal(result.completed.length, 1);
-  assert.equal(result.completed[0].state, 'failed');
-  assert.deepEqual(realRunManager.getActiveRuns(actor), []);
-  assert.equal(realRunManager.getRunHistory(actor)[0].status, 'failed');
-  assert.deepEqual(realRunManager.getRunHistory(actor)[0].createdResults, []);
-  assert.deepEqual(realRunManager.getRunHistory(actor)[0].usedTools, usedTools);
-  assert.deepEqual(calls.createResults, []);
-  assert.equal(calls.applyTools.length, 1);
-  assert.equal(calls.applyTools[0].actor, actor);
-  assert.equal(calls.failureFeedback.length, 1);
-  assert.deepEqual(order, ['completeRun']);
+    assert.equal(result.completed.length, 1);
+    assert.equal(result.completed[0].state, 'failed');
+    assert.deepEqual(realRunManager.getActiveRuns(actor), []);
+    assert.equal(realRunManager.getRunHistory(actor)[0].status, 'failed');
+    assert.deepEqual(realRunManager.getRunHistory(actor)[0].createdResults, []);
+    assert.deepEqual(realRunManager.getRunHistory(actor)[0].usedTools, usedTools);
+    assert.deepEqual(calls.createResults, []);
+    assert.equal(calls.applyTools.length, 1);
+    assert.equal(calls.applyTools[0].actor, actor);
+    assert.equal(calls.failureFeedback.length, 1);
+    assert.deepEqual(order, ['completeRun']);
+  } finally {
+    delete globalThis.Roll;
+  }
 });
 
 test('processWorldTime ignores non-matured waitingTime runs', async () => {
@@ -313,7 +319,6 @@ test('processWorldTime ignores non-matured waitingTime runs', async () => {
   assert.deepEqual(result.processed, []);
   assert.equal(runManager.getActiveRuns(actor).length, 1);
   assert.deepEqual(runManager.getRunHistory(actor), []);
-  assert.deepEqual(calls.resolveRouted, []);
   assert.deepEqual(calls.createResults, []);
 });
 
@@ -353,11 +358,12 @@ test('resume-time misconfiguration clears active run without history, results, t
   const runManager = makeRunManager({ now: () => worldTime });
   await createWaitingRun(runManager);
   worldTime = 1060;
-  const invalidTask = timedTask({ resultSelection: { provider: 'macroOutcome' } });
+  // A routed timed task whose system has no routed gathering check formula is
+  // misconfigured at resume time.
   const calls = {};
   const engine = makeEngine({
     runManager,
-    environments: [environment(invalidTask)],
+    systems: [system({ gatheringCraftingCheck: {} })],
     usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
     calls
@@ -368,7 +374,6 @@ test('resume-time misconfiguration clears active run without history, results, t
   assert.equal(result.cleared.length, 1);
   assert.deepEqual(runManager.getActiveRuns(actor), []);
   assert.deepEqual(runManager.getRunHistory(actor), []);
-  assert.deepEqual(calls.resolveRouted, []);
   assert.deepEqual(calls.createResults, []);
   assert.deepEqual(calls.applyTools, []);
   assert.deepEqual(calls.failureFeedback, []);
@@ -397,21 +402,25 @@ test('post-history timed side effects are blocked if completeRun persistence fai
     }
   };
   const calls = {};
-  const engine = makeEngine({
-    runManager,
-    environments: [environment(timedTask({ toolIds: ['tool-pick'] }))],
-    routedOutcome: { status: 'failed', checkResult: { outcome: 'fail' } },
-    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
-    calls
-  });
+  routedRoll(false); // routed failure → plans tools, then completeRun throws
+  try {
+    const engine = makeEngine({
+      runManager,
+      environments: [environment(timedTask({ toolIds: ['tool-pick'] }))],
+      usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+      calls
+    });
 
-  const result = await engine.processWorldTime(1060);
+    const result = await engine.processWorldTime(1060);
 
-  assert.equal(result.errors.length, 1);
-  assert.deepEqual(calls.planTools.length, 1);
-  assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.applyTools, []);
-  assert.deepEqual(calls.failureFeedback, []);
+    assert.equal(result.errors.length, 1);
+    assert.deepEqual(calls.planTools.length, 1);
+    assert.deepEqual(calls.createResults, []);
+    assert.deepEqual(calls.applyTools, []);
+    assert.deepEqual(calls.failureFeedback, []);
+  } finally {
+    delete globalThis.Roll;
+  }
 });
 
 test('post-history timed side effects are blocked when completeRun returns null', async () => {
@@ -435,24 +444,29 @@ test('post-history timed side effects are blocked when completeRun returns null'
     completeRun: async () => null
   };
   const calls = {};
-  const engine = makeEngine({
-    runManager,
-    environments: [environment(timedTask({ toolIds: ['tool-pick'] }))],
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
-    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
-    calls
-  });
+  routedRoll(true); // routed success → plans results, then completeRun returns null
+  try {
+    const engine = makeEngine({
+      runManager,
+      environments: [environment(timedTask({ toolIds: ['tool-pick'] }))],
+      createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
+      usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
+      calls
+    });
 
-  const result = await engine.processWorldTime(1060);
+    const result = await engine.processWorldTime(1060);
 
-  assert.deepEqual(result.completed, []);
-  assert.equal(result.errors.length, 1);
-  assert.equal(result.errors[0].code, 'TERMINAL_HISTORY_NOT_WRITTEN');
-  assert.equal(calls.planResults.length, 1);
-  assert.equal(calls.planTools.length, 1);
-  assert.deepEqual(calls.createResults, []);
-  assert.deepEqual(calls.applyTools, []);
-  assert.deepEqual(calls.failureFeedback, []);
+    assert.deepEqual(result.completed, []);
+    assert.equal(result.errors.length, 1);
+    assert.equal(result.errors[0].code, 'TERMINAL_HISTORY_NOT_WRITTEN');
+    assert.equal(calls.planResults.length, 1);
+    assert.equal(calls.planTools.length, 1);
+    assert.deepEqual(calls.createResults, []);
+    assert.deepEqual(calls.applyTools, []);
+    assert.deepEqual(calls.failureFeedback, []);
+  } finally {
+    delete globalThis.Roll;
+  }
 });
 
 test('fresh manual restart after resume-time misconfiguration repair is possible', async () => {
@@ -461,8 +475,13 @@ test('fresh manual restart after resume-time misconfiguration repair is possible
   const runManager = makeRunManager({ now: () => worldTime, ids: ['stuck-run', 'fresh-run'] });
   await createWaitingRun(runManager);
   worldTime = 1060;
-  const brokenTask = timedTask({ resultSelection: { provider: 'macroOutcome' } });
-  const engine = makeEngine({ runManager, environments: [environment(brokenTask)] });
+  // The system has no routed gathering check formula, so the matured run clears
+  // as a misconfiguration.
+  const engine = makeEngine({
+    runManager,
+    environments: [environment(timedTask())],
+    systems: [system({ gatheringCraftingCheck: {} })]
+  });
   await engine.processWorldTime(worldTime);
   assert.deepEqual(runManager.getActiveRuns(actor), []);
 
@@ -532,29 +551,34 @@ test('non-GM blind timed terminal history remains redacted and generic', async (
   await createWaitingRun(runManager, actor, { taskId: secretTask.id });
   worldTime = 1060;
   const calls = {};
-  const engine = makeEngine({
-    runManager,
-    environments: [environment(secretTask, { selectionMode: 'blind' })],
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1 }],
-    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
-    calls
-  });
+  routedRoll(true);
+  try {
+    const engine = makeEngine({
+      runManager,
+      environments: [environment(secretTask, { selectionMode: 'blind' })],
+      createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1 }],
+      usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
+      calls
+    });
 
-  const result = await engine.processWorldTime(worldTime);
-  const history = runManager.getRunHistory(actor);
-  const serializedResult = JSON.stringify(result);
-  const serializedHistory = JSON.stringify(history);
+    const result = await engine.processWorldTime(worldTime);
+    const history = runManager.getRunHistory(actor);
+    const serializedResult = JSON.stringify(result);
+    const serializedHistory = JSON.stringify(history);
 
-  assert.equal(result.completed.length, 1);
-  assert.equal(result.completed[0].taskId, null);
-  assert.equal(history.length, 1);
-  assert.equal(history[0].taskId, 'blind');
-  assert.deepEqual(history[0].createdResults, []);
-  assert.deepEqual(history[0].usedTools, []);
-  assert.deepEqual(history[0].checkResult, { blind: true, status: 'succeeded' });
-  for (const text of ['secret-mooncap-task', 'Secret Mooncap Patch', 'silver-sickle', 'secret-mooncap', 'macroOutcome']) {
-    assert.equal(serializedResult.includes(text), false, text);
-    assert.equal(serializedHistory.includes(text), false, text);
+    assert.equal(result.completed.length, 1);
+    assert.equal(result.completed[0].taskId, null);
+    assert.equal(history.length, 1);
+    assert.equal(history[0].taskId, 'blind');
+    assert.deepEqual(history[0].createdResults, []);
+    assert.deepEqual(history[0].usedTools, []);
+    assert.deepEqual(history[0].checkResult, { blind: true, status: 'succeeded' });
+    for (const text of ['secret-mooncap-task', 'Secret Mooncap Patch', 'silver-sickle', 'secret-mooncap']) {
+      assert.equal(serializedResult.includes(text), false, text);
+      assert.equal(serializedHistory.includes(text), false, text);
+    }
+  } finally {
+    delete globalThis.Roll;
   }
 });
 

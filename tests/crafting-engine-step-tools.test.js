@@ -85,7 +85,7 @@ class FakeItem {
 
 /**
  * Install a crafting system with name-matched managed components + tools.
- * `Hammer` is the STEP-2 tool component (no sourceUuid -> matched by name).
+ * `Hammer` is the STEP-2 tool component (no registeredItemUuid -> matched by name).
  */
 function installSystem() {
   const system = {
@@ -233,14 +233,16 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
   engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
-  engine._runSuccessMacro = async () => {};
 
   const recipe = twoStepRecipe();
   const actorRef = { uuid: 'Actor.a1' };
   const ingot = new FakeItem('i1', { name: 'Ingot', parent: actorRef });
+  // The hammer carries a durable per-system roles identity so it is selectable for
+  // usage/breakage under the issue-557 durable-identity gate (a name-only match is
+  // spared). getFabricateFlag reads the doubly-nested `flags.fabricate.<key>` path.
   const hammer = new FakeItem('h1', {
     name: 'Hammer',
-    flags: { fabricate: { toolUsage: { timesUsed: 0 } } },
+    flags: { fabricate: { roles: { 'sys-1': { toolId: 'tool-hammer' } }, toolUsage: { timesUsed: 0 } } },
     parent: actorRef
   });
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingot, hammer] };
@@ -275,11 +277,11 @@ test('(c) craft() of the step-tier step is blocked when the tool is absent', asy
   assert.match(result.message, /Missing required items|Missing required tool/);
 });
 
-test('(c) failure-path: a failed check breaks the step-tier tool when consumeCatalystsOnFail is set', async () => {
+test('(c) failure-path: a failed check breaks the step-tier tool when breakToolsOnFail is set', async () => {
   const system = installSystem();
   // Enable failure-path tool consumption (the gate at CraftingEngine
   // ~line 233/306 that drives _applyToolBreakage on a failed check).
-  system.craftingCheck = { consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: true } };
+  system.craftingCheck = { consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true } };
 
   const manager = new RecipeManager();
   let failurePayload = null;
@@ -290,12 +292,17 @@ test('(c) failure-path: a failed check breaks the step-tier tool when consumeCat
   // Force the crafting check to FAIL so the failure-path consumption runs.
   engine._runCraftingCheck = async () => ({ success: false, message: 'check failed', outcome: null, value: null, data: {} });
   engine._postCraftChatMessage = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const recipe = twoStepRecipe();
   const actorRef = { uuid: 'Actor.a1' };
   const ingot = new FakeItem('i1', { name: 'Ingot', parent: actorRef });
-  const hammer = new FakeItem('h1', { name: 'Hammer', parent: actorRef });
+  // Durable roles identity so the failed-check breakage path can select it (issue 561:
+  // the tool's own `roles[sys].toolId`).
+  const hammer = new FakeItem('h1', {
+    name: 'Hammer',
+    flags: { fabricate: { roles: { 'sys-1': { toolId: 'tool-hammer' } } } },
+    parent: actorRef
+  });
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingot, hammer] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
 

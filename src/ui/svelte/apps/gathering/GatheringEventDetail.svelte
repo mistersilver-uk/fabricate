@@ -12,6 +12,7 @@
      scene (reusing LinkedScene).
 -->
 <script>
+  import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { riskClass, riskLabel, biomeChipStyle, descriptionOrDefault } from '../../util/gatheringFormat.js';
   import ChanceBar from './ChanceBar.svelte';
@@ -91,7 +92,7 @@
   >
     <header class="gathering-event-detail-header">
       <span class="gathering-event-detail-thumb-wrap">
-        <img class="gathering-event-detail-thumb" class:is-fallback={!img} src={img || 'icons/svg/mystery-man.svg'} alt="" />
+        <img class="gathering-event-detail-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_EVENT_IMG} alt="" />
       </span>
       <span class="gathering-event-detail-heading">
         <h2 id={titleId} class="gathering-event-detail-title" title={name}>{name}</h2>

@@ -127,7 +127,7 @@ function makeSystem({
       macroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components,
     tools,
@@ -138,7 +138,7 @@ function makeSystem({
 function makeComponent({
   id = 'comp-1',
   name = 'Test Component',
-  sourceUuid = null,
+  registeredItemUuid = null,
   salvageEnabled = true,
   ingredientQuantity = 1,
   toolIds = [],
@@ -147,7 +147,7 @@ function makeComponent({
   return {
     id,
     name,
-    sourceUuid,
+    registeredItemUuid,
     salvage: salvageEnabled ? {
       enabled: true,
       ingredientQuantity,
@@ -407,7 +407,7 @@ test('salvage() consumes component on failure when consumeComponentOnFail is tru
       macroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     }
   });
   setupGame(system, actor);
@@ -435,7 +435,7 @@ test('salvage() does not consume component on failure when consumeComponentOnFai
       macroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeComponentOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: false }
     }
   });
   setupGame(system, actor);
@@ -443,6 +443,103 @@ test('salvage() does not consume component on failure when consumeComponentOnFai
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be deleted when consumeComponentOnFail=false');
+});
+
+test('salvage(): a cancelled interactive check aborts with zero mutation and no orphaned run', async () => {
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [], meta: {} })
+  };
+  const salvageRunManager = new SalvageRunManager();
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService, salvageRunManager });
+  // Simulate the player dismissing the interactive roll dialog.
+  engine._runSalvageCraftingCheck = async () => ({ success: false, cancelled: true });
+
+  const compItem = makeItem('comp-item', 'Test Component', 3);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent({ name: 'Test Component', ingredientQuantity: 1 });
+  const system = makeSystem({
+    components: [component],
+    salvageCraftingCheck: {
+      enabled: true,
+      macroUuid: null,
+      outcomes: [],
+      progressive: null,
+      // A policy that WOULD consume + break on a genuine failure — proving the
+      // cancel path bypasses it entirely.
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true }
+    }
+  });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id, { interactive: true });
+
+  assert.equal(result.success, false, 'cancelled salvage is not a success');
+  assert.equal(result.cancelled, true, 'cancelled flag surfaced');
+  assert.equal(result.results, null, 'no results created');
+  assert.equal(compItem.deleteCalled, false, 'component NOT consumed on cancel');
+  assert.equal(salvageRunManager.getActiveRuns(actor).length, 0, 'phantom in-progress run discarded');
+  assert.equal(salvageRunManager.getRunHistory(actor).length, 0, 'no history entry — zero run mutation');
+});
+
+test('misconfigured required salvage check: salvage aborts with ZERO mutation (no consume/break)', async () => {
+  // routed salvage with no authored roll formula is a GM-side misconfiguration. The
+  // real _runSalvageCraftingCheck flags it `misconfigured`, and salvage() must abort
+  // before any consumption even though the policy WOULD consume + break on a failure.
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [], meta: {} }),
+  };
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService });
+
+  const compItem = makeItem('comp-item', 'Test Component', 1);
+  const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
+  const actor = makeActor('actor-1', [compItem, toolItem]);
+
+  const tool = makeFakeTool('acid-vial');
+  tool.used = false;
+  engine._applyToolBreakage = async () => {
+    tool.used = true;
+    return [];
+  };
+  let consumeCalled = false;
+  engine._consumeComponentItems = async (...args) => {
+    consumeCalled = true;
+    // Defer to nothing — but flag the (unexpected) call.
+    return args.length ? [] : [];
+  };
+
+  const component = makeComponent({
+    name: 'Test Component',
+    toolIds: [tool.id],
+    resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }],
+  });
+  const system = makeSystem({
+    salvageResolutionMode: 'routed',
+    components: [component],
+    tools: [tool],
+    salvageCraftingCheck: {
+      enabled: true,
+      // No authored routed roll formula → required-check misconfiguration.
+      routed: { rollFormula: '' },
+      outcomes: [],
+      progressive: null,
+      // Policy would consume the component AND break tools on a genuine failure.
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true },
+    },
+  });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, false, 'a misconfigured required salvage check fails');
+  assert.equal(result.results, null, 'no results on a misconfigured abort');
+  assert.match(result.message, /requires a configured salvage check roll formula/);
+  assert.equal(consumeCalled, false, 'the component must NOT be consumed on a misconfiguration');
+  assert.equal(compItem.deleteCalled, false, 'source component item is untouched');
+  assert.equal(compItem.updateCalled, false, 'source component quantity is unchanged');
+  assert.equal(tool.used, false, 'tools must NOT be broken on a misconfiguration');
+  assert.equal(actor.createdItems.length, 0, 'no result items are created');
 });
 
 // ---------------------------------------------------------------------------
@@ -491,7 +588,7 @@ test('salvage() reduces component quantity when partially consumed', async () =>
 });
 
 test('salvage() creates result items on success', async () => {
-  const resultComp = { id: 'result-comp', name: 'Scrap Metal', sourceUuid: null };
+  const resultComp = { id: 'result-comp', name: 'Scrap Metal', registeredItemUuid: null };
   const resultGroup = { id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'result-comp', quantity: 3 }] };
 
   const fakeResolutionService = {
@@ -612,8 +709,8 @@ test('salvage() appends run to actor flags history and respects 50-entry limit',
 // ---------------------------------------------------------------------------
 
 test('salvage() simple mode creates result items with correct quantities from result group', async () => {
-  const resultComp1 = { id: 'scrap-iron', name: 'Scrap Iron', sourceUuid: null };
-  const resultComp2 = { id: 'scrap-wood', name: 'Scrap Wood', sourceUuid: null };
+  const resultComp1 = { id: 'scrap-iron', name: 'Scrap Iron', registeredItemUuid: null };
+  const resultComp2 = { id: 'scrap-wood', name: 'Scrap Wood', registeredItemUuid: null };
   const resultGroup = {
     id: 'rg-1', name: 'Salvage Pile',
     results: [
@@ -647,7 +744,7 @@ test('salvage() simple mode creates result items with correct quantities from re
 });
 
 test('salvage() simple mode uses only the first result group when component has multiple groups', async () => {
-  const resultComp = { id: 'scrap-iron', name: 'Scrap Iron', sourceUuid: null };
+  const resultComp = { id: 'scrap-iron', name: 'Scrap Iron', registeredItemUuid: null };
   const group1 = {
     id: 'rg-1', name: 'Group One',
     results: [{ id: 'r-1', componentId: 'scrap-iron', quantity: 1 }]
@@ -683,8 +780,8 @@ test('salvage() simple mode uses only the first result group when component has 
 // ---------------------------------------------------------------------------
 
 test('salvage() routed mode routes to correct result group based on check outcome', async () => {
-  const passComp = { id: 'gold-nugget', name: 'Gold Nugget', sourceUuid: null };
-  const failComp = { id: 'coal-dust', name: 'Coal Dust', sourceUuid: null };
+  const passComp = { id: 'gold-nugget', name: 'Gold Nugget', registeredItemUuid: null };
+  const failComp = { id: 'coal-dust', name: 'Coal Dust', registeredItemUuid: null };
   const passGroup = { id: 'rg-pass', name: 'Pass Results', results: [{ id: 'r-1', componentId: 'gold-nugget', quantity: 1 }] };
   const failGroup = { id: 'rg-fail', name: 'Fail Results', results: [{ id: 'r-2', componentId: 'coal-dust', quantity: 1 }] };
 
@@ -780,7 +877,10 @@ test('_resolveSalvageResultGroups routed mode selects correct group for each out
   assert.equal(failResult[0].id, 'rg-fail');
 });
 
-test('_resolveSalvageResultGroups legacy tiered alias uses routed logic', () => {
+test('_resolveSalvageResultGroups routed salvage routes by outcomeRouting (former tiered alias, now canonical)', () => {
+  // Salvage retains its own outcomeRouting model at runtime; the legacy `tiered`
+  // salvage token is normalized to `routed` by the manager / 1.4.0 migration
+  // before reaching the engine, so the engine only ever sees canonical `routed`.
   const engine = makeEngine();
   const groups = [
     { id: 'rg-pass', name: 'Pass', results: [{ id: 'r-1', componentId: 'ore', quantity: 1 }] },
@@ -794,7 +894,7 @@ test('_resolveSalvageResultGroups legacy tiered alias uses routed logic', () => 
       outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' }
     }
   };
-  const system = makeSystem({ salvageResolutionMode: 'tiered', components: [component] });
+  const system = makeSystem({ salvageResolutionMode: 'routed', components: [component] });
 
   const passResult = engine._resolveSalvageResultGroups(component, system, { outcome: 'pass', value: null });
   assert.equal(passResult.length, 1);
@@ -824,7 +924,7 @@ test('_resolveSalvageResultGroups progressive mode awards results up to check va
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [
       component,
@@ -855,7 +955,7 @@ test('_resolveSalvageResultGroups progressive mode awards nothing when check val
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [component, { id: 'item-a', name: 'Item A', difficulty: 2 }]
   });
@@ -865,9 +965,119 @@ test('_resolveSalvageResultGroups progressive mode awards nothing when check val
   assert.equal(awarded[0].results.length, 0, 'Value 0 should award nothing');
 });
 
+test('_resolveSalvageResultGroups progressive exceed mode awards only when value strictly exceeds cost', () => {
+  // exceed: a result is awarded only when `remaining > cost` (strict). value 5,
+  // costs 2 then 3 → item-a (5 > 2, remaining 3) awarded; item-b (3 > 3 false) stops.
+  const engine = makeEngine();
+  const resultGroup = {
+    id: 'rg-1', name: 'Loot',
+    results: [
+      { id: 'r-1', componentId: 'item-a', quantity: 1 }, // difficulty 2
+      { id: 'r-2', componentId: 'item-b', quantity: 1 }  // difficulty 3
+    ]
+  };
+  const component = {
+    id: 'comp-1', name: 'Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
+  };
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    salvageCraftingCheck: {
+      enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'exceed' },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
+    },
+    components: [
+      component,
+      { id: 'item-a', name: 'Item A', difficulty: 2 },
+      { id: 'item-b', name: 'Item B', difficulty: 3 }
+    ]
+  });
+
+  const awarded = engine._resolveSalvageResultGroups(component, system, { outcome: null, value: 5 });
+  assert.equal(awarded.length, 1);
+  assert.equal(awarded[0].results.length, 1, 'exceed awards item-a only (5 > 2); item-b stops (3 > 3 is false)');
+  assert.equal(awarded[0].results[0].componentId, 'item-a');
+});
+
+test('_resolveSalvageResultGroups progressive partial mode awards a final partial result on remainder', () => {
+  // partial: full results while `remaining >= cost`, then ONE final result on any
+  // leftover `remaining > 0`. value 4, costs 3 then 5 → item-a fully (remaining 1),
+  // item-b as the partial tail (remaining 1 > 0), then stop.
+  const engine = makeEngine();
+  const resultGroup = {
+    id: 'rg-1', name: 'Loot',
+    results: [
+      { id: 'r-1', componentId: 'item-a', quantity: 1 }, // difficulty 3
+      { id: 'r-2', componentId: 'item-b', quantity: 1 }, // difficulty 5
+      { id: 'r-3', componentId: 'item-c', quantity: 1 }  // difficulty 2
+    ]
+  };
+  const component = {
+    id: 'comp-1', name: 'Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
+  };
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    salvageCraftingCheck: {
+      enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'partial' },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
+    },
+    components: [
+      component,
+      { id: 'item-a', name: 'Item A', difficulty: 3 },
+      { id: 'item-b', name: 'Item B', difficulty: 5 },
+      { id: 'item-c', name: 'Item C', difficulty: 2 }
+    ]
+  });
+
+  const awarded = engine._resolveSalvageResultGroups(component, system, { outcome: null, value: 4 });
+  assert.equal(awarded.length, 1);
+  assert.equal(awarded[0].results.length, 2, 'partial awards item-a (full) then item-b (partial tail), stopping before item-c');
+  assert.equal(awarded[0].results[0].componentId, 'item-a');
+  assert.equal(awarded[0].results[1].componentId, 'item-b');
+});
+
+test('_resolveSalvageResultGroups progressive mode skips results with invalid difficulty and continues', () => {
+  // Salvage skips (continue) a result whose component difficulty is missing/<1
+  // rather than failing the whole award. value 6: item-a (cost 2) awarded, item-b
+  // (no difficulty) skipped, item-c (cost 3) awarded → both valid results awarded.
+  const engine = makeEngine();
+  const resultGroup = {
+    id: 'rg-1', name: 'Loot',
+    results: [
+      { id: 'r-1', componentId: 'item-a', quantity: 1 }, // difficulty 2
+      { id: 'r-2', componentId: 'item-b', quantity: 1 }, // no/invalid difficulty -> skipped
+      { id: 'r-3', componentId: 'item-c', quantity: 1 }  // difficulty 3
+    ]
+  };
+  const component = {
+    id: 'comp-1', name: 'Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
+  };
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    salvageCraftingCheck: {
+      enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
+    },
+    components: [
+      component,
+      { id: 'item-a', name: 'Item A', difficulty: 2 },
+      { id: 'item-b', name: 'Item B', difficulty: 0 }, // invalid (< 1) -> skipped, not a misconfiguration
+      { id: 'item-c', name: 'Item C', difficulty: 3 }
+    ]
+  });
+
+  const awarded = engine._resolveSalvageResultGroups(component, system, { outcome: null, value: 6 });
+  assert.equal(awarded.length, 1);
+  assert.equal(awarded[0].results.length, 2, 'item-a and item-c awarded; item-b skipped on invalid difficulty');
+  assert.equal(awarded[0].results[0].componentId, 'item-a');
+  assert.equal(awarded[0].results[1].componentId, 'item-c');
+});
+
 test('salvage() progressive mode creates items matching awarded results', async () => {
-  const itemAComp = { id: 'item-a', name: 'Item A', sourceUuid: null, difficulty: 2 };
-  const itemBComp = { id: 'item-b', name: 'Item B', sourceUuid: null, difficulty: 5 };
+  const itemAComp = { id: 'item-a', name: 'Item A', registeredItemUuid: null, difficulty: 2 };
+  const itemBComp = { id: 'item-b', name: 'Item B', registeredItemUuid: null, difficulty: 5 };
   const resultGroup = {
     id: 'rg-1', name: 'Loot',
     results: [
@@ -894,7 +1104,7 @@ test('salvage() progressive mode creates items matching awarded results', async 
     salvageResolutionMode: 'progressive',
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     },
     components: [component, itemAComp, itemBComp]
   });
@@ -932,7 +1142,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=true -- both cons
     tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: true }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true }
     }
   });
   setupGame(system, actor);
@@ -940,7 +1150,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=true -- both cons
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, true, 'Component should be consumed (consumeComponentOnFail=true)');
-  assert.equal(tool.used, true, 'Tool should be broken (consumeCatalystsOnFail=true)');
+  assert.equal(tool.used, true, 'Tool should be broken (breakToolsOnFail=true)');
 });
 
 test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only component consumed', async () => {
@@ -964,7 +1174,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only com
     tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
     }
   });
   setupGame(system, actor);
@@ -972,7 +1182,7 @@ test('salvage failure: consumeComponent=true, consumeCatalysts=false -- only com
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, true, 'Component should be consumed (consumeComponentOnFail=true)');
-  assert.equal(tool.used, false, 'Tool should NOT be broken (consumeCatalystsOnFail=false)');
+  assert.equal(tool.used, false, 'Tool should NOT be broken (breakToolsOnFail=false)');
 });
 
 test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only tools broken', async () => {
@@ -996,7 +1206,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only too
     tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: false, consumeCatalystsOnFail: true }
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: true }
     }
   });
   setupGame(system, actor);
@@ -1004,7 +1214,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=true -- only too
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be consumed (consumeComponentOnFail=false)');
-  assert.equal(tool.used, true, 'Tool should be broken (consumeCatalystsOnFail=true)');
+  assert.equal(tool.used, true, 'Tool should be broken (breakToolsOnFail=true)');
 });
 
 test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing consumed', async () => {
@@ -1028,7 +1238,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing
     tools: [tool],
     salvageCraftingCheck: {
       enabled: true, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: false }
     }
   });
   setupGame(system, actor);
@@ -1036,7 +1246,7 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing
   await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(compItem.deleteCalled, false, 'Component should NOT be consumed (consumeComponentOnFail=false)');
-  assert.equal(tool.used, false, 'Tool should NOT be broken (consumeCatalystsOnFail=false)');
+  assert.equal(tool.used, false, 'Tool should NOT be broken (breakToolsOnFail=false)');
 });
 
 // ---------------------------------------------------------------------------
@@ -1050,7 +1260,7 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
   // The system manager is provided via game.fabricate.getCraftingSystemManager.
   // We stub only _runSalvageCraftingCheck since it needs MacroExecutor.
 
-  const scrapComp = { id: 'scrap-metal', name: 'Scrap Metal', sourceUuid: null };
+  const scrapComp = { id: 'scrap-metal', name: 'Scrap Metal', registeredItemUuid: null };
   const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
   const tool = makeFakeTool('acid-vial');
 
@@ -1077,7 +1287,7 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
     salvageResolutionMode: 'simple',
     salvageCraftingCheck: {
       enabled: false, macroUuid: null, outcomes: [], progressive: null,
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: true }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true }
     },
     components: [component, scrapComp],
     tools: [tool]

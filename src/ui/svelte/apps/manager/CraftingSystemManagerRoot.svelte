@@ -1,9 +1,26 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import {
+    DEFAULT_GATHERING_ENVIRONMENT_IMG,
+    DEFAULT_GATHERING_EVENT_IMG,
+    DEFAULT_GATHERING_TASK_IMG
+  } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
+  import {
+    routedSuccessTierOptions,
+    routedHasOutcomeTiers,
+    routedOutcomeTierNames,
+    resolveRecipeCheckTierOptions,
+    resolveRecipeFixedOutcomeTierOptions
+  } from '../../../../utils/routedOutcomeKeywords.js';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
+  import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
+  import ComponentSourceInspector from './ComponentSourceInspector.svelte';
+  import ComponentDifficultyInspector from './ComponentDifficultyInspector.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
+  import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
   import EnvironmentsBrowserView from './EnvironmentsBrowserView.svelte';
   import EssenceBrowserView from './EssenceBrowserView.svelte';
@@ -15,6 +32,21 @@
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
+  import BooksScrollsView from './BooksScrollsView.svelte';
+  import CraftingSettingsView from './CraftingSettingsView.svelte';
+  import AccessTabView from './AccessTabView.svelte';
+  import GrantAccessInspector from './GrantAccessInspector.svelte';
+  import ItemPageInspector from './ItemPageInspector.svelte';
+  import RecipeItemEditor from './RecipeItemEditor.svelte';
+  import ItemPickerModal from './ItemPickerModal.svelte';
+  import {
+    buildCraftingNavItems,
+    activeCraftingTab as resolveActiveCraftingTab,
+    isCraftingRoute as isCraftingView,
+    CRAFTING_VIEWS,
+  } from './crafting/craftingNav.js';
+  import RecipeEditView from './RecipeEditView.svelte';
+  import RecipeItemInspector from './RecipeItemInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
@@ -25,6 +57,12 @@
   const viewState = store.viewState;
 
   let activeView = $state('systems');
+  // The tab the System Overview page (`system-edit`) should open on. The standalone
+  // overview route was folded into this page as its Validation tab; bumping
+  // `requestedSystemTabNonce` alongside `requestedSystemTab` lets a deep link (or the
+  // blocker banner) force the Validation tab open even when the page is already shown.
+  let requestedSystemTab = $state('settings');
+  let requestedSystemTabNonce = $state(0);
   let selectedRecipeId = $state('');
   let selectedComponentId = $state('');
   let selectedEssenceId = $state('');
@@ -37,9 +75,39 @@
   let componentEditDirty = $state(false);
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
+  // Staged progressive-difficulty value for the component being edited (number or
+  // null). Seeded on edit-entry; persisted with the rest of the draft on Save.
+  let componentDifficultyDraft = $state(null);
+  let recipeEditSaving = $state(false);
+  let recipeSaveFailed = $state(false);
+  // The recipe editor stages edits in a root-held draft and commits only on Save.
+  // `recipeDraft` is the live, edited copy passed down to the editor; `recipeDraftBaseline`
+  // is the last-persisted snapshot. Both are deep PLAIN clones so JSON.stringify
+  // comparison drives the dirty flag (mirrors the gathering-task/event editors).
+  let recipeDraft = $state(null);
+  let recipeDraftBaseline = $state(null);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
+  // Crafting nav group (issue 511): mirrors the gathering group's expand state.
+  // The whole group is gated behind experimental features (`recipesRouteEnabled`).
+  let craftingMenuExpanded = $state(false);
+  // The selected recipe item on the Books & Scrolls surface (issue 511).
+  let selectedRecipeItemId = $state('');
+  // The recipe selected on the Access surface (visibility=restricted); drives the
+  // GrantAccessInspector aside.
+  let selectedRecipeIdForAccess = $state('');
+  // Recipe-item editor draft (recipe-item-edit route). Mirrors the recipe-edit
+  // draft pattern: a root-held live draft + last-persisted baseline (deep plain
+  // clones) so JSON comparison drives the dirty flag and Discard reverts.
+  let recipeItemDraft = $state(null);
+  let recipeItemDraftBaseline = $state(null);
+  let recipeItemEditSaving = $state(false);
+  let recipeItemSaveFailed = $state(false);
+  let recipeItemActiveTab = $state('overview');
+  // Item picker modal (Create recipe item flow on Books & Scrolls / Overview tab).
+  let itemPickerOpen = $state(false);
+  let worldItemOptions = $state([]);
   // svelte-ignore state_referenced_locally
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
 
@@ -65,9 +133,177 @@
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
+
+  // Per-check tool-breakage trigger block (issue 419), carried on every check
+  // draft so authoring it under checkDriven authority persists. Deep-clone the
+  // persisted block (matching the engine's `{ enabled, triggers[] }` shape) or
+  // seed the empty default; triggers carry `{ id, label, condition }`.
+  function cloneCheckBreakage(checkBreakage) {
+    const source = checkBreakage && typeof checkBreakage === 'object' ? checkBreakage : {};
+    return {
+      triggers: Array.isArray(source.triggers)
+        ? source.triggers.map((trigger) => ({
+            id: trigger?.id,
+            condition:
+              trigger?.condition && typeof trigger.condition === 'object'
+                ? { ...trigger.condition }
+                : null,
+            outcome: ['success', 'failure', 'none'].includes(trigger?.outcome)
+              ? trigger.outcome
+              : 'none',
+            breakTools: trigger?.breakTools === true
+          }))
+        : []
+    };
+  }
+
+  // Routed crafting check editor: a staged draft is seeded from the selected
+  // system's craftingCheck.routed and committed only via the top-right Save
+  // button (the same staged pattern the other editors use), so persistence is
+  // explicit and never raced by navigation.
+  function cloneRoutedCheck(routed) {
+    const source = routed && typeof routed === 'object' ? routed : {};
+    const dc = Number(source.dc);
+    const rollFormula =
+      typeof source.rollFormula === 'string'
+        ? source.rollFormula
+        : typeof source.rollExpression === 'string'
+          ? source.rollExpression
+          : '';
+    return {
+      type: source.type === 'fixed' ? 'fixed' : 'relative',
+      rollFormula,
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
+      relativeOutcomes: Array.isArray(source.relativeOutcomes)
+        ? source.relativeOutcomes.map((outcome) => ({ ...outcome }))
+        : [],
+      fixedOutcomes: Array.isArray(source.fixedOutcomes)
+        ? source.fixedOutcomes.map((outcome) => ({ ...outcome }))
+        : [],
+      checkBreakage: cloneCheckBreakage(source.checkBreakage)
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkRoutedDraft = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
+  // svelte-ignore state_referenced_locally
+  let checkRoutedBaseline = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
+  // svelte-ignore state_referenced_locally
+  let lastChecksSystemId = $viewState.selectedSystem?.id || '';
+  // svelte-ignore state_referenced_locally
+  let lastChecksResolutionMode = $viewState.selectedSystem?.resolutionMode || 'simple';
+  let checkRoutedSaving = $state(false);
+  const checkRoutedDirty = $derived(
+    JSON.stringify(checkRoutedDraft) !== JSON.stringify(checkRoutedBaseline)
+  );
+
+  // Simple (pass/fail) crafting check draft — same staged pattern, used for simple
+  // and alchemy resolution modes.
+  function cloneSimpleCheck(simple) {
+    const source = simple && typeof simple === 'object' ? simple : {};
+    const dc = Number(source.dc);
+    return {
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
+      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
+      tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
+      macroUuid: source.macroUuid || null,
+      checkBreakage: cloneCheckBreakage(source.checkBreakage)
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkSimpleDraft = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
+  // svelte-ignore state_referenced_locally
+  let checkSimpleBaseline = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
+  let checkSimpleSaving = $state(false);
+  const checkSimpleDirty = $derived(
+    JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
+  );
+
+  // Progressive crafting check draft — same staged pattern, used for progressive
+  // resolution mode. Only the roll formula and crit table are edited here; the
+  // award settings (awardMode/allowPlayerReorder) are carried through untouched so
+  // a save never drops them.
+  function cloneProgressiveCheck(progressive) {
+    const source = progressive && typeof progressive === 'object' ? progressive : {};
+    return {
+      awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
+        ? source.awardMode
+        : 'equal',
+      allowPlayerReorder: source.allowPlayerReorder === true,
+      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
+      checkBreakage: cloneCheckBreakage(source.checkBreakage)
+    };
+  }
+  // svelte-ignore state_referenced_locally
+  let checkProgressiveDraft = $state(
+    cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
+  );
+  // svelte-ignore state_referenced_locally
+  let checkProgressiveBaseline = $state(
+    cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
+  );
+  let checkProgressiveSaving = $state(false);
+  const checkProgressiveDirty = $derived(
+    JSON.stringify(checkProgressiveDraft) !== JSON.stringify(checkProgressiveBaseline)
+  );
+
+  // Salvage check drafts — the salvage check now mirrors the crafting check shapes
+  // (simple/routed/progressive), so the crafting clone helpers are reused. Same
+  // staged pattern: one draft per mode, committed via the tab-aware header Save.
+  const sysSalvage = $viewState.selectedSystem?.salvageCraftingCheck;
+  // svelte-ignore state_referenced_locally
+  let salvageSimpleDraft = $state(cloneSimpleCheck(sysSalvage?.simple));
+  // svelte-ignore state_referenced_locally
+  let salvageSimpleBaseline = $state(cloneSimpleCheck(sysSalvage?.simple));
+  // svelte-ignore state_referenced_locally
+  let salvageRoutedDraft = $state(cloneRoutedCheck(sysSalvage?.routed));
+  // svelte-ignore state_referenced_locally
+  let salvageRoutedBaseline = $state(cloneRoutedCheck(sysSalvage?.routed));
+  // svelte-ignore state_referenced_locally
+  let salvageProgressiveDraft = $state(cloneProgressiveCheck(sysSalvage?.progressive));
+  // svelte-ignore state_referenced_locally
+  let salvageProgressiveBaseline = $state(cloneProgressiveCheck(sysSalvage?.progressive));
+  let salvageSimpleSaving = $state(false);
+  let salvageRoutedSaving = $state(false);
+  let salvageProgressiveSaving = $state(false);
+  const salvageSimpleDirty = $derived(
+    JSON.stringify(salvageSimpleDraft) !== JSON.stringify(salvageSimpleBaseline)
+  );
+  const salvageRoutedDirty = $derived(
+    JSON.stringify(salvageRoutedDraft) !== JSON.stringify(salvageRoutedBaseline)
+  );
+  const salvageProgressiveDirty = $derived(
+    JSON.stringify(salvageProgressiveDraft) !== JSON.stringify(salvageProgressiveBaseline)
+  );
+
+  // Gathering check drafts — the system-level gathering check mirrors the
+  // crafting/salvage progressive + routed shapes (d100 has no editable config),
+  // so the crafting clone helpers are reused. Same staged pattern as salvage.
+  const sysGathering = $viewState.selectedSystem?.gatheringCraftingCheck;
+  // svelte-ignore state_referenced_locally
+  let gatheringProgressiveDraft = $state(cloneProgressiveCheck(sysGathering?.progressive));
+  // svelte-ignore state_referenced_locally
+  let gatheringProgressiveBaseline = $state(cloneProgressiveCheck(sysGathering?.progressive));
+  // svelte-ignore state_referenced_locally
+  let gatheringRoutedDraft = $state(cloneRoutedCheck(sysGathering?.routed));
+  // svelte-ignore state_referenced_locally
+  let gatheringRoutedBaseline = $state(cloneRoutedCheck(sysGathering?.routed));
+  let gatheringProgressiveSaving = $state(false);
+  let gatheringRoutedSaving = $state(false);
+  const gatheringProgressiveDirty = $derived(
+    JSON.stringify(gatheringProgressiveDraft) !== JSON.stringify(gatheringProgressiveBaseline)
+  );
+  const gatheringRoutedDirty = $derived(
+    JSON.stringify(gatheringRoutedDraft) !== JSON.stringify(gatheringRoutedBaseline)
+  );
+  // Which Checks sub-tab is active (crafting | salvage | gathering | validation),
+  // so the shared header Save persists the right draft.
+  let checksActiveTab = $state('crafting');
   const placeholderViews = [
     { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
-    { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.Manager.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
   ];
 
@@ -75,10 +311,339 @@
   const selectedSystemId = $derived(selectedSystem?.id || '');
   const systemsLoading = $derived($viewState.systemsLoading === true);
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
+  const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
+  // Complex recipes need a resolution mode that allows multiple ingredient/result
+  // sets; simple/progressive systems craft exactly one set into one result.
+  const recipeMultiSetAllowed = $derived(!['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple'));
+  // Both routed modes route a result group across multiple result groups (by the
+  // ingredient set in routedByIngredients, by the check outcome in routedByCheck);
+  // the routing basis is a property of the system mode, not a per-recipe choice.
+  const recipeRouted = $derived(
+    ['routedByIngredients', 'routedByCheck'].includes(selectedSystem?.resolutionMode || 'simple')
+  );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences, recipesRouteEnabled));
+
+  // The pure `evaluateSystemValidation` report, computed in the admin store from
+  // the selected system's recipes/environments/components. Drives the GM system
+  // overview view, its rail count badge, and the system-blocker banner.
+  const systemValidationReport = $derived(
+    $viewState.systemValidation || { issues: [], counts: { critical: 0, warning: 0, info: 0, blockers: 0 }, blocksSystem: false }
+  );
+  const systemBlocksSystem = $derived(systemValidationReport.blocksSystem === true);
+  const systemOverviewCount = $derived(
+    (systemValidationReport.counts?.critical || 0) + (systemValidationReport.counts?.warning || 0)
+  );
+
+  // Per-check activation state for the right-menu "Active" card. A check is only
+  // toggleable when its resolution mode makes it optional (Simple); otherwise the
+  // mode requires it and the card explains that.
+  const checkActivation = $derived({
+    crafting: {
+      mode: selectedSystem?.resolutionMode || 'simple',
+      // The crafting check is optional in simple and routedByIngredients (it runs
+      // only when a roll formula is authored and checks are enabled); routedByCheck
+      // and progressive REQUIRE it. Alchemy is driven by alchemy.checkMode: simple
+      // and tiered are MANDATORY (cannot be disabled → requiredHint), while none has
+      // NO check (the `none` flag suppresses the Active TOGGLE and shows a distinct
+      // "resolves without a check" hint in place of the requiredHint — the Active
+      // card itself stays as a read-only note).
+      optional:
+        (selectedSystem?.resolutionMode || 'simple') === 'alchemy'
+          ? false
+          : ['simple', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
+      none:
+        selectedSystem?.resolutionMode === 'alchemy' &&
+        (selectedSystem?.alchemy?.checkMode || 'none') === 'none',
+      enabled: selectedSystem?.craftingCheck?.enabled === true
+    },
+    salvage: {
+      mode: selectedSystem?.salvageResolutionMode || 'simple',
+      optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
+      enabled: selectedSystem?.salvageCraftingCheck?.enabled === true
+    },
+    // The system-level gathering check's shape is the gathering economy's
+    // resolution mode. d100 is the fixed roll (optional/no enable toggle);
+    // progressive/routed are editable checks with an Active toggle.
+    gathering: {
+      mode: gatheringResolutionMode,
+      optional: gatheringResolutionMode === 'd100',
+      enabled: selectedSystem?.gatheringCraftingCheck?.enabled === true
+    }
+  });
+
+  // Which crafting check editor is active for the selected system, and whether it
+  // has unsaved staged edits — drives the single top-right Save button.
+  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients`
+  // shares the simple pass/fail slot with `simple`/`alchemy`, so it routes dirty
+  // tracking + Save through the simple draft (`store.saveCraftingCheckSimple`) and its
+  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. The separate
+  // `recipeRouted` derivation (multi-set / route enablement) still covers both routed
+  // modes.
+  const craftingCheckMode = $derived(
+    (function _craftingCheckMode(resolution) {
+      if (resolution === 'routedByCheck') return 'routed';
+      if (resolution === 'progressive') return 'progressive';
+      if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
+      return null;
+    })(selectedSystem?.resolutionMode || 'simple')
+  );
+  const craftingCheckDirty = $derived(
+    (craftingCheckMode === 'routed' && checkRoutedDirty) ||
+      (craftingCheckMode === 'simple' && checkSimpleDirty) ||
+      (craftingCheckMode === 'progressive' && checkProgressiveDirty)
+  );
+  const craftingCheckSaving = $derived(
+    checkRoutedSaving || checkSimpleSaving || checkProgressiveSaving
+  );
+
+  // The salvage check editor shown is selected by the salvage resolution mode.
+  const salvageResolutionMode = $derived(selectedSystem?.salvageResolutionMode || 'simple');
+  const salvageCheckDirty = $derived(
+    (salvageResolutionMode === 'routed' && salvageRoutedDirty) ||
+      (salvageResolutionMode === 'progressive' && salvageProgressiveDirty) ||
+      (salvageResolutionMode === 'simple' && salvageSimpleDirty)
+  );
+  const salvageCheckSaving = $derived(
+    salvageSimpleSaving || salvageRoutedSaving || salvageProgressiveSaving
+  );
+
+  // The gathering check editor shown is selected by the gathering economy's
+  // resolution mode; d100 has no editable draft, so it is never dirty/saving.
+  const gatheringCheckDirty = $derived(
+    (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) ||
+      (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty)
+  );
+  const gatheringCheckSaving = $derived(
+    gatheringProgressiveSaving || gatheringRoutedSaving
+  );
+
+  // Tab-aware Checks dirty/saving/save: the single header Save button persists
+  // whichever check sub-tab is active.
+  const checksDirty = $derived(
+    checksActiveTab === 'salvage'
+      ? salvageCheckDirty
+      : checksActiveTab === 'gathering'
+        ? gatheringCheckDirty
+        : craftingCheckDirty
+  );
+  const checksSaving = $derived(
+    checksActiveTab === 'salvage'
+      ? salvageCheckSaving
+      : checksActiveTab === 'gathering'
+        ? gatheringCheckSaving
+        : craftingCheckSaving
+  );
+
+  // Recipe tiers offered to the recipe editor's "Check tier" dropdown, resolved
+  // from the active crafting-check mode. Recipe tiers are authored on a RELATIVE
+  // check, so a simple-static check surfaces its `simple.tiers` and a routed
+  // relative check (`routed.type !== 'fixed'`) surfaces its `routed.tiers`; fixed,
+  // dynamic-dc, progressive and unknown modes offer nothing. See the pure helper.
+  const recipeCheckTierOptions = $derived(
+    resolveRecipeCheckTierOptions(selectedSystem?.craftingCheck, craftingCheckMode)
+  );
+  // Fixed-type routed success tiers offered to the recipe's "Minimum success tier"
+  // override; empty (control hidden) unless the system's real resolution mode is
+  // `routedByCheck` + fixed. Gated on `resolutionMode`, not the collapsed
+  // `craftingCheckMode`, so a `routedByIngredients` system (which authors its check
+  // on the shared `simple` pass/fail slot and has no outcome tiers) does not surface
+  // a dead control.
+  const recipeMinSuccessTierOptions = $derived(
+    resolveRecipeFixedOutcomeTierOptions(selectedSystem?.craftingCheck, selectedSystem?.resolutionMode)
+  );
+
+  // Routed-check outcome tiers (active type) offered to the recipe editor's
+  // check-mode result-set assignment control as {id, name}. Failure tiers are
+  // excluded — a failed check produces no result set to route to.
+  const recipeRoutedOutcomeTierOptions = $derived.by(() =>
+    routedSuccessTierOptions(selectedSystem?.craftingCheck?.routed)
+  );
+  // Whether ANY outcome tier is defined (even failure-only). Lets the recipe
+  // editor tell "no tiers authored" apart from "tiers exist but none is Success"
+  // — both empty the option list above, but each needs a different hint.
+  const recipeRoutedHasOutcomeTiers = $derived.by(() =>
+    routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
+  );
+
+  // Salvage feature gate + the inputs the per-component salvage editor needs.
+  const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);
+  // Routed-salvage outcome tier NAMES (active type), used by the per-component
+  // outcome-routing selects. Names map to result-group ids in component.salvage.
+  const salvageOutcomeNames = $derived(
+    routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
+  );
+  // System components offered to the salvage result picker ({id, name, img}).
+  const salvageComponentOptions = $derived(
+    itemCards.map((item) => ({ id: item.id, name: item.name, img: item.img }))
+  );
+
+  // Reseed the routed + simple check drafts and baselines when the selected system
+  // changes (not on every refresh of the same system, so a save never clobbers an
+  // open draft) OR when the SAME system's resolution mode changes. The latter is a
+  // data-loss guard: `CraftingSystemManager.updateSystem` moves the persisted
+  // crafting-check config across slots when a mode crosses the `routedByIngredients`
+  // boundary (routed↔simple), so the editor must re-read both crafting-check slots
+  // from the persisted system — otherwise a stale/empty draft would be Saved back and
+  // clobber the migrated config.
+  $effect(() => {
+    const resolutionMode = selectedSystem?.resolutionMode || 'simple';
+    const systemChanged = selectedSystemId !== lastChecksSystemId;
+    const resolutionModeChanged =
+      !systemChanged && resolutionMode !== lastChecksResolutionMode;
+    if (!systemChanged && !resolutionModeChanged) return;
+    lastChecksSystemId = selectedSystemId;
+    lastChecksResolutionMode = resolutionMode;
+    checkRoutedDraft = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
+    checkRoutedBaseline = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
+    checkSimpleDraft = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
+    checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
+    checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
+    checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
+    // A same-system resolution-mode change never touches the salvage/gathering
+    // checks; only reseed those on a genuine system switch so an open salvage/
+    // gathering draft is not clobbered by a crafting-mode change.
+    if (!systemChanged) return;
+    const nextSalvage = selectedSystem?.salvageCraftingCheck;
+    salvageSimpleDraft = cloneSimpleCheck(nextSalvage?.simple);
+    salvageSimpleBaseline = cloneSimpleCheck(nextSalvage?.simple);
+    salvageRoutedDraft = cloneRoutedCheck(nextSalvage?.routed);
+    salvageRoutedBaseline = cloneRoutedCheck(nextSalvage?.routed);
+    salvageProgressiveDraft = cloneProgressiveCheck(nextSalvage?.progressive);
+    salvageProgressiveBaseline = cloneProgressiveCheck(nextSalvage?.progressive);
+    const nextGathering = selectedSystem?.gatheringCraftingCheck;
+    gatheringProgressiveDraft = cloneProgressiveCheck(nextGathering?.progressive);
+    gatheringProgressiveBaseline = cloneProgressiveCheck(nextGathering?.progressive);
+    gatheringRoutedDraft = cloneRoutedCheck(nextGathering?.routed);
+    gatheringRoutedBaseline = cloneRoutedCheck(nextGathering?.routed);
+  });
+
+  function onUpdateCraftingCheck(next) {
+    checkRoutedDraft = next;
+  }
+
+  function onUpdateCraftingCheckSimple(next) {
+    checkSimpleDraft = next;
+  }
+
+  function onUpdateCraftingCheckProgressive(next) {
+    checkProgressiveDraft = next;
+  }
+
+  function onUpdateSalvageCheckSimple(next) {
+    salvageSimpleDraft = next;
+  }
+
+  function onUpdateSalvageCheckRouted(next) {
+    salvageRoutedDraft = next;
+  }
+
+  function onUpdateSalvageCheckProgressive(next) {
+    salvageProgressiveDraft = next;
+  }
+
+  function onUpdateGatheringCheckProgressive(next) {
+    gatheringProgressiveDraft = next;
+  }
+
+  function onUpdateGatheringCheckRouted(next) {
+    gatheringRoutedDraft = next;
+  }
+
+  async function saveCraftingCheck() {
+    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return;
+    if (craftingCheckMode === 'routed') {
+      checkRoutedSaving = true;
+      try {
+        await store?.saveCraftingCheckRouted?.(checkRoutedDraft);
+        checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
+      } finally {
+        checkRoutedSaving = false;
+      }
+    } else if (craftingCheckMode === 'simple') {
+      checkSimpleSaving = true;
+      try {
+        await store?.saveCraftingCheckSimple?.(checkSimpleDraft);
+        checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
+      } finally {
+        checkSimpleSaving = false;
+      }
+    } else if (craftingCheckMode === 'progressive') {
+      checkProgressiveSaving = true;
+      try {
+        await store?.saveCraftingCheckProgressive?.(checkProgressiveDraft);
+        checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
+      } finally {
+        checkProgressiveSaving = false;
+      }
+    }
+  }
+
+  async function saveSalvageCheck() {
+    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return;
+    if (salvageResolutionMode === 'routed') {
+      salvageRoutedSaving = true;
+      try {
+        await store?.saveSalvageCheckRouted?.(salvageRoutedDraft);
+        salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
+      } finally {
+        salvageRoutedSaving = false;
+      }
+    } else if (salvageResolutionMode === 'progressive') {
+      salvageProgressiveSaving = true;
+      try {
+        await store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft);
+        salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
+      } finally {
+        salvageProgressiveSaving = false;
+      }
+    } else {
+      salvageSimpleSaving = true;
+      try {
+        await store?.saveSalvageCheckSimple?.(salvageSimpleDraft);
+        salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
+      } finally {
+        salvageSimpleSaving = false;
+      }
+    }
+  }
+
+  async function saveGatheringCheck() {
+    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return;
+    if (gatheringResolutionMode === 'routed') {
+      gatheringRoutedSaving = true;
+      try {
+        await store?.saveGatheringCheckRouted?.(gatheringRoutedDraft);
+        gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
+      } finally {
+        gatheringRoutedSaving = false;
+      }
+    } else if (gatheringResolutionMode === 'progressive') {
+      gatheringProgressiveSaving = true;
+      try {
+        await store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft);
+        gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
+      } finally {
+        gatheringProgressiveSaving = false;
+      }
+    }
+    // d100 mode has no editable config — nothing to persist.
+  }
+
+  // The shared Checks header Save persists whichever sub-tab is active.
+  async function saveChecks() {
+    if (checksActiveTab === 'salvage') return saveSalvageCheck();
+    if (checksActiveTab === 'gathering') return saveGatheringCheck();
+    return saveCraftingCheck();
+  }
+
+  function onToggleCheckActive(kind, enabled) {
+    if (kind === 'crafting') store?.saveCraftingCheckActive?.(enabled);
+    else if (kind === 'salvage') store?.saveSalvageCheckActive?.(enabled);
+    else if (kind === 'gathering') store?.saveGatheringCheckActive?.(enabled);
+  }
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
     recipes: $viewState.recipes?.length || 0,
@@ -108,16 +673,6 @@
     categoryReferences: tagCategoryUsage.categoryReferenceCount,
     tagReferences: tagCategoryUsage.tagReferenceCount
   });
-  const topUsedCategoryExample = $derived(
-    categoryRows
-      .filter(row => row.id !== 'general' && (row.count || 0) > 0)
-      .sort((a, b) => (b.count || 0) - (a.count || 0))[0] || null
-  );
-  const topUsedTagExample = $derived(
-    tagRows
-      .filter(row => (row.count || 0) > 0)
-      .sort((a, b) => (b.count || 0) - (a.count || 0))[0] || null
-  );
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
   const selectedGatheringConditionShortcuts = $derived(buildSelectedGatheringConditionShortcuts(
@@ -129,8 +684,20 @@
       ? $viewState.gatheringConfig.systems[selectedSystemId].characterModifiers
       : []
   );
+  const selectedCurrencyUnits = $derived(
+    Array.isArray(selectedSystem?.requirements?.currency?.units)
+      ? selectedSystem.requirements.currency.units
+      : []
+  );
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
+  const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
+  const currencySpendStrategy = $derived(selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty');
+  const currencyProviderId = $derived(selectedSystem?.requirements?.currency?.providerId || '');
+  const currencyMacros = $derived(selectedSystem?.requirements?.currency?.macros || { canAfford: '', increment: '', decrement: '' });
+  const currencyProviderOptions = $derived(
+    getCurrencyProvidersForFoundrySystem(foundrySystemId).map(provider => ({ id: provider.id, label: provider.label }))
+  );
   async function onAddCharacterModifier() {
     if (!selectedSystemId) return null;
     return await store.addGatheringCharacterModifier(selectedSystemId);
@@ -146,6 +713,77 @@
   async function onDeleteCharacterModifier(modifierId) {
     if (!selectedSystemId) return;
     await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
+  }
+
+  // Character prerequisites (issue 544) — system-owned pass/fail learning gates.
+  const selectedCharacterPrerequisites = $derived(
+    Array.isArray(selectedSystem?.characterPrerequisites)
+      ? selectedSystem.characterPrerequisites
+      : []
+  );
+  const characterPrerequisitePresetsSupported = $derived(
+    ['dnd5e', 'pf2e'].includes(foundrySystemId)
+  );
+  async function onAddCharacterPrerequisite() {
+    if (!selectedSystemId) return null;
+    return await store.addCharacterPrerequisite(selectedSystemId);
+  }
+  async function onUpdateCharacterPrerequisite(prerequisiteId, patch) {
+    if (!selectedSystemId) return;
+    await store.updateCharacterPrerequisite(selectedSystemId, prerequisiteId, patch);
+  }
+  async function onDeleteCharacterPrerequisite(prerequisiteId) {
+    if (!selectedSystemId) return;
+    await store.deleteCharacterPrerequisite(selectedSystemId, prerequisiteId);
+  }
+  async function onSeedCharacterPrerequisitePresets() {
+    if (!selectedSystemId || !characterPrerequisitePresetsSupported) return;
+    await store.seedCharacterPrerequisitePresetsForSystem(selectedSystemId);
+  }
+
+  async function onAddCurrencyUnit() {
+    if (!selectedSystemId) return null;
+    return await store.addCurrencyUnit(selectedSystemId);
+  }
+  async function onUpdateCurrencyUnit(unitId, patch) {
+    if (!selectedSystemId) return;
+    await store.updateCurrencyUnit(selectedSystemId, unitId, patch);
+  }
+  async function onDeleteCurrencyUnit(unitId) {
+    if (!selectedSystemId) return;
+    await store.deleteCurrencyUnit(selectedSystemId, unitId);
+  }
+  async function onAddCurrencySubUnit(parentUnitId, subUnitId) {
+    if (!selectedSystemId) return;
+    await store.addCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+  }
+  async function onUpdateCurrencySubUnit(parentUnitId, subUnitId, amount) {
+    if (!selectedSystemId) return;
+    await store.updateCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId, amount);
+  }
+  async function onDeleteCurrencySubUnit(parentUnitId, subUnitId) {
+    if (!selectedSystemId) return;
+    await store.deleteCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+  }
+  async function onSeedCurrencyPresets() {
+    if (!selectedSystemId || !currencyPresetsSupported) return;
+    await store.seedCurrencyUnitPresets(selectedSystemId);
+  }
+  async function onSetCurrencySpendStrategy(spendStrategy) {
+    if (!selectedSystemId) return;
+    await store.setCurrencySpendStrategy(selectedSystemId, spendStrategy);
+  }
+  async function onSetCurrencyProvider(providerId) {
+    if (!selectedSystemId) return;
+    await store.setCurrencyProvider(selectedSystemId, providerId);
+  }
+  async function onSetCurrencyMacro(key, uuid) {
+    if (!selectedSystemId || !uuid) return;
+    await store.setCurrencyMacro(selectedSystemId, key, uuid);
+  }
+  async function onClearCurrencyMacro(key) {
+    if (!selectedSystemId) return;
+    await store.clearCurrencyMacro(selectedSystemId, key);
   }
 
   function characterModifierLibraryEntry(modifierId) {
@@ -420,6 +1058,62 @@
       || ($viewState.recipes || [])[0]
       || null
   );
+  // Recipe-edit deriveds read the live draft (not the persisted record) so the
+  // editor, inspector, and header chip all track unsaved staged edits.
+  // Alchemy check mode drives the alchemy recipe editor shape (decoupled from the
+  // single `complex` flag): none/simple → single ingredient set + single/labeled
+  // result sets; tiered → multi-group tier assignment (like routedByCheck).
+  const alchemyCheckMode = $derived(
+    selectedSystem?.resolutionMode === 'alchemy'
+      ? selectedSystem?.alchemy?.checkMode || 'none'
+      : null
+  );
+  // Alchemy ingredient sets are ALWAYS single (never Complex-routed); other modes
+  // read the recipe's own Complex flag. Result-group rendering is derived separately
+  // (checkMode for alchemy) so the two are no longer coupled through one flag.
+  const recipeComplex = $derived(
+    selectedSystem?.resolutionMode === 'alchemy' ? false : recipeDraft?.complex === true
+  );
+  // Alchemy Simple mode drives the Results tab's fixed two-slot editor (success +
+  // reserved failure result set).
+  const recipeAlchemySimple = $derived(alchemyCheckMode === 'simple');
+  // The routing basis is a property of the system MODE for the routed crafting
+  // modes (routedByCheck → 'check', routedByIngredients → 'ingredientSet'). Alchemy
+  // routes by the system-level check mode: tiered → 'check' (routed tier assignment),
+  // none/simple → null. The retired per-recipe provider is no longer read.
+  const recipeRoutingProvider = $derived(
+    (() => {
+      const mode = selectedSystem?.resolutionMode || 'simple';
+      if (mode === 'routedByCheck') return 'check';
+      if (mode === 'routedByIngredients') return 'ingredientSet';
+      if (mode === 'alchemy') return alchemyCheckMode === 'tiered' ? 'check' : null;
+      return null;
+    })()
+  );
+  // Progressive systems award a recipe's results in order, so the Results tab
+  // enables drag-reorder of the result rows (resolution mode is a system setting).
+  const recipeProgressive = $derived(selectedSystem?.resolutionMode === 'progressive');
+  // Alchemy enable-blocker context for the recipe editor's Validation tab (issue
+  // 549): the alchemy check mode (drives the result-selection blocker) and the
+  // cross-recipe signature conflicts touching this recipe. Both are null/[] for every
+  // non-alchemy system, so those systems gain no new checks. The conflicts recompute
+  // against the LIVE draft's ingredient sets (and the current recipe list) so the tab
+  // predicts the collision before the GM saves and clicks enable.
+  const recipeAlchemy = $derived(
+    selectedSystem?.resolutionMode === 'alchemy' ? { checkMode: alchemyCheckMode || 'none' } : null
+  );
+  const recipeSignatureConflicts = $derived.by(() => {
+    if (!recipeAlchemy || !recipeDraft?.id) return [];
+    // Reference the live recipe list so the prediction recomputes after a refresh.
+    void $viewState.recipes;
+    return store.getRecipeSignatureConflicts?.(recipeDraft.id, recipeDraft) || [];
+  });
+  // The per-recipe "restrict to specific users" editor only applies under the
+  // system's `player` recipe-visibility list mode; other modes gate visibility
+  // globally, per-knowledge, or not at all.
+  const recipePlayerListMode = $derived(selectedSystem?.recipeVisibility?.listMode === 'player');
+  const recipeEditDirty = $derived(Boolean(recipeDraft)
+    && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline));
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
   const showComponentEssences = $derived(itemCards.some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));
   const selectedComponent = $derived(
@@ -439,8 +1133,34 @@
   const canSaveEssenceEdit = $derived(essenceEditDirty === true
     && essenceEditDraft?.validName === true
     && essenceEditSaving !== true);
-  const canSaveComponentEdit = $derived(componentEditDirty === true
+  const canSaveComponentEdit = $derived(componentEditCombinedDirty === true
     && componentEditSaving !== true);
+  const canSaveRecipeEdit = $derived(recipeEditDirty === true
+    && Boolean(recipeDraft?.name?.trim())
+    && recipeEditSaving !== true);
+  const recipeKnowledgeMode = $derived(selectedSystem?.recipeVisibility?.knowledge?.mode || 'itemOrLearned');
+  const recipeItemDefinitions = $derived(selectedSystem?.recipeItemDefinitions || []);
+  // Locked recipe-item image for the Overview tab: resolve from the STAGED draft's
+  // recipeItemId against the available definitions, so staging a link change updates
+  // the preview immediately (do not read the persisted selectedRecipe projection).
+  const recipeDraftLinkedItemImage = $derived(
+    (() => {
+      const linkedId = String(recipeDraft?.recipeItemId || '');
+      if (!linkedId) return '';
+      const def = recipeItemDefinitions.find((entry) => entry.id === linkedId);
+      return def?.img || '';
+    })()
+  );
+  // The recipe-item card lives in the global inspector and is shown for every
+  // knowledge mode, including 'learned': learning a recipe requires it to link a
+  // recipe item (the book the player learns from) — `learnRecipe` /
+  // `learnRecipesFromOwnedItem` refuse a recipe with no recipe-item reference —
+  // and this inspector is the only place the link is authored. Suppressing it for
+  // 'learned' left learned-only systems with no way to make any recipe learnable.
+  const recipeInspectorVisible = $derived(currentView === 'recipe-edit'
+    && (recipeKnowledgeMode === 'item'
+      || recipeKnowledgeMode === 'learned'
+      || recipeKnowledgeMode === 'itemOrLearned'));
   const componentForEdit = $derived(currentView === 'component-edit'
     ? itemCards.find(item => item.id === selectedComponentId) || null
     : null);
@@ -448,6 +1168,23 @@
   const componentEditEssenceOptions = $derived(componentEssenceOptionsFor(componentForEdit));
   const componentEditShowTags = $derived(componentShowTagsFor(componentForEdit));
   const componentEditShowEssences = $derived(componentShowEssencesFor(componentForEdit));
+  // Progressive difficulty is authored from the right inspector but STAGED into
+  // the component editor's save flow (it persists on Save, not on change). The
+  // draft is seeded on edit-entry (editComponent); these derive its visibility,
+  // dirtiness, and the combined dirty state the Save button + route guard use.
+  const componentDifficultyShown = $derived(
+    currentView === 'component-edit'
+    && selectedSystem?.resolutionMode === 'progressive'
+    && !!componentForEdit
+  );
+  const componentDifficultyDirty = $derived(
+    componentDifficultyShown
+    && normalizeComponentDifficulty(componentDifficultyDraft)
+      !== normalizeComponentDifficulty(componentForEdit?.difficulty)
+  );
+  const componentEditCombinedDirty = $derived(
+    componentEditDirty === true || componentDifficultyDirty === true
+  );
   const environmentList = $derived($viewState.environments || []);
   const environmentValidationCount = $derived(Array.isArray($viewState.environmentValidationState?.errors)
     ? $viewState.environmentValidationState.errors.length
@@ -540,6 +1277,86 @@
       activeGatheringTab = 'environments';
     }
   });
+
+  // Crafting nav group (issue 511, PR-B redesign). The visible sub-tabs are a
+  // conditional set derived from the system's `visibilityMode` by the shared nav
+  // model (`buildCraftingNavItems`): Recipes and Settings are always present,
+  // Access appears under `restricted`, Books & Scrolls under `item`/`knowledge`.
+  // Each sub-item maps to a distinct route, so highlighting is derived from the
+  // active route via `resolveActiveCraftingTab`. The whole group is gated behind
+  // `recipesRouteEnabled` (experimental features).
+  const craftingVisibilityMode = $derived(selectedSystem?.visibilityMode || 'knowledge');
+  const recipeCount = $derived($viewState.recipes?.length || 0);
+  const recipeItemCount = $derived(recipeItemDefinitions.length);
+  const craftingNavItems = $derived(
+    buildCraftingNavItems({
+      visibilityMode: craftingVisibilityMode,
+      recipeCount,
+      recipeItemCount,
+    })
+  );
+  const isCraftingRoute = $derived(isCraftingView(currentView));
+  const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
+  // The recipe whose access grant is open on the Access surface.
+  const selectedRecipeForAccess = $derived(
+    ($viewState.recipes || []).find((recipe) => recipe.id === selectedRecipeIdForAccess) || null
+  );
+  // The projected recipe item selected on Books & Scrolls (drives the inspector).
+  const selectedRecipeItem = $derived(
+    (recipeItemDefinitions || []).find((def) => def.id === selectedRecipeItemId) || null
+  );
+  // ---- Recipe-item editor draft derivations (recipe-item-edit route) ---------
+  const recipeItemEditDirty = $derived(
+    Boolean(recipeItemDraft)
+      && JSON.stringify(recipeItemDraft) !== JSON.stringify(recipeItemDraftBaseline)
+  );
+  const canSaveRecipeItemEdit = $derived(recipeItemEditDirty === true && recipeItemEditSaving !== true);
+  // The linked linked world item for the editor's Overview preview: resolve from the
+  // DRAFT's originItemUuid (so a staged link change updates the preview) against the
+  // projected recipe item's resolved fields, then the world-item options.
+  const recipeItemEditorLinkedItem = $derived.by(() => {
+    const uuid = String(recipeItemDraft?.originItemUuid || '');
+    if (!uuid) return null;
+    const persisted = (recipeItemDefinitions || []).find((def) => def.originItemUuid === uuid);
+    if (persisted) {
+      return {
+        uuid,
+        name: persisted.resolvedName,
+        img: persisted.resolvedImg,
+        type: persisted.derivedType,
+        description: persisted.description || '',
+      };
+    }
+    const option = (worldItemOptions || []).find((item) => item.uuid === uuid);
+    return option ? { ...option } : { uuid, name: '', img: '', type: '' };
+  });
+  // Recipes contained by the edited recipe item, and the pool that can still be
+  // added. Derived from the DRAFT's `recipeIds` (staged membership), so linking and
+  // unlinking reflect live and only persist on Save.
+  const recipeItemDraftRecipeIds = $derived(
+    new Set((recipeItemDraft?.recipeIds || []).map((id) => String(id)))
+  );
+  const recipeItemEditorLinkedRecipes = $derived(
+    recipeItemDraft
+      ? ($viewState.recipes || []).filter((recipe) =>
+          recipeItemDraftRecipeIds.has(String(recipe?.id))
+        )
+      : []
+  );
+  const recipeItemEditorAvailableRecipes = $derived(
+    recipeItemDraft
+      ? ($viewState.recipes || []).filter(
+          (recipe) => !recipeItemDraftRecipeIds.has(String(recipe?.id))
+        )
+      : []
+  );
+  // The Crafting group's expansion follows the active route: it expands on
+  // entering a crafting child route and collapses on leaving, so the submenu
+  // never dangles open over unrelated views. A manual toggle from a non-crafting
+  // route sticks until the route category next changes.
+  $effect(() => {
+    craftingMenuExpanded = isCraftingRoute;
+  });
   const selectedGatheringRules = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
     rewardSelectionMode: 'highestRankedDrop',
     rewardLimit: 1,
@@ -555,6 +1372,9 @@
   // `enabled` flag wins over a stale legacy `mode` (mirrors the service / GM
   // economy-view read-compat mapping) so a disabled limit can't be resurrected.
   const selectedGatheringEconomy = $derived(selectedGatheringSystemConfig.economy || {});
+  // The gathering check editor shown is selected by the gathering economy's
+  // resolution mode (d100 → fixed, not editable; progressive/routed → editable).
+  const gatheringResolutionMode = $derived(selectedGatheringEconomy.resolutionMode || 'd100');
   const selectedGatheringTaskStaminaEnabled = $derived(
     selectedGatheringEconomy.stamina != null && Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.stamina, 'enabled')
       ? selectedGatheringEconomy.stamina.enabled === true
@@ -572,6 +1392,19 @@
   // rather than the gathering-config copy.
   const selectedGatheringSystemTools = $derived(Array.isArray($viewState.selectedSystem?.tools) ? $viewState.selectedSystem.tools : []);
   const toolsNavCount = $derived(selectedGatheringSystemTools.length);
+  // Recipe-editor tools library: enrich each tool with its backing component's
+  // name (so an unlabelled tool can fall back to the component name rather than
+  // exposing a raw id, mirroring the tool inspector's `label || component.name`
+  // resolution) and image (so the recipe Tools section and picker show the
+  // component thumbnail instead of a generic tool glyph).
+  const recipeToolsLibrary = $derived(
+    selectedGatheringSystemTools.map((tool) => {
+      const component = (selectedSystem?.managedItemOptions || []).find(
+        (item) => String(item.id) === String(tool.componentId)
+      );
+      return { ...tool, componentName: component?.name || '', componentImg: component?.img || '' };
+    })
+  );
   // Environments of the selected system, as { id, name } rows for the task
   // editor's optional default-environment select (the on-drop precedence middle
   // tier).
@@ -834,9 +1667,8 @@
   function resolutionModeLabel(mode) {
     const labels = {
       simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
-      routed: text('FABRICATE.Admin.Manager.ResolutionRouted', 'Routed'),
-      mapped: text('FABRICATE.Admin.Manager.ResolutionMappedLegacy', 'Legacy routed'),
-      tiered: text('FABRICATE.Admin.Manager.ResolutionTieredLegacy', 'Legacy routed by check'),
+      routedByIngredients: text('FABRICATE.Admin.Manager.ResolutionRoutedByIngredients', 'Routed by ingredients'),
+      routedByCheck: text('FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'),
       progressive: text('FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'),
       alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy')
     };
@@ -949,8 +1781,12 @@
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable, recipesAvailable) {
+    // The standalone `system-overview` route was folded into the `system-edit`
+    // page's Validation tab; a stale value (no system selected) falls through to
+    // the `systems` library here.
     if (!system) return 'systems';
-    if (view === 'recipes' && !recipesAvailable) return 'system-edit';
+    if (view === 'system-overview') return 'system-edit';
+    if (CRAFTING_VIEWS.includes(view) && !recipesAvailable) return 'system-edit';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
@@ -978,6 +1814,11 @@
 
   function viewTitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Title', 'Recipes');
+    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe');
+    if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle', 'Crafting settings');
+    if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access');
+    if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls');
+    if (currentView === 'recipe-item-edit') return text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Title', 'Components');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories');
@@ -988,20 +1829,23 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle', 'Travel and parties');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
+    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Title', 'Checks');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
-    if (currentView === 'environment-edit') {
-      const base = text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
-      const environmentName = String(environmentDraftForDisplay?.name || '').trim();
-      return environmentName ? `${base}: ${environmentName}` : base;
-    }
+    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings');
+    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.PageTitle', 'System Overview');
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
 
   function viewSubtitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Subtitle', 'Manage recipes for the selected crafting system.');
+    if (currentView === 'recipe-edit' && !recipeInspectorVisible) return text('FABRICATE.Admin.Manager.Recipe.EditIdentityOnlySubtitle', 'Edit identity for this recipe.');
+    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditSubtitle', 'Edit identity and the linked recipe item for this recipe.');
+    if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsHint', 'System-level crafting rules: resolution mode and recipe visibility.');
+    if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Subtitle', 'Grant individual recipes to specific characters or players.');
+    if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Subtitle', 'Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.');
+    if (currentView === 'recipe-item-edit') return text('FABRICATE.Admin.Manager.RecipeItem.EditSubtitle', 'Link a world item and recipes, then set its use and learn caps.');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditSubtitle', 'Update tags, essences, and source linkage for this component.');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Subtitle', 'Manage recipe category and item tag vocabulary for the selected crafting system.');
@@ -1013,14 +1857,12 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Travel.Subtitle', 'Manage Fabricate parties and set the current realm for the selected crafting system.');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
+    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Subtitle', 'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
-    if (currentView === 'environment-edit') {
-      const environmentDescription = String(environmentDraftForDisplay?.description || '').trim();
-      return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, tools, visibility, timing, and validation in the workspace.');
-    }
+    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected event.');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system.');
+    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.PageSubtitle', 'Edit base settings and review validation issues for the selected crafting system.');
     return text('FABRICATE.Admin.Manager.Subtitle', 'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.');
   }
 
@@ -1057,12 +1899,17 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions', 'Travel and party actions');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
+    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
     return text('FABRICATE.Admin.Manager.SystemActions', 'System actions');
   }
 
   function inspectorLabel() {
+    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.RecipeItem', 'Recipe item');
+    if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item');
+    if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Inspector', 'Grant access inspector');
+    if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Inspector', 'Selected recipe item inspector');
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Inspector', 'Selected recipe inspector');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Inspector', 'Tags and categories inspector');
@@ -1071,7 +1918,6 @@
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelInspector', 'Selected party inspector');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Inspector', 'Selected tool inspector');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Inspector', 'Selected environment inspector');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Inspector', 'System edit evidence');
     return text('FABRICATE.Admin.Manager.SelectedSystemInspector', 'Selected system inspector');
   }
 
@@ -1094,6 +1940,30 @@
     }
     essenceEditDirty = false;
     essenceEditDraft = null;
+    return true;
+  }
+
+  async function finishRecipeRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      const result = await saveRecipeDraft();
+      return result !== false;
+    }
+    // Discard: roll the draft back to the last-persisted baseline so the dirty
+    // flag clears, then let the caller proceed with navigation.
+    recipeDraft = cloneRecipeDraft(recipeDraftBaseline);
+    return true;
+  }
+
+  async function finishRecipeItemRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      const result = await saveRecipeItemDraft();
+      return result !== false;
+    }
+    // Discard: roll the draft back to the last-persisted baseline so the dirty
+    // flag clears, then let the caller proceed with navigation.
+    recipeItemDraft = cloneRecipeItemDraft(recipeItemDraftBaseline);
     return true;
   }
 
@@ -1139,7 +2009,7 @@
 
   function confirmComponentRouteExit(nextView) {
     if (activeView !== 'component-edit') return true;
-    if (componentEditDirty !== true) return true;
+    if (componentEditCombinedDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyComponentDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishComponentRouteExit);
     return finishComponentRouteExit(confirmed);
@@ -1159,6 +2029,22 @@
     const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishEssenceRouteExit);
     return finishEssenceRouteExit(confirmed);
+  }
+
+  function confirmRecipeRouteExit(nextView) {
+    if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;
+    if (recipeEditDirty !== true) return true;
+    const confirmed = store.confirmDiscardDirtyRecipeDraft?.() ?? false;
+    if (isPromise(confirmed)) return confirmed.then(finishRecipeRouteExit);
+    return finishRecipeRouteExit(confirmed);
+  }
+
+  function confirmRecipeItemRouteExit(nextView) {
+    if (activeView !== 'recipe-item-edit' || nextView === 'recipe-item-edit') return true;
+    if (recipeItemEditDirty !== true) return true;
+    const confirmed = store.confirmDiscardDirtyRecipeItemDraft?.() ?? false;
+    if (isPromise(confirmed)) return confirmed.then(finishRecipeItemRouteExit);
+    return finishRecipeItemRouteExit(confirmed);
   }
 
   function confirmGatheringTaskRouteExit(nextView) {
@@ -1193,6 +2079,24 @@
   }
 
   function continueRouteExitAfterEssence(nextView) {
+    const recipeResult = confirmRecipeRouteExit(nextView);
+    if (isPromise(recipeResult)) {
+      return recipeResult.then(value => value === false ? false : continueRouteExitAfterRecipe(nextView));
+    }
+    if (recipeResult === false) return false;
+    return continueRouteExitAfterRecipe(nextView);
+  }
+
+  function continueRouteExitAfterRecipe(nextView) {
+    const recipeItemResult = confirmRecipeItemRouteExit(nextView);
+    if (isPromise(recipeItemResult)) {
+      return recipeItemResult.then(value => value === false ? false : continueRouteExitAfterRecipeItem(nextView));
+    }
+    if (recipeItemResult === false) return false;
+    return continueRouteExitAfterRecipeItem(nextView);
+  }
+
+  function continueRouteExitAfterRecipeItem(nextView) {
     const componentResult = confirmComponentRouteExit(nextView);
     if (isPromise(componentResult)) {
       return componentResult.then(value => value === false ? false : continueRouteExitAfterComponent(nextView));
@@ -1263,8 +2167,8 @@
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools') && !selectedSystem) return;
-    if (view === 'recipes' && !recipesRouteEnabled) return;
+    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'checks') && !selectedSystem) return;
+    if ((view === 'recipes' || view === 'crafting-settings' || view === 'access' || view === 'books-scrolls' || view === 'recipe-item-edit') && !recipesRouteEnabled) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
@@ -1292,9 +2196,60 @@
     afterTruthyResult(selected, () => { activeView = 'systems'; });
   }
 
+  // Open the System Overview page (`system-edit`) on a specific tab. Bumping the
+  // nonce re-applies the requested tab in the child even when the page is already
+  // shown or the same system is re-selected, so deep links and the blocker banner
+  // can force the Validation tab open.
+  function requestSystemTab(tab) {
+    requestedSystemTab = tab === 'validation' ? 'validation' : 'settings';
+    requestedSystemTabNonce += 1;
+  }
+
   function editSystem(systemId) {
     if (!systemId) return;
-    afterTruthyResult(selectSystem(systemId, 'system-edit'), () => { activeView = 'system-edit'; });
+    afterTruthyResult(selectSystem(systemId, 'system-edit'), () => {
+      requestSystemTab('settings');
+      activeView = 'system-edit';
+    });
+  }
+
+  // The standalone overview route was folded into the System Overview page's
+  // Validation tab. Anything that asked for the old overview now opens this page
+  // with the Validation tab active.
+  function showSystemOverview() {
+    if (!selectedSystem) return;
+    afterTruthyResult(confirmRouteExit('system-edit'), () => {
+      requestSystemTab('validation');
+      activeView = 'system-edit';
+    });
+  }
+
+  // Maps a system-validation issue `kind` to the manager's deep-link selection
+  // helper + the view it routes to. This is the single source of truth the
+  // overview deep-links and the deep-link drift test both read, so an issue
+  // `nav.view`/`kind` the aggregator can emit always resolves to a real view
+  // token (the `system` kind is the overview itself and carries no deep link).
+  //
+  // `targetId(issue)` picks the id the selection helper can actually resolve:
+  // recipe/salvage use the entity's own id, but the environment editor selects
+  // by ENVIRONMENT id, so environment/task/event deep-links use the issue's
+  // `environmentId` (the task/event record id never resolves through
+  // `selectEnvironment`).
+  const OVERVIEW_DEEP_LINKS = {
+    recipe: { view: 'recipe-edit', targetId: (issue) => issue.entityId, open: (id) => editRecipe(id) },
+    environment: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
+    task: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
+    event: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
+    salvage: { view: 'component-edit', targetId: (issue) => issue.entityId, open: (id) => editComponent(id) }
+  };
+
+  function selectOverviewIssue(issue) {
+    if (!issue) return;
+    const target = OVERVIEW_DEEP_LINKS[issue.kind];
+    if (!target) return;
+    const id = target.targetId(issue);
+    if (!id) return;
+    target.open(id);
   }
 
   function backToSystemsBrowser() {
@@ -1328,6 +2283,346 @@
 
   function selectRecipe(recipeId) {
     selectedRecipeId = recipeId;
+  }
+
+  // Deep PLAIN clone for the recipe draft + baseline. Mirrors the gathering-task /
+  // event draft helpers: JSON round-trip strips reactivity and shared references so
+  // the dirty comparison and discard-revert are stable.
+  function cloneRecipeDraft(source) {
+    return source ? JSON.parse(JSON.stringify(source)) : null;
+  }
+
+  // Stage an edit into the in-flight draft without persisting. Every editor handler
+  // routes through here; Save commits the whole draft in one call.
+  function patchRecipeDraft(patch) {
+    if (!recipeDraft || !patch) return;
+    recipeDraft = { ...recipeDraft, ...patch };
+  }
+
+  function editRecipe(recipeId = selectedRecipe?.id) {
+    afterTruthyResult(confirmRouteExit('recipe-edit'), () => {
+      selectedRecipeId = recipeId;
+      recipeEditSaving = false;
+      recipeSaveFailed = false;
+      // Seed both draft and baseline from the persisted record (deep plain clones).
+      const source = ($viewState.recipes || []).find(recipe => recipe.id === recipeId) || null;
+      recipeDraft = cloneRecipeDraft(source);
+      recipeDraftBaseline = cloneRecipeDraft(source);
+      activeView = 'recipe-edit';
+    });
+  }
+
+  function clearRecipeDraft() {
+    recipeDraft = null;
+    recipeDraftBaseline = null;
+    recipeSaveFailed = false;
+  }
+
+  function backToRecipesBrowse() {
+    afterTruthyResult(confirmRouteExit('recipes'), () => {
+      activeView = 'recipes';
+    });
+  }
+
+  // Commit the staged draft in a single updateRecipe call. allowIncomplete keeps a
+  // shell's empty ingredients/results from blocking the save. On success the
+  // baseline advances (clearing dirty) and we return to the browser; on failure the
+  // store toasts and we surface an in-view warning.
+  async function saveRecipeDraft() {
+    if (recipeEditSaving) return false;
+    if (!recipeDraft?.id) return false;
+    recipeEditSaving = true;
+    recipeSaveFailed = false;
+    try {
+      const result = await store.updateRecipe?.(recipeDraft.id, recipeDraft, { allowIncomplete: true });
+      if (result === false) {
+        recipeSaveFailed = true;
+        return false;
+      }
+      recipeDraftBaseline = cloneRecipeDraft(recipeDraft);
+      activeView = 'recipes';
+      return result;
+    } catch (err) {
+      recipeSaveFailed = true;
+      return false;
+    } finally {
+      recipeEditSaving = false;
+    }
+  }
+
+  async function createRecipe() {
+    if (!selectedSystemId) return;
+    const created = await store.createRecipe?.();
+    if (created?.id) editRecipe(created.id);
+  }
+
+  async function deleteRecipeFromEdit() {
+    if (!selectedRecipeId || recipeEditSaving) return;
+    const result = await store.deleteRecipe?.(selectedRecipeId);
+    if (result === false) return; // cancelled or failed → stay in the editor
+    clearRecipeDraft();
+    activeView = 'recipes';
+  }
+
+  // The on/off toggle is the one immediate exception: enabling validates against the
+  // PERSISTED recipe, so it commits straight away (no staging, no dirty). On success
+  // both draft and baseline sync to the new state so it never registers as dirty; on
+  // failure the store toasts and we leave the toggle as-is.
+  async function handleToggleRecipeEnabled() {
+    if (!recipeDraft?.id) return;
+    const next = recipeDraft.enabled === false;
+    const ok = await store.toggleRecipeEnabled?.(recipeDraft.id, next);
+    if (ok === false) return;
+    recipeDraft = { ...recipeDraft, enabled: next };
+    recipeDraftBaseline = recipeDraftBaseline ? { ...recipeDraftBaseline, enabled: next } : recipeDraftBaseline;
+  }
+
+  async function handleAddRecipeItem(itemUuid) {
+    // Adding the definition to the system library is an immediate side effect; the
+    // resulting link id is staged via handleSetRecipeItem.
+    return store.addRecipeItemFromUuid?.(selectedSystemId, itemUuid);
+  }
+
+  // Set the recipe's book membership from the recipe editor (issue 511 many-to-many).
+  // Membership lives on the book, so this reconciles the definitions' `recipeIds`
+  // directly (no "Recipe updated" toast): linking ADDS the recipe to `recipeItemId`;
+  // unlinking (null) REMOVES it from the currently-shown book. Full multi-membership
+  // is managed on the book's Contents tab.
+  async function handleSetRecipeItem(recipeItemId) {
+    const rid = recipeDraft?.id;
+    if (!rid) return false;
+    const liveRecipe = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    const membership = new Set((liveRecipe?.recipeItemIds || []).map((id) => String(id)));
+    if (recipeItemId) {
+      membership.add(String(recipeItemId));
+    } else {
+      const shown = String(liveRecipe?.recipeItemId || '');
+      if (shown) membership.delete(shown);
+    }
+    await store.setRecipeBookMembership?.(rid, [...membership]);
+    // The change is persisted live (book-side), so re-sync the draft's projected
+    // membership on BOTH draft and baseline — keeping the recipe-item card current
+    // without marking the recipe draft dirty for a book change.
+    const updated = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    if (updated) {
+      const patch = {
+        recipeItemId: updated.recipeItemId || '',
+        recipeItemIds: Array.isArray(updated.recipeItemIds) ? updated.recipeItemIds : [],
+      };
+      if (recipeDraft) recipeDraft = { ...recipeDraft, ...patch };
+      if (recipeDraftBaseline) recipeDraftBaseline = { ...recipeDraftBaseline, ...patch };
+    }
+    return true;
+  }
+
+  // Remove ONE book from this recipe's membership (issue 511 many-to-many) — used
+  // by the recipe-item inspector's per-book unlink. Other linked books are kept.
+  async function handleRemoveRecipeItem(recipeItemId) {
+    const rid = recipeDraft?.id;
+    if (!rid || !recipeItemId) return false;
+    const liveRecipe = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    const membership = new Set((liveRecipe?.recipeItemIds || []).map((id) => String(id)));
+    membership.delete(String(recipeItemId));
+    await store.setRecipeBookMembership?.(rid, [...membership]);
+    const updated = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    if (updated) {
+      const patch = {
+        recipeItemId: updated.recipeItemId || '',
+        recipeItemIds: Array.isArray(updated.recipeItemIds) ? updated.recipeItemIds : [],
+      };
+      if (recipeDraft) recipeDraft = { ...recipeDraft, ...patch };
+      if (recipeDraftBaseline) recipeDraftBaseline = { ...recipeDraftBaseline, ...patch };
+    }
+    return true;
+  }
+
+  function handleSetRecipeCategory(category) {
+    patchRecipeDraft({ category });
+    return true;
+  }
+
+  // Enter multi-step: seed Step 1 from the draft's current top-level ingredients /
+  // results / tools so an already-craftable recipe stays craftable (the engine only
+  // falls back to top-level fields when the steps array is empty). New/empty recipes
+  // simply start with one named, empty step.
+  // Draft-staged steps need a stable id up front: step-scoped edits (ingredient
+  // sets, results, tools, duration) route by step id, and the store only assigns
+  // ids on save. Without one, an id-less step's edits misroute to the recipe scope.
+  function newStepId() {
+    return globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  // Mint an id for a recipe sub-entity (ingredient set / result group). Mirrors the
+  // section cards' eager-id pattern; routing keys these by id.
+  function recipeEntityId() {
+    return globalThis.foundry?.utils?.randomID?.() || `id-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function ensureEntityId(entry) {
+    return entry && !entry.id ? { ...entry, id: recipeEntityId() } : entry;
+  }
+
+  // Backfill ids on a scope's ingredient sets / result groups. A Simple-mode
+  // placeholder can be staged id-less; switching to Complex routes by id, so heal
+  // any id-less entry up front (returns only the keys that exist on the scope).
+  function backfillScopeIds(scope) {
+    const out = {};
+    if (Array.isArray(scope?.ingredientSets)) out.ingredientSets = scope.ingredientSets.map(ensureEntityId);
+    if (Array.isArray(scope?.resultGroups)) out.resultGroups = scope.resultGroups.map(ensureEntityId);
+    return out;
+  }
+
+  function handleEnterMultiStep() {
+    if (!recipeDraft) return false;
+    const seeded = {
+      id: newStepId(),
+      name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} 1`,
+      description: '',
+      ingredientSets: recipeDraft.ingredientSets || [],
+      resultGroups: recipeDraft.resultGroups || [],
+      toolIds: recipeDraft.toolIds || []
+    };
+    patchRecipeDraft({ steps: [seeded] });
+    return true;
+  }
+
+  // Reverting multi-step → single-step discards the per-step authoring, so warn
+  // before staging the empty steps array (engine falls back to top-level fields).
+  async function handleRevertToSingleStep() {
+    if (!recipeDraft) return false;
+    const name = String(recipeDraft.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
+    const confirmed = await store.confirmRecipeAction?.({
+      title: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'),
+      content: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name })
+    });
+    if (!confirmed) return false;
+    patchRecipeDraft({ steps: [] });
+    return true;
+  }
+
+  // Switch a recipe between Simple and Complex. Going Complex is a pure flag flip.
+  // Going Simple may drop extra sets/results across every scope (recipe-level and
+  // each step), so when anything would be removed we warn first, then stage the trim.
+  async function handleSetRecipeComplexity(complex) {
+    if (!recipeDraft) return false;
+    if (complex === true) {
+      // Entering Complex exposes per-set/per-group routing, so heal any id-less
+      // Simple-authored entry now (across every scope) rather than waiting for save.
+      const complexSteps = Array.isArray(recipeDraft.steps) ? recipeDraft.steps : [];
+      const patch = { complex: true };
+      if (complexSteps.length > 0) {
+        patch.steps = complexSteps.map((step) => ({ ...step, ...backfillScopeIds(step) }));
+      } else {
+        Object.assign(patch, backfillScopeIds(recipeDraft));
+      }
+      // Alchemy no longer routes via a recipe-level provider (retired for the
+      // system-level `alchemy.checkMode`), so entering Complex seeds nothing on an
+      // alchemy recipe — and the alchemy editor never exposes the Complex toggle
+      // anyway (its shape is derived from `alchemy.checkMode`).
+      patchRecipeDraft(patch);
+      return true;
+    }
+
+    const scopeHasExtras = (scope) => {
+      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+      return ingredientSets.length > 1 || resultGroups.length > 1;
+    };
+    const steps = Array.isArray(recipeDraft.steps) ? recipeDraft.steps : [];
+    // A multi-step recipe crafts from its steps (top-level sets are the single-step
+    // fallback), so only the scope we actually trim should drive the confirm.
+    const hasExtras = steps.length > 0 ? steps.some(scopeHasExtras) : scopeHasExtras(recipeDraft);
+
+    if (!hasExtras) {
+      patchRecipeDraft({ complex: false });
+      return true;
+    }
+
+    const name = String(recipeDraft.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
+    const perStep = steps.length > 0 ? localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimplePerStep') : '';
+    const confirmed = await store.confirmRecipeAction?.({
+      title: localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleTitle'),
+      content: localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleContent', { name, perStep })
+    });
+    if (!confirmed) return false;
+
+    const trimScope = (scope) => {
+      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+      return {
+        ingredientSets: ingredientSets.slice(0, 1),
+        resultGroups: resultGroups.slice(0, 1)
+      };
+    };
+
+    const patch = { complex: false };
+    if (steps.length > 0) {
+      patch.steps = steps.map((step) => ({ ...step, ...trimScope(step) }));
+    } else {
+      const trimmed = trimScope(recipeDraft);
+      patch.ingredientSets = trimmed.ingredientSets;
+      patch.resultGroups = trimmed.resultGroups;
+    }
+    patchRecipeDraft(patch);
+    return true;
+  }
+
+  function currentSteps() {
+    return Array.isArray(recipeDraft?.steps) ? [...recipeDraft.steps] : [];
+  }
+
+  function handleAddStep() {
+    if (!recipeDraft) return false;
+    const steps = currentSteps();
+    steps.push({ id: newStepId(), name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`, description: '' });
+    patchRecipeDraft({ steps });
+    return true;
+  }
+
+  function handleReorderSteps(from, to) {
+    if (!recipeDraft) return false;
+    const steps = currentSteps();
+    if (from < 0 || to < 0 || from >= steps.length || to >= steps.length || from === to) return false;
+    const [moved] = steps.splice(from, 1);
+    steps.splice(to, 0, moved);
+    patchRecipeDraft({ steps });
+    return true;
+  }
+
+  function handleUpdateStep(stepId, patch) {
+    if (!recipeDraft || !patch) return false;
+    const steps = currentSteps().map(step => (step.id === stepId ? { ...step, ...patch } : step));
+    patchRecipeDraft({ steps });
+    return true;
+  }
+
+  // Deleting a step removes the whole step (its ingredients, results, and tools), so
+  // warn with wording contextual to the tab the delete came from
+  // ('overview' | 'ingredients' | 'results' | 'tools'). Removing the last step
+  // reverts to single-step (empty steps array → top-level fallback). Then stage it.
+  async function handleDeleteStep(stepId, context = 'overview') {
+    if (!recipeDraft) return false;
+    const steps = currentSteps();
+    const step = steps.find(entry => entry?.id === stepId);
+    if (!step) return false;
+    const name = String(step.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedStep', 'this step');
+    const alsoDeleted = localize({
+      ingredients: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoIngredients',
+      results: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoResults',
+      tools: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoTools'
+    }[context] || 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoAll');
+    const confirmed = await store.confirmRecipeAction?.({
+      title: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'),
+      content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted })
+    });
+    if (!confirmed) return false;
+    patchRecipeDraft({ steps: steps.filter(entry => entry?.id !== stepId) });
+    return true;
+  }
+
+  function recipeEditSaveLabel() {
+    if (recipeEditSaving) return text('FABRICATE.Admin.Manager.Recipe.Saving', 'Saving...');
+    return text('FABRICATE.Admin.Manager.Recipe.Save', 'Save recipe');
   }
 
   function selectComponent(componentId) {
@@ -1382,14 +2677,6 @@
     store.deleteSystem?.(systemId);
   }
 
-  function importRecipes() {
-    store.importRecipes?.();
-  }
-
-  function exportRecipes() {
-    store.exportRecipes?.();
-  }
-
   function duplicateRecipe(recipeId = selectedRecipe?.id) {
     if (!recipeId) return;
     store.duplicateRecipe?.(recipeId);
@@ -1415,6 +2702,10 @@
       selectedComponentId = itemId;
       componentEditDirty = false;
       componentEditDraft = null;
+      // Seed the staged difficulty from the component's persisted value so the
+      // right-inspector input opens in sync and starts clean.
+      const entryItem = itemCards.find((item) => String(item.id) === String(itemId));
+      componentDifficultyDraft = normalizeComponentDifficulty(entryItem?.difficulty);
       activeView = 'component-edit';
     });
   }
@@ -1436,7 +2727,13 @@
     if (componentEditSaving || !itemId) return false;
     componentEditSaving = true;
     try {
-      const result = await store.updateComponent?.(itemId, updates);
+      // Fold the staged progressive-difficulty value into the same update so it
+      // persists through the editor's Save flow (only when the difficulty input
+      // is shown for this progressive system).
+      const merged = componentDifficultyShown
+        ? { ...(updates || {}), difficulty: normalizeComponentDifficulty(componentDifficultyDraft) }
+        : updates;
+      const result = await store.updateComponent?.(itemId, merged);
       if (result === false) return false;
       componentEditDirty = false;
       componentEditDraft = null;
@@ -1454,12 +2751,29 @@
     services?.onReplaceSource?.(itemId, data);
   }
 
+  // Coerce a raw difficulty value to the persisted shape: an integer >= 1, or
+  // null (cleared) for blank / sub-1 / non-integer / invalid input. Used to both
+  // stage and compare the draft against the persisted component value.
+  function normalizeComponentDifficulty(value) {
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    const numeric = Math.trunc(Number(value));
+    return Number.isFinite(numeric) && numeric >= 1 ? numeric : null;
+  }
+
+  // Stage a progressive-difficulty edit from the right inspector. This does NOT
+  // persist — the value rides along with the component editor's draft and is
+  // written on Save (see saveComponentEdit), so its dirty state and the Save
+  // button stay in sync with the rest of the editor.
+  function stageComponentDifficulty(value) {
+    componentDifficultyDraft = value;
+  }
+
   function unlinkComponentSource(itemId = selectedComponent?.id) {
     if (!itemId) return;
     services?.onUnlinkSource?.(itemId);
   }
 
-  function openComponentSource(uuid = selectedComponent?.sourceUuidDisplay) {
+  function openComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
     if (!uuid) return;
     services?.onOpenSource?.(uuid);
   }
@@ -1939,14 +3253,18 @@
 
   async function addToolFromDrop(data) {
     if (!data) return false;
+    // A managed-component drop still links the tool to that component (whetstone / component-
+    // linked tool).
     if (data.type === 'FabricateManagedComponent') {
       const componentId = data.componentId || data.id;
       if (!componentId) return false;
       return store.addToolToDraft?.({ componentId }) ?? false;
     }
-    const item = await services?.importSingleManagedItemFromDrop?.(data);
-    if (!item?.id) return false;
-    return store.addToolToDraft?.({ componentId: item.id }) ?? false;
+    // A raw Item drop creates a FIRST-CLASS item-sourced tool from the Item uuid (issue 561,
+    // B1) — no component import. The tool carries its own source refs + snapshot and a null
+    // componentId.
+    if (!data.uuid) return false;
+    return (await store.addToolFromUuidToDraft?.(data.uuid)) ?? false;
   }
 
   function gatheringConditionOptions(kind) {
@@ -2118,6 +3436,193 @@
     gatheringMenuExpanded = !gatheringMenuExpanded;
   }
 
+  // Crafting nav group handlers (issue 511), mirroring the gathering group. Route
+  // exit runs through `confirmRouteExit` (the Manager confirm-discard guard) via
+  // `setView`/`afterTruthyResult`.
+  function openCraftingSection(tabId = 'recipes') {
+    if (!recipesRouteEnabled) return;
+    const item = craftingNavItems.find(tab => tab.id === tabId) || craftingNavItems[0];
+    const nextView = item?.view || 'recipes';
+    afterTruthyResult(confirmRouteExit(nextView), () => {
+      activeView = nextView;
+      craftingMenuExpanded = true;
+    });
+  }
+
+  function activateCraftingParent() {
+    if (isCraftingRoute) {
+      craftingMenuExpanded = true;
+      return;
+    }
+    openCraftingSection('recipes');
+  }
+
+  // ---- Books & Scrolls surface handlers (issue 511, PR-B redesign) ----------
+  // Select a recipe item row (opens the ItemPageInspector aside).
+  function selectRecipeItem(recipeItemId) {
+    selectedRecipeItemId = recipeItemId;
+  }
+
+  // The ItemPageInspector quick-limit toggle emits a boolean; turn it into the
+  // right caps patch for the active visibility mode (live-apply, no draft). Item
+  // mode caps uses; every other mode caps learning.
+  function toggleRecipeItemQuickLimit(recipeItemId, limited) {
+    const patch = craftingVisibilityMode === 'item'
+      ? { item: { limitUses: limited === true, maxUses: 1 } }
+      : { learn: { limitLearning: limited === true, learnScope: 'perInstance', learnsAllowed: 1 } };
+    store.updateRecipeItemCaps?.(recipeItemId, patch);
+  }
+
+  // Deep PLAIN clone for the recipe-item draft + baseline. Mirrors the recipe
+  // draft helpers: JSON round-trip strips reactivity and shared references so the
+  // dirty comparison and discard-revert are stable.
+  function cloneRecipeItemDraft(source) {
+    return source ? JSON.parse(JSON.stringify(source)) : null;
+  }
+
+  // Recursively deep-merge a partial patch into the recipe-item draft. The editor
+  // emits nested caps patches (`{ caps: { item|learn: {...} } }`), so a shallow
+  // spread would clobber sibling cap fields; merge object values, replace scalars.
+  function deepMergeDraft(base, patch) {
+    const result = { ...(base || {}) };
+    for (const [key, value] of Object.entries(patch || {})) {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        result[key] = deepMergeDraft(result[key], value);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  function patchRecipeItemDraft(patch) {
+    if (!recipeItemDraft || !patch) return;
+    recipeItemDraft = deepMergeDraft(recipeItemDraft, patch);
+  }
+
+  // Open the full-window recipe-item editor for a definition (recipe-item-edit
+  // route). Seeds both draft and baseline from the persisted projection and loads
+  // the world-item options so the Overview tab's item picker has candidates.
+  function editRecipeItem(recipeItemId) {
+    if (!recipesRouteEnabled) return;
+    afterTruthyResult(confirmRouteExit('recipe-item-edit'), () => {
+      selectedRecipeItemId = recipeItemId;
+      recipeItemEditSaving = false;
+      recipeItemSaveFailed = false;
+      recipeItemActiveTab = 'overview';
+      const source = (recipeItemDefinitions || []).find((def) => def.id === recipeItemId) || null;
+      recipeItemDraft = cloneRecipeItemDraft(source);
+      recipeItemDraftBaseline = cloneRecipeItemDraft(source);
+      activeView = 'recipe-item-edit';
+      craftingMenuExpanded = true;
+      Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
+        worldItemOptions = options || [];
+      });
+    });
+  }
+
+  function clearRecipeItemDraft() {
+    recipeItemDraft = null;
+    recipeItemDraftBaseline = null;
+    recipeItemSaveFailed = false;
+  }
+
+  // Commit the staged recipe-item draft in a single updateRecipeItemDefinition
+  // call (via the store's saveRecipeItem wrapper). On success the baseline advances
+  // (clearing dirty) and we return to Books & Scrolls; on failure we surface a flag.
+  async function saveRecipeItemDraft() {
+    if (recipeItemEditSaving) return false;
+    if (!recipeItemDraft?.id) return false;
+    recipeItemEditSaving = true;
+    recipeItemSaveFailed = false;
+    try {
+      const result = await store.saveRecipeItem?.(recipeItemDraft.id, {
+        enabled: recipeItemDraft.enabled !== false,
+        originItemUuid: recipeItemDraft.originItemUuid ?? null,
+        recipeIds: Array.isArray(recipeItemDraft.recipeIds) ? recipeItemDraft.recipeIds : [],
+        caps: recipeItemDraft.caps || {},
+      });
+      if (result === false) {
+        recipeItemSaveFailed = true;
+        return false;
+      }
+      recipeItemDraftBaseline = cloneRecipeItemDraft(recipeItemDraft);
+      activeView = 'books-scrolls';
+      return result;
+    } catch (err) {
+      recipeItemSaveFailed = true;
+      return false;
+    } finally {
+      recipeItemEditSaving = false;
+    }
+  }
+
+  async function deleteRecipeItemFromEdit() {
+    if (!recipeItemDraft?.id || recipeItemEditSaving) return;
+    const result = await store.deleteRecipeItemDefinition?.(recipeItemDraft.id);
+    if (result === false) return; // cancelled or failed → stay in the editor
+    clearRecipeItemDraft();
+    activeView = 'books-scrolls';
+  }
+
+  function backToBooksScrolls() {
+    afterTruthyResult(confirmRouteExit('books-scrolls'), () => {
+      activeView = 'books-scrolls';
+    });
+  }
+
+  // Link / unlink the linked world item behind the edited recipe item (staged).
+  function linkRecipeItemSource(uuid) {
+    patchRecipeItemDraft({ originItemUuid: uuid || null });
+  }
+
+  function unlinkRecipeItemSource() {
+    patchRecipeItemDraft({ originItemUuid: null });
+  }
+
+  // Add / remove a recipe on the edited book. Membership lives on the book, so these
+  // STAGE into the recipe-item draft's `recipeIds` (persisted on Save, reverted on
+  // Discard) rather than editing the recipe directly — no "Recipe updated" toast.
+  function linkRecipeToItem(recipeId) {
+    if (!recipeItemDraft?.id || !recipeId) return;
+    const next = new Set((recipeItemDraft.recipeIds || []).map((id) => String(id)));
+    next.add(String(recipeId));
+    patchRecipeItemDraft({ recipeIds: [...next] });
+  }
+
+  function unlinkRecipeFromItem(recipeId) {
+    if (!recipeItemDraft?.id || !recipeId) return;
+    const next = (recipeItemDraft.recipeIds || [])
+      .map((id) => String(id))
+      .filter((id) => id !== String(recipeId));
+    patchRecipeItemDraft({ recipeIds: next });
+  }
+
+  // Create a new recipe item: open the world-item picker, add the picked item as a
+  // definition, then open its editor. Live side effect + navigation.
+  async function createRecipeItem() {
+    if (!recipesRouteEnabled) return;
+    worldItemOptions = (await services?.getWorldItemOptions?.()) || [];
+    itemPickerOpen = true;
+  }
+
+  async function pickRecipeItemFromUuid(uuid) {
+    itemPickerOpen = false;
+    if (!uuid) return;
+    const created = await store.addRecipeItemFromUuid?.(selectedSystemId, uuid);
+    const newId = typeof created === 'string' ? created : created?.item?.id || created?.id;
+    if (newId) editRecipeItem(newId);
+  }
+
+  function toggleCraftingMenu(event) {
+    event?.stopPropagation?.();
+    if (isCraftingRoute) {
+      craftingMenuExpanded = true;
+      return;
+    }
+    craftingMenuExpanded = !craftingMenuExpanded;
+  }
+
   function environmentListIndex(environmentId) {
     return environmentList.findIndex(environment => environment.id === environmentId);
   }
@@ -2131,14 +3636,14 @@
     return index >= 0 && index < environmentList.length - 1;
   }
 
-  function copyComponentSource(uuid = selectedComponent?.sourceUuidDisplay) {
+  function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
     if (!uuid) return;
     services?.onCopySourceUuid?.(uuid);
   }
 
   function selectedEssenceSourceUuid() {
     if (!selectedEssenceForInspector?.associatedItem) return '';
-    return selectedEssenceForInspector.sourceItemUuid || selectedEssenceForInspector.associatedItem.sourceItemUuid || '';
+    return selectedEssenceForInspector.sourceItemUuid || selectedEssenceForInspector.associatedItem.originItemUuid || '';
   }
 
   function copySelectedEssenceSource() {
@@ -2238,11 +3743,20 @@
   }
 
   function recipeImage(recipe) {
-    return recipe?.img || 'icons/svg/item-bag.svg';
+    return recipe?.recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
   }
 
   function componentImage(item) {
     return item?.img || 'icons/svg/item-bag.svg';
+  }
+
+  const INSPECTOR_DESCRIPTION_LIMIT = 160;
+
+  function truncateDescription(description) {
+    if (typeof description !== 'string') return '';
+    const trimmed = description.trim();
+    if (trimmed.length <= INSPECTOR_DESCRIPTION_LIMIT) return trimmed;
+    return `${trimmed.slice(0, INSPECTOR_DESCRIPTION_LIMIT).trimEnd()}…`;
   }
 
   function environmentName(environment) {
@@ -2261,7 +3775,7 @@
     // `img` is kept as a fallback for when the scene is unlinked.
     const sceneImage = environmentSceneImage(environment);
     if (sceneImage) return sceneImage;
-    return String(environment?.img || '').trim() || 'icons/svg/item-bag.svg';
+    return String(environment?.img || '').trim() || DEFAULT_GATHERING_ENVIRONMENT_IMG;
   }
 
   function hasEnvironmentImage(environment) {
@@ -2350,7 +3864,7 @@
   }
 
   function gatheringTaskImage(task) {
-    return task?.img || 'icons/svg/item-bag.svg';
+    return task?.img || DEFAULT_GATHERING_TASK_IMG;
   }
 
   function gatheringTaskDropRows(task) {
@@ -2812,7 +4326,35 @@
         {/if}
         {#if currentView === 'recipes'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
+        {/if}
+        {#if currentView === 'crafting-settings'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Settings', 'Settings')}</span>
+        {/if}
+        {#if currentView === 'access'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Nav.Access', 'Access')}</span>
+        {/if}
+        {#if currentView === 'books-scrolls'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</span>
+        {/if}
+        {#if currentView === 'recipe-item-edit'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={backToBooksScrolls}>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.RecipeItem.EditBreadcrumb', 'Edit recipe item')}</span>
         {/if}
         {#if currentView === 'components'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -2834,6 +4376,14 @@
             ? text('FABRICATE.Admin.Manager.Essence.CreateBreadcrumb', 'Create essence')
             : text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span>
         {/if}
+        {#if currentView === 'recipe-edit'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={backToRecipesBrowse}>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', 'Edit recipe')}</span>
+        {/if}
         {#if currentView === 'component-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToComponentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</button>
@@ -2848,7 +4398,7 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToEnvironmentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{viewTitle()}</span>
+          <span>{text('FABRICATE.Admin.Manager.Environment.EditBreadcrumb', 'Edit environment')}</span>
         {/if}
         {#if currentView === 'gathering-task-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -2866,9 +4416,13 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
         {/if}
+        {#if currentView === 'checks'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
+        {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.SystemEdit.Breadcrumb', 'System settings')}</span>
+          <span>{text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')}</span>
         {/if}
       </nav>
       <h1 class="manager-title">{viewTitle()}</h1>
@@ -2890,18 +4444,46 @@
     {#if currentView !== 'tools'}
     <div class="manager-header-actions" aria-label={headerActionsLabel()}>
       {#if currentView === 'recipes'}
-        <button type="button" class="manager-button" onclick={importRecipes} disabled={!selectedSystemId}>
-          <i class="fas fa-file-import" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
+        <button type="button" class="manager-button is-primary" onclick={createRecipe} disabled={!selectedSystemId}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
         </button>
-        <button type="button" class="manager-button" onclick={exportRecipes} disabled={!selectedSystemId}>
-          <i class="fas fa-file-export" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
+      {:else if currentView === 'recipe-edit'}
+        {#if recipeEditDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</span>
+        {/if}
+        <button type="button" class="manager-button" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
+        </button>
+        <button type="button" class="manager-button is-danger" onclick={deleteRecipeFromEdit} disabled={!selectedRecipeId || recipeEditSaving} title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}>
+          <i class="fas fa-trash" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
+        </button>
+        <button type="button" class="manager-button is-primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
+          <i class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{recipeEditSaveLabel()}</span>
+        </button>
+      {:else if currentView === 'recipe-item-edit'}
+        {#if recipeItemEditDirty}
+          <span class="manager-chip is-warning" data-recipe-item-dirty>{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</span>
+        {/if}
+        <button type="button" class="manager-button" data-recipe-item-back onclick={backToBooksScrolls} disabled={recipeItemEditSaving}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.RecipeItem.BackToBrowse', 'Back to Books & Scrolls')}</span>
+        </button>
+        <button type="button" class="manager-button is-danger" data-recipe-item-delete onclick={deleteRecipeItemFromEdit} disabled={!recipeItemDraft?.id || recipeItemEditSaving} title={text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}>
+          <i class="fas fa-trash" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}</span>
+        </button>
+        <button type="button" class="manager-button is-primary" data-recipe-item-save onclick={saveRecipeItemDraft} disabled={!canSaveRecipeItemEdit}>
+          <i class={recipeItemEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
         </button>
       {:else if currentView === 'components'}
         <!-- no header actions for the components list -->
       {:else if currentView === 'component-edit'}
-        {#if componentEditDirty}
+        {#if componentEditCombinedDirty}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}</span>
         {/if}
         <button type="button" class="manager-button" onclick={cancelComponentEdit} disabled={componentEditSaving}>
@@ -2914,6 +4496,14 @@
         </button>
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
+      {:else if currentView === 'checks'}
+        {#if checksDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
+        {/if}
+        <button type="button" class="manager-button is-primary" data-checks-save onclick={saveChecks} disabled={!checksDirty || checksSaving}>
+          <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
+        </button>
       {:else if currentView === 'essences'}
         <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -3092,16 +4682,59 @@
 
       <nav class="manager-nav" aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}>
         {#if selectedSystem}
-          <button type="button" class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`} aria-current={currentView === 'system-edit' ? 'page' : undefined} onclick={() => editSystem(selectedSystem.id)}>
-            <i class="fas fa-cog" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System settings')}</span>
+          <button type="button" class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`} aria-current={currentView === 'system-edit' ? 'page' : undefined} data-nav-system-edit onclick={() => editSystem(selectedSystem.id)}>
+            <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')}</span>
+            {#if systemOverviewCount > 0}
+              <span class="manager-nav-count" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
+            {/if}
           </button>
           {#if recipesRouteEnabled}
-            <button type="button" class={`manager-nav-button ${currentView === 'recipes' ? 'is-active' : ''}`} aria-current={currentView === 'recipes' ? 'page' : undefined} onclick={() => setView('recipes')}>
-              <i class="fas fa-scroll" aria-hidden="true"></i>
-              <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
-              <span class="manager-nav-count">{$viewState.recipes?.length || 0}</span>
-            </button>
+            <div class={`manager-nav-group ${craftingMenuExpanded ? 'is-expanded' : ''}`}>
+              <button
+                type="button"
+                class="manager-nav-button manager-nav-parent"
+                id="manager-nav-crafting"
+                aria-current={isCraftingRoute ? 'page' : undefined}
+                aria-expanded={craftingMenuExpanded}
+                onclick={activateCraftingParent}
+              >
+                <i class="fas fa-hammer" aria-hidden="true"></i>
+                <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
+                <span class="manager-nav-count">{$viewState.recipes?.length || 0}</span>
+              </button>
+              <button
+                type="button"
+                class="manager-nav-toggle"
+                aria-label={craftingMenuExpanded
+                  ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
+                  : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
+                aria-controls="manager-crafting-submenu"
+                aria-expanded={craftingMenuExpanded}
+                onclick={toggleCraftingMenu}
+              >
+                <i class={craftingMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+              </button>
+              {#if craftingMenuExpanded}
+                <div class="manager-nav-submenu" id="manager-crafting-submenu" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}>
+                  {#each craftingNavItems as craftingItem (craftingItem.id)}
+                    <button
+                      type="button"
+                      class={`manager-nav-subitem ${isCraftingRoute && activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
+                      id={`manager-crafting-nav-${craftingItem.id}`}
+                      aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id ? 'page' : undefined}
+                      onclick={() => openCraftingSection(craftingItem.id)}
+                    >
+                      <i class={craftingItem.icon} aria-hidden="true"></i>
+                      <span class="manager-nav-label">{text(craftingItem.labelKey, craftingItem.labelFallback)}</span>
+                      {#if craftingItem.count != null}
+                        <span class="manager-nav-count">{craftingItem.count}</span>
+                      {/if}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
           {/if}
           <button type="button" class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`} aria-current={currentView === 'components' || currentView === 'component-edit' ? 'page' : undefined} onclick={() => setView('components')}>
             <i class="fas fa-boxes" aria-hidden="true"></i>
@@ -3124,6 +4757,10 @@
             <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
             <span class="manager-nav-count">{toolsNavCount}</span>
+          </button>
+          <button type="button" class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`} aria-current={currentView === 'checks' ? 'page' : undefined} onclick={() => setView('checks')}>
+            <i class="fas fa-dice-d20" aria-hidden="true"></i>
+            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
           </button>
           {#if canShowEnvironments}
             <div class={`manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
@@ -3173,7 +4810,7 @@
             </div>
           {/if}
         {/if}
-        {#each visiblePlaceholderViews as view}
+        {#each visiblePlaceholderViews as view (view.labelKey)}
           <button type="button" class="manager-nav-button" disabled title={text('FABRICATE.Admin.Manager.PlannedView', '{view} is planned for a future release.').replace('{view}', text(view.labelKey, view.fallback))}>
             <i class={view.icon} aria-hidden="true"></i>
             <span class="manager-nav-label">{text(view.labelKey, view.fallback)}</span>
@@ -3298,11 +4935,45 @@
           />
         </section>
       </main>
+    {:else if currentView === 'checks' && selectedSystem}
+      <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}>
+        <section class="manager-environment-editor-shell">
+          <ChecksView
+            resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+            alchemyCheckMode={selectedSystem?.alchemy?.checkMode || 'none'}
+            craftingCheck={checkRoutedDraft}
+            craftingCheckSimple={checkSimpleDraft}
+            craftingCheckProgressive={checkProgressiveDraft}
+            {salvageResolutionMode}
+            salvageCheckSimple={salvageSimpleDraft}
+            salvageCheckRouted={salvageRoutedDraft}
+            salvageCheckProgressive={salvageProgressiveDraft}
+            {gatheringResolutionMode}
+            gatheringCheckProgressive={gatheringProgressiveDraft}
+            gatheringCheckRouted={gatheringRoutedDraft}
+            breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+            features={selectedSystem?.features || {}}
+            activation={checkActivation}
+            {onUpdateCraftingCheck}
+            {onUpdateCraftingCheckSimple}
+            {onUpdateCraftingCheckProgressive}
+            {onUpdateSalvageCheckSimple}
+            {onUpdateSalvageCheckRouted}
+            {onUpdateSalvageCheckProgressive}
+            {onUpdateGatheringCheckProgressive}
+            {onUpdateGatheringCheckRouted}
+            onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
+            onTabChange={(tab) => { checksActiveTab = tab; }}
+            {onToggleCheckActive}
+          />
+        </section>
+      </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
         task={editingGatheringTask}
         staminaEnabled={selectedGatheringTaskStaminaEnabled}
         nodesEnabled={selectedGatheringTaskNodesEnabled}
+        resolutionMode={gatheringResolutionMode}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
@@ -3342,6 +5013,7 @@
         expandedToolId={$viewState.toolsDraftExpandedToolId || ''}
         dirtyToolIds={dirtyToolIds}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
+        breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         onSelectTool={(id) => store.selectDraftTool?.(id)}
         onExpandTool={(id) => store.setExpandedDraftTool?.(id)}
         onToggleExpand={(id) => store.setExpandedDraftTool?.(id === $viewState.toolsDraftExpandedToolId ? '' : id)}
@@ -3349,6 +5021,7 @@
         onAddToolDrop={addToolFromDrop}
         onUpdateTool={(id, patch) => store.updateToolInDraft?.(id, patch)}
         onDeleteTool={(id) => store.deleteToolFromDraft?.(id)}
+        onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
@@ -3389,15 +5062,14 @@
         essenceOptions={componentEditEssenceOptions}
         showTags={componentEditShowTags}
         showEssences={componentEditShowEssences}
-        showSourceUi={true}
+        showSalvage={componentSalvageEnabled}
+        salvageResolutionMode={salvageResolutionMode}
+        salvageOutcomeNames={salvageOutcomeNames}
+        componentOptions={salvageComponentOptions}
         saving={componentEditSaving}
         onSave={saveComponentEdit}
         onDirtyChange={(dirty) => { componentEditDirty = dirty; }}
         onDraftChange={handleComponentDraftChange}
-        onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
-        onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
-        onOpenSource={(uuid) => openComponentSource(uuid)}
-        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
       {:else}
         <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}>
@@ -3427,6 +5099,83 @@
         onDeleteComponent={(id) => deleteComponent(id)}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
+    {:else if currentView === 'recipe-edit' && selectedSystem}
+      <RecipeEditView
+        recipe={recipeDraft}
+        complex={recipeComplex}
+        alchemySimple={recipeAlchemySimple}
+        progressive={recipeProgressive}
+        saving={recipeEditSaving}
+        saveFailed={recipeSaveFailed}
+        onPickImagePath={services?.pickImagePath}
+        linkedItemImage={recipeDraftLinkedItemImage}
+        currencyUnits={selectedCurrencyUnits}
+        toolsLibrary={recipeToolsLibrary}
+        componentOptions={selectedSystem?.managedItemOptions || []}
+        componentTagOptions={selectedSystem?.componentTagOptions || []}
+        essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
+        itemTags={selectedSystem?.itemTags || []}
+        checkTierOptions={recipeCheckTierOptions}
+        minSuccessTierOptions={recipeMinSuccessTierOptions}
+        routingProvider={recipeRoutingProvider}
+        routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
+        routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        alchemy={recipeAlchemy}
+        signatureConflicts={recipeSignatureConflicts}
+        playerListMode={recipePlayerListMode}
+        worldUsers={$viewState.worldUsers || []}
+        onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
+        onToggleEnabled={handleToggleRecipeEnabled}
+        onAddStep={handleAddStep}
+        onReorderSteps={handleReorderSteps}
+        onUpdateStep={handleUpdateStep}
+        onDeleteStep={handleDeleteStep}
+      />
+    {:else if currentView === 'crafting-settings' && selectedSystem}
+      <CraftingSettingsView
+        {selectedSystem}
+        onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
+        onSetSalvageResolutionMode={(nextMode) => store.setSalvageResolutionMode?.(nextMode)}
+        onSetVisibilityMode={(m) => store.setVisibilityMode?.(m)}
+      />
+    {:else if currentView === 'access' && selectedSystem}
+      <AccessTabView
+        recipes={$viewState.recipes || []}
+        recipeCategories={$viewState.recipeCategories || []}
+        recipeSearchTerm={$viewState.recipeSearchTerm || ''}
+        selectedRecipeId={selectedRecipeIdForAccess}
+        selectedSystemName={selectedSystem?.name || ''}
+        onSearchChange={(term) => store.setRecipeSearch?.(term)}
+        onSelectRecipe={(id) => selectedRecipeIdForAccess = id}
+      />
+    {:else if currentView === 'books-scrolls' && selectedSystem}
+      <BooksScrollsView
+        recipeItems={recipeItemDefinitions}
+        selectedSystemName={selectedSystem?.name || ''}
+        visibilityMode={craftingVisibilityMode}
+        {selectedRecipeItemId}
+        onSelectRecipeItem={(id) => selectRecipeItem(id)}
+        onOpenRecipeItem={(id) => editRecipeItem(id)}
+        onCreateRecipeItem={createRecipeItem}
+        onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
+      />
+    {:else if currentView === 'recipe-item-edit' && selectedSystem}
+      <RecipeItemEditor
+        recipeItem={recipeItemDraft}
+        linkedItem={recipeItemEditorLinkedItem}
+        linkedRecipes={recipeItemEditorLinkedRecipes}
+        availableRecipes={recipeItemEditorAvailableRecipes}
+        characterPrerequisites={selectedCharacterPrerequisites}
+        worldItems={worldItemOptions}
+        visibilityMode={craftingVisibilityMode}
+        activeTab={recipeItemActiveTab}
+        onSelectTab={(tab) => recipeItemActiveTab = tab}
+        onPatch={(patch) => patchRecipeItemDraft(patch)}
+        onLinkItem={(uuid) => linkRecipeItemSource(uuid)}
+        onUnlinkItem={() => unlinkRecipeItemSource()}
+        onLinkRecipe={(id) => linkRecipeToItem(id)}
+        onRemoveRecipe={(id) => unlinkRecipeFromItem(id)}
+      />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView
         recipes={$viewState.recipes || []}
@@ -3437,16 +5186,23 @@
         selectedSystemName={selectedSystem?.name || ''}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}
+        onEditRecipe={(id) => editRecipe(id)}
         onDuplicateRecipe={(id) => duplicateRecipe(id)}
         onDeleteRecipe={(id) => deleteRecipe(id)}
         onToggleEnabled={(id, enabled) => store.toggleRecipeEnabled?.(id, enabled)}
       />
     {:else if currentView === 'system-edit' && selectedSystem}
+      <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings')}>
+        <section class="manager-environment-editor-shell">
       <SystemEditView
         {selectedSystem}
-        onSaveDetails={(name, description, advancedOptionsEnabled) => store.saveSystemDetails?.(name, description, advancedOptionsEnabled)}
-        onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
-        onToggleAdvancedOptions={(checked) => store.toggleAdvancedOptions?.(checked)}
+        systemBlocked={systemBlocksSystem}
+        validationReport={systemValidationReport}
+        requestedTab={requestedSystemTab}
+        requestedTabNonce={requestedSystemTabNonce}
+        onSelectIssue={(issue) => selectOverviewIssue(issue)}
+        onShowSystemOverview={showSystemOverview}
+        onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
         onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         {characterModifierPresetsSupported}
@@ -3454,7 +5210,33 @@
         onUpdateCharacterModifier={onUpdateCharacterModifier}
         onDeleteCharacterModifier={onDeleteCharacterModifier}
         onSeedCharacterModifierPresets={onSeedCharacterModifierPresets}
+        characterPrerequisiteLibrary={selectedCharacterPrerequisites}
+        {characterPrerequisitePresetsSupported}
+        onAddCharacterPrerequisite={onAddCharacterPrerequisite}
+        onUpdateCharacterPrerequisite={onUpdateCharacterPrerequisite}
+        onDeleteCharacterPrerequisite={onDeleteCharacterPrerequisite}
+        onSeedCharacterPrerequisitePresets={onSeedCharacterPrerequisitePresets}
+        currencyUnits={selectedCurrencyUnits}
+        {currencyPresetsSupported}
+        {currencySpendStrategy}
+        {currencyProviderId}
+        {currencyMacros}
+        {currencyProviderOptions}
+        onAddCurrencyUnit={onAddCurrencyUnit}
+        onUpdateCurrencyUnit={onUpdateCurrencyUnit}
+        onDeleteCurrencyUnit={onDeleteCurrencyUnit}
+        onAddCurrencySubUnit={onAddCurrencySubUnit}
+        onUpdateCurrencySubUnit={onUpdateCurrencySubUnit}
+        onDeleteCurrencySubUnit={onDeleteCurrencySubUnit}
+        onSeedCurrencyPresets={onSeedCurrencyPresets}
+        onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}
+        onSetCurrencyProvider={onSetCurrencyProvider}
+        onSetCurrencyMacro={onSetCurrencyMacro}
+        onClearCurrencyMacro={onClearCurrencyMacro}
+        onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
       />
+        </section>
+      </main>
     {:else}
       <SystemsBrowserView
         systems={$viewState.systems || []}
@@ -3469,7 +5251,7 @@
       />
     {/if}
 
-    {#if currentView !== 'environment-edit' && currentView !== 'component-edit'}
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && (currentView !== 'recipe-edit' || recipeInspectorVisible)}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">
@@ -3501,53 +5283,18 @@
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.Counts', 'Vocabulary counts')}</h3>
           <div class="manager-fact-grid">
             <div class="manager-fact" data-tags-category-fact="base-categories">
-              <strong>{tagCategoryCounts.baseCategories}</strong>
-              <span>{text('FABRICATE.Admin.Manager.TagsCategories.BaseCategory', 'Base category')}</span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.baseCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.BaseCategory', 'Base category')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="custom-categories">
-              <strong>{tagCategoryCounts.customCategories}</strong>
-              <span>{text('FABRICATE.Admin.Manager.TagsCategories.CustomCategories', 'Custom categories')}</span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.customCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.CustomCategories', 'Custom categories')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="item-tags">
-              <strong>{tagCategoryCounts.itemTags}</strong>
-              <span>{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}</span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="references">
-              <strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.tagReferences}</strong>
-              <span>{text('FABRICATE.Admin.Manager.TagsCategories.References', 'References')}</span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.tagReferences}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.References', 'References')}</span></span>
             </div>
           </div>
-        </section>
-
-        <section class="manager-inspector-card" data-tags-evidence="examples">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.ExamplesTitle', 'Examples')}</h3>
-          {#if topUsedCategoryExample || topUsedTagExample}
-            <ul class="manager-evidence-list">
-              {#if topUsedCategoryExample}
-                <li data-tags-example="category">
-                  {(topUsedCategoryExample.count === 1
-                    ? text('FABRICATE.Admin.Manager.TagsCategories.ExampleCategorySingular', '"{name}" is used by 1 recipe.')
-                    : text('FABRICATE.Admin.Manager.TagsCategories.ExampleCategory', '"{name}" is used by {count} recipes.')
-                  ).replace('{name}', topUsedCategoryExample.name).replace('{count}', topUsedCategoryExample.count)}
-                </li>
-              {/if}
-              {#if topUsedTagExample}
-                <li data-tags-example="tag">
-                  {(topUsedTagExample.count === 1
-                    ? text('FABRICATE.Admin.Manager.TagsCategories.ExampleTagSingular', '"{name}" appears on 1 component.')
-                    : text('FABRICATE.Admin.Manager.TagsCategories.ExampleTag', '"{name}" appears on {count} components.')
-                  ).replace('{name}', topUsedTagExample.name).replace('{count}', topUsedTagExample.count)}
-                </li>
-              {/if}
-            </ul>
-          {:else}
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.ExamplesEmptyHint', 'Add a category or tag, then assign it to a recipe or component to see it appear here.')}</p>
-          {/if}
-        </section>
-
-        <section class="manager-inspector-card">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.GeneralTitle', 'General category')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.GeneralInspectorHint', 'General is the built-in category for recipes without a custom category and cannot be removed.')}</p>
         </section>
       {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
         {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
@@ -3569,7 +5316,7 @@
               </div>
 
               <p class="manager-muted">
-                {selectedGatheringTask.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+                {truncateDescription(selectedGatheringTask.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
               </p>
             </section>
 
@@ -4062,7 +5809,7 @@
           {:else if selectedGatheringEvent && currentView !== 'gathering-event-edit'}
             <section class="manager-inspector-card" data-gathering-event-inspector>
               <div class="manager-inspector-title-row is-hero-large">
-                <img class="manager-recipe-preview" src={selectedGatheringEvent.img || 'icons/svg/mystery-man.svg'} alt="" />
+                <img class="manager-recipe-preview" src={selectedGatheringEvent.img || DEFAULT_GATHERING_EVENT_IMG} alt="" />
                 <div class="manager-inspector-copy">
                   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Events.Selected', 'Selected gathering event')}</p>
                   <h2 class="manager-inspector-name" title={selectedGatheringEvent.name || ''}>{selectedGatheringEvent.name || text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')}</h2>
@@ -4078,7 +5825,7 @@
               </div>
 
               <p class="manager-muted">
-                {selectedGatheringEvent.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+                {truncateDescription(selectedGatheringEvent.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
               </p>
             </section>
 
@@ -4555,14 +6302,14 @@
             </div>
 
             <p class="manager-muted">
-              {selectedEnvironment.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+              {truncateDescription(selectedEnvironment.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
           <section class="manager-inspector-card">
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Details', 'Environment details')}</h3>
             <div class="manager-fact-grid">
-              {#each selectedEnvironmentFacts as fact}
+              {#each selectedEnvironmentFacts as fact (fact.id)}
                 <div class="manager-fact" data-environment-fact={fact.id}>
                   <span class="manager-fact-line"><strong>{fact.value}</strong> <span class="manager-fact-label">{fact.label}</span></span>
                 </div>
@@ -4645,7 +6392,7 @@
               </div>
             </div>
             <p class="manager-muted">
-              {selectedEssenceForInspector.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+              {truncateDescription(selectedEssenceForInspector.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
@@ -4781,7 +6528,7 @@
             </div>
 
             <p class="manager-muted">
-              {selectedComponent.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+              {truncateDescription(selectedComponent.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
@@ -4789,7 +6536,7 @@
             <section class="manager-inspector-card" data-component-section="tags">
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}</h3>
               <div class="manager-feature-list">
-                {#each selectedComponent.tags || [] as tag}
+                {#each selectedComponent.tags || [] as tag (tag)}
                   <span class="manager-chip">{tag}</span>
                 {:else}
                   <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoTags', 'No tags')}</span>
@@ -4802,7 +6549,7 @@
             <section class="manager-inspector-card" data-component-section="essences">
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}</h3>
               <div class="manager-feature-list">
-                {#each selectedComponent.essences || [] as essence}
+                {#each selectedComponent.essences || [] as essence (essence.id)}
                   <span class="manager-chip manager-essence-compact-chip" title={`${essence.name || essence.id} ${essence.quantity}`} aria-label={`${essence.name || essence.id} ${essence.quantity}`}>
                     <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
                   </span>
@@ -4815,12 +6562,12 @@
 
           <section class="manager-inspector-card" data-component-section="source">
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Source', 'Source')}</h3>
-            {#if selectedComponent.hasSourceUuid}
+            {#if selectedComponent.hasRegisteredItemUuid}
               <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SourceHint', 'This component keeps a stored source ID for import matching and replacement.')}</p>
               {#if selectedComponent.sourceMissing}
                 <p class="environment-stale-warning" data-component-source-missing>{text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</p>
               {/if}
-              <button type="button" class="manager-button" data-component-action="copy-source" title={selectedComponent.sourceUuidDisplay} onclick={() => copyComponentSource(selectedComponent.sourceUuidDisplay)}>
+              <button type="button" class="manager-button" data-component-action="copy-source" title={selectedComponent.registeredItemUuidDisplay} onclick={() => copyComponentSource(selectedComponent.registeredItemUuidDisplay)}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')}</span>
               </button>
@@ -4884,7 +6631,7 @@
             </div>
 
             <p class="manager-muted">
-              {selectedRecipe.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+              {truncateDescription(selectedRecipe.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
@@ -4893,21 +6640,17 @@
             <div class="manager-fact-grid">
               {#if showRecipeCategories}
                 <div class="manager-fact" data-recipe-fact="category">
-                  <strong>{selectedRecipe.category || text('FABRICATE.Admin.Manager.Recipe.General', 'General')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
+                  <span class="manager-fact-line"><strong>{selectedRecipe.category || text('FABRICATE.Admin.Manager.Recipe.General', 'General')}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span></span>
                 </div>
               {/if}
               <div class="manager-fact" data-recipe-fact="structure">
-                <strong>{structureLabel(selectedRecipe)}</strong>
-                <span>{text('FABRICATE.Admin.Manager.Recipe.Structure', 'Structure')}</span>
+                <span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Structure', 'Structure')}</span></span>
               </div>
               <div class="manager-fact" data-recipe-fact="steps">
-                <strong>{stepCount(selectedRecipe)}</strong>
-                <span>{text('FABRICATE.Admin.Manager.Recipe.Steps', 'Steps')}</span>
+                <span class="manager-fact-line"><strong>{stepCount(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.Steps', 'Steps')}</span></span>
               </div>
               <div class="manager-fact" data-recipe-fact="result-groups">
-                <strong>{resultGroupCount(selectedRecipe)}</strong>
-                <span>{text('FABRICATE.Admin.Manager.Recipe.ResultGroups', 'Result groups')}</span>
+                <span class="manager-fact-line"><strong>{resultGroupCount(selectedRecipe)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Recipe.ResultGroups', 'Result groups')}</span></span>
               </div>
             </div>
             {#if $viewState.showVisibilitySummary}
@@ -4922,7 +6665,7 @@
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Requirements', 'Requirements')}</h3>
             <p class="manager-muted">{requirementsSummary(selectedRecipe)}</p>
             <div class="manager-requirements-list">
-              {#each requirementsPreviewItems(selectedRecipe) as item}
+              {#each requirementsPreviewItems(selectedRecipe) as item (item.label)}
                 <div class="manager-requirement-row">
                   <span>{item.label}</span>
                   <strong>{item.value}</strong>
@@ -5107,45 +6850,64 @@
             </div>
           </div>
         {/if}
-      {:else if currentView === 'system-edit' && selectedSystem}
-        <section class="manager-inspector-card">
-          <div class="manager-inspector-title-row is-hero-large">
-            <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-              <i class="fas fa-layer-group"></i>
-            </span>
+      {:else if currentView === 'component-edit'}
+        {#if componentForEdit}
+          <ComponentSourceInspector
+            component={componentForEdit}
+            onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
+            onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
+            onOpenSource={(uuid) => openComponentSource(uuid)}
+            onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+          />
+          {#if componentDifficultyShown}
+            <ComponentDifficultyInspector
+              value={componentDifficultyDraft}
+              saving={componentEditSaving}
+              onChange={(value) => stageComponentDifficulty(value)}
+            />
+          {/if}
+        {:else}
+          <section class="manager-inspector-card">
             <div class="manager-inspector-copy">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.SystemEdit.Editing', 'Editing')}</p>
-              <h2 class="manager-inspector-name" title={selectedSystem.name}>{selectedSystem.name}</h2>
-              <div class="manager-chip-row">
-                <span class="manager-chip is-active">{resolutionModeLabel(selectedSystem.resolutionMode)}</span>
-                <span class={`manager-chip ${selectedSystem.advancedOptionsEnabled === false ? 'is-disabled' : 'is-active'}`}>
-                  {selectedSystem.advancedOptionsEnabled === false
-                    ? text('FABRICATE.Admin.Manager.SystemEdit.AdvancedHidden', 'Advanced hidden')
-                    : text('FABRICATE.Admin.Manager.SystemEdit.AdvancedVisible', 'Advanced visible')}
-                </span>
-              </div>
+              <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h2>
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}</p>
             </div>
-          </div>
-
-          <p class="manager-muted">
-            {selectedSystem.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-          </p>
-        </section>
-
-        <section class="manager-inspector-card">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Summary', 'Edit summary')}</h3>
-          <div class="manager-fact-grid">
-            <div class="manager-fact">
-              <strong>{resolutionModeLabel(selectedSystem.resolutionMode)}</strong>
-              <span>{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span>
-            </div>
-            <div class="manager-fact">
-              <strong>{enabledFeatureLabels.length}</strong>
-              <span>{text('FABRICATE.Admin.Manager.SystemEdit.EnabledFeatureCount', 'Features enabled')}</span>
-            </div>
-          </div>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.SystemEdit.DeepConfigHint', 'Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager views.')}</p>
-        </section>
+          </section>
+        {/if}
+      {:else if currentView === 'recipe-edit'}
+        <RecipeItemInspector
+          recipe={recipeDraft}
+          {recipeItemDefinitions}
+          categories={selectedSystem?.categories || []}
+          multiStepEnabled={recipeMultiStepEnabled}
+          complex={recipeComplex}
+          multiSetAllowed={recipeMultiSetAllowed}
+          hideComplexToggle={selectedSystem?.resolutionMode === 'alchemy'}
+          onSetComplexity={handleSetRecipeComplexity}
+          onAddRecipeItem={handleAddRecipeItem}
+          onSetRecipeItem={handleSetRecipeItem}
+          onRemoveRecipeItem={handleRemoveRecipeItem}
+          onSetCategory={handleSetRecipeCategory}
+          onEnterMultiStep={handleEnterMultiStep}
+          onRevertToSingleStep={handleRevertToSingleStep}
+          onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
+          onCopyItemUuid={(uuid) => services?.onCopySourceUuid?.(uuid)}
+        />
+      {:else if currentView === 'access'}
+        <GrantAccessInspector
+          recipe={selectedRecipeForAccess}
+          characters={store.getPcRoster?.() || []}
+          players={$viewState.worldUsers || []}
+          onSaveAccess={(id, grant) => store.saveRecipeAccess?.(id, grant)}
+        />
+      {:else if currentView === 'books-scrolls'}
+        <ItemPageInspector
+          item={selectedRecipeItem}
+          visibilityMode={craftingVisibilityMode}
+          onOpenRecipeItem={(id) => editRecipeItem(id)}
+          onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
+          onToggleQuickLimit={(id, limited) => toggleRecipeItemQuickLimit(id, limited)}
+        />
       {:else if selectedSystem}
         <section class="manager-inspector-card">
           <div class="manager-inspector-title-row is-hero-large">
@@ -5172,7 +6934,7 @@
         <section class="manager-inspector-card">
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
           <div class="manager-fact-grid">
-            {#each selectedCountFacts as fact}
+            {#each selectedCountFacts as fact (fact.id)}
               {@const labelParts = countLabelParts(fact.label)}
               <div class="manager-fact" class:is-off={fact.isOff} data-count-id={fact.id}>
                 {#if fact.isOff}
@@ -5194,7 +6956,7 @@
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}</h3>
           {#if enabledFeatureLabels.length > 0}
             <div class="manager-feature-list">
-              {#each enabledFeatureLabels as feature}
+              {#each enabledFeatureLabels as feature (feature)}
                 <span class="manager-chip is-active">{feature}</span>
               {/each}
             </div>
@@ -5273,4 +7035,13 @@
     </aside>
     {/if}
   </div>
+
+  <ItemPickerModal
+    open={itemPickerOpen}
+    items={worldItemOptions}
+    titleKey="FABRICATE.Admin.Manager.BooksScrolls.PickItemTitle"
+    titleFallback="Select an item"
+    onPick={(uuid) => pickRecipeItemFromUuid(uuid)}
+    onClose={() => itemPickerOpen = false}
+  />
 </div>

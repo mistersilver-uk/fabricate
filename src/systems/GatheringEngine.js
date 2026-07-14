@@ -1,8 +1,16 @@
+import { DEFAULT_GATHERING_EVENT_IMG } from '../gatheringImageDefaults.js';
 import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
 } from '../gatheringToolRuntime.js';
+import {
+  buildInteractiveRollOptions,
+  promptCheckRoll,
+} from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
+import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
+import { runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
   actorMatchesId,
@@ -32,6 +40,7 @@ import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
 import { isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
+import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
@@ -117,6 +126,11 @@ export class GatheringEngine {
     isGamePaused = null,
     sceneAccess = null,
     toolAvailability = null,
+    // Optional progressive-resolution seam (`resolveProgressive`). Routed
+    // resolution no longer uses a result resolver — it routes exclusively through
+    // the system-level gathering check formula (`_resolveRoutedFormulaOutcome`).
+    // Production wires nothing here, so progressive falls through to the built-in
+    // `resolveProgressiveAward`; tests inject a `resolveProgressive` stub.
     resultResolver = null,
     resultCreator = null,
     toolBreakage = null,
@@ -322,6 +336,10 @@ export class GatheringEngine {
     // attempt was opened against an interactable that owns its own scoped node
     // pool (issue 302). Null for the default environment-scoped flow.
     interactableRef = null,
+    // Opt-in interactive roll (UI-triggered attempt): surfaces the confirm-roll
+    // dialog + posts the roll to chat for the routed/progressive check paths.
+    // Defaults false so the programmatic API and timed maturation stay silent.
+    interactive = false,
   } = {}) {
     const resolved = await this._resolveStartContext({
       viewer,
@@ -352,6 +370,19 @@ export class GatheringEngine {
     }
 
     if (system.enabled === false || system.features?.gathering !== true) {
+      return this._blockedStart({
+        viewer,
+        actor: selectedActor,
+        environment,
+        task,
+        reason: this._blockedReason('SYSTEM_DISABLED'),
+      });
+    }
+
+    // System-validity gate: a system with a `blocks: 'system'` validation issue
+    // is unusable, so a non-GM attempt is rejected (mirrors the listing gate that
+    // hides it). GMs bypass so they can still attempt/diagnose a broken system.
+    if (viewer?.isGM !== true && this._isSystemBlockedForGathering(system, new Map())) {
       return this._blockedStart({
         viewer,
         actor: selectedActor,
@@ -511,7 +542,7 @@ export class GatheringEngine {
       });
     }
 
-    const configuration = this._validateStartTask(task);
+    const configuration = this._validateStartTask(task, system);
     if (configuration.valid !== true) {
       return this._blockedStart({
         viewer,
@@ -550,6 +581,7 @@ export class GatheringEngine {
       richAttempt,
       presentTools,
       interactableRef,
+      interactive,
     });
   }
 
@@ -561,7 +593,7 @@ export class GatheringEngine {
     }
 
     const { system, environment, task, interactableRef } = resolved;
-    const configuration = this._validateStartTask(task);
+    const configuration = this._validateStartTask(task, system);
     if (configuration.valid !== true) {
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -901,16 +933,55 @@ export class GatheringEngine {
     );
   }
 
-  _playerCandidateEnvironments(systems, _viewer) {
+  _playerCandidateEnvironments(systems, viewer) {
     const environments = normalizeList(this.environmentStore?.list?.());
+    // System-validity gate: a system with a `blocks: 'system'` issue exposes
+    // nothing to non-GM viewers (its environments are dropped before any task
+    // gating). GMs bypass so they still reach a broken system to fix it. Computed
+    // at most once per system per listing call, NOT a full overview rebuild.
+    const isGM = viewer?.isGM === true;
+    const blockedCache = new Map();
     return environments
       .filter((environment) => {
         if (!systems.has(environment?.craftingSystemId)) return false;
+        if (
+          !isGM &&
+          this._isSystemBlockedForGathering(systems.get(environment.craftingSystemId), blockedCache)
+        ) {
+          return false;
+        }
         return true;
       })
       .map((environment) =>
         this._composeEnvironment(environment, systems.get(environment.craftingSystemId))
       );
+  }
+
+  /**
+   * Whether a gathering system is hidden by a `blocks: 'system'` validation
+   * issue. Cached per listing call (keyed by system id) so a multi-environment
+   * system is evaluated once. Fail-open (false) when the system or recipe manager
+   * is unavailable so a missing collaborator never blanks a player's gathering
+   * listing. GM bypass is the caller's concern.
+   *
+   * @param {object|null|undefined} system
+   * @param {Map<string, boolean>} cache Per-call blocker cache, keyed by system id.
+   * @returns {boolean}
+   * @private
+   */
+  _isSystemBlockedForGathering(system, cache) {
+    const systemId = system?.id;
+    if (!systemId) return false;
+    if (cache.has(systemId)) return cache.get(systemId);
+
+    const recipeManager = globalThis.game?.fabricate?.getRecipeManager?.();
+    const recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
+    const { blocksSystem } = computeSystemVisibility(system, {
+      recipes,
+      components: system.components || [],
+    });
+    cache.set(systemId, blocksSystem === true);
+    return blocksSystem === true;
   }
 
   _composeEnvironment(environment, system = null) {
@@ -1803,8 +1874,8 @@ export class GatheringEngine {
     return weighted.at(-1).task;
   }
 
-  _validateStartTask(task) {
-    const errors = validateTaskConfiguration(task);
+  _validateStartTask(task, system = null) {
+    const errors = validateTaskConfiguration(task, system);
     return {
       valid: errors.length === 0,
       errors,
@@ -1931,13 +2002,35 @@ export class GatheringEngine {
     richAttempt = null,
     presentTools = null,
     interactableRef = null,
+    interactive = false,
   }) {
     const outcome =
       task.resolutionMode === 'd100'
-        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
+        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive })
         : task.resolutionMode === 'progressive'
-          ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
-          : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
+          ? await this._resolveProgressiveOutcome({
+              viewer,
+              actor,
+              system,
+              environment,
+              task,
+              interactive,
+            })
+          : await this._resolveRoutedOutcome({
+              viewer,
+              actor,
+              system,
+              environment,
+              task,
+              interactive,
+            });
+
+    // The player dismissed the interactive roll dialog: a user choice, not a
+    // blocked attempt. Return a quiet, non-notifying result BEFORE any run
+    // creation, side effects, or chat — zero mutation.
+    if (outcome.status === 'cancelled') {
+      return this._cancelledStart({ viewer, actor, environment, task });
+    }
 
     if (outcome.status === 'misconfigured') {
       return this._blockedStart({
@@ -2270,29 +2363,110 @@ export class GatheringEngine {
     });
   }
 
-  async _resolveRoutedOutcome({ viewer, actor, system, environment, task }) {
-    if (typeof this.resultResolver?.resolveRouted !== 'function') {
+  async _resolveRoutedOutcome({ actor, system, task, interactive = false }) {
+    // Routed gathering resolves exclusively through the system-level gathering
+    // check (Checks editor): roll the configured routed formula and map its total
+    // onto a named outcome tier, then route that tier name to a result group by
+    // name — the same name-matching the crafting/salvage routed paths use as their
+    // tier fallback. With no system routed roll formula the task is misconfigured.
+    const routed = system?.gatheringCraftingCheck?.routed;
+    const rollFormula = stringOrNull(routed?.rollFormula);
+    if (!rollFormula) {
       return misconfiguredOutcome({
-        code: 'MISSING_RESULT_RESOLVER',
-        message: 'Routed gathering resolution requires a result resolver',
+        code: 'MISSING_ROUTED_CHECK',
+        message: 'Routed gathering resolution requires a system-level gathering check roll formula',
       });
     }
 
-    const provider = stringOrNull(task.resultSelection?.provider);
-    const raw = await this.resultResolver.resolveRouted({
-      provider,
-      resultSelection: task.resultSelection ?? null,
-      resultGroups: normalizeList(task.resultGroups),
-      actor,
-      viewer,
-      system,
-      environment,
-      task,
-    });
-    return normalizeTerminalOutcome(raw);
+    return this._resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task, interactive });
   }
 
-  async _resolveD100Outcome({ viewer, actor, system, environment, task }) {
+  /**
+   * Resolve a routed gathering outcome from the system-level routed roll formula.
+   * Rolls via the shared {@link runFormulaRouted}, with the base DC resolved as the
+   * per-task `dcOverride` (when finite) else the routed check's own `dc` (default
+   * 15) — mirroring salvage's `_resolveSalvageDc`. The matched tier NAME is routed
+   * to a result group whose name matches it (case-insensitive); a failing or
+   * unmatched tier produces a terminal failure. The tier name and disposition are
+   * surfaced on `checkResult` and the outcome flows through the same
+   * `normalizeTerminalOutcome` machinery the provider path uses.
+   * @private
+   */
+  async _resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task, interactive = false }) {
+    const dc = this._resolveGatheringRoutedDc(routed, task);
+    const rolled = await runFormulaRouted({
+      formula: rollFormula,
+      dc,
+      thresholdMode: routed.thresholdMode,
+      type: routed.type,
+      relativeOutcomes: routed.relativeOutcomes,
+      fixedOutcomes: routed.fixedOutcomes,
+      triggers: routed.checkBreakage?.triggers,
+      actor,
+      label: 'Gathering',
+      // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
+      // a per-task dcOverride never opens a null-outcome dead zone.
+      clampToNearest: true,
+      rollOptions: buildInteractiveRollOptions({
+        interactive,
+        actor,
+        name: task?.name,
+        activity: 'Gathering',
+        img: task?.img,
+        dc,
+      }),
+    });
+
+    // The player cancelled the interactive roll: propagate a cancelled outcome so
+    // `_resolveImmediateAttempt` aborts with zero mutation.
+    if (rolled.cancelled) {
+      return { status: 'cancelled', resultGroups: [], checkResult: null };
+    }
+
+    const outcomeName = stringOrNull(rolled.outcome);
+    const checkResult = {
+      outcome: outcomeName,
+      value: rolled.value,
+      success: rolled.success === true,
+      data: rolled.data ?? {},
+      // Engine-evaluated (issue 419): the shared `evaluateCheckBreakage` seam honours
+      // the legacy `data.breakTools` and `checkBreakage` triggers only for
+      // engine-evaluated checks (a macro check never force-breaks tools).
+      engineEvaluated: true,
+    };
+
+    // A failing tier (or no tier match) routes to a terminal failure; a succeeding
+    // tier routes to the result group whose name matches the tier name.
+    if (rolled.success !== true || !outcomeName) {
+      return normalizeTerminalOutcome({ status: 'failed', outcome: outcomeName, checkResult });
+    }
+    // Gathering keeps ALL same-named groups (`firstOnly: false`); the per-system
+    // routing key (the success tier name) stays in the caller above.
+    const matched = matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
+      firstOnly: false,
+    });
+    return normalizeTerminalOutcome({
+      status: 'succeeded',
+      outcome: outcomeName,
+      resultGroups: matched,
+      checkResult,
+    });
+  }
+
+  /**
+   * Resolve the routed gathering check base DC: the per-task `dcOverride` (when a
+   * finite number) else the routed check sub-object's `dc` (fallback 15). Mirrors
+   * the salvage `_resolveSalvageDc` resolution.
+   * @private
+   */
+  _resolveGatheringRoutedDc(routed, task) {
+    const override = task?.dcOverride;
+    if (Number.isFinite(override)) return Math.trunc(override);
+    const dc = Number(routed?.dc);
+    return Number.isFinite(dc) ? Math.trunc(dc) : 15;
+  }
+
+  async _resolveD100Outcome({ viewer, actor, system, environment, task, interactive = false }) {
     if (typeof this.richState?.resolveD100Attempt !== 'function') {
       return misconfiguredOutcome({
         code: 'MISSING_D100_RESOLVER',
@@ -2305,6 +2479,29 @@ export class GatheringEngine {
     const eventModifier = Number(
       environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
     );
+
+    // Interactive d100 (opt-in): the d100 path does NOT use a Foundry `Roll` DC —
+    // each drop row / event is an independent percentile check. So there is no DC
+    // to show; the prompt just confirms the attempt and collects an optional flat
+    // situational modifier applied to every throw. A dismissed prompt returns a
+    // cancelled outcome the caller maps to a zero-mutation `_cancelledStart`.
+    let extraModifier = 0;
+    if (interactive) {
+      // No DC is passed: the d100 path has no single DC (each row/event is an
+      // independent percentile check), so the dialog shows no DC line.
+      const choice = await promptCheckRoll({
+        label: `${task?.name ?? 'Gathering'} — Gathering`,
+        name: task?.name,
+        activity: 'Gathering',
+        img: task?.img,
+      });
+      if (!choice || choice.confirmed === false) {
+        return { status: 'cancelled', resultGroups: [], checkResult: null };
+      }
+      const parsedBonus = Number(choice.bonus);
+      extraModifier = Number.isFinite(parsedBonus) ? parsedBonus : 0;
+    }
+
     const resolved = await this.richState.resolveD100Attempt({
       task,
       environment,
@@ -2313,6 +2510,13 @@ export class GatheringEngine {
       system,
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
+      // DSN animation + the situational bonus flow only for an interactive attempt;
+      // the automated/timed path leaves the resolver's behaviour untouched.
+      animate: interactive === true,
+      extraModifier,
+      rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
+      speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
+      flavor: `${task?.name ?? 'Gathering'} — Gathering check`,
     });
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({
@@ -2346,14 +2550,28 @@ export class GatheringEngine {
     };
   }
 
-  async _resolveProgressiveOutcome({ viewer, actor, system, environment, task }) {
+  async _resolveProgressiveOutcome({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    interactive = false,
+  }) {
     const checkResult = await this._evaluateGatheringCheck({
       actor,
       viewer,
       system,
       environment,
       task,
+      interactive,
     });
+    // The player cancelled the interactive roll: propagate a cancelled outcome so
+    // `_resolveImmediateAttempt` aborts with zero mutation (before normalization,
+    // which does not model a cancel).
+    if (checkResult?.cancelled) {
+      return { status: 'cancelled', resultGroups: [], checkResult: null };
+    }
     const normalizedCheck = normalizeCheckResult(checkResult);
     if (normalizedCheck.diagnostic) {
       return misconfiguredOutcome({
@@ -2404,28 +2622,57 @@ export class GatheringEngine {
     return outcome;
   }
 
-  async _evaluateGatheringCheck({ actor, viewer, system, environment, task }) {
-    if (typeof this.evaluator?.evaluateCheck !== 'function') {
+  async _evaluateGatheringCheck({ actor, system, task = null, interactive = false }) {
+    // System-level gathering check (Checks editor) drives progressive
+    // resolution: roll the configured formula and map its numeric total onto the
+    // check-result shape the progressive resolver expects (`{ success, status,
+    // value }`). Progressive has no DC, so `task.dcOverride` never applies here.
+    const progressive = system?.gatheringCraftingCheck?.progressive;
+    const rollFormula = stringOrNull(progressive?.rollFormula);
+    if (rollFormula) {
+      const rolled = await runFormulaProgressive({
+        formula: rollFormula,
+        triggers: progressive.checkBreakage?.triggers,
+        actor,
+        label: 'Gathering',
+        rollOptions: buildInteractiveRollOptions({
+          interactive,
+          actor,
+          name: task?.name,
+          activity: 'Gathering',
+          img: task?.img,
+        }),
+      });
+      // The player cancelled the interactive roll: surface a cancel marker so
+      // `_resolveProgressiveOutcome` aborts with zero mutation.
+      if (rolled.cancelled) {
+        return { success: false, status: null, value: null, cancelled: true };
+      }
+      // Progressive is value-driven, not pass/fail: leave `status` null so the
+      // award logic (in `resolveProgressiveAward`) decides succeeded/failed from
+      // the numeric `value`. A roll-evaluation error surfaces `success: false`,
+      // which the resolver short-circuits to a terminal failure.
       return {
-        success: null,
+        success: rolled.success === false ? false : null,
         status: null,
-        value: null,
-        reasonCode: 'MISCONFIGURED_PROVIDER',
-        diagnostic: {
-          code: 'MISSING_CHECK_EVALUATOR',
-          message: 'Progressive gathering resolution requires a check evaluator',
-        },
+        value: rolled.value,
+        data: rolled.data ?? {},
+        // Engine-evaluated (issue 419): see _resolveRoutedFormulaOutcome.
+        engineEvaluated: true,
       };
     }
 
-    return this.evaluator.evaluateCheck({
-      check: task.check ?? null,
-      actor,
-      viewer,
-      system,
-      environment,
-      task,
-    });
+    return {
+      success: null,
+      status: null,
+      value: null,
+      reasonCode: 'MISCONFIGURED_PROVIDER',
+      diagnostic: {
+        code: 'MISSING_GATHERING_CHECK',
+        message:
+          'Progressive gathering resolution requires a system-level gathering check roll formula',
+      },
+    };
   }
 
   async _createGatheredResults({ viewer, actor, system, environment, task, outcome }) {
@@ -2505,6 +2752,9 @@ export class GatheringEngine {
         presentTools,
         outcomeStatus: outcome.status,
         checkResult: checkResult ?? outcome.checkResult ?? null,
+        // Active gathering check's checkBreakage (issue 419) so the shared runtime's
+        // checkDriven override can fire, reaching crafting/salvage parity.
+        checkBreakage: this._resolveGatheringCheckBreakage(system, task),
       });
       return Array.isArray(planned) ? planned : [];
     } catch (error) {
@@ -2539,7 +2789,23 @@ export class GatheringEngine {
       presentTools,
       outcomeStatus: outcome.status,
       checkResult: outcome.checkResult ?? null,
+      // Active gathering check's checkBreakage (issue 419) — see _planTerminalTools.
+      checkBreakage: this._resolveGatheringCheckBreakage(system, task),
     });
+  }
+
+  /**
+   * Resolve the active gathering check's `checkBreakage` block for the task's
+   * resolution mode (issue 419). Routed gathering authors on the routed check,
+   * progressive on the progressive check; d100 has no check sub-object so it carries
+   * no checkBreakage. Returns null when none is configured.
+   * @private
+   */
+  _resolveGatheringCheckBreakage(system, task) {
+    const check = system?.gatheringCraftingCheck || {};
+    if (task?.resolutionMode === 'routed') return check.routed?.checkBreakage ?? null;
+    if (task?.resolutionMode === 'progressive') return check.progressive?.checkBreakage ?? null;
+    return null;
   }
 
   async _applyFailureFeedback({ viewer, actor, system, environment, task, outcome, checkResult }) {
@@ -2700,7 +2966,7 @@ export class GatheringEngine {
 
       const events = normalizeList(checkResult?.events).map((event) => ({
         name: stringOrEmpty(event?.name),
-        img: stringOrNull(event?.img) || 'icons/svg/mystery-man.svg',
+        img: stringOrNull(event?.img) || DEFAULT_GATHERING_EVENT_IMG,
       }));
 
       const brokenTools = normalizeList(usedTools)
@@ -2951,6 +3217,28 @@ export class GatheringEngine {
     };
   }
 
+  /**
+   * Build the quiet result returned when the player dismisses the interactive
+   * roll dialog. Not `accepted`, but carries no `blockedReasons` and sets
+   * `cancelled: true` so the UI treats it as a SILENT no-op (no notification) —
+   * distinct from a genuinely blocked attempt.
+   * @private
+   */
+  _cancelledStart({ viewer, actor = null, environment = null, task = null }) {
+    const opaqueBlind = environment && task && this._isOpaqueBlindTask({ environment, viewer });
+    return {
+      accepted: false,
+      cancelled: true,
+      started: false,
+      state: 'cancelled',
+      viewerId: idOf(viewer),
+      actorId: actor ? idOf(actor) : null,
+      environmentId: environment ? stringOrNull(environment.id) : null,
+      taskId: opaqueBlind ? null : task ? stringOrNull(task.id) : null,
+      blockedReasons: [],
+    };
+  }
+
   _blindTaskData({ environment, task, viewer }) {
     return this._isOpaqueBlindTask({ environment, viewer }) ? null : { taskId: task.id };
   }
@@ -3110,6 +3398,9 @@ function normalizeCheckResult(raw) {
     data: plainObjectOrNull(raw.data) ?? {},
     reasonCode: stringOrNull(raw.reasonCode),
     diagnostic: raw.diagnostic ?? null,
+    // Preserve the engine-evaluated flag (issue 419) so the shared breakage seam
+    // can honour `data.breakTools` / `checkBreakage` triggers under checkDriven.
+    ...(raw.engineEvaluated === true && { engineEvaluated: true }),
   };
 }
 
@@ -3168,51 +3459,33 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     });
   }
 
-  const awardMode = ['partial', 'equal', 'exceed'].includes(task?.progressive?.awardMode)
-    ? task.progressive.awardMode
+  // Award mode comes from the system-level gathering check, defaulting to 'equal'.
+  const requestedAwardMode = system?.gatheringCraftingCheck?.progressive?.awardMode ?? 'equal';
+  const awardMode = ['partial', 'equal', 'exceed'].includes(requestedAwardMode)
+    ? requestedAwardMode
     : 'equal';
-  const awarded = [];
-  let remaining = Math.max(0, value);
 
-  for (const result of normalizeList(group.results)) {
-    const cost = difficultyForResult(system, result);
-    if (!Number.isFinite(cost) || cost < 1) {
-      return misconfiguredOutcome({
-        code: 'INVALID_PROGRESSIVE_DIFFICULTY',
-        message: 'Progressive gathering result references a component without valid difficulty',
-        checkResult,
-      });
-    }
+  // Divergence 4 stays here: gathering already validated `Number.isFinite(value)`
+  // above and clamps `Math.max(0, value)` before handing the budget to the shared
+  // loop. Divergence 1 is `invalidCost: 'fail'` — an invalid per-result difficulty
+  // short-circuits with `invalidResultId`, which we raise as a misconfiguration
+  // here (the loop never builds that shape). Divergence 2 zeroes the budget after a
+  // `partial` tail award (`zeroRemainingOnPartial: true`).
+  const { awarded, remaining, invalidResultId } = resolveProgressiveAwardLoop({
+    results: normalizeList(group.results),
+    initialRemaining: Math.max(0, value),
+    costFor: (result) => difficultyForResult(system, result),
+    awardMode,
+    invalidCost: 'fail',
+    zeroRemainingOnPartial: true,
+  });
 
-    if (awardMode === 'exceed') {
-      if (remaining > cost) {
-        awarded.push(result);
-        remaining -= cost;
-      } else {
-        break;
-      }
-      continue;
-    }
-
-    if (awardMode === 'partial') {
-      if (remaining >= cost) {
-        awarded.push(result);
-        remaining -= cost;
-        continue;
-      }
-      if (remaining > 0) {
-        awarded.push(result);
-        remaining = 0;
-      }
-      break;
-    }
-
-    if (remaining >= cost) {
-      awarded.push(result);
-      remaining -= cost;
-    } else {
-      break;
-    }
+  if (invalidResultId !== undefined) {
+    return misconfiguredOutcome({
+      code: 'INVALID_PROGRESSIVE_DIFFICULTY',
+      message: 'Progressive gathering result references a component without valid difficulty',
+      checkResult,
+    });
   }
 
   return {
@@ -3253,7 +3526,7 @@ function normalizeVisibilityResult(result) {
   };
 }
 
-function validateTaskConfiguration(task) {
+function validateTaskConfiguration(task, system = null) {
   const errors = [];
   const resolutionMode = stringOrNull(task?.resolutionMode);
   const resultGroups = normalizeList(task?.resultGroups);
@@ -3296,26 +3569,17 @@ function validateTaskConfiguration(task) {
     }
   }
 
-  if (resolutionMode === 'routed') {
-    const provider = stringOrNull(task?.resultSelection?.provider);
-    if (provider !== 'macroOutcome' && provider !== 'rollTableOutcome') {
-      errors.push('Routed gathering task requires a supported result selection provider');
-    }
-    if (provider === 'macroOutcome' && !stringOrNull(task?.resultSelection?.macroUuid)) {
-      errors.push('Routed macro outcome gathering task requires a macro UUID');
-    }
-    if (provider === 'rollTableOutcome' && !stringOrNull(task?.resultSelection?.rollTableUuid)) {
-      errors.push('Routed roll table outcome gathering task requires a roll table UUID');
-    }
+  // Routed gathering resolves through the system-level gathering check formula,
+  // not a per-task result-selection provider: require the configured routed roll
+  // formula. The result-group / group-name checks above still apply.
+  if (
+    resolutionMode === 'routed' &&
+    !stringOrNull(system?.gatheringCraftingCheck?.routed?.rollFormula)
+  ) {
+    errors.push('Routed gathering task requires a system-level gathering check roll formula');
   }
 
   if (resolutionMode === 'progressive') {
-    if (!task?.check || typeof task.check !== 'object') {
-      errors.push('Progressive gathering task requires a check');
-    }
-    if (!task?.progressive || typeof task.progressive !== 'object') {
-      errors.push('Progressive gathering task requires progressive configuration');
-    }
     if (resultGroups.length !== 1) {
       errors.push('Progressive gathering task requires exactly one result group');
     }
@@ -3355,7 +3619,11 @@ function validateResultGroupNames(resultGroups) {
   const seen = new Map();
 
   for (const group of resultGroups) {
-    const normalizedName = normalizeOutcomeText(group?.name);
+    // Routed `ResultGroup.name` validation uses the SAME normalizer as the routed
+    // match path (`normalizeRoutedName`), so a name can never validate yet fail to
+    // route (or vice versa). The `String(value ?? '')` vs `String(name || '')`
+    // edge (0/false → '') is immaterial for outcome-name strings.
+    const normalizedName = normalizeRoutedName(group?.name);
     if (!normalizedName) {
       errors.push('Gathering result groups require names');
       continue;
@@ -3491,11 +3759,18 @@ function normalizeRunItems(items, { actor = null } = {}) {
         stringOrNull(item.actorUuid) || stringOrNull(item.actor?.uuid) || stringOrNull(actor?.uuid);
       const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
       const quantity = Number(item.quantity ?? source.system?.quantity ?? 1);
-      return {
+      const entry = {
         actorUuid,
         itemUuid,
         quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       };
+      // Carry name/img (when known) so the run journal can list the gathered items,
+      // not just a count — the awarded item document is in hand here.
+      const name = stringOrNull(item.name) || stringOrNull(source.name);
+      const img = stringOrNull(item.img) || stringOrNull(source.img);
+      if (name) entry.name = name;
+      if (img) entry.img = img;
+      return entry;
     })
     .filter((item) => item.actorUuid && item.itemUuid);
 }

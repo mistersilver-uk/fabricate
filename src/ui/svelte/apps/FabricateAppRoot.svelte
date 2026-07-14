@@ -10,8 +10,18 @@
   `activeTab`, so this component stays a pure projection of host state.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import {
+    localize,
+    subscribeSceneChange,
+    subscribeWorldTime,
+    subscribeInventoryChange,
+    subscribeCraftingDataChange
+  } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
+  import CraftingView from './crafting/CraftingView.svelte';
+  import AlchemyView from './alchemy/AlchemyView.svelte';
+  import JournalView from './journal/JournalView.svelte';
+  import InventoryView from './inventory/InventoryView.svelte';
   import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
 
   let {
@@ -55,7 +65,68 @@
     { id: 'inventory', icon: 'fa-boxes-stacked', label: 'FABRICATE.App.Nav.Inventory' }
   ];
 
-  const tabs = $derived(ALL_TABS.filter(tab => tab.requires !== 'alchemy' || showAlchemy));
+  // The Journal nav entry carries a live active-run count badge fed by the shared
+  // journal store's reactive `navCount` rune getter.
+  const journalNavCount = $derived(Number(services?.journal?.navCount ?? 0));
+  const tabs = $derived(
+    ALL_TABS
+      .filter(tab => tab.requires !== 'alchemy' || showAlchemy)
+      .map(tab => (tab.id === 'journal' ? { ...tab, count: journalNavCount } : tab))
+  );
+
+  // Shell-level Journal refresh: keep the store (and thus the nav badge) fresh
+  // even while the Journal tab is closed. A scene change or world-time advance
+  // quietly re-fetches; the store guards its own one-time initial load via
+  // `loadedOnce`. JournalView registers its own (tab-open) effects too; the extra
+  // quiet loads are harmless. READ-only — no side effects published here.
+  $effect(() => {
+    const store = services?.journal;
+    if (store && !store.loadedOnce) store.load();
+  });
+  $effect(() => subscribeWorldTime(() => services?.journal?.load?.(true)));
+  $effect(() => subscribeSceneChange(() => services?.journal?.load?.(true)));
+
+  // Is the actor whose items just changed one this app's crafting/inventory views
+  // read from? Membership in the selected crafting actor + the component-source
+  // actors, read at fire time so it tracks the live selection. Filters out
+  // unrelated actors' item churn so we don't reload on every world item edit.
+  function isRelevantCraftingActor(actorId) {
+    if (!actorId) return false;
+    const selected = services?.getSelectedCraftingActorId?.() || null;
+    if (selected && String(selected) === String(actorId)) return true;
+    const sources = services?.getCraftingComponentSourceIds?.() ?? [];
+    return Array.isArray(sources) && sources.some((id) => String(id) === String(actorId));
+  }
+
+  // Shell-level inventory-change refresh: adding/removing a component or editing an
+  // item quantity on a relevant actor invalidates owned counts and recipe
+  // craftability. Quietly re-fetch the item-derived shared stores (the Crafting and
+  // Inventory views read these singletons, so both tabs update — even while closed).
+  // The Gathering tab owns its own subscription (its listing is view-local).
+  $effect(() =>
+    subscribeInventoryChange(
+      () => {
+        services?.crafting?.load?.(true);
+        services?.inventory?.load?.(true);
+        services?.alchemy?.load?.(true);
+      },
+      { isRelevantActor: (actorId) => isRelevantCraftingActor(actorId) }
+    )
+  );
+
+  // Shell-level crafting-data refresh: a GM editing/saving a crafting system or
+  // recipe can change definitions surfaced on any tab (recipe names in Journal runs,
+  // component metadata, availability), so quietly reload every shared data store.
+  // Works cross-client via main.js's updateSetting bridge (see subscribeCraftingDataChange).
+  $effect(() =>
+    subscribeCraftingDataChange(() => {
+      services?.craftingSources?.load?.(true);
+      services?.crafting?.load?.(true);
+      services?.inventory?.load?.(true);
+      services?.alchemy?.load?.(true);
+      services?.journal?.load?.(true);
+    })
+  );
 </script>
 
 <div class="fabricate-app-shell">
@@ -71,6 +142,9 @@
       >
         <i class="fas {tab.icon}" aria-hidden="true"></i>
         <span class="fabricate-app-nav-label">{localize(tab.label)}</span>
+        {#if tab.count > 0}
+          <span class="fabricate-app-nav-count" data-nav-count={tab.id}>{tab.count}</span>
+        {/if}
       </button>
     {/each}
   </div>
@@ -80,27 +154,27 @@
          context cluster (next to the gathering weather/time/region info). It is
          passed down so ActorSelectTopBar can render it adjacent to those
          conditions; see ActorSelectTopBar for the chip markup + aria-live. -->
-    <ActorSelectTopBar store={services?.actorBar} {activeTab} {activeCanvasTool} />
+    <ActorSelectTopBar store={services?.actorBar} {services} {activeTab} {activeCanvasTool} />
 
     <section class="fabricate-app-content" role="tabpanel">
       {#each tabs as tab (tab.id)}
         {#if activeTab === tab.id}
-          {#if tab.id === 'gathering'}
+          {#if tab.id === 'crafting'}
+            <CraftingView {services} />
+          {:else if tab.id === 'alchemy'}
+            <!-- FORWARD-COMPAT NOTE: the Alchemy tab does not yet carry its own
+                 header/context bar. When it gains one (analogous to gathering's
+                 weather/time/region in ActorSelectTopBar), the active station-tool
+                 chip should move into THAT bar's RIGHT side, next to the tab's own
+                 context info. Until then the chip rides in the shared
+                 ActorSelectTopBar right bar (see the gathering pattern there). -->
+            <AlchemyView {services} />
+          {:else if tab.id === 'gathering'}
             <GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />
-          {:else}
-            <!-- Shared placeholder for the Crafting, (future) Alchemy, Journal,
-                 and Inventory tabs. FORWARD-COMPAT NOTE: when the Crafting and
-                 planned Alchemy tabs gain their own header/context bar (analogous
-                 to gathering's weather/time/region in ActorSelectTopBar), the
-                 active station-tool chip should move into THAT bar's RIGHT side,
-                 next to the tab's own context info. Until then the chip rides in
-                 the shared ActorSelectTopBar right bar (see the gathering pattern
-                 there). -->
-            <div class="fabricate-app-placeholder">
-              <i class="fas {tab.icon}" aria-hidden="true"></i>
-              <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>
-              <p class="fabricate-app-placeholder-hint">{localize('FABRICATE.App.ComingSoon')}</p>
-            </div>
+          {:else if tab.id === 'journal'}
+            <JournalView {services} />
+          {:else if tab.id === 'inventory'}
+            <InventoryView {services} />
           {/if}
         {/if}
       {/each}
@@ -130,6 +204,7 @@
   }
 
   .fabricate-app-nav-item {
+    position: relative;
     box-sizing: border-box;
     flex: 0 0 auto;
     display: flex;
@@ -192,35 +267,5 @@
     min-width: 0;
     min-height: 0;
     overflow: auto;
-  }
-
-  .fabricate-app-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    color: var(--fab-text-muted);
-    opacity: 0.6;
-  }
-
-  .fabricate-app-placeholder i {
-    font-size: 36px;
-  }
-
-  .fabricate-app-placeholder p {
-    margin: 0;
-  }
-
-  .fabricate-app-placeholder-title {
-    font-size: 18px;
-    font-weight: 600;
-  }
-
-  .fabricate-app-placeholder-hint {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
   }
 </style>

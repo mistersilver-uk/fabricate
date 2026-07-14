@@ -197,6 +197,11 @@ async function main() {
   const flags = new Set(args);
   const noZip = flags.has('--no-zip');
   const validateOnly = flags.has('--validate-only');
+  // --analyze: opt-in bundle visualizer. Forwarded to the vite build subprocess
+  // as ANALYZE=1 (cross-platform, no shell-specific env syntax); vite.config.js
+  // only wires the visualizer plugin when ANALYZE=1 is set, so the default build
+  // is byte-for-byte unaffected.
+  const analyze = flags.has('--analyze');
   let versionOptions;
   try {
     versionOptions = parseReleaseVersionOptions(args);
@@ -249,7 +254,13 @@ async function main() {
   await mkdir(distDir, { recursive: true });
 
   // 2. Run vite build
-  console.log('Running vite build...');
+  console.log(`Running vite build${analyze ? ' (bundle analyzer enabled)' : ''}...`);
+  // Opt the child vite build into the bundle analyzer via an inherited env var,
+  // set on process.env (which execSync inherits) so the build command below is
+  // left exactly as-is.
+  if (analyze) {
+    process.env.ANALYZE = '1';
+  }
   execSync('npx vite build', { cwd: ROOT, stdio: 'inherit' });
 
   // 3. Copy static assets
@@ -284,9 +295,15 @@ async function main() {
     const zipName = `fabricate-v${version}.zip`;
     console.log(`Creating ${zipName}...`);
     if (process.platform === 'win32') {
-      execSync(`tar -a -c -f "${zipName}" --exclude="*.zip" .`, { cwd: distDir, stdio: 'inherit' });
+      execSync(`tar -a -c -f "${zipName}" --exclude="*.zip" --exclude="*.map" .`, {
+        cwd: distDir,
+        stdio: 'inherit',
+      });
     } else {
-      execSync(`zip -r "${zipName}" . --exclude "*.zip"`, { cwd: distDir, stdio: 'inherit' });
+      execSync(`zip -r "${zipName}" . --exclude "*.zip" --exclude "*.map"`, {
+        cwd: distDir,
+        stdio: 'inherit',
+      });
     }
     console.log(`Created dist/${zipName}`);
   }

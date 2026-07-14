@@ -18,8 +18,15 @@
     getTimeOfDayLabelKey,
     getWeatherLabelKey
   } from '../util/gatheringConditionIcons.js';
+  import ComponentSourcesBar from '../apps/crafting/ComponentSourcesBar.svelte';
 
-  let { store = null, activeTab = 'crafting', onActorChange = null, activeCanvasTool = null } = $props();
+  let {
+    store = null,
+    services = null,
+    activeTab = 'crafting',
+    onActorChange = null,
+    activeCanvasTool = null
+  } = $props();
 
   const FALLBACK_PORTRAIT_ICON = 'fas fa-user';
 
@@ -32,6 +39,15 @@
   const selectedActor = $derived(store?.selectedActor ?? null);
   const hasActors = $derived(selectableActors.length > 0);
   const isGathering = $derived(activeTab === 'gathering');
+  const isCrafting = $derived(activeTab === 'crafting');
+  // The Inventory tab pulls owned components from the same component-source actors
+  // as Crafting, so it surfaces the same source picker in the shared bar.
+  const isInventory = $derived(activeTab === 'inventory');
+  // The Alchemy workbench pulls owned components from the same component-source
+  // actors as Crafting (AlchemyView wires `services.craftingSources` and the store
+  // reads `selectedSourceIds`), so it too surfaces the shared source picker.
+  const isAlchemy = $derived(activeTab === 'alchemy');
+  const showSourcesBar = $derived(isCrafting || isInventory || isAlchemy);
 
   // The active station tool's display name, shown in a status chip in the
   // right-side context cluster when the GM granted activation of a Tool-station
@@ -46,10 +62,10 @@
       : ''
   );
 
-  // The right-side context cluster renders when there is gathering context to
-  // show OR an active station tool chip to surface (forward-compatible: the chip
-  // appears on whatever tab is active, e.g. crafting's otherwise-empty right).
-  const hasRightContext = $derived(isGathering || Boolean(activeCanvasTool));
+  // The right-side context cluster renders when there is gathering context, the
+  // crafting tab's component-sources bar, OR an active station tool chip to
+  // surface (forward-compatible: the chip appears on whatever tab is active).
+  const hasRightContext = $derived(isGathering || showSourcesBar || Boolean(activeCanvasTool));
 
   // The bar is "ready" once its selectable list and conditions have loaded, so
   // the smoke harness can wait on a mounted, conditions-loaded bar.
@@ -144,16 +160,18 @@
   });
 </script>
 
-<div
-  bind:this={pickerRoot}
-  class="fabricate-app-actor-bar"
-  data-actor-bar-state={barState}
-  use:dismissOnOutsideClick={{
-    enabled: pickerOpen,
-    onDismiss: closePicker
-  }}
->
-  <div class="actor-bar-left">
+<div class="fabricate-app-actor-bar" data-actor-bar-state={barState}>
+  <!-- The dismiss region is the picker (trigger + popover) itself, NOT the whole
+       full-width bar — otherwise clicking the bar's empty area or its right-side
+       component-sources cluster would count as "inside" and leave the dropdown open. -->
+  <div
+    bind:this={pickerRoot}
+    class="actor-bar-left"
+    use:dismissOnOutsideClick={{
+      enabled: pickerOpen,
+      onDismiss: closePicker
+    }}
+  >
     <button
       type="button"
       class="actor-bar-trigger"
@@ -282,6 +300,11 @@
             </span>
           {/if}
         </span>
+      {/if}
+      {#if showSourcesBar}
+        <!-- The Crafting, Inventory and Alchemy tabs surface the component-source
+             actor picker (whose inventories the listing pulls from) in the right slot. -->
+        <ComponentSourcesBar {services} />
       {/if}
     </div>
   {/if}

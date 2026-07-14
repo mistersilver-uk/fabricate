@@ -22,10 +22,11 @@ Players will only see recipes they have learned or whose recipe item they posses
 2. Change the **List Mode** to **Knowledge**.
 3. Choose a **Knowledge Source**.
    The options are **Item** (must own a linked item), **Learned** (must explicitly learn), or **Item or Learned** (either).
-4. For each recipe, open the recipe editor and set a **Linked Recipe Item**.
-   Either browse for an existing item or click **Create Recipe Item** to generate a new scroll/manual.
+4. For each recipe, open the recipe editor and drag an item onto the **Recipe item** card to link a scroll or manual to it.
 5. Optionally turn on **Consume on Learn** if you want recipe scrolls to be one-time-use.
-6. Players can now discover recipes by finding recipe items in the world or learning them by dragging them onto their character sheet.
+6. Optionally cap how many recipes a book teaches by turning on **Limited recipes learned per item**, then set **Maximum recipes** and, if you like, **Delete when spent**.
+7. Players can now discover recipes by finding recipe items in the world.
+   Dropping an uncapped recipe item on a character auto-learns its recipes, and any owned recipe item can be learned from the **Inventory** tab of the Fabricate window (the only way to learn from a capped book).
 
 ## Learn more
 

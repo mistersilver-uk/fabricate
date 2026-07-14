@@ -11,6 +11,8 @@ const essenceBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/Essence
 const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte');
 const tagsCategoriesPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
 const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte');
+const craftingSettingsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
+const resolutionModeOptionsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js');
 const systemsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
 const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
 const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
@@ -29,6 +31,8 @@ const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
 const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
+const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
+const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
 const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
@@ -42,7 +46,7 @@ const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerSource = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
+const managerSource = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, craftingSettingsSource, resolutionModeOptionsSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
 
 function catalogValue(key) {
   return key.split('.').reduce((node, part) => node?.[part], lang);
@@ -64,6 +68,7 @@ function isChangedManagerEnvironmentLocalizationKey(key) {
   return key.startsWith('FABRICATE.Admin.Manager.Environment.')
     || key.startsWith('FABRICATE.Admin.Manager.EnvironmentEditor.')
     || key.startsWith('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.')
+    || key.startsWith('FABRICATE.Admin.Manager.CurrencyUnits.')
     || key.startsWith('FABRICATE.Admin.Environments.')
     || [
       'FABRICATE.Admin.Manager.GlobalConditions',
@@ -161,7 +166,8 @@ describe('CraftingSystemManager source contract', () => {
     }
     for (const snippet of [
       'manager-system-edit-form',
-      'manager-toggle-row'
+      'data-edit-control="advanced-options"',
+      'manager-feature-tile'
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
@@ -188,9 +194,219 @@ describe('CraftingSystemManager source contract', () => {
       'character-modifier editor should keep the localized Expression label'
     );
     for (const snippet of [
+      'data-system-currency-units',
+      'manager-currency-unit-card',
+      'handleAddCurrencyUnit',
+      'onSeedCurrencyPresets',
+      'manager-character-modifier-summary',
+      'manager-currency-subunit-builder',
+      'manager-availability-pill is-currency',
+      'manager-availability-pill-amount',
+      'onUpdateCurrencySubUnit(unit.id, contained.unitId, event.currentTarget.value)',
+      'onDeleteCurrencySubUnit(unit.id, contained.unitId)'
+    ]) {
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+    }
+    assert.ok(
+      rootSource.includes('currencyUnits={selectedCurrencyUnits}'),
+      'root should pass selected currency units to SystemEditView'
+    );
+    assert.ok(
+      rootSource.includes('onAddCurrencySubUnit={onAddCurrencySubUnit}'),
+      'root should pass currency sub-unit actions to SystemEditView'
+    );
+    assert.ok(
+      rootSource.includes('{currencySpendStrategy}'),
+      'root should thread the spend strategy to SystemEditView'
+    );
+    // Three peer top-level spend strategies (actorProperty / actorInventory / macro). The strategy
+    // select renders all three options and the editor branches on each strategy.
+    assert.ok(
+      systemEditSource.includes("currencySpendStrategy === 'actorInventory'"),
+      'currency editor should branch on the actorInventory spend strategy'
+    );
+    for (const value of ['actorProperty', 'actorInventory', 'macro']) {
+      assert.ok(
+        systemEditSource.includes(`value: '${value}'`),
+        `currency editor should offer the ${value} spend strategy option`
+      );
+    }
+    // Currency spend-strategy / provider / macro controls.
+    for (const snippet of [
+      'data-system-currency-strategy-select',
+      'onSetCurrencySpendStrategy(event.currentTarget.value)',
+      // The single shared strategy hint reflects the selected strategy.
+      'data-system-currency-strategy-hint',
+      'currencySpendStrategyHint()',
+      'data-system-currency-provider-select',
+      'onSetCurrencyProvider(event.currentTarget.value)',
+      'data-system-currency-no-provider',
+      'data-system-currency-macros',
+      'data-system-currency-macro-dropzone',
+      'manager-component-source-drop-zone',
+      'use:dragDrop',
+      'resolveDropData',
+      "type !== 'Macro'",
+      'onClearCurrencyMacro(field.key)',
+      // Each empty macro drop zone exposes a field-specific accessible name so the three zones are
+      // distinguishable to assistive tech (the linked-state group already has a field-specific label).
+      'aria-label={currencyMacroDropZoneLabel(field)}'
+    ]) {
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+    }
+    // The nested inventory-mode select is gone — macro is now a peer top-level strategy.
+    assert.ok(
+      !systemEditSource.includes('data-system-currency-inventory-mode-select'),
+      'currency editor should not render the removed nested inventory-mode select'
+    );
+    assert.ok(
+      !systemEditSource.includes('inventoryMode'),
+      'currency editor should not reference the removed inventoryMode model'
+    );
+    // The macro branch renders only under the peer macro strategy.
+    assert.ok(
+      systemEditSource.includes("currencySpendStrategy === 'macro'"),
+      'currency editor should branch on the macro spend strategy'
+    );
+    // A system with no registered provider can still select actorInventory but is steered to the
+    // macro strategy via a no-provider callout, and its units are never wiped.
+    assert.ok(
+      systemEditSource.includes('const currencyHasProviders = $derived(currencyProviderOptions.length > 0)'),
+      'currency editor should derive whether the system has any providers'
+    );
+    // The three macro drop zones (canAfford / increment / decrement) lay out side-by-side in a
+    // single responsive row via a namespaced container class.
+    assert.ok(
+      systemEditSource.includes('manager-currency-macro-zones manager-currency-macro-row'),
+      'macro drop zones should be wrapped in the single-row container'
+    );
+    // Sub-units only drive the engine in actorProperty mode, so the whole sub-unit section (heading,
+    // add control, chips, no-eligible callout) is gated behind a derived macro-mode flag — it must
+    // not render in provider (read-only) or macro modes.
+    assert.ok(
+      systemEditSource.includes('const currencyMacroMode = $derived('),
+      'currency editor should derive a macro-mode flag'
+    );
+    assert.ok(
+      systemEditSource.includes('{#if currencyMacroMode}'),
+      'currency editor should gate the per-unit editor body on the macro-mode flag'
+    );
+    // The sub-unit section markup (heading, add-sub-unit control, chips) lives only inside the
+    // non-macro branch, after the `{#if currencyMacroMode}` gate.
+    assert.ok(
+      systemEditSource.indexOf('{#if currencyMacroMode}') <
+        systemEditSource.indexOf('manager-currency-subunit-section'),
+      'sub-unit section should render only in the non-macro (actorProperty) branch'
+    );
+    // Macro mode shows a conversion hint instead of any sub-unit controls.
+    assert.ok(
+      systemEditSource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
+      'macro mode should include the macro-conversion hint'
+    );
+    // The actorInventory strategy (with a provider) makes the units provider-owned and read-only:
+    // the Add/Seed header actions and the editable unit controls are gated behind a non-read-only
+    // condition, and a dedicated read-only branch with a provider-managed callout renders instead.
+    assert.ok(
+      systemEditSource.includes('const currencyUnitsReadOnly = $derived(currencyShowProviderBranch)'),
+      'currency editor should derive a read-only flag for the active provider inventory branch'
+    );
+    assert.ok(
+      systemEditSource.includes('{#if !currencyUnitsReadOnly}'),
+      'currency editor should gate the Add/Seed header actions behind the non-provider (editable) condition'
+    );
+    assert.ok(
+      systemEditSource.includes('{#if currencyUnitsReadOnly}'),
+      'currency editor should render a dedicated read-only branch in provider mode'
+    );
+    for (const snippet of [
+      'data-system-currency-provider-managed',
+      'manager-currency-provider-managed-callout',
+      'currencyProviderManagedHint()',
+      'manager-currency-provider-managed-summary',
+      'manager-currency-readonly-fields',
+      'data-system-currency-readonly-label',
+      'data-system-currency-abbreviation',
+      'data-system-currency-denomination',
+      'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle'
+    ]) {
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include read-only ${snippet}`);
+    }
+    // Provider read-only units present label/abbreviation/denomination as static field/value pairs;
+    // they must NOT render sub-unit chips. The only `data-system-currency-subunit` occurrence lives
+    // in the editable (actorProperty) branch, after the provider-managed read-only branch.
+    assert.ok(
+      systemEditSource.indexOf('data-system-currency-provider-managed') <
+        systemEditSource.indexOf('data-system-currency-subunit'),
+      'provider-managed read-only branch should render before the editable sub-unit chips'
+    );
+    assert.equal(
+      systemEditSource.split('data-system-currency-subunit=').length - 1,
+      1,
+      'sub-unit chips should appear only once (in the editable actorProperty branch)'
+    );
+    // The read-only branch precedes the editable branch, so the editable controls (editable amount
+    // input, remove cross) live only after the provider-managed branch.
+    assert.ok(
+      systemEditSource.indexOf('data-system-currency-provider-managed') <
+        systemEditSource.indexOf('class="manager-availability-pill-amount"'),
+      'provider-managed read-only branch should render before the editable unit list'
+    );
+    for (const prop of [
+      '{currencyProviderId}',
+      '{currencyMacros}',
+      '{currencyProviderOptions}',
+      'onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}',
+      'onSetCurrencyProvider={onSetCurrencyProvider}',
+      'onSetCurrencyMacro={onSetCurrencyMacro}',
+      'onClearCurrencyMacro={onClearCurrencyMacro}'
+    ]) {
+      assert.ok(rootSource.includes(prop), `root should thread ${prop} to SystemEditView`);
+    }
+    // The removed nested inventory-mode setter must no longer be threaded.
+    assert.ok(
+      !rootSource.includes('onSetCurrencyInventoryMode'),
+      'root should not thread the removed inventory-mode setter'
+    );
+    assert.ok(
+      rootSource.includes('getCurrencyProvidersForFoundrySystem'),
+      'root should derive provider options from the currency provider registry'
+    );
+    // The currency feature toggle lives in the Optional features section, reads
+    // requirements.currency.enabled, and calls onToggleCurrency. It renders always (so the section is
+    // never empty), and the Currency Units card is gated on the enabled flag.
+    for (const snippet of [
+      'const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true)',
+      'data-system-currency-toggle',
+      'onToggleCurrency',
+      'FABRICATE.Admin.Manager.Feature.Currency',
+      'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Currency'
+    ]) {
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+    }
+    // The currency toggle tile renders independently of visibleFeatures, so the toggle list is no
+    // longer hidden behind the empty-feature guard.
+    assert.ok(
+      systemEditSource.includes('data-feature-key="currency"'),
+      'currency toggle tile should always render in the Optional features section'
+    );
+    // The Currency Units card is gated on currencyEnabled.
+    assert.ok(
+      systemEditSource.indexOf('{#if currencyEnabled}') <
+        systemEditSource.indexOf('manager-currency-unit-card'),
+      'Currency Units card should be gated behind the currencyEnabled flag'
+    );
+    assert.ok(
+      rootSource.includes("store.toggleRequirement?.('currency', next)"),
+      'root should thread onToggleCurrency to store.toggleRequirement'
+    );
+    for (const snippet of [
       'class="manager-systems-table"',
       'manager-system-row',
-      'manager-system-identity'
+      'manager-system-identity',
+      // Same-named systems are disambiguated in the rail via the shared helper (issue 346).
+      "import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js'",
+      'buildSystemLabelMap(systems)',
+      'systemDisplayLabel(system, systemLabels)'
     ]) {
       assert.ok(systemsBrowserSource.includes(snippet), `SystemsBrowserView should include ${snippet}`);
     }
@@ -202,6 +418,18 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(recipesBrowserSource.includes(snippet), `RecipesBrowserView should include ${snippet}`);
     }
+    assert.ok(
+      recipesBrowserSource.includes('recipe.incomplete'),
+      'RecipesBrowserView should render the derived Incomplete chip'
+    );
+    assert.ok(
+      recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
+      'RecipesBrowserView should use the localized Incomplete chip label'
+    );
+    assert.ok(
+      /recipe\.incomplete[\s\S]*?manager-chip is-warning/.test(recipesBrowserSource),
+      'Incomplete chip should use the is-warning tone to distinguish it from the locked chip'
+    );
   });
 
   it('keeps presentational Svelte free of direct Foundry globals', () => {
@@ -224,6 +452,30 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Title, 'System settings');
     assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.SaveDetails, 'Save details');
     assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.EditBadge, undefined);
+    assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.Title, 'Currency units');
+    assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.Add, 'Add currency unit');
+    assert.equal(lang.FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit, 'Add sub-unit');
+    for (const key of [
+      'SpendStrategy', 'SpendStrategyHint',
+      'SpendStrategyActorProperty', 'SpendStrategyActorPropertyHint',
+      'SpendStrategyActorInventory', 'SpendStrategyActorInventoryHint',
+      'SpendStrategyMacro', 'SpendStrategyMacroHint',
+      'Provider', 'ProviderHint', 'NoProviders',
+      'MacroCanAfford', 'MacroCanAffordHint', 'MacroIncrement', 'MacroIncrementHint',
+      'MacroDecrement', 'MacroDecrementHint', 'MacroDropHint', 'MacroDropZoneLabel', 'MacroReplaceHint',
+      'MacroUnlink', 'MacroMissing', 'MacroConversionHint',
+      'ProviderManagedTitle', 'ProviderManagedHint'
+    ]) {
+      assert.ok(lang.FABRICATE.Admin.Manager.CurrencyUnits[key], `CurrencyUnits.${key} should be defined`);
+    }
+    // The removed nested inventory-mode localization keys must be gone.
+    for (const key of ['InventoryMode', 'InventoryModeHint', 'InventoryModeProvider', 'InventoryModeMacro']) {
+      assert.equal(
+        lang.FABRICATE.Admin.Manager.CurrencyUnits[key],
+        undefined,
+        `CurrencyUnits.${key} should be removed`
+      );
+    }
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Title, 'Recipes');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Requirements, 'Requirements');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EnableNamed, 'Enable {name}');
@@ -285,10 +537,14 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(managerSource.includes('store.saveSystemDetails?.('), 'system edit should save details through the admin store');
     assert.ok(managerSource.includes('onSetResolutionMode(nextMode)') || managerSource.includes('store.setResolutionMode?.(nextMode)'), 'system edit should delegate resolution changes to the admin store');
     assert.ok(rootSource.includes('store.setResolutionMode?.'), 'root should pass the resolution-mode callback through to the system-edit view');
-    assert.ok(!managerSource.includes("value: 'routed'"), 'system edit should not offer unsupported routed persistence values before runtime support exists');
-    assert.ok(managerSource.includes("value: 'mapped'"), 'system edit should retain the existing routed-by-ingredients persistence value');
-    assert.ok(managerSource.includes("value: 'tiered'"), 'system edit should retain the existing routed-by-check persistence value');
-    assert.ok(rootSource.includes('store.toggleAdvancedOptions?.'), 'root should delegate advanced visibility changes to the admin store');
+    // Scope the resolution/salvage persistence-value assertions to the resolution
+    // mode options module: the alchemy check-mode selector at the top of the Checks
+    // tab's Crafting sub-tab legitimately carries a `value: 'tiered'` check-mode
+    // option that is unrelated to the retired legacy resolution/salvage `tiered` mode.
+    assert.ok(resolutionModeOptionsSource.includes("value: 'routed'"), 'salvage resolution should offer the canonical routed persistence value');
+    assert.ok(!resolutionModeOptionsSource.includes("value: 'mapped'"), 'resolution options should not offer the legacy mapped persistence value');
+    assert.ok(!resolutionModeOptionsSource.includes("value: 'tiered'"), 'resolution options should not offer the legacy tiered persistence value');
+    assert.ok(!rootSource.includes('store.toggleAdvancedOptions?.'), 'root should not retain the removed advanced visibility toggle wiring');
     assert.ok(rootSource.includes('store.toggleFeature?.'), 'root should delegate feature toggles to the admin store');
     assert.ok(!managerSource.includes("storeKey: 'complexRecipes'"), 'system edit should not reintroduce the legacy complex recipes toggle');
     assert.ok(!managerSource.includes("storeKey: 'craftingChecks'"), 'system edit should not reintroduce the legacy crafting checks toggle');
@@ -296,6 +552,130 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!appSource.includes('onEditSystem'), 'v2 wrapper should not provide a row edit service for this action');
     assert.ok(!appSource.includes('openCurrentAdmin'), 'v2 wrapper should not retain a legacy admin fallback service');
     assert.ok(!appSource.includes('LAST_MANAGED_CRAFTING_SYSTEM'), 'v2 row edit should not seed and launch the current admin');
+  });
+
+  it('renames the recipe resolution-mode legend and offers a salvage resolution-mode card', () => {
+    // The recipe card legend is renamed; its consumer is now the Crafting Settings
+    // page (issue 511 moved the resolution cards off System Overview).
+    assert.equal(lang.FABRICATE.Admin.SystemSettings.ResolutionMode, 'Recipe resolution mode');
+    assert.ok(craftingSettingsSource.includes("legendFallback=\"Recipe resolution mode\""), 'crafting settings inline fallback should match the renamed value');
+
+    // Salvage card source hooks: fieldset + option attribute names and the radio group name.
+    assert.ok(craftingSettingsSource.includes('data-crafting-salvage-resolution-mode'), 'crafting settings should declare the salvage fieldset hook');
+    assert.ok(craftingSettingsSource.includes('data-crafting-salvage-resolution-mode-option'), 'crafting settings should declare the salvage option hook');
+    assert.ok(craftingSettingsSource.includes('manager-crafting-salvage-resolution-mode'), 'crafting settings should use the dedicated salvage radio group name');
+
+    // New salvage i18n keys are present and non-empty.
+    for (const key of [
+      'SalvageResolutionMode',
+      'SalvageResolutionModeHint',
+      'SalvageResolutionSimple',
+      'SalvageResolutionSimpleDesc',
+      'SalvageResolutionProgressive',
+      'SalvageResolutionProgressiveDesc',
+      'SalvageResolutionRouted',
+      'SalvageResolutionRoutedDesc',
+      'ResolutionComingSoon'
+    ]) {
+      const value = lang.FABRICATE.Admin.SystemSettings[key];
+      assert.equal(typeof value, 'string', `SystemSettings.${key} should be a string`);
+      assert.ok(value.length > 0, `SystemSettings.${key} should be non-empty`);
+    }
+
+    // Salvage option-set guard: the salvage options offer simple (default) +
+    // progressive + routed, but never alchemy (no ingredient-set routing).
+    const salvageOptionsMatch = resolutionModeOptionsSource.match(/salvageResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
+    assert.ok(salvageOptionsMatch, 'the shared module should define a salvageResolutionModeOptions array');
+    const salvageOptionsBlock = salvageOptionsMatch[1];
+    assert.ok(salvageOptionsBlock.includes("value: 'simple'"), 'salvage should offer simple');
+    assert.ok(salvageOptionsBlock.includes("value: 'progressive'"), 'salvage should offer progressive');
+    assert.ok(salvageOptionsBlock.includes("value: 'routed'"), 'salvage should offer routed');
+    assert.ok(!salvageOptionsBlock.includes("value: 'alchemy'"), 'salvage should NOT offer alchemy');
+
+    // Persistence wiring threaded from the root through the crafting settings view to the store.
+    assert.ok(craftingSettingsSource.includes('onSetSalvageResolutionMode'), 'crafting settings should accept the salvage persistence prop');
+    assert.ok(rootSource.includes('store.setSalvageResolutionMode?.'), 'root should pass the salvage callback through to the crafting settings view');
+  });
+
+  it('offers a gathering resolution-mode card with d100 selectable and progressive/routed coming soon', () => {
+    const gatheringEconomySource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte'),
+      'utf8'
+    );
+    assert.ok(gatheringEconomySource.includes('data-gathering-resolution-mode'), 'gathering view should declare the resolution fieldset hook');
+    assert.ok(gatheringEconomySource.includes('data-gathering-resolution-mode-option'), 'gathering view should declare the resolution option hook');
+    assert.ok(gatheringEconomySource.includes('manager-gathering-resolution-mode'), 'gathering view should use the dedicated resolution radio group name');
+
+    const optionsMatch = gatheringEconomySource.match(/gatheringResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/);
+    assert.ok(optionsMatch, 'gathering view should define a gatheringResolutionModeOptions array');
+    const optionsBlock = optionsMatch[1];
+    assert.ok(optionsBlock.includes("value: 'd100'"), 'gathering should offer d100');
+    assert.ok(optionsBlock.includes("value: 'progressive'"), 'gathering should offer progressive');
+    assert.ok(optionsBlock.includes("value: 'routed'"), 'gathering should offer routed');
+
+    // d100 is selectable; progressive/routed are disabled coming-soon affordances.
+    assert.equal(lang.FABRICATE.Admin.Manager.Economy.GatheringResolutionMode, 'Gathering resolution mode');
+    for (const key of ['D100', 'D100Desc', 'Progressive', 'Routed']) {
+      const value = lang.FABRICATE.Admin.Manager.Economy.Resolution[key];
+      assert.equal(typeof value, 'string', `Economy.Resolution.${key} should be a string`);
+      assert.ok(value.length > 0, `Economy.Resolution.${key} should be non-empty`);
+    }
+  });
+
+  it('folds the validation overview into a full-width tabbed System Overview page (#429)', () => {
+    // The standalone overview route and the legacy "Edit summary" key are gone.
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Summary, undefined, 'the legacy Summary key is removed');
+    assert.ok(!rootSource.includes('SystemEdit.Summary'), 'no consumer references the removed Summary key');
+
+    // The System Overview page is the renamed system-edit route; the page title,
+    // breadcrumb, and nav label all read "System Overview".
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.Nav, 'System Overview', 'the nav item is renamed System Overview');
+    assert.equal(lang.FABRICATE.Admin.Manager.SystemEdit.PageTitle, 'System Overview');
+    assert.ok(
+      rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.PageTitle', 'System Overview')"),
+      'the page title reads System Overview'
+    );
+    assert.ok(
+      rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')"),
+      'the renamed nav item reads System Overview'
+    );
+
+    // The standalone Overview route was folded into the system-edit page; its old
+    // nav item and routed view token are gone.
+    assert.ok(!rootSource.includes('data-nav-system-overview'), 'the standalone Overview nav item is removed');
+    assert.ok(!rootSource.includes("activeView = 'system-overview'"), 'no route transitions to the standalone overview view');
+    assert.ok(rootSource.includes("if (view === 'system-overview') return 'system-edit'"), 'a stale overview token folds into the system-edit page');
+
+    // The renamed nav item uses the validation clipboard icon and carries the
+    // open-issue badge that the standalone Overview item used to own.
+    assert.ok(
+      rootSource.includes('data-nav-system-edit'),
+      'the renamed nav item exposes a stable data hook'
+    );
+    assert.ok(
+      rootSource.includes("{#if systemOverviewCount > 0}"),
+      'the renamed nav item carries the open-validation-issue badge'
+    );
+
+    // The page is a full-width tabbed shell mirroring the environment editor: the
+    // shared inspector is skipped, and SystemEditView owns the tabs + workspace.
+    assert.ok(
+      rootSource.includes("currentView !== 'system-edit'") &&
+        rootSource.includes("class=\"manager-inspector\""),
+      'the shared inspector is skipped for the full-width system-edit page'
+    );
+    assert.ok(systemEditSource.includes('SystemEditorTabs'), 'SystemEditView renders the tab bar');
+    assert.ok(systemEditSource.includes("activeTab === 'settings'"), 'Settings is a tab panel');
+    assert.ok(systemEditSource.includes("activeTab === 'validation'"), 'Validation is a tab panel');
+    assert.ok(systemEditSource.includes('SystemOverviewView'), 'the Validation tab renders the overview list');
+    assert.ok(systemEditSource.includes('manager-system-workspace'), 'the workspace mirrors the environment workspace');
+
+    // Recipe detail facts still use the shared inline fact-line/fact-label
+    // typography as the environment details card (the layout reference).
+    assert.ok(
+      rootSource.includes('<span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">'),
+      'recipe details facts use the shared manager-fact-line/label styling'
+    );
   });
 
   it('keeps first-slice action and navigation hierarchy focused', () => {
@@ -306,8 +686,8 @@ describe('CraftingSystemManager source contract', () => {
       'root should derive selected-system placeholder nav from selection and feature gates'
     );
     assert.ok(rootSource.includes('recipesRouteEnabled'), 'root should derive the recipes route from the experimental feature gate');
-    assert.ok(rootSource.includes("view === 'recipes' && !recipesAvailable"), 'route normalization should reject recipes while the experimental gate is disabled');
-    assert.ok(rootSource.includes("if (view === 'recipes' && !recipesRouteEnabled) return;"), 'setView should refuse direct recipes navigation while disabled');
+    assert.ok(rootSource.includes('CRAFTING_VIEWS.includes(view) && !recipesAvailable'), 'route normalization should reject every crafting view while the experimental gate is disabled');
+    assert.ok(rootSource.includes("if ((view === 'recipes' || view === 'crafting-settings' || view === 'access' || view === 'books-scrolls' || view === 'recipe-item-edit') && !recipesRouteEnabled) return;"), 'setView should refuse direct recipes/crafting navigation while disabled');
     assert.ok(rootSource.includes("{#if recipesRouteEnabled}"), 'recipes should not be hard-wired as an always-active rail route');
     assert.ok(
       rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),
@@ -500,18 +880,27 @@ describe('CraftingSystemManager source contract', () => {
     for (const snippet of [
       'store.setRecipeSearch?.',
       'store.toggleRecipeEnabled?.',
-      'store.importRecipes?.()',
-      'store.exportRecipes?.()',
+      'store.createRecipe?.()',
       'store.duplicateRecipe?.(recipeId)',
       'store.deleteRecipe?.(recipeId)'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
     }
-    // The standalone Recipe Editor was removed, so recipe create/edit (which
-    // only opened that window) are no longer wired from the manager.
-    assert.ok(!rootSource.includes('store.createRecipe'), 'recipe creation wiring should be removed');
-    assert.ok(!rootSource.includes('onEditRecipe'), 'recipe edit wiring should be removed');
-    assert.ok(!rootSource.includes('saveRecipe'), 'recipes browser should not introduce inline save behavior');
+    // The recipes header now offers a single primary "Create recipe" action
+    // (create-then-edit) instead of crafting-system import/export, which moved off
+    // the recipes header entirely.
+    assert.ok(rootSource.includes('function createRecipe('), 'createRecipe handler should be defined');
+    assert.ok(!rootSource.includes('onclick={importRecipes}'), 'recipes header should not render import');
+    assert.ok(!rootSource.includes('onclick={exportRecipes}'), 'recipes header should not render export');
+    // The row Edit action navigates to the in-manager recipe-edit route, so the
+    // editRecipe / backToRecipesBrowse / onEditRecipe wiring must be present.
+    assert.ok(rootSource.includes('onEditRecipe'), 'recipe edit prop should be wired to RecipesBrowserView');
+    assert.ok(rootSource.includes('function editRecipe('), 'editRecipe navigation should be defined');
+    assert.ok(rootSource.includes('function backToRecipesBrowse('), 'backToRecipesBrowse navigation should be defined');
+    assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');
+    // saveRecipeDraft lives in the root (it commits the root-held draft), so scope
+    // the inline-save absence to the browser source instead.
+    assert.ok(!recipesBrowserSource.includes('saveRecipe'), 'recipes browser should not introduce inline save behavior');
     assert.ok(!rootSource.includes('required station'), 'recipes browser should not introduce unsupported recipe fields');
   });
 

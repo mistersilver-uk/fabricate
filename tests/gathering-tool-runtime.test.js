@@ -14,6 +14,7 @@ import {
   matchGatheringTools
 } from '../src/gatheringToolRuntime.js';
 import { createToolBreakageRuntime } from '../src/toolBreakageRuntime.js';
+import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
 
 function makeRunManager() {
   let createdTerminal = null;
@@ -112,7 +113,7 @@ function makeSimpleEngine({
   toolBreakagePolicy = 'failureOnBreak',
   libraryTools = []
 }) {
-  const system = { id: 'system-a', enabled: true, features: { gathering: true } };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
     id: 'env-a',
     craftingSystemId: 'system-a',
@@ -139,14 +140,6 @@ function makeSimpleEngine({
     sceneAccess: { canAttempt: async () => ({ allowed: true }) },
     toolAvailability: makeAvailability({ missing: toolMissing, failedRequirements }),
     toolBreakage: breakage.impl,
-    resultResolver: {
-      async resolveRouted() {
-        return {
-          status: 'succeeded',
-          resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }]
-        };
-      }
-    },
     resultCreator: {
       async plan() { return []; },
       async create() { return []; }
@@ -163,7 +156,6 @@ function baseTask(overrides = {}) {
     enabled: true,
     resolutionMode: 'routed',
     tools: [],
-    resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.x' },
     resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }],
     ...overrides
   };
@@ -211,7 +203,13 @@ test('startAttempt succeeds with available tool and runs breakage plan/apply', a
     toolPlan: [{ componentId: 'comp-axe', mode: 'limitedUses', broken: false }],
     toolApply: [{ componentId: 'comp-axe', broken: false }]
   });
-  const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'succeeded');
   assert.equal(breakage.calls.plan, 1);
@@ -300,7 +298,7 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
     broken: false
   }];
   const task = baseTask({ toolIds: ['tool-axe'], timeRequirement: { minutes: 10 } });
-  const system = { id: 'system-a', enabled: true, features: { gathering: true } };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
     id: 'env-a',
     craftingSystemId: 'system-a',
@@ -338,14 +336,6 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
     getSystems: () => [system],
     getRunViewer: () => viewer,
     toolBreakage: breakage.impl,
-    resultResolver: {
-      async resolveRouted() {
-        return {
-          status: 'succeeded',
-          resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }]
-        };
-      }
-    },
     resultCreator: { plan: async () => [], create: async () => [] },
     failureFeedback: { apply: async () => null }
   });
@@ -384,7 +374,13 @@ test('successDespiteBreak policy preserves success even when a tool breaks', asy
     toolApply: [{ componentId: 'comp-axe', broken: true, onBreak: { action: 'flagged' } }],
     toolBreakagePolicy: 'successDespiteBreak'
   });
-  const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'succeeded');
   assert.equal(result.usedTools[0].broken, true);
@@ -405,7 +401,13 @@ test('multi-tool: any missing tool blocks the start', async () => {
 
 test('legacy task without tools is unaffected', async () => {
   const { engine, breakage } = makeSimpleEngine({ task: baseTask() });
-  const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(result.accepted, true);
   assert.equal(result.state, 'succeeded');
   assert.equal(breakage.calls.plan, 0, 'no tools means no breakage planning');
@@ -686,7 +688,7 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
   // virtual-present injection is exercised end to end (not via mocks).
   const tool = { componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
   const task = baseTask({ tools: [tool] });
-  const system = { id: 'system-a', enabled: true, features: { gathering: true } };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
     id: 'env-a', craftingSystemId: 'system-a', enabled: true, selectionMode: 'targeted', tasks: [task]
   };
@@ -713,11 +715,6 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
         matchGatheringTools({ actor, system: sys, task: t, tools, craftingSystemManager: matcher, presentTools }),
       buildItemRef: (_actor, item) => { buildRefs.push(item); return { actorUuid: null, itemUuid: item?.componentId ?? null, quantity: 1 }; }
     }),
-    resultResolver: {
-      async resolveRouted() {
-        return { status: 'succeeded', resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }] };
-      }
-    },
     resultCreator: { plan: async () => [], create: async () => [] },
     failureFeedback: { apply: async () => null }
   });
@@ -738,12 +735,117 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
 
   // WITH the active tool scoped to the matching system the attempt succeeds and
   // applies no usage/breakage.
-  const ok = await engine.startAttempt({
-    viewer, environmentId: 'env-a', taskId: 'task-a',
-    presentTools: { systemId: 'system-a', componentIds: ['comp-axe'] }
-  });
+  let ok;
+  routedRoll(true);
+  try {
+    ok = await engine.startAttempt({
+      viewer, environmentId: 'env-a', taskId: 'task-a',
+      presentTools: { systemId: 'system-a', componentIds: ['comp-axe'] }
+    });
+  } finally {
+    delete globalThis.Roll;
+  }
   assert.equal(ok.accepted, true);
   assert.equal(ok.state, 'succeeded');
   assert.deepEqual(ok.usedTools, [], 'no usedTools evidence for the virtual canvas tool');
   assert.equal(buildRefs.length, 0, 'breakage runtime never touched an owned item');
+});
+
+// ---------------------------------------------------------------------------
+// checkDriven authority parity via the shared runtime (issue 419)
+// ---------------------------------------------------------------------------
+
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import {
+  BreakageFakeItem as RuntimeFakeItem,
+  NATURAL_ONE_TRIGGER,
+  NATURAL_ONE_RESULT,
+  CHECK_DRIVEN_SYSTEM,
+} from './helpers/checkDrivenBreakageFixtures.js';
+
+function gatheringRuntime(items) {
+  return createToolBreakageRuntime({
+    matchTools: () => ({ items, missing: [] }),
+    buildItemRef: (actor, item) => ({ actorUuid: actor?.uuid ?? null, itemUuid: item.uuid, quantity: 1 })
+  });
+}
+
+const GATHER_TRIGGER = NATURAL_ONE_TRIGGER;
+const GATHER_RESULT = NATURAL_ONE_RESULT;
+const checkDrivenSystem = CHECK_DRIVEN_SYSTEM;
+
+test('gathering checkDriven runtime: forces breakage on non-immune tools, immune survives', async () => {
+  const axe = new RuntimeFakeItem('Item.gaxe');
+  const anvil = new RuntimeFakeItem('Item.ganvil');
+  const runtime = gatheringRuntime([
+    { tool: { componentId: 'gaxe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+    { tool: { componentId: 'ganvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } }, item: anvil }
+  ]);
+  const args = { actor: { uuid: 'Actor.g' }, task: { id: 'task-a' }, system: checkDrivenSystem, checkResult: GATHER_RESULT, checkBreakage: GATHER_TRIGGER };
+  await runtime.plan(args);
+  const applied = await runtime.apply(args);
+  const byId = Object.fromEntries(applied.map(e => [e.componentId, e]));
+  assert.equal(byId.gaxe.broken, true);
+  assert.equal(byId.gaxe.reason, 'Check breakage');
+  assert.equal(byId.ganvil.broken, false);
+  assert.equal(byId.ganvil.skippedImmune, true);
+});
+
+test('gathering/crafting drift: the gathering apply breaks exactly what the crafting resolver decides', async () => {
+  // ONE shared persisted checkDriven system + ONE engine-evaluated roll. The
+  // crafting resolver decides the break; the gathering runtime APPLIES it to a real
+  // item. If either surface drifts (resolver decision or runtime application), the
+  // crafting decision and the applied gathering evidence diverge and this fails.
+  const system = {
+    toolBreakage: { authority: 'checkDriven' },
+    resolutionMode: 'simple',
+    craftingCheck: { simple: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+    gatheringCraftingCheck: { routed: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+  };
+
+  // Crafting decision via the REAL resolver (resolution-mode service stub → simple).
+  const craftingEngine = new CraftingEngine(null, null, { getMode: () => 'simple' });
+  const craftingDecision = craftingEngine._resolveCraftingBreakageDecision(
+    system,
+    { id: 'r', craftingSystemId: 'sys' },
+    NATURAL_ONE_RESULT
+  );
+  assert.equal(craftingDecision.forceBreak, true, 'crafting resolver forces the break');
+
+  // Gathering APPLICATION via the real shared runtime against a real item.
+  const axe = new RuntimeFakeItem('Item.drift-axe');
+  const runtime = gatheringRuntime([
+    { tool: { componentId: 'drift-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+  ]);
+  const args = {
+    actor: { uuid: 'Actor.g' },
+    task: { id: 'task-drift', resolutionMode: 'routed' },
+    system,
+    checkResult: NATURAL_ONE_RESULT,
+    // The gathering surface resolves checkBreakage from the routed gathering check,
+    // exactly as GatheringEngine._planTerminalTools/_applyTerminalTools wire it.
+    checkBreakage: system.gatheringCraftingCheck.routed.checkBreakage,
+  };
+  await runtime.plan(args);
+  const applied = await runtime.apply(args);
+
+  // The gathering application result must agree with the crafting decision: same
+  // forceBreak verdict, same triggerId, same human-readable reason on the broken tool.
+  assert.equal(applied[0].broken, craftingDecision.forceBreak, 'gathering breaks iff crafting decided to');
+  assert.equal(applied[0].triggerId, craftingDecision.triggerId, 'same triggerId across surfaces');
+  assert.equal(applied[0].reason, craftingDecision.reason, 'same break reason across surfaces');
+});
+
+test('gathering checkDriven runtime: the realm toolBreakagePolicy is orthogonal to the break decision', async () => {
+  // The breakage runtime decides WHETHER a tool breaks; the realm toolBreakagePolicy
+  // (failureOnBreak/successDespiteBreak) governs what a broken tool does to the gather
+  // outcome and is applied elsewhere — it never reaches the runtime, so the break
+  // decision is the same regardless of policy.
+  const axe = new RuntimeFakeItem('Item.gaxe2');
+  const runtime = gatheringRuntime([
+    { tool: { componentId: 'gaxe2', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'flagBroken' } }, item: axe }
+  ]);
+  const args = { actor: { uuid: 'Actor.g' }, task: { id: 'task-b' }, system: checkDrivenSystem, checkResult: GATHER_RESULT, checkBreakage: GATHER_TRIGGER };
+  const applied = await runtime.apply(args);
+  assert.equal(applied[0].broken, true, 'the decision depends only on the check, not the realm policy');
 });

@@ -32,31 +32,7 @@
  * no drop). Runs at the new highest version (1.0.0), after all prior migrations.
  */
 
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function clone(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
-
-/**
- * Rename `oldKey` → `newKey` on a plain object in place, but only when `oldKey`
- * is present and `newKey` is absent (idempotent; never clobbers an existing new
- * key). A stale `oldKey` left beside an existing `newKey` is removed only when it
- * would otherwise duplicate — here we leave it inert to avoid data loss.
- *
- * @param {object} obj
- * @param {string} oldKey
- * @param {string} newKey
- */
-function renameKey(obj, oldKey, newKey) {
-  if (!isPlainObject(obj)) return;
-  if (!Object.prototype.hasOwnProperty.call(obj, oldKey)) return;
-  if (Object.prototype.hasOwnProperty.call(obj, newKey)) return; // already migrated → leave stale inert
-  obj[newKey] = obj[oldKey];
-  delete obj[oldKey];
-}
+import { isPlainObject, clone, renameKey } from './migrationHelpers.js';
 
 const POLICY_VALUE_REMAP = {
   successWithHazard: 'successWithEvent',

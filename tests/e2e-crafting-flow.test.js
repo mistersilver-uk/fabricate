@@ -7,7 +7,7 @@
  * Groups:
  *   1. Simple mode — validate, consume, create result
  *   2. Multi-step — start, advance, complete
- *   3. Legacy tiered compatibility mode — check macro returns outcome, routed to correct result group
+ *   3. Routed check — check macro returns outcome, name-matched to a result group
  *   4. Progressive mode — check macro returns value, awards based on difficulty
  */
 import test from 'node:test';
@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
+import { Tool } from '../src/models/Tool.js';
 
 // ---------------------------------------------------------------------------
 // Globals required for the modules to load
@@ -39,12 +40,12 @@ globalThis.ui = {
 /**
  * Build a fake actor item that tracks delete() and update() calls.
  */
-function makeItem({ id, name = `Item ${id}`, quantity = 1, sourceUuid = null } = {}) {
+function makeItem({ id, name = `Item ${id}`, quantity = 1, registeredItemUuid = null } = {}) {
   return {
     id,
     uuid: `Item.${id}`,
     name,
-    sourceUuid,
+    registeredItemUuid,
     parent: null,
     system: { quantity },
     effects: [],
@@ -138,6 +139,7 @@ function makeRecipe({
   ingredientSets = [],
   resultGroups = [],
   outcomeRouting = null,
+  resultSelection = null,
   steps = null
 } = {}) {
   const recipe = {
@@ -147,6 +149,7 @@ function makeRecipe({
     ingredientSets,
     resultGroups,
     outcomeRouting,
+    resultSelection,
     transferEffects: false,
     validate() { return { valid: true, errors: [] }; },
     toJSON() { return { id: this.id, name: this.name, craftingSystemId: this.craftingSystemId }; }
@@ -163,20 +166,19 @@ function makeSystem({
   resolutionMode = 'simple',
   craftingCheck = null,
   managedItems = [],
-  features = {}
+  features = {},
+  toolBreakage = undefined
 } = {}) {
   const sys = {
     id,
     resolutionMode,
+    ...(toolBreakage ? { toolBreakage } : {}),
     features: { multiStepRecipes: false, craftingChecks: false, essences: false, ...features },
     craftingCheck: craftingCheck || {
       enabled: false,
-      macroUuid: null,
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: [],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false }
     },
     managedItems,
     components: managedItems
@@ -239,7 +241,7 @@ test('simple mode: successful craft consumes ingredient and creates result item'
   const system = makeSystem({
     id: 'sys-1',
     resolutionMode: 'simple',
-    managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }]
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }]
   });
   setupGame(system);
 
@@ -262,8 +264,6 @@ test('simple mode: successful craft consumes ingredient and creates result item'
   const recipeManager = makeRecipeManager({ ingredientItem: herb, ingredientSet });
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -325,7 +325,7 @@ test('simple mode: exact quantity match deletes ingredient item', async () => {
   const system = makeSystem({
     id: 'sys-1',
     resolutionMode: 'simple',
-    managedItems: [{ id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }]
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }]
   });
   setupGame(system);
 
@@ -348,8 +348,6 @@ test('simple mode: exact quantity match deletes ingredient item', async () => {
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -417,8 +415,8 @@ test('multi-step: craft() advances through two steps to completion', async () =>
     id: 'sys-1',
     resolutionMode: 'simple',
     managedItems: [
-      { id: 'comp-extract', sourceUuid: 'uuid:extract', difficulty: 1 },
-      { id: 'comp-ingot', sourceUuid: 'uuid:ingot', difficulty: 1 }
+      { id: 'comp-extract', registeredItemUuid: 'uuid:extract', difficulty: 1 },
+      { id: 'comp-ingot', registeredItemUuid: 'uuid:ingot', difficulty: 1 }
     ]
   });
   setupGame(system);
@@ -474,8 +472,6 @@ test('multi-step: craft() advances through two steps to completion', async () =>
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   // Step 1: craft creates the run and executes step 0
   const result1 = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -494,6 +490,88 @@ test('multi-step: craft() advances through two steps to completion', async () =>
 
   // Both steps created result items
   assert.ok(craftingActor.createdItems.length >= 2, 'result items created across both steps');
+});
+
+test('multi-step: a cancelled interactive continuation aborts the resume with zero mutation', async () => {
+  const system = makeSystem({
+    id: 'sys-1',
+    resolutionMode: 'simple',
+    managedItems: [
+      { id: 'comp-extract', registeredItemUuid: 'uuid:extract', difficulty: 1 },
+      { id: 'comp-ingot', registeredItemUuid: 'uuid:ingot', difficulty: 1 }
+    ]
+  });
+  setupGame(system);
+
+  const extractSource = makeSourceItem('Extract');
+  const ingotSource = makeSourceItem('Ingot');
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'uuid:extract') return extractSource;
+    if (uuid === 'uuid:ingot') return ingotSource;
+    return null;
+  };
+
+  const herb = makeItem({ id: 'herb-cc', name: 'Herb', quantity: 3 });
+  const ore = makeItem({ id: 'ore-cc', name: 'Ore', quantity: 2 });
+
+  const set1 = makeIngredientSet({ id: 'set-step1', ingredientItem: herb, quantity: 1 });
+  const set2 = makeIngredientSet({ id: 'set-step2', ingredientItem: ore, quantity: 1 });
+
+  const steps = [
+    {
+      id: 'step-1', name: 'Step 1',
+      ingredientSets: [set1],
+      resultGroups: [{ id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'comp-extract', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
+    },
+    {
+      id: 'step-2', name: 'Step 2',
+      ingredientSets: [set2],
+      resultGroups: [{ id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'comp-ingot', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
+    }
+  ];
+
+  const recipe = makeRecipe({ craftingSystemId: 'sys-1', steps });
+  const sourceActor = makeActor({ id: 'a-cc', items: [herb, ore] });
+  const craftingActor = makeActor({ id: 'a-cc' });
+  const runManager = makeRunManager(2);
+
+  const recipeManager = {
+    canCraft(_actors, executionRecipe) {
+      const currentSets = executionRecipe.ingredientSets || [];
+      if (currentSets.some(s => s.id === 'set-step1')) {
+        return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [] } };
+      }
+      if (currentSets.some(s => s.id === 'set-step2')) {
+        return { canCraft: true, satisfiableSet: set2, missing: { ingredients: [], essences: [] } };
+      }
+      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [], essences: [] } };
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) { return item.id === ingredient.systemItemId; }
+  };
+
+  const resolutionService = makeResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  // Step 1 succeeds and advances the run to step index 1.
+  const result1 = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(result1.success, true, 'step 1 should succeed');
+  assert.equal(runManager.storedRun.currentStepIndex, 1, 'advanced to step index 1');
+
+  // The continuation (step 2) is triggered interactively and the player cancels the
+  // roll dialog: abort with zero mutation and do NOT advance the run.
+  engine._runCraftingCheck = async () => ({ success: false, cancelled: true });
+  const oreConsumedBefore = ore.updateCalled || ore.deleteCalled;
+  const result2 = await engine.craft(craftingActor, [sourceActor], recipe, null, {
+    runId: 'run-1',
+    interactive: true
+  });
+
+  assert.equal(result2.success, false, 'cancelled continuation is not a success');
+  assert.equal(result2.cancelled, true, 'cancelled flag surfaced');
+  assert.equal(runManager.storedRun.currentStepIndex, 1, 'run did NOT advance past step index 1');
+  assert.equal(runManager.storedRun.status, 'inProgress', 'run still in progress after cancel');
+  assert.equal(ore.updateCalled || ore.deleteCalled, oreConsumedBefore, 'step-2 ingredient not consumed on cancel');
 });
 
 test('multi-step: craft() returns failure when step ingredient is insufficient', async () => {
@@ -538,25 +616,22 @@ test('multi-step: craft() returns failure when step ingredient is insufficient',
 });
 
 // ===========================================================================
-// Group 3: Legacy tiered compatibility mode — check macro returns outcome, routed to correct result group
+// Group 3: Routed check — check macro returns outcome, name-matched to a result group
 // ===========================================================================
 
 function makeLegacyOutcomeRoutingSystem(id = 'sys-legacy-routing') {
   return makeSystem({
     id,
-    resolutionMode: 'tiered',
+    resolutionMode: 'routedByCheck',
     craftingCheck: {
       enabled: true,
-      macroUuid: 'macro:check',
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: ['critical', 'pass', 'fail'],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
-      { id: 'comp-great-potion', sourceUuid: 'uuid:great-potion', difficulty: 1 },
-      { id: 'comp-potion', sourceUuid: 'uuid:potion', difficulty: 1 }
+      { id: 'comp-great-potion', registeredItemUuid: 'uuid:great-potion', difficulty: 1 },
+      { id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }
     ]
   });
 }
@@ -565,26 +640,29 @@ function makeLegacyOutcomeRoutingRecipeFixture(system) {
   const herb = makeItem({ id: 'herb-routing', name: 'Herb', quantity: 5 });
   const ingredientSet = makeIngredientSet({ id: 'set-routing', ingredientItem: herb, quantity: 1 });
 
+  // Canonical routed + check (the 1.4.0 migration output): groups are
+  // name-matched against the outcome. The non-reserved outcomes `critical`/`pass`
+  // name their groups; the reserved `fail` outcome takes the failure path.
   const step = {
     id: 'step-1', name: 'Step 1',
     ingredientSets: [ingredientSet],
     resultGroups: [
-      { id: 'rg-critical', results: [{ id: 'r-critical', componentId: 'comp-great-potion', quantity: 1 }] },
-      { id: 'rg-pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }
+      { id: 'rg-critical', name: 'critical', results: [{ id: 'r-critical', componentId: 'comp-great-potion', quantity: 1 }] },
+      { id: 'rg-pass', name: 'pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }
     ],
-    outcomeRouting: { critical: 'rg-critical', pass: 'rg-pass', fail: 'rg-pass' }, timeRequirement: null
+    resultSelection: { provider: 'check' }, timeRequirement: null
   };
 
   const recipe = makeRecipe({
     craftingSystemId: system.id,
-    outcomeRouting: { critical: 'rg-critical', pass: 'rg-pass', fail: 'rg-pass' },
+    resultSelection: { provider: 'check' },
     steps: [step]
   });
 
   return { herb, ingredientSet, step, recipe };
 }
 
-test('legacy tiered compatibility mode: "critical" outcome routes to high-value result group', async () => {
+test('routed check: "critical" outcome routes to the critical-named result group', async () => {
   const system = makeLegacyOutcomeRoutingSystem('sys-legacy-routing-1');
   setupGame(system);
 
@@ -604,17 +682,15 @@ test('legacy tiered compatibility mode: "critical" outcome routes to high-value 
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'critical', value: 20, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(result.success, true, 'legacy tiered compatibility craft should succeed');
+  assert.equal(result.success, true, 'routed check craft should succeed');
   assert.equal(craftingActor.createdItems.length, 1, 'exactly one result item created');
   assert.equal(craftingActor.createdItems[0].name, 'Greater Potion', '"critical" outcome routes to Greater Potion');
 });
 
-test('legacy tiered compatibility mode: "pass" outcome routes to normal result group', async () => {
+test('routed check: "pass" outcome routes to the pass-named result group', async () => {
   const system = makeLegacyOutcomeRoutingSystem('sys-legacy-routing-2');
   setupGame(system);
 
@@ -640,17 +716,15 @@ test('legacy tiered compatibility mode: "pass" outcome routes to normal result g
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'pass', value: 10, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(result.success, true, 'legacy tiered compatibility craft should succeed with "pass" outcome');
+  assert.equal(result.success, true, 'routed check craft should succeed with "pass" outcome');
   assert.equal(craftingActor.createdItems.length, 1, 'exactly one result item created');
   assert.equal(craftingActor.createdItems[0].name, 'Potion', '"pass" outcome routes to normal Potion');
 });
 
-test('legacy tiered compatibility mode: check failure returns failure without creating results', async () => {
+test('routed check: check failure returns failure without creating results', async () => {
   const system = makeLegacyOutcomeRoutingSystem('sys-legacy-routing-3');
   setupGame(system);
   globalThis.fromUuid = async () => null;
@@ -661,13 +735,13 @@ test('legacy tiered compatibility mode: check failure returns failure without cr
   const step = {
     id: 'step-1', name: 'Step 1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }],
-    outcomeRouting: { critical: 'rg-pass', pass: 'rg-pass', fail: 'rg-pass' }, timeRequirement: null
+    resultGroups: [{ id: 'rg-pass', name: 'pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }],
+    resultSelection: { provider: 'check' }, timeRequirement: null
   };
 
   const recipe = makeRecipe({
     craftingSystemId: system.id,
-    outcomeRouting: { critical: 'rg-pass', pass: 'rg-pass', fail: 'rg-pass' },
+    resultSelection: { provider: 'check' },
     steps: [step]
   });
 
@@ -678,12 +752,10 @@ test('legacy tiered compatibility mode: check failure returns failure without cr
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: false, message: 'Roll too low', outcome: null, value: null, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(result.success, false, 'legacy tiered compatibility craft should fail when check fails');
+  assert.equal(result.success, false, 'routed check craft should fail when check fails');
   assert.match(result.message, /Roll too low/i, 'failure message should propagate');
   assert.equal(craftingActor.createdItems.length, 0, 'no items created on check failure');
 });
@@ -698,17 +770,14 @@ function makeProgressiveSystem(id = 'sys-prog') {
     resolutionMode: 'progressive',
     craftingCheck: {
       enabled: true,
-      macroUuid: 'macro:check',
-      successMacroUuid: null,
-      failureMacroUuid: null,
       outcomes: [],
-      progressive: { awardMode: 'equal' },
-      consumption: { consumeIngredientsOnFail: false, consumeCatalystsOnFail: false }
+      progressive: { awardMode: 'equal', rollFormula: '1d20' },
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
     },
     managedItems: [
-      { id: 'comp-a', sourceUuid: 'uuid:item-a', difficulty: 3 },
-      { id: 'comp-b', sourceUuid: 'uuid:item-b', difficulty: 5 },
-      { id: 'comp-c', sourceUuid: 'uuid:item-c', difficulty: 7 }
+      { id: 'comp-a', registeredItemUuid: 'uuid:item-a', difficulty: 3 },
+      { id: 'comp-b', registeredItemUuid: 'uuid:item-b', difficulty: 5 },
+      { id: 'comp-c', registeredItemUuid: 'uuid:item-c', difficulty: 7 }
     ]
   });
 }
@@ -752,8 +821,6 @@ test('progressive mode: check value 8 awards comp-a (cost 3) and comp-b (cost 5)
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   // Value 8: covers A (cost 3, remaining=5) and B (cost 5, remaining=0), but NOT C (cost 7)
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 8, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -789,8 +856,6 @@ test('progressive mode: check value 0 awards no results', async () => {
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 0, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -834,8 +899,6 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
   // Value 20 easily covers A (cost 3) and B (cost 5)
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: 20, data: {} });
-  engine._runSuccessMacro = async () => {};
-  engine._runFailureMacro = async () => {};
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -844,4 +907,174 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
   const names = craftingActor.createdItems.map(i => i.name);
   assert.ok(names.includes('Item A'), 'Item A should be created');
   assert.ok(names.includes('Item B'), 'Item B should be created');
+});
+
+// ===========================================================================
+// Group 5: Check-failure breakTools — the engine-evaluated forced-failure crit
+// breaks the owned tool on the breakToolsOnFail path. Each half (the
+// engine check surfacing data.breakTools, and _applyToolBreakage forcing a
+// never-breaking tool) is unit-proven; this exercises the craft() glue end to end.
+// ===========================================================================
+
+// An owned tool item whose Foundry flag set is tracked in a plain map, so
+// flagBroken on-break writes are observable without a Foundry runtime.
+function makeOwnedToolItem(componentId = 'hammer') {
+  const flags = {};
+  const item = {
+    id: `tool-${componentId}`,
+    uuid: `Item.tool-${componentId}`,
+    name: 'Hammer',
+    parent: { uuid: 'Actor.owner', id: 'owner' },
+    getFlag(ns, key) {
+      return flags[`${ns}.${key}`];
+    },
+    async setFlag(ns, key, value) {
+      flags[`${ns}.${key}`] = value;
+      return value;
+    },
+  };
+  return { item, flags };
+}
+
+test('check-failure breakTools: a forced-failure engine crit breaks the owned tool on the breakToolsOnFail path', async () => {
+  const system = makeSystem({
+    id: 'sys-break',
+    resolutionMode: 'simple',
+    // The routed/tier `data.breakTools` legacy bridge only force-breaks under
+    // checkDriven authority (issue 419 either-or rule): a check never breaks tools
+    // under toolSpecific.
+    toolBreakage: { authority: 'checkDriven' },
+    craftingCheck: {
+      enabled: true,
+      outcomes: [],
+      progressive: null,
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
+    },
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }],
+  });
+  setupGame(system);
+  globalThis.fromUuid = async () => makeSourceItem('Potion');
+
+  const herb = makeItem({ id: 'herb-break', name: 'Herb', quantity: 2 });
+  const ingredientSet = makeIngredientSet({ ingredientItem: herb, quantity: 1 });
+  const recipe = makeRecipe({
+    craftingSystemId: 'sys-break',
+    ingredientSets: [ingredientSet],
+    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] }],
+  });
+
+  // A never-breaking tool (breakageChance 0) that records breakage via a flag — so
+  // any observed break is the forced break, not chance.
+  const tool = new Tool({
+    componentId: 'hammer',
+    breakage: { mode: 'breakageChance', breakageChance: 0 },
+    onBreak: { mode: 'flagBroken' },
+  });
+  const { item: toolItem, flags } = makeOwnedToolItem('hammer');
+
+  const sourceActor = makeActor({ id: 'a-break', items: [herb, toolItem] });
+  const craftingActor = makeActor({ id: 'a-break' });
+
+  const recipeManager = {
+    canCraft() {
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+    },
+    getToolsForSet() {
+      return [tool];
+    },
+    toolMatchesItem(_recipe, _tool, item) {
+      return item === toolItem;
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item === herb && item.id === ingredient.systemItemId;
+    },
+  };
+  const resolutionService = makeResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, null, resolutionService);
+  // Engine-evaluated FAILURE with a tier `data.breakTools` flag — mirrors what
+  // _runRoutedCheck returns for a rerouted breakTools tier (the legacy bridge).
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 3,
+    data: { breakTools: true },
+    engineEvaluated: true,
+  });
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'the check failed, so the craft fails');
+  assert.equal(
+    flags['fabricate.fabricate.toolBroken'],
+    true,
+    'the forced-failure breakTools crit broke the owned tool on the failure path'
+  );
+  assert.equal(craftingActor.createdItems.length, 0, 'no result items on a failed craft');
+});
+
+test('check-failure breakTools: a macro data.breakTools does NOT force-break the tool', async () => {
+  const system = makeSystem({
+    id: 'sys-nobreak',
+    resolutionMode: 'simple',
+    craftingCheck: {
+      enabled: true,
+      outcomes: [],
+      progressive: null,
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
+    },
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }],
+  });
+  setupGame(system);
+  globalThis.fromUuid = async () => makeSourceItem('Potion');
+
+  const herb = makeItem({ id: 'herb-nobreak', name: 'Herb', quantity: 2 });
+  const ingredientSet = makeIngredientSet({ ingredientItem: herb, quantity: 1 });
+  const recipe = makeRecipe({
+    craftingSystemId: 'sys-nobreak',
+    ingredientSets: [ingredientSet],
+    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] }],
+  });
+
+  const tool = new Tool({
+    componentId: 'hammer',
+    breakage: { mode: 'breakageChance', breakageChance: 0 },
+    onBreak: { mode: 'flagBroken' },
+  });
+  const { item: toolItem, flags } = makeOwnedToolItem('hammer');
+
+  const sourceActor = makeActor({ id: 'a-nobreak', items: [herb, toolItem] });
+  const craftingActor = makeActor({ id: 'a-nobreak' });
+
+  const recipeManager = {
+    canCraft() {
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+    },
+    getToolsForSet() {
+      return [tool];
+    },
+    toolMatchesItem(_recipe, _tool, item) {
+      return item === toolItem;
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item === herb && item.id === ingredient.systemItemId;
+    },
+  };
+  const resolutionService = makeResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, null, resolutionService);
+  // A MACRO failure (no engineEvaluated marker) returning data.breakTools verbatim:
+  // it must NOT force breakage, since breakTools is not part of the macro contract.
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 3,
+    data: { breakTools: true },
+  });
+
+  await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(
+    flags['fabricate.fabricate.toolBroken'],
+    undefined,
+    'a macro data.breakTools passthrough must not force-break the tool'
+  );
 });

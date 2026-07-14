@@ -7,7 +7,7 @@
  *   3. _toolMatchesItem matches item with only _stats.compendiumSource
  *   4. _toolMatchesItem still matches item with only flags.core.sourceId (legacy)
  *   5. "Craftable only" filtering includes recipe when actor has items matched via _stats.compendiumSource
- *   T7. ingredientMatchesItem matches canonical sourceItemUuid when the live sourceUuid differs
+ *   T7. ingredientMatchesItem matches canonical originItemUuid when the live registeredItemUuid differs
  *   T8. _toolMatchesItem matches an item linked only by _stats.duplicateSource (drag-copied world item)
  *   T9. _toolMatchesItem does NOT match on flags.fabricate.mythwrightId alone
  */
@@ -16,7 +16,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // ---------------------------------------------------------------------------
-// Foundry globals (minimal shim — getSourceUuid will use item.flags.core.sourceId
+// Foundry globals (minimal shim — getCompendiumSourceUuid will use item.flags.core.sourceId
 // directly when foundry.utils.getProperty is available, so we provide it here)
 // ---------------------------------------------------------------------------
 
@@ -61,8 +61,26 @@ function makeIngredient(componentId, quantity = 1) {
   };
 }
 
+// Issue 561: a first-class Tool carries its OWN source refs (derived from its linked
+// component at migration/registration). Build the tool that the system exposes so the
+// matcher resolves the owned item against the tool's own refs, not through the component.
+function toolFromComponent(component) {
+  return {
+    id: `tool-${component.id}`,
+    componentId: component.id,
+    // No snapshot name here so the presence name-fallback resolves through the linked
+    // component's name (the migrated-tool behaviour), exactly as it did before.
+    name: null,
+    registeredItemUuid: component.registeredItemUuid || component.originItemUuid || null,
+    originItemUuid: component.originItemUuid || component.registeredItemUuid || null,
+    aliasItemUuids: Array.isArray(component.aliasItemUuids) ? component.aliasItemUuids : [],
+  };
+}
+
+// The `tool` argument passed to the matcher; it shares an id with the tool the system
+// exposes, so `resolveToolForItem` (which matches against `system.tools`) resolves to it.
 function makeTool(componentId) {
-  return { componentId, name: `tool-` };
+  return { id: `tool-${componentId}`, componentId, name: null };
 }
 
 function makeRecipe(overrides = {}) {
@@ -74,20 +92,21 @@ function makeRecipe(overrides = {}) {
   };
 }
 
-/** Build a fake system with one managed component */
-function makeSystem(componentId, sourceUuid, name = 'Test Item') {
+/** Build a fake system with one managed component and its first-class tool. */
+function makeSystem(componentId, registeredItemUuid, name = 'Test Item') {
+  const component = { id: componentId, registeredItemUuid, name };
   return {
-    advancedOptionsEnabled: false,
     features: {},
-    components: [{ id: componentId, sourceUuid, name }]
+    components: [component],
+    tools: [toolFromComponent(component)]
   };
 }
 
 function makeSystemWithComponent(component) {
   return {
-    advancedOptionsEnabled: false,
     features: {},
-    components: [component]
+    components: [component],
+    tools: [toolFromComponent(component)]
   };
 }
 
@@ -96,8 +115,8 @@ function makeSystemWithComponent(component) {
 // ---------------------------------------------------------------------------
 
 test('T1 - ingredientMatchesItem: matches item that only has _stats.compendiumSource', () => {
-  const sourceUuid = 'Compendium.world.items.abc';
-  const system = makeSystem('comp-1', sourceUuid);
+  const registeredItemUuid = 'Compendium.world.items.abc';
+  const system = makeSystem('comp-1', registeredItemUuid);
   globalThis.game = makeFakeGame({ system });
 
   const manager = new RecipeManager();
@@ -107,7 +126,7 @@ test('T1 - ingredientMatchesItem: matches item that only has _stats.compendiumSo
   // Item has no flags.core.sourceId — only _stats.compendiumSource (Foundry v12+)
   const item = {
     uuid: 'world-item-uuid-different',
-    _stats: { compendiumSource: sourceUuid },
+    _stats: { compendiumSource: registeredItemUuid },
     flags: {},
     name: 'Test Item',
     system: { quantity: 1 }
@@ -121,8 +140,8 @@ test('T1 - ingredientMatchesItem: matches item that only has _stats.compendiumSo
 // ---------------------------------------------------------------------------
 
 test('T2 - ingredientMatchesItem: matches item with only flags.core.sourceId (legacy)', () => {
-  const sourceUuid = 'Compendium.world.items.legacy';
-  const system = makeSystem('comp-2', sourceUuid);
+  const registeredItemUuid = 'Compendium.world.items.legacy';
+  const system = makeSystem('comp-2', registeredItemUuid);
   globalThis.game = makeFakeGame({ system });
 
   const manager = new RecipeManager();
@@ -131,7 +150,7 @@ test('T2 - ingredientMatchesItem: matches item with only flags.core.sourceId (le
 
   const item = {
     uuid: 'world-item-uuid-v10',
-    flags: { core: { sourceId: sourceUuid } },
+    flags: { core: { sourceId: registeredItemUuid } },
     name: 'Legacy Item',
     system: { quantity: 1 }
   };
@@ -144,8 +163,8 @@ test('T2 - ingredientMatchesItem: matches item with only flags.core.sourceId (le
 // ---------------------------------------------------------------------------
 
 test('T3 - _toolMatchesItem: matches item that only has _stats.compendiumSource', () => {
-  const sourceUuid = 'Compendium.world.items.catalyst';
-  const system = makeSystem('cat-1', sourceUuid);
+  const registeredItemUuid = 'Compendium.world.items.catalyst';
+  const system = makeSystem('cat-1', registeredItemUuid);
   globalThis.game = makeFakeGame({ system });
 
   const manager = new RecipeManager();
@@ -154,7 +173,7 @@ test('T3 - _toolMatchesItem: matches item that only has _stats.compendiumSource'
 
   const item = {
     uuid: 'world-catalyst-uuid',
-    _stats: { compendiumSource: sourceUuid },
+    _stats: { compendiumSource: registeredItemUuid },
     flags: {},
     name: 'Catalyst Item'
   };
@@ -167,8 +186,8 @@ test('T3 - _toolMatchesItem: matches item that only has _stats.compendiumSource'
 // ---------------------------------------------------------------------------
 
 test('T4 - _toolMatchesItem: matches item with only flags.core.sourceId (legacy)', () => {
-  const sourceUuid = 'Compendium.world.items.legacycat';
-  const system = makeSystem('cat-2', sourceUuid);
+  const registeredItemUuid = 'Compendium.world.items.legacycat';
+  const system = makeSystem('cat-2', registeredItemUuid);
   globalThis.game = makeFakeGame({ system });
 
   const manager = new RecipeManager();
@@ -177,7 +196,7 @@ test('T4 - _toolMatchesItem: matches item with only flags.core.sourceId (legacy)
 
   const item = {
     uuid: 'world-catalyst-uuid-v10',
-    flags: { core: { sourceId: sourceUuid } },
+    flags: { core: { sourceId: registeredItemUuid } },
     name: 'Legacy Catalyst'
   };
 
@@ -188,7 +207,7 @@ test('T4 - _toolMatchesItem: matches item with only flags.core.sourceId (legacy)
 // Test 5 — ingredientMatchesItem does NOT match when source UUIDs differ
 // ---------------------------------------------------------------------------
 
-test('T5 - ingredientMatchesItem: no match when compendiumSource differs from component sourceUuid', () => {
+test('T5 - ingredientMatchesItem: no match when compendiumSource differs from component registeredItemUuid', () => {
   const system = makeSystem('comp-5', 'Compendium.world.items.correct');
   globalThis.game = makeFakeGame({ system });
 
@@ -211,7 +230,7 @@ test('T5 - ingredientMatchesItem: no match when compendiumSource differs from co
 // Test 6 — _toolMatchesItem does NOT match when source UUIDs differ
 // ---------------------------------------------------------------------------
 
-test('T6 - _toolMatchesItem: no match when compendiumSource differs from component sourceUuid', () => {
+test('T6 - _toolMatchesItem: no match when compendiumSource differs from component registeredItemUuid', () => {
   const system = makeSystem('cat-6', 'Compendium.world.items.correct');
   globalThis.game = makeFakeGame({ system });
 
@@ -230,14 +249,14 @@ test('T6 - _toolMatchesItem: no match when compendiumSource differs from compone
 });
 
 // ---------------------------------------------------------------------------
-// Test 8 — duplicate-source-only item matches a catalyst via sourceItemUuid
+// Test 8 — duplicate-source-only item matches a catalyst via originItemUuid
 // ---------------------------------------------------------------------------
 
 test('T8 - toolMatchesItem: matches item linked only by _stats.duplicateSource', () => {
   const system = makeSystemWithComponent({
     id: 'cat-8',
-    sourceUuid: 'Compendium.world.items.pick-live',
-    sourceItemUuid: 'Item.world-pick',
+    registeredItemUuid: 'Compendium.world.items.pick-live',
+    originItemUuid: 'Item.world-pick',
     name: 'Mining Pick'
   });
   globalThis.game = makeFakeGame({ system });
@@ -258,14 +277,14 @@ test('T8 - toolMatchesItem: matches item linked only by _stats.duplicateSource',
 });
 
 // ---------------------------------------------------------------------------
-// Test 9 — mythwrightId-only item does NOT match
+// Test 9 — mythwrightId-only item with an unrelated name does NOT match
 // ---------------------------------------------------------------------------
 
-test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId alone', () => {
+test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId with an unrelated name', () => {
   const system = makeSystemWithComponent({
     id: 'cat-9',
-    sourceUuid: 'Compendium.world.items.pick-live',
-    sourceItemUuid: 'Item.world-pick',
+    registeredItemUuid: 'Compendium.world.items.pick-live',
+    originItemUuid: 'Item.world-pick',
     name: 'Mining Pick'
   });
   globalThis.game = makeFakeGame({ system });
@@ -274,21 +293,47 @@ test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId alone
   const recipe = makeRecipe();
   const tool = makeTool('cat-9');
 
+  // Neither the source UUIDs nor the name match — a mythwrightId flag alone is not
+  // a match signal.
   const item = {
     uuid: 'Item.actor-seeded',
     _stats: {},
     flags: { fabricate: { mythwrightId: 'mw-pick' } },
-    name: 'Mining Pick'
+    name: 'Unrelated Chisel'
   };
 
   assert.equal(manager.toolMatchesItem(recipe, tool, item), false);
 });
 
-test('T7 - ingredientMatchesItem: matches canonical sourceItemUuid when live sourceUuid differs', () => {
+test('T9b - toolMatchesItem: matches a same-named item when source UUIDs differ (template-copy fallback)', () => {
+  const system = makeSystemWithComponent({
+    id: 'cat-9b',
+    registeredItemUuid: 'Compendium.world.items.pick-live',
+    originItemUuid: 'Item.world-pick',
+    name: 'Mining Pick'
+  });
+  globalThis.game = makeFakeGame({ system });
+
+  const manager = new RecipeManager();
+  const recipe = makeRecipe();
+  const tool = makeTool('cat-9b');
+
+  // Owned copy whose only source ref is a template, not the tool component's source.
+  const item = {
+    uuid: 'Item.actor-templated',
+    _stats: { duplicateSource: 'Item.some-template' },
+    flags: {},
+    name: 'Mining Pick'
+  };
+
+  assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
+});
+
+test('T7 - ingredientMatchesItem: matches canonical originItemUuid when live registeredItemUuid differs', () => {
   const system = makeSystemWithComponent({
     id: 'comp-7',
-    sourceUuid: 'Compendium.world.items.iron-ore-live',
-    sourceItemUuid: 'Compendium.source.items.iron-ore',
+    registeredItemUuid: 'Compendium.world.items.iron-ore-live',
+    originItemUuid: 'Compendium.source.items.iron-ore',
     name: 'Iron Ore'
   });
   globalThis.game = makeFakeGame({ system });

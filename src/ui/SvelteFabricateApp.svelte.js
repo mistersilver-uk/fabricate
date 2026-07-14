@@ -3,6 +3,12 @@ import FabricateAppRoot from './svelte/apps/FabricateAppRoot.svelte';
 import { registerFabricateApp } from './appFactory.js';
 import { isAlchemyTabAvailable } from './svelte/util/alchemyTabAvailability.js';
 import { createActorBarStore } from './svelte/stores/actorBarStore.svelte.js';
+import { createCraftingStore } from './svelte/stores/craftingStore.svelte.js';
+import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore.svelte.js';
+import { createInventoryStore } from './svelte/stores/inventoryStore.svelte.js';
+import { createAlchemyStore } from './svelte/stores/alchemyStore.svelte.js';
+import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
+import { notifyWarn, localize } from './svelte/util/foundryBridge.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -190,10 +196,61 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         ...opts
       }) ?? null,
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
+      // Player Crafting tab seams. The listing/craft/source reads mirror the
+      // gathering seams: every Foundry-facing call routes through the
+      // `game.fabricate` facade so the stores stay Foundry-free.
+      listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
+      // Player Inventory tab seam — owned components/essences across the shared
+      // crafting source actors. Foundry-free store consumes this wrapper only.
+      listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts) ?? null,
+      // Learn one recipe from an owned recipe-item book (Inventory learn button).
+      learnRecipeFromInventory: (opts = {}) =>
+        game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
+      craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      // Fresh per-set craftability for an in-session ingredient-option override
+      // (issue 552). Synchronous so the store's `selectedCraftability` $derived can
+      // read it without an async round-trip; returns null when the facade is absent.
+      evaluateSelectedSet: (opts = {}) => game?.fabricate?.evaluateSelectedSet?.(opts) ?? null,
+      // Player Alchemy tab seams — the leak-safe workbench listing + brew submit +
+      // the persisted active-discipline getter/setter. Foundry-free store consumes
+      // these wrappers only.
+      listAlchemyForActor: (opts = {}) => game?.fabricate?.listAlchemyForActor?.(opts) ?? null,
+      submitAlchemyAttempt: (opts = {}) => game?.fabricate?.submitAlchemyAttempt?.(opts) ?? null,
+      getSelectedAlchemySystemId: () => game?.fabricate?.getSelectedAlchemySystemId?.() ?? '',
+      setSelectedAlchemySystemId: (id) => game?.fabricate?.setSelectedAlchemySystemId?.(id),
+      listCraftingSourceActors: () => game?.fabricate?.listCraftingSourceActors?.() ?? [],
+      getCraftingSourceActors: () => game?.fabricate?.getCraftingSourceActors?.() ?? [],
+      getSelectedCraftingActorId: () => game?.fabricate?.getSelectedCraftingActorId?.() ?? '',
+      setSelectedCraftingActorId: (id) => game?.fabricate?.setSelectedCraftingActorId?.(id),
+      getCraftingComponentSourceIds: () => game?.fabricate?.getCraftingComponentSourceIds?.() ?? [],
+      setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
+      getFavouriteRecipeIds: () => game?.fabricate?.getFavouriteRecipeIds?.() ?? [],
+      toggleFavouriteRecipe: (id) => game?.fabricate?.toggleFavouriteRecipe?.(id) ?? [],
+      // Player-facing notification seam (a failed craft surfaces as a warning).
+      notify: (message) => notifyWarn(message),
+      // Localized generic craft-failure message for a thrown craft (the engine can
+      // throw on the currency-payment macro path, producing no result message).
+      craftErrorMessage: () => localize('FABRICATE.App.Crafting.Notify.CraftFailed'),
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
+      // Player-side "hide unavailable (locked) environments" preference for the
+      // Environments column. Client-scoped, so it persists per client/device
+      // (`localStorage`), not per user account. The component reads/writes it
+      // through these seams rather than touching Foundry globals directly; the
+      // getter defaults to false (show all) when the facade is unavailable.
+      getHideUnavailableEnvironments: () =>
+        game?.fabricate?.getHideUnavailableEnvironments?.() ?? false,
+      setHideUnavailableEnvironments: (value) =>
+        game?.fabricate?.setHideUnavailableEnvironments?.(value),
       getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null,
+      // Player-facing Journal seams. The store/components never touch Foundry
+      // globals; these wrappers are the single Foundry-facing edge.
+      listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
+      advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
+      getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
+      getWorldTimeComponents: (worldTime) =>
+        game?.fabricate?.getWorldTimeComponents?.(worldTime) ?? null,
       // GM economy authoring + manual state controls (Manager app).
       getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
       setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
@@ -214,6 +271,29 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // One shared actor-bar store instance, reused across renders, so the shell
     // and the gathering tab read/write the same reactive selection state.
     services.actorBar = createActorBarStore({ services });
+    // Player Crafting tab stores. The component-sources store is created first so
+    // the crafting store can read the current source ids off it when it loads.
+    services.craftingSources = createCraftingSourcesStore({ services });
+    services.crafting = createCraftingStore({ services });
+    // Player Inventory tab store. Shares the crafting source/actor selection (it
+    // reads the same seams + sibling craftingSources store) so both tabs agree on
+    // what the player owns.
+    services.inventory = createInventoryStore({ services });
+    // Player Alchemy tab store. Reads the same crafting actor/source selection as
+    // the crafting + inventory stores (so all three agree on what the player owns)
+    // and owns the workbench/discipline state locally.
+    services.alchemy = createAlchemyStore({ services });
+    // Cross-tab navigation for the Inventory tab's "Pin for Crafting" / used-by
+    // links: select the recipe in the shared crafting store, then switch to the
+    // Crafting tab. Both stores are the same singletons the Crafting tab reads, so
+    // the selection is already applied when that tab renders.
+    services.navigateToCraftingRecipe = (recipeId) => {
+      if (recipeId) services.crafting?.select?.(recipeId);
+      this._selectTab('crafting');
+    };
+    // One shared journal store instance so the nav badge (shell) and the Journal
+    // tab read the same reactive run state.
+    services.journal = createJournalStore({ services });
     return services;
   }
 

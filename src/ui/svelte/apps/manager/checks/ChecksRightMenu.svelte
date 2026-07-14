@@ -1,0 +1,143 @@
+<!-- Svelte 5 runes mode -->
+<!--
+  Right-hand context menu for the Checks view. Tab-aware, mirroring the
+  gathering environment editor's right inspector. The Crafting, Salvage, and
+  Gathering tabs each expose this menu; the Validation tab renders no menu (the
+  parent simply does not mount this component there).
+
+  Each check is a singleton shaped by the system's resolution mode, so the menu
+  is a reference/help card explaining that coupling and linking to the relevant
+  documentation page — the same card format as the recipes "Set up recipes"
+  card.
+-->
+<script>
+  import { localize } from '../../../util/foundryBridge.js';
+
+  let { activeTab = 'crafting', activation = null, onToggleActive = () => {} } = $props();
+
+  function text(key, fallback) {
+    const translated = localize(key);
+    return translated && translated !== key ? translated : fallback;
+  }
+
+  const activeOn = $derived(activation?.enabled === true);
+  const activeTitle = text('FABRICATE.Admin.Manager.Checks.Active.Title', 'Active');
+  const onLabel = text('FABRICATE.Admin.Manager.StatusOn', 'On');
+  const offLabel = text('FABRICATE.Admin.Manager.StatusOff', 'Off');
+  const optionalHint = text(
+    'FABRICATE.Admin.Manager.Checks.Active.OptionalHint',
+    'Turn this check on to require a roll for the activity, or off to resolve it without one.'
+  );
+  // The gathering check's active toggle is mode-aware and inverted from the
+  // generic `optional` flag: d100 is the fixed roll (read-only note, no toggle),
+  // while progressive/routed are editable checks that expose an Active toggle.
+  const gatheringD100 = $derived(activeTab === 'gathering' && activation?.mode === 'd100');
+  // Alchemy "No check" mode: the crafting check does not run at all. Distinct from a
+  // MANDATORY check — hide the toggle AND show a "no check" hint, not the requiredHint.
+  const craftingNone = $derived(activeTab === 'crafting' && activation?.none === true);
+  const showActiveToggle = $derived(
+    activeTab === 'gathering' ? !gatheringD100 : !craftingNone && activation?.optional === true
+  );
+  const requiredHint = $derived(
+    craftingNone
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Active.AlchemyNoneHint',
+          'This alchemy system resolves without a crafting check. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author one.'
+        )
+      : activeTab === 'gathering'
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Active.GatheringHint',
+            'In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Checks.Active.RequiredHint',
+            'The current resolution mode requires this check, so it cannot be turned off here.'
+          )
+  );
+
+  const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
+
+  const MENUS = {
+    crafting: {
+      icon: 'fas fa-hammer',
+      kicker: text('FABRICATE.Admin.Manager.Checks.Crafting.HelpKicker', 'Crafting checks'),
+      title: text('FABRICATE.Admin.Manager.Checks.Crafting.HelpTitle', 'About crafting checks'),
+      desc: text(
+        'FABRICATE.Admin.Manager.Checks.Crafting.HelpDesc',
+        'The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.'
+      ),
+      docsHref: `${DOCS_BASE}/crafting-checks`,
+      docsLabel: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs')
+    },
+    salvage: {
+      icon: 'fas fa-recycle',
+      kicker: text('FABRICATE.Admin.Manager.Checks.Salvage.HelpKicker', 'Salvage checks'),
+      title: text('FABRICATE.Admin.Manager.Checks.Salvage.HelpTitle', 'About salvage checks'),
+      desc: text(
+        'FABRICATE.Admin.Manager.Checks.Salvage.HelpDesc',
+        'The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.'
+      ),
+      docsHref: `${DOCS_BASE}/salvage`,
+      docsLabel: text('FABRICATE.Admin.Manager.Checks.Salvage.Docs', 'Salvage docs')
+    },
+    gathering: {
+      icon: 'fas fa-seedling',
+      kicker: text('FABRICATE.Admin.Manager.Checks.Gathering.HelpKicker', 'Gathering checks'),
+      title: text('FABRICATE.Admin.Manager.Checks.Gathering.HelpTitle', 'About gathering checks'),
+      desc: text(
+        'FABRICATE.Admin.Manager.Checks.Gathering.HelpDesc',
+        'The gathering check is shaped by the task resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.'
+      ),
+      docsHref: `${DOCS_BASE}/gathering-environments`,
+      docsLabel: text('FABRICATE.Admin.Manager.Checks.Gathering.Docs', 'Gathering docs')
+    }
+  };
+
+  const menu = $derived(MENUS[activeTab] || MENUS.crafting);
+  const quickstart = text('FABRICATE.Admin.Manager.Checks.Quickstart', 'Quickstart');
+  const resources = text('FABRICATE.Admin.Manager.Checks.Resources', 'Check resources');
+</script>
+
+<aside class="manager-inspector manager-environment-inspector" aria-label={text('FABRICATE.Admin.Manager.Checks.Menu.Label', 'Checks context menu')}>
+  {#if activation}
+    <section class="manager-inspector-card" data-checks-active={activeTab}>
+      <p class="manager-kicker">{activeTitle}</p>
+      {#if showActiveToggle}
+        <button
+          type="button"
+          class={`manager-status-toggle ${activeOn ? 'is-on' : 'is-off'}`}
+          data-checks-active-toggle
+          aria-pressed={activeOn}
+          onclick={() => onToggleActive(!activeOn)}
+        >
+          <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+          <span class="manager-status-toggle-label">{activeOn ? onLabel : offLabel}</span>
+        </button>
+        <p class="manager-muted">{optionalHint}</p>
+      {:else}
+        <p class="manager-muted" data-checks-active-required>{requiredHint}</p>
+      {/if}
+    </section>
+  {/if}
+
+  <section class="manager-setup-card" data-checks-help={activeTab} aria-label={menu.title}>
+    <div class="manager-setup-card-header">
+      <i class={menu.icon} aria-hidden="true"></i>
+      <div>
+        <p class="manager-kicker">{menu.kicker}</p>
+        <h3>{menu.title}</h3>
+      </div>
+    </div>
+    <p class="manager-muted">{menu.desc}</p>
+    <div class="manager-setup-links" aria-label={resources}>
+      <a class="manager-button" href={menu.docsHref} target="_blank" rel="noreferrer">
+        <i class="fas fa-book-open" aria-hidden="true"></i>
+        <span>{menu.docsLabel}</span>
+      </a>
+      <a class="manager-button" href={`${DOCS_BASE}/quickstart`} target="_blank" rel="noreferrer">
+        <i class="fas fa-circle-question" aria-hidden="true"></i>
+        <span>{quickstart}</span>
+      </a>
+    </div>
+  </section>
+</aside>

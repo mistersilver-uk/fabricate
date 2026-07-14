@@ -16,6 +16,15 @@ const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
+// The recipe editor's four screenshot frames (overview/ingredients/validation/
+// multi-step) share the same trigger files, so any recipe editor/inspector/
+// sub-component change republishes all four.
+const RECIPE_EDIT_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
+];
+
 export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-systems',
@@ -42,10 +51,66 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   },
   {
+    id: 'manager-currency',
+    label: 'Manager currency configuration (spend strategy, units, macros)',
+    smokeLabels: ['currency-actor-property', 'currency-macro', 'currency-actor-inventory'],
+    matches: [
+      /^src\/systems\/currencyProfile\.js$/,
+      /^src\/systems\/CoinSpenders\.js$/,
+      /^src\/config\/currency(?:Presets|Providers)\.js$/,
+    ],
+  },
+  {
     id: 'manager-components',
     label: 'Manager components browser',
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+  },
+  {
+    id: 'manager-components-progressive',
+    label: 'Manager components browser — progressive difficulty column (value + None)',
+    smokeLabels: ['manager-components-progressive'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+  },
+  {
+    id: 'manager-component-edit',
+    label: 'Manager component editor (identity card + linked-source inspector)',
+    smokeLabels: ['manager-component-edit-normal'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComponentSourceInspector\.svelte$/,
+    ],
+  },
+  {
+    id: 'manager-component-edit-difficulty',
+    label: 'Manager component editor — staged progressive difficulty card',
+    smokeLabels: ['manager-component-edit-difficulty'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentDifficultyInspector\.svelte$/],
+  },
+  {
+    id: 'manager-component-edit-salvage',
+    label: 'Manager component editor — salvage authoring (result groups, routing, DC override)',
+    smokeLabels: ['manager-component-edit-salvage'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  },
+  {
+    id: 'manager-checks-gathering',
+    label: 'Manager Checks tab — gathering check editor (routed)',
+    smokeLabels: ['manager-checks-gathering'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksRightMenu\.svelte$/,
+    ],
+  },
+  {
+    id: 'manager-checks-validation',
+    label: 'Manager Checks tab — per-check Validation tab (readiness + issues)',
+    smokeLabels: ['manager-checks-validation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksValidationTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checksReadiness\.js$/,
+    ],
   },
   {
     id: 'manager-tags-categories',
@@ -99,6 +164,73 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/],
   },
   {
+    id: 'manager-import-report',
+    label: 'Manager import — post-import unresolved-reference report (#492)',
+    smokeLabels: ['manager-import-report'],
+    matches: [
+      /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+      /^src\/systems\/importReportContent\.js$/,
+    ],
+  },
+  // The gated Crafting nav group (issue 511) publishes three distinct frames — the
+  // expanded group rail, the Books & Scrolls surface, and the Settings placeholder.
+  // `collect` emits one file per recipe id, so each frame is its own recipe.
+  {
+    id: 'manager-crafting-group',
+    label: 'Manager Crafting nav group (expanded: Settings + Recipes + Books & Scrolls)',
+    smokeLabels: ['manager-crafting-group-expanded'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+  },
+  {
+    id: 'manager-books-scrolls',
+    label: 'Manager Books & Scrolls recipe-item surface',
+    smokeLabels: ['manager-books-scrolls-normal'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/],
+  },
+  {
+    id: 'manager-crafting-settings',
+    label: 'Manager Crafting → Settings placeholder',
+    smokeLabels: ['manager-crafting-settings'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+  },
+  // The recipe editor publishes FOUR distinct frames (overview/identity,
+  // ingredients, validation tab, multi-step durations). `collect` emits ONE
+  // file per recipe id (it takes the first matching smoke label), so each frame
+  // needs its own recipe — a single recipe with four smoke labels would only
+  // ever publish the first (overview) frame and silently drop the other three.
+  // The four share the same `matches` so any change to a recipe editor/inspector
+  // or recipe sub-component republishes all four together.
+  {
+    id: 'manager-recipe-edit-normal',
+    label: 'Manager recipe editor — overview / identity',
+    smokeLabels: ['manager-recipe-edit-normal'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-ingredients',
+    label: 'Manager recipe editor — ingredients (components, OR groups, tags, currency cost)',
+    smokeLabels: ['manager-recipe-edit-ingredients'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-validation',
+    label: 'Manager recipe editor — validation tab',
+    smokeLabels: ['manager-recipe-edit-validation'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-multistep',
+    label: 'Manager recipe editor — multi-step durations',
+    smokeLabels: ['manager-recipe-edit-multistep'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-tools',
+    label: 'Manager recipe editor — tools (component-name fallback for unlabelled tools)',
+    smokeLabels: ['manager-recipe-edit-tools'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
     id: 'player-gathering',
     label: 'Player gathering tab',
     smokeLabels: [
@@ -124,6 +256,64 @@ export const VIEW_RECIPES = Object.freeze([
     label: 'Player gathering — narrow window stacked columns (#330)',
     smokeLabels: ['player-gathering-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/gathering\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
+  {
+    id: 'player-crafting',
+    label: 'Player crafting tab',
+    // `player-crafting-alternatives` (issue 552, the IngredientOptionSelector
+    // "Alternatives" radiogroup) is listed first and also sorts alphabetically
+    // ahead of the other frames, so `collect` (which copies the first candidate
+    // after an alphabetical sort) prefers it — surfacing the per-slot option
+    // selector as the primary evidence for a change under crafting/.
+    smokeLabels: [
+      'player-crafting-alternatives',
+      'player-crafting-simple',
+      'player-crafting-ingredient-routed',
+      'player-crafting-routed-by-check',
+      'player-crafting-run-summary',
+    ],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-stacked',
+    label: 'Player crafting — narrow window stacked columns',
+    smokeLabels: ['player-crafting-stacked'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
+  // The player Alchemy workbench (issue 543) publishes three distinct frames — the
+  // discipline chooser, the three-column workbench, and the narrow stacked layout.
+  // `collect` emits one file per view id (first matching smoke label wins), so each
+  // frame is its own view. (The `player-alchemy-theme-*` frames are extra evidence
+  // and are intentionally NOT mapped here, like the `manager-theme-*` frames.)
+  {
+    id: 'player-alchemy',
+    label: 'Player alchemy workbench',
+    smokeLabels: ['player-alchemy-workbench'],
+    matches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  },
+  {
+    id: 'player-alchemy-chooser',
+    label: 'Player alchemy — discipline chooser',
+    smokeLabels: ['player-alchemy-chooser'],
+    matches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  },
+  {
+    id: 'player-alchemy-stacked',
+    label: 'Player alchemy — narrow window stacked columns',
+    smokeLabels: ['player-alchemy-stacked'],
+    matches: [/^src\/ui\/svelte\/apps\/alchemy\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
+  {
+    id: 'fabricate-journal',
+    label: 'Player Journal tab',
+    smokeLabels: ['fabricate-journal'],
+    matches: [/^src\/ui\/svelte\/apps\/journal\//],
+  },
+  {
+    id: 'player-inventory',
+    label: 'Player Inventory tab',
+    smokeLabels: ['player-inventory'],
+    matches: [/^src\/ui\/svelte\/apps\/inventory\//],
   },
   {
     id: 'fabricate-app-shell',
@@ -221,9 +411,15 @@ export function normalizePath(filePath) {
 
 export function isUiFile(filePath) {
   const normalized = normalizePath(filePath);
+  // `lang/` is deliberately excluded: a localization file is not itself a UI
+  // render target. No view recipe matches a `lang/` path, so a lang change only
+  // ever contributed UI status via the generic `theme-or-global-ui` fallback.
+  // By dropping `lang/` here we get co-occurrence semantics for free: a lang-only
+  // PR is not UI, while a lang change shipped alongside a render file
+  // (`src/ui/`, `styles/`, `*.svelte`, `*.css`) is still UI because that render
+  // file independently trips the gate and drives the recipe mapping.
   return normalized.startsWith('src/ui/')
     || normalized.startsWith('styles/')
-    || normalized.startsWith('lang/')
     || normalized.endsWith('.svelte')
     || normalized.endsWith('.css');
 }

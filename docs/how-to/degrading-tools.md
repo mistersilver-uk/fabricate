@@ -25,14 +25,21 @@ Author the tool once in the crafting system's **Tools** library with the **Limit
 
 1. **Add the tool component.** In your crafting system's **Components** tab, add the tool item as a managed component.
    If you plan to replace the tool with a broken variant on break, also add that broken-tool variant as a separate component.
+   You only need a managed component when you use the **Replace with** action below.
+   For the other on-break actions you can skip this step and drop the Item straight onto the Tools page instead, creating an item-sourced tool.
+   See [Authoring a Tool]({% link tools.md %}#authoring-a-tool).
 2. **Open the Tools library** for the system and click *Add tool*.
    Pick the tool component and optionally set a display label.
 3. **Pick the Limited uses breakage mode** and set **Max uses** to the number of crafts the tool survives (for example 50).
    Leave it blank for unlimited uses (still tracked).
 4. **Pick what happens when it breaks:**
-   - **Destroy item**. The tool is removed from inventory when it breaks.
-   - **Mark as broken**. The tool stays but is flagged as broken and cannot be used until a GM clears that mark.
-   - **Replace with...**. Swap the tool for a broken variant you can repair through a recipe.
+   - **Destroy item**.
+The tool is removed from inventory when it breaks.
+   - **Mark as broken**.
+The tool stays but is flagged as broken and cannot be used until a GM clears that mark.
+Fabricate also appends " (broken)" to the tool's name so it reads as broken at a glance, and clearing the mark does not remove that suffix, so the GM renames the tool back as well.
+   - **Replace with...**.
+Swap the tool for a broken variant you can repair through a recipe.
 5. **Save**, then require the tool from the recipe (or from a step or ingredient set).
 
 ## How usage is tracked
@@ -42,5 +49,7 @@ The count goes up before the break is checked, so a Max uses of 5 lets the tool 
 
 ## Learn more
 
-- [Tools]({% link tools.md %}). The full Tool model: requirement gate, breakage modes, and on-break actions.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}). The gathering-side equivalent.
+- [Tools]({% link tools.md %}).
+The full Tool model: requirement gate, breakage modes, and on-break actions.
+- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
+The gathering-side equivalent.

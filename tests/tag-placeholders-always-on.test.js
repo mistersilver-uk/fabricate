@@ -44,14 +44,13 @@ function makeRecipe(tag) {
 test('tag placeholders validate when legacy itemTags feature is disabled', () => {
   const manager = makeRecipeManager({
     id: 'sys-tags',
-    advancedOptionsEnabled: false,
     features: { itemTags: false },
     itemTags: ['herb']
   });
 
   const result = manager._validateTagPlaceholders(makeRecipe('herb'));
 
-  assert.deepEqual(result, { valid: true, errors: [] });
+  assert.deepEqual(result, { valid: true, errors: [], issues: [] });
 });
 
 test('tag placeholders still reject unknown tag ids', () => {
@@ -64,5 +63,6 @@ test('tag placeholders still reject unknown tag ids', () => {
   const result = manager._validateTagPlaceholders(makeRecipe('ore'));
 
   assert.equal(result.valid, false);
-  assert.deepEqual(result.errors, ['Ingredient group "group-1" references unknown tag "ore"']);
+  // The group is named by 1-based position, never its internal id (issue 595).
+  assert.deepEqual(result.errors, ['Ingredient group "1" references unknown tag "ore"']);
 });

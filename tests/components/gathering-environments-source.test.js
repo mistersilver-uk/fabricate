@@ -46,12 +46,12 @@ describe('Fabricate app wiring for the gathering tab', () => {
     );
   });
 
-  it('renders GatheringView on the gathering tab while other tabs keep the placeholder', () => {
+  it('renders GatheringView on the gathering tab (every tab now routes to a real view)', () => {
     assert.ok(rootSource.includes("import GatheringView from './gathering/GatheringView.svelte'"), 'root should import GatheringView');
     assert.ok(rootSource.includes('services = null'), 'root should accept a services prop');
     assert.ok(rootSource.includes("tab.id === 'gathering'"), 'root should branch on the gathering tab');
     assert.ok(rootSource.includes('<GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />'), 'root should render GatheringView with services + the scoped env/task');
-    assert.ok(rootSource.includes('fabricate-app-placeholder'), 'other tabs should keep the placeholder');
+    assert.ok(!rootSource.includes('fabricate-app-placeholder'), 'the coming-soon placeholder is gone now the alchemy tab is implemented');
   });
 });
 
@@ -196,14 +196,14 @@ describe('GatheringEnvironmentList labeled region', () => {
     assert.ok(listSource.includes('let pageSize = $state(6)'), 'pageSize defaults to 6');
     assert.ok(listSource.includes('const pageSizeOptions = [6, 9, 12]'), 'pageSizeOptions are [6, 9, 12]');
     assert.ok(listSource.includes('let pageIndex = $state(0)'), 'pageIndex defaults to 0');
-    assert.ok(listSource.includes('totalCount={filtered.length}'), 'pagination total is the filtered count');
+    assert.ok(listSource.includes('totalCount={visible.length}'), 'pagination total is the post-toggle visible count');
     assert.ok(
-      listSource.includes('paginated = $derived(filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize))'),
-      'paginated slices the filtered list by page'
+      listSource.includes('paginated = $derived(visible.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize))'),
+      'paginated slices the post-toggle visible list by page'
     );
     assert.ok(
-      listSource.includes('if (pageIndex > 0 && pageIndex * pageSize >= filtered.length) pageIndex = 0'),
-      'page resets to 0 when the search shrinks results'
+      listSource.includes('if (pageIndex > 0 && pageIndex * pageSize >= visible.length) pageIndex = 0'),
+      'page resets to 0 when the visible set shrinks'
     );
   });
 

@@ -57,20 +57,21 @@ Fabricate supports:
 
 A crafting system defines:
 
-- one system-wide resolution mode (`simple`, `routed`, `progressive`, `alchemy`)
+- one system-wide resolution mode (`simple`, `routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`)
 - optional feature toggles
 - check behaviour and macros
 - failure/success hooks
 - requirement providers (time/currency)
 - recipe visibility mode
-- recipe-level routed result selection providers (`ingredientSet`, `macroOutcome`, `rollTableOutcome`) when mode is `routed` or `alchemy`
+- a recipe-level result selection provider (`ingredientSet`, `check`) only when mode is `alchemy`; the routed crafting modes derive their routing basis from the system mode and carry no provider
 
 Changing resolution mode is destructive and governed by `007-destructive-changes-and-migrations.md`.
 
 ### Resolution Modes
 
 - `simple`
-- `routed`
+- `routedByIngredients`
+- `routedByCheck`
 - `progressive`
 - `alchemy`
 

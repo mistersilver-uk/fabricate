@@ -449,3 +449,198 @@ export function readLinkedVisualRef(doc) {
   if (!regionUuid || !behaviorId) return null;
   return { regionUuid, behaviorId };
 }
+
+/**
+ * Ownership predicate (visual side): is this Tile/Drawing/Token a Fabricate
+ * interactable visual? True iff it carries a well-formed reverse linked-visual
+ * flag block ({@link readLinkedVisualRef}). The mutation-edge counterpart to
+ * {@link isInteractableRegionBehavior} for the behaviour side — mutation seams
+ * consult it before writing to / deleting a resolved visual so ref drift or a
+ * crafted socket payload can never touch a foreign document.
+ *
+ * @param {object} doc  A Tile/Drawing/Token document (or plain object).
+ * @returns {boolean}
+ */
+export function isInteractableVisual(doc) {
+  return readLinkedVisualRef(doc) !== null;
+}
+
+// The EXACT set of leaf paths the relink provenance stamp is allowed to write to a
+// document that is not yet a Fabricate visual. This mirrors `buildLinkedVisualFlags`
+// (`{ fabricate: { isInteractableVisual, linkedRegionUuid, linkedBehaviorId } }`).
+// Any other leaf path in the update — `hidden`, `texture.src`, `x`, `y`, a foreign
+// flag namespace, etc. — takes the write OUT of the stamp-only allowlist.
+const INTERACTABLE_VISUAL_STAMP_PATHS = Object.freeze([
+  'flags.fabricate.isInteractableVisual',
+  'flags.fabricate.linkedRegionUuid',
+  'flags.fabricate.linkedBehaviorId',
+]);
+
+/**
+ * Flatten a Foundry update patch to `[dottedPath, leafValue]` pairs. Handles BOTH
+ * nested objects (`{ flags: { fabricate: { ... } } }`) AND dot-notation keys
+ * (`{ 'flags.fabricate.isInteractableVisual': true }`) — and any mix — by joining
+ * every key with `.` as it descends, so a smuggled flattened key can never
+ * masquerade as a different path than it writes. Arrays and non-plain values are
+ * treated as opaque leaves. PURE.
+ *
+ * @param {object} obj
+ * @param {string} [prefix]
+ * @returns {Array<[string, *]>}
+ */
+function flattenUpdatePaths(obj, prefix = '') {
+  const out = [];
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+  for (const [key, value] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const nested = flattenUpdatePaths(value, path);
+      // An empty-object value writes nothing meaningful, but keep it as a leaf so a
+      // stray `{ hidden: {} }` still counts as a non-allowlisted path (fail closed).
+      if (nested.length === 0) out.push([path, value]);
+      else out.push(...nested);
+    } else {
+      out.push([path, value]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Is this update EXACTLY the relink provenance stamp and nothing else? A strict
+ * allowlist (fail-closed): the stamp MUST be present (`isInteractableVisual === true`)
+ * and EVERY written leaf path must be one of {@link INTERACTABLE_VISUAL_STAMP_PATHS}.
+ * A single foreign key — nested or dot-notation-smuggled — rejects the whole write.
+ *
+ * @param {object} [update]
+ * @returns {boolean}
+ */
+function isInteractableVisualStampOnly(update) {
+  if (!update || typeof update !== 'object' || Array.isArray(update)) return false;
+  const entries = flattenUpdatePaths(update);
+  if (entries.length === 0) return false;
+  let stamped = false;
+  for (const [path, value] of entries) {
+    if (!INTERACTABLE_VISUAL_STAMP_PATHS.includes(path)) return false;
+    if (path === 'flags.fabricate.isInteractableVisual') {
+      if (value !== true) return false;
+      stamped = true;
+    }
+  }
+  return stamped;
+}
+
+/**
+ * Bidirectional-link verification: is the visual `doc` GENUINELY linked to the live
+ * `behavior`, by a reverse-flag↔forward-link round-trip? PURE.
+ *
+ * The reverse flag on a visual (`flags.fabricate.{isInteractableVisual,
+ * linkedRegionUuid,linkedBehaviorId}`) is mintable via a stamp-only write, so it
+ * MUST NOT by itself authorize a core-data write or delete. This authorizes those
+ * edges against the `fabricate.interactable` behaviour the visual claims, requiring
+ * ALL of:
+ *   (a) the visual carries a well-formed reverse flag ({@link readLinkedVisualRef});
+ *   (b) `behavior` exists and is a `fabricate.interactable` behaviour
+ *       ({@link isInteractableRegionBehavior}) — the caller resolves it from the
+ *       reverse flag's `linkedRegionUuid`/`linkedBehaviorId`;
+ *   (c) the behaviour's FORWARD link (`system.linkedVisual.uuid`) points back to
+ *       THIS exact document (`doc.uuid`).
+ *
+ * This is DEFENSE-IN-DEPTH that raises the bar, NOT a complete closure of the
+ * escalation. An attacker who mints a reverse flag pointing at a fake behaviour
+ * fails (b); one pointing at a real behaviour fails (c) as long as that behaviour's
+ * forward link still points at its genuine tile. HOWEVER the forward link is itself
+ * writable over the socket: the `INTERACTABLE_BEHAVIOR_UPDATE` edge
+ * (`applyInteractableBehaviorUpdate`) applies an arbitrary caller `update` to any
+ * `fabricate.interactable` behaviour (guarded only on the target's TYPE, with no
+ * field restriction and no sender authentication), so a determined attacker can
+ * forge `system.linkedVisual.uuid` to point at a target tile and then satisfy this
+ * round-trip. The round-trip therefore raises the cheapest escalation from a single
+ * message to a multi-message forge; FULL closure requires authenticating the socket
+ * SENDER as a GM — a module-wide socket-transport change tracked by issue 593.
+ *
+ * @param {object} doc  The resolved visual document (must expose `uuid`).
+ * @param {object} behavior  The behaviour resolved from the reverse flag's ref.
+ * @returns {boolean}
+ */
+export function visualLinkRoundTrips(doc, behavior) {
+  if (!readLinkedVisualRef(doc)) return false;
+  if (!isInteractableRegionBehavior(behavior)) return false;
+  const forwardUuid = coerceString(behavior?.system?.linkedVisual?.uuid);
+  const docUuid = coerceString(doc?.uuid);
+  if (!forwardUuid || !docUuid) return false;
+  return forwardUuid === docUuid;
+}
+
+/**
+ * Ownership guard for a linked-visual UPDATE write. Permitted when EITHER the update
+ * is EXACTLY the relink provenance stamp — the `flags.fabricate` reverse block
+ * ({@link buildLinkedVisualFlags}) and NOTHING else (the mint itself; writes no core
+ * data, so it is harmless even against a not-yet-linked GM-selected document) — OR
+ * the visual is GENUINELY bidirectionally linked to `behavior`
+ * ({@link visualLinkRoundTrips}). A minted reverse flag no longer authorizes a
+ * core-data write on its own; and the strict, fail-closed stamp allowlist stops a
+ * crafted payload from smuggling `hidden`/`texture`/geometry — or a
+ * dot-notation-flattened foreign key — alongside the stamp.
+ *
+ * @param {object} doc  The resolved visual document.
+ * @param {object} [update]  The pending document update patch.
+ * @param {object} [behavior]  The behaviour resolved from the doc's reverse-flag ref.
+ * @returns {boolean}
+ */
+export function mayApplyInteractableVisualUpdate(doc, update, behavior) {
+  if (isInteractableVisualStampOnly(update)) return true;
+  return visualLinkRoundTrips(doc, behavior);
+}
+
+/**
+ * Ownership guard for a linked-visual DELETE (terminal). Permitted ONLY when the
+ * visual is GENUINELY bidirectionally linked to `behavior`
+ * ({@link visualLinkRoundTrips}). A minted reverse flag — pointing at a fake or a
+ * mismatched behaviour — never authorizes a delete, closing the mint-then-delete
+ * escalation.
+ *
+ * @param {object} doc  The resolved visual document.
+ * @param {object} [behavior]  The behaviour resolved from the doc's reverse-flag ref.
+ * @returns {boolean}
+ */
+export function mayDeleteInteractableVisual(doc, behavior) {
+  return visualLinkRoundTrips(doc, behavior);
+}
+
+// The ONLY behaviour-update leaf paths a NON-GM socket sender may write: the
+// interactable's own scoped node pool (`system.node.*`) — the legitimate issue-302
+// player scoped-pool decrement, which runs on the gathering player's client and
+// emits an `INTERACTABLE_BEHAVIOR_UPDATE`. A non-GM must NEVER reach
+// `system.linkedVisual` (forward-link forge), `system.state`, `presentation`,
+// enable/lock/marker config, or anything else on the behaviour.
+const NON_GM_BEHAVIOR_UPDATE_ROOT = 'system.node';
+
+/**
+ * Ownership guard for a NON-GM socket sender's behaviour update (sender-auth layer,
+ * issue 593). A GM sender may write any behaviour field; a non-GM sender's `update`
+ * must touch ONLY the interactable's own scoped node pool. A strict, fail-closed
+ * allowlist mirroring {@link mayApplyInteractableVisualUpdate}'s stamp-only pattern:
+ * flatten the patch to leaf paths (handling BOTH nested objects AND dot-notation
+ * keys, and any mix), require at least one leaf, and reject unless EVERY leaf path
+ * is `system.node` itself or a `system.node.*` subpath. A single foreign leaf —
+ * `system.linkedVisual.uuid`, `system.state.enabled`, `presentation.hidden`, a
+ * dot-notation-smuggled key, etc. — rejects the whole write.
+ *
+ * @param {object} [update]  The pending behaviour-document update patch.
+ * @returns {boolean}
+ */
+export function mayApplyNonGmBehaviorUpdate(update) {
+  if (!update || typeof update !== 'object' || Array.isArray(update)) return false;
+  const entries = flattenUpdatePaths(update);
+  if (entries.length === 0) return false;
+  for (const [path] of entries) {
+    if (
+      path !== NON_GM_BEHAVIOR_UPDATE_ROOT &&
+      !path.startsWith(`${NON_GM_BEHAVIOR_UPDATE_ROOT}.`)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}

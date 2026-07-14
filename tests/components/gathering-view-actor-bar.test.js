@@ -122,6 +122,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     copyModule('src/ui/svelte/util/foundryBridge.js');
+    copyModule('src/gatheringImageDefaults.js');
     copyModule('src/ui/svelte/util/gatheringFormat.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
     copyModule('src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');

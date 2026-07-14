@@ -22,6 +22,23 @@ import {
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 
+// Run `runAssert(root)` against a temp dir seeded with `test-results/<name>`
+// fixtures, cleaning up afterwards. Module-scope so the per-test collect setup is
+// shared rather than repeated scaffolding in each `collect` test.
+function withScreenshotFixtures(fixtures, runAssert) {
+  const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
+  try {
+    const sourceDir = join(root, 'test-results');
+    mkdirSync(sourceDir, { recursive: true });
+    for (const [name, content] of Object.entries(fixtures || {})) {
+      writeFileSync(join(sourceDir, name), content);
+    }
+    runAssert(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 describe('UI PR screenshot evidence', () => {
   it('detects UI changes with the same path rules as CI', () => {
     assert.equal(hasUiChanges(['src/ui/svelte/apps/FabricateAppRoot.svelte']), true);
@@ -62,6 +79,140 @@ describe('UI PR screenshot evidence', () => {
     ]);
     assert.deepEqual(views[1].smokeLabels, ['player-gathering-realm-locked']);
     assert.deepEqual(views[2].smokeLabels, ['player-gathering-stacked']);
+  });
+
+  it('maps player crafting app files to the player-crafting recipes (incl. the stacked frame)', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/crafting/CraftingView.svelte',
+      'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
+    ]);
+
+    assert.deepEqual(
+      views.map(view => view.id),
+      ['player-crafting', 'player-crafting-stacked']
+    );
+    assert.deepEqual(views[0].smokeLabels, [
+      'player-crafting-alternatives',
+      'player-crafting-simple',
+      'player-crafting-ingredient-routed',
+      'player-crafting-routed-by-check',
+      'player-crafting-run-summary',
+    ]);
+    assert.deepEqual(views[1].smokeLabels, ['player-crafting-stacked']);
+  });
+
+  it('maps player alchemy app files to the player-alchemy recipes (incl. chooser + stacked frames)', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/alchemy/AlchemyView.svelte',
+      'src/ui/svelte/apps/alchemy/Workbench.svelte',
+    ]);
+
+    assert.deepEqual(
+      views.map(view => view.id),
+      ['player-alchemy', 'player-alchemy-chooser', 'player-alchemy-stacked']
+    );
+    assert.deepEqual(views[0].smokeLabels, ['player-alchemy-workbench']);
+    assert.deepEqual(views[1].smokeLabels, ['player-alchemy-chooser']);
+    assert.deepEqual(views[2].smokeLabels, ['player-alchemy-stacked']);
+  });
+
+  it('maps player journal app files to the fabricate-journal recipe', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/journal/JournalView.svelte',
+      'src/ui/svelte/apps/journal/RunDetail.svelte',
+    ]);
+
+    assert.deepEqual(views.map(view => view.id), ['fabricate-journal']);
+    assert.deepEqual(views[0].smokeLabels, ['fabricate-journal']);
+  });
+
+  it('maps player inventory app files to the player-inventory recipe', () => {
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/inventory/InventoryView.svelte',
+      'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
+    ]);
+
+    assert.deepEqual(views.map(view => view.id), ['player-inventory']);
+    assert.deepEqual(views[0].smokeLabels, ['player-inventory']);
+  });
+
+  it('maps the #492 import-report render files to the manager-import-report recipe', () => {
+    for (const file of [
+      'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+      'src/systems/importReportContent.js',
+    ]) {
+      const views = mapChangedFilesToViews([file]);
+      assert.ok(
+        views.some(view => view.id === 'manager-import-report'),
+        `${file} should map to the manager-import-report recipe`,
+      );
+    }
+    const view = VIEW_RECIPES.find(recipe => recipe.id === 'manager-import-report');
+    assert.deepEqual(view.smokeLabels, ['manager-import-report']);
+  });
+
+  it('maps a recipe editor file to all five recipe-edit frame recipes', () => {
+    const expected = [
+      'manager-recipe-edit-normal',
+      'manager-recipe-edit-ingredients',
+      'manager-recipe-edit-validation',
+      'manager-recipe-edit-multistep',
+      'manager-recipe-edit-tools',
+    ];
+
+    // The top-level editor view, the recipe-item inspector, and any recipe
+    // sub-component all republish all five frames.
+    for (const file of [
+      'src/ui/svelte/apps/manager/RecipeEditView.svelte',
+      'src/ui/svelte/apps/manager/RecipeItemInspector.svelte',
+      'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
+    ]) {
+      const views = mapChangedFilesToViews([file]);
+      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all five recipe-edit frames`);
+    }
+
+    // Each frame carries exactly its own single smoke label.
+    const views = mapChangedFilesToViews(['src/ui/svelte/apps/manager/RecipeEditView.svelte']);
+    assert.deepEqual(views.map(view => view.smokeLabels), [
+      ['manager-recipe-edit-normal'],
+      ['manager-recipe-edit-ingredients'],
+      ['manager-recipe-edit-validation'],
+      ['manager-recipe-edit-multistep'],
+      ['manager-recipe-edit-tools'],
+    ]);
+  });
+
+  it('collects the five recipe-edit frames into five separate files', () => {
+    withScreenshotFixtures(
+      {
+        'screenshot-01-manager-recipe-edit-normal.png': 'normal',
+        'screenshot-02-manager-recipe-edit-ingredients.png': 'ingredients',
+        'screenshot-03-manager-recipe-edit-validation.png': 'validation',
+        'screenshot-04-manager-recipe-edit-multistep.png': 'multistep',
+        'screenshot-05-manager-recipe-edit-tools.png': 'tools',
+      },
+      (root) => {
+        const result = collectScreenshotEvidence({
+          changedFiles: ['src/ui/svelte/apps/manager/RecipeEditView.svelte'],
+          prNumber: 654,
+          root,
+        });
+        assert.equal(result.copied.length, 5);
+        const byName = Object.fromEntries(
+          result.copied.map(item => [
+            item.destination.replaceAll('\\', '/').split('/').pop(),
+            readFileSync(item.destination, 'utf8'),
+          ]),
+        );
+        assert.deepEqual(byName, {
+          'manager-recipe-edit-normal.png': 'normal',
+          'manager-recipe-edit-ingredients.png': 'ingredients',
+          'manager-recipe-edit-validation.png': 'validation',
+          'manager-recipe-edit-multistep.png': 'multistep',
+          'manager-recipe-edit-tools.png': 'tools',
+        });
+      },
+    );
   });
 
   it('keeps every screenshot recipe backed by real smoke labels', () => {
@@ -128,34 +279,28 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('keeps smoke screenshot collection available as an explicit fallback', () => {
-    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
-    try {
-      const sourceDir = join(root, 'test-results');
-      mkdirSync(sourceDir, { recursive: true });
-      writeFileSync(join(sourceDir, 'screenshot-09-manager-environments-browse-normal-retry.png'), 'wrong');
-      writeFileSync(join(sourceDir, 'screenshot-08-manager-environments-browse-normal.png'), 'png');
-      writeFileSync(join(sourceDir, 'screenshot-07-manager-environments-browse-stacked.png'), 'stacked');
-
-      const result = collectScreenshotEvidence({
-        changedFiles: ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'],
-        prNumber: 456,
-        root,
-      });
-
-      assert.equal(result.copied.length, 1);
-      const relativeDestination = result.copied[0].destination.replace(root, '').replace(/\\/g, '/');
-      assert.equal(relativeDestination, '/tmp/pr-screenshots/456/manager-environments.png');
-      assert.equal(readFileSync(result.copied[0].destination, 'utf8'), 'stacked');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    withScreenshotFixtures(
+      {
+        'screenshot-09-manager-environments-browse-normal-retry.png': 'wrong',
+        'screenshot-08-manager-environments-browse-normal.png': 'png',
+        'screenshot-07-manager-environments-browse-stacked.png': 'stacked',
+      },
+      (root) => {
+        const result = collectScreenshotEvidence({
+          changedFiles: ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'],
+          prNumber: 456,
+          root,
+        });
+        assert.equal(result.copied.length, 1);
+        const relativeDestination = result.copied[0].destination.replace(root, '').replaceAll('\\', '/');
+        assert.equal(relativeDestination, '/tmp/pr-screenshots/456/manager-environments.png');
+        assert.equal(readFileSync(result.copied[0].destination, 'utf8'), 'stacked');
+      },
+    );
   });
 
   it('reports missing collection screenshots and supports allowMissing', () => {
-    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
-    try {
-      mkdirSync(join(root, 'test-results'), { recursive: true });
-
+    withScreenshotFixtures({}, (root) => {
       assert.throws(() => collectScreenshotEvidence({
         changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
         prNumber: 456,
@@ -169,9 +314,7 @@ describe('UI PR screenshot evidence', () => {
         allowMissing: true,
       });
       assert.deepEqual(result.missing.map(view => view.id), ['manager-tools']);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    });
   });
 
   it('does not expose the removed synthetic screenshot generator path', () => {
@@ -219,9 +362,24 @@ describe('UI PR screenshot evidence', () => {
     assert.throws(() => collectScreenshotEvidence({ changedFiles: [], prNumber: 'abc' }), /Invalid PR number/);
   });
 
-  it('detects i18n language changes and maps them to global UI', () => {
-    assert.equal(hasUiChanges(['lang/en.json']), true);
-    assert.deepEqual(mapChangedFilesToViews(['lang/en.json']).map(view => view.id), ['theme-or-global-ui']);
+  it('treats a lang-only change as non-UI (co-occurrence rule)', () => {
+    const langOnly = ['lang/en.json'];
+    assert.equal(hasUiChanges(langOnly), false);
+    assert.deepEqual(mapChangedFilesToViews(langOnly), []);
+  });
+
+  it('treats a lang change alongside a render file as UI driven by that render file', () => {
+    const view = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
+    const logicOnly = 'src/ui/svelte/stores/adminStore.js';
+    const ids = files => mapChangedFilesToViews(files).map(recipe => recipe.id);
+
+    // A recipe-matching view drives the mapping; the lang file adds nothing.
+    assert.equal(hasUiChanges(['lang/en.json', view]), true);
+    assert.deepEqual(ids(['lang/en.json', view]), ['manager-tools']);
+
+    // A render file that matches no recipe still trips the generic fallback.
+    assert.equal(hasUiChanges(['lang/en.json', logicOnly]), true);
+    assert.deepEqual(ids(['lang/en.json', logicOnly]), ['theme-or-global-ui']);
   });
 
   it('keeps every recipe match pattern pointed at a real tracked file', () => {

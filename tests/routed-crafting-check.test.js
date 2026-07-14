@@ -1,0 +1,317 @@
+// Engine integration tests for the authored routed crafting check
+// (CraftingEngine._runRoutedCheck via the _runCraftingCheck routed dispatch):
+// relative + fixed tier mapping, threshold meet/exceed, breakTools tiers, the
+// recipe-tier / dynamic base-DC resolution (which mirrors the simple check, NOT
+// the flat salvage DC), and the no-formula required-check failure.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+const {
+  installRoutedCheckEnv,
+  stubRoll,
+  evaluateArgs,
+  clearRollEngine,
+  defaultRouted,
+  makeRoutedEngine,
+  runRoutedCheck,
+} = await import('./helpers/routedCheckEngine.js');
+
+installRoutedCheckEnv();
+
+const { MacroExecutor } = await import('../src/utils/MacroExecutor.js');
+const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
+
+// A unified trigger forcing `outcome` (and optionally breakTools) when the rolled
+// group total equals `value` — the recombined replacement for a per-die crit.
+function totalTrigger({ id = 't', groupId = 0, value, outcome = 'none', breakTools = false }) {
+  return {
+    id,
+    condition: { type: 'diceGroup', groupId, aggregate: 'total', operator: '==', value },
+    outcome,
+    breakTools,
+  };
+}
+
+function breakage(...triggers) {
+  return { checkBreakage: { triggers } };
+}
+
+// Two success tiers (relative deltas) + one failure tier, so threshold + crit
+// routing have something to land on. Base DC default is 15.
+const RELATIVE_TIERS = [
+  { id: 't-fine', name: 'Fine', success: true, breakTools: false, dc: 0 }, // threshold 15
+  { id: 't-myth', name: 'Mythic', success: true, breakTools: false, dc: 5 }, // threshold 20
+  { id: 't-botch', name: 'Botch', success: false, breakTools: true, dc: -10 }, // threshold 5
+];
+
+// ── Non-interactive evaluate (defect 3) ──────────────────────────────────────
+
+test('routed: the roll evaluates with { allowInteractive: false } (no fulfilment dialog)', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15 }),
+  });
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  await runRoutedCheck(engine);
+  assert.deepEqual(evaluateArgs.at(-1), { allowInteractive: false });
+});
+
+// ── Relative tiers: threshold mapping ────────────────────────────────────────
+
+test('relative: a roll meeting the lower threshold maps to that tier', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15 }),
+  });
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.outcome, 'Fine', '16 >= 15 (Fine) but < 20 (Mythic)');
+  assert.equal(r.success, true);
+  assert.equal(r.value, 16);
+  assert.equal(r.data.dc, 15, 'base DC resolved');
+});
+
+test('relative: a roll meeting the higher threshold maps to the best tier', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15 }),
+  });
+  stubRoll(20, [{ number: 1, faces: 20, total: 20 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.outcome, 'Mythic', '20 >= 20 picks the highest matching tier');
+  assert.equal(r.success, true);
+});
+
+test('relative exceed: equal to the threshold does NOT match it', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15, thresholdMode: 'exceed' }),
+  });
+  // 20 > 15 (Fine) but NOT > 20 (Mythic): exceed drops the equal-threshold tier.
+  stubRoll(20, [{ number: 1, faces: 20, total: 20 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.outcome, 'Fine');
+  assert.equal(r.data.comparison, 'exceed');
+});
+
+test('relative: a roll below every success threshold matches the failure tier', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15 }),
+  });
+  // 6 >= 5 (Botch threshold) but < 15: only the failure tier matches.
+  stubRoll(6, [{ number: 1, faces: 20, total: 6 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.outcome, 'Botch');
+  assert.equal(r.success, false, 'the failure tier does not succeed');
+});
+
+// ── Fixed tiers ──────────────────────────────────────────────────────────────
+
+test('fixed: a total inside a tier range maps to that tier', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({
+      type: 'fixed',
+      fixedOutcomes: [
+        { id: 'f-lo', name: 'Low', success: true, breakTools: false, start: 1, end: 10 },
+        { id: 'f-hi', name: 'High', success: true, breakTools: false, start: 11, end: 20 },
+      ],
+    }),
+  });
+  stubRoll(14, [{ number: 1, faces: 20, total: 14 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.outcome, 'High', '14 is in [11, 20]');
+  assert.equal(r.success, true);
+});
+
+test('fixed: a total in no range yields a null outcome and failure', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({
+      type: 'fixed',
+      fixedOutcomes: [{ id: 'f-lo', name: 'Low', success: true, start: 1, end: 5 }],
+    }),
+  });
+  stubRoll(12, [{ number: 1, faces: 20, total: 12 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.outcome, null, '12 is outside [1, 5]');
+  assert.equal(r.success, false);
+});
+
+// ── breakTools tier ──────────────────────────────────────────────────────────
+
+test('a matched breakTools tier surfaces data.breakTools', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({
+      relativeOutcomes: [
+        { id: 't-dang', name: 'Dangerous', success: true, breakTools: true, dc: 0 },
+      ],
+      dc: 15,
+    }),
+  });
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.outcome, 'Dangerous');
+  assert.equal(r.data.breakTools, true, 'the matched tier carries breakTools');
+});
+
+test('a forced-failure trigger reroutes the disposition; the rerouted tier surfaces breakTools', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({
+      relativeOutcomes: RELATIVE_TIERS,
+      dc: 15,
+      ...breakage(totalTrigger({ id: 'c-fail', groupId: 0, value: 1, outcome: 'failure' })),
+    }),
+  });
+  // High roll would map to Mythic, but the failure trigger forces failure → worst
+  // failing tier (Botch), whose own breakTools is the surfaced flag.
+  stubRoll(20, [{ number: 1, faces: 20, total: 1 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.success, false, 'the forced-failure trigger overrides the threshold');
+  assert.equal(r.outcome, 'Botch', 'reroutes to the worst failing tier');
+  assert.equal(r.data.breakTools, true, 'the rerouted Botch tier carries breakTools');
+});
+
+// ── Base-DC resolution (mirrors the simple check, NOT the flat routed.dc) ──────
+
+test('recipe tier overrides the base DC and shifts every relative threshold', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({
+      relativeOutcomes: [{ id: 't-fine', name: 'Fine', success: true, dc: 0 }],
+      dc: 10, // flat config DC — must be IGNORED in favour of the recipe tier
+      tiers: [{ id: 'tier-hard', name: 'Hard', dc: 18 }],
+    }),
+  });
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  const r = await runRoutedCheck(engine, { craftingSystemId: 'sys-1', checkTierId: 'tier-hard' });
+  assert.equal(r.data.dc, 18, 'resolves the recipe tier DC, not the flat routed.dc');
+  // 17 < 18 (the tier-shifted Fine threshold) meets no tier, so the crafting engine's
+  // clampToNearest routes to the lowest (here only) tier rather than a null outcome.
+  assert.equal(r.outcome, 'Fine', 'below every threshold clamps to the closest tier');
+  assert.equal(r.success, true, "the clamped tier's own success flag stands");
+});
+
+test('dynamic DC macro return drives the base DC for routed thresholds', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({
+      relativeOutcomes: [{ id: 't-fine', name: 'Fine', success: true, dc: 0 }],
+      dc: 99,
+      dcMode: 'dynamic',
+      macroUuid: 'Macro.dc',
+    }),
+  });
+  stubRoll(14, [{ number: 1, faces: 20, total: 14 }]);
+  const orig = MacroExecutor.run;
+  MacroExecutor.run = async () => 12;
+  try {
+    const r = await runRoutedCheck(engine, { craftingSystemId: 'sys-1' }, { id: 'set-1' });
+    assert.equal(r.data.dc, 12, 'uses the dynamic macro DC, not the flat routed.dc');
+    assert.equal(r.outcome, 'Fine', '14 >= 12 (shifted Fine threshold)');
+  } finally {
+    MacroExecutor.run = orig;
+  }
+});
+
+test('an unknown recipe tier falls back to the flat routed DC', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({
+      relativeOutcomes: [{ id: 't-fine', name: 'Fine', success: true, dc: 0 }],
+      dc: 15,
+    }),
+  });
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  const r = await runRoutedCheck(engine, { craftingSystemId: 'sys-1', checkTierId: 'gone' });
+  assert.equal(r.data.dc, 15);
+  assert.equal(r.outcome, 'Fine');
+});
+
+// ── No-formula required-check failure ─────────────────────────────────────────
+
+test('routed + check provider with no rollFormula fails loudly (no legacy macro path)', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ rollFormula: '' }),
+  });
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.success, false, 'a required routed check with no formula fails');
+  assert.equal(r.outcome, null);
+  assert.match(r.message, /requires a configured crafting check roll formula/);
+});
+
+// ── engineEvaluated marker + breakTools gating ────────────────────────────────
+
+test('an engine-evaluated routed check is tagged engineEvaluated', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15 }),
+  });
+  stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.engineEvaluated, true);
+  // The shared seam subsumes the former _checkForcesToolBreak: no breakTools tier
+  // and no enabled checkBreakage → no forced break.
+  assert.equal(evaluateCheckBreakage({ checkResult: r }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: a non-engine-evaluated result does NOT force breakage', () => {
+  // A result that was not produced by an engine roll-formula path (no
+  // `engineEvaluated` marker) can never force tool breakage, even if it carries a
+  // `data.breakTools` flag. This guards the `engineEvaluated` gate inside
+  // evaluateCheckBreakage now that the legacy macro check source is gone.
+  const checkResult = { success: true, outcome: 'Fine', value: 7, data: { breakTools: true } };
+  assert.notEqual(checkResult.engineEvaluated, true);
+  assert.equal(
+    evaluateCheckBreakage({ checkResult }).forceBreak,
+    false,
+    'a non-engine-evaluated data.breakTools must not force tool breakage'
+  );
+});
+
+test('evaluateCheckBreakage: an engine routed breakTools tier DOES force breakage', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({
+      relativeOutcomes: [{ id: 't-dang', name: 'Dangerous', success: true, breakTools: true, dc: 0 }],
+      dc: 15,
+    }),
+  });
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(evaluateCheckBreakage({ checkResult: r }).forceBreak, true);
+});
+
+// ── Headless ──────────────────────────────────────────────────────────────────
+
+test('no Roll engine does not block the craft and fabricates no route', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15 }),
+  });
+  clearRollEngine();
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.success, true);
+  assert.equal(r.outcome, null);
+  assert.equal(r.value, null);
+});
+
+
+// ── checkDriven outcomeTier (issue 419) ──────────────────────────────────────
+
+test('checkDriven routed: an outcomeTier trigger on a SUCCESSFUL tier forces breakage', async () => {
+  const successTier = { id: 't-win', name: 'Win', success: true, breakTools: false, dc: 0 };
+  const { engine, system } = makeRoutedEngine({
+    routed: defaultRouted({
+      relativeOutcomes: [successTier],
+      dc: 15,
+      checkBreakage: {
+        triggers: [{ id: 'tier', breakTools: true, outcome: 'none', condition: { type: 'outcomeTier', tierIds: ['t-win'], outcomeKeys: [] } }],
+      },
+    }),
+  });
+  system.toolBreakage = { authority: 'checkDriven' };
+  stubRoll(18, [{ number: 1, faces: 20, total: 18, results: [{ result: 18, active: true }] }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.success, true, 'the tier succeeds');
+  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, r);
+  assert.equal(decision.forceBreak, true, 'a successful tier can break tools');
+  assert.equal(decision.triggerId, 'tier');
+});
+
+test('routed surfaces data.diceGroups and the matched outcomeId for the DSL', async () => {
+  const tier = { id: 't-win', name: 'Win', success: true, breakTools: false, dc: 0 };
+  const { engine } = makeRoutedEngine({ routed: defaultRouted({ relativeOutcomes: [tier], dc: 15 }) });
+  stubRoll(18, [{ number: 1, faces: 20, total: 18, results: [{ result: 18, active: true }] }]);
+  const r = await runRoutedCheck(engine);
+  assert.equal(r.data.outcomeId, 't-win');
+  assert.deepEqual(r.data.diceGroups, [{ groupId: 0, group: '1d20', sum: 18, results: [18] }]);
+});

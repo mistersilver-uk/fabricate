@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -10,6 +11,7 @@
     task = null,
     staminaEnabled = false,
     nodesEnabled = false,
+    resolutionMode = 'd100',
     itemCards = [],
     managedItemOptions = [],
     weatherOptions = [],
@@ -208,7 +210,7 @@
   }
 
   function taskImage() {
-    return task?.img || 'icons/svg/item-bag.svg';
+    return task?.img || DEFAULT_GATHERING_TASK_IMG;
   }
 
   function conditionId(option) {
@@ -351,6 +353,21 @@
   }
   function numericFieldValue(value) {
     return value === null || value === undefined ? '' : value;
+  }
+
+  // Per-task gathering DC override (progressive has no DC, so the field is shown
+  // only for routed; d100 has no DC either). null = use the system gathering
+  // check default DC. Mirrors the stamina-cost numeric field: '' when null,
+  // null when blank, truncated integer otherwise.
+  const dcOverrideEnabled = $derived(resolutionMode === 'routed');
+  const dcOverrideValue = $derived(numericFieldValue(task?.dcOverride));
+  function updateDcOverride(value) {
+    if (value === '' || value === null || value === undefined) {
+      onUpdateTask({ dcOverride: null });
+      return;
+    }
+    const next = Number(value);
+    onUpdateTask({ dcOverride: Number.isFinite(next) ? Math.trunc(next) : null });
   }
 
   // Resource-node authoring (enforced only when the system has resource nodes enabled).
@@ -819,6 +836,29 @@
             </button>
           </div>
         </div>
+      </div>
+    </section>
+    {/if}
+
+    {#if dcOverrideEnabled}
+    <section class="manager-task-dc-card" data-gathering-task-dc>
+      <div class="manager-task-card-header">
+        <div class="manager-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'Check DC override')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint', 'Override the system gathering check DC for this task. Leave blank to use the system default.')}</p>
+        </div>
+      </div>
+
+      <div class="manager-task-dc-row">
+        <label class="manager-field manager-task-dc-field">
+          <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
+          <input
+            type="number" step="1" placeholder={text('FABRICATE.Admin.Manager.Gathering.TaskDcOverridePlaceholder', 'System default')}
+            value={dcOverrideValue}
+            oninput={(event) => updateDcOverride(event.currentTarget.value)}
+            data-gathering-task-dc-override
+          />
+        </label>
       </div>
     </section>
     {/if}
@@ -1369,7 +1409,8 @@
 <style>
   /* Card chrome matching the other task-editor cards. */
   .manager-task-stamina-card,
-  .manager-task-nodes-card {
+  .manager-task-nodes-card,
+  .manager-task-dc-card {
     min-width: 0;
     display: flex;
     flex-direction: column;

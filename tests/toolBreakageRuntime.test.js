@@ -144,6 +144,23 @@ test('applyToolUsageAndBreakage: limitedUses increments toolUsage', async () => 
   assert.equal(entry.componentId, 'c');
 });
 
+test('applyToolUsageAndBreakage: limitedUses does NOT break one use early (post-increment count, no double +1)', async () => {
+  // Regression: the apply path increments via applyUsage, so the breakage decision
+  // must read the POST-increment timesUsed (Tool#evaluateBreakage), NOT re-project it
+  // with evaluateToolBreakagePlan's +1. A fresh maxUses:2 tool must survive the first
+  // apply (timesUsed 0→1, 1<2) and break only on the second (1→2, 2>=2).
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 2 }, onBreak: { mode: 'flagBroken' } });
+  const item = new FakeItem({});
+  const first = await applyToolUsageAndBreakage({ tool, item, buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }) });
+  assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 1 });
+  assert.equal(first.broken, false, 'first use (timesUsed 1) is below maxUses 2 → not broken');
+  assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), undefined);
+  const second = await applyToolUsageAndBreakage({ tool, item, buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }) });
+  assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 2 });
+  assert.equal(second.broken, true, 'second use (timesUsed 2) reaches maxUses 2 → broken');
+  assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), true);
+});
+
 test('applyToolUsageAndBreakage: breakageChance (non-limitedUses) writes NO usage flag', async () => {
   const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } });
   const item = new FakeItem({});
@@ -293,4 +310,224 @@ test('Tool.applyUsage prefers toolUsage over catalystItemUsage once toolUsage ex
   const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 5 }, catalystItemUsage: { timesUsed: 2 } } });
   await tool.applyUsage(item);
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 6 });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateCheckBreakage (issue 419) — the single shared trigger-evaluator seam
+// ---------------------------------------------------------------------------
+
+const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
+const {
+  engineCheckResult,
+  NATURAL_ONE_TRIGGER,
+  NATURAL_ONE_RESULT,
+  CHECK_DRIVEN_SYSTEM,
+} = await import('./helpers/checkDrivenBreakageFixtures.js');
+
+test('evaluateCheckBreakage: a non-engine-evaluated result never force-breaks', () => {
+  const result = { engineEvaluated: false, data: { breakTools: true } };
+  assert.deepEqual(evaluateCheckBreakage({ checkResult: result }), {
+    forceBreak: false,
+    triggerId: null,
+    reason: null,
+  });
+});
+
+test('evaluateCheckBreakage: legacy data.breakTools is an implicit always-on trigger', () => {
+  const result = engineCheckResult({ breakTools: true });
+  const decision = evaluateCheckBreakage({ checkResult: result });
+  assert.equal(decision.forceBreak, true);
+  assert.equal(decision.triggerId, 'legacyBreakTools');
+});
+
+test('evaluateCheckBreakage: rollTotal trigger (breakTools opt-in)', () => {
+  const checkBreakage = {
+    triggers: [{ id: 'r', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: 3 } }],
+  };
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 2 }) }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 4 }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: a matching trigger that does NOT opt into breakTools never force-breaks', () => {
+  // A trigger may force an outcome only (breakTools false/absent); it must not break tools.
+  const outcomeOnly = { triggers: [{ id: 'o', outcome: 'failure', breakTools: false, condition: { type: 'rollTotal', operator: '<=', value: 99 } }] };
+  assert.equal(evaluateCheckBreakage({ checkBreakage: outcomeOnly, checkResult: engineCheckResult({ total: 1 }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: progressiveValue trigger; absent value on a non-progressive check never matches', () => {
+  const checkBreakage = {
+    triggers: [{ id: 'p', breakTools: true, condition: { type: 'progressiveValue', operator: '>=', value: 100 } }],
+  };
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ value: 120, total: 12 }) }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ value: null, total: 12 }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: rollTotal and progressiveValue resolve from distinct sources on the same roll', () => {
+  const checkResult = engineCheckResult({ value: Number.MAX_SAFE_INTEGER, total: 1 });
+  const rollTotalTrigger = { triggers: [{ id: 'rt', breakTools: true, condition: { type: 'rollTotal', operator: '==', value: 1 } }] };
+  const progValueTrigger = { triggers: [{ id: 'pv', breakTools: true, condition: { type: 'progressiveValue', operator: '<=', value: 5 } }] };
+  assert.equal(evaluateCheckBreakage({ checkBreakage: rollTotalTrigger, checkResult }).forceBreak, true, 'rollTotal sees the raw 1');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: progValueTrigger, checkResult }).forceBreak, false, 'progressiveValue sees the awarded MAX');
+});
+
+test('evaluateCheckBreakage: outcomeTier trigger matches by tierId or outcome key', () => {
+  const byId = { triggers: [{ id: 'o', breakTools: true, condition: { type: 'outcomeTier', tierIds: ['t-danger'], outcomeKeys: [] } }] };
+  const byKey = { triggers: [{ id: 'o', breakTools: true, condition: { type: 'outcomeTier', tierIds: [], outcomeKeys: ['danger'] } }] };
+  const result = engineCheckResult({ outcome: 'Danger', outcomeId: 't-danger' });
+  assert.equal(evaluateCheckBreakage({ checkBreakage: byId, checkResult: result }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage: byKey, checkResult: result }).forceBreak, true);
+});
+
+test('evaluateCheckBreakage: diceGroup anyDie natural-1', () => {
+  const checkBreakage = {
+    triggers: [{ id: 'g', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+  };
+  const groups = [{ groupId: 0, group: '2d20', sum: 21, results: [1, 20] }];
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, true);
+  const noOne = [{ groupId: 0, group: '2d20', sum: 30, results: [10, 20] }];
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: noOne }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: diceGroup total, lowestDie, highestDie, and allDice aggregates', () => {
+  const lowest = { triggers: [{ id: 'l', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'lowestDie', operator: '<=', value: 2 } }] };
+  const total = { triggers: [{ id: 't', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '>=', value: 18 } }] };
+  // highestDie: the single d20 face is 19, so >= 18 matches.
+  const highest = { triggers: [{ id: 'h', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'highestDie', operator: '>=', value: 18 } }] };
+  // allDice: every die in the 2d6 group is <= 6 → matches; >= 6 would NOT (the 2 fails).
+  const allLow = { triggers: [{ id: 'a', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '<=', value: 6 } }] };
+  const allHigh = { triggers: [{ id: 'a2', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '>=', value: 6 } }] };
+  const groups = [
+    { groupId: 0, group: '1d20', sum: 19, results: [19] },
+    { groupId: 1, group: '2d6', sum: 8, results: [2, 6] },
+  ];
+  const checkResult = engineCheckResult({ diceGroups: groups });
+  assert.equal(evaluateCheckBreakage({ checkBreakage: lowest, checkResult }).forceBreak, true, 'lowestDie 2 <= 2');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: total, checkResult }).forceBreak, true, 'total 19 >= 18');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: highest, checkResult }).forceBreak, true, 'highestDie 19 >= 18');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: allLow, checkResult }).forceBreak, true, 'allDice (2,6) all <= 6');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: allHigh, checkResult }).forceBreak, false, 'allDice (2,6) NOT all >= 6');
+});
+
+test('evaluateCheckBreakage: non-total aggregate fails open when per-die results are missing', () => {
+  const checkBreakage = { triggers: [{ id: 'g', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }] };
+  const groups = [{ groupId: 0, group: '2d20', sum: 21 }];
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, false);
+});
+
+test('evaluateCheckBreakage: an empty trigger list with no legacy breakTools never matches', () => {
+  const checkBreakage = { triggers: [] };
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 1 }) }).forceBreak, false);
+});
+
+// ---------------------------------------------------------------------------
+// createToolBreakageRuntime checkDriven authority (issue 419)
+// ---------------------------------------------------------------------------
+
+function checkDrivenRuntime(items) {
+  return createToolBreakageRuntime({
+    matchTools: () => ({ items, missing: [] }),
+    buildItemRef: (_actor, i) => ({ actorUuid: 'Actor.a', itemUuid: i.uuid, quantity: 1 }),
+  });
+}
+
+const FORCE_TRIGGER = NATURAL_ONE_TRIGGER;
+const FORCE_RESULT = NATURAL_ONE_RESULT;
+const checkDrivenSystem = CHECK_DRIVEN_SYSTEM;
+
+test('checkDriven runtime: forces breakage on all non-immune tools while immune survives', async () => {
+  const axe = new FakeItem({}, { uuid: 'Item.axe' });
+  const hammer = new FakeItem({}, { uuid: 'Item.hammer' });
+  const immune = new FakeItem({}, { uuid: 'Item.immune' });
+  const runtime = checkDrivenRuntime([
+    { tool: { componentId: 'axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+    { tool: { componentId: 'hammer', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'flagBroken' } }, item: hammer },
+    { tool: { componentId: 'immune', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } }, item: immune },
+  ]);
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: FORCE_RESULT, checkBreakage: FORCE_TRIGGER };
+  await runtime.plan(args);
+  const applied = await runtime.apply(args);
+  const byId = Object.fromEntries(applied.map((e) => [e.componentId, e]));
+  assert.equal(byId.axe.broken, true, 'breakageChance-0 tool still breaks under checkDriven');
+  assert.equal(byId.axe.reason, 'Check breakage');
+  assert.equal(byId.hammer.broken, true);
+  assert.equal(byId.immune.broken, false, 'immune never breaks');
+  assert.equal(byId.immune.skippedImmune, true);
+});
+
+test('checkDriven runtime: no trigger match breaks nothing', async () => {
+  const axe = new FakeItem({}, { uuid: 'Item.axe' });
+  const runtime = checkDrivenRuntime([
+    { tool: { componentId: 'axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+  ]);
+  const noMatch = engineCheckResult({ diceGroups: [{ groupId: 0, group: '1d20', sum: 15, results: [15] }] });
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: noMatch, checkBreakage: FORCE_TRIGGER };
+  await runtime.plan(args);
+  const applied = await runtime.apply(args);
+  assert.equal(applied[0].broken, false, 'limitedUses own-mode is ignored under checkDriven; no trigger then no break');
+});
+
+test('checkDriven runtime: virtual-present tools are recorded as skipped, not mutated', async () => {
+  const runtime = checkDrivenRuntime([
+    { tool: { componentId: 'station', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } }, item: null, virtual: true },
+  ]);
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: FORCE_RESULT, checkBreakage: FORCE_TRIGGER };
+  const applied = await runtime.apply(args);
+  assert.equal(applied.length, 1);
+  assert.equal(applied[0].virtual, true);
+  assert.equal(applied[0].broken, false);
+});
+
+// ---------------------------------------------------------------------------
+// Crafting-vs-gathering drift (criterion 8): the REAL per-surface resolvers must
+// reach the identical decision for ONE shared persisted checkDriven system + ONE
+// engine-evaluated check result. This drives CraftingEngine._resolveCraftingBreakageDecision
+// AND the gathering surface's _resolveGatheringCheckBreakage → evaluateCheckBreakage,
+// so a change to either resolver can fail this test (the former tautology could not).
+// ---------------------------------------------------------------------------
+
+const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
+const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
+
+test('drift: crafting and gathering resolvers reach the identical break decision for one shared system + roll', () => {
+  // ONE persisted checkDriven system carrying the same checkBreakage block on the
+  // simple crafting check and the routed gathering check.
+  const system = {
+    toolBreakage: { authority: 'checkDriven' },
+    resolutionMode: 'simple',
+    craftingCheck: { simple: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+    gatheringCraftingCheck: { routed: { rollFormula: '1d20', checkBreakage: NATURAL_ONE_TRIGGER } },
+  };
+  const checkResult = NATURAL_ONE_RESULT;
+
+  // Crafting surface: the real resolver. A resolution-mode service stub returns the
+  // simple mode so it reads craftingCheck.simple.checkBreakage (and never touches
+  // the `game` global).
+  const craftingEngine = new CraftingEngine(null, null, { getMode: () => 'simple' });
+  const craftingDecision = craftingEngine._resolveCraftingBreakageDecision(
+    system,
+    { id: 'r', craftingSystemId: 'sys' },
+    checkResult
+  );
+
+  // Gathering surface: the real resolver pulls the routed gathering checkBreakage,
+  // then the shared seam decides — exactly as GatheringEngine wires plan/apply.
+  const gatheringEngine = new GatheringEngine({});
+  const gatheringCheckBreakage = gatheringEngine._resolveGatheringCheckBreakage(system, {
+    resolutionMode: 'routed',
+  });
+  const gatheringDecision = evaluateCheckBreakage({
+    checkBreakage: gatheringCheckBreakage,
+    checkResult,
+  });
+
+  // The shared decision shape ({ forceBreak, triggerId, reason }) must match; the
+  // crafting resolver additionally tags the system authority, which is not part of
+  // the per-surface break decision the gathering runtime compares.
+  assert.equal(craftingDecision.forceBreak, true, 'crafting forces breakage on the natural 1');
+  assert.equal(gatheringDecision.forceBreak, true, 'gathering forces breakage on the natural 1');
+  assert.deepEqual(
+    { forceBreak: craftingDecision.forceBreak, triggerId: craftingDecision.triggerId, reason: craftingDecision.reason },
+    gatheringDecision,
+    'both surfaces resolve the identical { forceBreak, triggerId, reason } decision'
+  );
 });

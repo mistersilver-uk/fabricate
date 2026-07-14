@@ -1282,8 +1282,8 @@ test('manager environments browser and edit route define compact responsive geom
     'environment details band should include a compact status/evidence card'
   );
   assert.ok(
-    workspaceBlock.includes('grid-template-columns: minmax(0, 1fr) 340px;'),
-    'environment editor workspace should pair the main composition column with a fixed 340px inspector at normal widths'
+    workspaceBlock.includes('grid-template-columns: minmax(0, 1fr) 300px;'),
+    'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths'
   );
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(
@@ -1724,7 +1724,8 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const gridBlock = blockFor('.fabricate-manager .manager-edit-grid');
   const fieldInputBlock = blockFor('.fabricate-manager .manager-field input,\n.fabricate-manager .manager-field select');
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
-  const toggleRowBlock = blockFor('.fabricate-manager .manager-toggle-row');
+  const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');
+  const featureTileHeadBlock = blockFor('.fabricate-manager .manager-feature-tile-head');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const narrowQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
@@ -1733,7 +1734,8 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   assert.ok(gridBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'system edit fields should use a stable two-column grid');
   assert.ok(fieldInputBlock.includes('height: 36px;'), 'system edit inputs and selects should have stable control height');
   assert.ok(toggleListBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'feature toggles should use stable two-column rows');
-  assert.ok(toggleRowBlock.includes('grid-template-columns: 20px minmax(0, 1fr);'), 'toggle rows should reserve checkbox width');
+  assert.ok(featureTileBlock.includes('flex-direction: column;'), 'feature tiles should stack heading and hint vertically');
+  assert.ok(featureTileHeadBlock.includes('justify-content: space-between;'), 'feature tile heading should push the pill toggle to the trailing edge');
   assert.ok(
     mediumQuery.includes('.fabricate-manager .manager-toggle-list') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
     'medium edit layout should collapse feature toggles before text becomes cramped'
@@ -1886,5 +1888,142 @@ test('every view-specific manager-body grid override narrows the rail column whe
       collapsedBlock.includes('grid-template-columns: 56px '),
       `view "${view}" collapsed override should narrow the rail column to 56px`
     );
+  }
+});
+
+test('recipe tag chips zero their list-item margins so a host list rule cannot inflate one chip', async () => {
+  // Regression: chips are <li>s, and a host (Foundry) global list rule giving
+  // non-last items a margin-bottom inflated only the first chip's box (e.g. it
+  // rendered 34px tall vs the last chip's 30px). Our class rule must zero the
+  // margin and win on specificity even when the host rule is declared later.
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 760, height: 320 }, deviceScaleFactor: 1 });
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
+            /* Simulate a host global list rhythm declared after our stylesheet. */
+            li:not(:last-child) { margin-bottom: 4px; }
+            .fas::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
+              <ul class="manager-recipe-tag-chips">
+                <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
+                <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
+              </ul>
+            </div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const chips = Array.from(document.querySelectorAll('.manager-recipe-tag-chip'));
+      return chips.map((chip) => {
+        const style = getComputedStyle(chip);
+        return {
+          marginTop: style.marginTop,
+          marginBottom: style.marginBottom,
+          height: chip.getBoundingClientRect().height
+        };
+      });
+    });
+
+    assert.equal(report.length, 2, 'both tag chips should render');
+    for (const [index, chip] of report.entries()) {
+      assert.equal(chip.marginBottom, '0px', `chip ${index} should have no bottom margin despite the host list rule`);
+      assert.equal(chip.marginTop, '0px', `chip ${index} should have no top margin`);
+    }
+    assert.equal(report[0].height, report[1].height, 'both chips should derive the same height');
+  } finally {
+    await page.close();
+    await browser.close();
+  }
+});
+
+test('recipe tag list spans the full row width on its own line below the controls', async () => {
+  // The chosen-tags box should drop to a full-width line under the match
+  // controls + quantity row, so chips never share width with the row-end controls.
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 760, height: 360 }, deviceScaleFactor: 1 });
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
+            .harness-row-width { width: 600px; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <div class="harness-row-width">
+              <div class="manager-recipe-ingredient-option-row" data-recipe-option>
+                <div class="manager-recipe-option-target">
+                  <div class="manager-recipe-option-tags">
+                    <div class="manager-recipe-option-tags-controls">
+                      <div class="manager-recipe-tag-match-toggle">
+                        <button type="button" class="manager-recipe-tag-match-option is-selected">Any</button>
+                        <button type="button" class="manager-recipe-tag-match-option">All</button>
+                      </div>
+                      <button type="button" class="manager-button is-subtle manager-recipe-tag-trigger"><i class="fas fa-tag"></i><span>Add tag</span></button>
+                    </div>
+                  </div>
+                </div>
+                <div class="manager-recipe-option-controls">
+                  <input type="number" class="manager-recipe-option-quantity" value="1">
+                  <button type="button" class="manager-icon-button is-danger manager-recipe-option-remove"><i class="fas fa-minus"></i></button>
+                </div>
+                <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
+                  <ul class="manager-recipe-tag-chips">
+                    <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
+                    <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const rectFor = (selector) => {
+        const rect = document.querySelector(selector).getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width };
+      };
+      return {
+        row: rectFor('.manager-recipe-ingredient-option-row'),
+        target: rectFor('.manager-recipe-option-target'),
+        controls: rectFor('.manager-recipe-option-controls'),
+        list: rectFor('.manager-recipe-option-tags-list')
+      };
+    });
+
+    assert.ok(
+      Math.abs(report.list.width - report.row.width) <= 1,
+      `tags list should fill the row width (list ${report.list.width} vs row ${report.row.width})`
+    );
+    assert.ok(
+      report.list.top >= report.controls.bottom - 1 && report.list.top >= report.target.bottom - 1,
+      'tags list should sit on its own line below the controls/quantity row'
+    );
+  } finally {
+    await page.close();
+    await browser.close();
   }
 });

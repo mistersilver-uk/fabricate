@@ -40,7 +40,16 @@ This is the same behaviour gathering tasks use.
 ## The requirement gate
 
 Every applicable Tool must be **present** in the source actor's inventory and must **pass its optional requirement** before the activity can proceed.
-The owned item is recognised whether it is the Tool component's source world item or a copy duplicated from it.
+The owned item is recognised whether it is the Tool's own source world item or a copy duplicated from it.
+
+{: .note }
+> Presence is matched broadly, but breakage and usage are not.
+> Only an item Fabricate can identify as the Tool by a durable link is ever consumed, marked as broken, or has its usage counter advanced.
+> A loosely recognised copy still satisfies presence but is spared from breakage and usage until you repair or re-issue it.
+> This covers a copy duplicated from another item in a world that has not been repaired, or a copy that merely shares the Tool's name.
+> Sparing it is deliberate, so Fabricate never destroys the wrong item.
+> Run **Repair Item Data**, or re-issue the Tool from its source item, to restore breakage and usage tracking for such a copy.
+> See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
 
 A Tool's optional requirement is a condition checked against the acting character that must pass.
 You write it as a single roll expression evaluated against the character's roll data, for example a proficiency check.
@@ -54,38 +63,109 @@ In crafting the Tool is flagged as missing or unsatisfied in the craftability su
 
 Each Tool picks exactly one breakage mechanic:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Mode | Behaviour |
 |:-----|:----------|
 | Limited uses | A usage counter ticks up each attempt. The Tool breaks when the counter reaches the chosen maximum. Leave the maximum unset for unlimited use, in which case usage is still tracked. |
 | A chance each use | A flat percent chance per attempt that the Tool breaks. Set it to 100 to always break and to 0 to never break. |
 | A dice roll | A dice roll is compared against a numeric threshold. The Tool breaks when the roll comes in below the threshold. |
+| Immune | The Tool never breaks. It is still recorded as used, but it carries no breakage settings and no on-break action ever runs. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Which of these you can choose for a Tool depends on the **Tool breakage source** described below.
+Under **Tool-specific** you pick one of the first three mechanics and configure its settings.
+Under **Check-driven** the per-Tool choice is simply **Breakable** or **Immune**, with no extra settings, because the check decides whether breakable Tools break.
+A **Breakable** Tool keeps whatever mechanic it had under Tool-specific, so switching the source back restores it.
+An immune Tool is the clean way to model a piece of equipment that is always present but never wears out.
 
 {: .note }
-> Only limited-uses Tools track how many times each item has been used. The other two modes never record a per-item usage count.
+> Only limited-uses Tools track how many times each item has been used.
+The other modes never record a per-item usage count.
+
+## Tool breakage source
+
+By default each Tool decides for itself whether it breaks, using the breakage mode you picked above.
+You can instead hand that decision to the check the attempt rolls, so the same roll that decides the result also decides whether the required Tools break.
+
+You choose between these two on the system's **Tools** page, in the **Tool breakage source** setting:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Source | Behaviour |
+|:-------|:----------|
+| Tool-specific | The default. Each Tool's own breakage mode decides whether it breaks. |
+| Check-driven | The active check decides whether all of the required Tools break for the attempt. Each Tool's own breakage mode is ignored, with one exception. An Immune Tool still never breaks. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The setting applies to the whole crafting system.
+It covers crafting, salvage, and gathering together.
+
+When the source is **Check-driven**, the option explains that per-Tool breakage modes are no longer evaluated, except Immune, and each Tool's breakage control becomes a simple Breakable or Immune choice.
+Immune is how you exempt a single Tool from check-driven breakage.
+Set that Tool to Immune and it will never break, even when the check breaks every other required Tool.
+
+You decide exactly when a check-driven check breaks Tools on the check editor itself.
+See [Tool breakage triggers]({% link crafting-checks.md %}#tool-breakage-triggers).
 
 ## On-break actions
 
 When a Tool breaks, the on-break action you chose runs:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Action | Behaviour |
 |:-------|:----------|
 | Destroy it | The owned Tool is removed from the character's inventory. |
-| Flag it as broken | The Tool stays in inventory but is marked as broken. A broken Tool fails the presence check on future attempts until a GM clears it. |
+| Flag it as broken | The Tool stays in inventory but is marked as broken, and Fabricate appends " (broken)" to its name so it reads as broken at a glance. A broken Tool fails the presence check on future attempts until a GM clears it. Clearing the mark does not remove the " (broken)" name, so the GM also renames the Tool back to undo the break. |
 | Replace it with a broken variant | The original is removed and a broken variant component is created on the character. You can build a recipe that consumes the broken variant to produce the repaired Tool. While the character holds the broken variant, the gathering app shows the required Tool as **Broken** rather than **Missing**. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ## Authoring a Tool
 
 Tools are authored in the Crafting System Manager (not constructed via the API).
-In Manager V2:
+Open the system's Tools page first.
+With a crafting system selected, click the top-level **Tools** entry in the Manager navigation.
+It sits alongside Components, Essences, and the Gathering group, and it is not nested under Gathering, because Tools belong to the system.
 
-1. **Add the component.** In the system's **Components** tab, add the Tool item as a managed component.
+There are two ways to create a Tool.
+
+### From an item (no component needed)
+
+You can make any Item a Tool directly, without first importing it as a crafting component.
+Drag an Item from the Items directory (or a compendium) onto the Tools page.
+On an empty Tools library you can drop the Item straight onto the empty-state panel.
+Fabricate creates a first-class Tool that shows the item's own name and image.
+The tool row is marked **Item source** so you can tell it apart from a component-linked Tool at a glance.
+
+Use this for equipment that is only ever a tool, such as a forge, a cauldron, or a pick, so it never clutters your Components list.
+
+### From a managed component
+
+You can also base a Tool on a crafting component you already manage, which is the right choice when the same item is both a tool and a crafting material (a whetstone that is also an ingredient).
+
+1. **Add the component.** In the system's **Components** tab, add the item as a managed component.
    If you plan to replace the Tool with a broken variant when it breaks, also add the broken-tool variant as a separate component.
-2. **Open the system's Tools page.** With a crafting system selected, click the top-level **Tools** entry in the Manager navigation (it sits alongside Components, Essences, and the Gathering group, and it is not nested under Gathering, because Tools belong to the system).
-   Click *Add tool*, pick the Tool component (drag-drop from the Items directory or use the dropdown), and optionally set a display label.
-3. **(Optional) Add a requirement**, a condition checked against the acting character (see [The requirement gate](#the-requirement-gate)).
-4. **Pick a breakage mode**: limited uses, a chance each use, or a dice roll (see [Breakage modes](#breakage-modes)).
-5. **Pick an on-break action**: destroy it, flag it as broken, or replace it with a broken variant (see [On-break actions](#on-break-actions)).
-6. **Save**, then reference the saved Tool from the recipes, steps, ingredient sets, gathering tasks, or salvage configurations that require it.
+2. On the Tools page, click *Add tool* and pick the component (drag-drop from the Items directory or use the dropdown).
+   The Tool shows the component's name and image, and its row is marked **Component**.
+
+### Finishing either kind
+
+After creating the Tool by either route, configure the rest of it and save:
+
+1. **(Optional) Set a display label** to override the name shown on the tool.
+2. **(Optional) Add a requirement**, a condition checked against the acting character (see [The requirement gate](#the-requirement-gate)).
+3. **Pick a breakage mode**: under the Tool-specific source, limited uses, a chance each use, or a dice roll; under the Check-driven source, simply Breakable or Immune (see [Breakage modes](#breakage-modes)).
+4. **Pick an on-break action**: destroy it, flag it as broken, or replace it with a broken variant (see [On-break actions](#on-break-actions)).
+5. **Save**, then reference the saved Tool from the recipes, steps, ingredient sets, gathering tasks, or salvage configurations that require it.
+
+{: .note }
+> An item-sourced Tool takes a snapshot of the item's name and image when you create it.
+> Renaming the source item later does not change what the Tool shows.
+> Re-create the Tool if you want it to pick up the new name.
 
 ## Failure behaviour
 
@@ -98,7 +178,14 @@ You can separately choose to apply Tool breakage on a failed salvage check.
 {: .note }
 > See [Consumption on Failure]({% link crafting-checks.md %}#consumption-on-failure) for where these options live.
 
+This applies to check-driven breakage too.
+On a failed attempt, a check that would break the required Tools only does so when you have allowed breakage on failure for that activity.
+On a successful attempt the Tools always break when the check says they do.
+
 For gathering, the system-level **Tool breakage outcome** setting (Manager V2 → System Settings → Gathering Rules) decides whether a broken Tool fails the whole attempt (the default) or whether drops are still awarded with the breakage reported alongside.
+That setting is separate from the **Tool breakage source** above.
+The source decides whether a Tool breaks.
+The outcome setting decides what a broken Tool does to the gather.
 
 ## What the results show
 
@@ -115,14 +202,20 @@ After the migration runs, the GM sees a one-time notification with a count of mi
 
 The conversion preserves behaviour:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Old catalyst | Resulting Tool |
 |:-------------|:---------------|
 | Present but never consumed | A Tool that never breaks and is flagged as broken if it ever would. It is present-only and tracks no usage. |
 | Consumed on use, limited uses, destroyed when exhausted | A limited-uses Tool that is destroyed when it breaks. |
 | Consumed on use, limited uses, kept when exhausted | A limited-uses Tool that is flagged as broken when it breaks. |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 {: .note }
-> The present-only row is a deliberate, behaviour-preserving choice. A Tool with a zero breakage chance never wears out and never records usage, exactly matching the old never-consumed behaviour.
+> The present-only row is a deliberate, behaviour-preserving choice.
+A Tool with a zero breakage chance never wears out, matching the old never-consumed behaviour.
+For new Tools you author by hand, the Immune mode is the clearer way to say "this never breaks".
 
 Identical catalysts are combined into a single shared library Tool.
 Catalysts that differ in meaning are kept separate.
@@ -147,7 +240,11 @@ Once the old copies are cleared, running it again does nothing.
 
 ## See Also
 
-- [Recipes overview]({% link recipes/index.md %}). How Tools fit into recipe definitions and resolution modes.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}). A worked example of a gathering Tool that wears out.
-- [Canvas Interactables]({% link canvas-interactables.md %}). Place Tool stations on the canvas as Scene Regions players activate by walking in, so they can use a Tool without owning it.
-- [Crafting Engine API]({% link api/crafting-engine.md %}). Programmatic control over crafting runs and Tool validation.
+- [Recipes overview]({% link recipes/index.md %}).
+How Tools fit into recipe definitions and resolution modes.
+- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
+A worked example of a gathering Tool that wears out.
+- [Canvas Interactables]({% link canvas-interactables.md %}).
+Place Tool stations on the canvas as Scene Regions players activate by walking in, so they can use a Tool without owning it.
+- [Crafting Engine API]({% link api/crafting-engine.md %}).
+Programmatic control over crafting runs and Tool validation.

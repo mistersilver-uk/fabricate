@@ -6,6 +6,7 @@ export const FABRICATE_THEME_IDS = Object.freeze({
   IRONBLOOD_FORGE: 'ironblood-forge',
   HEARTH_HERB: 'hearth-herb',
   STARGLASS_ARCANA: 'starglass-arcana',
+  SOVEREIGN: 'sovereign',
   FOUNDRY_NATIVE: 'foundry-native'
 });
 
@@ -17,6 +18,7 @@ export const FABRICATE_THEME_CHOICES = Object.freeze({
   [FABRICATE_THEME_IDS.IRONBLOOD_FORGE]: 'Ironblood Forge',
   [FABRICATE_THEME_IDS.HEARTH_HERB]: 'Hearth & Herb',
   [FABRICATE_THEME_IDS.STARGLASS_ARCANA]: 'Starglass Arcana',
+  [FABRICATE_THEME_IDS.SOVEREIGN]: 'Sovereign',
   [FABRICATE_THEME_IDS.FOUNDRY_NATIVE]: 'Foundry Native'
 });
 

@@ -25,14 +25,26 @@ Fabricate keeps the header action in step as crafting systems change, so disabli
 
 ![Fabricate gathering feature enabled](img/screenshots/fabricate-enable-gathering.webp)
 
+## Gathering Resolution Mode
+
+The system's gathering **Settings** tab has a **Gathering resolution mode** card above the Limitation card.
+It chooses how a gathering attempt decides its outcome.
+
+The only mode available today is **d100**, which is selected by default.
+**Progressive** and **Routed by check** are shown but disabled with a "Coming soon" label, because they are planned and not yet available.
+
 ## Gathering Limitations
 
 Each crafting system decides how often its gathering tasks can be attempted through **two independent limitations**, set on the system's gathering **Settings** tab under **Limitation**:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Limitation | Toggle | What it caps |
 |:-----------|:-------|:-------------|
 | **Stamina** | **Stamina** pill | A per-character stamina pool. Each attempt spends the task's stamina cost. A character can keep going only while they have stamina, which regenerates as world time passes. |
 | **Resource nodes** | **Resource nodes** pill | A finite per-task node pool in each environment. Each accepted attempt depletes one node. Once a pool is empty the task is blocked until its nodes respawn over world time. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The two toggles are **independent, not a single choice**.
 Each can be on or off on its own:
@@ -174,15 +186,19 @@ Your edits are held until you click **Save changes**, leaving with unsaved edits
 
 Each library tool carries:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
-| **Component** | The managed component the tool refers to (required) |
-| **Display label** | Optional. Falls back to the component name |
+| **Source** | The item the tool is. Either its own source item (an item-sourced tool) or a managed component (a component-linked tool). See [Tools]({% link tools.md %}) |
+| **Display label** | Optional. Falls back to the tool's item or component name |
 | **Tool requirement** | Optional formula checked against the character's roll data. See [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
-| **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), or **Dice expression** (a formula compared against a threshold) |
+| **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), **Dice expression** (a formula compared against a threshold), or **Immune** (never breaks) |
 | **On-break action** | One of **Destroy item**, **Mark as broken**, or **Replace with item** (the replacement must differ from the original) |
 
-A tool is invalid if it has no component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+A tool is invalid if it has neither a source item nor a component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
 The Save button stays disabled until every tool is valid.
 Hover it to see the first failing reason.
 
@@ -205,6 +221,8 @@ GMs can toggle matched task and event records on or off per environment.
 
 Gathering Task records support:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
 | **Name, description, image, enabled** | GM-authored task identity and availability |
@@ -214,11 +232,15 @@ Gathering Task records support:
 | **Stamina and modifiers** | Optional stamina cost and a gathering roll modifier formula |
 | **Required tools** | Optional references to the system's Gathering Tools library. All referenced tools are required. |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 {: .note }
 > Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more).
 > See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use examples.
 
 Reusable event records support:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Field | Description |
 |:------|:------------|
@@ -227,6 +249,8 @@ Reusable event records support:
 | **Weather, time of day** | Optional runtime availability gates. Empty means any |
 | **Trigger rate** | The event trigger rate from 1 to 100 |
 | **Modifier** | Optional event roll modifier formula |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Disabled Gathering Tasks and events never match for player gathering.
 
@@ -262,27 +286,28 @@ If no events are enabled or matched, the environment is mechanically safe even w
 An environment contains one or more Environment Tasks.
 The task editor lets you set:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Area | What you set |
 |:-----|:-------------|
 | Task basics | Name, description, image, whether it is enabled, and how it is resolved |
 | Visibility gate | Turn task visibility on or off, then set its formula and required threshold |
-| Routed result selection | Choose a macro or a roll table to decide which result group is awarded |
 | Progressive checks | Choose the award mode plus the check formula and an optional threshold |
 | Time requirement | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years |
 | Failure outcome | Leave clear for Fabricate's default failure feedback, or set custom text or a macro |
 | Result groups | Add, rename, delete, and reorder groups |
 | Results | Add, edit, delete, and reorder component results, each with a component and a quantity |
-| Required tools | Reference the system's Tools library. The tools themselves (their component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
+| Required tools | Reference the system's Tools library. The tools themselves (their source item or component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Progressive task result difficulty comes from the chosen component's own difficulty.
 Result rows do not store their own difficulty.
 
 New environments start as disabled drafts.
 Library-backed automatic environments can be set up without a placeholder task.
-A placeholder task can be saved while it is disabled, even when its macro, roll table, or progressive check formula is still blank.
+A placeholder task can be saved while it is disabled, even when its progressive check formula is still blank.
 Once a task is enabled, saving requires complete configuration for the way it is resolved.
-
-If a saved macro is no longer present in your world, the editor keeps it shown as the selected value, warns that it is missing, and preserves it until the GM changes the field.
 
 Task images can be typed directly or chosen with Foundry's image file picker when it is available.
 Cancelling the picker leaves the current path unchanged.
@@ -303,27 +328,31 @@ Clearing visibility removes the gate only when the task already had one saved.
 
 ## Routed Result Selection
 
-Routed gathering tasks use either a macro or a roll table to choose which result group is awarded.
+Routed gathering tasks do not carry their own result-selection setting.
+They are resolved by the system's gathering check, which you configure once for the whole system.
+When a routed task is attempted, the gathering check rolls and produces a named outcome.
+That outcome name is matched to a result group by name, and the matching group is awarded.
 
-| Source | What you choose | Notes |
-|:-------|:----------------|:------|
-| Macro | A Foundry script macro | The macro's outcome is matched to a result group by name. |
-| Roll table | A Foundry roll table | The drawn result is matched to a result group by name. |
+A few outcome names are reserved and take the failure path instead of awarding a group.
+Because the match is by name, give each result group a name that lines up with one of your gathering check's outcomes.
+Names are matched ignoring upper and lower case and surrounding spaces, so each result group needs a name that is unique once case is ignored.
 
-Switching between a macro and a roll table keeps only the choice you are currently using, so it does not hold on to the other one.
-
-The roll table field offers a picker populated from your world's roll tables, and you can also paste a reference by hand.
-If a saved roll table is no longer in the list, the editor shows a missing-reference warning and preserves the value until the GM clears or replaces it.
+If the outcome is a success but matches none of your result groups, the attempt fails and no group is awarded.
+A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 
 ## Progressive Checks
 
 Progressive gathering tasks need an award mode and a check formula.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Field | Description |
 |:------|:------------|
 | Award mode | One of equal, partial, or exceed |
 | Check formula | Required. A roll expression evaluated against the acting character's roll data |
 | Check threshold | Optional. When left blank the check just produces a value |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 When you set a threshold, the rolled value is compared against it for success or failure.
 When you leave it blank, the check simply produces a value.
@@ -385,7 +414,8 @@ On other tabs the right side is empty.
 The player app's left column lists environments as cards.
 **Available** environments (enabled, with at least one visible task) sort first and are selectable.
 **Locked** environments sort after them and are shown only as non-interactive teasers.
-A locked card is a disabled environment surfaced to non-GM players.
+A locked card is one your party cannot currently reach.
+That covers a disabled environment, and an environment in another realm or gated behind a scene the party is not on.
 It carries the environment identity (name, image, biome chips) and a visible lock indicator, but no tasks, weights, or composition internals leak through it.
 
 Blind environments show a **blind** chip.
@@ -396,6 +426,28 @@ Biome chips on a card use the same labels, icons, and colours as the GM Environm
 Visible environments and tasks remain listed even when they are currently blocked.
 Scene-linked entries stay visible when the selected character is not on the linked scene or has no active token there, and the app shows the reason it is blocked.
 Active timed runs, last-attempt feedback, and recent history remain visible for the selected character even when browsing is empty or blocked.
+
+#### Hide unavailable
+
+Beneath the environment search field is a **Hide unavailable** toggle switch.
+Turn it on to tidy the column when locked teasers pile up.
+It hides only the environments your party cannot currently reach.
+That is the locked teasers: disabled environments, and environments in another realm or gated behind a scene you are not on.
+The toggle label shows how many environments are currently unavailable, for example **Hide unavailable (3)**.
+
+It does not hide environments you can still select whose individual tasks happen to be blocked.
+An in-realm environment where a task is short on stamina or missing a tool stays visible so you can open it and read why the task is blocked.
+It also leaves blind environments visible unless they are themselves locked.
+
+The toggle starts **off**, so you see every environment until you opt in.
+It only changes what this device shows.
+It never changes saved data or anything the GM configured, and it does not affect what other players see.
+Fabricate remembers the choice for this browser or device, so reopening the app here keeps it on.
+Opening Fabricate on another device or in another browser starts from off again.
+
+If turning it on hides every environment in the column, Fabricate shows an **all unavailable environments hidden** message with a **Show unavailable** button.
+Use that button to bring the hidden environments back.
+This is a different message from the **no environments match your search** one you get when a search term matches nothing.
 
 Targeted task rows can show task names, descriptions, active-run timing, status, result counts, required-tool counts, and recent history.
 For non-GM users, blind rows and missing-environment history stay redacted: the app uses a generic label and does not expose hidden task names, result details, or tool details.
@@ -420,6 +472,11 @@ It is not the chance the whole attempt succeeds, so it can read high while an at
 Tasks that have no enabled drop rows carry no bar.
 The opaque blind action never shows per-task success chances.
 
+Attempting a routed or progressive task opens an interactive roll dialog before anything is gathered, and the roll posts to chat so a module like Dice So Nice can animate it.
+Cancelling the dialog aborts the attempt with no changes.
+The immediate d100 mode and timed tasks do not prompt.
+See [Rolling a check from the UI]({% link crafting-checks.md %}#rolling-a-check-from-the-ui) for the full behaviour.
+
 ![Fabricate player gathering task](img/screenshots/fabricate-player-gathering-task.webp)
 ![Fabricate player gathering events](img/screenshots/fabricate-player-gathering-events.webp)
 ![Fabricate player gathering missing tool](img/screenshots/fabricate-player-gathering-tool-blocked.webp)
@@ -436,28 +493,42 @@ Every referenced tool must be an enabled library entry, and the character must h
 
 A library tool carries:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Field | Description |
 |:------|:------------|
-| Component | The managed component the tool is, taken from the system's component library (required) |
+| Source | The item the tool is. Either its own source item or a managed component from the system's component library. See [Tools]({% link tools.md %}) |
 | Requirement | Optional. A roll expression that must hold true for the character to use the tool |
-| Breakage mechanic | One of limited uses, breakage chance, or a dice expression |
+| Breakage mechanic | One of limited uses, breakage chance, a dice expression, or immune (never breaks) |
 | Maximum uses | For limited uses: a positive number, or blank for unlimited |
 | Breakage chance | For breakage chance: a whole percent from 0 to 100 |
 | Dice expression and threshold | For a dice expression: a roll formula and a number it must reach to avoid breaking |
 | On-break action | One of destroy the item, mark it as broken, or replace it with another component |
 | Replacement | For replace: a different managed component given to the character when the tool breaks |
 
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 The system-level Gathering Rules setting **Tool breakage outcome** controls what happens when any tool breaks.
 By default a break makes the attempt fail and clears its drops.
 You can instead let the attempt keep its success.
 Either way, the on-break action always happens.
 
+Whether a tool breaks in the first place follows the system's **Tool breakage source** setting on the [Tools]({% link tools.md %}#tool-breakage-source) page.
+With the default **Tool-specific** source, each tool's own breakage mechanic decides.
+With the **Check-driven** source, the gathering check decides whether all required tools break, the same way it does for crafting and salvage, and per-tool mechanics are ignored except for immune tools.
+This takes effect once the Progressive and Routed by check gathering modes ship.
+The only gathering mode available today, d100, has no check for triggers to read, so check-driven breakage cannot fire for a d100 attempt.
+Until then, gathering tool breakage uses the Tool-specific source regardless of this setting.
+This is separate from the **Tool breakage outcome** setting above.
+The source decides whether a tool breaks.
+The outcome setting decides what a broken tool does to the gather.
+
 A missing or disabled library tool blocks the attempt, as does a tool the character does not own, a tool the character owns that is broken, and a failed tool requirement.
 
-A tool is recognised whether the character owns the tool component's source item directly or owns a copy dragged or duplicated from it.
-Fabricate matches the owned item against the tool's component, so dropping a copy of the source item onto the character still satisfies the requirement.
+A tool is recognised whether the character owns the tool's own source item directly or owns a copy dragged or duplicated from it.
+Fabricate matches the owned item against the tool's own source references, so dropping a copy of the source item onto the character still satisfies the requirement.
 
-In the player app, a tool whose component is missing from inventory shows as **Missing**.
+In the player app, a tool the character does not own shows as **Missing**.
 A tool the character holds but cannot use shows as **Broken**.
 This covers both an item the character owns that is already broken and an owned broken-variant component for that tool.
 The **Broken** state is for display only.
@@ -480,12 +551,12 @@ Summary entries that point at a field are clickable and jump back to it.
 
 Some errors point at a whole list rather than a single field, such as the result groups, a specific group's name, a group's results, or an individual result row.
 
-Disabled tasks skip the macro, roll table, and progressive completeness checks, so a placeholder task can be saved while a GM is still authoring it.
+Disabled tasks skip the progressive completeness checks, so a placeholder task can be saved while a GM is still authoring it.
 Enabled tasks must be fully configured:
 
-- A macro-routed task needs a macro.
-- A roll-table-routed task needs a roll table.
-- A progressive task needs an award mode and a check formula. The threshold is optional.
+- A routed task needs the system to have a gathering check formula configured.
+- A progressive task needs an award mode and a check formula.
+The threshold is optional.
 
 A custom failure outcome is validated whether or not the task is enabled.
 

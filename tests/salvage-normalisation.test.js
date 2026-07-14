@@ -27,19 +27,19 @@ function makeManager() {
 // Group 1: System-level salvage normalisation (4 tests)
 // ---------------------------------------------------------------------------
 
-test('features.salvage defaults to false when not provided', () => {
+test('features.salvage defaults to true (salvage is an opt-out feature)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 'sys-1' });
-  assert.equal(system.features.salvage, false);
+  assert.equal(system.features.salvage, true);
 });
 
-test('features.salvage is true when explicitly set to true', () => {
+test('features.salvage honors an explicit false (salvage is optional)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
-    features: { salvage: true }
+    features: { salvage: false }
   });
-  assert.equal(system.features.salvage, true);
+  assert.equal(system.features.salvage, false);
 });
 
 test('salvageResolutionMode defaults to "simple" when not provided', () => {
@@ -72,21 +72,22 @@ test('salvageResolutionMode accepts canonical values, maps legacy tiered to rout
 // Group 2: salvageCraftingCheck normalisation (5 tests)
 // ---------------------------------------------------------------------------
 
-test('default salvageCraftingCheck has enabled: false, consumeComponentOnFail: true, consumeCatalystsOnFail: false', () => {
+test('default salvageCraftingCheck has enabled: false, consumeComponentOnFail: true, breakToolsOnFail: false', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 'sys-1' });
   const check = system.salvageCraftingCheck;
 
   assert.equal(check.enabled, false);
   assert.equal(check.consumption.consumeComponentOnFail, true);
-  assert.equal(check.consumption.consumeCatalystsOnFail, false);
+  assert.equal(check.consumption.breakToolsOnFail, false);
 });
 
-test('salvageCraftingCheck preserves macro UUIDs when provided', () => {
+test('salvageCraftingCheck drops the deprecated check-source fields', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
     salvageCraftingCheck: {
+      enabled: false,
       macroUuid: 'Macro.abc123',
       successMacroUuid: 'Macro.success',
       failureMacroUuid: 'Macro.fail'
@@ -94,11 +95,11 @@ test('salvageCraftingCheck preserves macro UUIDs when provided', () => {
   });
   const check = system.salvageCraftingCheck;
 
-  assert.equal(check.macroUuid, 'Macro.abc123');
-  assert.equal(check.successMacroUuid, 'Macro.success');
-  assert.equal(check.failureMacroUuid, 'Macro.fail');
-  // enabled=true because macroUuid is set
-  assert.equal(check.enabled, true);
+  assert.equal(check.macroUuid, undefined, 'root macroUuid is removed');
+  assert.equal(check.successMacroUuid, undefined);
+  assert.equal(check.failureMacroUuid, undefined);
+  // `enabled` is now purely the on/off toggle — a legacy macro config no longer flips it on.
+  assert.equal(check.enabled, false);
 });
 
 test('salvageCraftingCheck.consumption.consumeComponentOnFail can be set to false', () => {
@@ -128,15 +129,18 @@ test('salvageCraftingCheck.outcomes defaults to ["fail", "pass"]', () => {
 // Group 3: Component-level salvage normalisation (6 tests)
 // ---------------------------------------------------------------------------
 
-test('when features.salvage is false, normalised component does NOT have a salvage key', () => {
+test('component salvage config is preserved even when features.salvage is off (non-destructive toggle)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
+    // Salvage off: the feature is disabled, but the component still carries its
+    // (inert) salvage config so re-enabling restores it.
     features: { salvage: false },
     components: [{ id: 'comp-1', name: 'Iron Ore' }]
   });
   const component = system.components[0];
-  assert.equal(Object.prototype.hasOwnProperty.call(component, 'salvage'), false);
+  assert.equal(system.features.salvage, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(component, 'salvage'), true);
 });
 
 test('when features.salvage is true and component has no salvage data, defaults are applied', () => {
@@ -306,10 +310,9 @@ test('full round-trip: system with salvage enabled, component with full salvage 
     features: { salvage: true },
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
-      macroUuid: 'Macro.salvage-check',
       consumption: {
         consumeComponentOnFail: false,
-        consumeCatalystsOnFail: true
+        breakToolsOnFail: true
       },
       outcomes: ['critical', 'pass', 'fail'],
       progressive: { awardMode: 'partial', allowPlayerReorder: true }
@@ -343,9 +346,9 @@ test('full round-trip: system with salvage enabled, component with full salvage 
   // System-level checks
   assert.equal(system.features.salvage, true);
   assert.equal(system.salvageResolutionMode, 'routed');
-  assert.equal(system.salvageCraftingCheck.macroUuid, 'Macro.salvage-check');
+  assert.equal(system.salvageCraftingCheck.macroUuid, undefined, 'deprecated macroUuid is dropped');
   assert.equal(system.salvageCraftingCheck.consumption.consumeComponentOnFail, false);
-  assert.equal(system.salvageCraftingCheck.consumption.consumeCatalystsOnFail, true);
+  assert.equal(system.salvageCraftingCheck.consumption.breakToolsOnFail, true);
   assert.deepEqual(system.salvageCraftingCheck.outcomes, ['critical', 'pass', 'fail']);
   assert.equal(system.salvageCraftingCheck.progressive.awardMode, 'partial');
   assert.equal(system.salvageCraftingCheck.progressive.allowPlayerReorder, true);
@@ -360,4 +363,54 @@ test('full round-trip: system with salvage enabled, component with full salvage 
   assert.deepEqual(comp.salvage.outcomeRouting, { critical: 'rg-high', pass: 'rg-low', fail: 'rg-low' });
   assert.deepEqual(comp.salvage.timeRequirement, { hours: 2 });
   assert.deepEqual(comp.salvage.currencyRequirement, { unit: 'gp', amount: 50 });
+});
+
+// ---------------------------------------------------------------------------
+// breakToolsOnFail: legacy consumeCatalystsOnFail read-fallback (1.7.0 rename)
+// ---------------------------------------------------------------------------
+
+test('normalization reads legacy consumeCatalystsOnFail as breakToolsOnFail on salvage consumption', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'legacy-salvage',
+    name: 'Legacy',
+    features: { salvage: true },
+    salvageCraftingCheck: {
+      enabled: true,
+      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: true },
+    },
+  });
+  assert.equal(system.salvageCraftingCheck.consumption.breakToolsOnFail, true);
+  assert.equal(
+    'consumeCatalystsOnFail' in system.salvageCraftingCheck.consumption,
+    false,
+    'legacy key is not re-emitted'
+  );
+});
+
+test('normalization reads legacy consumeCatalystsOnFail as breakToolsOnFail on crafting consumption', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'legacy-craft',
+    name: 'Legacy',
+    craftingCheck: {
+      enabled: true,
+      consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: true },
+    },
+  });
+  assert.equal(system.craftingCheck.consumption.breakToolsOnFail, true);
+  assert.equal('consumeCatalystsOnFail' in system.craftingCheck.consumption, false);
+});
+
+test('normalization prefers the new breakToolsOnFail key when both are present', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'both-keys',
+    name: 'Both',
+    craftingCheck: {
+      enabled: true,
+      consumption: { breakToolsOnFail: true, consumeCatalystsOnFail: false },
+    },
+  });
+  assert.equal(system.craftingCheck.consumption.breakToolsOnFail, true);
 });

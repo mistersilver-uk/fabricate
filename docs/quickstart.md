@@ -21,12 +21,13 @@ This guide walks you through installing Fabricate, creating your first crafting 
 ### Theme
 
 Fabricate defaults to the **Fabricate** colour theme.
-The module includes five additional themes:
+The module includes six additional themes:
 
 - **Mythwright**
 - **Ironblood Forge**
 - **Hearth & Herb**
 - **Starglass Arcana**
+- **Sovereign**
 - **Foundry Native**
 
 Open Foundry's module settings for Fabricate and set **Fabricate Theme** to switch palettes.
@@ -50,6 +51,9 @@ You'll see three new header buttons:
 - **Manage Crafting Systems** (GM only): opens the Fabricate GM admin panel
 
 When no crafting systems are enabled, players do not see the **Craft Item** or **Gathering** buttons.
+
+The unified Fabricate window also has a **Journal** tab where players monitor the runs their characters have started across crafting, gathering, and salvage, and continue crafting runs.
+See [Journal]({% link journal.md %}).
 
 ## Step 2: Create a Crafting System
 
@@ -85,12 +89,14 @@ It is opt-in per crafting system.
 1. In the GM admin, open your system's **Gathering** section and, on the **Settings** tab, enable the "Gathering" feature
 2. Switch to the **Environments** tab under **Gathering** and click **Create Environment**
 3. Give it a **Name** and optional **Description** (like the "Azure Grove" or "Sunken Ruins")
-4. Choose a **Selection Mode**: 
-  - **Targeted** shows players a list of task rows
-  - **Blind** shows a single opaque gather action that resolves a hidden task at random
-5. Select a danger level for the environment (used to match tasks and events)
-6. Optionally add **Biome** tags (also used in matching) and/or link a Scene to gate gathering in that environment
-7. If you like, give your environment an image
+4. Choose a **Selection Mode**:
+
+- **Targeted** shows players a list of task rows
+- **Blind** shows a single opaque gather action that resolves a hidden task at random
+
+1. Select a danger level for the environment (used to match tasks and events)
+2. Optionally add **Biome** tags (also used in matching) and/or link a Scene to gate gathering in that environment
+3. If you like, give your environment an image
 
 ![Fabricate Enable Gathering](img/screenshots/fabricate-enable-gathering.webp)
 ![Fabricate create environment](img/screenshots/fabricate-create-environment.webp)
@@ -108,8 +114,8 @@ They are authored once and composed into environments.
 1. Open the **Tasks** tab under Gathering and create a task
 2. Give it a **Name** and optional **Biomes** (empty means "matches any biome")
 3. Add **Drop rows**.
-  These are (optionally) ordered rows, each pointing at a component with a **quantity** and a **drop rate** from 0 to 100. 
-  The drop row order is the rank used by the system's Gathering Rules when you choose "Highest ranked successful drop" in the gathering reward rules. 
+  These are (optionally) ordered rows, each pointing at a component with a **quantity** and a **drop rate** from 0 to 100.
+  The drop row order is the rank used by the system's Gathering Rules when you choose "Highest ranked successful drop" in the gathering reward rules.
 4. Optionally set a **Stamina** cost, a gathering roll **modifier**, **Weather**/**time of day** gates, and any **Required tools** from the system's Tools library
 
 ![Fabricate gathering task editor](img/screenshots/fabricate-create-gathering-task.webp)
@@ -126,7 +132,7 @@ They add flavour, complications, and can even cause a gathering attempt to fail.
 
 1. Open the **Events** tab under Gathering and create an event
 2. Give it a **Name** and optional **Danger** and **Biomes** match tags (empty means "matches any")
-3. Set a **Drop rate** from 1 to 100. 
+3. Set a **Drop rate** from 1 to 100.
   That's the chance the event triggers on a gathering attempt
 4. Optionally add one or more roll **modifier** and **Weather**/**time of day** gates
 

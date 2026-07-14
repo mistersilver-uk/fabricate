@@ -6,7 +6,7 @@ import { confirmDialog, renderDialog, choiceDialog } from './foundryCompat.js';
 import { registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
-import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
+import { resolveDropUuid, resolveDropData, folderIdFromDropData } from './svelte/util/dropUtils.js';
 import { localize, subscribeSceneChange, subscribeTravelMarkerMove } from './svelte/util/foundryBridge.js';
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sceneRegions.js';
@@ -14,6 +14,57 @@ import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
 import { tokenDocumentCenter } from '../canvas/regionHitTest.js';
 import { validateImportData, prepareForImport } from '../systems/CraftingSystemExporter.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
+import { buildImportReportContent } from '../systems/importReportContent.js';
+
+/** Minimal HTML-escape for values interpolated into DialogV2 raw HTML (F4). */
+function escapeImportReportHtml(value) {
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]
+  );
+}
+
+/**
+ * Render the pure import-report content into escaped, theme-classed HTML for the
+ * informational DialogV2. No colour literals (theme-colour-contract gate).
+ */
+function renderImportReportHtml(content) {
+  const esc = escapeImportReportHtml;
+  const parts = [`<section class="fabricate-import-report">`];
+  parts.push(`<p class="fabricate-import-report__headline">${esc(content.headline)}</p>`);
+
+  if (!content.hasReported) {
+    parts.push(`<p class="fabricate-import-report__empty">${esc(content.emptyStateLabel)}</p>`);
+  } else {
+    parts.push(
+      `<div class="fabricate-import-report__scroll" style="max-height: 20rem; overflow-y: auto;">`
+    );
+    for (const group of content.groups) {
+      parts.push(
+        `<h2 class="fabricate-import-report__kind">${esc(group.kindLabel)} (${group.count})</h2>`
+      );
+      parts.push(`<ul class="fabricate-import-report__list">`);
+      for (const row of group.rows) {
+        const owner = row.ownerName
+          ? `${esc(row.ownerTypeLabel)}: ${esc(row.ownerName)}`
+          : esc(row.ownerTypeLabel);
+        parts.push(
+          `<li><span class="fabricate-import-report__owner">${owner}</span> ` +
+            `<code class="fabricate-import-report__ref" style="overflow-wrap: anywhere; word-break: break-all;">${esc(row.referenceValue)}</code></li>`
+        );
+      }
+      parts.push(`</ul>`);
+    }
+    parts.push(`</div>`);
+  }
+
+  if (content.handledCount > 0) {
+    parts.push(`<p class="fabricate-import-report__handled">${esc(content.handledLine)}</p>`);
+  }
+  parts.push(`</section>`);
+  return parts.join('');
+}
 
 function getFolderCollectionValues(folders) {
   if (!folders) return [];
@@ -28,6 +79,17 @@ function getFolderById(folders, id) {
   if (!folders || !id) return null;
   if (typeof folders.get === 'function') return folders.get(id) || null;
   return getFolderCollectionValues(folders).find(folder => folder?.id === id) || null;
+}
+
+function resolveDroppedFolder(data, folders) {
+  // Foundry v13 folder drags emit { type: 'Folder', uuid: 'Folder.<id>' }. Prefer the
+  // UUID resolver (handles world folders synchronously) and fall back to id lookup so
+  // legacy { type: 'Folder', id } drag data keeps working.
+  if (data?.uuid && typeof globalThis.fromUuidSync === 'function') {
+    const byUuid = globalThis.fromUuidSync(data.uuid);
+    if (byUuid) return byUuid;
+  }
+  return getFolderById(folders, folderIdFromDropData(data));
 }
 
 function folderDocumentType(folder) {
@@ -55,6 +117,21 @@ function collectFolderItems(folder, folders, visited = new Set()) {
   return [...directItems, ...nestedItems];
 }
 
+// A Folder living inside a compendium pack does not expose live Item documents. Its `.contents`
+// are the pack's index entries (each carrying an authoritative `.uuid`, but no `.documentName`),
+// and its descendants live in `pack.folders` rather than `game.folders` — so collectFolderItems
+// cannot walk it. Enumerate the folder plus every descendant via getSubfolders(true) and read each
+// index entry's uuid. Gate on Item-typed folders to mirror the world-folder behaviour.
+function collectCompendiumFolderItemUuids(folder) {
+  if (!folder) return [];
+  if (folderDocumentType(folder) && folderDocumentType(folder) !== 'Item') return [];
+  const subfolders = typeof folder.getSubfolders === 'function' ? folder.getSubfolders(true) : [];
+  return [folder, ...subfolders]
+    .flatMap(current => current?.contents || [])
+    .map(entry => entry?.uuid)
+    .filter(Boolean);
+}
+
 export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
 ) {
@@ -64,6 +141,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   _adminStore = null;
   _services = null;
   _confirmDiscardDirtyEssenceDraft = null;
+  // Foundry user CRUD hook registrations, torn down on close, that keep the
+  // per-recipe restriction allow-list current when players change while open.
+  _userHooks = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-crafting-system-manager',
@@ -187,6 +267,51 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           .map(scene => normalizeSceneOption(scene))
           .filter(scene => scene.uuid && scene.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
+      // Non-GM world users ({ id, name }), name-sorted, for the per-recipe
+      // "restrict to specific users" allow-list under the `player` list mode.
+      // GMs are excluded because they always see every recipe, so restricting
+      // to a GM would be a no-op.
+      getWorldUsers: () => {
+        const USER_ROLES = globalThis.CONST?.USER_ROLES || {
+          NONE: 0,
+          PLAYER: 1,
+          TRUSTED: 2,
+          ASSISTANT: 3,
+          GAMEMASTER: 4,
+        };
+        const loc = (key, fallback) => {
+          const translated = game?.i18n?.localize?.(key);
+          return translated && translated !== key ? translated : fallback;
+        };
+        const roleLabel = (role) => {
+          switch (role) {
+            case USER_ROLES.GAMEMASTER:
+              return loc('USER.RoleGamemaster', 'Game Master');
+            case USER_ROLES.ASSISTANT:
+              return loc('USER.RoleAssistant', 'Assistant GM');
+            case USER_ROLES.TRUSTED:
+              return loc('USER.RoleTrusted', 'Trusted Player');
+            case USER_ROLES.PLAYER:
+              return loc('USER.RolePlayer', 'Player');
+            default:
+              return loc('USER.RoleNone', 'None');
+          }
+        };
+        // Foundry `User#color` is a Color (v11+) or a plain string on older cores.
+        const colorOf = (user) => {
+          const color = user?.color;
+          if (!color) return '';
+          return typeof color === 'string' ? color : color.css || color.toString?.() || '';
+        };
+        return Array.from(game.users?.contents || [])
+          .map(user => ({
+            id: user.id,
+            name: user.name,
+            role: roleLabel(user.role),
+            color: colorOf(user),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      },
       getActorOptions: () =>
         Array.from(game.actors?.contents || [])
           .map(actor => ({
@@ -198,14 +323,28 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter(actor => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
-      getRollTableOptions: () =>
-        Array.from(game.tables?.contents || [])
-          .map(table => ({
-            uuid: table.uuid,
-            name: table.name,
-            img: table.img || ''
+      // Player-character actors ({ id, name, img }), name-sorted, for the per-recipe
+      // "grant access to specific characters" roster under the `restricted`
+      // visibility mode. A character is a player-character per
+      // `game.fabricate.isPlayerCharacterActor` (actor.type === 'character'),
+      // with a plain type fallback so the store never touches classification logic.
+      getPlayerCharacterActors: () =>
+        Array.from(game.actors?.contents || [])
+          .filter(actor => game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character')
+          .map(actor => ({ id: actor.id, name: actor.name, img: actor.img || '' }))
+          .filter(actor => actor.id && actor.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      // Game-world Items ({ uuid, name, img, type }), name-sorted, for the
+      // ItemPickerModal (Books & Scrolls links a recipe item to a world Item).
+      getWorldItemOptions: () =>
+        Array.from(game.items?.contents || [])
+          .map(item => ({
+            uuid: item.uuid,
+            name: item.name,
+            img: item.img || '',
+            type: item.type || ''
           }))
-          .filter(table => table.uuid && table.name)
+          .filter(item => item.uuid && item.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       pickImagePath: async (currentPath = '') => {
         const FilePickerClass = foundry?.applications?.apps?.FilePicker?.implementation
@@ -338,6 +477,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         });
         if (!result || !result.file) return;
 
+        // The import itself (parse → validate → persist) is the only work whose
+        // failure is an "Import failed" toast; the post-success report render is
+        // deliberately OUTSIDE this try so a render error is never misreported as
+        // a failed import.
+        let summary;
         try {
           const text = await result.file.text();
           const data = JSON.parse(text);
@@ -356,28 +500,47 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
           const systemManager = game.fabricate.getCraftingSystemManager();
           const recipeManager = game.fabricate.getRecipeManager();
-          const importer = new CompendiumImporter(systemManager, recipeManager);
-          const summary = await importer.importFromPackData(packData, {
+          const importer = new CompendiumImporter(systemManager, recipeManager, {
+            environmentStore: game.fabricate.getGatheringEnvironmentStore?.() ?? null,
+            getSetting: (key) => getSetting(key),
+            setSetting: (key, value) => setSetting(key, value),
+            isGM: () => game.user?.isGM === true
+          });
+          summary = await importer.importFromPackData(packData, {
             overwriteExisting: result.conflictMode === 'overwrite'
           });
-
-          if (summary.system.skipped) {
-            ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
-          } else {
-            const verb = summary.collisions.some(c => c.type === 'system' && c.resolution === 'overwritten')
-              ? 'Updated' : 'Imported';
-            const message = `${verb} "${summary.system.name}" with ${summary.components.total} components, ${summary.recipes.imported} imported recipes, ${summary.recipes.skipped} skipped recipes, and ${summary.recipes.errors.length} failed recipes.`;
-            if (summary.recipes.errors.length > 0) {
-              ui.notifications.warn(message);
-            } else {
-              ui.notifications.info(message);
-            }
-          }
-
-          await this._adminStore.refresh();
         } catch (err) {
+          // Hard failures stay on the DISTINCT error-toast path (never the report).
           ui.notifications.error(`Import failed: ${err.message}`);
+          return;
         }
+
+        if (summary.system.skipped) {
+          // "already exists — skipped" stays a toast; it does NOT open the report.
+          ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
+          await this._adminStore.refresh();
+          return;
+        }
+
+        const verb = summary.collisions.some(c => c.type === 'system' && c.resolution === 'overwritten')
+          ? 'Updated' : 'Imported';
+        const message = `${verb} "${summary.system.name}" with ${summary.components.total} components, ${summary.recipes.imported} imported recipes, ${summary.recipes.skipped} skipped recipes, and ${summary.recipes.errors.length} failed recipes.`;
+        if (summary.recipes.errors.length > 0) {
+          ui.notifications.warn(message);
+        } else {
+          ui.notifications.info(message);
+        }
+
+        await this._adminStore.refresh();
+
+        // Post-import GM-readable report (informational DialogV2 — single OK).
+        const content = buildImportReportContent(summary, (key, data) => localize(key, data));
+        await DialogV2.wait({
+          window: { title: content.title },
+          content: renderImportReportHtml(content),
+          buttons: [{ action: 'ok', label: localize('FABRICATE.Admin.ImportReport.Close'), default: true }],
+          rejectClose: false
+        });
       }
     };
   }
@@ -386,6 +549,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     if (!this._adminStore) {
       this._services = this._buildServices();
       this._adminStore = createAdminStore(this._services);
+      this._registerUserHooks();
     }
 
     const resolveSingleItemDropUuid = (data) => {
@@ -488,12 +652,18 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
               return;
             }
-            const folder = getFolderById(game.folders, data.id);
-            if (!folder) return;
-            const folderItems = folderDocumentType(folder) && folderDocumentType(folder) !== 'Item'
-              ? []
-              : collectFolderItems(folder, game.folders);
-            if (folderItems.length === 0) {
+            const folder = resolveDroppedFolder(data, game.folders);
+            if (!folder) {
+              ui.notifications.warn(localize('FABRICATE.Admin.Items.FolderNotResolved'));
+              return;
+            }
+            // Compendium folders expose pack index entries (resolved here to uuids); world folders
+            // expose live Item documents traversed via collectFolderItems. `folder.pack` is the
+            // packId string for compendium folders and null/undefined for world folders.
+            const itemUuids = folder.pack
+              ? collectCompendiumFolderItemUuids(folder)
+              : collectFolderItems(folder, game.folders).map(folderItem => folderItem.uuid);
+            if (itemUuids.length === 0) {
               ui.notifications.info(localize('FABRICATE.Admin.Items.FolderEmpty', {
                 name: folder.name || data.id
               }));
@@ -503,8 +673,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             let updated = 0;
             let skipped = 0;
             const sourceFallbacks = [];
-            for (const folderItem of folderItems) {
-              const result = await systemManager.addItemFromUuid(systemId, folderItem.uuid);
+            for (const itemUuid of itemUuids) {
+              const result = await systemManager.addItemFromUuid(systemId, itemUuid);
               if (result.action === 'added') added++;
               else if (result.action === 'updated') updated++;
               else skipped++;
@@ -514,7 +684,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               added,
               updated,
               skipped,
-              total: folderItems.length,
+              total: itemUuids.length,
               name: folder.name || data.id
             }));
             notifyBulkSourceFallback(sourceFallbacks);
@@ -562,7 +732,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           const systemId = get(this._adminStore.selectedSystemId) || '';
           if (!systemId || !itemId) return;
           try {
-            await systemManager.updateItem(systemId, itemId, { sourceItemUuid: null });
+            await systemManager.updateItem(systemId, itemId, { originItemUuid: null });
             ui.notifications.info(localize('FABRICATE.Admin.Items.SourceUnlinked'));
             await this._adminStore.refresh();
           } catch (err) {
@@ -639,10 +809,12 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           const prevEconomy = get(this._adminStore?.viewState)?.gatheringConfig?.systems?.[opts?.systemId]?.economy;
           const prevStamina = prevEconomy?.stamina?.enabled === true;
           const prevNodes = prevEconomy?.nodes?.enabled === true;
+          const prevResolution = prevEconomy?.resolutionMode ?? 'd100';
           const nextStamina = opts?.economy?.stamina?.enabled === true;
           const nextNodes = opts?.economy?.nodes?.enabled === true;
+          const nextResolution = opts?.economy?.resolutionMode ?? 'd100';
           const result = await game?.fabricate?.setGatheringEconomy?.(opts);
-          if (nextStamina !== prevStamina || nextNodes !== prevNodes) this._adminStore?.refreshGatheringConfig?.();
+          if (nextStamina !== prevStamina || nextNodes !== prevNodes || nextResolution !== prevResolution) this._adminStore?.refreshGatheringConfig?.();
           return result;
         },
         getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
@@ -652,6 +824,26 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts)
       }
     };
+  }
+
+  // Keep the per-recipe restriction allow-list (`worldUsers`) live: when a player
+  // is created, renamed, or removed while the manager is open, re-project it.
+  // Each entry is `[hook, id]` so `_unregisterUserHooks` can pair them off.
+  _registerUserHooks() {
+    if (this._userHooks) return;
+    const reproject = () => this._adminStore?.refreshWorldUsers?.();
+    this._userHooks = ['createUser', 'updateUser', 'deleteUser'].map((hook) => [
+      hook,
+      Hooks.on(hook, reproject),
+    ]);
+  }
+
+  _unregisterUserHooks() {
+    if (!this._userHooks) return;
+    for (const [hook, id] of this._userHooks) {
+      Hooks.off(hook, id);
+    }
+    this._userHooks = null;
   }
 
   async close(options) {
@@ -668,6 +860,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     }
 
     this._confirmDiscardDirtyEssenceDraft = null;
+    this._unregisterUserHooks();
     if (this._adminStore) {
       this._adminStore.destroy();
       this._adminStore = null;

@@ -91,6 +91,11 @@ jobs:
 
       - name: Run smoke test (up → run → down)
         if: env.SKIP_SMOKE != 'true'
+        # The module is already built by the dedicated "Build module" step above
+        # (cached layer + clearer log attribution), so skip the orchestrator's
+        # own step-0 build to avoid building twice.
+        env:
+          FOUNDRY_SKIP_BUILD: '1'
         run: npm run test:foundry
 
       - name: Upload test artifacts

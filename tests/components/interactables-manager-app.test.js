@@ -93,7 +93,25 @@ describe('InteractablesManagerApp singleton window', () => {
   it('routes delete through services.confirmDialog (DialogV2.confirm), never globalThis.confirm()', () => {
     assert.ok(appSource.includes('await confirmDialog('), 'delete confirms through the DialogV2 bridge');
     assert.ok(!appSource.includes('globalThis.confirm('), 'never calls globalThis.confirm()');
-    assert.ok(appSource.includes('region.delete?.()'), 'delete removes the region (and its behaviour)');
+  });
+
+  it('routes delete through the provenance-aware plan/execute helpers, never a bare region.delete (issue 533)', () => {
+    assert.ok(
+      appSource.includes('planInteractableDeletion(region'),
+      'delete decides scope via the pure ownership plan'
+    );
+    assert.ok(
+      appSource.includes('executeInteractableDeletion(region, plan)'),
+      'delete applies the plan (region vs behaviour-only)'
+    );
+    assert.ok(
+      !appSource.includes('region.delete?.()'),
+      'never wholesale-deletes the region directly (would destroy a promoted user region)'
+    );
+    assert.ok(
+      appSource.includes('DeletePromptRegion') && appSource.includes('DeletePromptBehaviour'),
+      'confirm copy tells the GM whether the region or only the behaviour is removed'
+    );
   });
 
   it('promotes through the pure decision + the SHARED behaviour-system builder (no second builder)', () => {
@@ -214,6 +232,16 @@ describe('InteractablesManagerRoot body', () => {
       ['bind:value={selectedReferenceId}', 'source picker'],
       ['bind:group={visualMode}', 'marker vs region-only'],
       ['services?.promote?.(', 'confirm calls the promote seam'],
+    ]);
+  });
+
+  it('disambiguates same-named systems and defaults to a source-bearing one (issue 346)', () => {
+    expectAll([
+      ["from '../../util/systemDisambiguation.js'", 'uses the shared disambiguation helper'],
+      ['buildSystemLabelMap(systems)', 'builds the disambiguated label map'],
+      ['systemDisplayLabel(system, systemLabels)', 'renders the disambiguated label in the promote system picker'],
+      ['pickDefaultSystemId(systems, systemHasSources)', 'default selection prefers a source-bearing system'],
+      ['function systemHasSources(systemId)', 'tests for selectable sources of the current source type'],
     ]);
   });
 

@@ -8,6 +8,7 @@ import { CompendiumImporter } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
+import { RunJournalBuilder } from './systems/RunJournalBuilder.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
@@ -19,18 +20,29 @@ import { isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
-import { secondsPerUnitFromCalendar } from './systems/foundryCalendar.js';
+import { secondsPerUnitFromCalendar, daysPerYearFromCalendar } from './systems/foundryCalendar.js';
+import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
-import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
+import { renderDialog, viewScene, localize as bridgeLocalize } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
+import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
+import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
+import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
+import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
+import {
+  createGatheringResultCreator,
+  resolveGatheringResultSource,
+  gatheringRunItemRef
+} from './gatheringResultCreation.js';
+import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
@@ -55,15 +67,23 @@ import {
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE } from './config/settings.js';
+import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
+import { setFabricateFlag } from './config/flags.js';
+import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
+import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
+import {
+  ActorInventoryCoinSpender,
+  ActorPropertyCoinSpender,
+} from './systems/CoinSpenders.js';
+import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
-import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
 import {
   handleInteractableSocketMessage,
@@ -82,6 +102,11 @@ import {
   readInteractableBehaviorSystem
 } from './canvas/regions/interactableRegionFlags.js';
 import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
+import {
+  decideWorldInteractableCleanup,
+  executeWorldInteractableCleanup,
+  planHasWork
+} from './canvas/regions/interactableCleanup.js';
 import {
   assignInteractableConfigSheet,
   resolveInteractableConfigTarget,
@@ -196,87 +221,6 @@ function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression
   });
 }
 
-function createGatheringResultResolver(resolutionModeService) {
-  return {
-    async resolveRouted({ provider, resultSelection, resultGroups = [] } = {}) {
-      if (provider === 'macroOutcome') {
-        try {
-          return await runGatheringMacro(resultSelection?.macroUuid, { kind: 'gatheringOutcome', resultGroups });
-        } catch (err) {
-          console.error('Fabricate | Gathering routed-outcome macro failed:', err);
-          return {
-            status: 'misconfigured',
-            diagnostics: [{ code: 'MACRO_OUTCOME_THREW', message: err?.message || 'Gathering outcome macro threw' }]
-          };
-        }
-      }
-
-      if (provider === 'rollTableOutcome') {
-        const tableResult = await resolutionModeService.resolveByRollTable(
-          { resultSelection },
-          null,
-          resultGroups
-        );
-        return normalizeGatheringRollTableOutcome(tableResult);
-      }
-
-      return {
-        status: 'misconfigured',
-        diagnostics: [{ code: 'UNSUPPORTED_RESULT_PROVIDER', message: `Unsupported gathering result provider "${provider}"` }]
-      };
-    }
-  };
-}
-
-function createGatheringResultCreator(craftingSystemManager) {
-  return {
-    async plan({ actor, system, resultGroups = [] } = {}) {
-      return flattenGatheringResults(resultGroups)
-        .map(result => {
-          const source = resolveGatheringResultSource(result, system, craftingSystemManager);
-          return source ? gatheringRunItemRef(actor, source, result.quantity) : null;
-        })
-        .filter(Boolean);
-    },
-
-    async create({ actor, system, resultGroups = [] } = {}) {
-      const created = [];
-      for (const result of flattenGatheringResults(resultGroups)) {
-        const source = resolveGatheringResultSource(result, system, craftingSystemManager);
-        if (!source) continue;
-
-        const itemData = source.toObject?.() ?? {
-          name: source.name ?? 'Gathered Item',
-          img: source.img ?? 'icons/svg/item-bag.svg',
-          type: source.type ?? 'loot',
-          system: source.system ? globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system } : {}
-        };
-        itemData.system ??= {};
-        if (itemData.system.quantity !== undefined || result.quantity) {
-          itemData.system.quantity = Number(result.quantity || 1);
-        }
-        if (source.uuid) {
-          globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
-        }
-
-        // Stack onto an existing matching item (same source UUID chain) that uses
-        // a quantity field, rather than creating a duplicate document.
-        const existing = findStackableMatch(normalizeFoundryCollection(actor.items), source);
-        if (existing) {
-          const next = Number(existing.system?.quantity || 0) + Number(result.quantity || 1);
-          await existing.update({ 'system.quantity': next });
-          created.push(gatheringRunItemRef(actor, existing, result.quantity));
-          continue;
-        }
-
-        const [item] = await actor.createEmbeddedDocuments('Item', [itemData]);
-        if (item) created.push(gatheringRunItemRef(actor, item, result.quantity));
-      }
-      return created;
-    }
-  };
-}
-
 function createGatheringFailureFeedback() {
   return {
     async apply({ failureOutcome, actor, viewer, system, environment, task, outcome, checkResult } = {}) {
@@ -368,61 +312,6 @@ async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
   });
 }
 
-function normalizeGatheringRollTableOutcome(tableResult) {
-  const disposition = tableResult?.meta?.disposition;
-  if (disposition === 'success') {
-    return { status: 'succeeded', resultGroups: tableResult.groups ?? [], checkResult: tableResult.meta };
-  }
-  if (disposition === 'fail' || disposition === 'miss') {
-    return { status: 'failed', resultGroups: [], checkResult: tableResult.meta };
-  }
-  return {
-    status: 'misconfigured',
-    diagnostics: [{ code: 'ROLL_TABLE_OUTCOME_FAILED', message: tableResult?.meta?.error || 'Gathering roll table did not resolve an outcome' }]
-  };
-}
-
-function flattenGatheringResults(resultGroups = []) {
-  return resultGroups.flatMap(group => Array.isArray(group?.results) ? group.results : []);
-}
-
-function resolveGatheringResultSource(result, system, craftingSystemManager) {
-  if (result?.itemUuid) return resolveUuidSync(result.itemUuid);
-  const componentId = result?.componentId || result?.systemItemId;
-  const component = (system?.components ?? []).find(entry => entry.id === componentId)
-    ?? craftingSystemManager?.getSystem?.(system?.id)?.components?.find(entry => entry.id === componentId)
-    ?? null;
-  if (!component) return null;
-  if (component.sourceUuid) return resolveUuidSync(component.sourceUuid) ?? component;
-  return component;
-}
-
-function resolveUuidSync(uuid) {
-  if (!uuid || typeof globalThis.fromUuidSync !== 'function') return null;
-  try {
-    return globalThis.fromUuidSync(uuid) ?? null;
-  } catch (_err) {
-    return null;
-  }
-}
-
-function normalizeFoundryCollection(collection) {
-  if (!collection) return [];
-  if (Array.isArray(collection)) return collection;
-  if (Array.isArray(collection.contents)) return collection.contents;
-  if (typeof collection.values === 'function') return Array.from(collection.values());
-  if (typeof collection[Symbol.iterator] === 'function') return Array.from(collection);
-  return [];
-}
-
-function gatheringRunItemRef(actor, item, quantity = 1) {
-  return {
-    actorUuid: actor?.uuid ?? null,
-    itemUuid: item?.uuid ?? item?.sourceUuid ?? null,
-    quantity: Number.isFinite(Number(quantity)) && Number(quantity) > 0 ? Number(quantity) : 1
-  };
-}
-
 function localizeGathering(key, data = {}) {
   return game.i18n?.format?.(key, data) ?? game.i18n?.localize?.(key) ?? key;
 }
@@ -483,13 +372,22 @@ class Fabricate {
     this.craftingSystemManager = null;
     this.craftingRunManager = null;
     this.salvageRunManager = null;
+    this._runJournalBuilder = null;
     this.gatheringEnvironmentStore = null;
     this.gatheringRichStateService = null;
     this.gatheringRunManager = null;
     this.gatheringGateAndCheckEvaluator = null;
     this.recipeVisibilityService = null;
     this.resolutionModeService = null;
+    // Lazily-built player-facing crafting listing projector (issue: player
+    // Crafting tab). Constructed on first read once the managers exist.
+    this._craftingListingBuilder = null;
+    // Lazily-built player-facing inventory listing projector (player Inventory
+    // tab). Constructed on first read once the managers exist.
+    this._inventoryListingBuilder = null;
     this.itemPilesIntegration = null;
+    this.actorInventoryCoinSpender = null;
+    this.actorPropertyCoinSpender = null;
     this.compendiumImporter = null;
     this.ready = false;
     // Replay-safe readiness signal: resolves once `initialize()` completes and
@@ -534,13 +432,22 @@ class Fabricate {
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
+    // The generic actor-inventory spender resolves a per-system coin adapter by
+    // game.system.id; pf2e is the sole registered adapter (an internal map, not a plugin
+    // registry). The actor-property spender is generic and needs no system-specific wiring.
+    this.actorInventoryCoinSpender = new ActorInventoryCoinSpender({
+      adapters: new Map([['pf2e', new Pf2eInventoryCoinAdapter()]]),
+    });
+    this.actorPropertyCoinSpender = new ActorPropertyCoinSpender();
     this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager);
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
       this.craftingRunManager,
       this.resolutionModeService,
       this.itemPilesIntegration,
-      this.salvageRunManager
+      this.salvageRunManager,
+      this.actorInventoryCoinSpender,
+      this.actorPropertyCoinSpender
     );
 
     // Initialize recipe manager
@@ -633,7 +540,6 @@ class Fabricate {
         craftingSystemManager: this.craftingSystemManager,
         evaluator: this.gatheringGateAndCheckEvaluator
       }),
-      resultResolver: createGatheringResultResolver(this.resolutionModeService),
       resultCreator: createGatheringResultCreator(this.craftingSystemManager),
       toolBreakage: createGatheringToolBreakage({
         craftingSystemManager: this.craftingSystemManager,
@@ -677,6 +583,12 @@ class Fabricate {
       ])
     );
     await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
+    // Prune legacy phantom crafting runs: a single-step recipe with no time
+    // requirement can never legitimately persist an active run, so any such run left
+    // in the active store predates the craft() cleanup guard and is stranded.
+    await this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
+      this.recipeManager.getRecipe(id)
+    );
     await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
     await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
@@ -686,7 +598,6 @@ class Fabricate {
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
-    registerItemSheetRecipeLearnControl(this.recipeVisibilityService);
 
     this.ready = true;
     this._resolveReady?.();
@@ -746,6 +657,30 @@ class Fabricate {
       const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
         || `Fabricate unified gathering realms for: ${systemList}. Travel & Realms is disabled by default — enable it per system. Realm-scoped tasks/events may now appear in more environments.`;
       ui.notifications?.info?.(message);
+    }
+
+    // One-time GM-facing notice: when the 1.6.0 migration removed the legacy routed
+    // result-selection providers, dropping roll-table references (the draw mechanism
+    // is gone) and stripping gathering-task result selections. Name the affected
+    // recipes/tasks so the GM can reconfigure them; routed gathering tasks now resolve
+    // via the system gathering check, so the GM must populate
+    // `gatheringCraftingCheck.routed.rollFormula` for any stripped task. GM-only; only
+    // when something was actually dropped or stripped.
+    const removedProviders = summary?.removedResultSelectionProviders ?? null;
+    const droppedRollTableRecipes = Array.isArray(removedProviders?.droppedRollTableRecipes)
+      ? removedProviders.droppedRollTableRecipes : [];
+    const strippedGatheringTasks = Array.isArray(removedProviders?.strippedGatheringTasks)
+      ? removedProviders.strippedGatheringTasks : [];
+    if ((droppedRollTableRecipes.length > 0 || strippedGatheringTasks.length > 0) && game.user?.isGM) {
+      // Console recovery log naming the affected recipes/tasks. Routed gathering tasks now
+      // resolve via the system gathering check, so the GM must populate
+      // `gatheringCraftingCheck.routed.rollFormula` for any stripped task. The localized GM
+      // toast + lang key ride PR-2 of #424 (the UI PR that carries screenshot evidence).
+      console.warn(
+        'Fabricate | 1.6.0 migration removed legacy result-selection providers. ' +
+          'Populate gatheringCraftingCheck.routed.rollFormula for any stripped gathering task. Affected items:',
+        { droppedRollTableRecipes, strippedGatheringTasks }
+      );
     }
   }
 
@@ -1054,6 +989,14 @@ class Fabricate {
     return this.itemPilesIntegration;
   }
 
+  getActorInventoryCoinSpender() {
+    return this.actorInventoryCoinSpender;
+  }
+
+  getActorPropertyCoinSpender() {
+    return this.actorPropertyCoinSpender;
+  }
+
   getCompendiumImporter() {
     return this.compendiumImporter;
   }
@@ -1166,12 +1109,547 @@ class Fabricate {
   }
 
   /**
+   * Lazily build (and cache) the {@link CraftingListingBuilder} that projects the
+   * crafting backend into redaction-safe player listing models. Mirrors the
+   * gathering listing path: a one-directional read-side collaborator wired with
+   * the existing managers/services so GM and player viewers resolve through one
+   * code path. The builder imports no Foundry globals — `localize` and
+   * `nowWorldTime` are injected here.
+   *
+   * @returns {CraftingListingBuilder}
+   * @private
+   */
+  _getCraftingListingBuilder() {
+    if (this._craftingListingBuilder) return this._craftingListingBuilder;
+    this._craftingListingBuilder = new CraftingListingBuilder({
+      recipeManager: this.recipeManager,
+      recipeVisibility: this.recipeVisibilityService,
+      resolutionModeService: this.resolutionModeService,
+      craftingSystemManager: this.craftingSystemManager,
+      localize: (key, data) =>
+        data !== undefined
+          ? (game.i18n?.format?.(key, data) ?? key)
+          : (game.i18n?.localize?.(key) ?? key),
+      nowWorldTime: () => game.time?.worldTime ?? 0,
+      resolveCheckFormula: (formula, actor) => resolveCheckFormulaDisplay(formula, actor),
+    });
+    return this._craftingListingBuilder;
+  }
+
+  /**
+   * Resolve a stored crafting actor preference against Foundry's actor
+   * collection. Returns null when the id is empty or stale.
+   *
+   * Defense-in-depth: for a non-GM viewer the resolved actor must pass the same
+   * ownership predicate the gathering attempt path uses, so a stale or
+   * console-supplied id the current user does not own can never have its
+   * inventory read by the listing projection. A GM resolves any extant actor.
+   *
+   * @param {string|null} actorId
+   * @returns {Actor|null}
+   * @private
+   */
+  _resolveCraftingActor(actorId) {
+    const actor = actorId ? (game.actors?.get?.(actorId) ?? null) : null;
+    if (!actor) return null;
+    if (game.user?.isGM === true) return actor;
+    return isGatheringActorSelectableByUser(actor, game.user) ? actor : null;
+  }
+
+  /**
+   * Resolve the effective crafting actor + component-source actors for a listing
+   * or craft, applying the persisted defaults. A truthy `rememberedActorId`
+   * overrides the persisted selection; component-source ids default to the
+   * persisted set. Stale/non-extant ids resolve to nothing.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.rememberedActorId]
+   * @param {string[]|null} [options.componentSourceActorIds]
+   * @returns {{ craftingActor: Actor|null, componentSourceActors: Actor[] }}
+   * @private
+   */
+  _resolveCraftingSources({ rememberedActorId = null, componentSourceActorIds = null } = {}) {
+    const actorId = rememberedActorId || this.getSelectedCraftingActorId() || null;
+    const craftingActor = this._resolveCraftingActor(actorId);
+    const sourceIds = Array.isArray(componentSourceActorIds)
+      ? componentSourceActorIds
+      : this.getCraftingComponentSourceIds();
+    const componentSourceActors = sourceIds
+      .map((id) => this._resolveCraftingActor(id))
+      .filter(Boolean);
+    return { craftingActor, componentSourceActors };
+  }
+
+  /**
+   * Build the player-facing Crafting listing for the current user and selected
+   * crafting actor + component sources. The current Foundry user is always the
+   * viewer (GM bypass is honoured by the visibility service), regardless of any
+   * caller-supplied viewer.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.rememberedActorId] Crafting actor id; defaults
+   *   to the persisted last-crafting selection when omitted.
+   * @param {string[]|null} [options.componentSourceActorIds] Additional inventory
+   *   source actor ids; defaults to the persisted component-source set.
+   * @returns {object} Redaction-safe crafting listing model.
+   */
+  listCraftingForActor(options = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
+    return this._getCraftingListingBuilder().buildListing({
+      craftingActor,
+      componentSourceActors,
+      viewer: game.user,
+    });
+  }
+
+  /**
+   * Lazily build (and cache) the {@link InventoryListingBuilder} that projects the
+   * owned-component view for the player Inventory tab. Mirrors
+   * {@link Fabricate#_getCraftingListingBuilder}: a Foundry-global-free read-side
+   * collaborator wired with the existing managers — `localize` and `nowWorldTime`
+   * are injected here. `recipeVisibility` is injected so a non-GM viewer's used-by
+   * list never names an undiscovered (teaser) recipe.
+   *
+   * @returns {InventoryListingBuilder}
+   * @private
+   */
+  _getInventoryListingBuilder() {
+    if (this._inventoryListingBuilder) return this._inventoryListingBuilder;
+    this._inventoryListingBuilder = new InventoryListingBuilder({
+      recipeManager: this.recipeManager,
+      craftingSystemManager: this.craftingSystemManager,
+      recipeVisibility: this.recipeVisibilityService,
+      localize: (key, data) =>
+        data !== undefined
+          ? (game.i18n?.format?.(key, data) ?? key)
+          : (game.i18n?.localize?.(key) ?? key),
+      nowWorldTime: () => game.time?.worldTime ?? 0,
+      // Gathering tasks live in the `gatheringConfig` setting (keyed by system id),
+      // not on the system object — surface them for the "produced by" gathering index.
+      getGatheringTasksForSystem: (systemId) => {
+        const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
+        const tasks = config?.systems?.[systemId]?.tasks;
+        return Array.isArray(tasks) ? tasks : [];
+      },
+    });
+    return this._inventoryListingBuilder;
+  }
+
+  /**
+   * Build the player-facing Inventory listing for the current user's selected
+   * crafting actor + component-source actors. Reuses the crafting selection
+   * (same persisted actor + component sources) so the Inventory and Crafting tabs
+   * agree on what the player owns. The current Foundry user is always the viewer.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.rememberedActorId] Crafting actor id; defaults
+   *   to the persisted last-crafting selection when omitted.
+   * @param {string[]|null} [options.componentSourceActorIds] Additional inventory
+   *   source actor ids; defaults to the persisted component-source set.
+   * @returns {object} Inventory listing model (owned components + essence rows).
+   */
+  listInventoryForActor(options = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
+    return this._getInventoryListingBuilder().buildListing({
+      craftingActor,
+      componentSourceActors,
+      viewer: game.user,
+    });
+  }
+
+  /**
+   * Learn one recipe from an owned recipe-item "book" for the player Inventory
+   * learn affordance. Resolves the crafting actor + component sources (same scope
+   * the inventory listing was computed for), then delegates to the visibility
+   * service, which enforces the per-document learn budget for capped systems and
+   * leaves uncapped books intact.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id (defaults to the
+   *   persisted selection).
+   * @param {string} options.recipeId Recipe to learn.
+   * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
+   * @returns {Promise<{success: boolean, message: string, messageData?: object}>}
+   */
+  async learnRecipeFromInventory({ actorId = null, recipeId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    const recipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!recipe) {
+      return { success: false, message: 'FABRICATE.Knowledge.NoMatchingItem' };
+    }
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    return this.recipeVisibilityService.learnRecipeFromOwnedBook({
+      recipe,
+      craftingActor,
+      componentSourceActors,
+    });
+  }
+
+  /**
+   * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.
+   * Resolves the crafting actor + component sources from the supplied ids (or the
+   * persisted defaults) so the attempt uses the same inventory scope the listing
+   * was computed for.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id.
+   * @param {string} options.recipeId Recipe id.
+   * @param {string|null} [options.ingredientSetId] Chosen ingredient set id.
+   * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
+   * @param {boolean} [options.interactive] When true, prompt the player with the
+   *   confirm-roll dialog (optional situational modifier) and post the roll to chat
+   *   so Dice So Nice animates it. Defaults to false so macros and automation keep
+   *   the original silent behaviour. The Fabricate Crafting tab passes true. A
+   *   dismissed prompt returns `{ success: false, cancelled: true }` with zero
+   *   mutation (no ingredients, currency, or tools consumed, no run created).
+   * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
+   */
+  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, componentSourceActorIds = null, interactive = false } = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    if (!craftingActor) {
+      return { success: false, results: null, message: 'No crafting actor selected' };
+    }
+    const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
+    // `interactive` (UI-triggered craft) opts into the confirm-roll dialog + chat
+    // post; omitted/false for macros/automation so they stay silent (no API break).
+    return await this.craft(craftingActor, recipeId, {
+      componentSourceActors: sources,
+      ingredientSetId,
+      // Per-group player option overrides (issue 552); null keeps default resolution.
+      ingredientOptionOverrides,
+      interactive,
+    });
+  }
+
+  /**
+   * Re-evaluate the craftability of ONE ingredient set with in-session per-group
+   * option overrides applied (issue 552). Backs the crafting store's
+   * `selectedCraftability` recompute when the player picks a non-default option, so
+   * the ingredient tiles reflect the chosen option/stack through the SAME
+   * `RecipeManager.evaluateCraftability` → `resolveIngredientSelection` seam the
+   * engine consumes. Synchronous (the store reads it from a `$derived`).
+   *
+   * @param {object} options
+   * @param {string|null} [options.recipeId]
+   * @param {string|null} [options.setId] The ingredient set to re-evaluate.
+   * @param {object|null} [options.optionOverrides] `{ [groupId]: {optionIndex, heldItemId?} }`.
+   * @param {string|null} [options.actorId] Crafting actor id (defaults to persisted).
+   * @param {string[]|null} [options.componentSourceActorIds]
+   * @returns {object|null} Fresh single-set craftability, or null when unresolvable.
+   */
+  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, actorId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    const recipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!recipe) return null;
+    const set = Array.isArray(recipe.ingredientSets)
+      ? recipe.ingredientSets.find((candidate) => String(candidate?.id) === String(setId))
+      : null;
+    if (!set) return null;
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    const sources = componentSourceActors.length > 0
+      ? componentSourceActors
+      : (craftingActor ? [craftingActor] : []);
+    if (sources.length === 0) return null;
+    // Narrow the evaluation to the one selected set (mirrors CraftingListingBuilder's
+    // per-set copy): keeps the recipe's data fields + the IngredientSet instance
+    // methods while scoping craftability to this set.
+    const singleSetRecipe = { ...recipe, ingredientSets: [set] };
+    return this.recipeManager.evaluateCraftability(sources, singleSetRecipe, {
+      craftingActor,
+      optionOverrides,
+    }) ?? null;
+  }
+
+  /**
+   * Lazily build (and cache) the {@link AlchemyListingBuilder} that projects the
+   * leak-safe player Alchemy workbench view. Mirrors
+   * {@link Fabricate#_getCraftingListingBuilder}: a Foundry-global-free read-side
+   * collaborator wired with the existing managers. `localize` is injected here.
+   *
+   * @returns {AlchemyListingBuilder}
+   * @private
+   */
+  _getAlchemyListingBuilder() {
+    if (this._alchemyListingBuilder) return this._alchemyListingBuilder;
+    this._alchemyListingBuilder = new AlchemyListingBuilder({
+      recipeManager: this.recipeManager,
+      craftingSystemManager: this.craftingSystemManager,
+      recipeVisibility: this.recipeVisibilityService,
+      localize: (key, data) =>
+        data !== undefined
+          ? (game.i18n?.format?.(key, data) ?? key)
+          : (game.i18n?.localize?.(key) ?? key),
+    });
+    return this._alchemyListingBuilder;
+  }
+
+  /**
+   * Build the leak-safe player Alchemy workbench listing for the current user and
+   * selected crafting actor + component sources, scoped to `craftingSystemId`. The
+   * current Foundry user is always the viewer (GM bypass honoured by the builder),
+   * and the actor is resolved through the SAME owner gate as crafting
+   * ({@link Fabricate#_resolveCraftingActor}) — a non-owner viewer's actor resolves
+   * to null, so the builder returns a denied, empty listing (never another user's
+   * inventory or fizzle memory).
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.actorId] Crafting actor id; defaults to the
+   *   persisted last-crafting selection when omitted.
+   * @param {string|null} [options.craftingSystemId] The chosen alchemy (crafting) system.
+   * @param {string[]|null} [options.componentSourceActorIds] Additional inventory
+   *   source actor ids; defaults to the persisted component-source set.
+   * @returns {object} Leak-safe alchemy listing model.
+   */
+  listAlchemyForActor({ actorId = null, craftingSystemId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    return this._getAlchemyListingBuilder().buildListing({
+      craftingActor,
+      componentSourceActors,
+      viewer: game.user,
+      craftingSystemId,
+    });
+  }
+
+  /**
+   * Submit a workbench of components as an alchemy brew attempt. Owner-scoped like
+   * {@link Fabricate#craftRecipe}: resolves the crafting actor + component sources
+   * (or persisted defaults), maps each submitted component id to an owned item unit
+   * on the sources, then delegates to {@link CraftingEngine#craftAlchemy}, which is
+   * authoritative — it matches against ALL enabled recipes (known + undiscovered),
+   * discovers + consumes + produces on a match, and fizzles (no check, no roll,
+   * `disposition:'no-match'`) otherwise.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id.
+   * @param {string} options.craftingSystemId Alchemy system to match against.
+   * @param {string[]} [options.submittedComponentIds] One component id per placed
+   *   unit (a stack of N contributes the id N times).
+   * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
+   * @param {boolean} [options.interactive] Prompt an interactive roll on a matched
+   *   brew (the workbench passes true). Defaults to false for API/automation. A
+   *   fizzle runs no check, so this flag never triggers a roll on the fizzle path.
+   * @returns {Promise<object>} The craftAlchemy result.
+   */
+  async submitAlchemyAttempt({
+    actorId = null,
+    craftingSystemId = null,
+    submittedComponentIds = [],
+    componentSourceActorIds = null,
+    interactive = false,
+  } = {}) {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    if (!craftingActor) {
+      return { success: false, results: null, message: 'No crafting actor selected', disposition: 'error' };
+    }
+    const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
+    const system = this.craftingSystemManager?.getSystem?.(craftingSystemId) ?? null;
+    const components = Array.isArray(system?.components) ? system.components : [];
+    const submittedItems = resolveAlchemySubmissions(
+      sources,
+      components,
+      submittedComponentIds,
+      craftingSystemId
+    );
+    if (submittedItems.length === 0) {
+      return { success: false, results: null, message: 'FABRICATE.App.Alchemy.NoIngredients', disposition: 'error' };
+    }
+    return await this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
+      craftingSystemId,
+      interactive,
+    });
+  }
+
+  /**
+   * Read the persisted last-selected alchemy system (`LAST_ALCHEMY_SYSTEM` client
+   * setting). Returns an empty string when unset.
+   *
+   * @returns {string}
+   */
+  getSelectedAlchemySystemId() {
+    return getSetting(SETTING_KEYS.LAST_ALCHEMY_SYSTEM) || '';
+  }
+
+  /**
+   * Persist the selected alchemy system (`LAST_ALCHEMY_SYSTEM`).
+   *
+   * @param {string} id Crafting system id to persist.
+   * @returns {*}
+   */
+  setSelectedAlchemySystemId(id) {
+    return setSetting(SETTING_KEYS.LAST_ALCHEMY_SYSTEM, id ?? '');
+  }
+
+  /**
+   * List the actors the current user may select as crafting/component-source
+   * actors. Filtered exactly like the actor-selection bar
+   * (`getBarSelectableActors` → owned player characters; a GM sees all) so the
+   * component-source picker offers the same characters as the crafting-actor
+   * selector — not owned non-character actors. Returns redaction-safe display data
+   * only — each record carries `{ id, uuid, name, img }`.
+   *
+   * @returns {Array<{id: string|null, uuid: string|null, name: string, img: string|null}>}
+   */
+  listCraftingSourceActors() {
+    this._requireReady();
+    return getBarSelectableActors({ viewer: game.user }).map((actor) => ({
+      id: actor?.id ?? actor?.uuid ?? null,
+      uuid: actor?.uuid ?? null,
+      name: actor?.name ?? '',
+      img: actor?.img ?? null,
+    }));
+  }
+
+  /**
+   * Resolve the current selection's component-source actors as real Foundry actor
+   * objects (crafting actor + persisted sources), for the pure shopping-list
+   * aggregator. Owner-scoped via the persisted ids only — no widening of access.
+   *
+   * @returns {Actor[]}
+   */
+  getCraftingSourceActors() {
+    this._requireReady();
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources();
+    const actors = componentSourceActors.length > 0 ? componentSourceActors : [];
+    if (craftingActor && !actors.includes(craftingActor)) actors.unshift(craftingActor);
+    return actors;
+  }
+
+  /**
+   * Read the persisted remembered crafting-actor selection (`LAST_CRAFTING_ACTOR`
+   * client setting). Returns an empty string when unset.
+   *
+   * @returns {string}
+   */
+  getSelectedCraftingActorId() {
+    return getSetting(SETTING_KEYS.LAST_CRAFTING_ACTOR) || '';
+  }
+
+  /**
+   * Persist the remembered crafting-actor selection (`LAST_CRAFTING_ACTOR`).
+   *
+   * @param {string} id Actor id to persist.
+   * @returns {*}
+   */
+  setSelectedCraftingActorId(id) {
+    return setSetting(SETTING_KEYS.LAST_CRAFTING_ACTOR, id ?? '');
+  }
+
+  /**
+   * Read the persisted component-source actor ids (`LAST_COMPONENT_SOURCES`).
+   *
+   * @returns {string[]}
+   */
+  getCraftingComponentSourceIds() {
+    const ids = getSetting(SETTING_KEYS.LAST_COMPONENT_SOURCES);
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  /**
+   * Persist the component-source actor ids (`LAST_COMPONENT_SOURCES`).
+   *
+   * @param {string[]} ids Actor ids to persist.
+   * @returns {*}
+   */
+  setCraftingComponentSourceIds(ids) {
+    return setSetting(SETTING_KEYS.LAST_COMPONENT_SOURCES, Array.isArray(ids) ? ids : []);
+  }
+
+  /**
+   * The player's favourite recipe ids (client-scoped, `FAVOURITE_RECIPES`).
+   *
+   * @returns {string[]}
+   */
+  getFavouriteRecipeIds() {
+    const ids = getSetting(SETTING_KEYS.FAVOURITE_RECIPES);
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  /**
+   * Toggle a recipe's favourite state and persist the updated id list.
+   *
+   * @param {string} recipeId The recipe id to add/remove.
+   * @returns {string[]} The updated favourite id list (unchanged if `recipeId` is falsy).
+   */
+  toggleFavouriteRecipe(recipeId) {
+    const current = this.getFavouriteRecipeIds();
+    if (!recipeId) return current;
+    const next = current.includes(recipeId)
+      ? current.filter((id) => id !== recipeId)
+      : [...current, recipeId];
+    setSetting(SETTING_KEYS.FAVOURITE_RECIPES, next);
+    return next;
+  }
+
+  /**
+   * Whether the player has opted to hide unavailable (locked) gathering
+   * environments in the Environments column.
+   *
+   * Backed by the `GATHERING_HIDE_UNAVAILABLE` setting, which is
+   * `scope: 'client'`. A client-scoped setting persists in that browser's
+   * `localStorage`, so this preference is per client/device, not per user.
+   * The same account on a second device or browser starts at the default
+   * (off). Defaults to false (show all).
+   *
+   * @returns {boolean}
+   */
+  getHideUnavailableEnvironments() {
+    // Boolean() rather than `=== true`: the setting is registered `type: Boolean`
+    // so the value is already boolean, and the strict compare trips a static-analysis
+    // false positive (game.settings.get is not typed as boolean).
+    return Boolean(getSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE));
+  }
+
+  /**
+   * Persist the player's "hide unavailable environments" preference.
+   *
+   * Writes the client-scoped `GATHERING_HIDE_UNAVAILABLE` setting, so the
+   * choice is remembered per client/device (`localStorage`) and does not
+   * follow the user account to another device. This is a view-only preference
+   * and changes no saved data, the engine listing, or GM configuration.
+   *
+   * @param {boolean} value Whether to hide unavailable (locked) environments.
+   * @returns {Promise<boolean>}
+   */
+  setHideUnavailableEnvironments(value) {
+    return setSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE, value === true);
+  }
+
+  /**
    * Start a gathering attempt for the current user.
    *
    * The raw GatheringEngine remains module-internal so all public attempts use
    * current-user viewer enforcement.
    *
    * @param {object} options Gathering start-attempt options.
+   * @param {boolean} [options.interactive] When true, prompt the player with the
+   *   confirm-roll dialog (optional situational modifier) and post the roll to chat
+   *   so Dice So Nice animates it, for the routed and progressive check paths.
+   *   Defaults to false so macros and automation stay silent. The Fabricate
+   *   Gathering view passes true. The d100 immediate gathering mode never prompts
+   *   (its roll runs outside the shared check seam), and timed gathering tasks never
+   *   prompt (they resolve at GM-gated world-time maturation). A dismissed prompt
+   *   returns a quiet `{ accepted: false, cancelled: true }` result with zero
+   *   mutation and no notification.
    * @returns {*} Gathering start-attempt result.
    */
   startGatheringAttempt(options = {}) {
@@ -1382,6 +1860,191 @@ class Fabricate {
   }
 
   /**
+   * Current world time in seconds (the Foundry-facing read seam). Lives on this
+   * edge so the Journal store and pure UI utils stay free of `game.*`.
+   *
+   * @returns {number}
+   */
+  getWorldTime() {
+    return Number(game.time?.worldTime || 0);
+  }
+
+  /**
+   * Calendar components (`{ year, day, hour, minute, … }`) for an absolute world
+   * time, via the V13 calendar's `timeToComponents`. Augmented with `daysPerYear`
+   * (when derivable) so the pure {@link worldTimeLabel} util can compose a
+   * monotonic, 1-based absolute campaign day from the within-year `day` (which
+   * resets each year) without itself touching `game.*`. Returns null when no
+   * calendar is configured.
+   *
+   * @param {number} [worldTime] Defaults to the current world time.
+   * @returns {object|null}
+   */
+  getWorldTimeComponents(worldTime = this.getWorldTime()) {
+    const calendar = game.time?.calendar ?? null;
+    if (typeof calendar?.timeToComponents !== 'function') return null;
+    try {
+      const components = calendar.timeToComponents(Number(worldTime) || 0);
+      if (!components || typeof components !== 'object') return null;
+      const daysPerYear = daysPerYearFromCalendar(calendar);
+      if (daysPerYear !== null) components.daysPerYear = daysPerYear;
+      return components;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Lazily construct the singleton {@link RunJournalBuilder}, wired to the real
+   * run managers and services. Held on the instance so a fresh builder is not
+   * rebuilt per listing call.
+   * @private
+   * @returns {RunJournalBuilder}
+   */
+  _getRunJournalBuilder() {
+    if (!this._runJournalBuilder) {
+      this._runJournalBuilder = new RunJournalBuilder({
+        craftingRunManager: this.craftingRunManager,
+        salvageRunManager: this.salvageRunManager,
+        gatheringRunSource: this.gatheringRunManager,
+        recipeManager: this.recipeManager,
+        resolutionModeService: this.resolutionModeService,
+        recipeVisibility: this.recipeVisibilityService,
+        getSystem: (systemId) => this.craftingSystemManager?.getSystem(systemId) ?? null,
+        getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
+        getGatheringTask: (environmentId, taskId) =>
+          this._resolveJournalGatheringTask(environmentId, taskId),
+        getRecipeItemImg: (systemId, recipeItemId) =>
+          this.craftingSystemManager?.getRecipeItemDefinition?.(systemId, recipeItemId)?.img ?? null,
+        getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
+        getViewer: () => game.user,
+        localize: (key, data) => localizeGathering(key, data),
+        nowWorldTime: () => this.getWorldTime(),
+      });
+    }
+    return this._runJournalBuilder;
+  }
+
+  /**
+   * Resolve a system library tool to `{ id, name, img }` for the Journal step
+   * detail. The display name prefers the tool's authored label, falling back to
+   * the referenced component's name, then the raw id.
+   * @private
+   */
+  _resolveJournalTool(systemId, toolId) {
+    const system = this.craftingSystemManager?.getSystem(systemId);
+    if (!system || !toolId) return null;
+    const tool = (system.tools || []).find((entry) => entry?.id === toolId);
+    if (!tool) return null;
+    const component = (system.components || []).find((entry) => entry?.id === tool.componentId);
+    return {
+      id: tool.id,
+      name: tool.label || component?.name || tool.id,
+      img: component?.img || null,
+    };
+  }
+
+  /**
+   * Resolve a gathering run's task to `{ name, img }` for the Journal, via the
+   * COMPOSED environment (`_findEnvironment`), which carries the authored task
+   * name/image — the raw environment store does not. Mirrors how a crafting run
+   * resolves its recipe name/image. Returns null when the environment or task
+   * cannot be resolved (the Journal then falls back to the raw task id + default).
+   * @private
+   */
+  _resolveJournalGatheringTask(environmentId, taskId) {
+    if (!environmentId || !taskId) return null;
+    const environment = gatheringEngine?._findEnvironment?.(environmentId);
+    const tasks = Array.isArray(environment?.tasks) ? environment.tasks : [];
+    const task = tasks.find((entry) => entry?.id === taskId);
+    return task ? { name: task.name, img: task.img } : null;
+  }
+
+  /**
+   * Resolve a run's awarded/created result item to `{ name, img }` by its recorded
+   * uuid, so the Journal can label produced items — including history recorded
+   * before name/img were captured at award time. Best-effort + synchronous
+   * (`fromUuidSync`); returns null when the item is gone or unresolvable.
+   * @private
+   */
+  _resolveJournalResultItem(itemUuid) {
+    if (!itemUuid || typeof fromUuidSync !== 'function') return null;
+    let doc = null;
+    try {
+      doc = fromUuidSync(itemUuid);
+    } catch {
+      doc = null;
+    }
+    return doc ? { name: doc.name ?? null, img: doc.img ?? null } : null;
+  }
+
+  /**
+   * Resolve the selected actor for the Journal against the bar-selectable list,
+   * preferring a remembered id (by `id` or `uuid`), then the first selectable.
+   * Mirrors the gathering listing's remembered-actor seam.
+   * @private
+   */
+  _resolveJournalActor(rememberedActorId) {
+    const selectable = getBarSelectableActors({ viewer: game.user });
+    if (selectable.length === 0) return null;
+    if (rememberedActorId) {
+      const wanted = String(rememberedActorId);
+      const match = selectable.find((actor) => actor?.id === wanted || actor?.uuid === wanted);
+      if (match) return match;
+    }
+    return selectable[0];
+  }
+
+  /**
+   * Build the unified Journal listing (active + terminal runs) for the current
+   * user's selected actor. Resolves the actor via the same remembered-actor seam
+   * as {@link Fabricate#listGatheringForActor}.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.rememberedActorId] Actor id to list for.
+   * @returns {object} The JournalListing.
+   */
+  listJournalForActor(options = {}) {
+    this._requireReady();
+    const { rememberedActorId } = this._withRememberedActorDefault(options);
+    const actor = this._resolveJournalActor(rememberedActorId);
+    return this._getRunJournalBuilder().buildListing({ actor, viewer: game.user });
+  }
+
+  /**
+   * Advance a crafting run's current step — the single player-triggerable run
+   * advance boundary. The run's persisted `componentSourceActorUuids` are UUIDs
+   * (NOT ids), so they resolve via `fromUuidSync` (falsy entries filtered, with an
+   * `[actor]` fallback when none resolve). Because `craft()` writes directly to
+   * the source actors (no socket-to-GM relay), a non-owner of any source actor
+   * cannot advance the run — that case returns a clear "needs owner" message
+   * instead of throwing.
+   *
+   * @param {object} options
+   * @param {string} options.actorId World-actor id the run is keyed to.
+   * @param {string} options.runId Active run id.
+   * @param {string} options.recipeId Recipe id to craft.
+   * @param {boolean} [options.interactive] When true (a player "Trigger Next Step"
+   *   click), prompt the interactive roll dialog + post the roll to chat. Defaults
+   *   false so automated/headless advances stay silent.
+   * @returns {Promise<object>} The craft result, or a `{ success: false, message }`.
+   */
+  async advanceCraftingRun({ actorId, runId, recipeId, interactive = false } = {}) {
+    this._requireReady();
+    const actor = game.actors?.get(actorId);
+    const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
+    const resolved = resolveAdvanceSources({ actor, run, fromUuid: globalThis.fromUuidSync });
+    if (resolved.blocked) {
+      return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner') };
+    }
+    return this.craft(actor, recipeId, {
+      runId,
+      componentSourceActors: resolved.componentSourceActors,
+      interactive,
+    });
+  }
+
+  /**
    * Quick craft helper - craft a recipe for an actor
    * @param {Actor} actor - The actor performing the craft
    * @param {string|Recipe} recipe - Recipe ID or Recipe object
@@ -1568,6 +2231,82 @@ function bindFabricateGlobal() {
       overwriteExisting: options.overwriteExisting || false
     });
   };
+
+  // GM "prepare for uninstall" cleanup (issue 535). `fabricate.interactable` is a
+  // module-defined RegionBehavior sub-type; Foundry does NOT remove it when Fabricate
+  // is disabled/uninstalled, so it errors on every scene load (and, on Foundry
+  // < 14.360, cascade-invalidates the parent Region + Scene). This GM-invocable API
+  // strips ONLY what Fabricate owns — its `fabricate.interactable` behaviours + its own
+  // Tile/Drawing markers — and clears its region-ownership + Token reverse flags,
+  // NEVER deleting a parent Region, a foreign behaviour, or a GM's own Token marker.
+  // Exposed as a plain API method (no rendered UI control) so a GM can run it from a
+  // macro/console; see docs/canvas-interactables.md "Uninstalling Fabricate cleanly".
+  game.fabricate.cleanupInteractables = () => runInteractableWorldCleanup();
+}
+
+/**
+ * The GM-invocable uninstall-safe interactable cleanup edge. Gathers the world's
+ * scenes, computes the pure removal plan, confirms with the GM, applies it, and
+ * reports a summary. GM-gated and no-throw. Returns the applied counts, or `null`
+ * when it was not run (non-GM, nothing to do, or the GM cancelled).
+ *
+ * @returns {Promise<object|null>}
+ */
+async function runInteractableWorldCleanup() {
+  const t = (key, fallback, data) => {
+    const i18n = globalThis.game?.i18n;
+    if (data && typeof i18n?.format === 'function') {
+      const out = i18n.format(key, data);
+      if (out && out !== key) return out;
+    } else if (typeof i18n?.localize === 'function') {
+      const out = i18n.localize(key);
+      if (out && out !== key) return out;
+    }
+    return fallback;
+  };
+
+  if (globalThis.game?.user?.isGM !== true) {
+    globalThis.ui?.notifications?.warn?.(
+      t('FABRICATE.Canvas.Cleanup.NotGM', 'Only a GM can run Fabricate interactable cleanup.')
+    );
+    return null;
+  }
+
+  const scenes = [...(globalThis.game?.scenes ?? [])];
+  const plan = decideWorldInteractableCleanup(scenes);
+  if (!planHasWork(plan)) {
+    globalThis.ui?.notifications?.info?.(
+      t('FABRICATE.Canvas.Cleanup.NothingToDo', 'No Fabricate interactables found. Nothing to clean up.')
+    );
+    return plan.summary;
+  }
+
+  const { summary } = plan;
+  const confirmed = await globalThis.foundry?.applications?.api?.DialogV2?.confirm?.({
+    window: { title: t('FABRICATE.Canvas.Cleanup.Title', 'Remove Fabricate interactables') },
+    content: `<p>${t(
+      'FABRICATE.Canvas.Cleanup.Prompt',
+      'Remove {behaviors} Fabricate interactable(s) and {markers} marker(s) across {scenes} scene(s)? Your regions, tokens, and any other region behaviours are kept. Run this BEFORE disabling or uninstalling Fabricate.',
+      {
+        behaviors: summary.behaviorsRemoved,
+        markers: summary.visualsDeleted,
+        scenes: summary.scenesTouched
+      }
+    )}</p>`,
+    yes: { label: t('FABRICATE.Canvas.Cleanup.Confirm', 'Remove them') },
+    no: { label: t('FABRICATE.Canvas.Cleanup.Cancel', 'Cancel') }
+  });
+  if (confirmed !== true) return null;
+
+  const applied = await executeWorldInteractableCleanup(scenes, plan);
+  globalThis.ui?.notifications?.info?.(
+    t(
+      'FABRICATE.Canvas.Cleanup.Done',
+      'Removed {behaviors} Fabricate interactable(s) and {markers} marker(s). You can now safely disable or uninstall Fabricate.',
+      { behaviors: applied.behaviorsRemoved, markers: applied.visualsDeleted }
+    )
+  );
+  return applied;
 }
 
 // Hook into Foundry's initialization
@@ -1575,6 +2314,29 @@ Hooks.once('init', async () => {
   console.log('Fabricate | Init Hook');
   registerFabricateConfig();
   bindFabricateGlobal();
+});
+
+// GM-only Compendium Directory bulk-import action. Registered at module
+// top-level (NOT in the `ready` body): the CompendiumDirectory entry context
+// menu is built exactly once in `_onFirstRender`, which runs during the sidebar
+// force-render BEFORE `Hooks.callAll('ready')`, so a `ready`-body listener could
+// miss the one-time build. This differs from the `renderItemDirectory`
+// header-button wiring below, which legitimately re-runs on every render.
+// The listener MUTATES `contextOptions` in place and returns nothing.
+Hooks.on('getCompendiumContextOptions', (application, contextOptions) => {
+  contextOptions.push(buildCompendiumImportContextOption({
+    localize: bridgeLocalize,
+    isGM: () => game.user?.isGM,
+    isItemPack: (id) => game.packs.get(id)?.documentName === 'Item',
+    getPackName: (id) => {
+      const pack = game.packs.get(id);
+      return pack?.title ?? pack?.metadata?.label ?? id;
+    },
+    getSystems: () => game.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [],
+    promptSelectSystem: promptSelectCraftingSystem,
+    importPack: (systemId, packId) => game.fabricate.getCraftingSystemManager().addItemsFromPack(systemId, packId),
+    notify: ui.notifications
+  }));
 });
 
 // Hook into Foundry's ready event
@@ -1589,6 +2351,16 @@ Hooks.once('ready', async () => {
   bindFabricateGlobal();
   await fabricate.initialize();
   await processFabricateWorldTime();
+  await runRecipeItemFlagAutoStamp();
+  await runComponentFlagAutoStamp();
+  // MUST run after the MigrationRunner (which persists the 1.15.0 tool source-ref migration
+  // at init) and after the component stamp — it reads the migration-populated tool refs.
+  await runToolFlagAutoStamp();
+  // #540 Phase 2 (issue 600): re-stamp durable component identity onto owned actor items
+  // that currently resolve to a component by name only. Runs after the source-side component
+  // stamp so a fresh drag inherits the flag first, and reaches the copies already in
+  // inventories that predate it.
+  await runOwnedItemComponentIdentityRestamp();
 
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
@@ -1597,7 +2369,12 @@ Hooks.once('ready', async () => {
   // calls.
   InteractableManager.instance.register();
 
-  game.socket?.on(EVENT_SCENE_SOCKET, (payload) => {
+  game.socket?.on(EVENT_SCENE_SOCKET, (payload, senderId) => {
+    // `senderId` is Foundry's server-attested sender user id (the trusted 2nd
+    // callback arg of a custom module socket broadcast — set from the authenticated
+    // session in `dist/server/sockets.mjs handleCustomSocket`, NOT from the client
+    // payload). The interactable handler authenticates privileged edges against it
+    // (issue 593); payload `userId` fields are client-supplied and spoofable.
     // Defensive: the event router shares the `module.fabricate` channel with the
     // canvas Interactable round-trip. Guard it so a throw on an event payload can
     // never prevent a non-event Interactable payload from reaching
@@ -1619,6 +2396,8 @@ Hooks.once('ready', async () => {
     // validates activation; only the targeted user opens a granted session. The
     // validate/grant + open bodies are the manager's region-first activation seams.
     handleInteractableSocketMessage(payload, {
+      senderId,
+      isSenderGM: (id) => game.users?.get(id)?.isGM === true,
       validateAndGrant: (request) => InteractableManager.instance.validateAndGrant(request),
       openGrant: (grant) => InteractableManager.instance.openGrant(grant),
       notifyDenied: (reason) => InteractableManager.instance.notifyActivationDenied(reason)
@@ -1644,6 +2423,15 @@ Hooks.once('ready', async () => {
     if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
       void runInteractableMarkerSync();
     }
+    // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
+    // `Hooks.callAll`s fired only on the GM's client. `updateSetting` fires on every
+    // client when the replicated world setting lands, so reload the stale in-memory
+    // manager here and re-emit the local change hook so open player apps refresh.
+    handleFabricateSettingChange(key, {
+      craftingSystemManager: fabricate.craftingSystemManager,
+      recipeManager: fabricate.recipeManager,
+      callAll: (hook, payload) => Hooks.callAll(hook, payload),
+    });
   });
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();
@@ -1652,6 +2440,137 @@ Hooks.once('ready', async () => {
 
   Hooks.callAll('fabricate.ready');
 });
+
+/**
+ * Issue 555 R3 (repurposed by issue 567) — one-shot, primary-GM-gated backfill that stamps
+ * the durable per-system recipe-item identity `flags.fabricate.roles[systemId].recipeItemDefinitionId`
+ * (and strips stale `_stats.duplicateSource`) on every registered recipe-item definition's
+ * writable source Item, per owning system, so a source registered in two systems lands both
+ * leaves. Keyed by the `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting (target bumped 1 → 2), so
+ * a world already stamped at v1 (the retired scalar) re-runs once to backfill the `roles` map;
+ * a fresh world runs once. Sources only — owned copies inherit the flag on future drags and are
+ * otherwise covered by the manual "Repair item data" action. This is NOT a MigrationRunner entry:
+ * that runner reads and writes only settings-data payloads and has no Item handle, so it cannot
+ * write Item flags.
+ */
+async function runRecipeItemFlagAutoStamp() {
+  try {
+    // Primary-GM only, so exactly one client performs the write in a multi-GM world.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (Number(getSetting(SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION)) >= RECIPE_ITEM_FLAG_STAMP_TARGET) {
+      return;
+    }
+    const manager = fabricate?.getCraftingSystemManager?.();
+    if (!manager?.autoStampRecipeItemSources) return;
+    const summary = await manager.autoStampRecipeItemSources();
+    console.debug?.('Fabricate | recipe-item durable-flag auto-stamp complete', summary);
+    await setSetting(SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION, RECIPE_ITEM_FLAG_STAMP_TARGET);
+  } catch (error) {
+    console.error('Fabricate | recipe-item durable-flag auto-stamp failed', error);
+  }
+}
+
+/**
+ * Issue 556 — one-shot, primary-GM-gated backfill that stamps the durable per-system
+ * `flags.fabricate.roles[system.id].componentId` (and strips a clone's stale
+ * `_stats.duplicateSource`) on every registered component's writable source Item. Keyed
+ * by the `COMPONENT_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
+ * Placed BEFORE the `updateItem` hook registers, so restamp writes cannot trigger a
+ * metadata-refresh storm. Sources only — owned copies inherit the flag on future drags
+ * and are otherwise covered by the manual "Repair item data" action. NOT a MigrationRunner
+ * entry: that runner reads/writes only settings-data payloads and cannot write Item flags.
+ */
+async function runComponentFlagAutoStamp() {
+  try {
+    // Primary-GM only, so exactly one client performs the write in a multi-GM world.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (Number(getSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION)) >= COMPONENT_FLAG_STAMP_TARGET) {
+      return;
+    }
+    const manager = fabricate?.getCraftingSystemManager?.();
+    if (!manager?.autoStampComponentSources) return;
+    const summary = await manager.autoStampComponentSources();
+    console.debug?.('Fabricate | component durable-flag auto-stamp complete', summary);
+    await setSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION, COMPONENT_FLAG_STAMP_TARGET);
+  } catch (error) {
+    console.error('Fabricate | component durable-flag auto-stamp failed', error);
+  }
+}
+
+/**
+ * Issue 561 — one-shot, primary-GM-gated backfill that stamps the durable per-system
+ * `flags.fabricate.roles[system.id].toolId` on every registered tool's writable source Item.
+ * Keyed by the `TOOL_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
+ * MUST run AFTER the `1.15.0` settings-data migration (`migrateToolsToFirstClass`) populates
+ * each tool's source refs — the migration persists at init, this reads the live normalized
+ * systems in the `ready` body — and BEFORE the `updateItem` hook registers. Sources only —
+ * owned copies inherit the flag on future drags and are otherwise covered by the manual
+ * "Repair item data" action. NOT a MigrationRunner entry: that runner cannot write Item flags.
+ */
+async function runToolFlagAutoStamp() {
+  try {
+    // Primary-GM only, so exactly one client performs the write in a multi-GM world.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (Number(getSetting(SETTING_KEYS.TOOL_FLAG_STAMP_VERSION)) >= TOOL_FLAG_STAMP_TARGET) {
+      return;
+    }
+    const manager = fabricate?.getCraftingSystemManager?.();
+    if (!manager?.autoStampToolSources) return;
+    const summary = await manager.autoStampToolSources();
+    console.debug?.('Fabricate | tool durable-flag auto-stamp complete', summary);
+    await setSetting(SETTING_KEYS.TOOL_FLAG_STAMP_VERSION, TOOL_FLAG_STAMP_TARGET);
+  } catch (error) {
+    console.error('Fabricate | tool durable-flag auto-stamp failed', error);
+  }
+}
+
+/**
+ * Issue 600 (#540 Phase 2) — one-shot, active-GM-gated re-stamp that writes the durable
+ * per-system `flags.fabricate.roles[systemId].componentId` onto OWNED ACTOR items that
+ * currently resolve to a system component by NAME ONLY, so they stop depending on the
+ * deprecated name fallback (Phase 3 removal deferred to issue 601). The owned-copy analogue
+ * of {@link runComponentFlagAutoStamp} (which stamps registered component SOURCES): those
+ * cover future drags, this reaches the copies already in inventories. Keyed by the
+ * `OWNED_ITEM_COMPONENT_STAMP_VERSION` world setting so it runs exactly once per world.
+ *
+ * SCOPE DECISION: it scans the world's `game.actors` collection (fully hydrated at `ready`)
+ * and NOT unlinked synthetic-token actors (`scene.tokens` with `actorLink:false`). A LINKED
+ * token shares its world actor document, so `game.actors` already covers it; an unlinked
+ * token actor is an ephemeral, delta-based synthetic whose items are frequently transient
+ * NPC/monster overrides, and writing flags through the token-delta model is fragile — so it
+ * is deliberately excluded (conservative, "never touch a doc you can't safely resolve").
+ * Actors/scenes not hydrated at `ready` are likewise never force-loaded. Idempotent,
+ * merge-safe per role leaf, dotted-id safe, and no-throw-per-item (see the migration module).
+ *
+ * NOT a MigrationRunner entry: that runner reads/writes only settings-data payloads and has
+ * no Item handle, so it cannot write Item flags — identical to the source-side stamps.
+ */
+async function runOwnedItemComponentIdentityRestamp() {
+  try {
+    // Active-GM only, so exactly one client performs the inventory writes.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (
+      Number(getSetting(SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION)) >=
+      OWNED_ITEM_COMPONENT_STAMP_TARGET
+    ) {
+      return;
+    }
+    const manager = fabricate?.getCraftingSystemManager?.();
+    const systems = manager?.getSystems?.() ?? [];
+    const summary = await restampOwnedItemComponentIdentity({
+      actors: game.actors ?? [],
+      systems,
+      writeFlag: (item, flagKey, componentId) => setFabricateFlag(item, flagKey, componentId),
+    });
+    console.debug?.('Fabricate | owned-item component identity re-stamp complete', summary);
+    await setSetting(
+      SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION,
+      OWNED_ITEM_COMPONENT_STAMP_TARGET
+    );
+  } catch (error) {
+    console.error('Fabricate | owned-item component identity re-stamp failed', error);
+  }
+}
 
 /**
  * Run the env-node-driven marker image sync across all scenes. Resolves the live
@@ -2062,6 +2981,7 @@ globalThis.fabricate = {
 export const __test = {
   createGatheringToolAvailability,
   createGatheringToolBreakage,
+  createGatheringResultCreator,
   matchGatheringTools
 };
 

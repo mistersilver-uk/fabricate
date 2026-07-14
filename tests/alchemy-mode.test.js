@@ -40,6 +40,25 @@ const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
+const { getItemSourceReferences } = await import('../src/utils/sourceUuid.js');
+const { component, roleItem } = await import('./helpers/componentIdentityFixtures.js');
+const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js');
+
+// Bucketing moved to the collector (issue 572): `_matchAlchemySignature` now consumes
+// pre-bucketed `{ item, componentId }` records. This shim builds those records through
+// the SAME production resolver the collector/palette use (system-scoped by
+// `options.system?.id`), so these tests still exercise resolution + matching end to
+// end rather than hand-supplying bucket ids. The bracket-notation call keeps the shim
+// itself out of the call-site rewrite.
+function matchSig(engine, items, recipes, components, validator, options = {}) {
+  return engine['_matchAlchemySignature'](
+    toAlchemyRecords(items, components, options?.system?.id),
+    recipes,
+    components,
+    validator,
+    options
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Flag helpers (same pattern as recipe-visibility-service.test.js)
@@ -85,7 +104,7 @@ function buildAlchemySystem(overrides = {}) {
   return {
     id: 'alchemy-sys',
     resolutionMode: 'alchemy',
-    alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false },
+    alchemy: { checkMode: 'none', learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false },
     recipeVisibility: { listMode: 'global' },
     craftingCheck: { enabled: false, macroUuid: null, outcomes: [] },
     features: { multiStepRecipes: false },
@@ -104,8 +123,8 @@ function buildIngredientSet(groups, essences = {}) {
   };
 }
 
-function buildComponent(id, sourceItemUuid = null) {
-  return { id, name: id, tags: [], sourceItemUuid, sourceUuid: sourceItemUuid };
+function buildComponent(id, originItemUuid = null) {
+  return { id, name: id, tags: [], originItemUuid, registeredItemUuid: originItemUuid };
 }
 
 function buildIngredientGroup(componentId) {
@@ -161,9 +180,20 @@ test('CraftingSystemManager normalizes alchemy config with defaults', () => {
   // Pass legacy 'cauldron' key to test the fallback path (system.alchemy ?? system.cauldron)
   const system = manager._normalizeSystem({ resolutionMode: 'alchemy', cauldron: {} });
   assert.ok(system.alchemy, 'alchemy config should be set');
+  assert.equal(system.alchemy.checkMode, 'none', 'checkMode defaults to none');
   assert.equal(system.alchemy.learnOnCraft, false);
   assert.equal(system.alchemy.consumeOnFail, true);
   assert.equal(system.alchemy.showAttemptHistoryToPlayers, true);
+});
+
+test('CraftingSystemManager normalizes alchemy checkMode enum (none/simple/tiered; invalid → none)', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  for (const mode of ['none', 'simple', 'tiered']) {
+    const system = manager._normalizeSystem({ resolutionMode: 'alchemy', alchemy: { checkMode: mode } });
+    assert.equal(system.alchemy.checkMode, mode);
+  }
+  const bad = manager._normalizeSystem({ resolutionMode: 'alchemy', alchemy: { checkMode: 'bogus' } });
+  assert.equal(bad.alchemy.checkMode, 'none', 'an invalid checkMode coerces to none');
 });
 
 test('CraftingSystemManager respects explicit alchemy config values', () => {
@@ -249,27 +279,36 @@ test('CraftingSystemManager accepts legacy gatheringRegions/gatheringRegionSetti
 test('ResolutionModeService.validateRecipe: alchemy recipe with no ingredient sets is invalid', () => {
   const system = buildAlchemySystem();
   const service = buildResolutionService(system);
-  const recipe = buildRecipe('r1', [], [{ id: 'rg1', name: 'group1', results: [] }], {
-    resultSelection: { provider: 'ingredientSet' }
-  });
+  const recipe = buildRecipe('r1', [], [{ id: 'rg1', name: 'group1', results: [] }]);
   const result = service.validateRecipe(recipe);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(e => e.includes('ingredient set')));
 });
 
+test('ResolutionModeService.validateRecipe: alchemy recipe with more than one ingredient set is invalid', () => {
+  const system = buildAlchemySystem();
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')]), buildIngredientSet([buildIngredientGroup('c2')])],
+    [{ id: 'rg1', name: 'group1', results: [] }]
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /exactly 1 ingredient set/i.test(e)));
+});
+
 test('ResolutionModeService.validateRecipe: alchemy recipe with no result groups is invalid', () => {
   const system = buildAlchemySystem();
   const service = buildResolutionService(system);
-  const recipe = buildRecipe('r1', [buildIngredientSet([buildIngredientGroup('c1')])], [], {
-    resultSelection: { provider: 'ingredientSet' }
-  });
+  const recipe = buildRecipe('r1', [buildIngredientSet([buildIngredientGroup('c1')])], []);
   const result = service.validateRecipe(recipe);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(e => e.includes('result group')));
 });
 
-test('ResolutionModeService.validateRecipe: alchemy recipe with no provider is invalid', () => {
-  const system = buildAlchemySystem();
+test('ResolutionModeService.validateRecipe: None-mode recipe with one set + one group is valid (no provider)', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'none' } });
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
@@ -277,50 +316,66 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with no provider is i
     [{ id: 'rg1', name: 'group1', results: [] }]
   );
   const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('provider')));
-});
-
-test('ResolutionModeService.validateRecipe: alchemy recipe with invalid provider is invalid', () => {
-  const system = buildAlchemySystem();
-  const service = buildResolutionService(system);
-  const recipe = buildRecipe(
-    'r1',
-    [buildIngredientSet([buildIngredientGroup('c1')])],
-    [{ id: 'rg1', name: 'group1', results: [] }],
-    { resultSelection: { provider: 'unknownProvider' } }
-  );
-  const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('provider')));
-});
-
-test('ResolutionModeService.validateRecipe: alchemy recipe with rollTableOutcome but no UUID is invalid', () => {
-  const system = buildAlchemySystem();
-  const service = buildResolutionService(system);
-  const recipe = buildRecipe(
-    'r1',
-    [buildIngredientSet([buildIngredientGroup('c1')])],
-    [{ id: 'rg1', name: 'group1', results: [] }],
-    { resultSelection: { provider: 'rollTableOutcome' } }
-  );
-  const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('UUID')));
-});
-
-test('ResolutionModeService.validateRecipe: valid alchemy recipe with ingredientSet provider passes', () => {
-  const system = buildAlchemySystem();
-  const service = buildResolutionService(system);
-  const recipe = buildRecipe(
-    'r1',
-    [buildIngredientSet([buildIngredientGroup('c1')])],
-    [{ id: 'rg1', name: 'group1', results: [] }],
-    { resultSelection: { provider: 'ingredientSet' } }
-  );
-  const result = service.validateRecipe(recipe);
-  assert.equal(result.valid, true);
+  assert.equal(result.valid, true, result.errors.join(', '));
   assert.equal(result.errors.length, 0);
+});
+
+test('ResolutionModeService.validateRecipe: Simple-mode recipe with success + reserved failure group is valid', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')])],
+    [
+      { id: 'rg1', name: 'On success', results: [] },
+      { id: 'rg-fail', name: 'On a failed check', role: 'failure', results: [] }
+    ]
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, true, result.errors.join(', '));
+});
+
+test('ResolutionModeService.validateRecipe: Simple-mode tolerates an absent failure group', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')])],
+    [{ id: 'rg1', name: 'On success', results: [] }]
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, true, result.errors.join(', '));
+});
+
+test('ResolutionModeService.validateRecipe: None/Simple reject more than one SUCCESS group', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'none' } });
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')])],
+    [
+      { id: 'rg1', name: 'group1', results: [] },
+      { id: 'rg2', name: 'group2', results: [] }
+    ]
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /exactly 1 result group/i.test(e)));
+});
+
+test('ResolutionModeService.validateRecipe: Tiered-mode recipe with multiple result groups is valid', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'tiered' } });
+  const service = buildResolutionService(system);
+  const recipe = buildRecipe(
+    'r1',
+    [buildIngredientSet([buildIngredientGroup('c1')])],
+    [
+      { id: 'rg1', name: 'Fine', checkOutcomeIds: ['t1'], results: [] },
+      { id: 'rg2', name: 'Superb', checkOutcomeIds: ['t2'], results: [] }
+    ]
+  );
+  const result = service.validateRecipe(recipe);
+  assert.equal(result.valid, true, result.errors.join(', '));
 });
 
 test('ResolutionModeService.validateRecipe: alchemy recipe with explicit steps fails validation', () => {
@@ -332,8 +387,7 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with explicit steps f
     ...buildRecipe(
       'r1',
       [buildIngredientSet([buildIngredientGroup('c1')])],
-      [{ id: 'rg1', name: 'group1', results: [] }],
-      { resultSelection: { provider: 'ingredientSet' } }
+      [{ id: 'rg1', name: 'group1', results: [] }]
     ),
     getExecutionSteps: () => [explicitStep]
   };
@@ -346,86 +400,86 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with explicit steps f
 // ResolutionModeService: alchemy resolveResultGroups
 // ============================================================================
 
-test('resolveResultGroups: alchemy + ingredientSet provider returns mapped group', () => {
-  const system = buildAlchemySystem();
+test('resolveResultGroups: alchemy None returns the single success group', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'none' } });
   const service = buildResolutionService(system);
-  const allGroups = [
-    { id: 'rg1', name: 'Group1', results: [] },
-    { id: 'rg2', name: 'Group2', results: [] }
-  ];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'ingredientSet' } };
-  const ingredientSet = { resultGroupId: 'rg2' };
+  const allGroups = [{ id: 'rg1', name: 'Group1', results: [] }];
+  const recipe = { craftingSystemId: 'alchemy-sys' };
   const step = { resultGroups: allGroups };
 
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet });
-  assert.equal(result.groups.length, 1);
-  assert.equal(result.groups[0].id, 'rg2');
-});
-
-test('resolveResultGroups: alchemy + ingredientSet provider falls back to first group when no mapping', () => {
-  const system = buildAlchemySystem();
-  const service = buildResolutionService(system);
-  const allGroups = [
-    { id: 'rg1', name: 'Group1', results: [] },
-    { id: 'rg2', name: 'Group2', results: [] }
-  ];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'ingredientSet' } };
-  const step = { resultGroups: allGroups };
-
-  const result = service.resolveResultGroups({ recipe, step, ingredientSet: {} });
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { success: true, outcome: null } });
   assert.equal(result.groups.length, 1);
   assert.equal(result.groups[0].id, 'rg1');
 });
 
-test('resolveResultGroups: alchemy + macroOutcome provider returns matched group', () => {
-  const system = buildAlchemySystem();
+test('resolveResultGroups: alchemy Simple PASS returns the success group (not the failure group)', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
   const service = buildResolutionService(system);
   const allGroups = [
-    { id: 'rg1', name: 'success', results: [] },
-    { id: 'rg2', name: 'partial', results: [] }
+    { id: 'rg1', name: 'On success', results: [] },
+    { id: 'rg-fail', name: 'On a failed check', role: 'failure', results: [] }
   ];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys' };
   const step = { resultGroups: allGroups };
 
-  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'success' }, ingredientSet: {} });
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { success: true } });
   assert.equal(result.groups.length, 1);
   assert.equal(result.groups[0].id, 'rg1');
 });
 
-test('resolveResultGroups: alchemy + macroOutcome returns empty groups on fail keyword', () => {
-  const system = buildAlchemySystem();
+test('resolveResultGroups: alchemy Simple FAIL returns the reserved failure group', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
   const service = buildResolutionService(system);
-  const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
+  const allGroups = [
+    { id: 'rg1', name: 'On success', results: [] },
+    { id: 'rg-fail', name: 'On a failed check', role: 'failure', results: [] }
+  ];
+  const recipe = { craftingSystemId: 'alchemy-sys' };
   const step = { resultGroups: allGroups };
 
-  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'fail' }, ingredientSet: {} });
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { success: false } });
+  assert.equal(result.groups.length, 1);
+  assert.equal(result.groups[0].id, 'rg-fail');
+  assert.equal(result.meta.disposition, 'fail');
+});
+
+test('resolveResultGroups: alchemy Simple FAIL with no failure group produces nothing (tolerated)', () => {
+  const system = buildAlchemySystem({ alchemy: { checkMode: 'simple' } });
+  const service = buildResolutionService(system);
+  const allGroups = [{ id: 'rg1', name: 'On success', results: [] }];
+  const recipe = { craftingSystemId: 'alchemy-sys' };
+  const step = { resultGroups: allGroups };
+
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { success: false } });
   assert.equal(result.groups.length, 0);
   assert.equal(result.meta.disposition, 'fail');
 });
 
-test('resolveResultGroups: alchemy + macroOutcome returns empty groups on miss keyword', () => {
-  const system = buildAlchemySystem();
+test('resolveResultGroups: alchemy Tiered routes the outcome to its assigned tier group (checkOutcomeIds)', () => {
+  const system = buildAlchemySystem({
+    alchemy: { checkMode: 'tiered' },
+    craftingCheck: {
+      routed: {
+        type: 'relative',
+        relativeOutcomes: [
+          { id: 't-fine', name: 'Fine', success: true },
+          { id: 't-superb', name: 'Superb', success: true }
+        ]
+      }
+    }
+  });
   const service = buildResolutionService(system);
-  const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
+  const allGroups = [
+    { id: 'rg1', name: 'Fine result', checkOutcomeIds: ['t-fine'], results: [] },
+    { id: 'rg2', name: 'Superb result', checkOutcomeIds: ['t-superb'], results: [] }
+  ];
+  const recipe = { craftingSystemId: 'alchemy-sys' };
   const step = { resultGroups: allGroups };
 
-  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'miss' }, ingredientSet: {} });
-  assert.equal(result.groups.length, 0);
-  assert.equal(result.meta.disposition, 'miss');
-});
-
-test('resolveResultGroups: alchemy + macroOutcome returns misconfiguration on no match', () => {
-  const system = buildAlchemySystem();
-  const service = buildResolutionService(system);
-  const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
-  const step = { resultGroups: allGroups };
-
-  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'nonexistent' }, ingredientSet: {} });
-  assert.equal(result.groups.length, 0);
-  assert.equal(result.meta.disposition, 'misconfiguration');
+  const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'Superb' } });
+  assert.equal(result.groups.length, 1);
+  assert.equal(result.groups[0].id, 'rg2');
+  assert.equal(result.meta.disposition, 'success');
 });
 
 // ============================================================================
@@ -446,7 +500,10 @@ test('RecipeVisibilityService: GM sees all alchemy recipes', () => {
   assert.equal(result.craftable, true);
 });
 
-test('RecipeVisibilityService: non-GM sees no recipes in alchemy mode when learnOnCraft=false', () => {
+test('RecipeVisibilityService: reveal-not-gate — a non-revealed global-mode recipe is NOT revealed but is still craftable', () => {
+  // global mode reveals discovery-only; learnOnCraft off + not learned => not
+  // revealed. Reveal-not-gate: craftable stays true (matched signature is the sole
+  // brew gate).
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: false, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -458,10 +515,11 @@ test('RecipeVisibilityService: non-GM sees no recipes in alchemy mode when learn
     craftingActor: actor
   });
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'alchemy-hidden');
+  assert.equal(result.craftable, true, 'brewing is never gated by reveal state');
+  assert.equal(result.reason, 'alchemy-unrevealed');
 });
 
-test('RecipeVisibilityService: non-GM sees learned recipe when learnOnCraft=true', () => {
+test('RecipeVisibilityService: a brew-discovered (learned) global-mode recipe is revealed and craftable', () => {
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -475,10 +533,11 @@ test('RecipeVisibilityService: non-GM sees learned recipe when learnOnCraft=true
     craftingActor: actor
   });
   assert.equal(result.visible, true);
-  assert.equal(result.reason, 'alchemy-learned');
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'alchemy-revealed');
 });
 
-test('RecipeVisibilityService: non-GM does NOT see un-learned recipe when learnOnCraft=true', () => {
+test('RecipeVisibilityService: an un-learned global-mode recipe is not revealed but stays craftable (brew never gated)', () => {
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -490,7 +549,8 @@ test('RecipeVisibilityService: non-GM does NOT see un-learned recipe when learnO
     craftingActor: actor
   });
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'alchemy-not-learned');
+  assert.equal(result.craftable, true, 'brewing is never gated by reveal state');
+  assert.equal(result.reason, 'alchemy-unrevealed');
 });
 
 test('RecipeVisibilityService.learnRecipeOnCraft: adds recipe to actor learned map', async () => {
@@ -560,14 +620,14 @@ test('SignatureValidator.computeSignature returns groups for alchemy ingredient 
   assert.ok(sig[0].has('c1'));
 });
 
-test('CraftingEngine._matchAlchemySignature matches submitted items by canonical sourceItemUuid when live sourceUuid differs (no essences)', () => {
+test('CraftingEngine._matchAlchemySignature matches submitted items by canonical originItemUuid when live registeredItemUuid differs (no essences)', () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const components = [{
     id: 'c1',
     name: 'Iron Ore',
-    sourceUuid: 'Compendium.world.items.iron-ore-live',
-    sourceItemUuid: 'Compendium.source.items.iron-ore',
-    fallbackItemIds: []
+    registeredItemUuid: 'Compendium.world.items.iron-ore-live',
+    originItemUuid: 'Compendium.source.items.iron-ore',
+    aliasItemUuids: []
   }];
   const recipe = buildRecipe(
     'alchemy-recipe',
@@ -581,7 +641,7 @@ test('CraftingEngine._matchAlchemySignature matches submitted items by canonical
     getComponentsForSystem: () => components
   });
 
-  const result = engine._matchAlchemySignature([{
+  const result = matchSig(engine, [{
     uuid: 'Item.actor-owned-iron-ore',
     _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
     flags: {}
@@ -608,12 +668,10 @@ function buildSubmittedItem(uuid, essences = {}) {
 
 const essenceSystem = {
   features: { essences: true },
-  advancedOptionsEnabled: true
 };
 
 const noEssenceSystem = {
   features: { essences: false },
-  advancedOptionsEnabled: true
 };
 
 test('_matchAlchemySignature matches pure-essence recipe when submitted items satisfy essences', () => {
@@ -633,7 +691,7 @@ test('_matchAlchemySignature matches pure-essence recipe when submitted items sa
 
   // Submit same item twice → 1 essence × 2 = 2 total
   const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item, item], [recipe], [], validator, { system: essenceSystem }
   );
 
@@ -648,15 +706,15 @@ test('_matchAlchemySignature matches pure-essence recipe from component-defined 
     {
       id: 'red-herb',
       name: 'Red Herb',
-      sourceUuid: 'Compendium.test.red-herb',
-      sourceItemUuid: 'Compendium.test.red-herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
       essences: { [essenceId]: 1 }
     },
     {
       id: 'silverleaf',
       name: 'Silverleaf',
-      sourceUuid: 'Compendium.test.silverleaf',
-      sourceItemUuid: 'Compendium.test.silverleaf',
+      registeredItemUuid: 'Compendium.test.silverleaf',
+      originItemUuid: 'Compendium.test.silverleaf',
       essences: { [essenceId]: 1 }
     }
   ];
@@ -677,7 +735,7 @@ test('_matchAlchemySignature matches pure-essence recipe from component-defined 
   const silverleaf = buildSubmittedItem('Item.silverleaf', {});
   silverleaf._stats = { compendiumSource: 'Compendium.test.silverleaf' };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [redHerb, silverleaf], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -691,8 +749,8 @@ test('_matchAlchemySignature uses item-flag essences before component fallback',
   const components = [{
     id: 'red-herb',
     name: 'Red Herb',
-    sourceUuid: 'Compendium.test.red-herb',
-    sourceItemUuid: 'Compendium.test.red-herb',
+    registeredItemUuid: 'Compendium.test.red-herb',
+    originItemUuid: 'Compendium.test.red-herb',
     essences: { [essenceId]: 5 }
   }];
   const recipe = buildRecipe(
@@ -710,7 +768,7 @@ test('_matchAlchemySignature uses item-flag essences before component fallback',
   const redHerb = buildSubmittedItem('Item.red-herb', { [essenceId]: 1 });
   redHerb._stats = { compendiumSource: 'Compendium.test.red-herb' };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [redHerb], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -723,8 +781,8 @@ test('_matchAlchemySignature does not multiply component essences by stack quant
   const components = [{
     id: 'red-herb',
     name: 'Red Herb',
-    sourceUuid: 'Compendium.test.red-herb',
-    sourceItemUuid: 'Compendium.test.red-herb',
+    registeredItemUuid: 'Compendium.test.red-herb',
+    originItemUuid: 'Compendium.test.red-herb',
     essences: { [essenceId]: 1 }
   }];
   const recipe = buildRecipe(
@@ -743,7 +801,7 @@ test('_matchAlchemySignature does not multiply component essences by stack quant
   redHerb._stats = { compendiumSource: 'Compendium.test.red-herb' };
   redHerb.system = { quantity: 5 };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [redHerb], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -767,7 +825,7 @@ test('_matchAlchemySignature rejects pure-essence recipe when essences are insuf
 
   // Only 2 essences submitted but 3 needed
   const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item, item], [recipe], [], validator, { system: essenceSystem }
   );
 
@@ -792,7 +850,7 @@ test('_matchAlchemySignature skips essence check when system has essences disabl
 
   const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
   // With essences disabled, the set has no groups and no recognized essences → skip
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item, item], [recipe], [], validator, { system: noEssenceSystem }
   );
 
@@ -819,7 +877,7 @@ test('_matchAlchemySignature matches mixed ingredient-group + essence recipe', (
   const item = buildSubmittedItem('Item.actor-crystal', { [essenceId]: 1 });
   item._stats = { compendiumSource: 'Compendium.source.items.crystal' };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -847,7 +905,7 @@ test('_matchAlchemySignature rejects mixed recipe when groups match but essences
   const item = buildSubmittedItem('Item.actor-crystal', { [essenceId]: 1 });
   item._stats = { compendiumSource: 'Compendium.source.items.crystal' };
 
-  const result = engine._matchAlchemySignature(
+  const result = matchSig(engine, 
     [item], [recipe], components, validator, { system: essenceSystem }
   );
 
@@ -862,8 +920,8 @@ test('_buildEssenceContext resolves component-defined essences for effect transf
     components: [{
       id: 'red-herb',
       name: 'Red Herb',
-      sourceUuid: 'Compendium.test.red-herb',
-      sourceItemUuid: 'Compendium.test.red-herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
       essences: { [essenceId]: 1 }
     }]
   });
@@ -922,6 +980,142 @@ test('_consumeSubmittedAlchemyItems consumes correct quantity when same item sub
   assert.equal(updateCalls[0].data['system.quantity'], 2);
 });
 
+// ============================================================================
+// CraftingEngine._matchAlchemySignature: ingredient quantity enforcement (T-260)
+// ============================================================================
+
+// An ingredient group whose single option requires `quantity` of `componentId`.
+function buildIngredientGroupQty(componentId, quantity) {
+  return {
+    id: `g-${Math.random().toString(36).slice(2)}`,
+    options: [{ match: { type: 'component', componentId }, quantity }]
+  };
+}
+
+// The workbench expands a stack into one submission per unit; mirror that here by
+// returning `count` discrete submissions that all resolve to the same source.
+function buildIngotSubmissions(registeredItemUuid, count) {
+  return Array.from({ length: count }, () => ({
+    uuid: registeredItemUuid,
+    _stats: { compendiumSource: registeredItemUuid },
+    system: { quantity: 1 },
+    flags: {}
+  }));
+}
+
+function buildQuantityRecipe(componentId, requiredQty) {
+  return buildRecipe(
+    'forge-blade',
+    [buildIngredientSet([buildIngredientGroupQty(componentId, requiredQty)])],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+}
+
+test('_matchAlchemySignature matches when submitted quantity equals the required ingredient quantity', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [buildComponent('iron', 'Item.iron-ingot')];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  const result = matchSig(engine, 
+    buildIngotSubmissions('Item.iron-ingot', 5), [recipe], components, validator
+  );
+
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'forge-blade');
+});
+
+test('_matchAlchemySignature does NOT match when submitted quantity is below the required ingredient quantity', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [buildComponent('iron', 'Item.iron-ingot')];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  // The headline defect: one ingot must NOT satisfy a five-ingot group.
+  const single = matchSig(engine, 
+    buildIngotSubmissions('Item.iron-ingot', 1), [recipe], components, validator
+  );
+  assert.equal(single.matched, false, 'one ingot must not satisfy a five-ingot group');
+
+  // Boundary: one short of the requirement still fails.
+  const oneShort = matchSig(engine, 
+    buildIngotSubmissions('Item.iron-ingot', 4), [recipe], components, validator
+  );
+  assert.equal(oneShort.matched, false, 'four ingots must not satisfy a five-ingot group');
+});
+
+test('_matchAlchemySignature matches when submitted quantity exceeds the required ingredient quantity', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [buildComponent('iron', 'Item.iron-ingot')];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  const result = matchSig(engine, 
+    buildIngotSubmissions('Item.iron-ingot', 6), [recipe], components, validator
+  );
+
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'forge-blade');
+});
+
+test('craftAlchemy reaches the no-match disposition (and consumes) when ingredient quantity is insufficient', async () => {
+  const registeredItemUuid = 'Item.iron-ingot';
+  const components = [buildComponent('iron', registeredItemUuid)];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const system = buildAlchemySystem({
+    id: 'alchemy-sys',
+    components,
+    alchemy: { learnOnCraft: false, consumeOnFail: true, showAttemptHistoryToPlayers: false }
+  });
+  game.fabricate.getCraftingSystemManager = () => ({
+    getSystem: (id) => (id === 'alchemy-sys' ? system : null)
+  });
+  const validator = new SignatureValidator({
+    getSystem: () => system,
+    getRecipesForSystem: () => [recipe],
+    getComponentsForSystem: () => components
+  });
+  const engine = new CraftingEngine({ getRecipes: () => [recipe] });
+
+  const deleted = [];
+  const actorItem = {
+    uuid: registeredItemUuid,
+    system: { quantity: 1 },
+    async delete() { deleted.push(this.uuid); },
+    async update() {}
+  };
+  const sourceActor = { items: [actorItem] };
+  // Submit only one of the five required ingots.
+  const submitted = toAlchemyRecords(
+    buildIngotSubmissions(registeredItemUuid, 1),
+    components,
+    'alchemy-sys'
+  );
+
+  const result = await engine.craftAlchemy({ id: 'pc' }, [sourceActor], submitted, {
+    craftingSystemId: 'alchemy-sys',
+    signatureValidator: validator
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.disposition, 'no-match');
+  assert.equal(result.consumed, true);
+  assert.equal(deleted.length, 1, 'insufficient submission is still consumed on the no-match path');
+});
+
 test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals item quantity', async () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
 
@@ -947,4 +1141,197 @@ test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals i
 
   assert.equal(deleteCalls.length, 1, 'should delete when count >= qty');
   assert.equal(updateCalls.length, 0);
+});
+
+// ============================================================================
+// CraftingEngine._matchAlchemySignature: durable component identity (issue 558)
+//
+// Signature bucketing routes through the shared, list-aware, system-scoped
+// resolver `resolveComponentForItem`, so a submission is attributed to the single
+// component it IS (durable-flag-first), not to whichever component its raw
+// source-reference chain happens to overlap.
+// ============================================================================
+
+// Convenience: the SignatureValidator these signature tests always feed the same
+// three no-op lookups plus one component set. Hoisted so the new-code duplication
+// stays under the SonarCloud gate.
+function buildSignatureValidator(components) {
+  return new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components,
+  });
+}
+
+// A single-group signature recipe requiring one component by id.
+function buildComponentRecipe(id, componentId) {
+  return buildRecipe(
+    id,
+    [buildIngredientSet([buildIngredientGroup(componentId)])],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+}
+
+// A single-group signature recipe whose one option matches by tag and requires
+// `quantity` units. Used to exercise one-unit-per-group counting: the option
+// expands to every component carrying `tag`.
+function buildTagGroupRecipe(id, tag, quantity) {
+  return buildRecipe(
+    id,
+    [
+      buildIngredientSet([
+        {
+          id: `g-${Math.random().toString(36).slice(2)}`,
+          options: [{ match: { type: 'tags', tags: [tag], tagMatch: 'any' }, quantity }],
+        },
+      ]),
+    ],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+}
+
+test('_matchAlchemySignature attributes a submission to its durable componentId flag, not its duplicate-lineage raw refs (A1, issue 558)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const sys = 'alchemy-sys';
+  // Two distinct components; A's source ref is Item.A, B's is Item.B.
+  const componentA = component('cA', { registeredItemUuid: 'Item.A', originItemUuid: 'Item.A' });
+  const componentB = component('cB', { registeredItemUuid: 'Item.B', originItemUuid: 'Item.B' });
+  const components = [componentA, componentB];
+  const validator = buildSignatureValidator(components);
+
+  // A submission the collector attributed to B (durable roles flag) that STILL
+  // carries a transitive duplicateSource pointing at A's source. Its raw refs
+  // ([uuid, Item.A]) genuinely overlap A, so the pre-fix flag-blind matcher
+  // credited A (non-vacuity: without the Item.A overlap this would pass for the
+  // wrong reason).
+  const item = roleItem({
+    uuid: 'Item.owned-copy-of-A',
+    duplicateSource: 'Item.A',
+    roles: { [sys]: { componentId: 'cB' } },
+    name: 'Restamped Draught',
+  });
+  assert.ok(
+    getItemSourceReferences(item).includes('Item.A'),
+    'non-vacuity: the submission raw refs must genuinely overlap component A'
+  );
+
+  const matchesB = matchSig(engine, 
+    [item],
+    [buildComponentRecipe('needs-B', 'cB')],
+    components,
+    validator,
+    { system: { id: sys } }
+  );
+  const matchesA = matchSig(engine, 
+    [item],
+    [buildComponentRecipe('needs-A', 'cA')],
+    components,
+    validator,
+    { system: { id: sys } }
+  );
+
+  assert.equal(matchesB.matched, true, 'submission is credited to its durable componentId B');
+  assert.equal(
+    matchesA.matched,
+    false,
+    'submission is NOT credited to duplicate-lineage component A'
+  );
+});
+
+test('_matchAlchemySignature resolves a submission carrying only a bare top-level registeredItemUuid (A2b, characterization)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [buildComponent('bare', 'Item.bare-source')];
+  const validator = buildSignatureValidator(components);
+
+  // The item carries ONLY a bare top-level `registeredItemUuid` — no uuid, no
+  // _stats.compendiumSource, no duplicateSource — so `getItemSourceReferences`
+  // (and thus the shared resolver) sees nothing; only the LOCAL bare-registeredItemUuid
+  // supplement can attribute it.
+  const result = matchSig(engine, 
+    [{ registeredItemUuid: 'Item.bare-source' }],
+    [buildComponentRecipe('bare-recipe', 'bare')],
+    components,
+    validator
+  );
+
+  assert.equal(result.matched, true, 'bare top-level registeredItemUuid still resolves to its component');
+});
+
+test('_matchAlchemySignature counts a submission matching several of a group\'s components as one unit (A2c)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  // Two components sharing a tag but with distinct source refs.
+  const components = [
+    { ...buildComponent('c1', 'Item.c1'), tags: ['metal'] },
+    { ...buildComponent('c2', 'Item.c2'), tags: ['metal'] },
+  ];
+  const validator = buildSignatureValidator(components);
+  // A single submission whose raw refs overlap BOTH components.
+  const submission = { uuid: 'Item.c1', _stats: { compendiumSource: 'Item.c2' }, flags: {} };
+
+  const result = matchSig(engine, 
+    [submission],
+    [buildTagGroupRecipe('needs-two-metal', 'metal', 2)],
+    components,
+    validator
+  );
+
+  // Counted as one unit (not two), so a group needing two metal units is unmet.
+  assert.equal(result.matched, false, 'one submission contributes at most one unit to a group');
+});
+
+test('_matchAlchemySignature falls through a stale/foreign identity flag to the raw-ref tier (A2d)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const sys = 'alchemy-sys';
+  const components = [component('cC', { registeredItemUuid: 'Item.C', originItemUuid: 'Item.C' })];
+  const validator = buildSignatureValidator(components);
+  // The roles flag names a component absent from this system's set (stale/foreign),
+  // so it is inert; the raw refs overlap the real component C.
+  const item = roleItem({
+    uuid: 'Item.owned-C',
+    compendiumSource: 'Item.C',
+    roles: { [sys]: { componentId: 'ghost' } },
+    name: 'Owned C',
+  });
+
+  const result = matchSig(engine, 
+    [item],
+    [buildComponentRecipe('needs-C', 'cC')],
+    components,
+    validator,
+    { system: { id: sys } }
+  );
+
+  assert.equal(result.matched, true, 'an inert flag does not suppress the legitimate raw-ref match');
+});
+
+test('_matchAlchemySignature resolves a cross-group multi-overlap submission to a single component (order-dependent, issue 558)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  // Component identity is now "one item = one component": a submission whose raw
+  // refs overlap components in DIFFERENT groups resolves to the FIRST match in the
+  // full set (order-dependent by design), not counted in both groups as the
+  // pre-fix flag-blind intersection did.
+  const componentX = component('cX', { registeredItemUuid: 'Item.X', originItemUuid: 'Item.X' });
+  const componentY = component('cY', { registeredItemUuid: 'Item.Y', originItemUuid: 'Item.Y' });
+  const components = [componentX, componentY];
+  const validator = buildSignatureValidator(components);
+  // Raw refs overlap both X and Y; cX is first in the set, so it resolves to cX.
+  const submission = { uuid: 'Item.X', _stats: { compendiumSource: 'Item.Y' }, flags: {} };
+
+  const matchesX = matchSig(engine, 
+    [submission],
+    [buildComponentRecipe('needs-X', 'cX')],
+    components,
+    validator
+  );
+  const matchesY = matchSig(engine, 
+    [submission],
+    [buildComponentRecipe('needs-Y', 'cY')],
+    components,
+    validator
+  );
+
+  assert.equal(matchesX.matched, true, 'resolves to the first overlapping component (cX)');
+  assert.equal(matchesY.matched, false, 'not also counted toward the second overlapping component (cY)');
 });

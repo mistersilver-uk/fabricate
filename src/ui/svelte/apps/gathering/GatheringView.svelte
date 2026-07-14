@@ -10,7 +10,7 @@
   highlight-only — no center-column wiring yet.
 -->
 <script>
-  import { localize, notifyWarn, subscribeSceneChange, subscribeTravelMarkerMove } from '../../util/foundryBridge.js';
+  import { localize, notifyWarn, subscribeSceneChange, subscribeTravelMarkerMove, subscribeInventoryChange, subscribeCraftingDataChange } from '../../util/foundryBridge.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
@@ -207,11 +207,20 @@
       const result = await services?.startGatheringAttempt?.({
         environmentId,
         taskId,
-        rememberedActorId: store?.selectedActorId ?? null
+        rememberedActorId: store?.selectedActorId ?? null,
+        // UI-triggered attempt: prompt an interactive roll dialog + post the roll
+        // to chat (Dice So Nice) for the routed/progressive check paths.
+        interactive: true
       });
       // Never swallow a rejected attempt: surface WHY so a blocked attempt can't be
       // a silent no-op. A started/accepted attempt reports its outcome via the chat
-      // card, so only an explicit rejection notifies here.
+      // card, so only an explicit rejection notifies here. A CANCELLED attempt
+      // (player dismissed the roll dialog) is a user choice, not a rejection: it is
+      // also `accepted: false` but carries no blockedReasons, so handle it first and
+      // stay silent.
+      if (result && result.cancelled === true) {
+        return;
+      }
       if (result && result.accepted === false) {
         notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
       }
@@ -254,6 +263,19 @@
   $effect(() => subscribeTravelMarkerMove((actorUuid) => {
     if (services?.isTravelMarkerActor?.(actorUuid)) load(true);
   }));
+
+  // Present-tool availability is read live from the selected actor's items, so an
+  // item added/removed/edited on that actor can change which tasks are attemptable.
+  // Quietly re-fetch when the selected gathering actor's inventory changes.
+  $effect(() => subscribeInventoryChange(() => load(true), {
+    isRelevantActor: (actorId) =>
+      Boolean(store?.selectedActorId) && String(actorId) === String(store.selectedActorId)
+  }));
+
+  // A GM editing/saving a crafting system can change the gathering tasks, tools, or
+  // drop tables surfaced here; quietly re-fetch. Cross-client via the updateSetting
+  // bridge (see subscribeCraftingDataChange).
+  $effect(() => subscribeCraftingDataChange(() => load(true)));
 
   // Report the selected environment's stamina pool up to the shared store so the
   // header bar can render it; cleared when no environment is selected.
@@ -331,7 +353,7 @@
   <div class="gathering-view-container">
   <div class="gathering-view-grid" data-gathering-state="populated">
     <div class="gathering-view-column gathering-view-column-left">
-      <GatheringEnvironmentList {environments} {selectedId} {onSelect} />
+      <GatheringEnvironmentList {environments} {selectedId} {onSelect} {services} />
     </div>
     <section class="gathering-view-column gathering-view-column-center" data-gathering-detail>
       <GatheringDetail

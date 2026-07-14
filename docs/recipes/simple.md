@@ -7,7 +7,8 @@ nav_order: 1
 
 # Simple Mode
 
-The simplest resolution mode. One ingredient set, one result group, optional pass/fail check.
+The simplest resolution mode.
+One ingredient set, one result group, optional pass/fail check.
 
 ---
 
@@ -46,5 +47,5 @@ See [Crafting Checks]({% link crafting-checks.md %}) for how checks work.
 
 ## See Also
 
-- [Routed Mode]({% link recipes/routed.md %}): produce different results from one recipe, chosen by ingredients, a skill check, or a roll table.
+- [Routed Modes]({% link recipes/routed.md %}): produce different results from one recipe, chosen by ingredients or a skill check.
 - [Crafting Checks]({% link crafting-checks.md %}): how crafting checks are configured.

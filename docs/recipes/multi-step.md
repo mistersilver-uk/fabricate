@@ -38,18 +38,21 @@ Runs are saved on the crafting character and persist across sessions.
 
 A three-step recipe for creating enchanted plate armour:
 
-**Step 1: Forge the Plates**
+### Step 1: Forge the Plates
+
 - Ingredients: 5x Steel Ingot, requires the Forge tool
 - Time: 4 hours of world time
 - Result: 1x Unfinished Plate Set
 
-**Step 2: Assemble the Armour**
+### Step 2: Assemble the Armour
+
 - Ingredients: 1x Unfinished Plate Set, 2x Leather Strap
 - Result: 1x Plate Armour
 
-**Step 3: Enchant**
+### Step 3: Enchant
+
 - Ingredients: 1x Plate Armour, 1x Enchanting Gem
-- Crafting check: skill-based (Routed with a named outcome)
+- Crafting check: skill-based (Routed by check with a named outcome)
 - Result: 1x Enchanted Plate Armour (quality depends on check)
 
 ### Creating the recipe
@@ -66,6 +69,7 @@ When a step has a time requirement, the run waits on time after the step's ingre
 The step completes automatically when world time advances past the required duration.
 
 Time gates are checked:
+
 - When the player tries to advance (they'll see how much time remains)
 - Whenever world time advances (the step completes and advances on its own)
 - On module startup (catches up on offline time)

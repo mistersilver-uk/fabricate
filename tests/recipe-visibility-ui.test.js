@@ -106,20 +106,9 @@ test('_normalizeRecipeVisibility - knowledge.mode accepts learned', () => {
   assert.equal(result.knowledge.mode, 'learned');
 });
 
-test('_normalizeRecipeVisibility - knowledge.learn.consumeOnLearn defaults true', () => {
-  const manager = makeManager();
-  const result = manager._normalizeRecipeVisibility({ listMode: 'knowledge' });
-  assert.equal(result.knowledge.learn.consumeOnLearn, true);
-});
-
-test('_normalizeRecipeVisibility - knowledge.learn.consumeOnLearn can be set false', () => {
-  const manager = makeManager();
-  const result = manager._normalizeRecipeVisibility({
-    listMode: 'knowledge',
-    knowledge: { learn: { consumeOnLearn: false } }
-  });
-  assert.equal(result.knowledge.learn.consumeOnLearn, false);
-});
+// consumeOnLearn moved to per-recipe-item caps (issue 511); it is no longer a
+// system-wide knowledge field. See tests/recipe-item-definitions.test.js for its
+// per-item normalization.
 
 test('_normalizeRecipeVisibility - knowledge.learn.dragDropEnabled defaults true', () => {
   const manager = makeManager();
@@ -210,12 +199,12 @@ test('updateSystem - changing listMode from player to knowledge with mode preser
   manager.systems.set('sys-2', system);
 
   const updated = await manager.updateSystem('sys-2', {
-    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned', learn: { consumeOnLearn: false } } }
+    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned', learn: { dragDropEnabled: false } } }
   });
 
   assert.equal(updated.recipeVisibility.listMode, 'knowledge');
   assert.equal(updated.recipeVisibility.knowledge.mode, 'learned');
-  assert.equal(updated.recipeVisibility.knowledge.learn.consumeOnLearn, false);
+  assert.equal(updated.recipeVisibility.knowledge.learn.dragDropEnabled, false);
 });
 
 test('updateSystem - changing listMode from player to global results in global', async () => {
@@ -244,18 +233,17 @@ test('_normalizeRecipeVisibility - global mode produces complete knowledge sub-o
   const result = manager._normalizeRecipeVisibility({ listMode: 'global' });
   assert.ok(result.knowledge, 'knowledge sub-object should exist');
   assert.equal(typeof result.knowledge.mode, 'string');
-  assert.ok(result.knowledge.item, 'knowledge.item should exist');
   assert.ok(result.knowledge.learn, 'knowledge.learn should exist');
 });
 
-test('_normalizeRecipeVisibility - knowledge mode does not affect item sub-object defaults', () => {
+test('_normalizeRecipeVisibility - knowledge mode does not affect learn strategy defaults', () => {
   const manager = makeManager();
   const result = manager._normalizeRecipeVisibility({
     listMode: 'knowledge',
     knowledge: { mode: 'item' }
   });
-  assert.equal(result.knowledge.item.limitUses, false);
-  assert.equal(result.knowledge.item.destroyWhenExhausted, false);
+  // Per-item caps moved off the system-wide config; only the learn strategy remains.
+  assert.equal('item' in result.knowledge, false);
   assert.equal(result.knowledge.learn.dragDropEnabled, true);
 });
 

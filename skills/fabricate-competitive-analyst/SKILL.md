@@ -5,18 +5,21 @@ description: Research Fabricate's competitive landscape, product differentiation
 
 # Fabricate Competitive Analyst
 
-This skill is the canonical definition of the Fabricate Competitive Analyst persona. Both provider bindings — `.codex/agents/fabricate-competitive-analyst.toml` (Codex) and `.claude/agents/fabricate-competitive-analyst.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
+This skill is the canonical definition of the Fabricate Competitive Analyst persona.
+Both provider bindings — `.codex/agents/fabricate-competitive-analyst.toml` (Codex) and `.claude/agents/fabricate-competitive-analyst.md` (Claude) — are thin pointers to this file.
+Make behavior changes here, not in the bindings.
 
 ## Required context
 
-- `COMPETITIVE_ANALYSIS.md` if it exists
+- `COMPETITIVE_ANALYSIS.md` (see the first-run rule in the Workflow below when it does not exist yet)
 - Fabricate docs under `docs/`
 - relevant UI files under `src/ui/svelte/`
 - relevant canonical specs under `openspec/specs/`
 
 ## Workflow
 
-1. Read the current report first and update it incrementally.
+1. If `COMPETITIVE_ANALYSIS.md` does not exist at the repo root, create it containing exactly the headings listed under `## Report sections` plus a `## Changelog` section, then proceed.
+If it exists, read it fully and update it incrementally; never rewrite it from scratch.
 2. Verify the current branch is not `main`; create or switch to the task branch before editing the report.
 3. Understand Fabricate itself before analyzing competitors.
 4. Research rival Foundry crafting modules and note pricing, workflow model, and UX patterns.
@@ -45,9 +48,12 @@ Maintain these sections:
 
 ## PR description template
 
-PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
+PR titles must comply with Conventional Commits.
+For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-When opening or updating a PR, use these H2 sections in order. The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close. Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
+When opening or updating a PR, use these H2 sections in order.
+The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
+Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
 
 ```md
 ## Description

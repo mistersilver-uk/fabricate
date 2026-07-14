@@ -31,8 +31,9 @@ const DEFAULT_PREMIUM_CONFIG = resolve(ROOT, '..', 'fabricate-premium', 'release
  */
 export function parseArgs(args) {
   const options = {
-    profile: env.AWS_PROFILE || DEFAULT_PROFILE,
-    region: env.AWS_REGION || DEFAULT_REGION,
+    // profile/region are deliberately NOT defaulted here — resolveAwsEnv must be able to tell
+    // "the caller asked for a profile" apart from "nobody mentioned a profile", because in CI
+    // the difference decides whether the AWS SDK uses OIDC credentials or a nonexistent profile.
     channel: DEFAULT_CHANNEL,
     json: false,
     premium: true,
@@ -68,6 +69,66 @@ export function parseArgs(args) {
   }
 
   return options;
+}
+
+/**
+ * Resolve the AWS environment variables the S3 client should run under.
+ *
+ * The GitHub Actions case is the whole reason this is a separate, exported function:
+ *
+ *   - `AWS_PROFILE` must be ABSENT from the result when running under `GITHUB_ACTIONS` with no
+ *     explicit `--profile`. Not empty, and above all not `undefined`: assigning `undefined` to a
+ *     `process.env` key stores the STRING `"undefined"`, which the SDK dutifully resolves as a
+ *     profile name and fails on.
+ *   - The SDK's credential chain SKIPS the environment-variable provider entirely whenever
+ *     `AWS_PROFILE` is set — so setting it at all in CI would make the SDK ignore the short-lived
+ *     OIDC credentials that `aws-actions/configure-aws-credentials` exports, and the run would
+ *     fail looking for a shared-config profile that does not exist on the runner.
+ *
+ * Locally the opposite is true: fall back to the maintainer's `fabricate-beta` profile so the
+ * script works with no arguments.
+ *
+ * @param {Record<string, string|boolean|string[]>} [options] Parsed CLI options.
+ * @param {Record<string, string|undefined>} [environment] The process environment to read.
+ * @returns {Record<string, string>} The AWS environment overrides to apply. `AWS_PROFILE` is
+ *   either a non-empty string or absent — never `undefined`.
+ */
+export function resolveAwsEnv(options = {}, environment = env) {
+  const isGithubActions = Boolean(environment.GITHUB_ACTIONS);
+  const explicitProfile = String(options.profile || '').trim();
+  const localProfile = String(environment.AWS_PROFILE || '').trim() || DEFAULT_PROFILE;
+  const profile = isGithubActions ? explicitProfile : explicitProfile || localProfile;
+
+  const resolved = {
+    AWS_REGION: String(options.region || environment.AWS_REGION || DEFAULT_REGION),
+    AWS_SDK_LOAD_CONFIG: String(environment.AWS_SDK_LOAD_CONFIG || '1')
+  };
+
+  // Conditional assignment, never `AWS_PROFILE: profile || undefined` — see above.
+  if (profile) resolved.AWS_PROFILE = profile;
+
+  return resolved;
+}
+
+/**
+ * Apply the resolved AWS environment to a target environment object (`process.env` by default).
+ *
+ * `Object.assign` alone is NOT enough, and that gap is the whole bug 0.4 exists to close: assign
+ * cannot REMOVE a key. If `AWS_PROFILE` is already set in the runner's environment, an omitted
+ * key leaves the stale value in place, the SDK sees a profile, skips the environment-variable
+ * credential provider, and ignores the OIDC credentials entirely. So an omitted `AWS_PROFILE` is
+ * explicitly DELETED, not merely not-written.
+ *
+ * @param {Record<string, string|boolean|string[]>} [options] Parsed CLI options.
+ * @param {Record<string, string|undefined>} [environment] The process environment to read.
+ * @param {Record<string, string|undefined>} [target] The environment object to mutate.
+ * @returns {Record<string, string>} The AWS environment that was applied.
+ */
+export function applyAwsEnv(options = {}, environment = env, target = process.env) {
+  const resolved = resolveAwsEnv(options, environment);
+  Object.assign(target, resolved);
+  if (!('AWS_PROFILE' in resolved)) delete target.AWS_PROFILE;
+  return resolved;
 }
 
 /**
@@ -257,7 +318,8 @@ export function printHelp() {
 Queries exact latest manifests from S3 without requiring ListBucket.
 
 Options:
-  --profile <name>          AWS CLI/shared-config profile (default: ${DEFAULT_PROFILE})
+  --profile <name>          AWS CLI/shared-config profile (default: ${DEFAULT_PROFILE} locally;
+                            no profile under GITHUB_ACTIONS, where OIDC credentials are used)
   --region <name>           AWS region (default: ${DEFAULT_REGION})
   --bucket <name>           Primary S3 bucket for manifests
   --channel <name>          Release channel (default: ${DEFAULT_CHANNEL})
@@ -277,9 +339,8 @@ async function main() {
     return;
   }
 
-  process.env.AWS_PROFILE = String(options.profile || DEFAULT_PROFILE);
-  process.env.AWS_REGION = String(options.region || DEFAULT_REGION);
-  process.env.AWS_SDK_LOAD_CONFIG = process.env.AWS_SDK_LOAD_CONFIG || '1';
+  // An absent AWS_PROFILE must be absent from process.env too — deleted, not just not-written.
+  const awsEnv = applyAwsEnv(options, env);
 
   const fabricateConfig = await readJsonIfExists(String(options.config));
   const premiumConfig = options.premium === false
@@ -291,7 +352,7 @@ async function main() {
     throw new Error('No module targets found. Check release config paths or pass --include <moduleId>.');
   }
 
-  const s3 = new S3Client({ region: String(options.region || DEFAULT_REGION) });
+  const s3 = new S3Client({ region: awsEnv.AWS_REGION });
   const rows = await Promise.all(targets.map((target) => fetchLatestManifest(s3, target)));
 
   if (options.json) {

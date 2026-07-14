@@ -1,0 +1,37 @@
+{
+  // Lint every authored Markdown file; ignores below carve out generated/vendored/scratch.
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules",
+    ".foundry-e2e",
+    "docs/_site",
+    "docs/.jekyll-cache",
+    "dist",
+    "tmp",
+    "CHANGELOG.md"
+  ],
+  // One-sentence-per-line rule (markdownlint-sentences-per-line, parser: "none").
+  "customRules": ["markdownlint-sentences-per-line"],
+  "config": {
+    "default": true,
+    // line-length: conflicts with one-sentence-per-line (sentences become long single lines).
+    "MD013": false,
+    // duplicate headings: these structured docs reuse section headings (e.g. "Why",
+    // "Tasks") under different parents; only flag duplicates among siblings.
+    "MD024": { "siblings_only": true },
+    // single H1: docs/ Jekyll pages carry a front-matter `title:` plus a body `# H1`;
+    // don't count the front-matter title so the single body H1 is the page title.
+    "MD025": { "front_matter_title": "" },
+    // inline HTML: intentional in agent/skill/spec docs (e.g. <details>, comments, tags).
+    "MD033": false,
+    // first-line H1: many docs are front-matter-led (agent/skill/prompt definitions) or
+    // badge-led (README); a mandatory first-line heading fights that convention.
+    "MD041": false,
+    // table column alignment: not auto-fixable and demands monospace pipe-alignment that is
+    // impractical to maintain by hand. MD055 (pipe style) and MD056 (column count) stay on
+    // and catch real table breakage.
+    "MD060": false,
+    // Enforce one sentence per line.
+    "markdownlint-sentences-per-line": true
+  }
+}

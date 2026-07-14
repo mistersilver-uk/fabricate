@@ -17,14 +17,45 @@
     expandedToolId = '',
     dirtyToolIds = [],
     managedItemOptions = [],
+    breakageAuthority = 'toolSpecific',
     onSelectTool = () => {},
     onExpandTool = () => {},
     onToggleExpand = () => {},
     onAddTool = () => {},
     onAddToolDrop = () => {},
     onUpdateTool = () => {},
-    onDeleteTool = () => {}
+    onDeleteTool = () => {},
+    onSetBreakageAuthority = () => {}
   } = $props();
+
+  // Tool-breakage authority (issue 419): under "checkDriven" the active check's
+  // breakage triggers decide whether all required tools break, and a tool's own
+  // breakage mode is not evaluated (except "immune"). Each option's description
+  // carries that detail, so there is no separate advisory line.
+  const BREAKAGE_AUTHORITY_OPTIONS = [
+    {
+      value: 'toolSpecific',
+      icon: 'fas fa-screwdriver-wrench',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific',
+      labelFallback: 'Tool-specific',
+      descKey: 'FABRICATE.Admin.Manager.Tools.AuthorityToolSpecificDesc',
+      descFallback: "Each tool's own breakage mode decides whether it breaks."
+    },
+    {
+      value: 'checkDriven',
+      icon: 'fas fa-dice',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven',
+      labelFallback: 'Check-driven',
+      descKey: 'FABRICATE.Admin.Manager.Tools.AuthorityCheckDrivenDesc',
+      descFallback:
+        'Per-tool breakage modes are not evaluated (except Immune); the active check decides whether all required tools break.'
+    }
+  ];
+
+  function setBreakageAuthority(authority) {
+    if (authority === breakageAuthority) return;
+    onSetBreakageAuthority?.(authority);
+  }
 
   function text(key, fallback = key) {
     const translated = localize(key);
@@ -45,23 +76,47 @@
     return managedItemMap.get(String(componentId)) || null;
   }
 
+  // A first-class item-sourced tool (issue 561) carries its OWN source refs + a name/img
+  // display snapshot and has componentId: null. A component-linked / whetstone tool reads its
+  // display from the managed component. This distinction drives display + the source chip.
+  function isItemSourcedTool(tool) {
+    return !tool?.componentId && !!(tool?.name || tool?.originItemUuid || tool?.registeredItemUuid);
+  }
+
   function toolImage(tool) {
-    return managedItem(tool?.componentId)?.img || 'icons/svg/item-bag.svg';
+    if (tool?.componentId) return managedItem(tool.componentId)?.img || 'icons/svg/item-bag.svg';
+    return tool?.img || 'icons/svg/item-bag.svg';
   }
 
   function toolPrimaryLabel(tool) {
     const label = String(tool?.label || '').trim();
     if (label) return label;
-    const componentName = managedItem(tool?.componentId)?.name;
-    if (componentName) return String(componentName);
+    if (tool?.componentId) {
+      const componentName = managedItem(tool.componentId)?.name;
+      if (componentName) return String(componentName);
+    }
+    if (tool?.name) return String(tool.name);
     return text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No tool name');
   }
 
   function toolSecondary(tool) {
-    const rarity = managedItem(tool?.componentId)?.rarity;
     const baseLabel = text('FABRICATE.Admin.Manager.Tools.SecondaryLabel', 'Tool');
+    if (isItemSourcedTool(tool)) {
+      return `${baseLabel} · ${text('FABRICATE.Admin.Manager.Tools.SourceItem', 'Item source')}`;
+    }
+    const rarity = managedItem(tool?.componentId)?.rarity;
     if (rarity) return `${baseLabel} · ${rarity}`;
     return `${baseLabel} · ${text('FABRICATE.Admin.Manager.Tools.SecondaryRarityFallback', 'Common')}`;
+  }
+
+  function sourceChipClass(tool) {
+    return isItemSourcedTool(tool) ? 'manager-chip is-positive' : 'manager-chip is-neutral';
+  }
+
+  function sourceChipLabel(tool) {
+    return isItemSourcedTool(tool)
+      ? text('FABRICATE.Admin.Manager.Tools.SourceItem', 'Item source')
+      : text('FABRICATE.Admin.Manager.Tools.SourceComponent', 'Component');
   }
 
   function requirementChipClass(tool) {
@@ -75,11 +130,22 @@
   }
 
   function breakageChipClass(tool) {
-    return tool?.breakage?.mode === 'limitedUses' ? 'manager-chip is-neutral' : 'manager-chip is-warning';
+    const mode = tool?.breakage?.mode;
+    if (mode === 'immune') return 'manager-chip is-positive';
+    // Under check-driven authority the per-tool mechanic is not used, so a
+    // non-immune tool simply reads as "breakable".
+    if (isCheckDriven) return 'manager-chip is-warning';
+    return mode === 'limitedUses' ? 'manager-chip is-neutral' : 'manager-chip is-warning';
   }
 
   function breakageChipLabel(tool) {
     const mode = tool?.breakage?.mode;
+    if (mode === 'immune') {
+      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryImmune', 'Never breaks');
+    }
+    if (isCheckDriven) {
+      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryBreakable', 'Breakable');
+    }
     if (mode === 'limitedUses') {
       const maxUses = tool?.breakage?.maxUses;
       if (maxUses === null || maxUses === undefined) {
@@ -177,14 +243,57 @@
     });
   }
 
+  // The per-tool breakage mechanic is authority-driven (issue 419). Under
+  // tool-specific authority the tool's own mode decides breakage, so the original
+  // three mechanics are offered. Under check-driven authority the tool's mechanic
+  // is ignored except `immune`, so the only meaningful per-tool choice is whether
+  // the tool can break at all: Breakable (any non-immune mode) vs Immune.
+  const isCheckDriven = $derived(breakageAuthority === 'checkDriven');
+  const TOOL_SPECIFIC_BREAKAGE_MODES = [
+    { value: 'limitedUses', icon: 'fas fa-hashtag', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', labelFallback: 'Limited uses' },
+    { value: 'breakageChance', icon: 'fas fa-percent', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageChance', labelFallback: 'Breakage chance' },
+    { value: 'diceExpression', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageDice', labelFallback: 'Dice expression' }
+  ];
+  const CHECK_DRIVEN_BREAKAGE_MODES = [
+    { value: 'breakable', icon: 'fas fa-hammer', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageBreakable', labelFallback: 'Breakable' },
+    { value: 'immune', icon: 'fas fa-shield', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageImmune', labelFallback: 'Immune' }
+  ];
+
+  // The breakage option to highlight for a tool under the active authority. Under
+  // check-driven a non-immune mode reads as "breakable"; under tool-specific an
+  // immune tool coerces to "limited uses" (an unlimited limited-uses tool also
+  // never breaks, so the display stays behaviourally faithful until edited).
+  function breakageDisplayMode(tool) {
+    const mode = tool?.breakage?.mode;
+    if (isCheckDriven) return mode === 'immune' ? 'immune' : 'breakable';
+    return !mode || mode === 'immune' ? 'limitedUses' : mode;
+  }
+
   function setBreakageMode(tool, mode) {
     if (mode === 'limitedUses') {
       onUpdateTool?.(tool.id, { breakage: { mode, maxUses: null } });
     } else if (mode === 'breakageChance') {
       onUpdateTool?.(tool.id, { breakage: { mode, breakageChance: 0 } });
+    } else if (mode === 'immune') {
+      // Immune carries no breakage fields: the tool never breaks (issue 419).
+      onUpdateTool?.(tool.id, { breakage: { mode } });
     } else {
       onUpdateTool?.(tool.id, { breakage: { mode, formula: '', threshold: 0 } });
     }
+  }
+
+  // Check-driven breakage is binary. "Immune" persists the fields-less immune mode;
+  // "Breakable" keeps the tool's existing non-immune mechanic (so switching the
+  // source back to tool-specific restores it), defaulting to unlimited limited-uses
+  // when the tool was previously immune.
+  function setCheckDrivenBreakage(tool, selection) {
+    if (selection === 'immune') {
+      onUpdateTool?.(tool.id, { breakage: { mode: 'immune' } });
+      return;
+    }
+    const current = tool?.breakage?.mode;
+    if (current && current !== 'immune') return;
+    onUpdateTool?.(tool.id, { breakage: { mode: 'limitedUses', maxUses: null } });
   }
 
   function onBreakageChanceInput(tool, event) {
@@ -272,6 +381,34 @@
     role="tabpanel"
     aria-labelledby="manager-gathering-nav-tools"
   >
+  <section class="manager-inspector-card manager-tools-card" data-manager-tools-authority>
+    <div class="manager-tools-card-header">
+      <div>
+        <h3 class="manager-card-title" id="manager-tools-authority-title">{text('FABRICATE.Admin.Manager.Tools.AuthorityTitle', 'Tool breakage source')}</h3>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.AuthorityHint', 'Choose what decides whether a required tool breaks during an attempt.')}</p>
+      </div>
+    </div>
+    <fieldset class="manager-radio-group manager-tools-section" role="radiogroup" aria-labelledby="manager-tools-authority-title">
+      <div class="manager-radio-options">
+        {#each BREAKAGE_AUTHORITY_OPTIONS as option (option.value)}
+          <label class={`manager-radio-option ${breakageAuthority === option.value ? 'is-selected' : ''}`}>
+            <input type="radio"
+              name="manager-tools-breakage-authority"
+              value={option.value}
+              data-breakage-authority={option.value}
+              checked={breakageAuthority === option.value}
+              onchange={() => setBreakageAuthority(option.value)} />
+            <i class={option.icon} aria-hidden="true"></i>
+            <span class="manager-radio-option-body">
+              <span class="manager-radio-option-name">{text(option.labelKey, option.labelFallback)}</span>
+              <span class="manager-radio-option-desc">{text(option.descKey, option.descFallback)}</span>
+            </span>
+          </label>
+        {/each}
+      </div>
+    </fieldset>
+  </section>
+
   <section class="manager-inspector-card manager-tools-card" data-manager-tools-browser>
     <div class="manager-tools-card-header">
       <div>
@@ -285,11 +422,13 @@
     </div>
 
     {#if tools.length === 0}
-      <div class="manager-empty is-compact manager-tools-empty">
+      <div class="manager-empty is-compact manager-tools-empty"
+        data-manager-tools-empty-drop
+        use:dragDrop={{ onDrop: handleAddToolDrop, activeClass: 'is-drop-active' }}>
         <div>
           <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
           <h3>{text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No tools yet')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.EmptyHint', 'Add a reusable tool that gathering tasks can require.')}</p>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.EmptyHintDrop', 'Add a reusable tool that gathering tasks can require, or drop an Item here to create one directly.')}</p>
           <button type="button" class="manager-button is-primary" onclick={() => onAddTool?.()}>
             <i class="fas fa-plus" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Tools.Add', 'Add tool')}</span>
@@ -333,6 +472,10 @@
                 </div>
               </div>
               <div class="manager-tools-row-summary">
+                <span class={sourceChipClass(tool)} data-manager-tool-source-kind={isItemSourcedTool(tool) ? 'item' : 'component'}>
+                  <i class={isItemSourcedTool(tool) ? 'fas fa-file-import' : 'fas fa-cube'} aria-hidden="true"></i>
+                  <span>{sourceChipLabel(tool)}</span>
+                </span>
                 <span class={requirementChipClass(tool)}>
                   <i class="fas fa-shield-halved" aria-hidden="true"></i>
                   <span>{requirementChipLabel(tool)}</span>
@@ -375,6 +518,14 @@
                             <span class="manager-system-name">{managedItem(tool.componentId)?.name || text('FABRICATE.Admin.Manager.Tools.OverviewComponentMissing', 'Not set')}</span>
                           </span>
                         </button>
+                      {:else if isItemSourcedTool(tool)}
+                        <div class="manager-gathering-task-identity manager-tool-item-source" data-manager-tool-item-source={tool.id}>
+                          <img class="manager-gathering-task-thumb" src={toolImage(tool)} alt="" />
+                          <span class="manager-system-copy">
+                            <span class="manager-system-name">{tool.name || text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No tool name')}</span>
+                            <span class="manager-system-description">{text('FABRICATE.Admin.Manager.Tools.SourceItem', 'Item source')}</span>
+                          </span>
+                        </div>
                       {:else}
                         <div class="manager-gathering-task-identity manager-drop-empty-component is-empty">
                           <span class="manager-inline-drop-zone" aria-hidden="true">
@@ -393,9 +544,11 @@
                     <span>{text('FABRICATE.Admin.Manager.Tools.LabelField', 'Display label')}</span>
                     <input type="text"
                       value={tool.label || ''}
-                      placeholder={managedItem(tool.componentId)?.name || ''}
+                      placeholder={managedItem(tool.componentId)?.name || tool.name || ''}
                       oninput={(event) => onUpdateTool?.(tool.id, { label: event.currentTarget.value })} />
-                    <span class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
+                    <span class="manager-muted">{isItemSourcedTool(tool)
+                      ? text('FABRICATE.Admin.Manager.Tools.LabelHintItem', 'Optional. Falls back to the source item name.')
+                      : text('FABRICATE.Admin.Manager.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
                   </label>
                 </div>
 
@@ -435,23 +588,19 @@
                 <fieldset class="manager-radio-group manager-tools-section" role="radiogroup" aria-labelledby={`tool-${tool.id}-breakage-legend`}>
                   <legend id={`tool-${tool.id}-breakage-legend`} class="manager-radio-group-legend">{text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}</legend>
                   <div class="manager-radio-options">
-                    {#each [
-                      { value: 'limitedUses', icon: 'fas fa-hashtag', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', labelFallback: 'Limited uses' },
-                      { value: 'breakageChance', icon: 'fas fa-percent', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageChance', labelFallback: 'Breakage chance' },
-                      { value: 'diceExpression', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageDice', labelFallback: 'Dice expression' }
-                    ] as option (option.value)}
-                      <label class={`manager-radio-option ${tool.breakage?.mode === option.value ? 'is-selected' : ''}`}>
+                    {#each (isCheckDriven ? CHECK_DRIVEN_BREAKAGE_MODES : TOOL_SPECIFIC_BREAKAGE_MODES) as option (option.value)}
+                      <label class={`manager-radio-option ${breakageDisplayMode(tool) === option.value ? 'is-selected' : ''}`}>
                         <input type="radio"
                           name={`tool-${tool.id}-breakage-mode`}
                           value={option.value}
-                          checked={tool.breakage?.mode === option.value}
-                          onchange={() => setBreakageMode(tool, option.value)} />
+                          checked={breakageDisplayMode(tool) === option.value}
+                          onchange={() => (isCheckDriven ? setCheckDrivenBreakage(tool, option.value) : setBreakageMode(tool, option.value))} />
                         <i class={option.icon} aria-hidden="true"></i>
                         <span>{text(option.labelKey, option.labelFallback)}</span>
                       </label>
                     {/each}
                   </div>
-                  {#if tool.breakage?.mode === 'limitedUses'}
+                  {#if breakageDisplayMode(tool) === 'limitedUses'}
                     <label class="manager-field manager-tools-inline-field">
                       <span>{text('FABRICATE.Admin.Manager.Tools.BreakageMaxUses', 'Maximum uses')}</span>
                       <input type="number"
@@ -459,14 +608,14 @@
                         min="1"
                         step="1"
                         placeholder={text('FABRICATE.Admin.Manager.Tools.BreakageMaxUsesHint', 'Blank = unlimited')}
-                        value={tool.breakage.maxUses ?? ''}
+                        value={tool.breakage?.maxUses ?? ''}
                         oninput={(event) => {
                           const raw = event.currentTarget.value;
                           const next = raw === '' ? null : Number(raw);
                           onUpdateTool?.(tool.id, { breakage: { mode: 'limitedUses', maxUses: next } });
                         }} />
                     </label>
-                  {:else if tool.breakage?.mode === 'breakageChance'}
+                  {:else if breakageDisplayMode(tool) === 'breakageChance'}
                     <label class="manager-field manager-tools-inline-field">
                       <span>{text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}</span>
                       <span class="manager-drop-rate-value">
@@ -496,7 +645,7 @@
                         </span>
                       </span>
                     </label>
-                  {:else if tool.breakage?.mode === 'diceExpression'}
+                  {:else if breakageDisplayMode(tool) === 'diceExpression'}
                     <div class="manager-tools-inline-fields">
                       <label class="manager-field manager-tools-inline-field">
                         <span>{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span>

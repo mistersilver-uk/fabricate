@@ -122,8 +122,7 @@ export function respawnNodeOnce(node, { now, secondsPerUnit, rollChance, rollExp
     for (let i = 0; i < intervals; i++) {
       // The chance seam returns the RAW 1..100 roll; persist it (matching the
       // authoritative env path's `lastRoll.rolls`) and hit on `roll <= chance*100`.
-      const roll =
-        typeof rollChance === 'function' ? Number(rollChance(chance)) : Number.POSITIVE_INFINITY;
+      const roll = typeof rollChance === 'function' ? Number(rollChance(chance)) : Infinity;
       rolls.push(roll);
       if (roll <= chance * 100) gain += 1;
     }

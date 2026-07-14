@@ -102,7 +102,7 @@ function buildRecipe({
 function buildSystem({
   id = 'system-1',
   dragDropEnabled = true,
-  sourceItemUuid = 'shared-source',
+  originItemUuid = 'shared-source',
   listMode = 'knowledge',
   knowledgeMode = 'learned'
 } = {}) {
@@ -116,7 +116,7 @@ function buildSystem({
         learn: { consumeOnLearn: false, dragDropEnabled }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', sourceItemUuid }]
+    recipeItemDefinitions: [{ id: 'book', originItemUuid }]
   };
 }
 
@@ -208,7 +208,7 @@ describe('RecipeItemLearningHook', () => {
     const { actor, service } = createScenario({
       item,
       systems: {
-        'system-1': buildSystem({ sourceItemUuid: 'Actor.actor-1.Item.exact' })
+        'system-1': buildSystem({ originItemUuid: 'Actor.actor-1.Item.exact' })
       }
     });
 
@@ -258,7 +258,7 @@ describe('RecipeItemLearningHook', () => {
   it('remains silent when no recipe matches the created owned item', async () => {
     const { actor, item, service } = createScenario({
       systems: {
-        'system-1': buildSystem({ sourceItemUuid: 'different-source' })
+        'system-1': buildSystem({ originItemUuid: 'different-source' })
       }
     });
 
@@ -357,6 +357,79 @@ describe('RecipeItemLearningHook', () => {
     assert.equal(actor.getFlag('fabricate', 'fabricate.learnedRecipes'), undefined);
     assert.equal(infoMessages.length, 0);
     assert.equal(warnMessages.length, 0);
+  });
+
+  function buildCappedSystem({ id = 'system-1', maxRecipes = 2, dragDropEnabled = true, originItemUuid = 'shared-source' } = {}) {
+    return {
+      id,
+      recipeVisibility: {
+        listMode: 'knowledge',
+        // mode + dragDropEnabled stay system-wide; the learn cap is per-item (issue 511).
+        knowledge: {
+          mode: 'learned',
+          learn: { dragDropEnabled }
+        }
+      },
+      recipeItemDefinitions: [
+        {
+          id: 'book',
+          originItemUuid,
+          caps: {
+            item: { limitUses: false },
+            learn: { consumeOnLearn: false, limitRecipes: true, maxRecipes }
+          }
+        }
+      ]
+    };
+  }
+
+  it('does not auto-learn a capped-system book on drop (routes it to the item-sheet picker)', async () => {
+    const { actor, item, service } = createScenario({
+      systems: { 'system-1': buildCappedSystem() }
+    });
+
+    registerRecipeItemLearningHook(service, deps());
+    await hookRegistrations[0].handler(item, {}, 'user-1');
+
+    // No bulk auto-learn and no learn-count mutation for a capped book on drop.
+    assert.equal(actor.getFlag('fabricate', 'fabricate.learnedRecipes'), undefined);
+    assert.equal(service._getRecipeItemLearnCount(item), 0);
+    assert.equal(infoMessages.length, 0);
+  });
+
+  it('auto-learns the uncapped-system recipe of a mixed drop while suppressing the capped one', async () => {
+    const recipes = [
+      buildRecipe({ id: 'capped-recipe', name: 'Capped Recipe', craftingSystemId: 'capped-system' }),
+      buildRecipe({ id: 'uncapped-recipe', name: 'Uncapped Recipe', craftingSystemId: 'uncapped-system' })
+    ];
+    const { actor, item, service } = createScenario({
+      recipes,
+      systems: {
+        'capped-system': buildCappedSystem({ id: 'capped-system' }),
+        'uncapped-system': buildSystem({ id: 'uncapped-system', dragDropEnabled: true })
+      }
+    });
+
+    registerRecipeItemLearningHook(service, deps());
+    await hookRegistrations[0].handler(item, {}, 'user-1');
+
+    const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+    assert.deepEqual(Object.keys(learned), ['uncapped-recipe']);
+    assert.equal(service._getRecipeItemLearnCount(item), 0);
+    assert.equal(infoMessages.length, 1);
+    assert.match(infoMessages[0], /Uncapped Recipe/);
+  });
+
+  it('FN1: a capped book with dragDropEnabled ON still surfaces the item-sheet picker eligibility', () => {
+    const { service } = createScenario({
+      systems: { 'system-1': buildCappedSystem({ dragDropEnabled: true }) }
+    });
+    const recipe = buildRecipe();
+
+    // Auto-drop is suppressed, but the manual (item-sheet) picker path stays
+    // eligible even though drag-and-drop is enabled.
+    assert.equal(service._isRecipeEligibleForOwnedItemLearning(recipe, 'auto'), false);
+    assert.equal(service._isRecipeEligibleForOwnedItemLearning(recipe, 'manual'), true);
   });
 
   it('warns for already-known outcomes and reports one notification max', () => {

@@ -91,8 +91,18 @@ test('Changing salvageResolutionMode from simple to routed disables components w
       enabled: true,
       macroUuid: 'Macro.check',
       outcomes: ['pass', 'fail'],
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
-      progressive: { awardMode: 'equal', allowPlayerReorder: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+      // Routed salvage routes by outcome-tier name: a success tier the component
+      // never routes makes it invalid for routed (see ResolutionModeService).
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        relativeOutcomes: [
+          { id: 't-pass', name: 'pass', success: true, dc: 0 },
+          { id: 't-fail', name: 'fail', success: false, dc: -5 }
+        ]
+      }
     },
     components: [{
       id: 'comp-1',
@@ -101,7 +111,7 @@ test('Changing salvageResolutionMode from simple to routed disables components w
         enabled: true,
         ingredientQuantity: 1,
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
-        // no outcomeRouting → invalid for routed
+        // no outcomeRouting → the "pass" success tier is unrouted → invalid for routed
       }
     }]
   };
@@ -130,7 +140,7 @@ test('Changing salvageResolutionMode from routed to simple disables components w
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       enabled: true, macroUuid: 'Macro.check', outcomes: ['pass', 'fail'],
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false }
     },
     components: [{
@@ -169,7 +179,7 @@ test('Mode change does not disable components that are already valid for the new
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       enabled: false, macroUuid: null, outcomes: [],
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false }
     },
     components: [{
@@ -207,8 +217,16 @@ test('GM notification sent when components are disabled by mode change', async (
     salvageResolutionMode: 'simple',
     salvageCraftingCheck: {
       enabled: true, macroUuid: 'Macro.check', outcomes: ['pass', 'fail'],
-      consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
-      progressive: { awardMode: 'equal', allowPlayerReorder: false }
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        relativeOutcomes: [
+          { id: 't-pass', name: 'pass', success: true, dc: 0 },
+          { id: 't-fail', name: 'fail', success: false, dc: -5 }
+        ]
+      }
     },
     components: [{
       id: 'comp-1',
@@ -217,7 +235,7 @@ test('GM notification sent when components are disabled by mode change', async (
         enabled: true,
         ingredientQuantity: 1,
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
-        // no outcomeRouting → invalid for routed
+        // no outcomeRouting → the "pass" success tier is unrouted → invalid for routed
       }
     }]
   };
@@ -241,7 +259,7 @@ test('GM notification sent when components are disabled by mode change', async (
 // Group 2: Feature disable cleans up salvage runs
 // ---------------------------------------------------------------------------
 
-test('Setting features.salvage to false removes salvage run history for that system', async () => {
+test('Disabling salvage takes effect and cleans up this system\'s salvage runs', async () => {
   const systemId = 'sys-cleanup';
   const runForThisSystem = { id: 'run-1', craftingSystemId: systemId, componentId: 'comp-1', status: 'succeeded' };
   const actor = makeActor('actor-1', [runForThisSystem]);
@@ -263,16 +281,18 @@ test('Setting features.salvage to false removes salvage run history for that sys
   });
   mgr.systems.set(normalized.id, normalized);
 
-  await mgr.updateSystem(systemId, { features: { salvage: false } });
+  // Salvage is an optional feature: disabling it now takes effect and triggers
+  // cleanup of this system's in-flight salvage runs.
+  const updated = await mgr.updateSystem(systemId, { features: { salvage: false } });
+  assert.equal(updated.features.salvage, false, 'salvage can now be disabled');
 
   const stored = actor.getFlag('fabricate', 'fabricate.salvageRuns');
-  assert.ok(stored, 'salvageRuns flag should be present');
-  const history = stored.history || [];
+  const history = stored?.history || [];
   const remaining = history.filter(r => r.craftingSystemId === systemId);
-  assert.equal(remaining.length, 0, 'History entries for the disabled system should be removed');
+  assert.equal(remaining.length, 0, 'Disabling salvage cleans up this system\'s run history');
 });
 
-test('Setting features.salvage to false does not remove runs from other systems', async () => {
+test('Disabling salvage on one system never removes runs from other systems', async () => {
   const systemId = 'sys-a';
   const otherSystemId = 'sys-b';
   const runForA = { id: 'run-a', craftingSystemId: systemId, componentId: 'comp-1', status: 'succeeded' };
@@ -300,7 +320,7 @@ test('Setting features.salvage to false does not remove runs from other systems'
   assert.equal(bRuns.length, 1, 'Runs for other systems should NOT be removed');
 });
 
-test('Setting features.salvage to false works when no actors exist', async () => {
+test('A salvage feature update is a safe no-op when no actors exist', async () => {
   const systemId = 'sys-empty';
   const mgr = makeManager();
   mgr._getResolutionModeService = () => null;
@@ -322,7 +342,7 @@ test('Setting features.salvage to false works when no actors exist', async () =>
   );
 });
 
-test('Setting features.salvage from false to false does not trigger flag writes', async () => {
+test('Salvage stays on, so a no-op feature update triggers no salvage-run flag writes', async () => {
   const systemId = 'sys-noop';
   const actor = makeActor('actor-1', []);
   actor._setFlagCalled = false;
@@ -334,7 +354,8 @@ test('Setting features.salvage from false to false does not trigger flag writes'
     actors: [actor]
   };
 
-  // System already has salvage disabled
+  // Salvage is always on; an explicit `false` normalizes back to true, so this
+  // update changes nothing salvage-related and writes no salvage-run flags.
   const normalized = mgr._normalizeSystem({
     id: systemId, name: 'Test', features: { salvage: false },
     salvageResolutionMode: 'simple', components: []

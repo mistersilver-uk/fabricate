@@ -9,19 +9,32 @@
 
 import { SETTING_KEYS } from '../config/settings.js';
 
+import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
+import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
+import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem.js';
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
+import { migrateInvertRecipeItemLink } from './migrateInvertRecipeItemLink.js';
+import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
+import { migrateMoveRoutedByIngredientsCheck } from './migrateMoveRoutedByIngredientsCheck.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
+import { migrateRecipeItemCapsPerItem } from './migrateRecipeItemCapsPerItem.js';
+import { migrateRemoveLegacyCheckSources } from './migrateRemoveLegacyCheckSources.js';
+import { migrateRemoveResultSelectionProviders } from './migrateRemoveResultSelectionProviders.js';
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
+import { migrateRenameSourceUuidFields } from './migrateRenameSourceUuidFields.js';
+import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
+import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
+import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
 import { isFatalMigrationError } from './migrationErrors.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
@@ -53,6 +66,21 @@ function compareSemver(a, b) {
   return 0;
 }
 
+/**
+ * True when a value is the transient `_removedResultSelectionProviders` payload shape
+ * emitted by the 1.6.0 migration (an object carrying at least one of the two arrays).
+ * @param {*} value
+ * @returns {boolean}
+ */
+function _isRemovedProvidersPayload(value) {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (Array.isArray(value.droppedRollTableRecipes) || Array.isArray(value.strippedGatheringTasks))
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Migration registry
 // ---------------------------------------------------------------------------
@@ -61,42 +89,32 @@ const MIGRATIONS = [
   {
     version: '0.1.0',
     label: 'Rename systemItemId to componentId',
-    migrate(data) {
-      return {
-        recipes: migrateRecipes(data.recipes),
-        systems: migrateCraftingSystems(data.systems),
-      };
-    },
+    migrate: (data) => ({
+      recipes: migrateRecipes(data.recipes),
+      systems: migrateCraftingSystems(data.systems),
+    }),
   },
   {
     version: '0.2.0',
     label: 'Clear stale top-level gathering regions',
-    migrate(data) {
-      return {
-        gatheringConfig: migrateGatheringConfig(data.gatheringConfig),
-      };
-    },
+    migrate: (data) => ({
+      gatheringConfig: migrateGatheringConfig(data.gatheringConfig),
+    }),
   },
   {
     version: '0.3.0',
     label: 'System-level gathering economy modes (remove attemptLimit/economyMode)',
-    migrate(data) {
-      return migrateGatheringEconomy(data.gatheringConfig, data.environments);
-    },
+    migrate: (data) => migrateGatheringEconomy(data.gatheringConfig, data.environments),
   },
   {
     version: '0.4.0',
     label: 'Collapse resource-node respawn policies to manual|overTime + gainMode',
-    migrate(data) {
-      return migrateNodeRespawnModes(data.gatheringConfig, data.environments);
-    },
+    migrate: (data) => migrateNodeRespawnModes(data.gatheringConfig, data.environments),
   },
   {
     version: '0.5.0',
     label: 'Store node respawn intervals as unit+amount (calendar-aware) instead of raw seconds',
-    migrate(data) {
-      return migrateNodeRespawnIntervals(data.gatheringConfig, data.environments);
-    },
+    migrate: (data) => migrateNodeRespawnIntervals(data.gatheringConfig, data.environments),
   },
   {
     version: '0.6.0',
@@ -123,27 +141,21 @@ const MIGRATIONS = [
   {
     version: '0.8.0',
     label: 'Replace gathering economy mode enum with independent stamina/nodes toggles',
-    migrate(data) {
-      return migrateGatheringLimitationToggles(data.gatheringConfig);
-    },
+    migrate: (data) => migrateGatheringLimitationToggles(data.gatheringConfig),
   },
   {
     version: '0.9.0',
     label:
       'Unify gathering regions (vocabulary → GatheringRegion; drop region as a composition axis)',
-    migrate(data) {
-      // Runs after the 0.2.0 migration (which preserves per-system region vocab)
-      // so it sees that vocab. Surfaces the names of systems that had regions via
-      // a transient `_unifiedRegionSystems` field for the runner's GM notice.
-      return migrateUnifyGatheringRegions(data);
-    },
+    // Runs after the 0.2.0 migration (which preserves per-system region vocab)
+    // so it sees that vocab. Surfaces the names of systems that had regions via
+    // a transient `_unifiedRegionSystems` field for the runner's GM notice.
+    migrate: (data) => migrateUnifyGatheringRegions(data),
   },
   {
     version: '1.0.0',
     label: 'Rename gathering Hazard concept to Event (keys, policy values, region-modifier kind)',
-    migrate(data) {
-      return migrateRenameGatheringHazardsToEvents(data);
-    },
+    migrate: (data) => migrateRenameGatheringHazardsToEvents(data),
   },
   {
     version: '1.1.0',
@@ -152,24 +164,118 @@ const MIGRATIONS = [
     // `gatheringRegions` key for its per-region modifier rewrite. Semver-sorted
     // application keeps 1.1.0 after 1.0.0, so the rename only fires once the
     // earlier migrations have consumed the old schema.
-    migrate(data) {
-      return migrateRenameGatheringRegionsToRealms(data);
-    },
+    migrate: (data) => migrateRenameGatheringRegionsToRealms(data),
   },
   {
     version: '1.2.0',
     label: 'Unify stamina-regen policy name elapsedTime → overTime (matches node respawn)',
-    migrate(data) {
-      return migrateStaminaRegenPolicy(data.gatheringConfig);
-    },
+    migrate: (data) => migrateStaminaRegenPolicy(data.gatheringConfig),
   },
   {
     version: '1.3.0',
     label:
       'Remove the dnd5e/pf2e/macro provider model from gathering gates, checks, tool requirements, and character modifiers (formula-only)',
+    migrate: (data) => migrateRemoveSystemProvider(data),
+  },
+  {
+    version: '1.4.0',
+    label:
+      'Hard-migrate legacy mapped/tiered resolution modes to canonical routed + provider (ingredientSet/macroOutcome with tiered group-name reconciliation)',
+    migrate: (data) => migrateLegacyResolutionModes(data),
+  },
+  {
+    version: '1.5.0',
+    label: 'Seed the system-level gathering check from per-task gathering check formulas',
     migrate(data) {
-      return migrateRemoveSystemProvider(data);
+      const { systems, gatheringConfig } = migrateGatheringChecksToSystem(
+        data.systems,
+        data.gatheringConfig
+      );
+      return { systems, gatheringConfig };
     },
+  },
+  {
+    version: '1.6.0',
+    label:
+      'Remove legacy routed result-selection providers (macroOutcome/rollTableOutcome → check); drop rollTableUuid; strip gathering-task result selections',
+    migrate(data) {
+      // Surfaces dropped roll-table recipes/steps + stripped gathering tasks via the
+      // transient `_removedResultSelectionProviders` field (consumed by the runner for
+      // a one-time GM recovery notice, then stripped — never persisted).
+      const { recipes, gatheringConfig, _removedResultSelectionProviders } =
+        migrateRemoveResultSelectionProviders(data);
+      return { recipes, gatheringConfig, _removedResultSelectionProviders };
+    },
+  },
+  {
+    version: '1.7.0',
+    label:
+      'Rename consumeCatalystsOnFail → breakToolsOnFail on crafting/salvage consumption; ' +
+      'strip residual dead catalysts arrays from recipes, component salvage, and gathering tasks',
+    migrate: (data) => migrateBreakToolsOnFail(data),
+  },
+  {
+    version: '1.8.0',
+    label:
+      'Remove deprecated check sources (root macroUuid/successMacroUuid/failureMacroUuid/checkSource/builtIn) from crafting/salvage/gathering checks, and the orphaned recipe resultSelection.macroUuid',
+    migrate: (data) => migrateRemoveLegacyCheckSources(data),
+  },
+  {
+    version: '1.9.0',
+    label:
+      'Split the crafting routed resolution mode into routedByIngredients/routedByCheck ' +
+      '(majority provider wins, ties → routedByIngredients; minority recipes reconciled)',
+    migrate: (data) => migrateSplitRoutedResolutionModes(data),
+  },
+  {
+    version: '1.10.0',
+    label:
+      'Move routedByIngredients systems’ optional pass/fail crafting check from ' +
+      'craftingCheck.routed to the shared craftingCheck.simple slot (tier ids preserved; routed formula cleared)',
+    migrate: (data) => migrateMoveRoutedByIngredientsCheck(data),
+  },
+  {
+    version: '1.11.0',
+    label:
+      'Move recipe-item use/learn caps from the system-wide recipeVisibility.knowledge config ' +
+      'onto each recipe item definition (per-item caps; mode + dragDropEnabled stay system-wide)',
+    migrate: (data) => migrateRecipeItemCapsPerItem(data),
+  },
+  {
+    version: '1.12.0',
+    label:
+      'Seed the flat system-level visibilityMode enum (global/restricted/item/knowledge) ' +
+      'from the legacy recipeVisibility.listMode + knowledge.mode pair (recipeVisibility kept)',
+    migrate: (data) => migrateVisibilityModeEnum(data),
+  },
+  {
+    version: '1.13.0',
+    label:
+      'Invert the recipe ↔ recipe-item link: move book/scroll membership onto each ' +
+      'definition as recipeIds[] (many-to-many) and strip recipe.recipeItemId / linkedRecipeItemUuid',
+    migrate: (data) => migrateInvertRecipeItemLink(data),
+  },
+  {
+    version: '1.14.0',
+    label:
+      'Retire the per-recipe alchemy resultSelection.provider for the system-level ' +
+      'alchemy.checkMode (none/simple/tiered); strip resultSelection; collapse multi-ingredient-set alchemy recipes',
+    migrate: (data) => migrateAlchemyCheckMode(data),
+  },
+  {
+    version: '1.15.0',
+    label:
+      'Convert legacy componentId-referencing library Tools into first-class tools carrying ' +
+      'their own source references + name/img display snapshot (componentId preserved)',
+    migrate: (data) => migrateToolsToFirstClass(data.systems),
+  },
+  {
+    version: '1.16.0',
+    label:
+      'Rename registered-entry source-uuid fields (sourceUuid→registeredItemUuid, ' +
+      'sourceItemUuid→originItemUuid, fallbackItemIds→aliasItemUuids) on components, ' +
+      'recipe-item definitions, and tools',
+    migrate: (data) => migrateRenameSourceUuidFields(data.systems),
   },
   // Future migrations added here in version order
 ];
@@ -205,7 +311,7 @@ export class MigrationRunner {
    * Only persists data when changes are detected.
    * Updates migrationVersion to the highest migration version that ran.
    *
-   * @returns {Promise<{ ran: number, aborted: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
+   * @returns {Promise<{ ran: number, aborted: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], removedResultSelectionProviders: { droppedRollTableRecipes: object[], strippedGatheringTasks: object[] }, abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
    *   a summary of the run so the caller can fire one-time edge effects (e.g. the
    *   GM catalyst-migration and region-unification notices) or surface an aborted pass.
    */
@@ -217,7 +323,16 @@ export class MigrationRunner {
       .sort((a, b) => compareSemver(a.version, b.version));
 
     if (pending.length === 0) {
-      return { ran: 0, aborted: false, migratedCatalystCount: 0, unifiedRegionSystems: [] };
+      return {
+        ran: 0,
+        aborted: false,
+        migratedCatalystCount: 0,
+        unifiedRegionSystems: [],
+        removedResultSelectionProviders: {
+          droppedRollTableRecipes: [],
+          strippedGatheringTasks: [],
+        },
+      };
     }
 
     const rawRecipes = this._getSetting(SETTING_KEYS.RECIPES) ?? [];
@@ -242,6 +357,10 @@ export class MigrationRunner {
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
     let unifiedRegionSystems = [];
+    let removedResultSelectionProviders = {
+      droppedRollTableRecipes: [],
+      strippedGatheringTasks: [],
+    };
 
     for (const migration of pending) {
       // Capture the last known-good transformed payload BEFORE running this
@@ -287,6 +406,10 @@ export class MigrationRunner {
             failures,
             migratedCatalystCount: 0,
             unifiedRegionSystems: [],
+            removedResultSelectionProviders: {
+              droppedRollTableRecipes: [],
+              strippedGatheringTasks: [],
+            },
           };
         }
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
@@ -308,6 +431,20 @@ export class MigrationRunner {
       unifiedRegionSystems = data._unifiedRegionSystems.map(String);
     }
     delete data._unifiedRegionSystems;
+
+    // The 1.6.0 legacy-result-selection-provider migration reports the recipes/steps
+    // whose dropped `rollTableUuid` needs manual reconfiguration and the gathering
+    // tasks whose `resultSelection` was stripped (the GM must populate
+    // `gatheringCraftingCheck.routed.rollFormula`). Capture it for the GM notice and
+    // strip it so it is never persisted as part of any setting payload.
+    if (_isRemovedProvidersPayload(data._removedResultSelectionProviders)) {
+      removedResultSelectionProviders = {
+        droppedRollTableRecipes:
+          data._removedResultSelectionProviders.droppedRollTableRecipes ?? [],
+        strippedGatheringTasks: data._removedResultSelectionProviders.strippedGatheringTasks ?? [],
+      };
+    }
+    delete data._removedResultSelectionProviders;
 
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
@@ -337,7 +474,13 @@ export class MigrationRunner {
 
     console.log(`Fabricate | Migrations complete: ran ${pending.length} migration(s)`);
 
-    return { ran: pending.length, aborted: false, migratedCatalystCount, unifiedRegionSystems };
+    return {
+      ran: pending.length,
+      aborted: false,
+      migratedCatalystCount,
+      unifiedRegionSystems,
+      removedResultSelectionProviders,
+    };
   }
 
   /**

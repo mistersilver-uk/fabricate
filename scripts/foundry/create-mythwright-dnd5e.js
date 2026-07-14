@@ -441,6 +441,10 @@ const MythwrightDnd5eBootstrap = (() => {
       delete payload._stats.compendiumSource;
       if (Object.keys(payload._stats).length === 0) delete payload._stats;
     }
+    delete payload.registeredItemUuid;
+    delete payload.originItemUuid;
+    delete payload.aliasItemUuids;
+    // Also strip the pre-#560 field names in case a source Item carries the legacy shape.
     delete payload.sourceUuid;
     delete payload.sourceItemUuid;
     delete payload.fallbackItemIds;
@@ -879,10 +883,10 @@ const MythwrightDnd5eBootstrap = (() => {
 
   function componentFromItem(id, item, extra = {}) {
     const itemUuid = item.uuid || null;
-    const sourceUuid = extra.preserveSourceIdentity === false
+    const registeredItemUuid = extra.preserveSourceIdentity === false
       ? (itemUuid?.startsWith('Compendium.') ? null : itemUuid)
       : itemUuid;
-    const sourceItemUuid = extra.preserveSourceIdentity === false
+    const originItemUuid = extra.preserveSourceIdentity === false
       ? (itemUuid?.startsWith('Compendium.') ? null : itemUuid)
       : (itemSourceId(item) || itemUuid);
     const itemDescription = htmlToText(item.system?.description?.value || item.toObject?.()?.system?.description?.value || '');
@@ -891,9 +895,9 @@ const MythwrightDnd5eBootstrap = (() => {
       name: item.name,
       description: itemDescription,
       img: sanitizeIconPath(item.img || DEFAULT_ITEM_ICON, { allowExternal: true }),
-      sourceUuid,
-      sourceItemUuid,
-      fallbackItemIds: [],
+      registeredItemUuid,
+      originItemUuid,
+      aliasItemUuids: [],
       tags: extra.tags || [],
       difficulty: extra.difficulty || 1,
       salvage: extra.salvage || { enabled: false },
@@ -1334,7 +1338,7 @@ const MythwrightDnd5eBootstrap = (() => {
       system: 'dnd5e',
       tags: [],
       enabled: true,
-      resultSelection: { provider: 'macroOutcome' },
+      resultSelection: { provider: 'check' },
       steps: [
         {
           id: `${recipeId}-refine`,
@@ -1361,7 +1365,7 @@ const MythwrightDnd5eBootstrap = (() => {
           id: `${recipeId}-finish`,
           name: 'Finish Quality',
           ingredientSets: [ingredientSet(`${recipeId}-finish-set`, [baseId, 'artisan-catalyst'])],
-          resultSelection: { provider: 'macroOutcome' },
+          resultSelection: { provider: 'check' },
           resultGroups: MUNDANE_QUALITY.map(quality => resultGroup(
             quality.toLowerCase(),
             quality,
@@ -1383,7 +1387,7 @@ const MythwrightDnd5eBootstrap = (() => {
       system: 'dnd5e',
       tags: [],
       enabled: true,
-      resultSelection: { provider: 'macroOutcome' },
+      resultSelection: { provider: 'check' },
       steps: [
         {
           id: `${relicId}-gather`,
@@ -1396,7 +1400,7 @@ const MythwrightDnd5eBootstrap = (() => {
           id: `${relicId}-finish`,
           name: 'Awaken Relic',
           ingredientSets: [ingredientSet(`${relicId}-finish-set`, ['mythic-catalyst', 'dragon-scale'], null, { [essenceId]: 2 })],
-          resultSelection: { provider: 'macroOutcome' },
+          resultSelection: { provider: 'check' },
           resultGroups: RELIC_QUALITY.map(quality => resultGroup(quality.toLowerCase(), quality, relicId))
         }
       ]
@@ -1418,14 +1422,14 @@ const MythwrightDnd5eBootstrap = (() => {
       tags: [],
       enabled: true,
       transferEffects: true,
-      resultSelection: { provider: 'macroOutcome' },
+      resultSelection: { provider: 'check' },
       steps: [{
         id: `${recipeId}-finish`,
         name: 'Elemental Finish',
         ingredientSets: [
           ingredientSet(`${recipeId}-finish-set`, [baseComponentId, 'artisan-catalyst'], null, { [definition.essenceId]: 1 })
         ],
-        resultSelection: { provider: 'macroOutcome' },
+        resultSelection: { provider: 'check' },
         resultGroups: qualityDefinitions.map(variant => resultGroup(variant.quality.id, variant.quality.name, variant.id))
       }]
     };
@@ -1461,14 +1465,14 @@ const MythwrightDnd5eBootstrap = (() => {
         macroUuid: macroUuid || '',
         mode: 'namedOutcomes',
         outcomes: ['flawed', 'standard', 'fine', 'masterwork', 'mythic'],
-        consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false }
+        consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false }
       },
       salvageResolutionMode: 'routed',
       salvageCraftingCheck: {
         enabled: true,
         macroUuid: macroUuid || '',
         outcomes: ['pass', 'fail'],
-        consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+        consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
       },
       essenceDefinitions: ESSENCES.map(essence => ({
         id: essence.id,
@@ -1651,7 +1655,7 @@ try {
 } catch (err) {
   console.warn('Mythwright | Falling back to Standard outcome', err);
 }
-if (!finalStep) return { success: true, outcome: 'standard', value: total, data: { provider: 'macroOutcome' } };
+if (!finalStep) return { success: true, outcome: 'standard', value: total, data: { provider: 'check' } };
 if (total <= 1) return { success: false, outcome: 'fail', value: total, message: 'Catastrophic failure', data: {} };
 if (total < 8) return { success: true, outcome: 'flawed', value: total, data: {} };
 if (total < 14) return { success: true, outcome: 'standard', value: total, data: {} };

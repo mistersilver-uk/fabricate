@@ -69,9 +69,9 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
         img: 'icons/longsword.webp',
         uuid: 'Compendium.dnd5e.items.longsword',
         toObject: () => ({
-          sourceUuid: 'Compendium.dnd5e.items.longsword',
-          sourceItemUuid: 'Compendium.dnd5e.items.longsword',
-          fallbackItemIds: ['Compendium.dnd5e.items.old-longsword'],
+          registeredItemUuid: 'Compendium.dnd5e.items.longsword',
+          originItemUuid: 'Compendium.dnd5e.items.longsword',
+          aliasItemUuids: ['Compendium.dnd5e.items.old-longsword'],
           _stats: { compendiumSource: 'Compendium.dnd5e.items.longsword' },
           system: { quantity: 1 },
           flags: { core: { sourceId: 'Compendium.dnd5e.items.longsword' } }
@@ -82,9 +82,9 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(payload.name, 'Fine Longsword');
     assert.equal(payload.flags.core, undefined);
     assert.equal(payload._stats, undefined);
-    assert.equal(payload.sourceUuid, undefined);
-    assert.equal(payload.sourceItemUuid, undefined);
-    assert.equal(payload.fallbackItemIds, undefined);
+    assert.equal(payload.registeredItemUuid, undefined);
+    assert.equal(payload.originItemUuid, undefined);
+    assert.equal(payload.aliasItemUuids, undefined);
     assert.equal(payload.flags.fabricate.mythwrightBaseSourceId, 'Compendium.dnd5e.items.longsword');
   });
 
@@ -104,9 +104,9 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       }
     );
 
-    assert.equal(component.sourceUuid, 'Item.world-fine-longsword');
-    assert.equal(component.sourceItemUuid, 'Item.world-fine-longsword');
-    assert.deepEqual(component.fallbackItemIds, []);
+    assert.equal(component.registeredItemUuid, 'Item.world-fine-longsword');
+    assert.equal(component.originItemUuid, 'Item.world-fine-longsword');
+    assert.deepEqual(component.aliasItemUuids, []);
     assert.equal(component.mythwrightBaseSourceId, 'Compendium.dnd5e.items.longsword');
   });
 
@@ -293,13 +293,13 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       toObject: () => ({ system: { description: { value: '<p>A standard SRD longsword.</p>' } } })
     });
 
-    assert.equal(component.sourceUuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
-    assert.equal(component.sourceItemUuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
+    assert.equal(component.registeredItemUuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
+    assert.equal(component.originItemUuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
     assert.equal(component.name, 'Longsword');
     assert.match(component.description, /standard SRD longsword/);
   });
 
-  it('builds deterministic multi-step SRD recipes with a macroOutcome finishing step', () => {
+  it('builds deterministic multi-step SRD recipes with a check finishing step', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const target = { name: 'Longsword', type: 'weapon', item: { img: 'icons/longsword.webp' } };
     const recipe = helper.buildRecipeForSrd(target, new Map([
@@ -310,7 +310,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(recipe.category, 'Weapons');
     assert.deepEqual(recipe.tags, []);
     assert.equal(recipe.steps.length, 4);
-    assert.equal(recipe.steps.at(-1).resultSelection.provider, 'macroOutcome');
+    assert.equal(recipe.steps.at(-1).resultSelection.provider, 'check');
     assert.ok(recipe.steps.every(step =>
       step.ingredientSets.every(set =>
         set.ingredientGroups.every(group =>
@@ -542,8 +542,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
         img: 'icons/scale-mail.webp',
         uuid: 'Compendium.dnd5e.items.scale-mail',
         toObject: () => ({
-          sourceUuid: 'Compendium.dnd5e.items.scale-mail',
-          sourceItemUuid: 'Compendium.dnd5e.items.scale-mail',
+          registeredItemUuid: 'Compendium.dnd5e.items.scale-mail',
+          originItemUuid: 'Compendium.dnd5e.items.scale-mail',
           system: { quantity: 1, description: { value: '<p>Base armour.</p>' } },
           flags: { core: { sourceId: 'Compendium.dnd5e.items.scale-mail' } },
           _stats: { compendiumSource: 'Compendium.dnd5e.items.scale-mail' }
@@ -554,8 +554,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
 
     assert.equal(payload.flags.core, undefined);
     assert.equal(payload._stats, undefined);
-    assert.equal(payload.sourceUuid, undefined);
-    assert.equal(payload.sourceItemUuid, undefined);
+    assert.equal(payload.registeredItemUuid, undefined);
+    assert.equal(payload.originItemUuid, undefined);
     assert.equal(payload.flags.fabricate.elemental.resistanceType, 'fire');
     assert.match(payload.system.description.value, /resistance to fire damage/);
     assert.equal(payload.effects.at(-1).changes[0].key, 'system.traits.dr.value');
@@ -627,8 +627,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(recipe.category, 'Weapons');
     assert.equal(recipe.img, 'icons/weapons/swords/shortsword-guard-gold-red.webp');
     assert.deepEqual(recipe.tags, []);
-    assert.equal(recipe.resultSelection.provider, 'macroOutcome');
-    assert.equal(recipe.steps[0].resultSelection.provider, 'macroOutcome');
+    assert.equal(recipe.resultSelection.provider, 'check');
+    assert.equal(recipe.steps[0].resultSelection.provider, 'check');
     assert.ok(set.ingredientGroups.every(group =>
       group.options.every(option => option.match.type === 'component')
     ));

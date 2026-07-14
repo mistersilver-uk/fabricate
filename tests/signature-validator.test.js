@@ -15,14 +15,17 @@ function makeComponent(id, tags = []) {
   return { id, name: id, tags };
 }
 
-function makeIngredient(matchType, { componentId = null, tags = [], tagMatch = 'any' } = {}) {
+function makeIngredient(
+  matchType,
+  { componentId = null, tags = [], tagMatch = 'any', quantity = 1 } = {}
+) {
   if (matchType === 'component') {
-    return { match: { type: 'component', componentId } };
+    return { match: { type: 'component', componentId }, quantity };
   }
   if (matchType === 'tags') {
-    return { match: { type: 'tags', tags, tagMatch } };
+    return { match: { type: 'tags', tags, tagMatch }, quantity };
   }
-  return { match: null };
+  return { match: null, quantity };
 }
 
 function makeGroup(options) {
@@ -353,6 +356,35 @@ test('expandIngredientToComponentIds: tags all match returns only components wit
 });
 
 // ---------------------------------------------------------------------------
+// 14b. expandIngredientToComponentIds: currency contributes no component ids
+// ---------------------------------------------------------------------------
+
+test('expandIngredientToComponentIds: currency match returns an empty set', () => {
+  const validator = buildValidator(null);
+  const ingredient = { match: { type: 'currency', unit: 'gp', amount: 100 } };
+  const components = [makeComponent('comp-a', ['fire'])];
+
+  const result = validator.expandIngredientToComponentIds(ingredient, components);
+  assert.ok(result instanceof Set);
+  assert.equal(result.size, 0, 'currency is not a managed component');
+});
+
+test('computeSignature ignores a currency option but keeps component ids in the group', () => {
+  const validator = buildValidator(null);
+  const components = [makeComponent('comp-iron', [])];
+  const group = makeGroup([
+    makeIngredient('component', { componentId: 'comp-iron' }),
+    { match: { type: 'currency', unit: 'gp', amount: 100 } },
+  ]);
+  const set = makeIngredientSet([group]);
+
+  const signature = validator.computeSignature(set, components);
+  assert.equal(signature.length, 1, 'one group');
+  assert.equal(signature[0].size, 1, 'currency option adds no ids');
+  assert.ok(signature[0].has('comp-iron'));
+});
+
+// ---------------------------------------------------------------------------
 // 15. Multiple ingredient sets per recipe: each set generates separate entries
 // ---------------------------------------------------------------------------
 
@@ -372,6 +404,268 @@ test('multiple ingredient sets per recipe: conflict detected across sets', () =>
   const result = validator.validateSystem('sys-1');
   assert.equal(result.valid, false);
   assert.ok(result.conflicts.length >= 1);
+});
+
+// ---------------------------------------------------------------------------
+// 17. Shared-base multi-group recipes are NOT a collision (issue 547)
+//
+// Two distinct alchemy recipes that merely share a common base component but
+// differ in a distinguishing group must both be enablable. Neither recipe's
+// group requirements are a subset of the other's, so no single minimal
+// submission satisfies both, and there is no genuine ambiguity.
+// ---------------------------------------------------------------------------
+
+test('shared-base multi-group recipes sharing one base component → no conflict (issue 547)', () => {
+  const components = [
+    makeComponent('comp-water'),
+    makeComponent('comp-herb'),
+    makeComponent('comp-mineral'),
+  ];
+
+  // Healing Potion: group1 {Water}, group2 {Herb}
+  const healing = makeRecipe('r-healing', 'Healing Potion', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-herb' })]),
+    ]),
+  ]);
+
+  // Mana Potion: group1 {Water}, group2 {Mineral}
+  const mana = makeRecipe('r-mana', 'Mana Potion', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-mineral' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [healing, mana], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    true,
+    `Recipes sharing only a base component must not collide; got: ${JSON.stringify(result.conflicts)}`
+  );
+  assert.equal(result.conflicts.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 18. Subset group requirements ARE a collision (issue 547)
+//
+// A set whose group requirements are a subset of another set's is genuine
+// ambiguity: every submission satisfying the larger set also satisfies the
+// smaller one (runtime matching is superset-tolerant), so the smaller recipe
+// can never be reached distinctly. Must still be rejected.
+// ---------------------------------------------------------------------------
+
+test('subset group requirements → conflict (issue 547)', () => {
+  const components = [makeComponent('comp-water'), makeComponent('comp-herb')];
+
+  // Set X: single group {Water}
+  const recipeX = makeRecipe('r-x', 'Plain Water Brew', [
+    makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-water' })])]),
+  ]);
+
+  // Set Y: groups {Water}, {Herb} — X's requirement is a subset of Y's
+  const recipeY = makeRecipe('r-y', 'Herbal Water Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-herb' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeX, recipeY], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(result.valid, false, 'Subset group requirements must be rejected');
+  assert.ok(result.conflicts.length > 0);
+});
+
+// ---------------------------------------------------------------------------
+// 19. Multi-group joint satisfiability across option-alternatives (issue 547)
+//
+// When one set's group is a subset (in component-id terms) of the covering
+// set's corresponding group for EVERY covering group, every submission that
+// satisfies the dependent set also satisfies the covering set → collision.
+// ---------------------------------------------------------------------------
+
+test('multi-group joint satisfiability: dependent groups subset covering groups → conflict', () => {
+  const components = [
+    makeComponent('comp-water'),
+    makeComponent('comp-herb'),
+    makeComponent('comp-mineral'),
+  ];
+
+  // Dependent: {Water}, {Herb}
+  const dependent = makeRecipe('r-dep', 'Dependent Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-herb' })]),
+    ]),
+  ]);
+
+  // Covering: {Water}, {Herb OR Mineral} — the dependent's Herb group is a
+  // subset of the covering's {Herb, Mineral} group, so satisfying the
+  // dependent (Water + Herb) always satisfies the covering too.
+  const covering = makeRecipe('r-cov', 'Covering Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([
+        makeIngredient('component', { componentId: 'comp-herb' }),
+        makeIngredient('component', { componentId: 'comp-mineral' }),
+      ]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [dependent, covering], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(result.valid, false, 'Dependent-subsumed-by-covering must be rejected');
+  assert.ok(result.conflicts.length > 0);
+});
+
+// ---------------------------------------------------------------------------
+// 20. Distinguishing option-alternatives are NOT a collision (issue 547)
+//
+// Two sets sharing a base group but whose second groups are disjoint option
+// sets have no joint minimal submission → no collision.
+// ---------------------------------------------------------------------------
+
+test('shared base with disjoint option-alternative second groups → no conflict', () => {
+  const components = [
+    makeComponent('comp-water'),
+    makeComponent('comp-herb'),
+    makeComponent('comp-root'),
+    makeComponent('comp-mineral'),
+    makeComponent('comp-crystal'),
+  ];
+
+  // {Water}, {Herb OR Root}
+  const recipeA = makeRecipe('r-a', 'Recipe A', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([
+        makeIngredient('component', { componentId: 'comp-herb' }),
+        makeIngredient('component', { componentId: 'comp-root' }),
+      ]),
+    ]),
+  ]);
+
+  // {Water}, {Mineral OR Crystal}
+  const recipeB = makeRecipe('r-b', 'Recipe B', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
+      makeGroup([
+        makeIngredient('component', { componentId: 'comp-mineral' }),
+        makeIngredient('component', { componentId: 'comp-crystal' }),
+      ]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeA, recipeB], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    true,
+    `Disjoint distinguishing groups must not collide; got: ${JSON.stringify(result.conflicts)}`
+  );
+  assert.equal(result.conflicts.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 21. quantity>=2 multi-component group joint satisfiability (issue 547 follow-up)
+//
+// A `quantity: 2` "metal"-tag group is naturally crafted with TWO DISTINCT metal
+// components (iron + gold). That single craft also fully satisfies a second
+// recipe whose two single-component groups are {iron} and {gold}, so the runtime
+// (first-match) would silently brew the wrong recipe. The transversal test must
+// let a quantity>=2 group contribute multiple distinct components, or it
+// under-rejects this genuine ambiguity.
+// ---------------------------------------------------------------------------
+
+test('quantity>=2 multi-component group vs its distinct components → conflict (issue 547)', () => {
+  const components = [
+    makeComponent('comp-iron', ['metal']),
+    makeComponent('comp-gold', ['metal']),
+    makeComponent('comp-salt'),
+    makeComponent('comp-pepper'),
+  ];
+
+  // Recipe A: {metal x2}, {salt}, {pepper} — the metal group is crafted iron+gold.
+  const recipeA = makeRecipe('r-a', 'Alloy Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('tags', { tags: ['metal'], tagMatch: 'any', quantity: 2 })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-salt' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-pepper' })]),
+    ]),
+  ]);
+
+  // Recipe B: {iron}, {gold} — satisfied by iron+gold, which A's natural craft supplies.
+  const recipeB = makeRecipe('r-b', 'Iron & Gold Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-iron' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-gold' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeB, recipeA], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    false,
+    'A quantity>=2 multi-component craft that also fully matches another set must be rejected'
+  );
+  assert.ok(result.conflicts.length > 0);
+});
+
+// ---------------------------------------------------------------------------
+// 22. quantity 1 multi-component group does NOT over-reject (issue 547)
+//
+// The same shape but with quantity 1 supplies only ONE metal unit, so a natural
+// craft is iron OR gold — never both — and does not satisfy the {iron},{gold}
+// set. Must stay enablable (guards against the fix over-rejecting quantity 1).
+// ---------------------------------------------------------------------------
+
+test('quantity 1 multi-component group vs its distinct components → no conflict (issue 547)', () => {
+  const components = [
+    makeComponent('comp-iron', ['metal']),
+    makeComponent('comp-gold', ['metal']),
+    makeComponent('comp-salt'),
+    makeComponent('comp-pepper'),
+  ];
+
+  const recipeA = makeRecipe('r-a', 'Single Metal Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('tags', { tags: ['metal'], tagMatch: 'any', quantity: 1 })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-salt' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-pepper' })]),
+    ]),
+  ]);
+
+  const recipeB = makeRecipe('r-b', 'Iron & Gold Brew', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-iron' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-gold' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeB, recipeA], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    true,
+    `A quantity 1 metal group supplies only one unit and cannot satisfy {iron},{gold}; got: ${JSON.stringify(result.conflicts)}`
+  );
+  assert.equal(result.conflicts.length, 0);
 });
 
 // ---------------------------------------------------------------------------
