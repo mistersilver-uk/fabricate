@@ -78,6 +78,13 @@ jobs:
   release-s3:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Job-level (NOT workflow-level) so it survives being called as a reusable workflow, and
+    # per-channel so a beta publish and a public publish do not serialise needlessly. cancel-in-
+    # progress is false: a second push must QUEUE behind an in-flight publish, never cancel it
+    # mid-loop and leave a half-written (channel-manifest-but-not-tester) state behind.
+    concurrency:
+      group: release-s3-${{ inputs.channel }}
+      cancel-in-progress: false
     steps:
       # Tag validation runs AFTER checkout (it needs scripts/), not before it. The
       # validator is deliberately zero-dependency, so it runs on the runner's
@@ -146,9 +153,15 @@ jobs:
           CHANNEL: ${{ inputs.channel }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # --source-sha is the tagged commit ACTUALLY being built, taken from the checked-out tree.
+          # It must NOT come from GITHUB_SHA: the "Checkout release tag" step above did
+          # `git checkout "$tag"`, so GITHUB_SHA still names the ref that triggered the run, not the
+          # commit whose bytes this zip carries. The provenance guard keys resume/overwrite on it.
+          SOURCE_SHA="$(git rev-parse HEAD)"
           node scripts/release-s3.js \
             --version "$VERSION" \
             --channel "$CHANNEL" \
+            --source-sha "$SOURCE_SHA" \
             ${{ inputs.check_heads == true && '--check-heads' || '' }} \
             ${{ inputs.dry_run == true && '--dry-run' || '' }} \
             ${{ inputs.overwrite == true && '--overwrite' || '' }}
