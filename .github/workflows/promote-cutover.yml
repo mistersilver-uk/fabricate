@@ -28,6 +28,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
+      - name: Guard — must be dispatched with --ref release
+        run: |
+          if [ "${{ github.ref_name }}" != "release" ]; then
+            echo "::error::Dispatch this with --ref release. Got '${{ github.ref_name }}', which would"
+            echo "::error::mint off the wrong branch (a -beta.N, no draft). See the header comment."
+            exit 1
+          fi
+
       - name: Checkout release
         uses: actions/checkout@v4
         with:
@@ -38,7 +46,11 @@ jobs:
         run: |
           git config user.name "fabricate-release-bot"
           git config user.email "release-bot@users.noreply.github.com"
-          git fetch origin main
+          git fetch origin +refs/heads/main:refs/remotes/origin/main --tags --force
+          # semantic-release runs `git tag --merged <branch>` for EVERY configured branch (main and
+          # release), so both must exist as LOCAL refs — the runner only checked out `release`.
+          git branch -f main origin/main
+          git checkout -B release
           git merge --no-ff origin/main -m "chore(#627): promote main into release for the first stable"
           echo "release now at $(git rev-parse --short HEAD), reaches $(git rev-list --count v1.2.1..HEAD) commits since v1.2.1"
 
@@ -56,14 +68,11 @@ jobs:
         id: semrel
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Two independent branch signals must both say `release`, or the mint is wrong:
-          #  - GITHUB_REF_NAME drives the CONFIG's classifyBranch (which plugins load — the github
-          #    draft plugin is release/maintenance only), and a workflow_dispatch run defaults it
-          #    to `main` (the plugin would be omitted, minting NO draft);
-          #  - GITHUB_REF drives semantic-release's OWN branch detection (env-ci), and a dispatch
-          #    run defaults it to refs/heads/main (it would compute a `-beta.N`, not the stable).
-          GITHUB_REF_NAME: release
-          GITHUB_REF: refs/heads/release
+          # This workflow MUST be dispatched with `--ref release`. GITHUB_REF_NAME/GITHUB_REF are
+          # reserved and cannot be overridden by a step `env:`, so the ONLY way both the config's
+          # classifyBranch (reads GITHUB_REF_NAME) and semantic-release's env-ci (reads GITHUB_REF)
+          # see `release` is for the runner itself to be on `release`. A dispatch from `main` or a
+          # feature branch computes a `-beta.N` off the wrong branch and mints no draft.
         run: |
           set -o pipefail
           if [ "${{ inputs.dry_run }}" = "true" ]; then
