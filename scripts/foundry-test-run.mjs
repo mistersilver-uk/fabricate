@@ -3585,10 +3585,13 @@ async function main() {
         // danger row and category grouping had NEVER been photographed. These two seed
         // the missing states rather than mutating a recipe another phase depends on.
         //
-        // 'Temper a Blade' carries an ingredient set and a result group with NO results:
-        // structurally sound (persistable) but not craftable, so `_isRecipeIncomplete` is
-        // true and, being OFF, it renders as "Can't enable" — enabling it would be refused.
-        const emptyResultRecipe = await rm.createRecipe({
+        // 'Temper a Blade' carries an ingredient set but NO result groups: structurally
+        // sound (an empty result group would fail structure — this omits the group entirely),
+        // so `validateStructure()` passes while `validate()` fails, which is exactly the
+        // `_isRecipeIncomplete` predicate. Being OFF, the row reads "Can't enable" — enabling
+        // it would be refused. The edits carry `allowIncomplete` because the merged recipe is
+        // still an incomplete shell.
+        const incompleteRecipe = await rm.createRecipe({
           name: 'Temper a Blade',
           description: 'Re-harden a finished blade to raise its edge retention.',
           craftingSystemId: systemId,
@@ -3601,10 +3604,9 @@ async function main() {
                 match: { type: 'component', componentId: componentMap['Iron Sword'] }
               }]
             }]
-          }],
-          resultGroups: [{ name: 'Tempered Blade', results: [] }]
+          }]
         }, { allowIncomplete: true });
-        await rm.updateRecipe(emptyResultRecipe.id, { enabled: false, category: 'Smithing' });
+        await rm.updateRecipe(incompleteRecipe.id, { enabled: false, category: 'Smithing' }, { allowIncomplete: true });
 
         // A COMPLETE recipe that is locked (visible to players, GM-only to craft) — the
         // one row state the lock control writes and nothing had ever captured.
@@ -3630,10 +3632,11 @@ async function main() {
         await rm.updateRecipe(lockedRecipe.id, { locked: true, category: 'Smithing' });
 
         // Spread the existing recipes across the two authored categories so the library
-        // renders THREE groups (Alchemy / General / Smithing), not one.
-        await rm.updateRecipe(recipe1.id, { category: 'Smithing' });
-        await rm.updateRecipe(recipe2.id, { category: 'Alchemy' });
-        await rm.updateRecipe(multiStepRecipe.id, { category: 'Smithing' });
+        // renders THREE groups (Alchemy / General / Smithing), not one. `allowIncomplete`
+        // keeps a category edit from re-gating an already-savable draft on completeness.
+        await rm.updateRecipe(recipe1.id, { category: 'Smithing' }, { allowIncomplete: true });
+        await rm.updateRecipe(recipe2.id, { category: 'Alchemy' }, { allowIncomplete: true });
+        await rm.updateRecipe(multiStepRecipe.id, { category: 'Smithing' }, { allowIncomplete: true });
 
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
         const gatheringEnvironment = await environmentStore.create({
