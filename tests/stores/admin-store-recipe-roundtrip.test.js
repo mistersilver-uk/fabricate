@@ -1,6 +1,21 @@
 /**
  * THE named-field round-trip test (issue 643 §2b F2).
  *
+ * Two recipes are driven through the whole chain, because the draft path has TWO
+ * halves and the second one has no other guard:
+ *
+ *  1. `SILENT_RECIPE` — single-scope: sets, groups and result groups hang off the
+ *     recipe itself.
+ *  2. `MULTI_STEP_RECIPE` — `complex: true` with a real `steps[]`. A step's
+ *     `ingredientSets[]` is the IDENTICAL `IngredientSet` shape (`Recipe._normalizeStep`
+ *     builds it with `IngredientSet.fromJSON`) — the same `toolIds`, `essences`,
+ *     `resultMapping` and per-option `tagMatch` — and `_buildRecipeList` projects
+ *     `steps` WHOLESALE into the draft. The step-scope transformations in
+ *     `CraftingSystemManagerRoot.svelte` (`handleEnterMultiStep`,
+ *     `handleRevertToSingleStep`, `backfillScopeIds`, `trimScope`) genuinely move
+ *     sets between recipe scope and step scope, so a lossy rewrite THERE would be
+ *     invisible to a single-scope fixture and would ship green.
+ *
  * Seven groups of fields are persisted and runtime-honoured but have **no UI
  * affordance at all**. They survive only by round-trip, and nothing on screen would
  * reveal their loss:
@@ -132,6 +147,119 @@ const SILENT_RECIPE = Object.freeze({
   ],
 });
 
+// The multi-step half of the same guard. Every silent field that has a per-SET or
+// per-OPTION home is re-declared at STEP scope here, because `steps[].ingredientSets[]`
+// is the same `IngredientSet` shape and the projection copies `steps` wholesale: a
+// draft path that flattened, re-keyed or re-built a step's sets could drop exactly
+// these and no screen would show it.
+const MULTI_STEP_RECIPE = Object.freeze({
+  id: 'r-steps',
+  name: 'Sequence of Silence',
+  description: 'A multi-step recipe carrying the same silent fields at STEP scope.',
+  img: 'icons/scroll.webp',
+  category: 'Potions',
+  craftingSystemId: 'sys1',
+  enabled: true,
+  locked: false,
+
+  // An explicit authoring flag — NOT derived. A multi-step recipe that lost it would
+  // collapse back to the streamlined single-set editor on reload.
+  complex: true,
+  transferEffects: true,
+  isVariable: true,
+
+  steps: [
+    {
+      id: 'step-1',
+      name: 'Macerate',
+      description: 'Break the reagents down.',
+      // Step-scope tools (distinct from the per-SET tools below and from the
+      // recipe-level `toolIds`).
+      toolIds: ['tool-mortar'],
+      timeRequirement: { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
+      ingredientSets: [
+        {
+          id: 'step-1-set-1',
+          name: 'Macerate primary',
+          essences: { fire: 1 },
+          // Per-SET tools INSIDE a step: two nested scopes deep, and no editor at all.
+          toolIds: ['tool-alembic'],
+          resultMapping: ['step-1-group'],
+          resultGroupId: 'step-1-group',
+          ingredientGroups: [
+            {
+              id: 'step-1-grp',
+              options: [
+                {
+                  id: 'step-1-ing-1',
+                  quantity: 3,
+                  match: { type: 'component', componentId: 'cmp-herb' },
+                  extractEffects: true,
+                  effectFilter: ['Poisoned'],
+                },
+                {
+                  id: 'step-1-ing-2',
+                  quantity: 1,
+                  // tagMatch at STEP scope: the "or…" popover lands on this row too.
+                  match: { type: 'tags', tags: ['herbal', 'rare'], tagMatch: 'all' },
+                },
+                {
+                  id: 'step-1-ing-3',
+                  quantity: 1,
+                  match: { type: 'currency', unit: 'gp', amount: 5 },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      resultGroups: [
+        {
+          id: 'step-1-group',
+          name: 'Macerated pulp',
+          results: [{ id: 'step-1-res', componentId: 'cmp-sludge', quantity: 1 }],
+        },
+      ],
+    },
+    {
+      id: 'step-2',
+      name: 'Distil',
+      description: 'Draw the essence off.',
+      toolIds: [],
+      timeRequirement: { minutes: 0, hours: 2, days: 0, months: 0, years: 0 },
+      ingredientSets: [
+        {
+          id: 'step-2-set-1',
+          name: 'Distil primary',
+          essences: { fire: 2 },
+          toolIds: ['tool-alembic', 'tool-mortar'],
+          resultMapping: ['step-2-group'],
+          resultGroupId: 'step-2-group',
+          ingredientGroups: [
+            {
+              id: 'step-2-grp',
+              options: [
+                {
+                  id: 'step-2-ing-1',
+                  quantity: 1,
+                  match: { type: 'component', componentId: 'cmp-sludge' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      resultGroups: [
+        {
+          id: 'step-2-group',
+          name: 'On success',
+          results: [{ id: 'step-2-res', componentId: 'cmp-potion', quantity: 1 }],
+        },
+      ],
+    },
+  ],
+});
+
 function createSystem() {
   return {
     id: 'sys1',
@@ -217,18 +345,19 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
 
     recipeManager = new RecipeManager();
     recipeManager.recipes.set(SILENT_RECIPE.id, Recipe.fromJSON(SILENT_RECIPE));
+    recipeManager.recipes.set(MULTI_STEP_RECIPE.id, Recipe.fromJSON(MULTI_STEP_RECIPE));
     recipeManager.initialized = true;
 
     store = createAdminStore(createServices(recipeManager));
     await store.refresh();
   });
 
-  function persisted() {
-    return recipeManager.getRecipe(SILENT_RECIPE.id).toJSON();
+  function persisted(id = SILENT_RECIPE.id) {
+    return recipeManager.getRecipe(id).toJSON();
   }
 
-  function projectedRow() {
-    return (get(store.viewState).recipes || []).find((row) => row.id === SILENT_RECIPE.id);
+  function projectedRow(id = SILENT_RECIPE.id) {
+    return (get(store.viewState).recipes || []).find((row) => row.id === id);
   }
 
   it('survives load -> edit an unrelated field -> save byte-for-byte', async () => {
@@ -259,7 +388,25 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
   // The deepEqual above would catch every one of these, but it would fail as one
   // opaque diff. These name the field, so a regression reports WHICH silent field the
   // draft path dropped.
-  it('preserves Recipe.complex, teaser, transferEffects, isVariable and outcomeRouting', async () => {
+  //
+  // ---------------------------------------------------------------------------
+  // The MERGE FLOOR, named honestly.
+  //
+  // `complex`, `teaser`, `transferEffects`, `isVariable` and `outcomeRouting` are
+  // TOP-LEVEL scalars, and `RecipeManager.updateRecipe` saves
+  // `{ ...recipe.toJSON(), ...updates, id }` — a SHALLOW merge. A top-level key that
+  // the draft never carried is therefore restored from the persisted record, so these
+  // assertions pin `RecipeManager`'s merge floor, NOT the Studio's draft path: they
+  // cannot fail from a projection or draft-clone regression (three of the five —
+  // `teaser`, `transferEffects`, `isVariable` — are not even in `_buildRecipeList`'s
+  // projection today, and still survive).
+  //
+  // They are kept because the merge floor is itself worth pinning — a `set()` that
+  // replaced rather than merged would silently null every one of them — but the test
+  // says what it guards. What guards the DRAFT path for nested scope is the per-set /
+  // per-option / per-step group below, where the draft really does carry the values.
+  // ---------------------------------------------------------------------------
+  it('RecipeManager.updateRecipe restores top-level complex/teaser/transferEffects/isVariable/outcomeRouting from the persisted record (the shallow-merge floor, not the draft path)', async () => {
     const draft = patchRecipeDraft(cloneRecipeDraft(projectedRow()), { description: 'Rewritten.' });
     await store.updateRecipe(draft.id, draft, { allowIncomplete: true });
 
@@ -278,6 +425,20 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     assert.equal(after.transferEffects, true, 'transferEffects has no UI');
     assert.equal(after.isVariable, true, 'isVariable has no UI');
     assert.deepEqual(after.outcomeRouting, { success: 'grp-success' }, 'the legacy routing map survives');
+  });
+
+  // The other half of that story: the merge floor holds even when the draft drops the
+  // key entirely. This is the assertion the test above was silently making.
+  it('restores a top-level silent field even when the draft omits the key outright', async () => {
+    const draft = cloneRecipeDraft(projectedRow());
+    delete draft.complex;
+    delete draft.outcomeRouting;
+
+    await store.updateRecipe(draft.id, { ...draft, name: 'Merge floor' }, { allowIncomplete: true });
+
+    const after = persisted();
+    assert.equal(after.complex, true, 'a missing top-level key falls back to the persisted value');
+    assert.deepEqual(after.outcomeRouting, { success: 'grp-success' });
   });
 
   it('preserves per-SET toolIds and resultMapping (neither has any editor)', async () => {
@@ -350,5 +511,118 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
       { ...afterFirst, name: 'Pass two' },
       'the second pass moves nothing but the name either'
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // The MULTI-STEP half. `steps[].ingredientSets[]` is the same `IngredientSet`
+  // shape as the recipe's own, and `steps` is a NESTED array the shallow merge in
+  // `RecipeManager.updateRecipe` cannot repair: once the draft carries a `steps`
+  // key at all, whatever it holds REPLACES the persisted array wholesale. So unlike
+  // the top-level scalars above, every assertion here really does guard the draft
+  // path — projection → clone → patch → save.
+  // -------------------------------------------------------------------------
+  describe('a complex, multi-step recipe (the step-scope draft path)', () => {
+    function stepDraft(patch) {
+      return patchRecipeDraft(cloneRecipeDraft(projectedRow(MULTI_STEP_RECIPE.id)), patch);
+    }
+
+    it('survives load -> edit an unrelated field -> save byte-for-byte', async () => {
+      const before_ = persisted(MULTI_STEP_RECIPE.id);
+
+      const draft = stepDraft({ name: 'Sequence of Silence (revised)' });
+      const saved = await store.updateRecipe(draft.id, draft, { allowIncomplete: true });
+      assert.equal(saved, true, 'the save succeeds');
+
+      assert.deepEqual(
+        persisted(MULTI_STEP_RECIPE.id),
+        { ...before_, name: 'Sequence of Silence (revised)' },
+        'no step, set, group, option or result field moved'
+      );
+    });
+
+    it('preserves per-STEP toolIds, timeRequirement and step identity', async () => {
+      const draft = stepDraft({ description: 'Rewritten.' });
+      await store.updateRecipe(draft.id, draft, { allowIncomplete: true });
+
+      const steps = persisted(MULTI_STEP_RECIPE.id).steps;
+      assert.equal(steps.length, 2, 'both steps survive — a flattening rewrite drops one');
+      assert.deepEqual(
+        steps.map((step) => [step.id, step.name]),
+        [
+          ['step-1', 'Macerate'],
+          ['step-2', 'Distil'],
+        ],
+        'step ids and names survive in order (order is load-bearing: steps craft in sequence)'
+      );
+      assert.deepEqual(steps[0].toolIds, ['tool-mortar'], 'step-scope tools survive');
+      assert.deepEqual(steps[1].toolIds, [], 'a step with no tools stays empty rather than inheriting');
+      assert.equal(steps[0].timeRequirement.minutes, 30, 'per-step duration survives');
+      assert.equal(steps[1].timeRequirement.hours, 2);
+    });
+
+    it('preserves per-SET toolIds, essences and resultMapping INSIDE a step', async () => {
+      const draft = stepDraft({ img: 'icons/other.webp' });
+      await store.updateRecipe(draft.id, draft, { allowIncomplete: true });
+
+      const [first, second] = persisted(MULTI_STEP_RECIPE.id).steps;
+      const firstSet = first.ingredientSets[0];
+      const secondSet = second.ingredientSets[0];
+
+      assert.deepEqual(
+        firstSet.toolIds,
+        ['tool-alembic'],
+        'per-SET tools inside a step have no editor at ANY scope — round-trip is their only guard'
+      );
+      assert.deepEqual(secondSet.toolIds, ['tool-alembic', 'tool-mortar']);
+      assert.deepEqual(firstSet.essences, { fire: 1 }, 'the per-set essence requirement survives');
+      assert.deepEqual(secondSet.essences, { fire: 2 });
+      assert.deepEqual(firstSet.resultMapping, ['step-1-group'], 'the variable-output mapping survives');
+      assert.equal(firstSet.resultGroupId, 'step-1-group', 'set -> result-group routing survives');
+      assert.equal(secondSet.resultGroupId, 'step-2-group');
+    });
+
+    it("preserves a step option's tagMatch: 'all', extractEffects/effectFilter and currency match", async () => {
+      const draft = stepDraft({ category: 'general' });
+      await store.updateRecipe(draft.id, draft, { allowIncomplete: true });
+
+      const options = persisted(MULTI_STEP_RECIPE.id).steps[0].ingredientSets[0].ingredientGroups[0]
+        .options;
+      const component = options.find((option) => option.match.type === 'component');
+      const tags = options.find((option) => option.match.type === 'tags');
+      const currency = options.find((option) => option.match.type === 'currency');
+
+      assert.equal(tags.match.tagMatch, 'all', "a step-scoped tagMatch: 'all' survives");
+      assert.deepEqual(tags.match.tags, ['herbal', 'rare']);
+      assert.equal(component.quantity, 3, 'the option quantity survives');
+      assert.equal(component.extractEffects, true);
+      assert.deepEqual(component.effectFilter, ['Poisoned']);
+      assert.deepEqual(currency.match, { type: 'currency', unit: 'gp', amount: 5 });
+    });
+
+    it("preserves each step's result groups and their items", async () => {
+      const draft = stepDraft({ name: 'Renamed again' });
+      await store.updateRecipe(draft.id, draft, { allowIncomplete: true });
+
+      const [first, second] = persisted(MULTI_STEP_RECIPE.id).steps;
+      assert.equal(first.resultGroups[0].id, 'step-1-group');
+      assert.equal(first.resultGroups[0].results[0].componentId, 'cmp-sludge');
+      assert.equal(second.resultGroups[0].results[0].componentId, 'cmp-potion');
+      assert.equal(second.resultGroups[0].results[0].quantity, 1);
+    });
+
+    it('survives a SECOND round trip at step scope', async () => {
+      const first = stepDraft({ name: 'Pass one' });
+      await store.updateRecipe(first.id, first, { allowIncomplete: true });
+      const afterFirst = persisted(MULTI_STEP_RECIPE.id);
+
+      const second = stepDraft({ name: 'Pass two' });
+      await store.updateRecipe(second.id, second, { allowIncomplete: true });
+
+      assert.deepEqual(
+        persisted(MULTI_STEP_RECIPE.id),
+        { ...afterFirst, name: 'Pass two' },
+        'the second pass moves nothing but the name either'
+      );
+    });
   });
 });
