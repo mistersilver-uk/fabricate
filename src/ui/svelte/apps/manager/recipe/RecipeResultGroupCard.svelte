@@ -260,7 +260,10 @@
   {/if}
 
   {#if results.length === 0}
-    <p class="manager-muted manager-recipe-ingredient-set-empty">{text('FABRICATE.Admin.Manager.Recipe.ResultSetEmptyHint', 'Add an item this recipe produces.')}</p>
+    <!-- Danger-bordered dashed panel (§C5): an outcome that produces nothing is a gap. -->
+    <div class="manager-recipe-result-empty" data-recipe-result-empty>
+      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ResultSetEmptyPanel', 'Nothing produced on this outcome.')}</p>
+    </div>
   {:else}
     <div class="manager-recipe-ingredient-set-groups">
       {#each results as item, index (item?.id || index)}
@@ -338,10 +341,14 @@
     <SearchablePopover
       options={componentPickerOptions}
       pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-      triggerClass="manager-button is-subtle manager-recipe-add-component-trigger"
-      triggerIcon="fas fa-cube"
-      triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-      triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+      triggerClass="manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
+      triggerIcon="fas fa-plus"
+      triggerLabel={progressive
+        ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+        : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+      triggerAriaLabel={progressive
+        ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+        : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
       triggerAddMarker="result-item"
       dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
       searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}

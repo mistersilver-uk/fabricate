@@ -168,12 +168,7 @@
   }
 </script>
 
-<section class="manager-task-core-card manager-recipe-section" data-recipe-section={`${idPrefix}results`}>
-  <div class="manager-task-card-heading">
-    <div>
-      <h3>{text('FABRICATE.Admin.Manager.Recipe.ResultsSection', 'Results')}</h3>
-    </div>
-  </div>
+<section class="manager-recipe-results-section" data-recipe-section={`${idPrefix}results`}>
   {#if alchemySimple}
     <!-- Alchemy Simple: exactly two labeled result sets (success + reserved failure);
          no add-set, no remove on either. -->
@@ -213,20 +208,17 @@
     <div class="manager-recipe-section-empty">
       <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}</p>
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ResultsEmptyHint', 'Add a set of items this recipe can produce.')}</p>
-      <button type="button" class="manager-button" data-recipe-add="result-set" onclick={() => addGroup()}>
+      <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="result-set" onclick={() => addGroup()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
       </button>
     </div>
   {:else}
-    <ul class="manager-recipe-ingredient-sets">
+    <!-- Results has NO OR relationship between groups (§C2): the producing group is
+         chosen at craft time by outcome/routing, so no OR divider sits between them. -->
+    <ul class="manager-recipe-result-groups">
       {#each groups as group, index (group?.id || index)}
-        <li class="manager-recipe-ingredient-set-item">
-          {#if index > 0}
-            <div class="manager-recipe-ingredient-set-or" aria-hidden="true">
-              <span>{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
-            </div>
-          {/if}
+        <li class="manager-recipe-result-group-item">
           <RecipeResultGroupCard
             {group}
             {componentOptions}
@@ -245,7 +237,7 @@
         </li>
       {/each}
     </ul>
-    <button type="button" class="manager-button" data-recipe-add="result-set" onclick={() => addGroup()}>
+    <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="result-set" onclick={() => addGroup()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
     </button>

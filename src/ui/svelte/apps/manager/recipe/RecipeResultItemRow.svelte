@@ -103,6 +103,7 @@
 
   <div class="manager-recipe-option-controls">
     {#if progressive && selectedComponent}
+      <span class="manager-recipe-difficulty-label" aria-hidden="true">{text('FABRICATE.Admin.Manager.Recipe.DifficultyMicroLabel', 'Difficulty')}</span>
       <!-- Read-only: `component.difficulty` has four consumers, and the component
            editor's Difficulty card is the surface with the right save/discard
            lifecycle. `ui-integration` already requires a read-only badge here. -->
@@ -127,7 +128,7 @@
         type="number"
         min="1"
         max="9999"
-        class="manager-recipe-option-quantity"
+        class="manager-recipe-option-quantity manager-recipe-result-quantity"
         data-recipe-option-quantity
         aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
         value={quantity}
@@ -135,13 +136,14 @@
       />
     {/if}
 
+    <!-- A subtle × (§C7), never a loud red fa-minus. -->
     <button
       type="button"
-      class="manager-icon-button is-danger manager-recipe-option-remove"
+      class="manager-recipe-result-remove manager-recipe-option-remove"
       data-recipe-remove="result-item"
       aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
       title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
       onclick={() => onRemove()}
-    ><i class="fas fa-minus" aria-hidden="true"></i></button>
+    ><i class="fas fa-times" aria-hidden="true"></i></button>
   </div>
 </div>

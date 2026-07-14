@@ -6985,6 +6985,94 @@
   background: var(--fab-danger-soft);
 }
 
+/* ── Rebuilt Results tab (issue 643 §C) ─────────────────────────────────────── */
+.fabricate-manager .manager-recipe-results-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-recipe-result-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  margin: 0 0 var(--fab-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+/* Roll-budget info strip (progressive, §C4). */
+.fabricate-manager .manager-recipe-info-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-info-border);
+  border-radius: 9px;
+  background: var(--fab-info-soft);
+  color: var(--fab-info-text);
+  font-size: 0.78rem;
+}
+
+/* Full-width dashed add-set / add-stage row (§C6). */
+.fabricate-manager .manager-button.is-dashed.manager-recipe-add-full {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Danger-bordered dashed panel for an outcome that produces nothing (§C5). */
+.fabricate-manager .manager-recipe-result-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fab-space-3);
+  border: 1px dashed var(--fab-danger-border);
+  border-radius: 9px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-recipe-result-empty p {
+  margin: 0;
+}
+
+/* Subtle × remove on a result item (§C7), never a red fa-minus. */
+.fabricate-manager .manager-recipe-result-remove {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-result-remove:hover {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+/* Mono, right-aligned result quantity (§C7). */
+.fabricate-manager .manager-recipe-result-quantity {
+  font-family: var(--fab-font-mono);
+  text-align: right;
+}
+
+/* Uppercase "DIFFICULTY" micro-label beside the read-only badge (§C4). */
+.fabricate-manager .manager-recipe-difficulty-label {
+  color: var(--fab-text-subtle);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* Nested ingredient editor: sets -> groups -> options + per-set essences. */
 .fabricate-manager .manager-recipe-ingredient-sets {
   display: flex;
