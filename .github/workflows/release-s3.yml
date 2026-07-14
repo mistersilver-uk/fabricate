@@ -1,12 +1,25 @@
-name: "Release Candidate to S3"
+name: "Publish to S3"
 
+# Reusable per-channel publisher. Takes a release TAG, derives its version, checks out that
+# tagged commit, builds, and publishes to the requested channel's S3 targets. Called by beta.yml
+# (channel: beta) and, in later issue #627 chunks, by the early-access/public promotion workflows.
 on:
   workflow_dispatch:
     inputs:
-      rc_tag:
-        description: "RC tag to publish (e.g. v1.0.0-rc.3)"
+      tag:
+        description: "Release tag to publish (e.g. v1.4.0-beta.3 or v1.4.0)"
         required: true
         type: string
+      channel:
+        description: "Channel to publish (beta, early-access, public, or a hotfix line)"
+        required: false
+        type: string
+        default: beta
+      check_heads:
+        description: "Read and report every target's head + the guard verdict; publish nothing"
+        required: false
+        type: boolean
+        default: false
       dry_run:
         description: "Dry-run: build and stage but do not upload"
         required: false
@@ -19,10 +32,20 @@ on:
         default: false
   workflow_call:
     inputs:
-      rc_tag:
-        description: "RC tag to publish (e.g. v1.0.0-rc.3)"
+      tag:
+        description: "Release tag to publish (e.g. v1.4.0-beta.3 or v1.4.0)"
         required: true
         type: string
+      channel:
+        description: "Channel to publish (beta, early-access, public, or a hotfix line)"
+        required: false
+        type: string
+        default: beta
+      check_heads:
+        description: "Read and report every target's head + the guard verdict; publish nothing"
+        required: false
+        type: boolean
+        default: false
       dry_run:
         description: "Dry-run: build and stage but do not upload"
         required: false
@@ -34,11 +57,14 @@ on:
         type: boolean
         default: false
     secrets:
-      # Secrets are NOT inherited by reusable workflows — the caller
-      # (release-candidate.yml) must pass this through explicitly. Without it the
-      # publish refuses to run (tester groups configured + secret unset).
+      # Secrets are NOT inherited by reusable workflows — the caller (beta.yml, and later the
+      # early-access/public promotions) must pass these through explicitly. The publish refuses to
+      # run if a channel declares tester groups but its tester-path secret is unset.
       S3_TESTER_PATH_SECRET:
         description: "Secret directory segment for the closed-beta tester feed path"
+        required: false
+      S3_EARLY_ACCESS_PATH_SECRET:
+        description: "Secret directory segment for the patron early-access tester feed path"
         required: false
 
 # id-token: write lets the workflow request a GitHub OIDC token, which is
@@ -63,21 +89,23 @@ jobs:
       - name: Validate release tag
         id: version
         env:
-          RC_TAG: ${{ inputs.rc_tag }}
+          # `--kind any` accepts a beta/rc prerelease tag (beta channel) AND a stable tag
+          # (early-access/public channels), because this reusable workflow publishes every channel.
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          VERSION=$(node scripts/validate-release-tag.mjs "$RC_TAG" --kind beta)
+          VERSION=$(node scripts/validate-release-tag.mjs "$RELEASE_TAG" --kind any)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing $RC_TAG → version $VERSION"
+          echo "Publishing $RELEASE_TAG → version $VERSION (channel ${{ inputs.channel }})"
 
       - name: Validate tag exists
         run: |
-          if ! git tag -l "${{ inputs.rc_tag }}" | grep -q .; then
-            echo "::error::Tag '${{ inputs.rc_tag }}' does not exist"
+          if ! git tag -l "${{ inputs.tag }}" | grep -q .; then
+            echo "::error::Tag '${{ inputs.tag }}' does not exist"
             exit 1
           fi
 
-      - name: Checkout RC tag
-        run: git checkout "${{ inputs.rc_tag }}"
+      - name: Checkout release tag
+        run: git checkout "${{ inputs.tag }}"
 
       - uses: actions/setup-node@v6
         with:
@@ -87,10 +115,11 @@ jobs:
       - run: npm ci
 
       - name: Configure AWS credentials via OIDC
-        # Skipped on dry-run: the script neither imports the AWS SDK nor calls
-        # S3 when --dry-run is set, so a dry-run must not require OIDC/role setup.
-        if: ${{ !inputs.dry_run }}
-        uses: aws-actions/configure-aws-credentials@v4
+        # Credentials are needed for a real publish AND for a `--check-heads` read. They are skipped
+        # only on a dry-run that is NOT also reading heads: the script imports no AWS SDK and reaches
+        # no bucket when `--dry-run` is set alone.
+        if: ${{ !inputs.dry_run || inputs.check_heads }}
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -99,12 +128,15 @@ jobs:
         env:
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
-          # Secret directory segment for the closed-beta tester feed path. GitHub
-          # masks its value in logs; the script also withholds all S3 keys/URLs in
-          # CI and refuses to publish tester groups when this is unset.
+          # Secret directory segments for the private tester feed paths. GitHub masks their values
+          # in logs; the script also withholds all S3 keys/URLs in CI and refuses to publish a
+          # channel's tester groups when that channel's tester-path secret is unset.
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+          S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
         run: |
           node scripts/release-s3.js \
             --version "${{ steps.version.outputs.version }}" \
+            --channel "${{ inputs.channel }}" \
+            ${{ inputs.check_heads == true && '--check-heads' || '' }} \
             ${{ inputs.dry_run == true && '--dry-run' || '' }} \
             ${{ inputs.overwrite == true && '--overwrite' || '' }}
