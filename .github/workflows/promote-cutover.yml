@@ -1,0 +1,124 @@
+name: promote-cutover
+
+# One-time cutover promotion for issue #627 (task 2.5(iii)+(iv)).
+#
+# Mints the first stable v1.3.0 as a DRAFT on `release`, publishes it to the private early-access
+# channel, and forward-ports it into `main`. Runs on Linux so it avoids the Windows-only
+# publishCmd echo-quoting issue of a local `npx semantic-release`. NOTHING is made public here:
+# the release stays a draft and only early-access gets the artefact. Replaced by the proper
+# promote workflows in Phase 3 (tasks 3.3-3.5); delete this file once those land.
+#
+# `dry_run: true` (the default) performs the merge + build locally in the runner and prints what
+# WOULD happen, writing no tag, no draft, no S3 object, and no push to `main` or `release`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — compute and print only; no tag, draft, S3 write, or push."
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v4
+        with:
+          ref: release
+          fetch-depth: 0
+
+      - name: Forward main onto release (the prerelease promotion merge)
+        run: |
+          git config user.name "fabricate-release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-ff origin/main -m "chore(#627): promote main into release for the first stable"
+          echo "release now at $(git rev-parse --short HEAD), reaches $(git rev-list --count v1.2.1..HEAD) commits since v1.2.1"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Push the promoted commit onto release
+        if: ${{ !inputs.dry_run }}
+        run: git push origin HEAD:release
+
+      - name: Semantic-release — mint the stable version as a draft
+        id: semrel
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Two independent branch signals must both say `release`, or the mint is wrong:
+          #  - GITHUB_REF_NAME drives the CONFIG's classifyBranch (which plugins load — the github
+          #    draft plugin is release/maintenance only), and a workflow_dispatch run defaults it
+          #    to `main` (the plugin would be omitted, minting NO draft);
+          #  - GITHUB_REF drives semantic-release's OWN branch detection (env-ci), and a dispatch
+          #    run defaults it to refs/heads/main (it would compute a `-beta.N`, not the stable).
+          GITHUB_REF_NAME: release
+          GITHUB_REF: refs/heads/release
+        run: |
+          set -o pipefail
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            npx semantic-release --dry-run 2>&1 | tee /tmp/semrel.log
+          else
+            npx semantic-release 2>&1 | tee /tmp/semrel.log
+          fi
+          VER=$(grep -oE "The next release version is [0-9]+\.[0-9]+\.[0-9]+([-.0-9A-Za-z]*)" /tmp/semrel.log \
+                | grep -oE "[0-9]+\.[0-9]+\.[0-9]+([-.0-9A-Za-z]*)" | head -1)
+          if [ -z "$VER" ]; then echo "::error::could not determine the computed version"; exit 1; fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Computed stable version: $VER"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Publish the stable version to the early-access channel
+        env:
+          S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+          S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+        run: |
+          ARGS="--version ${{ steps.semrel.outputs.version }} --channel early-access"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          echo "release-s3: $ARGS"
+          node scripts/release-s3.js $ARGS
+
+      - name: Mint an App installation token for the forward-port
+        id: apptoken
+        if: ${{ !inputs.dry_run }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_KEY }}
+
+      - name: Forward-port release into main (via the bypass App)
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
+        run: |
+          git config user.name "fabricate-release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          git merge --no-ff release -m "chore(#627): forward-port release into main"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main
+
+      - name: Dry-run summary
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "DRY RUN — would have:"
+          echo "  * pushed the promoted commit onto release"
+          echo "  * minted v${{ steps.semrel.outputs.version }} + a DRAFT GitHub release"
+          echo "  * published v${{ steps.semrel.outputs.version }} to the early-access S3 channel"
+          echo "  * forward-ported release into main via the bypass App"
