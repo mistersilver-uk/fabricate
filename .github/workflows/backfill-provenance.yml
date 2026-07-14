@@ -41,6 +41,7 @@ jobs:
       group: release-s3-${{ inputs.channel }}
       cancel-in-progress: false
     steps:
+      # Checkout first (a local composite action is only resolvable once the repo is present).
       # fetch-depth: 0 brings the tags — the backfill derives each zip's source sha from its
       # `v<version>` tag (`git rev-list -n 1 v<version>`); an unreachable tag stamps `unknown`,
       # which the guard treats as absent.
@@ -48,18 +49,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      # Shared Node + npm ci + OIDC preamble. OIDC is always needed: even a dry-run LISTS the bucket
+      # to enumerate the zips it would stamp. aws-role/aws-region are forwarded because the composite
+      # cannot read vars.* itself.
+      - uses: ./.github/actions/release-setup
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Configure AWS credentials via OIDC
-        # Always needed: even a dry-run LISTS the bucket to enumerate the zips it would stamp.
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          enable-oidc: true
+          aws-role: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Backfill provenance
