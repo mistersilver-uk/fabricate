@@ -49,6 +49,51 @@ test('the smoke harness no longer ships or reads bundled actor portraits', async
   );
 });
 
+// Issue 643 §4b: the recipe editor's context rail is MODE-CONDITIONAL. Its restricted
+// (access) branch is only reachable in a `visibilityMode: 'restricted'` system whose
+// recipe actually carries a grant — and the smoke world seeded none of that, so a run
+// would silently capture the Books & Scrolls branch instead and the PR evidence would
+// show the wrong rail. These assertions are the guard: they fail if the fixture is
+// dropped, and the failure names what went missing.
+test('the smoke world seeds a restricted-visibility system so the recipe access rail is screenshottable', () => {
+  assert.match(
+    smokeRunSource,
+    /updateSystem\(restrictedSystemId, \{ visibilityMode: 'restricted' \}\)/,
+    'the smoke world must seed a visibilityMode:"restricted" crafting system'
+  );
+  assert.match(
+    smokeRunSource,
+    /access: \{\s*characterIds: \[crafterId, travelMemberId\]\.filter\(Boolean\),\s*playerIds: \[gathererUserId\]\.filter\(Boolean\)\s*\}/,
+    'the restricted recipe must carry an access grant naming BOTH characters and a player'
+  );
+  assert.match(
+    smokeRunSource,
+    /observerUser\.update\(\{ character: travelMember\.id \}\)/,
+    'a seeded PLAYER user must have an assigned character, or the rail\'s assigned-controller route has no fixture'
+  );
+  assert.match(
+    smokeRunSource,
+    /label: 'manager-recipe-edit-access-rail'/,
+    'Phase D0 must capture the restricted rail'
+  );
+});
+
+test('the restricted-rail capture reuses the shared smoke helpers instead of a fresh open/assert span', () => {
+  const captureBlock = smokeRunSource.slice(
+    smokeRunSource.indexOf("await openManagerRecipeEditor(page, craftingSetup.restrictedRecipeName);"),
+    smokeRunSource.indexOf("label: 'manager-recipe-edit-access-rail'")
+  );
+  assert.ok(captureBlock.length > 0, 'expected to find the restricted-rail capture block');
+  // SonarCloud measures duplication in scripts/** despite `sonar.cpd.exclusions`
+  // (PR 527 failed on four near-identical open→wait→assert→screenshot spans), so a
+  // new capture composes the existing helpers rather than re-inlining them.
+  assert.doesNotMatch(
+    captureBlock,
+    /assertManagerLayoutStable\(|assertNoScreenshotOverlays\(|await screenshot\(page,/,
+    'the restricted-rail capture should go through captureStableManagerView, not re-inline its steps'
+  );
+});
+
 test('release build copies module assets into the Foundry module', () => {
   assert.match(
     releaseSource,

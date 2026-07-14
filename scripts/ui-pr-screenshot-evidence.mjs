@@ -201,13 +201,13 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-crafting-settings'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
-  // The recipe editor publishes FOUR distinct frames (overview/identity,
-  // ingredients, validation tab, multi-step durations). `collect` emits ONE
-  // file per recipe id (it takes the first matching smoke label), so each frame
-  // needs its own recipe — a single recipe with four smoke labels would only
-  // ever publish the first (overview) frame and silently drop the other three.
-  // The four share the same `matches` so any change to a recipe editor/inspector
-  // or recipe sub-component republishes all four together.
+  // The recipe editor publishes SIX distinct frames (overview/identity, ingredients,
+  // validation tab, multi-step durations, tools, and the restricted-visibility
+  // context rail). `collect` emits ONE file per recipe id (it takes the first
+  // matching smoke label), so each frame needs its own recipe — a single recipe with
+  // six smoke labels would only ever publish the first (overview) frame and silently
+  // drop the rest. All six share the same `matches`, so any change to a recipe
+  // editor/inspector or recipe sub-component republishes them together.
   {
     id: 'manager-recipe-edit-normal',
     label: 'Manager recipe editor — overview / identity',
@@ -236,6 +236,16 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-recipe-edit-tools',
     label: 'Manager recipe editor — tools (component-name fallback for unlabelled tools)',
     smokeLabels: ['manager-recipe-edit-tools'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    // The context rail is MODE-CONDITIONAL (issue 643 §4b). Every other recipe frame
+    // is captured against a system whose visibility mode drives the Books & Scrolls
+    // branch, so without this frame the restricted (access) branch would ship with no
+    // screenshot evidence at all.
+    id: 'manager-recipe-edit-access-rail',
+    label: 'Manager recipe editor — restricted-visibility context rail (players and characters with access)',
+    smokeLabels: ['manager-recipe-edit-access-rail'],
     matches: RECIPE_EDIT_MATCHES,
   },
   {

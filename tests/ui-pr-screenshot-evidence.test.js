@@ -151,17 +151,21 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(view.smokeLabels, ['manager-import-report']);
   });
 
-  it('maps a recipe editor file to all five recipe-edit frame recipes', () => {
+  it('maps a recipe editor file to all six recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',
       'manager-recipe-edit-ingredients',
       'manager-recipe-edit-validation',
       'manager-recipe-edit-multistep',
       'manager-recipe-edit-tools',
+      // The MODE-CONDITIONAL context rail's restricted (access) branch. It is the
+      // only frame captured against a restricted-visibility system; the other five
+      // run against a system whose mode drives the Books & Scrolls branch.
+      'manager-recipe-edit-access-rail',
     ];
 
     // The top-level editor view, the context rail, and any recipe sub-component all
-    // republish all five frames. The rail lives under `recipe/` (issue 643) so the
+    // republish all six frames. The rail lives under `recipe/` (issue 643) so the
     // glob covers it; the BROWSER inspector deliberately lives under `recipes/`.
     for (const file of [
       'src/ui/svelte/apps/manager/RecipeEditView.svelte',
@@ -169,7 +173,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
-      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all five recipe-edit frames`);
+      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all six recipe-edit frames`);
     }
 
     // Each frame carries exactly its own single smoke label.
@@ -180,10 +184,11 @@ describe('UI PR screenshot evidence', () => {
       ['manager-recipe-edit-validation'],
       ['manager-recipe-edit-multistep'],
       ['manager-recipe-edit-tools'],
+      ['manager-recipe-edit-access-rail'],
     ]);
   });
 
-  it('collects the five recipe-edit frames into five separate files', () => {
+  it('collects the six recipe-edit frames into six separate files', () => {
     withScreenshotFixtures(
       {
         'screenshot-01-manager-recipe-edit-normal.png': 'normal',
@@ -191,6 +196,7 @@ describe('UI PR screenshot evidence', () => {
         'screenshot-03-manager-recipe-edit-validation.png': 'validation',
         'screenshot-04-manager-recipe-edit-multistep.png': 'multistep',
         'screenshot-05-manager-recipe-edit-tools.png': 'tools',
+        'screenshot-06-manager-recipe-edit-access-rail.png': 'access-rail',
       },
       (root) => {
         const result = collectScreenshotEvidence({
@@ -198,7 +204,7 @@ describe('UI PR screenshot evidence', () => {
           prNumber: 654,
           root,
         });
-        assert.equal(result.copied.length, 5);
+        assert.equal(result.copied.length, 6);
         const byName = Object.fromEntries(
           result.copied.map(item => [
             item.destination.replaceAll('\\', '/').split('/').pop(),
@@ -211,6 +217,7 @@ describe('UI PR screenshot evidence', () => {
           'manager-recipe-edit-validation.png': 'validation',
           'manager-recipe-edit-multistep.png': 'multistep',
           'manager-recipe-edit-tools.png': 'tools',
+          'manager-recipe-edit-access-rail.png': 'access-rail',
         });
       },
     );

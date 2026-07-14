@@ -2566,6 +2566,9 @@ const cleanup = {
   sceneIds: [],
   systemId: null,
   blockedSystemId: null,
+  // The `visibilityMode: 'restricted'` system whose recipe carries an access grant
+  // (issue 643 §4b) — the only fixture that renders the recipe rail's ACCESS branch.
+  restrictedSystemId: null,
   recipeIds: [],
   // Issue #489 craft-execution coverage fixtures: dedicated per-mode crafting
   // systems (simple / routedByIngredients / routedByCheck / progressive) and
@@ -2924,10 +2927,20 @@ async function main() {
           missingTestUsers.length > 0 ? await User.createDocuments(missingTestUsers) : []
         );
         const gathererUser = users.find(user => user.name === 'Fabricate Gatherer');
+        const observerUser = users.find(user => user.name === 'Fabricate Observer');
         const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
         const noneLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.NONE ?? 0;
         await crafter.update({ ownership: { default: noneLevel, [gathererUser.id]: ownerLevel } });
         if (travelMember) await travelMember.update({ ownership: { default: noneLevel } });
+        // "Who controls this character" is a UNION of two independent routes: the
+        // viewer holds Foundry OWNER on the actor, OR the actor is that user's
+        // ASSIGNED character (`User#character`). The crafter covers the OWNER route
+        // (above). Nothing in the smoke world ever assigned a character, so the
+        // assigned route had no fixture at all — assign the travel member to the
+        // Observer, and the restricted recipe rail can render both sublines.
+        if (travelMember && observerUser) {
+          await observerUser.update({ character: travelMember.id });
+        }
         const userIds = users.map(user => user.id);
 
         // Build inventory copies from world items
@@ -2966,6 +2979,7 @@ async function main() {
           actorIds,
           userIds,
           gathererUserId: gathererUser.id,
+          observerUserId: observerUser?.id ?? null,
           crafterId: crafter.id,
           travelMemberId: travelMember?.id ?? null,
           itemsByName
@@ -2978,6 +2992,7 @@ async function main() {
       cleanup.crafterId = createdDocs.crafterId;
       cleanup.travelMemberId = createdDocs.travelMemberId;
       cleanup.gathererUserId = createdDocs.gathererUserId;
+      cleanup.observerUserId = createdDocs.observerUserId;
       process.stdout.write(`  Created ${createdDocs.itemIds.length} items and ${createdDocs.actorIds.length} actors with inventories.\n`);
 
       // Screenshot the Items sidebar (force: true bypasses overlays like "Game Paused")
@@ -3101,7 +3116,7 @@ async function main() {
         await closeOpenApplications(page);
       }
 
-      const craftingSetup = await page.evaluate(async () => {
+      const craftingSetup = await page.evaluate(async ({ gathererUserId, crafterId, travelMemberId }) => {
         const csm = game.fabricate.getCraftingSystemManager();
 
         // Create the crafting system
@@ -3792,13 +3807,70 @@ async function main() {
           enabledTaskIds: ['broken-stale-task']
         });
 
+        // A `visibilityMode: 'restricted'` system (issue 643 §4b). The recipe
+        // editor's context rail is MODE-CONDITIONAL: `restricted` shows who the
+        // recipe is granted to, `item`/`knowledge` shows the books teaching it. The
+        // smoke world had no restricted system, no access grant and no assigned
+        // character, so the access branch could not be captured at all — a run would
+        // silently screenshot the Books & Scrolls branch instead and the PR evidence
+        // would show the wrong rail.
+        const restrictedSystem = await csm.createSystem({
+          name: 'Warded Athenaeum',
+          description: 'A restricted system whose recipes are granted to named players and characters.'
+        });
+        const restrictedSystemId = restrictedSystem.id;
+        const restrictedComponentIds = [];
+        for (const restrictedWorldItem of game.items.contents.slice(0, 2)) {
+          const added = await csm.addItemFromUuid(restrictedSystemId, restrictedWorldItem.uuid);
+          if (added?.item?.id) restrictedComponentIds.push(added.item.id);
+        }
+        await csm.updateSystem(restrictedSystemId, { visibilityMode: 'restricted' });
+        const wardedRecipe = await rm.createRecipe({
+          name: 'Warded Rite',
+          description: 'A rite only the warded may perform.',
+          craftingSystemId: restrictedSystemId,
+          img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Ward Focus',
+              options: [{
+                quantity: 1,
+                match: { type: 'component', componentId: restrictedComponentIds[0] }
+              }]
+            }]
+          }],
+          resultGroups: [{
+            name: 'Warded Sigil',
+            results: [{
+              componentId: restrictedComponentIds[1] ?? restrictedComponentIds[0],
+              quantity: 1
+            }]
+          }]
+        });
+        // The grant carries BOTH a player and characters, and the two characters
+        // reach their controllers by DIFFERENT routes — the crafter via Foundry
+        // OWNER ownership, the travel member via `User#character` assignment — so the
+        // rail's `controlledBy` union is exercised, not just one half of it.
+        await rm.updateRecipe(
+          wardedRecipe.id,
+          {
+            access: {
+              characterIds: [crafterId, travelMemberId].filter(Boolean),
+              playerIds: [gathererUserId].filter(Boolean)
+            }
+          },
+          { allowIncomplete: true }
+        );
+
         return {
           systemId,
           blockedSystemId,
           blockedComponentNames: blockedComponents.map((component) => component.name),
           blockedEnvironmentId: blockedEnvironment?.id ?? null,
+          restrictedSystemId,
+          restrictedRecipeName: 'Warded Rite',
           componentMap,
-          recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id],
+          recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id, wardedRecipe.id],
           healingPotionRecipeId: recipe2.id,
           sceneIds: [azureGroveScene.id],
           gatheringEnvironmentId: gatheringEnvironment.id,
@@ -3814,10 +3886,15 @@ async function main() {
             behaviorId: unconfiguredBehavior?.id ?? null
           }
         };
+      }, {
+        gathererUserId: cleanup.gathererUserId,
+        crafterId: cleanup.crafterId,
+        travelMemberId: cleanup.travelMemberId
       });
 
       cleanup.systemId = craftingSetup.systemId;
       cleanup.blockedSystemId = craftingSetup.blockedSystemId;
+      cleanup.restrictedSystemId = craftingSetup.restrictedSystemId;
       cleanup.recipeIds = craftingSetup.recipeIds;
       cleanup.sceneIds = craftingSetup.sceneIds;
       // The interactable Region is embedded in azureGroveScene, so it is cleaned
@@ -4414,6 +4491,36 @@ async function main() {
         await assertManagerLayoutStable(page, 'recipe edit multistep');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-multistep');
+
+        // Warded Rite (restricted system) → the recipe editor's context rail renders
+        // its ACCESS branch: players with access, characters with access, and each
+        // character's "played by" subline. This is the ONLY capture of the restricted
+        // branch — every other recipe capture runs against Arcane Forge, whose
+        // visibility mode drives the Books & Scrolls branch instead. Guarded so a
+        // hiccup records a failed step instead of aborting the rest of Phase D0, and
+        // the system selection is restored either way.
+        try {
+          await page.locator('.fabricate-manager .manager-scope-return').first().click();
+          await selectSmokeSystemInManager(page, craftingSetup.restrictedSystemId);
+          await openManagerRecipeEditor(page, craftingSetup.restrictedRecipeName);
+          await page.locator('.fabricate-manager [data-recipe-section="access"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-recipe-access-characters]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await captureStableManagerView(page, {
+            layout: 'recipe edit access rail',
+            label: 'manager-recipe-edit-access-rail',
+          });
+          results.steps.push({ step: 'recipe-edit-access-rail', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'recipe-edit-access-rail', passed: false, error: err.message });
+          process.stderr.write(`Restricted recipe rail capture failed: ${err.message}\n`);
+        } finally {
+          // Every later Phase D0 capture reads the fully-seeded Arcane Forge system,
+          // so re-select it whether or not the restricted capture succeeded.
+          await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+          await selectSmokeSystemInManager(page, craftingSetup.systemId).catch(() => {});
+        }
 
         // Return to the recipes browser for the remaining navigation.
         await openManagerCraftingSection(page, 'recipes', 'recipes');
@@ -6220,15 +6327,21 @@ async function main() {
           try { await Item.deleteDocuments(cleanupData.executionItemIds); } catch { /* ok */ }
         }
 
-        // Delete the dedicated broken system seeded for the overview/banner captures
-        // (and its gathering environment via the environment store).
-        if (cleanupData.blockedSystemId) {
+        // Delete the dedicated single-purpose systems: the broken one seeded for the
+        // overview/banner captures, and the restricted-visibility one seeded for the
+        // recipe rail's access branch (issue 643). Both go through the same delete
+        // (with their gathering environments via the environment store), so they
+        // share one loop rather than two near-identical blocks.
+        const singlePurposeSystemIds = [
+          cleanupData.blockedSystemId,
+          cleanupData.restrictedSystemId
+        ].filter(Boolean);
+        if (singlePurposeSystemIds.length > 0) {
           const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
-          try { await environmentStore?.cleanupByCraftingSystem?.(cleanupData.blockedSystemId); } catch { /* ok */ }
-
           const csm = game.fabricate?.getCraftingSystemManager?.();
-          if (csm) {
-            try { await csm.deleteSystem(cleanupData.blockedSystemId); } catch { /* already deleted */ }
+          for (const singlePurposeSystemId of singlePurposeSystemIds) {
+            try { await environmentStore?.cleanupByCraftingSystem?.(singlePurposeSystemId); } catch { /* ok */ }
+            try { await csm?.deleteSystem(singlePurposeSystemId); } catch { /* already deleted */ }
           }
         }
 
