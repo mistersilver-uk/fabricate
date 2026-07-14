@@ -73,8 +73,6 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      # Armed only for a release-line promotion whose beta head lags `version`; job 3 does the catch-up.
-      catchup_beta: ${{ steps.checks.outputs.catchup_beta }}
       # The public head BEFORE this promotion — the lower bound for aggregating superseded drafts'
       # notes in job 4, and the re-run signal for job 3's public write (prev_public == version ⇒ skip).
       prev_public: ${{ steps.checks.outputs.prev_public }}
@@ -219,24 +217,26 @@ jobs:
             console.log(`source target ${target.label} advertises v${version} ✓`);
           }
 
-          // 3. REGISTRY-LEAD read: no private target of beta OR early-access may end up Foundry-older
-          //    than the version about to reach the registry, or that cohort is offered a rewrite out
-          //    of its private channel. A lagging beta ARMS the catch-up for a release-line version;
-          //    a lagging private head on a HOTFIX has no catch-up (publishing the hotfix there would
-          //    move that head to a lower line) and HARD-FAILS before the POST.
-          let catchupBeta = false;
+          // 3. REGISTRY-LEAD read: no private target of beta OR early-access may be left Foundry-older
+          //    than the version about to reach the registry. Such a head would be offered a rewrite
+          //    out of its private channel once v${version} is on the registry — a silent, irreversible
+          //    cohort defection. This HARD-FAILS for EVERY case (release-line AND hotfix, beta AND
+          //    early-access) before the POST. There is NO catch-up: publishing a stable version onto a
+          //    private channel would level that head with the registry and discard the fail-safe
+          //    property that a prerelease head always sorts ABOVE its own GA — the cohort would then
+          //    defect on the NEXT public version. The normal flow never trips this, because beta sits
+          //    at a "${version}-beta.N" (or higher) head and foundryIsNewerVersion(version, that) is
+          //    false. A hit is therefore a genuine anomaly — a stale head from a failed publish, or an
+          //    abandoned old beta — exactly when a human should stop and look.
           for (const channel of ['beta', 'early-access']) {
             for (const target of targetsFor(channel)) {
               const head = await readHead(target.manifestKey, target.label);
               if (head === null) continue; // an absent private head advertises nothing older.
               if (!foundryIsNewerVersion(version, head)) continue; // head is equal-or-newer: safe.
-              if (isHotfix) {
-                fail(`registry-lead: ${channel} target ${target.label} advertises v${head}, which Foundry considers OLDER than the hotfix v${version} being promoted to the registry. Its cohort would be offered a rewrite to public. Advance '${channel}' past v${version} first, then re-run.`);
-              } else if (channel === 'beta') {
-                catchupBeta = true;
-                console.log(`beta target ${target.label} advertises v${head}, older than v${version} — arming the beta catch-up.`);
+              if (channel === 'beta') {
+                fail(`registry-lead: beta target ${target.label} advertises v${head}, older than the v${version} being promoted to public. Foundry would defect that cohort. Advance beta first — push the feature work to main so beta.yml mints a newer beta (whose prerelease head sorts above v${version}) — then re-run this promotion.`);
               } else {
-                fail(`registry-lead: early-access target ${target.label} advertises v${head}, older than v${version} on a release-line promotion whose source is early-access. This should be impossible after step 2 — refusing.`);
+                fail(`registry-lead: early-access target ${target.label} advertises v${head}, older than the v${version} being promoted to public. Foundry would defect that cohort. Advance early-access first (promote a newer version onto it) — then re-run this promotion.`);
               }
             }
           }
@@ -246,9 +246,9 @@ jobs:
 
           await appendFile(
             process.env.GITHUB_OUTPUT,
-            `catchup_beta=${catchupBeta}\nprev_public=${prevPublic}\nis_hotfix=${isHotfix}\n`
+            `prev_public=${prevPublic}\nis_hotfix=${isHotfix}\n`
           );
-          console.log(`Guard passed. catchup_beta=${catchupBeta} prev_public=${prevPublic || '(none)'} is_hotfix=${isHotfix}`);
+          console.log(`Guard passed. prev_public=${prevPublic || '(none)'} is_hotfix=${isHotfix}`);
           NODE
 
   # ── JOB 2: FORWARD-PORT ─────────────────────────────────────────────────────────────────────────
@@ -320,15 +320,18 @@ jobs:
 
   # ── JOB 3: PUBLISH ──────────────────────────────────────────────────────────────────────────────
   # ALWAYS runs (no job-level `if:`). RE-STAGES from the built dist via release-s3.js, never an S3
-  # copy. The public write skips at STEP level when the public head already advertises the version
-  # (re-run safety, driven off guard.prev_public). NO early-access re-publish. The beta catch-up runs
-  # only when armed by the guard's fresh per-target read (which requires a strict backward gap, so an
-  # equal head is never armed).
+  # copy. It writes exactly ONE thing: the public sources feed. The write skips at STEP level when the
+  # public head already advertises the version (re-run safety, driven off guard.prev_public). NO
+  # early-access re-publish, and NOTHING is written to the beta channel — a lagging private head is a
+  # hard failure in the guard, never a catch-up here (a stable version on a private channel would
+  # discard the prerelease-outranks-GA fail-safe and defect the cohort on the next public version).
   publish:
-    # Linear chain: waits for forward-port so the release line is merged into main BEFORE the beta
-    # catch-up writes the (prerelease) beta channel — "forward-port before any prerelease channel is
-    # written" (Version authority and promotion mechanics). A failed/skipped forward-port skips this
-    # job, which then fails job 4's strict `if:` — the un-draft is never reached.
+    # Linear chain (guard → forward-port → publish → job 4): waits for forward-port so the release
+    # line is merged into main BEFORE the version is made public — "a release promotion of a version
+    # built on the release line MUST forward-port that line into the prerelease line before any
+    # prerelease channel is written" (Version authority and promotion mechanics). A failed/skipped
+    # forward-port skips this job, which then fails job 4's strict `if:` — the un-draft is never
+    # reached. It still needs `guard` for the prev_public re-run signal.
     needs: [guard, forward-port]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -340,7 +343,6 @@ jobs:
         if: ${{ inputs.dry_run }}
         env:
           VERSION: ${{ inputs.version }}
-          CATCHUP_BETA: ${{ needs.guard.outputs.catchup_beta }}
           PREV_PUBLIC: ${{ needs.guard.outputs.prev_public }}
         run: |
           echo "::notice::DRY RUN — no S3 write."
@@ -349,11 +351,7 @@ jobs:
           else
             echo "Would RE-STAGE v$VERSION from the built dist and publish it to the 'public' channel (node scripts/release-s3.js --version $VERSION --channel public)."
           fi
-          if [ "$CATCHUP_BETA" = "true" ]; then
-            echo "Would run the beta catch-up: publish v$VERSION to 'beta' (it lags the version reaching the registry)."
-          else
-            echo "No beta catch-up (not armed)."
-          fi
+          echo "Nothing is written to the beta or early-access channels."
 
       - uses: actions/checkout@v6
         if: ${{ !inputs.dry_run }}
@@ -392,21 +390,6 @@ jobs:
           # 'public' has no tester group, so this is exactly one target: the public sources feed.
           git checkout "v$VERSION"
           node scripts/release-s3.js --version "$VERSION" --channel public
-
-      - name: Beta catch-up (release-line only, armed by the guard)
-        if: ${{ !inputs.dry_run && needs.guard.outputs.catchup_beta == 'true' }}
-        env:
-          VERSION: ${{ inputs.version }}
-          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
-          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
-          # beta derives its tester manifest from its OWN secret.
-          S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
-        run: |
-          # Armed only when a fresh per-target read found beta strictly Foundry-older than v$VERSION,
-          # so this is a forward move; release-s3.js's own head guard still refuses any backward one.
-          git checkout "v$VERSION"
-          echo "Advancing the beta head to v$VERSION so it is not left behind the registry."
-          node scripts/release-s3.js --version "$VERSION" --channel beta
 
   # ── JOB 4: READBACK → PREFLIGHT → UN-DRAFT → REGISTER ───────────────────────────────────────────
   # The `if:` is VERBATIM from the issue: no `inputs.dry_run` disjunct, so a *skipped* job 2/3 (which

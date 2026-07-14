@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
 const { rewriteModuleJson, getRequiredFiles, validateDist, getFlag, parseReleaseVersionOptions, applyReleaseUrls } = await import('../scripts/release.js');
@@ -230,6 +233,36 @@ test('applyReleaseUrls mutates and returns the same manifest, preserving other f
   assert.equal(result, original, 'returns the same object it mutated');
   assert.equal(result.id, 'fabricate');
   assert.deepEqual(result.esmodules, ['main.js']);
+});
+
+// A build-wiring integration test. The pure applyReleaseUrls tests above cannot catch a DELETED (or
+// mis-gated) call site inside release.js's main(): a real `--dist-version` build is what proves the
+// URLs actually reach dist/module.json. The download URL is the effective mutation-catcher — the
+// tracked source module.json already carries a latest-release *manifest*, but its download URL is the
+// latest one, so a missing call site leaves dist with a non-version-pinned download and this fails.
+test('release.js --dist-version wires the release URLs into the built dist/module.json', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const version = '9.9.9-wiretest';
+  const trackedManifestPath = join(root, 'module.json');
+  const trackedBefore = readFileSync(trackedManifestPath, 'utf8');
+
+  execFileSync(process.execPath, ['scripts/release.js', '--dist-version', version, '--no-zip'], {
+    cwd: root,
+    stdio: 'ignore',
+  });
+
+  const built = JSON.parse(readFileSync(join(root, 'dist', 'module.json'), 'utf8'));
+  const expected = applyReleaseUrls({}, version);
+  assert.equal(built.version, version, '--dist-version must set the built version');
+  assert.equal(built.manifest, expected.manifest, 'built manifest must be the latest-release URL');
+  assert.equal(built.download, expected.download, 'built download must be the version-pinned URL');
+
+  // --dist-version must NOT mutate the tracked source module.json (only --version is allowed to).
+  assert.equal(
+    readFileSync(trackedManifestPath, 'utf8'),
+    trackedBefore,
+    'tracked module.json must be untouched by a --dist-version build'
+  );
 });
 
 // ───────────────────────────────────────────────────────────────────────────
