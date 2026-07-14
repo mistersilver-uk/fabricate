@@ -18,6 +18,15 @@ This guide walks you through installing Fabricate, creating your first crafting 
 4. Click **Install**
 5. Enable the module in your world
 
+### Which channel am I on?
+
+Fabricate ships through three channels: the public registry, a private closed-beta channel, and a private patron early-access channel.
+The channel you are on is **fixed at install time** — it is the manifest URL you installed from.
+If you are a tester or a patron and want to move between channels (for example from early access to public, or from beta to early access), the only supported route is to **uninstall Fabricate and reinstall from the other channel's manifest URL**.
+Foundry will never offer that switch as an in-place update: a private channel is deliberately not advertised as an upgrade of the public one, so its testers and patrons are never quietly moved off it.
+That is the privacy property working as designed, not a bug.
+{: .note }
+
 ### Theme
 
 Fabricate defaults to the **Fabricate** colour theme.

@@ -38,19 +38,116 @@ We follow a **spec-driven approach** for development with agents:
 
 This ensures consistency, maintainability, and clear documentation of system behaviour.
 
+## How releases work
+
+This section explains; it does not specify.
+It MUST NOT restate a MUST from the spec; where a rule matters it states the consequence in plain language and links to the requirement by name.
+If the two disagree, the spec wins.
+
+The canonical rules live in `openspec/specs/release-and-distribution/spec.md`, cited below by requirement name.
+The mechanism — the semantic-release plugin wiring, the workflow names, the git operations, the version comparison — lives in the detailed sections further down (Release pipeline, Beta workflow, S3 publish workflow); this section deliberately keeps none of it.
+
+### The three channels
+
+Fabricate publishes to three audiences through three channels, promoted in a fixed order.
+
+- **beta** — the closed-tester channel, served through an unguessable tester URL.
+It is private: it has no publicly downloadable artefact of any kind.
+- **early-access** — the patron channel, promoted from beta and served the same way.
+It is private too: patrons pay for access, not for a different build, because there is no login gate and nothing anonymous can reach it.
+- **public** — everyone, listed on the Foundry package registry, promoted from early access.
+
+A client stays on the channel it installed from and never crosses to another in place — see the **Channel isolation** requirement.
+The tester feeds are what make the private channels private: a cohort is only ever given a tester URL, never a channel's own sources URL, and that is what keeps the bucket policy safe (see the S3 publish workflow section).
+
+### Promotions come in two kinds
+
+Two different operations are both called "promotion", and conflating them is a mistake the spec calls out under **Channel topology and promotion order**.
+
+- A **prerelease promotion** takes a tested commit from beta, moves it onto the release line, and MINTS a new stable version there.
+This is the only operation that creates a version number.
+- A **release promotion** takes an already-minted stable version and MOVES it to the next stage (early access, then public).
+It mints nothing and creates no tag; it changes only what each channel advertises and, as its final act, makes the release public.
+
+When a release-line version is promoted, the release line is merged back into the prerelease line first — the **forward-port** — so the prerelease line's next version always numbers above the one just released (the **Version authority and promotion mechanics** requirement).
+
+### Hotfixes
+
+A hotfix reaches the current public version without shipping any unreleased feature work (the **Hotfix isolation** requirement).
+Which route you take depends on what is currently soaking in early access.
+
+- If a version **carrying features** is soaking, promoting it early would ship those features, so the hotfix is cut on its own line from the public tag, carries only the fix, and goes straight to public through its own channel — the soaking version and any unreleased `main` work stay behind.
+- If a **patch** is soaking, it carries only fixes by construction, so you promote it first and cut a further hotfix on top only if one is still needed.
+
+A hotfix line accepts fixes only, is never offered to the private cohorts (its own channel keeps no cohort), and is brought back into the release line and then `main` by cherry-pick so neither loses the fix.
+Nothing becomes publicly obtainable until the promotion completes — the **Promotion-gated public availability** requirement.
+
+### The three-channel flow
+
+The prerelease line (`main`) feeds beta on every releasing push; a prerelease promotion mints the stable version on the release line and publishes early access; a release promotion moves that same version to public.
+The forward-port carries the release line back into `main`.
+
+```mermaid
+flowchart LR
+  main["main (prerelease line)"] -->|"every releasing push"| beta["beta channel (private testers)"]
+  main -->|"prerelease promotion: merge tested commit, mint stable"| release["release (release line)"]
+  release -->|"publish stable"| ea["early-access channel (private patrons)"]
+  ea -->|"release promotion: move the SAME version"| public["public channel + Foundry registry"]
+  release -. "forward-port merge" .-> main
+```
+
+### The hotfix path
+
+A hotfix is cut from the public tag onto its own line, carries only the fix, and is promoted straight to public through its own cohort-less channel.
+Neither the soaking early-access version nor unreleased `main` work is dragged in; the fix returns to the release line and `main` by cherry-pick.
+
+```mermaid
+flowchart TD
+  pub["public v1.4.0"] -->|"git branch 1.4.x from the public tag"| hl["hotfix line 1.4.x"]
+  hl -->|"fix only, mints v1.4.1"| hc["hotfix channel (no cohort)"]
+  hc -->|"release promotion (source is the hotfix line)"| pubnew["public v1.4.1 + registry"]
+  soak["early-access 1.5.0-beta.N soaking (private)"] -. "NOT dragged in" .-> hl
+  work["unreleased main feature work"] -. "NOT dragged in" .-> hl
+  hl -->|"cherry-pick back"| release2["release"]
+  release2 -->|"forward-port"| main2["main"]
+```
+
+### The promotion job graph
+
+A public promotion is a four-job graph.
+The guard verifies the source channel and the private heads; the forward-port and the publish run in parallel; the final job reads everything back and only then performs the two irreversible steps — un-drafting the release and posting to the registry — LAST, so anything that can fail has already failed.
+
+```mermaid
+flowchart TD
+  guard["guard: verify source channel + private heads"] --> fp["forward-port: merge release into main"]
+  guard --> publish["publish: re-stage public targets"]
+  fp --> final["read back, download assets, aggregate notes, build + validate registry payload"]
+  publish --> final
+  final --> undraft["un-draft the release (irreversible)"]
+  undraft --> registry["registry POST (irreversible, LAST)"]
+```
+
 ## Release Workflow
 
 Fabricate uses a local release build script to assemble the final module distribution before publishing.
 
 ### npm Scripts
 
+There is no `npm run release` script; the release is minted by the pipeline, not by a hand-run command (the **Version authority and promotion mechanics** requirement in `openspec/specs/release-and-distribution/spec.md`).
+The local build scripts are:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Script | Command | What it does |
 |:-------|:--------|:-------------|
-| `release` | `npm run release` | Full build: clean `dist/`, run Vite, copy assets, write `dist/module.json`, zip, validate |
-| `release:build` | `npm run release:build` | Same as `release` but skips the zip step — useful in CI environments |
-| `release:validate` | `npm run release:validate` | Validate an existing `dist/` without rebuilding |
+| `release:build` | `npm run release:build` | Full build: run Vite, copy assets, write `dist/module.json`, and zip — this is `node scripts/release.js` with no flags |
+| `release:validate` | `npm run release:validate` | Validate an existing `dist/` without rebuilding (`--validate-only`) |
+| `release:s3` | `npm run release:s3` | Publish a built `dist/` to a channel's S3 targets (`scripts/release-s3.js`) |
+| `release:s3:dry-run` | `npm run release:s3:dry-run` | The same publish, printing every planned key and URL and writing nothing (`--dry-run`) |
 
-All three scripts are implemented in `scripts/release.js`, which exports three utility functions used by both the script and its tests:
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+`scripts/release.js` exports three utility functions used by both the script and its tests:
 
 - **`rewriteModuleJson(manifest)`** — produces a `dist/`-ready manifest: strips the `dist/` prefix from `esmodules` paths and strips the `.db` suffix from pack paths.
 - **`getRequiredFiles(manifest)`** — returns the list of files that must be present in `dist/` based on the rewritten manifest.
@@ -59,11 +156,11 @@ All three scripts are implemented in `scripts/release.js`, which exports three u
 ### Building a Release
 
 ```bash
-# Standard release (build + zip)
-npm run release
+# Standard build + zip
+npm run release:build
 
 # Build only, no zip (e.g. for CI artifact upload)
-npm run release:build
+node scripts/release.js --no-zip
 
 # Validate dist/ without rebuilding
 npm run release:validate
@@ -114,14 +211,14 @@ Svelte component edits appear instantly without a page reload; other JS changes 
 
 ### Release Script CI Usage
 
-The `--no-zip` flag (`npm run release:build`) is designed for use in GitHub Actions:
+The `--no-zip` flag (`node scripts/release.js --no-zip`) is designed for use in GitHub Actions, where the zip is created separately or the raw `dist/` is uploaded as an artifact:
 
 ```yaml
 - uses: actions/setup-node@v4
   with:
     node-version: '20'
 - run: npm ci
-- run: npm run release:build
+- run: node scripts/release.js --no-zip
 - uses: actions/upload-artifact@v4
   with:
     name: fabricate-dist
@@ -648,50 +745,110 @@ File: `.github/workflows/foundry-integration.yml`
 
 Runs:
 
-- On push to `main` when `src/`, `scripts/`, `module.json`, or `docker-compose.foundry.yml` change.
-- On a weekly schedule (Monday 04:00 UTC).
+- As a reusable workflow (`workflow_call`) invoked by the release pipeline — `beta.yml` and `release.yml` — with `require_credentials: true`.
 - On manual trigger via `workflow_dispatch`.
-- As a reusable workflow called by the release pipeline.
 
+It has no `push` or `schedule` trigger; the release workflows call it, and that is the only automatic path.
+The `require_credentials` input is load-bearing: with it unset the job SKIPS green when `FOUNDRY_USERNAME` / `FOUNDRY_PASSWORD` are absent, so a release publish must pass `require_credentials: true` or it could ship on a build whose smoke test silently never ran.
 If the smoke test fails, the workflow opens (or comments on an existing) GitHub Issue labelled `foundry-smoke-failure`.
 Requires two repository secrets: `FOUNDRY_USERNAME` and `FOUNDRY_PASSWORD`.
 
 ### Beta workflow
 
-Superseded by the three-channel model; full rewrite pending in #627 Phase 4.
-
 File: `.github/workflows/beta.yml`
 
 Trigger: push to `main`.
+
+`main` is the prerelease line, so `semantic-release` computes a `-beta.N` version for the pushed commit.
+The `-beta.N` suffix is a **privacy mechanism, not a `!` breaking-change scheme**: because a stable version does not compare as newer than its own prereleases under Foundry's version check, publishing the eventual public `v1.5.0` never offers an update to a client sitting on `1.5.0-beta.N` — the **Version scheme** requirement.
+Do not "clean up" the preid into anything Foundry orders above its GA, or the whole private cohort is offered the public build on its next update check.
 
 Steps:
 
 1. Run unit tests (`npm test`) and build.
 2. Run the Foundry integration smoke test (via the reusable workflow, with `require_credentials: true` so the job fails rather than skipping green when Foundry credentials are unset).
 3. Run `semantic-release` to determine the version bump and inject a `-beta.N` version into the built `dist/module.json`.
-On `main` NO GitHub release object is created — that omission is what keeps the private beta channel private — so the config's `successCmd` writes `next_version`/`next_tag` to `$GITHUB_OUTPUT` as the version signal.
+On `main` the config OMITS `@semantic-release/github` (see the allowlist in the Release pipeline section), so NO GitHub release object is created — that omission is what keeps the private beta channel private — and the config's `successCmd` writes `next_version`/`next_tag` to `$GITHUB_OUTPUT` as the version signal instead.
 4. When `next_version` is non-empty, call `.github/workflows/release-s3.yml` with `channel: beta`, `tag: <next_tag>`, `dry_run: false`, and `overwrite: false`.
 When `next_version` is empty (a push with no releasing commits), skip S3 publishing without failing the run.
 
-### S3 publish workflow
+### Release workflow (early-access producer)
 
-Superseded by the three-channel model; full rewrite pending in #627 Phase 4.
+File: `.github/workflows/release.yml`
+
+Trigger: push to `release` or to a hotfix line (`[0-9]+.[0-9]+.x`).
+
+This is the **sole producer of the private early-access channel**.
+`semantic-release` mints the STABLE version for the pushed commit and — because the github plugin IS loaded here with `draftRelease: true` — drafts its GitHub release with the zip and `module.json` as assets.
+Nothing is made public: the release is a DRAFT and only a private channel receives the artefact.
+
+- On `release` the channel is `early-access`.
+- On a hotfix line the channel is that line's own name (`${{ github.ref_name }}`), NEVER `early-access` — a hotfix must not be offered to patrons.
+A hotfix line is semantic-release's `'maintenance'` branch *type*; in our vocabulary it is always a **hotfix line**, and its channel keeps **no cohort** (it exists only so a hotfix can be published, guarded, and promoted, with CI and smoke but no soak).
+
+A `workflow_dispatch(tag)` re-entry point exists because a push run can mint the tag and draft but then fail the S3 publish; without re-entry the channel would never carry the version and the promotion's guard would refuse it forever.
+
+### Prerelease promotion (promote to early access)
+
+File: `.github/workflows/promote-to-early-access.yml`
+
+Trigger: `workflow_dispatch(beta_tag)`.
+
+This is the **prerelease promotion**: it does the MERGE ONLY of a tested beta commit onto `release`, which then triggers `release.yml` to mint the stable version and publish early access.
+It is a `git merge --no-ff` (**never a squash** — squashing collapses the Conventional Commit types semantic-release reads and mis-computes the version, per the **Version authority and promotion mechanics** requirement).
+Before merging it verifies the tag's shape, that it exists, that its commit is an ancestor of `origin/main`, and that **every** private `beta` target — the channel manifest AND every tester manifest — already advertises that version.
+Ancestry alone is not enough: the tag is pushed before the beta publish job, so a tag whose publish failed is still an ancestor of `main` yet leaves a stale head, which later turns a hotfix into a cohort defection (the **Registry lead prohibition** requirement).
+
+### Public promotion
+
+File: `promote-to-public.yml` (task 3.5, renamed from `.github/workflows/promote-release.yml`).
+
+Trigger: `workflow_dispatch` with `version`, `source_channel` (default `early-access`), and `dry_run`.
+
+This is the **release promotion**: it moves an already-minted stable version to `public` and the registry, minting nothing.
+The promotion is **TOLD** its `source_channel` (a hotfix promotes with `source_channel: <its line>`); it never infers "EA head != version, therefore hotfix", because that guess fails open.
+It is a four-job `needs:` chain, and the ordering is the whole point of the **Promotion-gated public availability** requirement — everything that can fail runs before the one step that cannot be undone:
+
+1. **guard** — verifies the `source_channel`, asserts the source channel advertises `version` across every private target, and performs the registry-lead read against every private target of `beta` and `early-access`.
+A lagging private head hard-fails the promotion **before** the registry POST, naming the remedy: advance that channel first (mint a newer beta on `main`; there is no bare-stable catch-up, which would defect the cohort).
+2. **forward-port** — merges `release` into `main` via the bypass actor for a release-line version, so `main`'s next version numbers above it; a hotfix no-ops this at step level.
+3. **publish** — re-stages the `public` targets from the built `dist` (promotion is a **re-publish, never an S3 copy** — copying a private artefact would bake the secret cohort URL into the public build and sidegrade public installers onto the private feed).
+4. **readback-preflight-undraft-register** — reads back every written manifest, downloads the release assets to confirm both exist, **aggregates the notes of any superseded stable draft** strictly between the current public version and this one on the same line (without this the public changelog silently loses a whole feature set; the consumed drafts are left drafted as the record), builds and validates the registry payload (its `manifest` is CONSTRUCTED as the version-pinned `releases/download/v<version>/module.json`, never copied from the artefact), then performs the two irreversible steps LAST: `gh release edit --draft=false --latest` and the registry POST.
+
+Under `dry_run: true` all four jobs RUN and every mutating step no-ops and prints its plan — the un-draft and the POST included — so a dry run never publishes anything.
+
+One thing a reader will file as a bug but must not "fix": the early-access draft's zip bakes the **public latest-release** manifest URL, not the early-access one.
+That is deliberate and harmless — a private draft is excluded from GitHub's "latest", and baking the public URL is exactly what makes the un-draft a clean flip to public with no manifest rewrite (the **Self-contained distribution targets** requirement).
+
+### S3 publish workflow
 
 File: `.github/workflows/release-s3.yml`
 
 Triggers:
 
 - Manual `workflow_dispatch`, with `tag`, `channel`, `check_heads`, `dry_run`, and `overwrite` inputs.
-- Reusable `workflow_call` from `beta.yml` (and, in later #627 chunks, the early-access/public promotion workflows), using the same inputs.
+- Reusable `workflow_call` from `beta.yml` and `release.yml` (and the promotion workflows), using the same inputs.
 
-Manual dispatch is the operator path for dry-runs, `--check-heads` reads, recovery reruns, and intentional overwrite attempts.
-Automatic calls from `beta.yml` publish only a newly-minted beta tag and do not overwrite an existing versioned zip.
+The reusable publisher takes a release tag, derives its version, checks out that tagged commit, builds, and publishes to the requested channel's S3 targets from `release.s3.config.json`'s `channels` map (`beta` → the closed-tester group; `early-access` → the patron group; `public` → no tester group; a hotfix line is not declared, so its only target is its sources target).
+Before writing anything it runs the monotonic-head guard per target: a publish that would move a head to a version Foundry considers older fails closed and names the remedy — a higher version, not a downgrade override (the **Monotonic channel heads** requirement).
+The stall the guard catches is a **double-digit rollover in the part glued to the prerelease suffix** (`1.5.0-beta.10` vs `1.5.0-beta.9` compares fine, but `1.4.10-beta.1` vs `1.4.9-beta.1` string-compares `"10-beta"` below `"9-beta"`); its remedy is a version bump that **keeps** the prerelease identifier (`1.5.0-beta.1`), never a bare stable version, which would level the head with the registry and defect the cohort.
+A pure-stable channel like `public` can never stall this way.
 
-**Closed-beta tester path secret.**
-The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, where `<segment>` comes from the repository **secret** `S3_TESTER_PATH_SECRET` (env var of the same name locally) — never the committed config.
-Generate it once (`openssl rand -hex 16`) and set it before publishing; the publish **refuses to run** when tester groups are configured but the secret is unset, so the feed can never fall back to a guessable URL.
-`release-s3.js` withholds all S3 keys and install URLs from CI logs (they only print on local/`--dry-run` runs); GitHub also masks the secret value.
-To rotate a compromised path: set a new `S3_TESTER_PATH_SECRET`, publish, distribute the new manifest URL to testers privately, then delete the old objects (`aws s3 rm --recursive s3://<bucket>/testers/<group>/fabricate/` — the legacy prefix only; the new `<segment>/` path is not matched).
+**Cohorts get tester URLs, never the sources URL.**
+The sources target is what the tooling reads; on a private channel nothing installs from it, and a cohort is only ever given an unguessable tester URL.
+That separation is what makes the bucket policy safe — denying the derivable sources path locks out anonymous readers without defecting any cohort, because no cohort is pinned to it (the **Channel isolation** requirement).
+
+**Tester path secret (effectively immutable).**
+The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` for beta, a separate `S3_EARLY_ACCESS_PATH_SECRET` for early access, referred to abstractly here — never paste the value) — never the committed config.
+Generate each once and set it before publishing; the publish **refuses to run** when a channel declares tester groups but its secret is unset, so the feed can never fall back to a guessable URL.
+Treat the secret as immutable once a cohort exists: rotating it 404s every distributed manifest URL, and because Foundry's `checkPackage` suppresses that 404 and shows only an offer to switch the client to the public registry, a rotation is a **cohort migration, not hygiene** — you would hand the whole cohort to the registry.
+`release-s3.js` withholds all S3 keys and install URLs from CI logs (they print only on local/`--dry-run` runs); GitHub also masks the secret value.
+
+**`--overwrite`.**
+The one legitimate use is re-staging a zip whose manifest never advertised the version (a failed first publish), so no client can already be pinned to it.
+Automatic calls publish only a newly-minted tag and never overwrite an existing versioned zip.
+Note that `isNewerVersion('1.3.0', '1.3.0-rc.85') === false`, so the first public `v1.3.0` is not offered to any client still installed from a legacy `-rc.N` prerelease — that is expected, and those clients rejoin the public line through Foundry's manifest-rewrite offer.
+For the same reason, **do not delete the 179 existing `v*-rc.*` prereleases**: each one's assets bake `releases/download/v<ver>/module.json`, so deleting a prerelease 404s every client installed from it.
 
 ### Codex workflows
 
@@ -834,18 +991,51 @@ The pipeline is configured in `release.config.js`.
 | Any with `BREAKING CHANGE` footer | Major |
 | All other types | No release |
 
+### The branch allowlist and the github plugin
+
+`release.config.js`'s `branches` array has three entries: the hotfix glob `'+([0-9]).+([0-9]).x'`, `'release'`, and `{ name: 'main', prerelease: 'beta' }` (no `channel`).
+A pure, exported `classifyBranch(name)` maps a branch to `'main' | 'release' | 'maintenance'` and throws for anything else.
+`'maintenance'` is semantic-release's own branch *type* for a line cut from a released version — in our vocabulary that is always a **hotfix line**.
+
+`classifyBranch` drives an **allowlist** for `@semantic-release/github`:
+
+- on `main` the github plugin is **OMITTED**, so no GitHub release object is ever created — this omission is the beta channel's privacy mechanism;
+- on `release` and on a hotfix line the plugin is loaded with `draftRelease: true` as a literal constant.
+
+**No branch ever yields `draftRelease: false`.**
+A `false` here would publish a stable release the moment it is minted, defeating the entire promotion gate; the invariant is pinned by `tests/release-config.test.js`.
+
 ### What semantic-release does on a release
 
 1. Reads all commits since the last tag using `@semantic-release/commit-analyzer`.
 2. Generates release notes with `@semantic-release/release-notes-generator`.
-3. Calls `node scripts/release.js --version <new-version>` via `@semantic-release/exec`.
-This injects the version into `module.json`, runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
-4. Creates a drafted GitHub Release with the zip and the raw `module.json` as assets — on the `release` and hotfix lines only; on `main` no GitHub release object is created.
-5. On `main`, `beta.yml` reads the minted `next_tag` from `$GITHUB_OUTPUT` (not a tag diff) and publishes that exact tag to the beta channel through the reusable S3 workflow.
+3. Calls the release build via `@semantic-release/exec`, using `--dist-version <new-version>` so the build injects the version into the generated `dist/module.json` only and never mutates the tracked `module.json`.
+This runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
+4. On `release` and a hotfix line, creates a **drafted** GitHub Release with the zip and the raw `module.json` as assets; on `main` no GitHub release object is created.
+5. The config's `successCmd` writes `next_version`/`next_tag` to `$GITHUB_OUTPUT`; `beta.yml` reads that (not a tag diff) and publishes the beta tag through the reusable S3 workflow.
 
 GitHub Releases are the canonical release history.
-There is no committed `CHANGELOG.md` in this repository; release notes are generated from Conventional Commits per release candidate and aggregated across that base's RCs when an RC is promoted.
+There is no committed `CHANGELOG.md` in this repository; release notes are generated from Conventional Commits per version, and a superseded stable draft's notes are aggregated into the release that reaches `public` after it (the **Version authority and promotion mechanics** requirement).
 The CI release flow does not commit a repository changelog back to `main`; branch protection requires pull requests and status checks on `main`, so release automation publishes tags and GitHub Releases without a protected-branch writeback step.
+
+### The cutover (F4)
+
+Switching `main` from the old `next` channel to the `-beta` prerelease scheme is a one-time, order-sensitive cutover, because the change touches **both** the channel and the prerelease identifier (preid).
+Renaming the preid without promoting first lets a `feat:` compute a fresh `1.3.0-beta.1` and publish it with no `EINVALIDNEXTVERSION` error — a silent wrong version.
+The safe sequence: the config-change PR carries a **non-releasing** title (`main` is squash-merged, so the PR title is the commit semantic-release analyses); every PR merged during the cutover window keeps a non-releasing title (a `fix:` while `lastRelease` is `1.2.1` mints a permanent garbage `1.2.2-beta.1` tag); the first prerelease promotion is run manually with `GITHUB_REF_NAME=release` set (a bare local run would fall back to `main` and mint no draft); then the forward-port to `main`; then unfreeze.
+
+### The hotfix runbook
+
+The route depends on what is currently soaking in early access (the **Hotfix isolation** requirement):
+
+- **A minor or major is soaking (route 1 — hotfix line).**
+Promoting it would ship its features, so cut `N.N.x` from the PUBLIC tag (`git branch 1.4.x v1.4.0`), land `fix:` commits only (a `feat:` hard-fails `EINVALIDNEXTVERSION` — the guard rail), let `release.yml` mint the draft and publish the line's own channel, promote with `source_channel: <the line>`, then `cherry-pick` the fix into `release` and let the forward-port carry it to `main`.
+**Never merge `release` or `main` into the hotfix line** (`EINVALIDMAINTENANCEMERGE`); a fix leaves a hotfix line by cherry-pick only.
+Delete the branch once the fix is in `release`.
+- **A patch is soaking (route 2 — promote the soak first).**
+A soaking patch carries only `fix`/`perf` commits by construction, so promoting it leaks no feature work; promote it, then cut a further hotfix on top only if one is still needed.
+Taking the hotfix line against a soaking patch would recompute a tag that already exists on a different commit, so a pre-flight refusal (`git ls-remote --tags origin "v<computed>"`) blocks it before any tag push.
+Name the trade when you take route 2: promoting the soak early ships a patch that has **not finished its soak** — it forgoes soak time even though it leaks no features, and the operator must choose that knowingly.
 
 ### Running the release script locally
 
