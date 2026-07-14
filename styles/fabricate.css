@@ -3395,8 +3395,16 @@
   color: var(--fab-danger-text);
 }
 
-.fabricate-manager .manager-status-toggle:hover {
-  border-color: var(--fab-mv2-border-strong);
+/* Hover affordance (issue 643). The switch sets `border: 0` on the BUTTON, which left
+   the old hover rule (a `border-color` on the button itself) inert — every switch in
+   the manager (components, essences, tools, gathering, environments, books, access)
+   had no hover response at all. The affordance belongs on the TRACK,
+   which is the part that actually has an edge: its border and fill lift toward the
+   text colour, so the switch responds identically in the on, off and danger states
+   and in every theme. A disabled switch does not respond. */
+.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled):hover .manager-status-toggle-track {
+  border-color: color-mix(in srgb, var(--fab-toggle-track-border) 55%, var(--fab-text));
+  background: color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text));
 }
 
 .fabricate-manager .manager-status-toggle:focus {
@@ -3457,9 +3465,11 @@
   background: var(--fab-mv2-surface-3);
 }
 
+/* The selected system card is the same identity cue as a selected browser row, so it
+   moves to the accent family with them (issue 643). */
 .fabricate-manager .manager-system-row.is-selected {
-  border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-success-soft);
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-soft);
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
 }
 
@@ -3468,7 +3478,7 @@
 }
 
 .fabricate-manager .manager-system-row:focus-visible {
-  outline: 2px solid var(--fab-success-border);
+  outline: 2px solid var(--fab-mv2-accent);
   outline-offset: 3px;
 }
 
@@ -3499,13 +3509,19 @@
   background: var(--fab-mv2-surface-3);
 }
 
+/* Selection is an IDENTITY cue ("you are here"), never a status (issue 643). It
+   therefore reads in the ACCENT family — a soft surface plus an accent ring — and
+   not in success/amber, which stay reserved for enabled and warning states. The old
+   `--fab-success-soft` tint put the selected row in the very colour its own switch
+   uses for ON, inches apart. This matches the rail's active nav row, which already
+   moved to the accent for the same reason. */
 .fabricate-manager .manager-recipe-row.is-selected,
 .fabricate-manager .manager-component-row.is-selected,
 .fabricate-manager .manager-environment-row.is-selected,
 .fabricate-manager .manager-gathering-task-row.is-selected,
 .fabricate-manager .manager-essence-row.is-selected {
-  border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-success-soft);
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-soft);
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
 }
 
@@ -3545,12 +3561,14 @@
   box-shadow: none;
 }
 
+/* Keyboard focus is an identity cue too, so it rings in the accent like every other
+   focus-visible ring in the manager — not in the success family (issue 643). */
 .fabricate-manager .manager-system-identity:focus-visible,
 .fabricate-manager .manager-recipe-identity:focus-visible,
 .fabricate-manager .manager-component-identity:focus-visible,
 .fabricate-manager .manager-environment-identity:focus-visible,
 .fabricate-manager .manager-gathering-task-identity:focus-visible {
-  outline: 2px solid var(--fab-success-border);
+  outline: 2px solid var(--fab-mv2-accent);
   outline-offset: 3px;
   border-radius: 6px;
 }
@@ -3807,8 +3825,12 @@
 }
 
 .fabricate-manager .manager-system-name,
+/* An inspected record's NAME is set in the Studio serif (issue 643) — the same
+   family the browser row's name and the rail's system card use, so an entity reads
+   the same wherever it is named. */
 .fabricate-manager .manager-inspector-name {
   margin: 0;
+  font-family: var(--fab-font-serif);
   font-weight: 700;
   line-height: 1.25;
   overflow-wrap: break-word;
@@ -6032,6 +6054,8 @@
   min-width: 0;
 }
 
+/* A NAME input is set in the serif, exactly as the name it authors renders
+   elsewhere (issue 643) — the set name here, the recipe name on the Overview tab. */
 .fabricate-manager .manager-recipe-ingredient-set-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -6041,7 +6065,13 @@
   border-radius: 6px;
   background: var(--fab-mv2-bg);
   color: var(--fab-mv2-text);
+  font-family: var(--fab-font-serif);
   font-weight: 700;
+}
+
+.fabricate-manager input[data-recipe-field="name"] {
+  font-family: var(--fab-font-serif);
+  font-weight: 600;
 }
 
 .fabricate-manager .manager-recipe-ingredient-set-empty {
@@ -6551,10 +6581,14 @@
   min-width: 0;
 }
 
+/* Section and card titles are SERIF (issue 643): the typographic contract sets
+   names and headings in Spectral and every numeric in JetBrains Mono. The uppercase
+   micro-label geometry is unchanged — only the family moves. */
 .fabricate-manager .manager-rail-title,
 .fabricate-manager .manager-card-title {
   margin: 0;
   color: var(--fab-mv2-text-muted);
+  font-family: var(--fab-font-serif);
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -11518,8 +11552,12 @@
   border-bottom-color: var(--fab-mv2-accent);
 }
 
+/* Editor tab badges are counts — issue counts, item counts — so they take the mono
+   face with tabular figures like every other numeric in the product (issue 643). */
 .fabricate-manager .manager-editor-tab-badge {
   margin-left: var(--fab-space-2xs);
+  font-family: var(--fab-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .fabricate-manager .manager-editor-tab-panel {
@@ -11926,8 +11964,13 @@
   letter-spacing: 0.04em;
 }
 
+/* The order pip is a NUMBER (a step index / a progressive result's position), so it
+   is set in the mono face with tabular figures (issue 643): 10 and 11 must not shift
+   the grip beside them. */
 .fabricate-manager .manager-environment-comp-order {
+  font-family: var(--fab-font-mono);
   font-size: 0.72em;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
 

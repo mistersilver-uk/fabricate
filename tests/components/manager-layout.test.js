@@ -288,6 +288,21 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
   // so these assertions read the custom-property declarations, not a background.
   assert.ok(offBlock.includes('var(--fab-bg-3)'), 'disabled status should read as a neutral off switch, not a warning');
   assert.ok(offBlock.includes('var(--fab-border-strong)'), 'the off track should keep a visible edge');
+  // The switch sets `border: 0` on the BUTTON, so a `:hover { border-color }` rule on
+  // the button is inert. The hover affordance has to live on the TRACK, which is the
+  // part with an edge — otherwise every switch in the manager has no hover state at all.
+  const toggleHoverBlock = blockFor(
+    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled):hover .manager-status-toggle-track'
+  );
+  assert.ok(
+    toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
+    'hovering a switch must visibly change its track'
+  );
+  assert.equal(
+    /\.manager-status-toggle:hover \{/.test(css),
+    false,
+    'a hover rule on the border-less button itself is dead code'
+  );
   assert.ok(trackBlock.includes('width: 34px;'), 'toggle track should use the 34x20 switch geometry');
   assert.ok(trackBlock.includes('height: 20px;'), 'toggle track should use the 34x20 switch geometry');
   assert.ok(trackBlock.includes('background: var(--fab-toggle-track);'), 'the track should carry the state colour');
@@ -583,6 +598,80 @@ test('manager recipe row collapses in the specified order and never drops its co
       `${kept} must survive every width — it is an operable control`
     );
   }
+});
+
+// Selection is an identity cue ("you are here"), never a status. Success/amber stay
+// reserved for enabled and warning states — a selected row tinted `--fab-success-soft`
+// wears the exact colour its own ON switch uses, inches away (issue 643).
+test('a selected browser row reads as an identity cue in the accent family, not a status', () => {
+  const selectedRowBlock = blockFor(
+    '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected,\n.fabricate-manager .manager-environment-row.is-selected,\n.fabricate-manager .manager-gathering-task-row.is-selected,\n.fabricate-manager .manager-essence-row.is-selected'
+  );
+  const selectedSystemBlock = blockFor('.fabricate-manager .manager-system-row.is-selected');
+  const identityFocusBlock = blockFor(
+    '.fabricate-manager .manager-system-identity:focus-visible,\n.fabricate-manager .manager-recipe-identity:focus-visible,\n.fabricate-manager .manager-component-identity:focus-visible,\n.fabricate-manager .manager-environment-identity:focus-visible,\n.fabricate-manager .manager-gathering-task-identity:focus-visible'
+  );
+
+  for (const [name, block] of [
+    ['the selected row', selectedRowBlock],
+    ['the selected system card', selectedSystemBlock]
+  ]) {
+    assert.ok(block.includes('background: var(--fab-surface-soft);'), `${name} uses a neutral soft surface`);
+    assert.ok(block.includes('border-color: var(--fab-accent-border);'), `${name} rings in the accent`);
+    assert.equal(
+      block.includes('var(--fab-success-soft)'),
+      false,
+      `${name} must not wear the enabled-status colour`
+    );
+  }
+
+  assert.ok(
+    identityFocusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    'the identity focus ring follows the accent focus standard, not the success family'
+  );
+});
+
+// The typographic contract (issue 643, `openspec/specs/ui-integration/spec.md`
+// § Typographic contract): serif on names and headings, mono + tabular figures on
+// every numeric. A count badge that shifts width between 9 and 10 moves the control
+// beside it, so tabular-nums is part of the contract, not a nicety.
+test('the typographic contract sets names in the serif and numerics in the mono face', () => {
+  const SERIF = [
+    '.fabricate-manager .manager-rail-title,\n.fabricate-manager .manager-card-title',
+    '.fabricate-manager .manager-inspector-name',
+    '.fabricate-manager .manager-recipe-name-row .manager-system-name',
+    '.fabricate-manager .manager-scope-name',
+    '.fabricate-manager .manager-recipe-ingredient-set-name',
+    '.fabricate-manager input[data-recipe-field="name"]'
+  ];
+  for (const selector of SERIF) {
+    assert.ok(
+      blockFor(selector).includes('font-family: var(--fab-font-serif);'),
+      `${selector} is a name or a heading and belongs in the serif`
+    );
+  }
+
+  const MONO = [
+    '.fabricate-manager .manager-chip.is-mono',
+    '.fabricate-manager .manager-editor-tab-badge',
+    '.fabricate-manager .manager-environment-comp-order'
+  ];
+  for (const selector of MONO) {
+    const block = blockFor(selector);
+    assert.ok(
+      block.includes('font-family: var(--fab-font-mono);'),
+      `${selector} renders a number and belongs in the mono face`
+    );
+    assert.ok(
+      block.includes('font-variant-numeric: tabular-nums;'),
+      `${selector} must not change width between 9 and 10`
+    );
+  }
+
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipe-io-counts').includes('font-family: var(--fab-font-mono);'),
+    "the row's in/out counts are numerics"
+  );
 });
 
 test('manager gathering task browser defines bounded toolbar and compact table geometry without reorder controls', () => {

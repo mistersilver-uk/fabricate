@@ -230,14 +230,29 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
 
   it('shows the projected check DC, and an em dash when the system has no usable check', async () => {
     const withDc = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'dc', dc: 18 } })] });
-    assert.equal(withDc.querySelector('[data-recipe-check]').dataset.recipeCheck, 'dc');
-    assert.match(withDc.querySelector('[data-recipe-check]').textContent, /DC 18/);
+    const dcPill = withDc.querySelector('[data-recipe-check]');
+    assert.equal(dcPill.dataset.recipeCheck, 'dc');
+    assert.match(dcPill.textContent, /DC 18/);
+    // The DC is the archetypal numeric in this row: it takes the mono face. The
+    // word-only kinds below do not — mono marks a number, it does not decorate a pill.
+    assert.ok(dcPill.classList.contains('is-mono'), 'a DC is a numeric and reads in the mono face');
     browser.remount();
 
     const noCheck = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'none', dc: null } })] });
     const pill = noCheck.querySelector('[data-recipe-check]');
     assert.equal(pill.dataset.recipeCheck, 'none');
     assert.match(pill.textContent, /—/);
+    assert.equal(pill.classList.contains('is-mono'), false, 'an em dash is not a number');
+    browser.remount();
+
+    const dynamic = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'dynamic', dc: null } })]
+    });
+    assert.equal(
+      dynamic.querySelector('[data-recipe-check]').classList.contains('is-mono'),
+      false,
+      'a macro-resolved DC has no number to set'
+    );
   });
 });
 

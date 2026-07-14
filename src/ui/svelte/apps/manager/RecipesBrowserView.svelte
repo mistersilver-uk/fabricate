@@ -471,7 +471,11 @@
                         </span>
                       </span>
 
-                      <span class={`manager-chip manager-recipe-check is-${check.kind}`} data-recipe-check={check.kind} title={check.title || undefined}>
+                      <!-- The DC is the archetypal numeric in this row, so the pill
+                           takes the mono face (`is-mono`, tabular figures) when it
+                           carries a number. The word-only kinds (Dynamic DC,
+                           Progressive, the em dash) stay in the UI face. -->
+                      <span class={`manager-chip manager-recipe-check is-${check.kind} ${check.kind === 'dc' ? 'is-mono' : ''}`} data-recipe-check={check.kind} title={check.title || undefined}>
                         <i class={check.icon} aria-hidden="true"></i>
                         <span>{check.label}</span>
                       </span>
