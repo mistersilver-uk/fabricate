@@ -864,3 +864,32 @@ node scripts/release.js --validate-only
 # Inject a specific version into module.json, then build
 node scripts/release.js --version 1.2.3
 ```
+
+### Hotfix runbook
+
+Superseded by the three-channel model; full rewrite pending in #627 Phase 4 (task 4.5b).
+
+A **hotfix** patches the current public release without shipping unreleased feature work.
+Which route you take depends on **what is soaking** in early-access.
+
+**Route decision.**
+A soaking **minor or major** carries features, so promoting it would ship them — cut a **hotfix line** from the public tag instead.
+A soaking **patch** carries only `fix`/`perf` commits by construction, so promoting it leaks no feature work — **promote the soak first**, then cut a hotfix on top only if one is still needed.
+The trade when you promote the soak (route 2) is that you ship a patch that has **not completed its soak**.
+It leaks no *feature* work, but it forgoes *soak time* — choose it knowingly.
+
+**Pre-flight.**
+Before cutting a hotfix line, run `node scripts/hotfix-preflight.mjs v<base>` (for example `v1.4.0`).
+It computes the next patch tag and **refuses** when that tag already exists on `origin` — a signal that a patch is soaking, so route 2 applies.
+This is defense-in-depth: semantic-release also refuses the collision (`EINVALIDNEXTVERSION`), but the pre-flight refuses earlier, before the branch is cut, and more legibly.
+
+**Route 1 — cut a hotfix line.**
+
+1. Cut `N.N.x` from the **public tag**, never from `release` or `main`: `git branch 1.4.x v1.4.0`.
+2. Land **`fix:` commits only**; a `feat:` hard-fails with `EINVALIDNEXTVERSION`, the guard rail that keeps feature work off the line.
+3. `release.yml` mints the draft release and publishes the hotfix's own channel (`1.4.x`), never `early-access`.
+4. Promote it with `promote-to-public.yml`, passing `source_channel: 1.4.x`.
+5. **Cherry-pick** the fix into `release`; the automation's forward-port then carries it on to `main`.
+6. Delete the hotfix branch once the fix has landed in `release`.
+
+**Never merge `release` or `main` into a hotfix line** — it fails with `EINVALIDMAINTENANCEMERGE`, and a fix leaves a hotfix line by cherry-pick only.
