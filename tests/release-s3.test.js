@@ -314,13 +314,16 @@ for (const [name, mutate] of [
 }
 
 test('assertPublishSafety treats a guard-side sourceSha of "unknown" as absent (never a match)', () => {
+  // The zip carries a REAL, identified sha — so the zip-side check would PASS. Only the guard-side
+  // `unknown` branch can fail this case; pairing it with an identified zip isolates that branch (a
+  // `if (sourceSha === 'unknown') return true` mutation would flip this to a resume and be caught).
   const body = { id: 'fabricate', version: '1.4.0' };
   const state = [
     rec({
       target: CH,
       head: '1.4.0',
       body: JSON.stringify(body, null, 2),
-      zip: zipHead(prov('1.4.0', 'unknown')),
+      zip: zipHead(prov('1.4.0', 'sha1')),
     }),
   ];
   const verdict = safety({ sourceSha: 'unknown', staged: [{ target: CH, body }], state });
@@ -465,6 +468,24 @@ test('buildCopyObjectParams issues REPLACE and re-supplies ContentType + CacheCo
   assert.deepEqual(params.Metadata, prov('1.4.0', 'sha1'));
 });
 
+test('buildCopyObjectParams percent-encodes CopySource per segment, preserving slashes', () => {
+  // x-amz-copy-source is an HTTP header the SDK serialises verbatim (not a path label it encodes),
+  // so a URL-unsafe char in a secret tester segment must be encoded here or CopyObject breaks alone.
+  const params = buildCopyObjectParams('my-bucket', {
+    sourceKey: 'testers/closed-beta/a b+c%/fabricate/versions/1.4.0/fabricate-1.4.0.zip',
+    destKey: 'ignored',
+    metadata: prov('1.4.0', 'sha1'),
+    contentType: 'application/zip',
+    cacheControl: CACHE_IMMUTABLE,
+  });
+  assert.equal(
+    params.CopySource,
+    'my-bucket/testers/closed-beta/a%20b%2Bc%25/fabricate/versions/1.4.0/fabricate-1.4.0.zip'
+  );
+  // Slashes are preserved (each segment encoded independently), and the bucket name is left as-is.
+  assert.ok(params.CopySource.startsWith('my-bucket/testers/closed-beta/'));
+});
+
 // ───────────────────────────────────────────────────────────────────────────
 // 1.2 / 1.4 / 1.5 / 1.6 / 1.7 — through main(): conditional writes, read-back,
 // provenance stamping, backfill, and the tripwire writing NOTHING
@@ -501,6 +522,11 @@ async function makeMain({
   const configPath = join(dir, 'cfg.json');
   await writeFile(configPath, JSON.stringify(config));
 
+  // Per-KEY staleness: `staleReadBack` may be a boolean (every manifest reads back stale) or a
+  // predicate naming WHICH keys do. Per-key lets a test hold the channel manifest current while only
+  // the tester manifest reads back stale — which must STILL fail the run, pinning the "verify every
+  // manifest" loop against a `staged.slice(0, 1)` mutation.
+  const isStale = typeof staleReadBack === 'function' ? staleReadBack : () => staleReadBack;
   const store = {};
   const puts = [];
   const copies = [];
@@ -508,7 +534,7 @@ async function makeMain({
     headObject: async (key) => zips[key] ?? null,
     getObject: async (key) => {
       if (key in store) {
-        return staleReadBack
+        return isStale(key)
           ? { status: 200, body: JSON.stringify({ version: '0.0.0-stale' }), etag: 'stale' }
           : { status: 200, body: store[key], etag: `etag-${key}` };
       }
@@ -607,6 +633,27 @@ test('main() fails the run when a post-publish read-back advertises a stale vers
   await assert.rejects(
     harness.run('--version', '1.4.0-beta.1', '--source-sha', 'deadbeef'),
     /read-back/
+  );
+});
+
+test('main() fails when ONLY the tester manifest reads back stale — every target is verified', async () => {
+  // The channel manifest reads back current; only the tester manifest is stale. A partial publish
+  // (channel written, tester not established) must NOT report green — so this pins the read-back
+  // loop over EVERY target (a `staged.slice(0, 1)` mutation that verifies only the channel passes
+  // all other tests but must fail here).
+  const harness = await makeMain({
+    heads: {
+      [CH_MANIFEST]: {
+        status: 200,
+        body: JSON.stringify({ version: '1.3.0-beta.9' }),
+        etag: 'chetag',
+      },
+    },
+    staleReadBack: (key) => key === TE_MANIFEST,
+  });
+  await assert.rejects(
+    harness.run('--version', '1.4.0-beta.1', '--source-sha', 'deadbeef'),
+    /tester-closed-beta-2026/
   );
 });
 

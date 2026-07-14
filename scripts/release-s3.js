@@ -512,6 +512,12 @@ async function createDefaultS3Client({ bucket, region }) {
  * included — so `ContentType` and `CacheControl` MUST be re-supplied here, or the copy silently
  * downgrades every immutable-cached zip clients install from to a default-cached
  * `binary/octet-stream`. Exported so this contract is pinned without the AWS SDK.
+ *
+ * `CopySource` is percent-encoded PER SEGMENT (slashes preserved): `x-amz-copy-source` is an HTTP
+ * header the SDK serialises VERBATIM, not a path label it URI-encodes for you. A tester feed path
+ * carries a secret segment; if that secret ever held a URL-unsafe char (space, `+`, `%`, `#`), an
+ * unencoded `CopySource` would break the backfill's CopyObject alone while the path-label-encoded
+ * Put/Get/Head kept working. The bucket name is left as-is (it is DNS-safe).
  * @param {string} bucket The bucket the object lives in.
  * @param {{sourceKey: string, destKey: string, metadata: Record<string, string>,
  *   contentType: string, cacheControl: string}} copy The in-place copy inputs.
@@ -521,9 +527,10 @@ export function buildCopyObjectParams(
   bucket,
   { sourceKey, destKey, metadata, contentType, cacheControl }
 ) {
+  const encodedSource = sourceKey.split('/').map(encodeURIComponent).join('/');
   return {
     Bucket: bucket,
-    CopySource: `${bucket}/${sourceKey}`,
+    CopySource: `${bucket}/${encodedSource}`,
     Key: destKey,
     MetadataDirective: 'REPLACE',
     Metadata: metadata,
