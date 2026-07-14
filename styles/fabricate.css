@@ -6689,6 +6689,182 @@
   object-fit: cover;
 }
 
+/* ── Recipe editor tab intro + rebuilt Tools tab (issue 643 §D) ─────────────── */
+
+/* Mode-adaptive tab heading + intro copy, OUTSIDE any card (§D1/§B5/§C3). */
+.fabricate-manager .manager-recipe-tab-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-recipe-tab-title {
+  margin: 0;
+  font-family: var(--fab-font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-tools-tab,
+.fabricate-manager .manager-recipe-results-tab,
+.fabricate-manager .manager-recipe-ingredients-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-4);
+}
+
+.fabricate-manager .manager-recipe-tools-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+/* Rebuilt tool row: medallion + name + right-aligned "not consumed" + subtle ×. */
+.fabricate-manager .manager-recipe-tool-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-recipe-tool-medallion {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager .manager-recipe-tool-medallion img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-recipe-tool-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-recipe-tool-note {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+}
+
+/* Subtle × remove — never a loud red trash button (§D1). */
+.fabricate-manager .manager-recipe-tool-remove {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-tool-remove:hover {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+/* Single centered dashed empty panel (§D3). */
+.fabricate-manager .manager-recipe-tools-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fab-space-4);
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 9px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-recipe-tools-empty p {
+  margin: 0;
+}
+
+/* Global-tools card (multi-step): accent border + accent-soft fill, globe medallion. */
+.fabricate-manager .manager-recipe-tools-global {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 12px;
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-recipe-tools-global-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-recipe-tools-global-medallion {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--fab-accent);
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager .manager-recipe-tools-global-head p {
+  margin: 0;
+}
+
+/* Centered hairline divider with a "PLUS, PER STEP" micro-label (§D2). */
+.fabricate-manager .manager-recipe-tools-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  color: var(--fab-text-subtle);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-recipe-tools-divider::before,
+.fabricate-manager .manager-recipe-tools-divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--fab-border);
+}
+
+/* Dashed accent add-button used across the rebuilt requirement tabs. */
+.fabricate-manager .manager-button.is-dashed {
+  border-style: dashed;
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+  background: transparent;
+}
+
+.fabricate-manager .manager-button.is-dashed:not(:disabled):hover {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
 /* Nested ingredient editor: sets -> groups -> options + per-set essences. */
 .fabricate-manager .manager-recipe-ingredient-sets {
   display: flex;

@@ -1168,7 +1168,7 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="tools"]'),
       'tools section renders on the Tools tab'
     );
-    assert.match(target.textContent, /No tools yet/, 'tools empty text shown');
+    assert.match(target.textContent, /No tools required/, 'tools empty panel shown');
     editHarness.remount();
   });
 
@@ -2873,21 +2873,15 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(target, 'tools');
     await flushRender();
-    // Recipe-level tools section (idPrefix '') shows the recipe-wide tool.
+    // Recipe-level (global) tools section (idPrefix '') shows the recipe-wide tool.
     assert.ok(
       target.querySelector('[data-recipe-section="tools"] [data-recipe-tool-id="tool-anvil"]'),
       'recipe-level tools section lists the recipe-wide tool'
     );
-    // Per-step tool section is collapsed until the step is expanded.
-    assert.equal(
-      target.querySelector('[data-recipe-section="step-sa-tools"]'),
-      null,
-      'per-step tools section is collapsed'
-    );
-    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
-    await flushRender();
+    // Per-step tool sections render ALWAYS-OPEN on the Tools tab (issue 643 §C1) — the
+    // old single-expand accordion showed nothing until a step was clicked.
     const stepTools = target.querySelector('[data-recipe-section="step-sa-tools"]');
-    assert.ok(stepTools, 'expanding the step reveals its tools section');
+    assert.ok(stepTools, 'the per-step tools section renders without expanding');
     stepTools.querySelector('.manager-recipe-tools-trigger').click();
     await flushRender();
     document.querySelectorAll('.manager-travel-option').forEach((option) => {
@@ -2914,8 +2908,7 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(target, 'results');
     await flushRender();
-    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
-    await flushRender();
+    // Per-step result sections render always-open on the Results tab (issue 643 §C1).
     target
       .querySelector('[data-recipe-section="step-sa-results"] [data-recipe-add="result-set"]')
       .click();
