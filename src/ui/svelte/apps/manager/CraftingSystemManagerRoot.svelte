@@ -1120,10 +1120,6 @@
     void $viewState.recipes;
     return store.getRecipeSignatureConflicts?.(recipeDraft.id, recipeDraft) || [];
   });
-  // The per-recipe "restrict to specific users" editor only applies under the
-  // system's `player` recipe-visibility list mode; other modes gate visibility
-  // globally, per-knowledge, or not at all.
-  const recipePlayerListMode = $derived(selectedSystem?.recipeVisibility?.listMode === 'player');
 
   // --- Recipe editor context rail (issue 643 §4b) --------------------------------
   // The rail's top section is MODE-CONDITIONAL off the same craftingEffect matrix the
@@ -2584,6 +2580,20 @@
 
   function currentSteps() {
     return Array.isArray(recipeDraft?.steps) ? [...recipeDraft.steps] : [];
+  }
+
+  // Locking persists immediately (like enable) and is NEVER gated in either
+  // direction — a GM locks a recipe precisely while it is unfinished, which is the
+  // explicit contrast with toggleRecipeEnabled. Draft AND baseline both advance so a
+  // lock never registers as an unsaved recipe edit.
+  async function handleToggleRecipeLocked(next) {
+    if (!recipeDraft?.id) return;
+    const ok = await store.toggleRecipeLocked?.(recipeDraft.id, next === true);
+    if (ok === false) return;
+    recipeDraft = { ...recipeDraft, locked: next === true };
+    recipeDraftBaseline = recipeDraftBaseline
+      ? { ...recipeDraftBaseline, locked: next === true }
+      : recipeDraftBaseline;
   }
 
   function handleAddStep() {
@@ -5060,14 +5070,14 @@
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}
-        playerListMode={recipePlayerListMode}
-        worldUsers={$viewState.worldUsers || []}
+        onOpenComponent={(componentId) => editComponent(componentId)}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
         requestedTab={requestedRecipeTab}
         requestedTabNonce={requestedRecipeTabNonce}
         onOpenCraftingSettings={() => openCraftingSection('settings')}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
+        onToggleLocked={handleToggleRecipeLocked}
         onAddStep={handleAddStep}
         onReorderSteps={handleReorderSteps}
         onUpdateStep={handleUpdateStep}

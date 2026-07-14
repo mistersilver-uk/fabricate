@@ -59,11 +59,10 @@
     // Progressive systems award a recipe's results in order, so the Results tab
     // exposes drag-reorder on the result rows. Other modes ignore result order.
     progressive = false,
-    // True when the system's recipe visibility list mode is `player`; unlocks the
-    // per-recipe "restrict to specific users" editor on the Overview tab.
-    playerListMode = false,
-    // Non-GM world users ({ id, name }) offered as the restriction allow-list.
-    worldUsers = [],
+    // Progressive result rows deep-link to the COMPONENT editor's Difficulty card:
+    // `component.difficulty` is consumed by recipes, salvage, gathering AND system
+    // validation, so it is a read-only badge here, never an inline stepper.
+    onOpenComponent = () => {},
     // The SYSTEM's resolution mode. Never per-recipe: the banner reports it on every
     // tab and routes to Crafting Settings, which is the only place it can change.
     resolutionMode = 'simple',
@@ -74,6 +73,7 @@
     onOpenCraftingSettings = () => {},
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
+    onToggleLocked = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
@@ -92,6 +92,7 @@
   const description = $derived(recipe?.description || '');
   const img = $derived(recipe?.img || '');
   const enabled = $derived(recipe?.enabled !== false);
+  const locked = $derived(recipe?.locked === true);
 
   // A recipe is multi-step when it carries an explicit steps array; per-step
   // groupings replace the recipe-level sections in that mode (the right-inspector
@@ -277,8 +278,8 @@
             {isMultiStep}
             {checkTierOptions}
             {minSuccessTierOptions}
-            {playerListMode}
-            {worldUsers}
+            {locked}
+            {onToggleLocked}
             {onUpdateRecipe}
             {onAddStep}
             {onReorderSteps}
@@ -307,6 +308,7 @@
             {componentOptions}
             {routingProvider}
             {progressive}
+            {onOpenComponent}
             outcomeTierOptions={routedOutcomeTierOptions}
             outcomeTiersDefined={routedOutcomeTiersDefined}
             onAssignIngredientSet={assignIngredientSet}

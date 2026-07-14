@@ -5689,84 +5689,24 @@
   gap: var(--fab-space-2);
 }
 
-/* One unit column: the unit label header, then the up chevron / editable field /
-   down chevron fused into a single connected control (no gaps; the chevrons share
-   the field's border and are square where they meet it). Fixed, narrow width so
-   every column is uniform. */
+/* One unit column: the unit label header above the shared Stepper primitive (an
+   editable input flanked by -/+ adjuncts). Fixed, narrow width so every column is
+   uniform. */
 .fabricate-manager .manager-recipe-duration-stepper {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  width: 3.25rem;
-}
-
-.fabricate-manager .manager-recipe-duration-step {
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  height: 18px;
-  padding: 0;
-  border: 1px solid var(--fab-mv2-border);
-  background: var(--fab-overlay-light-04);
-  color: var(--fab-mv2-text);
-  font-size: 0.62rem;
-  cursor: pointer;
+  width: 5.5rem;
 }
 
-/* Round only the outer corners; square where the chevron joins the field, and
-   drop the shared border edge so the join reads as a single line. */
-.fabricate-manager .manager-recipe-duration-step[data-recipe-duration-step='up'] {
-  border-radius: 6px 6px 0 0;
-  border-bottom: none;
-}
-
-.fabricate-manager .manager-recipe-duration-step[data-recipe-duration-step='down'] {
-  border-radius: 0 0 6px 6px;
-  border-top: none;
-}
-
-.fabricate-manager .manager-recipe-duration-step:hover {
-  border-color: var(--fab-mv2-accent);
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-08);
-}
-
-/* The number-only field. Square corners so it sits flush between the two
-   chevrons. */
 .fabricate-manager .manager-recipe-duration-field {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
-  height: 30px;
-  padding: 0;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 0;
-  background: var(--fab-mv2-bg);
 }
 
-/* The count fills the narrow field, centred (up to four digits). */
-.fabricate-manager .manager-recipe-duration-input {
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--fab-mv2-text);
-  text-align: center;
-  appearance: textfield;
-}
-
-/* Hide the native spinners — the custom up/down chevrons replace them. */
-.fabricate-manager .manager-recipe-duration-input::-webkit-outer-spin-button,
-.fabricate-manager .manager-recipe-duration-input::-webkit-inner-spin-button {
-  margin: 0;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-/* The unit label sits at the top of the column, above the connected stepper. */
+/* The unit label sits at the top of the column, above the stepper. */
 .fabricate-manager .manager-recipe-duration-unit {
   margin-bottom: var(--fab-space-2xs);
   overflow: hidden;
@@ -6165,26 +6105,6 @@
   gap: var(--fab-space-2);
 }
 
-/* The per-row alternative-add cluster is grouped on the right, visually distinct
-   from the within-option tag editor on the left. */
-.fabricate-manager .manager-recipe-option-alternative-adds {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-/* Square, icon-only add controls so they don't read as the labelled set-level
-   "Add component" / "Add tag requirement" buttons; sized to match the adjacent
-   remove (icon) button. */
-.fabricate-manager .manager-button.manager-recipe-add-alternative-trigger {
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
-  min-width: 0;
-  padding: 0;
-}
-
 .fabricate-manager .manager-recipe-tag-match-toggle {
   display: inline-flex;
   flex: 0 0 auto;
@@ -6254,14 +6174,54 @@
   min-width: 0;
 }
 
-/* The per-OR-group footer add cluster: one set of "Add component / Add tag
-   requirement" controls inside the requirement box instead of per row. */
+/* The requirement's single "or..." control (issue 643): one popover per requirement
+   offering the ingredient kinds this system can honour, replacing the loose per-row
+   and footer add-buttons. It reads as an affordance, not a filled button, so it is a
+   dashed accent chip. */
 .fabricate-manager .manager-recipe-requirement-adds {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-2);
   padding-top: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-chip.manager-recipe-or-trigger {
+  border: 1px dashed var(--fab-accent-border);
+  color: var(--fab-accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-chip.manager-recipe-or-trigger:hover {
+  background: var(--fab-accent-soft);
+}
+
+/* Progressive result rows: keyboard move controls beside the drag grip. Reorder was
+   drag-ONLY, with no keyboard path at all — and order is load-bearing in progressive
+   mode, so these are real buttons, disabled at the ends. */
+.fabricate-manager .manager-recipe-result-move {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fabricate-manager .manager-recipe-result-move .manager-icon-button {
+  width: 22px;
+  height: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  font-size: 0.6rem;
+}
+
+/* The READ-ONLY difficulty badge on a progressive result row. It deep-links to the
+   component editor rather than editing in place: component.difficulty has four
+   consumers, so an inline stepper would write across an aggregate boundary. */
+.fabricate-manager .manager-chip.manager-recipe-difficulty-badge {
+  flex: 0 0 auto;
+  cursor: pointer;
 }
 
 .fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait {

@@ -45,6 +45,9 @@
     progressive = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
+    // Deep-link from a progressive row's read-only difficulty badge to the component
+    // editor's Difficulty card.
+    onOpenComponent = () => {},
     idPrefix = ''
   } = $props();
 
@@ -178,6 +181,7 @@
       <RecipeResultGroupCard
         group={alchemySuccessGroup}
         {componentOptions}
+        {onOpenComponent}
         hideRemove={true}
         staticLabel={text('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
         onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
@@ -185,6 +189,7 @@
       <RecipeResultGroupCard
         group={alchemyFailureGroup}
         {componentOptions}
+        {onOpenComponent}
         reserved={true}
         hideRemove={true}
         roleAccent="warning"
@@ -200,6 +205,7 @@
         chromeless={true}
         {componentOptions}
         {progressive}
+        {onOpenComponent}
         onChange={(nextGroup) => updateSimpleGroup(nextGroup)}
       />
     </div>
@@ -226,6 +232,7 @@
             {componentOptions}
             {routingProvider}
             {progressive}
+            {onOpenComponent}
             ingredientSetOptions={ingredientOptionsFor(group)}
             assignedIngredientSetIds={assignedSetIdsFor(group)}
             outcomeTierOptions={tierOptionsFor(index)}

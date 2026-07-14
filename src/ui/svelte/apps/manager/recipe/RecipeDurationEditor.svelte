@@ -27,6 +27,7 @@
     formatTimeRequirement,
     durationUnitLabelSingular
   } from '../../../util/recipeDuration.js';
+  import Stepper from '../../../components/Stepper.svelte';
 
   let { timeRequirement = null, disabled = false, onChange = () => {} } = $props();
 
@@ -66,22 +67,6 @@
     };
     const total = next.minutes + next.hours + next.days + next.months + next.years;
     onChange(total > 0 ? next : null);
-  }
-
-  // Step a single unit up/down (the spinner buttons and ArrowUp/ArrowDown keys),
-  // clamped at 0 by setUnit.
-  function stepUnit(unit, delta) {
-    setUnit(unit, unitValue(unit) + delta);
-  }
-
-  function onUnitKeydown(event, unit) {
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      stepUnit(unit, 1);
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      stepUnit(unit, -1);
-    }
   }
 
   // Right-clicking the trigger clears the whole duration (mirrors the recipe-item
@@ -217,41 +202,23 @@
         }
       }}
     >
+      <!-- Each unit is the shared Stepper: a real, typeable input with the -/+ buttons
+           as adjuncts. A click-only stepper would be a keyboard regression. -->
       <div class="manager-recipe-duration-row">
         {#each TIME_UNITS as unit (unit)}
           {@const unitLabel = durationUnitLabelSingular(unit)}
           <div class="manager-recipe-duration-stepper" data-recipe-duration-stepper={unit}>
             <span class="manager-recipe-duration-unit">{unitLabel}</span>
-            <button
-              type="button"
-              class="manager-recipe-duration-step"
-              data-recipe-duration-step="up"
-              aria-label={`${text('FABRICATE.Admin.Manager.Recipe.DurationIncrease', 'Increase')} ${unitLabel}`}
-              title={`${text('FABRICATE.Admin.Manager.Recipe.DurationIncrease', 'Increase')} ${unitLabel}`}
-              onclick={() => stepUnit(unit, 1)}
-            ><i class="fa-solid fa-chevron-up" aria-hidden="true"></i></button>
-            <div class="manager-recipe-duration-field">
-              <input
-                type="number"
-                min="0"
-                step="1"
-                class="manager-recipe-duration-input"
-                data-recipe-duration
-                data-recipe-duration-unit={unit}
-                aria-label={unitLabel}
+            <div class="manager-recipe-duration-field" data-recipe-duration-unit={unit}>
+              <Stepper
                 value={unitValue(unit)}
-                oninput={(event) => setUnit(unit, event.currentTarget.value)}
-                onkeydown={(event) => onUnitKeydown(event, unit)}
+                min={0}
+                ariaLabel={unitLabel}
+                decrementLabel={`${text('FABRICATE.Admin.Manager.Recipe.DurationDecrease', 'Decrease')} ${unitLabel}`}
+                incrementLabel={`${text('FABRICATE.Admin.Manager.Recipe.DurationIncrease', 'Increase')} ${unitLabel}`}
+                onChange={(next) => setUnit(unit, next)}
               />
             </div>
-            <button
-              type="button"
-              class="manager-recipe-duration-step"
-              data-recipe-duration-step="down"
-              aria-label={`${text('FABRICATE.Admin.Manager.Recipe.DurationDecrease', 'Decrease')} ${unitLabel}`}
-              title={`${text('FABRICATE.Admin.Manager.Recipe.DurationDecrease', 'Decrease')} ${unitLabel}`}
-              onclick={() => stepUnit(unit, -1)}
-            ><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>
           </div>
         {/each}
       </div>

@@ -118,6 +118,17 @@
   function updateEssences(nextEssences) {
     onChange({ ...set, essences: nextEssences });
   }
+
+  // The requirement's "or…" popover offers Essence under its OWN heading, because an
+  // essence requirement is NOT an OR alternative: there is no essence match type, and
+  // `IngredientSet.essences` is an AND requirement on the whole SET. Choosing it seeds
+  // the first essence the set does not already require, at amount 1; the per-set
+  // essence editor below refines it.
+  function addEssenceRequirement() {
+    const next = (essenceOptions || []).find((essence) => !(essence.id in essences));
+    if (!next) return;
+    updateEssences({ ...essences, [next.id]: 1 });
+  }
 </script>
 
 <div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`} data-recipe-set data-recipe-set-id={set?.id || ''}>
@@ -174,8 +185,10 @@
           {componentOptions}
           {itemTags}
           {currencyUnits}
+          {essenceOptions}
           onChange={(nextGroup) => updateGroup(index, nextGroup)}
           onRemove={() => removeGroup(index)}
+          onAddEssenceRequirement={addEssenceRequirement}
         />
       {/each}
     </div>

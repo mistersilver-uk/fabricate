@@ -23,6 +23,8 @@ const sharedComponentNames = [
   'Medallion',
   'StatusPill',
   'CollapsibleGroupHeader',
+  // The duration editor's per-unit steppers are the shared editable-input Stepper.
+  'Stepper',
 ];
 
 let tempRoot;
@@ -3617,59 +3619,73 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
-    // Not in player mode ⇒ no visibility section.
+  // The per-recipe visibility card is GONE (issue 643 §2c). It was a legacy surface
+  // editing legacy fields: gated on the superseded `recipeVisibility.listMode`, writing
+  // `recipe.visibility { restricted, allowedUserIds }` whose canonical successor is
+  // `recipe.access { characterIds, playerIds }` — owned by the Access tab. The
+  // assertions below are the REMOVAL contract, not a repoint of the old editor.
+  it('recipe overview no longer renders any per-recipe visibility editor', () => {
     mountRecipeOverview({
-      recipe: { id: 'r1', visibility: null },
-      playerListMode: false,
-      worldUsers: [{ id: 'u1', name: 'Alice' }],
+      recipe: { id: 'r1', visibility: { restricted: true, allowedUserIds: ['u1'] } },
       onUpdateRecipe: () => {},
     });
-    assert.equal(target.querySelector('[data-recipe-section="visibility"]'), null);
+    assert.equal(
+      target.querySelector('[data-recipe-section="visibility"]'),
+      null,
+      'the legacy visibility section is deleted, not restyled'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-field="visibility-restricted"]'),
+      null,
+      'no restrict toggle'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-users]'),
+      null,
+      'no allowed-users allow-list'
+    );
+  });
+
+  // The Locked STATUS card is a different concept from the recipe-item locked IMAGE
+  // (`data-recipe-item-locked-image`), so it deliberately sits outside that naming
+  // family. `recipe.locked` was persisted and engine-honoured but written by nothing.
+  it('recipe overview renders the Locked status card and toggles it in both directions', () => {
+    const toggled = [];
+    mountRecipeOverview({
+      recipe: { id: 'r1' },
+      locked: false,
+      onToggleLocked: (next) => toggled.push(next),
+      onUpdateRecipe: () => {},
+    });
+    const card = target.querySelector('[data-recipe-section="locked-status"]');
+    assert.ok(card, 'the Locked status card renders');
+    assert.equal(
+      target.querySelector('[data-recipe-item-locked-image]'),
+      null,
+      'the Locked card is not the recipe-item locked-image affordance'
+    );
+    const toggle = target.querySelector('[data-recipe-field="locked"]');
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'an unlocked recipe reads off');
+    toggle.click();
+    assert.deepEqual(toggled, [true], 'locking requests locked = true');
 
     unmount(mounted);
     mounted = null;
     target.remove();
 
-    // Player mode ⇒ restrict toggle present; toggling stages the full visibility object.
-    const emitted = [];
+    // Unlocking is never gated — a GM locks a recipe precisely while it is unfinished.
+    const unlocked = [];
     mountRecipeOverview({
-      recipe: { id: 'r1', visibility: null },
-      playerListMode: true,
-      worldUsers: [{ id: 'u1', name: 'Alice' }],
-      onUpdateRecipe: (patch) => emitted.push(patch),
+      recipe: { id: 'r1' },
+      locked: true,
+      onToggleLocked: (next) => unlocked.push(next),
+      onUpdateRecipe: () => {},
     });
-    assert.ok(target.querySelector('[data-recipe-section="visibility"]'), 'visibility section renders');
-    const toggle = target.querySelector('[data-recipe-field="visibility-restricted"]');
-    assert.ok(toggle, 'the restrict toggle renders');
-    toggle.click();
-    assert.deepEqual(emitted.at(-1), {
-      visibility: { restricted: true, allowedUserIds: [] },
-    });
-  });
-
-  it('recipe overview restriction editor toggles a user into allowedUserIds', () => {
-    const emitted = [];
-    mountRecipeOverview({
-      recipe: { id: 'r1', visibility: { restricted: true, allowedUserIds: [] } },
-      playerListMode: true,
-      worldUsers: [
-        { id: 'u1', name: 'Alice' },
-        { id: 'u2', name: 'Bob' },
-      ],
-      onUpdateRecipe: (patch) => emitted.push(patch),
-    });
-    // The empty-state warning shows while restricted with no users selected.
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-empty]'),
-      'the no-users-selected warning renders'
-    );
-    const bob = target.querySelector('[data-recipe-visibility-user="u2"] input');
-    assert.ok(bob, 'a checkbox renders per world user');
-    bob.dispatchEvent(new Event('change', { bubbles: true }));
-    assert.deepEqual(emitted.at(-1), {
-      visibility: { restricted: true, allowedUserIds: ['u2'] },
-    });
+    const lockedToggle = target.querySelector('[data-recipe-field="locked"]');
+    assert.equal(lockedToggle.getAttribute('aria-pressed'), 'true', 'a locked recipe reads on');
+    assert.equal(lockedToggle.disabled, false, 'unlocking is never gated');
+    lockedToggle.click();
+    assert.deepEqual(unlocked, [false], 'unlocking requests locked = false');
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {

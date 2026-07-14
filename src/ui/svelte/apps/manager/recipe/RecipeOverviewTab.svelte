@@ -39,11 +39,12 @@
     // only for a routed+fixed system, so the "Minimum success tier" control below
     // auto-hides everywhere else.
     minSuccessTierOptions = [],
-    // True when the system's recipe-visibility list mode is `player`: unlocks the
-    // per-recipe "restrict to specific users" editor below.
-    playerListMode = false,
-    // Non-GM world users ({ id, name }) offered as the restriction allow-list.
-    worldUsers = [],
+    // `recipe.locked` — persisted, engine-honoured (`guardCraftStart` refuses a
+    // locked craft) and, until issue 643, written by NOTHING in the UI. Its write
+    // path is never gated, unlike enable: a GM locks a recipe precisely while it is
+    // unfinished.
+    locked = false,
+    onToggleLocked = () => {},
     onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
@@ -60,31 +61,6 @@
     return value || DEFAULT_RECIPE_IMAGE;
   }
 
-  // Per-recipe visibility (player list mode). The draft is the source of truth.
-  const restricted = $derived(recipe?.visibility?.restricted === true);
-  const allowedUserIds = $derived(
-    Array.isArray(recipe?.visibility?.allowedUserIds) ? recipe.visibility.allowedUserIds : []
-  );
-
-  function emitVisibility(next) {
-    onUpdateRecipe({
-      visibility: {
-        restricted: next.restricted,
-        allowedUserIds: next.allowedUserIds,
-      },
-    });
-  }
-
-  function toggleRestricted() {
-    emitVisibility({ restricted: !restricted, allowedUserIds });
-  }
-
-  function toggleAllowedUser(userId) {
-    const nextIds = allowedUserIds.includes(userId)
-      ? allowedUserIds.filter((id) => id !== userId)
-      : [...allowedUserIds, userId];
-    emitVisibility({ restricted, allowedUserIds: nextIds });
-  }
 </script>
 
 <section class="manager-recipe-tab manager-recipe-overview" data-recipe-tab="overview" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Overview', 'Overview')}>
@@ -190,56 +166,36 @@
     {/if}
   </section>
 
-  {#if playerListMode}
-    <section class="manager-task-core-card manager-recipe-visibility-section" data-recipe-section="visibility">
-      <div class="manager-task-card-heading">
-        <div>
-          <h3>{text('FABRICATE.Admin.Manager.Recipe.Visibility.Title', 'Visibility')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Visibility.RestrictHint', 'Restrict this recipe to specific players. When off, every player can see it.')}</p>
-        </div>
+  <!-- The Locked status card. "Locked" is OVERLOADED on this tab: it already means
+       "the image picker is locked because a recipe item is linked"
+       (data-recipe-item-locked-image). This is a DIFFERENT concept — the recipe stays
+       visible to players, but only a GM can craft it — so it gets its own i18n keys
+       and its hooks stay out of the `…-locked-image` naming family. -->
+  <section class="manager-task-core-card" data-recipe-section="locked-status">
+    <div class="manager-task-card-heading">
+      <div>
+        <h3>{text('FABRICATE.Admin.Manager.Recipe.Locked.Title', 'Locked')}</h3>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Locked.Hint', 'A locked recipe stays visible to players, but only a GM can craft it.')}</p>
       </div>
-      <div class="manager-task-core-status">
-        <button
-          type="button"
-          class={`manager-status-toggle ${restricted ? 'is-on' : 'is-off'}`}
-          data-recipe-field="visibility-restricted"
-          aria-pressed={restricted}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.Visibility.RestrictToggle', 'Restrict visibility to specific users')}
-          disabled={saving}
-          onclick={toggleRestricted}
-        >
-          <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-          <span class="manager-status-toggle-label">{restricted ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
-        </button>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Visibility.RestrictToggle', 'Restrict visibility to specific users')}</p>
-      </div>
-      {#if restricted}
-        <div class="manager-field is-wide" data-recipe-visibility-users>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.Visibility.AllowedUsers', 'Allowed users')}</span>
-          {#if worldUsers.length > 0}
-            <div class="manager-toggle-list">
-              {#each worldUsers as user (user.id)}
-                <label class="manager-field manager-recipe-visibility-user" data-recipe-visibility-user={user.id}>
-                  <input
-                    type="checkbox"
-                    checked={allowedUserIds.includes(user.id)}
-                    disabled={saving}
-                    onchange={() => toggleAllowedUser(user.id)}
-                  />
-                  <span>{user.name}</span>
-                </label>
-              {/each}
-            </div>
-          {:else}
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Visibility.NoWorldUsers', 'No non-GM players exist in this world yet.')}</p>
-          {/if}
-          {#if allowedUserIds.length === 0}
-            <p class="manager-muted manager-form-warning" data-recipe-visibility-empty>{text('FABRICATE.Admin.Manager.Recipe.Visibility.NoUsersSelected', 'Restricted with no users selected — no player can see this recipe.')}</p>
-          {/if}
-        </div>
-      {/if}
-    </section>
-  {/if}
+    </div>
+    <div class="manager-task-core-status">
+      <button
+        type="button"
+        class={`manager-status-toggle ${locked ? 'is-on' : 'is-off'}`}
+        data-recipe-field="locked"
+        aria-pressed={locked}
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.Locked.Toggle', 'Lock this recipe')}
+        disabled={saving}
+        onclick={() => onToggleLocked(!locked)}
+      >
+        <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+        <span class="manager-status-toggle-label">{locked ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+      </button>
+      <p class="manager-muted" data-recipe-locked-state>{locked
+        ? text('FABRICATE.Admin.Manager.Recipe.Locked.OnHint', 'Players can see this recipe but cannot craft it.')
+        : text('FABRICATE.Admin.Manager.Recipe.Locked.OffHint', 'Players who can see this recipe can craft it.')}</p>
+    </div>
+  </section>
 
   {#if isMultiStep}
     <RecipeStepsCard

@@ -71,6 +71,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
@@ -102,6 +103,7 @@ const stepsHarness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-steps-',
   rawModules: RAW_MODULES,
   compiledModules: [
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
     'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
@@ -277,6 +279,21 @@ async function pickPopoverOption(target, trigger, optionPattern) {
   [...document.querySelectorAll('.manager-travel-option')]
     .find((option) => optionPattern.test(option.textContent))
     .click();
+  await flushRender();
+}
+
+// Open a requirement's single "or..." (Accept instead) popover.
+async function openOrMenu(target, groupId) {
+  target.querySelector(`[data-recipe-group-id="${groupId}"] .manager-recipe-or-trigger`).click();
+  await flushRender();
+}
+
+// Open the "or..." popover and choose the type carrying the given data-recipe-add
+// token. The popover portals out of the group subtree, so the option is resolved at
+// document level (as pickPopoverOption already does).
+async function pickOrOption(target, groupId, addToken) {
+  await openOrMenu(target, groupId);
+  document.querySelector(`[data-recipe-add="${addToken}"]`).click();
   await flushRender();
 }
 
@@ -911,8 +928,14 @@ describe('RecipeEditView (mounted)', () => {
     assert.match(trigger.textContent, /Add duration/, 'an unset duration reads Add duration');
     trigger.click();
     await flushRender();
-    const daysInput = document.querySelector('[data-recipe-duration-unit="days"]');
-    assert.ok(daysInput, 'the duration editor exposes a days input');
+    // Each unit is the shared Stepper: the PRIMARY control is a real, typeable
+    // number input; the -/+ buttons are adjuncts. A click-only stepper would be a
+    // keyboard regression.
+    const daysInput = document.querySelector(
+      '[data-recipe-duration-unit="days"] [data-stepper-input]'
+    );
+    assert.ok(daysInput, 'the duration editor exposes a typeable days input');
+    assert.equal(daysInput.getAttribute('type'), 'number', 'it is a real number input');
     daysInput.value = '3';
     daysInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.equal(patches.length, 1, 'editing the duration emits exactly one patch');
@@ -941,7 +964,11 @@ describe('RecipeEditView (mounted)', () => {
     assert.match(trigger.textContent, /5 hours/, 'a set duration reads its formatted value');
     trigger.click();
     await flushRender();
-    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
+    const hoursInput = document.querySelector(
+      '[data-recipe-duration-unit="hours"] [data-stepper-input]'
+    );
+    // The Stepper ignores a partially-typed empty field mid-keystroke, so a zeroing
+    // edit is typed as '0' and commits on input.
     hoursInput.value = '0';
     hoursInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.equal(patches.length, 1, 'zeroing the only unit emits a patch');
@@ -957,9 +984,9 @@ describe('RecipeEditView (mounted)', () => {
     target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
     await flushRender();
     const upDays = document.querySelector(
-      '[data-recipe-duration-stepper="days"] [data-recipe-duration-step="up"]'
+      '[data-recipe-duration-stepper="days"] [data-stepper-increment]'
     );
-    assert.ok(upDays, 'each unit exposes an up stepper');
+    assert.ok(upDays, 'each unit exposes an increment adjunct');
     upDays.click();
     assert.deepEqual(
       patches.at(-1),
@@ -969,22 +996,22 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('increments a duration unit via the ArrowUp key on the input', async () => {
+  it('clamps a duration unit at zero and never commits a negative', async () => {
+    // The decrement adjunct is disabled at the Stepper's `min`, so the hand-rolled
+    // "clamp at 0" arithmetic the old editor carried is now the primitive's job — and
+    // this is the test that keeps it honest.
     const patches = [];
     const target = await editHarness.mount(
       identityProps({ onUpdateRecipe: (patch) => patches.push(patch) })
     );
     target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
     await flushRender();
-    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
-    hoursInput.dispatchEvent(
-      new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })
+    const downHours = document.querySelector(
+      '[data-recipe-duration-stepper="hours"] [data-stepper-decrement]'
     );
-    assert.deepEqual(
-      patches.at(-1),
-      { timeRequirement: { minutes: 0, hours: 1, days: 0, months: 0, years: 0 } },
-      'ArrowUp increments the focused unit'
-    );
+    assert.equal(downHours.disabled, true, 'the decrement adjunct is disabled at zero');
+    downHours.click();
+    assert.equal(patches.length, 0, 'a zero unit cannot be decremented below zero');
     editHarness.remount();
   });
 
@@ -1363,7 +1390,7 @@ describe('RecipeEditView (mounted)', () => {
   // a drag handle on each result row. A progressive recipe holds a single result
   // group (multi-set is forbidden), rendered chromeless. `progressive` is threaded
   // from the system resolution mode through the editor shell to the group card.
-  function mountProgressiveResults(results, { progressive = true } = {}) {
+  function mountProgressiveResults(results, { progressive = true, props = {} } = {}) {
     const patches = [];
     return editHarness
       .mount(
@@ -1377,6 +1404,7 @@ describe('RecipeEditView (mounted)', () => {
             resultGroups: [{ id: 'grp-1', name: '', results }],
           },
           onUpdateRecipe: (patch) => patches.push(patch),
+          ...props,
         })
       )
       .then(async (target) => {
@@ -1517,6 +1545,136 @@ describe('RecipeEditView (mounted)', () => {
         '[data-recipe-section="results"] [data-recipe-option-quantity]'
       ),
       'non-progressive result rows still render the quantity field'
+    );
+    editHarness.remount();
+  });
+
+  // Reorder was DRAG-ONLY: an aria-hidden grip on a draggable div, with an
+  // a11y_no_static_element_interactions suppression and NO keyboard path at all. Order
+  // is load-bearing in progressive mode (the award loop spends the check budget down the
+  // list), so that was a live accessibility hole. These are real buttons (issue 643 §6).
+  it('progressive: result rows expose keyboard move buttons, disabled at the ends', async () => {
+    const { target } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+    ]);
+    const rows = target.querySelectorAll('[data-recipe-result-row]');
+    const firstUp = rows[0].querySelector('[data-recipe-result-move-up]');
+    const firstDown = rows[0].querySelector('[data-recipe-result-move-down]');
+    const lastUp = rows[1].querySelector('[data-recipe-result-move-up]');
+    const lastDown = rows[1].querySelector('[data-recipe-result-move-down]');
+
+    assert.ok(firstUp && firstDown && lastUp && lastDown, 'both rows expose move buttons');
+    assert.equal(firstUp.disabled, true, 'the first row cannot move up');
+    assert.equal(firstDown.disabled, false, 'the first row can move down');
+    assert.equal(lastUp.disabled, false, 'the last row can move up');
+    assert.equal(lastDown.disabled, true, 'the last row cannot move down');
+
+    // The accessible name NAMES the row, so a screen-reader user knows what moves.
+    assert.match(
+      firstDown.getAttribute('aria-label'),
+      /Move down .* Mountain Herb/,
+      'the move button names the result it moves'
+    );
+    editHarness.remount();
+  });
+
+  it('progressive: a keyboard move reorders the group and announces the new position', async () => {
+    const { target, patches } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+    ]);
+    const rows = target.querySelectorAll('[data-recipe-result-row]');
+    rows[1].querySelector('[data-recipe-result-move-up]').click();
+    await flushRender();
+
+    assert.deepEqual(
+      patches.at(-1).resultGroups[0].results.map((result) => result.id),
+      ['res-2', 'res-1'],
+      'moving the second row up reorders the group'
+    );
+    const status = target.querySelector('[data-recipe-result-order-status]');
+    assert.equal(status.getAttribute('aria-live'), 'polite', 'the change is announced politely');
+    assert.match(status.textContent, /Pure Water moved to position 1 of 2/, 'and it names the move');
+    editHarness.remount();
+  });
+
+  it('non-progressive: result rows expose no move buttons', async () => {
+    const { target } = await mountProgressiveResults(
+      [
+        { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+        { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+      ],
+      { progressive: false }
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-result-move]'),
+      null,
+      'only progressive results are ordered, so only they get move controls'
+    );
+    editHarness.remount();
+  });
+
+  // `component.difficulty` is consumed by progressive recipes, progressive salvage,
+  // progressive gathering AND the system-validation blocker. An inline stepper here
+  // would either write cross-aggregate immediately (bypassing both dirty guards) or make
+  // "Save recipe" silently persist a *Component* change — so it is a READ-ONLY badge
+  // with a deep-link to the component editor's Difficulty card.
+  it('progressive: renders a READ-ONLY difficulty badge that deep-links to the component editor', async () => {
+    const opened = [];
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      {
+        props: {
+          componentOptions: [
+            { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp', difficulty: 12 },
+          ],
+          onOpenComponent: (id) => opened.push(id),
+        },
+      }
+    );
+    const badge = target.querySelector('[data-recipe-result-difficulty]');
+    assert.ok(badge, 'the difficulty badge renders');
+    assert.equal(badge.getAttribute('data-recipe-result-difficulty'), '12', 'it shows the value');
+    assert.match(badge.textContent, /Difficulty 12/, 'and reads it out');
+    // It is a deep-link, NOT an editor: no input of any kind inside the badge.
+    assert.equal(badge.querySelector('input'), null, 'the badge carries no editable control');
+    badge.click();
+    assert.deepEqual(opened, ['cmp-herb'], 'it routes to the component that owns the difficulty');
+    editHarness.remount();
+  });
+
+  it('progressive: a component with no authored difficulty reads as unset, not as zero', async () => {
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-water', quantity: 1 }],
+      {
+        props: {
+          componentOptions: [{ id: 'cmp-water', name: 'Pure Water', img: 'icons/water.webp' }],
+        },
+      }
+    );
+    const badge = target.querySelector('[data-recipe-result-difficulty]');
+    assert.equal(badge.getAttribute('data-recipe-result-difficulty'), '', 'no fabricated value');
+    assert.match(badge.textContent, /No difficulty/, 'it says so rather than showing a 0');
+    editHarness.remount();
+  });
+
+  it('non-progressive: result rows show no difficulty badge', async () => {
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      {
+        progressive: false,
+        props: {
+          componentOptions: [
+            { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp', difficulty: 12 },
+          ],
+        },
+      }
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-result-difficulty]'),
+      null,
+      'difficulty only participates in progressive resolution'
     );
     editHarness.remount();
   });
@@ -1817,24 +1975,21 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a component alternative via the row-end Add component popover', async () => {
+  it('appends a component alternative via the "or..." Accept-instead popover', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS } }
     );
-    await pickPopoverOption(
-      target,
-      '[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]',
-      /Pure Water/
-    );
-    assert.equal(patches.length, 1, 'choosing an alternative patches the recipe');
+    await pickOrOption(target, 'grp-1', 'alternative-component');
+    assert.equal(patches.length, 1, 'choosing an alternative kind patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the alternative list grew by one');
     assert.deepEqual(
       options[1].match,
-      { type: 'component', componentId: 'cmp-water' },
-      'the new alternative is a component match'
+      { type: 'component', componentId: null },
+      'the new alternative is an EMPTY component match for the row picker to fill'
     );
+    assert.equal(options[1].quantity, 1, 'it defaults to quantity 1');
     editHarness.remount();
   });
 
@@ -1860,40 +2015,34 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('increments an existing component alternative instead of duplicating it', async () => {
+  it('leaves an existing alternative untouched when a new one is appended', async () => {
+    // The old row-end add was itself a component PICKER, so it could dedupe-and-bump an
+    // alternative that already named the chosen component. The "or..." popover picks a
+    // KIND, not a component, so there is nothing to dedupe against at add time: the new
+    // alternative is born empty and the row's own picker fills it. A GM who then picks a
+    // component the requirement already lists gets the Validation tab's
+    // `duplicateAlternative` issue, which is the honest place for that check.
     const { target, patches } = await mountSingleGroup(
-      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS } }
     );
-    await pickPopoverOption(
-      target,
-      '[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]',
-      /Mountain Herb/
-    );
-    assert.equal(
-      patches.length,
-      1,
-      'choosing the existing alternative component patches the recipe'
-    );
+    await pickOrOption(target, 'grp-1', 'alternative-component');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
-    assert.equal(options.length, 1, 'no duplicate alternative is appended');
-    assert.equal(options[0].quantity, 2, 'the existing alternative quantity is incremented by one');
+    assert.equal(options.length, 2, 'the existing alternative is kept and a new one appended');
     assert.deepEqual(
-      options[0].match,
-      { type: 'component', componentId: 'cmp-herb' },
-      'the match is unchanged'
+      options[0],
+      { quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } },
+      'the existing alternative is untouched'
     );
     editHarness.remount();
   });
 
-  it('appends a tag alternative via the row-end Add tag requirement button', async () => {
+  it('appends a tag alternative via the "or..." Accept-instead popover', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-tag"]')
-      .click();
+    await pickOrOption(target, 'grp-1', 'alternative-tag');
     assert.equal(patches.length, 1, 'adding a tag alternative patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the alternative list grew by one');
@@ -1910,11 +2059,8 @@ describe('RecipeEditView (mounted)', () => {
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
-    // Starting from a one-component requirement, add a tag alternative from the row.
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-tag"]')
-      .click();
-    await flushRender();
+    // Starting from a one-component requirement, add a tag alternative from "or...".
+    await pickOrOption(target, 'grp-1', 'alternative-tag');
     const options = patches.at(-1).ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the requirement now holds two alternatives');
     const matchTypes = options.map((option) => option.match.type).sort();
@@ -2043,92 +2189,108 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders the per-row add cluster (with tooltips) for a single-alternative requirement', async () => {
+  it('renders ONE "or..." control per requirement, and no per-row add cluster', async () => {
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
     const req = target.querySelector('[data-recipe-group-id="grp-1"]');
-    const row = req.querySelector('[data-recipe-option]');
-    // The add cluster lives inside the option row for a single-alternative requirement.
-    const rowAddComponent = row.querySelector('[data-recipe-add="alternative-component"]');
-    const rowAddTag = row.querySelector('[data-recipe-add="alternative-tag"]');
-    assert.ok(rowAddComponent, 'the per-row add-component control renders in the option row');
-    assert.ok(rowAddTag, 'the per-row add-tag control renders in the option row');
-    // No footer add cluster for a single-alternative requirement.
+    const triggers = req.querySelectorAll('.manager-recipe-or-trigger');
+    assert.equal(triggers.length, 1, 'exactly one "or..." trigger per requirement');
     assert.equal(
-      req.querySelector('.manager-recipe-requirement-adds'),
-      null,
-      'no footer add cluster for a bare requirement'
+      triggers[0].getAttribute('aria-haspopup'),
+      'dialog',
+      'it reuses SearchablePopover (aria-haspopup, Escape-dismiss, focus-on-open)'
     );
-    // Both inline add controls carry title tooltips.
-    assert.equal(
-      rowAddComponent.getAttribute('title'),
-      'Add alternative component',
-      'the add-component trigger has a tooltip'
-    );
-    assert.equal(
-      rowAddTag.getAttribute('title'),
-      'Add alternative tag requirement',
-      'the add-tag button has a tooltip'
-    );
-    editHarness.remount();
-  });
-
-  it('renders exactly one footer add cluster (and no per-row adds) for a multi-alternative OR group', async () => {
-    const { target } = await mountSingleGroup(
-      [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
-      ],
-      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
-    );
-    const req = target.querySelector('[data-recipe-group-id="grp-1"]');
-    // Exactly one add-component and one add-tag control in the whole requirement.
-    assert.equal(
-      req.querySelectorAll('[data-recipe-add="alternative-component"]').length,
-      1,
-      'one add-component control per OR group'
-    );
-    assert.equal(
-      req.querySelectorAll('[data-recipe-add="alternative-tag"]').length,
-      1,
-      'one add-tag control per OR group'
-    );
-    // The single add cluster lives in the requirement footer, not in any option row.
-    const footer = req.querySelector('.manager-recipe-requirement-adds');
-    assert.ok(footer, 'the footer add cluster renders for an OR group');
-    assert.ok(
-      footer.querySelector('[data-recipe-add="alternative-component"]'),
-      'the add-component control is in the footer'
-    );
-    for (const optionRow of req.querySelectorAll('[data-recipe-option]')) {
+    for (const row of req.querySelectorAll('[data-recipe-option]')) {
       assert.equal(
-        optionRow.querySelector('.manager-recipe-option-alternative-adds'),
+        row.querySelector('[data-recipe-add]'),
         null,
-        'option rows have no per-row add cluster'
-      );
-      assert.equal(
-        optionRow.querySelector('[data-recipe-add="alternative-component"]'),
-        null,
-        'option rows have no add-component control'
+        'option rows carry no add controls of their own'
       );
     }
-    // The footer add controls keep their tooltips.
+    editHarness.remount();
+  });
+
+  it('offers FOUR kinds in the "or..." menu, each keeping its data-recipe-add token', async () => {
+    // The token family is PRESERVED on the popover's type choices rather than renamed:
+    // this file drives ~25 call sites through it. Currency and Essence appear only when
+    // the system configures them, so the menu never offers what it cannot honour.
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+    for (const token of [
+      'alternative-component',
+      'alternative-tag',
+      'alternative-currency',
+      'alternative-essence',
+    ]) {
+      assert.ok(
+        document.querySelector(`[data-recipe-add="${token}"]`),
+        `the "or..." menu offers ${token}`
+      );
+    }
+    editHarness.remount();
+  });
+
+  it('omits currency and essence from the "or..." menu when the system configures neither', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
+    await openOrMenu(target, 'grp-1');
+    assert.ok(document.querySelector('[data-recipe-add="alternative-component"]'));
+    assert.ok(document.querySelector('[data-recipe-add="alternative-tag"]'));
     assert.equal(
-      footer.querySelector('[data-recipe-add="alternative-component"]').getAttribute('title'),
-      'Add alternative component',
-      'footer add-component tooltip'
+      document.querySelector('[data-recipe-add="alternative-currency"]'),
+      null,
+      'no currency choice without configured currency units'
     );
     assert.equal(
-      footer.querySelector('[data-recipe-add="alternative-tag"]').getAttribute('title'),
-      'Add alternative tag requirement',
-      'footer add-tag tooltip'
+      document.querySelector('[data-recipe-add="alternative-essence"]'),
+      null,
+      'no essence choice without system essences'
     );
     editHarness.remount();
   });
 
-  it('appends an alternative from the OR-group footer add-component control', async () => {
+  it('adds an ESSENCE requirement to the SET, not an OR alternative to the requirement', async () => {
+    // There is NO essence ingredient match type: `IngredientSet.essences` is an AND
+    // requirement on the whole set. The menu offers it under its own heading and the
+    // choice bubbles to the set — mislabelling it as an "alternative" would promise OR
+    // semantics the engine does not implement.
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    await pickOrOption(target, 'grp-1', 'alternative-essence');
+    assert.equal(patches.length, 1, 'choosing Essence patches the recipe');
+    const set = patches[0].ingredientSets[0];
+    assert.deepEqual(set.essences, { 'ess-life': 1 }, 'the first unrequired essence is seeded at 1');
+    assert.equal(
+      set.ingredientGroups[0].options.length,
+      1,
+      'the requirement gains NO new alternative'
+    );
+    editHarness.remount();
+  });
+
+  it('appends a third alternative to an already-mixed OR group from the "or..." menu', async () => {
     const { target, patches } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -2136,21 +2298,14 @@ describe('RecipeEditView (mounted)', () => {
       ],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
-    const footer = target.querySelector(
-      '[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds'
-    );
-    await pickPopoverOption(
-      target,
-      footer.querySelector('[data-recipe-add="alternative-component"]'),
-      /Pure Water/
-    );
-    assert.equal(patches.length, 1, 'choosing from the footer patches the recipe');
+    await pickOrOption(target, 'grp-1', 'alternative-component');
+    assert.equal(patches.length, 1, 'choosing from the "or..." menu patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 3, 'the alternative list grew by one');
     assert.deepEqual(
       options[2].match,
-      { type: 'component', componentId: 'cmp-water' },
-      'the appended alternative is the chosen component'
+      { type: 'component', componentId: null },
+      'the appended alternative is an empty component match'
     );
     editHarness.remount();
   });
@@ -2299,14 +2454,12 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a currency alternative via the row-end Add cost button', async () => {
+  it('appends a currency alternative via the "or..." Accept-instead popover', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS } }
     );
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-cost"]')
-      .click();
+    await pickOrOption(target, 'grp-1', 'alternative-currency');
     assert.equal(patches.length, 1, 'adding a cost alternative patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the alternative list grew by one');
@@ -3533,8 +3686,10 @@ describe('RecipeStepsCard (mounted)', () => {
     const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');
     triggers[1].click();
     await flushRender();
-    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
-    assert.ok(hoursInput, 'the duration editor exposes an hours input');
+    const hoursInput = document.querySelector(
+      '[data-recipe-duration-unit="hours"] [data-stepper-input]'
+    );
+    assert.ok(hoursInput, 'the duration editor exposes a typeable hours input');
     hoursInput.value = '4';
     hoursInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.equal(updates.length, 1, 'editing a unit emits exactly one patch');
@@ -3560,7 +3715,9 @@ describe('RecipeStepsCard (mounted)', () => {
     );
     target.querySelector('[data-recipe-duration-trigger]').click();
     await flushRender();
-    const daysInput = document.querySelector('[data-recipe-duration-unit="days"]');
+    const daysInput = document.querySelector(
+      '[data-recipe-duration-unit="days"] [data-stepper-input]'
+    );
     daysInput.value = '0';
     daysInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.equal(updates.at(-1)[0], 'solo', 'the patch targets the edited step');

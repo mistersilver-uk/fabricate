@@ -52,7 +52,10 @@
     progressive = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
-    onRemove = () => {}
+    onRemove = () => {},
+    // Deep-link from a progressive row's read-only difficulty badge to the component
+    // editor (component.difficulty is a Component property with four consumers).
+    onOpenComponent = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -79,6 +82,25 @@
   function handleResultDrop(targetIndex) {
     if (dragIndex >= 0 && dragIndex !== targetIndex) reorderItem(dragIndex, targetIndex);
     dragIndex = -1;
+  }
+
+  // Reorder was DRAG-ONLY, with an aria-hidden grip on a draggable div and no keyboard
+  // path at all — a live accessibility hole, since order is load-bearing in progressive
+  // mode (the award loop spends the check budget down the list). These are real buttons,
+  // disabled at the ends, and the position change is announced through the aria-live
+  // region below (issue 643 §6).
+  let announcement = $state('');
+
+  function componentNameFor(item) {
+    const match = (componentOptions || []).find((option) => option.id === item?.componentId);
+    return match?.name || text('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
+  }
+
+  function moveItem(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= results.length) return;
+    reorderItem(index, target);
+    announcement = `${componentNameFor(results[index])} ${text('FABRICATE.Admin.Manager.Recipe.MovedToPosition', 'moved to position')} ${target + 1} ${text('FABRICATE.Admin.Manager.Recipe.OfCount', 'of')} ${results.length}`;
   }
 
   // Routing provider: 'ingredientSet' is Ingredient routing; 'check'
@@ -245,10 +267,31 @@
               <i class="fas fa-grip-vertical" aria-hidden="true"></i>
               <span class="manager-environment-comp-order">{index + 1}</span>
             </span>
+            <span class="manager-recipe-result-move" data-recipe-result-move>
+              <button
+                type="button"
+                class="manager-icon-button"
+                data-recipe-result-move-up
+                aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')} — ${componentNameFor(item)}`}
+                title={text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')}
+                disabled={index === 0}
+                onclick={() => moveItem(index, -1)}
+              ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
+              <button
+                type="button"
+                class="manager-icon-button"
+                data-recipe-result-move-down
+                aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')} — ${componentNameFor(item)}`}
+                title={text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')}
+                disabled={index === results.length - 1}
+                onclick={() => moveItem(index, 1)}
+              ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+            </span>
             <RecipeResultItemRow
               {item}
               {componentOptions}
               {progressive}
+              {onOpenComponent}
               onChange={(nextItem) => updateItem(index, nextItem)}
               onRemove={() => removeItem(index)}
             />
@@ -263,6 +306,10 @@
         {/if}
       {/each}
     </div>
+  {/if}
+
+  {#if progressive}
+    <p class="sr-only" aria-live="polite" data-recipe-result-order-status>{announcement}</p>
   {/if}
 
   <div class="manager-recipe-ingredient-set-add">

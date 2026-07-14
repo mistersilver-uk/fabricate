@@ -812,6 +812,35 @@ The recipe editor carries no drop zone and no "link another" affordance: a secon
 Owned copies match by UUID or resolved source UUID of the linked recipe item definition.
 If the required linkage is missing, show a validation warning.
 
+### Locked
+
+`recipe.locked` is persisted and engine-honoured (`guardCraftStart` refuses a locked craft), and the Overview tab is where it is written.
+
+A locked recipe stays **visible** to players but only a GM can craft it — a different concept from the Overview's recipe-item *image* lock (which merely means the image comes from a linked recipe item), so it carries its own copy and its own hooks.
+
+The lock write path is **never gated**, in either direction, in explicit contrast with the enable toggle: a GM locks a recipe precisely while it is unfinished, so an enable-blocking validation issue must not also block locking it.
+The change persists immediately (like `enabled`), outside the recipe draft's Save.
+
+### Ingredients tab
+
+A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" popover** per requirement, replacing the loose per-row and footer add-buttons.
+It offers exactly what the engine can honour:
+
+- **Accept instead** — Component, Tag and Currency: the three real ingredient match types.
+Each is appended to that requirement as a new, empty OR alternative for the row's own picker to fill in.
+- **Require as well** — Essence: there is **no** essence match type.
+An essence requirement is a property of the ingredient **set** (`IngredientSet.essences`) — an AND requirement, not an OR alternative — so it is offered under its own heading and applies to the set, rather than being mislabelled as an alternative.
+
+Currency and Essence appear only when the system configures currency units or essences, so the menu never offers a choice the system cannot honour.
+The per-option `tagMatch` (any / all) control is retained on every tag alternative.
+
+Multi-set authoring is gated by **`Recipe.complex`** plus the mode's structural constraints (`simple` and `progressive` are one set to one group; alchemy forces a single set) — never by `resolutionMode` alone.
+
+### Duration
+
+Duration unit controls are steppers whose **primary control is a real, typeable number input**, with the −/+ buttons as adjuncts and a clamp at zero.
+A click-only stepper is a keyboard regression.
+
 ### Step Structure UI
 
 Step mode (Single / Multi-step) is authored from the context rail's segmented control, and is offered when the system enables multi-step recipes — or whenever the recipe already has steps, so a multi-step recipe can always be reverted.
@@ -894,8 +923,12 @@ No "add result set" beyond the two.
 ### Progressive UI
 
 - Ordered results editor
-- Read-only difficulty badge per result item
+- Read-only difficulty badge per result item.
+The badge deep-links to the component editor's Difficulty card, and never edits in place: `component.difficulty` is a **Component** property consumed by progressive recipes, progressive salvage, progressive gathering and the system-validation blocker, so an inline editor here would write across an aggregate boundary (or make "Save recipe" silently persist a Component change).
+A component with no authored difficulty reads as unset, not as `0`.
 - Drag reorder controls
+- **Keyboard reorder controls** alongside them: per-row Move up / Move down buttons, disabled at the ends, whose accessible name names the result they move, with the new position announced through an `aria-live="polite"` region.
+Result order is load-bearing in progressive mode (the award loop spends the check budget down the list), so a drag-only reorder is an accessibility gap, not a convenience one.
 - Reorder indicator if `allowPlayerReorder` is true
 
 ## Crafting App (Player)

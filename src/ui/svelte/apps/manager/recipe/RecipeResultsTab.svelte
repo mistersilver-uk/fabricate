@@ -34,6 +34,9 @@
     // Progressive systems award results in order; forwarded to each result section
     // so its rows get drag-reorder handles.
     progressive = false,
+    // Deep-link from a progressive row's read-only difficulty badge to the component
+    // editor's Difficulty card (component.difficulty is a Component property).
+    onOpenComponent = () => {},
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {}
@@ -72,6 +75,7 @@
             {componentOptions}
             {routingProvider}
             {progressive}
+            {onOpenComponent}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
             {outcomeTiersDefined}
@@ -90,6 +94,7 @@
       {componentOptions}
       {routingProvider}
       {progressive}
+      {onOpenComponent}
       {ingredientSets}
       {outcomeTierOptions}
       {outcomeTiersDefined}

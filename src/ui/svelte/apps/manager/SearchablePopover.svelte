@@ -8,8 +8,11 @@
   within it does not dismiss).
 
   Props:
-    options      — [{ id, label, icon?, trailing? }] (consumer builds the full
-                   list, including any leading "special" option such as Auto)
+    options      — [{ id, label, icon?, trailing?, addMarker? }] (consumer builds the
+                   full list, including any leading "special" option such as Auto).
+                   `addMarker` stamps `data-recipe-add` on that OPTION (the recipe
+                   editor's "Accept instead" menu keeps its token family on the four
+                   type choices rather than on a trigger per type)
     value        — id of the currently selected option (for aria-selected)
     triggerClass — class string for the trigger button (consumer-controlled)
     triggerIcon  — leading icon class on the trigger (optional)
@@ -204,6 +207,7 @@
             class="manager-travel-option"
             role="option"
             aria-selected={option.id === value}
+            data-recipe-add={option.addMarker || undefined}
             title={option.label}
             onclick={() => choose(option.id)}
           >

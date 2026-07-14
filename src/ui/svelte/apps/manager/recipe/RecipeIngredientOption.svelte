@@ -9,10 +9,10 @@
   Each alternative reads its match type from `option.match.type` — a component
   alternative shows the component's image + name as the picker trigger (click to
   swap the component); a tag alternative shows tag chips + an "Add tag" picker +
-  an any/all toggle. The row-end control cluster ("Add component" /
-  "Add tag requirement" / remove) adds or removes ALTERNATIVES on the
-  requirement, which is distinct from the within-option tag editor's "Add tag"
-  (which edits THIS alternative's tags).
+  an any/all toggle. Adding an ALTERNATIVE moved to the requirement's single "or…"
+  ("Accept instead") popover (issue 643); this row keeps only its own editing
+  controls — including the per-option `tagMatch` (any/all) control, which sits
+  exactly where the popover lands and is the highest-risk silent loss in the change.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -30,11 +30,7 @@
     currencyUnits = [],
     onChange = () => {},
     onRemove = () => {},
-    onAddComponentAlternative = () => {},
-    onAddTagAlternative = () => {},
-    onAddCurrencyAlternative = () => {},
-    canRemove = true,
-    showRowAdds = true
+    canRemove = true
   } = $props();
 
   function text(key, fallback) {
@@ -240,44 +236,6 @@
         value={quantity}
         onchange={(e) => setQuantity(e.target.value)}
       />
-    {/if}
-
-    {#if showRowAdds}
-      <div class="manager-recipe-option-alternative-adds">
-        <SearchablePopover
-          options={componentPickerOptions}
-          pickerClass="manager-recipe-component-picker manager-recipe-add-alternative"
-          triggerClass="manager-button is-subtle manager-recipe-add-alternative-trigger"
-          triggerIcon="fas fa-cube"
-          triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
-          triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
-          triggerAddMarker="alternative-component"
-          dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
-          searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-          searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-          emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
-          showChevron={false}
-          onChoose={(id) => onAddComponentAlternative(id)}
-        />
-        <button
-          type="button"
-          class="manager-button is-subtle manager-recipe-add-alternative-trigger"
-          data-recipe-add="alternative-tag"
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')}
-          title={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')}
-          onclick={() => onAddTagAlternative()}
-        ><i class="fas fa-tags" aria-hidden="true"></i></button>
-        {#if (currencyUnits || []).length > 0}
-          <button
-            type="button"
-            class="manager-button is-subtle manager-recipe-add-alternative-trigger"
-            data-recipe-add="alternative-cost"
-            aria-label={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')}
-            title={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')}
-            onclick={() => onAddCurrencyAlternative()}
-          ><i class="fa-solid fa-coins" aria-hidden="true"></i></button>
-        {/if}
-      </div>
     {/if}
 
     {#if canRemove}
