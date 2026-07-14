@@ -58,7 +58,7 @@ const PARSE_CASES = [
   ['v1.4.0\n', null, 'anchored at the end — a trailing newline is not stripped for you'],
 
   // Leading zeros. These tags are typed BY HAND into a workflow_dispatch box, so a typo that
-  // validates clean here goes on to mint a permanent tag (and, in promote-release, a public
+  // validates clean here goes on to mint a permanent tag (and, in promote-to-public, a public
   // GitHub release). SemVer's numeric identifier is (0|[1-9]\d*), never \d+.
   ['v1.04.0', null, 'a leading zero in the minor is a typo, not a version'],
   ['v01.4.0', null, 'a leading zero in the major is a typo, not a version'],
@@ -143,7 +143,7 @@ test('the exported patterns are anchored and mutually exclusive', () => {
 });
 
 test('the promotion target is derived by the parser, never by stripping -rc.N by hand', () => {
-  // promote-release.yml builds `gh release create v${BASE} --latest` from this. A kind-specific
+  // promote-to-public.yml derives the public `v${BASE}` release from this. A kind-specific
   // strip would leave BASE as `1.4.0-beta.3` and publish a permanent public garbage release.
   assert.equal(parseReleaseTag('v1.0.0-rc.85').base, '1.0.0');
   assert.equal(parseReleaseTag('v1.4.0-beta.3').base, '1.4.0');
