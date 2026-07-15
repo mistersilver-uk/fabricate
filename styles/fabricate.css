@@ -8058,7 +8058,11 @@
 
 .fabricate-manager .manager-recipe-result-move .manager-icon-button {
   /* Flatter + wider (issue 643): the two stacked chevrons keep the compact stage row low
-     rather than forcing its height, and read as a squat rocker rather than tall buttons. */
+     rather than forcing its height, and read as a squat rocker rather than tall buttons.
+     `flex: 0 0 auto` is load-bearing — the base .manager-icon-button sets `flex: 0 0 34px`,
+     whose flex-BASIS is the MAIN (vertical) size in this column, so it would override
+     `height` and stretch each chevron to 34px. */
+  flex: 0 0 auto;
   width: 30px;
   height: 13px;
   min-width: 0;
