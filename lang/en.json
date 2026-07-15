@@ -1738,6 +1738,8 @@
           "StepLabel": "Step",
           "PrevStep": "Previous step",
           "NextStep": "Next step",
+          "OutcomeSuccessLabel": "Success",
+          "OutcomeFailureLabel": "Failure",
           "ResultSetLabel": "Result set",
           "SelectIngredientSet": "Select ingredient set",
           "SetNamePlaceholder": "Set name",

@@ -1150,4 +1150,50 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(produces[0].textContent, /Mountain Herb/);
     assert.match(produces[0].textContent, /×3/);
   });
+
+  it('alchemy: labels the two produce groups Success and Failure, never "Result Group N"', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-alc',
+        resultItemCount: 2,
+        resultGroupCount: 2,
+        resultGroups: [
+          { id: 'g-succ', name: 'Result Group 1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] },
+          { id: 'g-fail', name: 'Result Group 2', role: 'failure', results: [{ id: 'b', componentId: 'cmp-herb', quantity: 1 }] }
+        ]
+      }),
+      resolutionMode: 'alchemy',
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    const outcomes = [...root.querySelectorAll('[data-recipe-produces-outcome]')];
+    assert.deepEqual(outcomes.map((o) => o.textContent.trim()), ['Success', 'Failure']);
+    assert.ok(outcomes[0].classList.contains('is-success'));
+    assert.ok(outcomes[1].classList.contains('is-failure'));
+    assert.doesNotMatch(
+      root.querySelector('.manager-recipe-flow-list').textContent,
+      /Result Group/,
+      'no anonymous "Result Group N" text in alchemy produces'
+    );
+  });
+
+  it('alchemy: an unroled second group still reads as the Failure output (first group is Success)', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-alc2',
+        resultGroups: [
+          { id: 'g1', name: 'Result Group 1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] },
+          { id: 'g2', name: 'Result Group 2', results: [{ id: 'b', componentId: 'cmp-herb', quantity: 1 }] }
+        ]
+      }),
+      resolutionMode: 'alchemy',
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-recipe-produces-outcome]')].map((o) => o.dataset.recipeProducesOutcome),
+      ['success', 'failure']
+    );
+  });
 });

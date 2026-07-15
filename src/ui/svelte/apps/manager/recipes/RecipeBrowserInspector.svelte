@@ -174,6 +174,17 @@
   // grouped UNDER each tier's group rather than dumped into one flat list with a pill per
   // row. The group heading names the tier; its rows drop the redundant per-row pill.
   const isRoutedByCheck = $derived(resolutionMode === 'routedByCheck');
+  // Alchemy is a two-outcome model: exactly one Success group and one Failure group. The
+  // success group is the FIRST result group not flagged `role: 'failure'`; every other
+  // group is the failure output. So the inspector labels the produces "Success" /
+  // "Failure" rather than an anonymous "Result Group N" (issue 643).
+  const isAlchemy = $derived(resolutionMode === 'alchemy');
+  const alchemySuccessGroupId = $derived(
+    (() => {
+      const groups = Array.isArray(selectedRecipe?.resultGroups) ? selectedRecipe.resultGroups : [];
+      return (groups.find((group) => group?.role !== 'failure') || groups[0])?.id ?? null;
+    })()
+  );
 
   // id → outcome tier name, so a routed-by-check group heading can read as the TIER it
   // produces on ("Standard", "Masterwork") rather than an anonymous "Result Group N".
@@ -527,6 +538,16 @@
             class="manager-recipe-flow-group manager-recipe-flow-dc"
             data-recipe-produces-dc={row.difficulty === null ? '' : String(row.difficulty)}
           >{progressiveDcLabel(row)}</span>
+        {:else if isAlchemy && showGroupPill}
+          <!-- Alchemy: the two outcomes are Success and Failure, so the pill names the
+               OUTCOME rather than an anonymous "Result Group N". -->
+          {@const success = row.groupId === alchemySuccessGroupId}
+          <span
+            class={`manager-recipe-flow-group ${success ? 'is-success' : 'is-failure'}`}
+            data-recipe-produces-outcome={success ? 'success' : 'failure'}
+          >{success
+              ? text('FABRICATE.Admin.Manager.Recipe.OutcomeSuccessLabel', 'Success')
+              : text('FABRICATE.Admin.Manager.Recipe.OutcomeFailureLabel', 'Failure')}</span>
         {:else if showGroupPill && row.groupName && !routedPairing}
           <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
                tiers are authored, so the NAME is the recipe's; the tone is not. -->
