@@ -73,10 +73,12 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
       3,
       'all three inspector actions are manager-button controls'
     );
+    // The selectors chain `.manager-button` (0,3,0) so they beat the base
+    // `.manager-button` rule declared later in the sheet — issue 643.
     for (const selector of [
-      '.fabricate-manager .manager-recipe-browser-inspector-duplicate',
-      '.fabricate-manager .manager-recipe-browser-inspector-edit',
-      '.fabricate-manager .manager-recipe-browser-inspector-delete'
+      '.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate',
+      '.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit',
+      '.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete'
     ]) {
       const cssBlock = css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)));
       assert.ok(cssBlock.includes('width: 100%;'), `${selector} should be full width`);

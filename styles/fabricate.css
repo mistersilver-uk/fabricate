@@ -3792,16 +3792,27 @@
   min-width: 0;
 }
 
-/* Dark secondary: the panel surface, a subtle border, normal text. */
-.fabricate-manager .manager-recipe-browser-inspector-duplicate {
+/* These three chain `.manager-button` into the selector (raising specificity to
+   0,3,0) so they beat the base `.fabricate-manager .manager-button` rule declared
+   LATER in this file (0,2,0) — which otherwise wins on source order and repaints
+   every one of them the dark overlay surface, collapsing Edit's accent fill and
+   Delete's danger text into the same flat button (issue 643). This is the same
+   `.manager-button.<modifier>` specificity lift used for the recipe add-buttons. */
+
+/* Dark secondary: the panel surface, a subtle border, normal text. The font-size
+   and weight match the Edit button so all three action buttons read at one size. */
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate {
   width: 100%;
   min-height: 36px;
   justify-content: center;
   border-color: var(--fab-mv2-border);
   background: var(--fab-mv2-surface-1);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-.fabricate-manager .manager-recipe-browser-inspector-edit {
+/* Accent primary: the loudest control on the panel. */
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit {
   width: 100%;
   min-height: 38px;
   justify-content: center;
@@ -3812,25 +3823,27 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-recipe-browser-inspector-edit:not(:disabled):hover,
-.fabricate-manager .manager-recipe-browser-inspector-edit:focus-visible {
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit:focus-visible {
   border-color: var(--fab-accent);
   background: var(--fab-accent-strong);
 }
 
 /* Dark danger button: the same surface as Duplicate, but danger-red text and a subtly
    danger-tinted border so it reads as destructive without shouting louder than Edit. */
-.fabricate-manager .manager-recipe-browser-inspector-delete {
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete {
   width: 100%;
   min-height: 36px;
   justify-content: center;
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-mv2-surface-1);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-.fabricate-manager .manager-recipe-browser-inspector-delete:not(:disabled):hover,
-.fabricate-manager .manager-recipe-browser-inspector-delete:focus-visible {
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete:not(:disabled):hover,
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete:focus-visible {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
@@ -3860,7 +3873,7 @@
   overflow: hidden;
   color: var(--fab-mv2-text);
   font-family: var(--fab-font-serif);
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1.15;
