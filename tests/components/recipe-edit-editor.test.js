@@ -22,6 +22,14 @@ const graphPath = resolve(repoRoot, 'src/ui/svelte/util/recipeGraphBuilder.js');
 const iconsPath = resolve(repoRoot, 'src/ui/svelte/util/recipeImageIcons.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
+const routingAssignmentPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte'
+);
+const resultGroupCardPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte'
+);
 
 const editSource = readFileSync(editPath, 'utf8');
 // The identity card + locked image-picker markup live in the Overview tab. The
@@ -39,6 +47,8 @@ const graphSource = readFileSync(graphPath, 'utf8');
 const iconsSource = readFileSync(iconsPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
+const routingAssignmentSource = readFileSync(routingAssignmentPath, 'utf8');
+const resultGroupCardSource = readFileSync(resultGroupCardPath, 'utf8');
 
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
@@ -769,6 +779,55 @@ describe('RecipeEditView locks the image picker to the linked recipe item', () =
       rootSource.includes('recipeDraft?.recipeItemId')
         && rootSource.includes('recipeItemDefinitions.find('),
       'the derivation resolves the staged recipeItemId against recipeItemDefinitions'
+    );
+  });
+});
+
+describe('routed result-set head anchors the add-trigger to the right (issue 643 CHANGE 4)', () => {
+  it('pushes the routing add-trigger to the far right of the chip row via an auto margin', () => {
+    assert.ok(
+      /\.manager-recipe-routing-assignment-chips \.manager-recipe-routing-picker\s*\{[^}]*margin-left:\s*auto/.test(
+        css
+      ),
+      'the routing add-trigger (picker) is anchored right with margin-left: auto so it sits by the delete button'
+    );
+  });
+
+  it('keeps the reusable routing hooks intact on both routed heads', () => {
+    // The add-trigger carries the routing-option add marker and chips carry the chip
+    // hook — both are relied on by the mounted routing tests and the smoke harness.
+    assert.ok(
+      routingAssignmentSource.includes('triggerAddMarker="routing-option"'),
+      'the add-trigger keeps its routing-option marker'
+    );
+    assert.ok(
+      routingAssignmentSource.includes('data-routing-chip={chip.id}'),
+      'each assigned chip keeps its data-routing-chip hook'
+    );
+    // The trigger (SearchablePopover wrapper) carries the routing-picker class the
+    // right-anchor rule targets, and it is the LAST flow child after the chips.
+    assert.ok(
+      routingAssignmentSource.includes('manager-recipe-routing-picker'),
+      'the add-trigger wrapper carries the routing-picker class'
+    );
+    assert.ok(
+      routingAssignmentSource.indexOf('{#each chips') <
+        routingAssignmentSource.indexOf('manager-recipe-routing-picker'),
+      'the add-trigger renders after the chips so the auto margin pushes only it right'
+    );
+  });
+
+  it('places the delete button immediately after the routing head in the result-set head', () => {
+    // The head reads [routing assignment (label + chips + right-anchored add)] [trash],
+    // so the add-trigger lands next to the delete (result-set remove) button.
+    assert.ok(
+      resultGroupCardSource.includes('data-recipe-remove="result-set"'),
+      'the result-set head keeps its delete hook'
+    );
+    assert.ok(
+      resultGroupCardSource.indexOf('<RecipeRoutingAssignment') <
+        resultGroupCardSource.indexOf('data-recipe-remove="result-set"'),
+      'the delete button follows the routing assignment in the head'
     );
   });
 });

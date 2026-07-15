@@ -7502,6 +7502,14 @@
   gap: var(--fab-space-2);
 }
 
+/* The add-trigger is anchored to the RIGHT of the chip row (issue 643) so it sits
+   next to the result-set delete button instead of wandering as chips are added or
+   removed. It is the last flow child of the chip row, so an auto left margin pushes
+   it (and only it) to the far edge; the chips keep their natural left order. */
+.fabricate-manager .manager-recipe-routing-assignment-chips .manager-recipe-routing-picker {
+  margin-left: auto;
+}
+
 .fabricate-manager .manager-recipe-routing-chip {
   display: inline-flex;
   align-items: center;
