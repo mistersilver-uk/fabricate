@@ -34,13 +34,18 @@
   import { getRecipeCategoryLabel } from '../../../../../utils/recipeCategories.js';
   import {
     buildRecipeProduceRows,
-    buildRecipeRequirementRows
+    buildRecipeRequirementRows,
+    buildRecipeRoutingModel
   } from '../../../../../utils/recipeBrowserModel.js';
 
   let {
     selectedRecipe = null,
     recipeCount = 0,
     componentCount = 0,
+    // The SYSTEM's resolution mode. In `routedByIngredients` the chosen ingredient set
+    // routes to a result group, so the inspector pairs a set dropdown with a result-set
+    // dropdown; every other mode renders the flat Requires / Produces lists.
+    resolutionMode = '',
     // The system's components and essences, used ONLY to resolve the names and images
     // of the ids the recipe references. The inspector reads; it never authors.
     componentOptions = [],
@@ -147,7 +152,65 @@
   //
   // The empty-Produces warning still keys on the SUCCESS rows: a recipe whose only group is
   // the failure group still makes nothing when the craft succeeds, and the GM is told so.
-  const successRows = $derived(produceRows.filter((row) => !row.failure));
+  // Routed-by-ingredients pairing (issue 643): the ingredient sets, the result groups,
+  // and the set→group routing each set carries. The set and result-set dropdowns are
+  // driven by ONE selection (the ingredient set), so choosing either keeps both in sync.
+  const routingModel = $derived(
+    selectedRecipe ? buildRecipeRoutingModel(selectedRecipe) : { sets: [], groups: [] }
+  );
+  const isRoutedByIngredients = $derived(resolutionMode === 'routedByIngredients');
+  // Show the paired dropdowns only when the mode routes by ingredients AND there are
+  // recipe-level ingredient sets to route; otherwise the flat lists render unchanged.
+  const routedPairing = $derived(isRoutedByIngredients && routingModel.sets.length > 0);
+
+  let selectedRoutingSetId = $state(null);
+  // Re-seed the selection whenever the inspected recipe's set list changes (a new recipe,
+  // or an edit), defaulting to the first set. Guards against a stale id from a prior recipe.
+  $effect(() => {
+    const ids = routingModel.sets.map((set) => set.id);
+    if (!ids.includes(selectedRoutingSetId)) {
+      selectedRoutingSetId = ids[0] ?? null;
+    }
+  });
+
+  const selectedRoutingSet = $derived(
+    routingModel.sets.find((set) => set.id === selectedRoutingSetId) || null
+  );
+  const selectedRoutingGroupId = $derived(selectedRoutingSet?.groupId ?? null);
+
+  // When pairing is active, REQUIRES shows only the selected set's requirements and
+  // PRODUCES only its routed result group's items; otherwise the whole lists render.
+  const visibleRequirementRows = $derived(
+    routedPairing
+      ? requirementRows.filter((row) => row.setId === selectedRoutingSetId)
+      : requirementRows
+  );
+  const visibleProduceRows = $derived(
+    routedPairing
+      ? produceRows.filter((row) => row.groupId === selectedRoutingGroupId)
+      : produceRows
+  );
+  const successRows = $derived(visibleProduceRows.filter((row) => !row.failure));
+
+  function selectRoutingSet(setId) {
+    if (routingModel.sets.some((set) => set.id === setId)) selectedRoutingSetId = setId;
+  }
+
+  // The result-set dropdown drives the SAME selection: pick the ingredient set that
+  // routes to the chosen group so the set dropdown above updates in lockstep.
+  function selectRoutingGroup(groupId) {
+    const set = routingModel.sets.find((entry) => entry.groupId === groupId);
+    if (set) selectedRoutingSetId = set.id;
+  }
+
+  // The set / result-set dropdown option labels, with a positional fallback for an
+  // unnamed set or group ("Set 1", "Result set 1").
+  function routingSetLabel(set, index) {
+    return set.name || `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
+  }
+  function routingGroupLabel(group, index) {
+    return group.name || `${text('FABRICATE.Admin.Manager.Recipe.ResultSetLabel', 'Result set')} ${index + 1}`;
+  }
 
   const UNNAMED_COMPONENT = 'FABRICATE.Admin.Manager.Recipe.UnknownComponent';
 
@@ -262,6 +325,21 @@
     {/if}
 
     <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}</p>
+    {#if routedPairing}
+      <!-- Routed by ingredients: the chosen set is the route, so a dropdown picks which
+           set's requirements to show — and drives the paired result-set dropdown below. -->
+      <select
+        class="manager-recipe-route-select"
+        data-recipe-route="ingredient-set"
+        value={selectedRoutingSetId}
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.SelectIngredientSet', 'Select ingredient set')}
+        onchange={(event) => selectRoutingSet(event.currentTarget.value)}
+      >
+        {#each routingModel.sets as set, index (set.id)}
+          <option value={set.id}>{routingSetLabel(set, index)}</option>
+        {/each}
+      </select>
+    {/if}
     {#snippet requirementRow(row)}
       <div class="manager-recipe-flow-row" data-recipe-requirement={row.kind}>
         <span class="manager-recipe-flow-icon" aria-hidden="true">
@@ -275,11 +353,11 @@
         <span class="manager-recipe-flow-qty">{requirementQuantity(row)}</span>
       </div>
     {/snippet}
-    {#if requirementRows.length === 0}
+    {#if visibleRequirementRows.length === 0}
       <p class="manager-muted" data-recipe-requires-empty>{text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}</p>
     {:else}
       <div class="manager-recipe-flow-list">
-        {#each requirementRows as req (req.id)}
+        {#each visibleRequirementRows as req (req.id)}
           {#if req.type === 'anyOf'}
             <!-- A multi-option requirement is satisfied by ANY ONE of its members, so
                  they are drawn as EQUAL peers inside one bordered group — none promoted
@@ -301,6 +379,21 @@
     {/if}
 
     <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}</p>
+    {#if routedPairing}
+      <!-- The paired result-set dropdown: choosing a result set selects the ingredient
+           set that routes to it, keeping the set dropdown above in lockstep. -->
+      <select
+        class="manager-recipe-route-select"
+        data-recipe-route="result-set"
+        value={selectedRoutingGroupId}
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.SelectResultSet', 'Select result set')}
+        onchange={(event) => selectRoutingGroup(event.currentTarget.value)}
+      >
+        {#each routingModel.groups as group, index (group.id)}
+          <option value={group.id}>{routingGroupLabel(group, index)}</option>
+        {/each}
+      </select>
+    {/if}
     <div class="manager-recipe-flow-list">
       <!--
         Every produced row, TONED BY ROLE. A `role: 'failure'` group is the reserved
@@ -309,7 +402,7 @@
         them. Filtering it out made an alchemy recipe's failure output invisible in the one
         surface whose job is to say what a recipe makes.
       -->
-      {#each produceRows as row (row.id)}
+      {#each visibleProduceRows as row (row.id)}
         <div
           class={`manager-recipe-flow-row ${row.failure ? 'is-failure' : 'is-produced'}`}
           data-recipe-produces={row.failure ? 'failure' : 'success'}
@@ -322,7 +415,7 @@
             {/if}
           </span>
           <span class="manager-recipe-flow-name">{produceName(row)}</span>
-          {#if row.groupName}
+          {#if row.groupName && !routedPairing}
             <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
                  tiers are authored, so the NAME is the recipe's; the tone is not. -->
             <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}>{row.groupName}</span>

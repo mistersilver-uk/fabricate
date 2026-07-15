@@ -484,6 +484,39 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
 }
 
 /**
+ * The routed-by-ingredients pairing model for the library inspector (issue 643): the
+ * recipe's ingredient sets and result groups, plus the set→group routing each set
+ * carries (`IngredientSet.resultGroupId`). In this mode the chosen ingredient set
+ * determines the produced result group, so the inspector pairs a set dropdown with a
+ * result-set dropdown and keeps them in sync via this map.
+ *
+ * Ids match the ones `buildRecipeRequirementRows` (`setId`) and `buildRecipeProduceRows`
+ * (`groupId`) stamp on their rows, so the inspector can filter those rows by the
+ * selected set/group. Recipe-level only — a stepped recipe (uncommon for this mode)
+ * yields empty lists and the inspector falls back to its flat all-rows view.
+ *
+ * @param {object} recipe a projected recipe row.
+ * @returns {{ sets: {id: string, name: string, groupId: string|null}[],
+ *   groups: {id: string, name: string}[] }}
+ */
+export function buildRecipeRoutingModel(recipe) {
+  const sets = (Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []).map(
+    (set, index) => ({
+      id: set?.id || `set-${index + 1}`,
+      name: set?.name || '',
+      groupId: set?.resultGroupId || null,
+    })
+  );
+  const groups = (Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []).map(
+    (group, index) => ({
+      id: group?.id || `group-${index + 1}`,
+      name: group?.name || '',
+    })
+  );
+  return { sets, groups };
+}
+
+/**
  * Run the whole pipeline in one call: filter → sort → paginate (→ group the page).
  * Grouping is applied to the PAGE, not the full list, so the pager stays the unit
  * of truth for how many rows are on screen.

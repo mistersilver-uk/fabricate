@@ -884,4 +884,122 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(root.textContent, /Select a recipe/);
     assert.equal(root.querySelector('[data-recipe-inspector]'), null);
   });
+
+  // Routed-by-ingredients pairing (issue 643): set-1 (Herb route) requires Mountain Herb
+  // and routes to grp-1 (produces Healing Potion); set-2 (Potion route) requires Healing
+  // Potion and routes to grp-2 (produces Mountain Herb) — so a route's requirement and its
+  // produce name each other's component, making the filtered lists unambiguous.
+  function makeRoutedByIngredientsRecipe(overrides = {}) {
+    return makeRecipe({
+      id: 'r-routed',
+      resultItemCount: 2,
+      resultGroupCount: 2,
+      checkSummary: { kind: 'ingredients', dc: null },
+      ingredientSets: [
+        {
+          id: 'set-1',
+          name: 'Herb route',
+          resultGroupId: 'grp-1',
+          ingredientGroups: [{ id: 'ig1', options: [{ id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }]
+        },
+        {
+          id: 'set-2',
+          name: 'Potion route',
+          resultGroupId: 'grp-2',
+          ingredientGroups: [{ id: 'ig2', options: [{ id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-potion' } }] }]
+        }
+      ],
+      resultGroups: [
+        { id: 'grp-1', name: 'Result Group 1', results: [{ id: 'x1', componentId: 'cmp-potion', quantity: 3 }] },
+        { id: 'grp-2', name: 'Result Group 2', results: [{ id: 'x2', componentId: 'cmp-herb', quantity: 1 }] }
+      ],
+      ...overrides
+    });
+  }
+
+  function changeSelect(select, value) {
+    select.value = value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+  }
+
+  it('routed by ingredients: renders paired set/result dropdowns, filters both lists, drops the group pill', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRoutedByIngredientsRecipe(),
+      resolutionMode: 'routedByIngredients',
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    const setSelect = root.querySelector('[data-recipe-route="ingredient-set"]');
+    const groupSelect = root.querySelector('[data-recipe-route="result-set"]');
+    assert.ok(setSelect && groupSelect, 'both dropdowns render');
+    assert.deepEqual([...setSelect.options].map((o) => o.textContent.trim()), ['Herb route', 'Potion route']);
+    assert.deepEqual([...groupSelect.options].map((o) => o.textContent.trim()), ['Result Group 1', 'Result Group 2']);
+
+    // Default is the first set, and the result-set dropdown shows the group it routes to.
+    assert.equal(setSelect.value, 'set-1');
+    assert.equal(groupSelect.value, 'grp-1');
+
+    const requires = root.querySelector('.manager-recipe-flow-list');
+    assert.match(requires.textContent, /Mountain Herb/, 'Requires shows set-1 requirement');
+    assert.doesNotMatch(requires.textContent, /Healing Potion/, 'and only that set');
+
+    const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
+    assert.equal(produceRows.length, 1, 'only the routed result group is produced');
+    assert.match(produceRows[0].textContent, /Healing Potion/, 'grp-1 produces the potion');
+    assert.equal(root.querySelector('.manager-recipe-flow-group'), null, 'no Result Group pill in the produces list');
+  });
+
+  it('routed by ingredients: choosing an ingredient set drives the paired result set and both lists', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRoutedByIngredientsRecipe(),
+      resolutionMode: 'routedByIngredients',
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    changeSelect(root.querySelector('[data-recipe-route="ingredient-set"]'), 'set-2');
+
+    assert.equal(root.querySelector('[data-recipe-route="result-set"]').value, 'grp-2', 'result-set follows the set');
+    const requires = root.querySelector('.manager-recipe-flow-list');
+    assert.match(requires.textContent, /Healing Potion/, 'Requires now shows set-2');
+    assert.doesNotMatch(requires.textContent, /Mountain Herb/);
+    const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
+    assert.equal(produceRows.length, 1);
+    assert.match(produceRows[0].textContent, /Mountain Herb/, 'grp-2 produces the herb');
+  });
+
+  it('routed by ingredients: choosing a result set conversely selects the corresponding ingredient set', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRoutedByIngredientsRecipe(),
+      resolutionMode: 'routedByIngredients',
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    // Start on set-2, then pick grp-1 from the result-set dropdown → jumps back to set-1.
+    changeSelect(root.querySelector('[data-recipe-route="ingredient-set"]'), 'set-2');
+    changeSelect(root.querySelector('[data-recipe-route="result-set"]'), 'grp-1');
+
+    assert.equal(root.querySelector('[data-recipe-route="ingredient-set"]').value, 'set-1', 'the set dropdown follows the result set');
+    const requires = root.querySelector('.manager-recipe-flow-list');
+    assert.match(requires.textContent, /Mountain Herb/);
+    assert.match(root.querySelector('[data-recipe-produces]').textContent, /Healing Potion/);
+  });
+
+  it('non-routed modes keep the flat lists and the group pill, with no dropdowns', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRoutedByIngredientsRecipe(),
+      resolutionMode: 'simple',
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    assert.equal(root.querySelector('[data-recipe-route]'), null, 'no routing dropdowns outside routed-by-ingredients');
+    // Both groups' produces are listed, each keeping its group pill.
+    const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
+    assert.equal(produceRows.length, 2);
+    assert.ok(root.querySelector('.manager-recipe-flow-group'), 'the group pill stays outside routed-by-ingredients');
+  });
 });

@@ -6,6 +6,7 @@ import {
   buildRecipeBrowserModel,
   buildRecipeProduceRows,
   buildRecipeRequirementRows,
+  buildRecipeRoutingModel,
   deriveRecipeIo,
   deriveRecipeStatuses,
   describeActiveFilters,
@@ -515,5 +516,62 @@ describe('recipeBrowserModel — multi-step recipes', () => {
       essenceOptions: ESSENCES
     }).map((row) => row.id);
     assert.equal(new Set(ids).size, ids.length);
+  });
+});
+
+describe('buildRecipeRoutingModel', () => {
+  const ROUTED = {
+    ingredientSets: [
+      { id: 'set-a', name: 'Fire route', resultGroupId: 'grp-2' },
+      { id: 'set-b', name: '', resultGroupId: 'grp-1' }
+    ],
+    resultGroups: [
+      { id: 'grp-1', name: 'Result Group 1' },
+      { id: 'grp-2', name: 'Result Group 2' }
+    ]
+  };
+
+  it('maps each ingredient set to the result group it routes to via resultGroupId', () => {
+    const { sets, groups } = buildRecipeRoutingModel(ROUTED);
+    assert.deepEqual(sets, [
+      { id: 'set-a', name: 'Fire route', groupId: 'grp-2' },
+      { id: 'set-b', name: '', groupId: 'grp-1' }
+    ]);
+    assert.deepEqual(groups, [
+      { id: 'grp-1', name: 'Result Group 1' },
+      { id: 'grp-2', name: 'Result Group 2' }
+    ]);
+  });
+
+  it('uses the same setId / groupId that the requirement / produce row builders stamp', () => {
+    // The inspector filters requirement rows by row.setId and produce rows by row.groupId
+    // against this model's ids, so they MUST agree — with real groups/results to stamp.
+    const recipe = {
+      ingredientSets: [
+        {
+          id: 'set-a',
+          name: 'Fire route',
+          resultGroupId: 'grp-2',
+          ingredientGroups: [{ id: 'ig1', options: [{ quantity: 1, match: { type: 'component', componentId: 'c1' } }] }]
+        }
+      ],
+      resultGroups: [{ id: 'grp-2', name: 'Result Group 2', results: [{ id: 'r1', componentId: 'c1', quantity: 1 }] }]
+    };
+    const { sets, groups } = buildRecipeRoutingModel(recipe);
+    const reqSetIds = new Set(buildRecipeRequirementRows(recipe, {}).map((row) => row.setId));
+    const produceGroupIds = new Set(buildRecipeProduceRows(recipe, {}).map((row) => row.groupId));
+    assert.ok(reqSetIds.has(sets[0].id), 'the routing set id filters the requirement rows');
+    assert.ok(produceGroupIds.has(groups[0].id), 'the routing group id filters the produce rows');
+    assert.equal(sets[0].groupId, groups[0].id, 'the set routes to the group the produce rows carry');
+  });
+
+  it('carries a null groupId for an unrouted set and tolerates a recipe with no sets', () => {
+    const { sets } = buildRecipeRoutingModel({
+      ingredientSets: [{ id: 's1', name: 'Loose' }],
+      resultGroups: []
+    });
+    assert.equal(sets[0].groupId, null);
+    assert.deepEqual(buildRecipeRoutingModel({}), { sets: [], groups: [] });
+    assert.deepEqual(buildRecipeRoutingModel(null), { sets: [], groups: [] });
   });
 });

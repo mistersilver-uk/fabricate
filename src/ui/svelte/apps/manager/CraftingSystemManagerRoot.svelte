@@ -6631,6 +6631,7 @@
       {:else if currentView === 'recipes'}
         <RecipeBrowserInspector
           {selectedRecipe}
+          resolutionMode={selectedSystem?.resolutionMode || 'simple'}
           recipeCount={($viewState.recipes || []).length}
           componentCount={selectedCounts.components}
           componentOptions={selectedSystem?.managedItemOptions || []}

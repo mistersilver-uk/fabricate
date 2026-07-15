@@ -3908,6 +3908,24 @@
   margin-top: 0;
 }
 
+/* The routed-by-ingredients set / result-set dropdowns under the Requires / Produces
+   labels. Same Fabricate select treatment as the recipe editor's overview selects, at
+   the shared recipe control-text scale; the 0,2,1 selector outranks Foundry core's
+   aggressive `select` rules (issue 643). */
+.fabricate-manager .manager-recipe-route-select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  margin-top: var(--fab-space-1);
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 7px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-size: var(--fab-recipe-control-font);
+  cursor: pointer;
+}
+
 .fabricate-manager .manager-recipe-browser-inspector-hero {
   display: flex;
   gap: var(--fab-space-3);
