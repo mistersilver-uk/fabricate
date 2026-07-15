@@ -4190,7 +4190,9 @@
   overflow: hidden;
   padding: 1px 7px;
   border-radius: 999px;
-  font-size: 0.52rem;
+
+  /* 0.62rem (~10px): the outcome-tier pills at 0.52rem were too small to read (issue 643). */
+  font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-overflow: ellipsis;

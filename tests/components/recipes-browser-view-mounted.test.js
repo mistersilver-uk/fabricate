@@ -923,7 +923,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     flushSync();
   }
 
-  it('routed by ingredients: renders paired set/result dropdowns, filters both lists, drops the group pill', async () => {
+  it('routed by ingredients: one ingredient-set dropdown filters both lists and drops the group pill', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRoutedByIngredientsRecipe(),
       resolutionMode: 'routedByIngredients',
@@ -932,14 +932,11 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
 
     const setSelect = root.querySelector('[data-recipe-route="ingredient-set"]');
-    const groupSelect = root.querySelector('[data-recipe-route="result-set"]');
-    assert.ok(setSelect && groupSelect, 'both dropdowns render');
+    assert.ok(setSelect, 'the ingredient-set dropdown renders');
+    // The lower result-set dropdown was removed — the single set dropdown drives both lists.
+    assert.equal(root.querySelector('[data-recipe-route="result-set"]'), null, 'no redundant result-set dropdown');
     assert.deepEqual([...setSelect.options].map((o) => o.textContent.trim()), ['Herb route', 'Potion route']);
-    assert.deepEqual([...groupSelect.options].map((o) => o.textContent.trim()), ['Result Group 1', 'Result Group 2']);
-
-    // Default is the first set, and the result-set dropdown shows the group it routes to.
-    assert.equal(setSelect.value, 'set-1');
-    assert.equal(groupSelect.value, 'grp-1');
+    assert.equal(setSelect.value, 'set-1', 'defaults to the first set');
 
     const requires = root.querySelector('.manager-recipe-flow-list');
     assert.match(requires.textContent, /Mountain Herb/, 'Requires shows set-1 requirement');
@@ -951,7 +948,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(root.querySelector('.manager-recipe-flow-group'), null, 'no Result Group pill in the produces list');
   });
 
-  it('routed by ingredients: choosing an ingredient set drives the paired result set and both lists', async () => {
+  it('routed by ingredients: choosing an ingredient set re-filters both the Requires and Produces lists', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRoutedByIngredientsRecipe(),
       resolutionMode: 'routedByIngredients',
@@ -961,31 +958,12 @@ describe('RecipeBrowserInspector (mounted)', () => {
 
     changeSelect(root.querySelector('[data-recipe-route="ingredient-set"]'), 'set-2');
 
-    assert.equal(root.querySelector('[data-recipe-route="result-set"]').value, 'grp-2', 'result-set follows the set');
     const requires = root.querySelector('.manager-recipe-flow-list');
     assert.match(requires.textContent, /Healing Potion/, 'Requires now shows set-2');
     assert.doesNotMatch(requires.textContent, /Mountain Herb/);
     const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(produceRows.length, 1);
-    assert.match(produceRows[0].textContent, /Mountain Herb/, 'grp-2 produces the herb');
-  });
-
-  it('routed by ingredients: choosing a result set conversely selects the corresponding ingredient set', async () => {
-    const root = await inspector.mount({
-      selectedRecipe: makeRoutedByIngredientsRecipe(),
-      resolutionMode: 'routedByIngredients',
-      recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
-    });
-
-    // Start on set-2, then pick grp-1 from the result-set dropdown → jumps back to set-1.
-    changeSelect(root.querySelector('[data-recipe-route="ingredient-set"]'), 'set-2');
-    changeSelect(root.querySelector('[data-recipe-route="result-set"]'), 'grp-1');
-
-    assert.equal(root.querySelector('[data-recipe-route="ingredient-set"]').value, 'set-1', 'the set dropdown follows the result set');
-    const requires = root.querySelector('.manager-recipe-flow-list');
-    assert.match(requires.textContent, /Mountain Herb/);
-    assert.match(root.querySelector('[data-recipe-produces]').textContent, /Healing Potion/);
+    assert.match(produceRows[0].textContent, /Mountain Herb/, 'set-2 routes to grp-2, which produces the herb');
   });
 
   it('non-routed modes keep the flat lists and the group pill, with no dropdowns', async () => {

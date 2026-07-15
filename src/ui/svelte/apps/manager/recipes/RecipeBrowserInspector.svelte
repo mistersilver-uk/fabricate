@@ -196,20 +196,11 @@
     if (routingModel.sets.some((set) => set.id === setId)) selectedRoutingSetId = setId;
   }
 
-  // The result-set dropdown drives the SAME selection: pick the ingredient set that
-  // routes to the chosen group so the set dropdown above updates in lockstep.
-  function selectRoutingGroup(groupId) {
-    const set = routingModel.sets.find((entry) => entry.groupId === groupId);
-    if (set) selectedRoutingSetId = set.id;
-  }
-
-  // The set / result-set dropdown option labels, with a positional fallback for an
-  // unnamed set or group ("Set 1", "Result set 1").
+  // The ingredient-set dropdown option label, with a positional fallback for an unnamed
+  // set ("Set 1"). It drives BOTH lists: the selected set filters Requires and its routed
+  // result group filters Produces, so a second dropdown would be redundant.
   function routingSetLabel(set, index) {
     return set.name || `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
-  }
-  function routingGroupLabel(group, index) {
-    return group.name || `${text('FABRICATE.Admin.Manager.Recipe.ResultSetLabel', 'Result set')} ${index + 1}`;
   }
 
   const UNNAMED_COMPONENT = 'FABRICATE.Admin.Manager.Recipe.UnknownComponent';
@@ -379,21 +370,6 @@
     {/if}
 
     <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}</p>
-    {#if routedPairing}
-      <!-- The paired result-set dropdown: choosing a result set selects the ingredient
-           set that routes to it, keeping the set dropdown above in lockstep. -->
-      <select
-        class="manager-recipe-route-select"
-        data-recipe-route="result-set"
-        value={selectedRoutingGroupId}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.SelectResultSet', 'Select result set')}
-        onchange={(event) => selectRoutingGroup(event.currentTarget.value)}
-      >
-        {#each routingModel.groups as group, index (group.id)}
-          <option value={group.id}>{routingGroupLabel(group, index)}</option>
-        {/each}
-      </select>
-    {/if}
     <div class="manager-recipe-flow-list">
       <!--
         Every produced row, TONED BY ROLE. A `role: 'failure'` group is the reserved
