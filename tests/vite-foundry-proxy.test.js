@@ -33,17 +33,6 @@ function makeResponse() {
   return res;
 }
 
-function waitForEnd(res) {
-  return new Promise((resolve) => {
-    const timer = setInterval(() => {
-      if (res.finished) {
-        clearInterval(timer);
-        resolve();
-      }
-    }, 5);
-  });
-}
-
 test('rewriteFabricateModuleUrl maps the module entry to the source entry /src/main.js', () => {
   // Serve the source entry directly so dev startup skips the root-shim's async
   // import hop, which otherwise widens the window for a missed `init` hook.
@@ -73,17 +62,12 @@ test('rewriteFabricateModuleUrl ignores non-module requests', () => {
 
 test('serveRepoAsset serves a repo font with the woff2 content type', async () => {
   const res = makeResponse();
-  let nextCalled = false;
-  serveRepoAsset(
+  const served = serveRepoAsset(
     { url: '/assets/fonts/spectral-latin-600-normal.woff2' },
     res,
-    REPO_ROOT,
-    () => {
-      nextCalled = true;
-    }
+    REPO_ROOT
   );
-  await waitForEnd(res);
-  assert.equal(nextCalled, false, 'an existing asset should not fall through to next()');
+  assert.equal(served, true, 'an existing asset is served, not deferred');
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['content-type'], 'font/woff2');
   assert.ok(Number(res.headers['content-length']) > 0, 'the font should have a non-zero length');
@@ -91,20 +75,16 @@ test('serveRepoAsset serves a repo font with the woff2 content type', async () =
 
 test('serveRepoAsset refuses a path that escapes the assets directory', async () => {
   const res = makeResponse();
-  let nextCalled = false;
-  await serveRepoAsset({ url: '/assets/../package.json' }, res, REPO_ROOT, () => {
-    nextCalled = true;
-  });
-  assert.equal(nextCalled, true, 'a traversal path must fall through to next(), not be served');
-  assert.equal(res.statusCode, null, 'nothing should be written for a rejected path');
+  const served = serveRepoAsset({ url: '/assets/../package.json' }, res, REPO_ROOT);
+  assert.equal(served, false, 'a traversal path is not served (the caller proxies it on)');
+  assert.equal(res.statusCode, null, 'nothing is written for a rejected path');
 });
 
-test('serveRepoAsset falls through to next() for a missing asset', async () => {
+test('serveRepoAsset returns false for a missing asset so the caller can proxy it', async () => {
   const res = makeResponse();
-  let nextCalled = false;
-  await serveRepoAsset({ url: '/assets/fonts/does-not-exist.woff2' }, res, REPO_ROOT, () => {
-    nextCalled = true;
-  });
-  assert.equal(nextCalled, true);
+  // Foundry serves plenty of `/assets/` paths; a repo miss must NOT be served here,
+  // so the middleware forwards it to Foundry instead of dead-ending in Vite.
+  const served = serveRepoAsset({ url: '/assets/fonts/does-not-exist.woff2' }, res, REPO_ROOT);
+  assert.equal(served, false);
   assert.equal(res.statusCode, null);
 });

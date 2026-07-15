@@ -1,6 +1,5 @@
 import http from 'node:http';
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { createReadStream, statSync } from 'node:fs';
 import { join, normalize, extname } from 'node:path';
 
 const FOUNDRY_ORIGIN = 'http://localhost:30000';
@@ -49,9 +48,13 @@ export function fabricateDevProxy() {
 
         // Serve repo static assets (fonts, preview images) straight from disk.
         // Without this the `@font-face` `/assets/fonts/*.woff2` requests fall to
-        // the catch-all and get proxied to Foundry, which 404s them.
+        // the catch-all and get proxied to Foundry, which 404s them. A path that is
+        // NOT a repo asset (Foundry serves plenty under `/assets/` too) must fall
+        // through to Foundry — the original catch-all — NOT to Vite's `next()`,
+        // which would dead-end it in a 404.
         if (req.url?.startsWith('/assets/')) {
-          return serveRepoAsset(req, res, root, next);
+          if (serveRepoAsset(req, res, root)) return;
+          return proxyToFoundry(req, res);
         }
 
         if (rewrittenModuleUrl) {
@@ -103,41 +106,50 @@ export function rewriteFabricateModuleUrl(requestUrl) {
 }
 
 /**
- * Serve a file under the repo's `assets/` directory in dev. Falls through to the
- * next middleware (ultimately a 404) when the file does not exist, and refuses any
- * path that escapes the project root.
+ * Serve a file under the repo's `assets/` directory in dev.
+ *
+ * Returns `true` when it wrote a response, `false` when the request is not a repo
+ * asset (missing file, or a path that escapes `assets/`) — the caller then proxies
+ * the request to Foundry, which owns every other `/assets/` path.
+ *
+ * Synchronous on purpose: the middleware must decide serve-or-proxy in a single
+ * tick and hand a miss straight to `proxyToFoundry` (deferring that decision to a
+ * promise let connect fall through to Vite's 404 before the proxy ran). A `statSync`
+ * in a dev-only proxy is negligible.
  *
  * @param {http.IncomingMessage} req
  * @param {http.ServerResponse} res
  * @param {string} root Vite project root (the repo root).
- * @param {() => void} next
+ * @returns {boolean} whether a response was written.
  */
-export async function serveRepoAsset(req, res, root, next) {
+export function serveRepoAsset(req, res, root) {
   const pathname = new URL(req.url || '/', FOUNDRY_ORIGIN).pathname;
   const relative = normalize(decodeURIComponent(pathname)).replace(/^([/\\])+/, '');
   const filePath = join(root, relative);
 
-  // Path-traversal guard: the resolved file must stay inside the project root.
+  // Path-traversal guard: the resolved file must stay inside `assets/`.
   if (!filePath.startsWith(join(root, 'assets'))) {
-    return next();
+    return false;
   }
 
+  let info;
   try {
-    const info = await stat(filePath);
-    if (!info.isFile()) return next();
-
-    const type = ASSET_CONTENT_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
-    res.writeHead(200, {
-      'content-type': type,
-      'content-length': info.size,
-      // Fonts/images are content-hashed by filename in prod; in dev keep them
-      // fresh so an edited asset is picked up on reload.
-      'cache-control': 'no-cache'
-    });
-    createReadStream(filePath).pipe(res);
+    info = statSync(filePath);
   } catch {
-    return next();
+    return false;
   }
+  if (!info.isFile()) return false;
+
+  const type = ASSET_CONTENT_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
+  res.writeHead(200, {
+    'content-type': type,
+    'content-length': info.size,
+    // Fonts/images are content-hashed by filename in prod; in dev keep them
+    // fresh so an edited asset is picked up on reload.
+    'cache-control': 'no-cache'
+  });
+  createReadStream(filePath).pipe(res);
+  return true;
 }
 
 function proxyToFoundry(clientReq, clientRes) {
