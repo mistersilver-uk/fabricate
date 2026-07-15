@@ -4022,11 +4022,39 @@
   border-color: var(--fab-danger-border);
 }
 
-/* An alternative satisfies the SAME requirement (any one of them will do), so it is
-   inset and led by an OR — never presented as a second thing to bring. */
-.fabricate-manager .manager-recipe-flow-row.is-alternative {
-  margin-left: var(--fab-space-3);
-  border-style: dashed;
+/* A multi-option requirement: an accent-bordered container whose members are drawn as
+   equal peers (any one satisfies it), led by an "ANY ONE OF" pill — mirroring the
+   editor's ANY-ONE-OF group. No member is promoted above the others. */
+.fabricate-manager .manager-recipe-flow-anyof {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 8px;
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-recipe-flow-anyof-label {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border-radius: 999px;
+  background: var(--fab-accent-soft);
+  color: var(--fab-accent);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Members sit on the plain surface inside the accent container so the group frame,
+   not each row, carries the "these are alternatives" signal. */
+.fabricate-manager .manager-recipe-flow-anyof .manager-recipe-flow-row {
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-recipe-flow-icon {
@@ -4058,14 +4086,6 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.fabricate-manager .manager-recipe-flow-or {
-  margin-right: var(--fab-space-1);
-  color: var(--fab-accent);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
 }
 
 /*

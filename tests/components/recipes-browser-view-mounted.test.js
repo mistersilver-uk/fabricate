@@ -754,19 +754,32 @@ describe('RecipeBrowserInspector (mounted)', () => {
       essenceOptions: INSPECTOR_ESSENCES
     });
 
-    const rows = [...root.querySelectorAll('[data-recipe-requirement]')];
-    assert.deepEqual(
-      rows.map((row) => row.dataset.recipeRequirement),
-      ['component', 'currency', 'essence'],
-      'a currency cost is not a component, and a per-SET essence is not an alternative'
+    // The two options share ONE requirement, so they render as equal members inside an
+    // ANY-ONE-OF group — neither promoted above the other.
+    const group = root.querySelector('[data-recipe-requirement="anyOf"]');
+    assert.ok(group, 'a two-option requirement renders as an any-one-of group');
+    assert.ok(
+      group.querySelector('.manager-recipe-flow-anyof-label'),
+      'the group is led by an ANY ONE OF label'
     );
-    assert.match(rows[0].textContent, /Mountain Herb/);
-    assert.match(rows[0].querySelector('.manager-recipe-flow-qty').textContent, /×2/);
-    assert.match(rows[1].textContent, /25 gp/);
-    // The second OPTION of the same requirement is an alternative: any one satisfies it.
-    assert.ok(rows[1].classList.contains('is-alternative'));
-    assert.equal(rows[0].classList.contains('is-alternative'), false);
-    assert.match(rows[2].textContent, /Fire/);
+    const members = [...group.querySelectorAll('[data-recipe-requirement]')];
+    assert.deepEqual(
+      members.map((member) => member.dataset.recipeRequirement),
+      ['component', 'currency'],
+      'a currency cost is not a component; both are equal members of the group'
+    );
+    assert.match(members[0].textContent, /Mountain Herb/);
+    assert.match(members[0].querySelector('.manager-recipe-flow-qty').textContent, /×2/);
+    assert.match(members[1].textContent, /25 gp/);
+    // No member is inset or promoted — the group frame carries the "alternatives" signal.
+    assert.equal(root.querySelector('.is-alternative'), null);
+
+    // The per-SET essence is an AND requirement: a flat entry, not a group member.
+    const essence = root.querySelector(
+      '.manager-recipe-flow-list > [data-recipe-requirement="essence"]'
+    );
+    assert.ok(essence, 'the set essence is a flat requirement outside the any-one-of group');
+    assert.match(essence.textContent, /Fire/);
   });
 
   it('lists what the recipe PRODUCES, with a success-toned group pill and a mono quantity', async () => {

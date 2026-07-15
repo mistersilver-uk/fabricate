@@ -334,26 +334,31 @@ function findById(roster, id) {
 }
 
 /**
- * One Requires row per ingredient OPTION, in authoring order.
+ * The Requires list, one entry per ingredient REQUIREMENT (an `ingredientGroup`), in
+ * authoring order.
  *
- * An option is not always a component: the three real match types are `component`,
- * `tags` and `currency` (`src/models/match/matchTypes.js`), and each is reported as
- * itself rather than flattened into a component row it is not. A requirement (an
- * `ingredientGroup`) with two or more options is satisfied by ANY ONE of them, so
- * every option after the first is flagged `alternative: true` — the caller renders
- * that as an OR, never as a second thing to bring.
+ * A requirement's options are the three real match types — `component`, `tags` and
+ * `currency` (`src/models/match/matchTypes.js`) — each reported as itself rather than
+ * flattened into a component row it is not. Shape depends on how many options a
+ * requirement has:
+ *  - ONE option → a flat requirement entry (`type: 'requirement'`) carrying that
+ *    option's fields directly.
+ *  - TWO OR MORE → an `type: 'anyOf'` group whose `members[]` are ALL equal peers
+ *    (any one satisfies it). No member is promoted above the others; the caller draws
+ *    the whole group inside an "ANY ONE OF" container.
  *
  * Per-SET essences are AND requirements on the whole set, so they follow that set's
- * options as their own `essence` rows.
+ * requirements as their own `type: 'essence'` entries.
  *
  * @param {object} recipe a projected recipe row.
  * @param {{componentOptions?: object[], essenceOptions?: object[]}} [rosters]
- * @returns {object[]} rows: `{ id, kind, name, img, quantity, alternative, setId, setName, scopeName, … }`
+ * @returns {object[]} requirements: a flat entry `{ id, type: 'requirement'|'essence', kind, name, img, quantity, … }`
+ *   or a group `{ id, type: 'anyOf', members: [{ id, kind, name, img, quantity, … }], setId, setName, scopeName }`
  */
 export function buildRecipeRequirementRows(recipe, rosters = {}) {
   const components = rosters.componentOptions;
   const essences = rosters.essenceOptions;
-  const rows = [];
+  const requirements = [];
 
   for (const scope of executionScopes(recipe)) {
     for (const [setIndex, set] of (scope.ingredientSets || []).entries()) {
@@ -364,32 +369,36 @@ export function buildRecipeRequirementRows(recipe, rosters = {}) {
 
       for (const [groupIndex, group] of groups.entries()) {
         const options = Array.isArray(group?.options) ? group.options : [];
-        for (const [optionIndex, option] of options.entries()) {
-          rows.push({
-            ...base,
-            ...describeRequirementOption(option, components),
-            id: `${setId}:${group?.id || groupIndex}:${option?.id || optionIndex}`,
-            alternative: optionIndex > 0,
-          });
+        if (options.length === 0) continue;
+        const groupId = `${setId}:${group?.id || groupIndex}`;
+        const members = options.map((option, optionIndex) => ({
+          ...describeRequirementOption(option, components),
+          id: `${groupId}:${option?.id || optionIndex}`,
+        }));
+
+        if (members.length === 1) {
+          requirements.push({ ...base, ...members[0], id: groupId, type: 'requirement' });
+        } else {
+          requirements.push({ ...base, id: groupId, type: 'anyOf', members });
         }
       }
 
       for (const [essenceId, amount] of Object.entries(set?.essences || {})) {
-        rows.push({
+        requirements.push({
           ...base,
           id: `${setId}:essence:${essenceId}`,
+          type: 'essence',
           kind: 'essence',
           name: findById(essences, essenceId)?.name || '',
           icon: findById(essences, essenceId)?.icon || 'fas fa-flask-vial',
           img: '',
           quantity: Number(amount) || 0,
-          alternative: false,
         });
       }
     }
   }
 
-  return rows;
+  return requirements;
 }
 
 function describeRequirementOption(option, components) {

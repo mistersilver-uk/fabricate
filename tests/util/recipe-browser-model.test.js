@@ -318,25 +318,56 @@ describe('recipeBrowserModel — the inspector Requires list', () => {
   });
 
   it('reports each option AS ITS OWN MATCH TYPE, never flattened into a component', () => {
+    // The three options share one requirement, so they are members of an any-one-of
+    // group; the set-scoped essence is its own AND entry after it.
+    const [group, essence] = rows;
+    assert.equal(group.type, 'anyOf');
     assert.deepEqual(
-      rows.map((row) => row.kind),
-      ['component', 'tags', 'currency', 'essence'],
-      'the three real match types, then the set-scoped essence requirement'
+      group.members.map((member) => member.kind),
+      ['component', 'tags', 'currency'],
+      'the three real match types, as equal members'
     );
-    assert.equal(rows[0].name, 'Mountain Herb');
-    assert.equal(rows[0].img, 'icons/herb.webp');
-    assert.equal(rows[0].quantity, 2);
-    assert.deepEqual(rows[1].tags, ['herbal', 'rare']);
-    assert.equal(rows[1].tagMatch, 'all', 'tagMatch is carried, not dropped');
-    assert.deepEqual([rows[2].unit, rows[2].amount], ['gp', 25]);
+    assert.equal(group.members[0].name, 'Mountain Herb');
+    assert.equal(group.members[0].img, 'icons/herb.webp');
+    assert.equal(group.members[0].quantity, 2);
+    assert.deepEqual(group.members[1].tags, ['herbal', 'rare']);
+    assert.equal(group.members[1].tagMatch, 'all', 'tagMatch is carried, not dropped');
+    assert.deepEqual([group.members[2].unit, group.members[2].amount], ['gp', 25]);
+    assert.equal(essence.type, 'essence');
   });
 
-  it('flags every option after the first as an ALTERNATIVE (any one satisfies the requirement)', () => {
-    assert.deepEqual(
-      rows.map((row) => row.alternative),
-      [false, true, true, false],
-      'the OR alternatives are flagged; the set-scoped essence is an AND requirement'
+  it('groups a multi-option requirement as EQUAL peers, never promoting the first', () => {
+    const [group] = rows;
+    assert.equal(group.type, 'anyOf', 'a requirement with 2+ options is an any-one-of group');
+    assert.equal(group.members.length, 3, 'every option is an equal member of the group');
+    assert.equal(
+      group.members.some((member) => 'alternative' in member),
+      false,
+      'no member is flagged primary/alternative — they are peers'
     );
+  });
+
+  it('renders a SINGLE-option requirement as a flat entry, not a group', () => {
+    const [entry, ...rest] = buildRecipeRequirementRows(
+      {
+        ingredientSets: [
+          {
+            id: 's',
+            ingredientGroups: [
+              {
+                id: 'g',
+                options: [{ id: 'o', quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }]
+              }
+            ]
+          }
+        ]
+      },
+      { componentOptions: COMPONENTS }
+    );
+    assert.equal(rest.length, 0, 'one group, one entry');
+    assert.equal(entry.type, 'requirement');
+    assert.equal(entry.kind, 'component');
+    assert.equal(entry.name, 'Mountain Herb');
   });
 
   it('carries the per-SET essence requirement with its resolved name and amount', () => {

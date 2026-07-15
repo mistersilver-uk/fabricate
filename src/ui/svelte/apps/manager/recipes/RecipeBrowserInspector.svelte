@@ -262,30 +262,40 @@
     {/if}
 
     <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}</p>
+    {#snippet requirementRow(row)}
+      <div class="manager-recipe-flow-row" data-recipe-requirement={row.kind}>
+        <span class="manager-recipe-flow-icon" aria-hidden="true">
+          {#if row.img}
+            <img src={row.img} alt="" />
+          {:else}
+            <i class={row.icon}></i>
+          {/if}
+        </span>
+        <span class="manager-recipe-flow-name">{requirementName(row)}</span>
+        <span class="manager-recipe-flow-qty">{requirementQuantity(row)}</span>
+      </div>
+    {/snippet}
     {#if requirementRows.length === 0}
       <p class="manager-muted" data-recipe-requires-empty>{text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}</p>
     {:else}
       <div class="manager-recipe-flow-list">
-        {#each requirementRows as row (row.id)}
-          <!-- A requirement with alternatives is satisfied by ANY ONE of them, so an
-               alternative row is marked as an OR — never as a second thing to bring. -->
-          <div
-            class={`manager-recipe-flow-row ${row.alternative ? 'is-alternative' : ''}`}
-            data-recipe-requirement={row.kind}
-          >
-            <span class="manager-recipe-flow-icon" aria-hidden="true">
-              {#if row.img}
-                <img src={row.img} alt="" />
-              {:else}
-                <i class={row.icon}></i>
-              {/if}
-            </span>
-            <span class="manager-recipe-flow-name">
-              {#if row.alternative}<span class="manager-recipe-flow-or">{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>{/if}
-              {requirementName(row)}
-            </span>
-            <span class="manager-recipe-flow-qty">{requirementQuantity(row)}</span>
-          </div>
+        {#each requirementRows as req (req.id)}
+          {#if req.type === 'anyOf'}
+            <!-- A multi-option requirement is satisfied by ANY ONE of its members, so
+                 they are drawn as EQUAL peers inside one bordered group — none promoted
+                 above the others. -->
+            <div class="manager-recipe-flow-anyof" data-recipe-requirement="anyOf">
+              <span class="manager-recipe-flow-anyof-label">
+                <i class="fas fa-code-branch" aria-hidden="true"></i>
+                {text('FABRICATE.Admin.Manager.Recipe.AnyOneOf', 'Any one of')}
+              </span>
+              {#each req.members as member (member.id)}
+                {@render requirementRow(member)}
+              {/each}
+            </div>
+          {:else}
+            {@render requirementRow(req)}
+          {/if}
         {/each}
       </div>
     {/if}
