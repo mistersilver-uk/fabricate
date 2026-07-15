@@ -3029,7 +3029,7 @@
   grid-template-columns: var(--fab-recipe-cluster-cols);
   gap: var(--fab-space-3);
   flex-shrink: 0;
-  place-items: center end;
+  place-items: center;
   margin-left: auto;
 }
 
@@ -3202,22 +3202,17 @@
 }
 
 /* The row's right cluster is a fixed grid sharing `--fab-recipe-cluster-cols` with the
-   column header, so every cell aligns to its header AND row-to-row (issue 643). Items
-   sit at the END of their fixed columns (`justify-items: end`) so a short check pill or
-   I/O readout keeps its content width against the right of its column rather than
-   stretching to fill it — the header labels are right-aligned to match. */
+   column header, so every cell aligns to its header AND row-to-row (issue 643). Cells
+   are CENTRED in their fixed columns (`place-items: center`) so the DC pill sits under
+   the centred CHECK label rather than hard against the right edge next to the lock —
+   and the header labels centre to match. */
 .fabricate-manager .manager-recipe-cluster {
   display: grid;
   grid-template-columns: var(--fab-recipe-cluster-cols);
   flex-shrink: 0;
   gap: var(--fab-space-3);
-  place-items: center end;
+  place-items: center;
   margin-left: auto;
-}
-
-/* The enable switch centres in its column, matching the centred Status header. */
-.fabricate-manager .manager-recipe-cluster .manager-recipe-status {
-  justify-self: center;
 }
 
 /* The name row can carry THREE `white-space: nowrap` pills (Disabled + Locked + Can't
@@ -3740,7 +3735,7 @@
   gap: var(--fab-space-chip);
   height: 34px;
   min-height: 34px;
-  padding: 0 var(--fab-space-2);
+  padding: 0 var(--fab-space-3);
   border-radius: 9px;
   font-size: 0.78rem;
   font-weight: 600;
