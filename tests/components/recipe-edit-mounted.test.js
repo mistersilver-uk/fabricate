@@ -3392,8 +3392,8 @@ describe('RecipeContextRail (mounted)', () => {
       'the access heading must not sit in the medallion title grid, which would wrap it to one word per line'
     );
     assert.ok(
-      accessCard.querySelector(':scope > h3.manager-card-title'),
-      'the access card heading is a bare card title, like every other card in the rail'
+      accessCard.querySelector(':scope > h3.manager-recipe-rail-label'),
+      'the access heading is a bare uppercase micro-label, like every rail section (issue 643 §G1)'
     );
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-item"]'),
@@ -3719,18 +3719,25 @@ describe('RecipeContextRail (mounted)', () => {
   });
 
   // --- the validation mini-list --------------------------------------------------
-  it('shows an All clear pill when the readiness evaluator reports no issues', async () => {
-    const target = await railHarness.mount(railProps({ readiness: { checks: [], issues: [] } }));
+  it('shows an All clear pill plus the positive check list when the evaluator reports no issues', async () => {
+    const target = await railHarness.mount(
+      railProps({ readiness: { checks: [{ id: 'hasName', satisfied: true }], issues: [] } })
+    );
     assert.ok(target.querySelector('[data-recipe-validation-clear]'), 'renders the All clear pill');
-    assert.equal(
+    // The positive-state list always renders (issue 643 §G2): a passing check reads green.
+    assert.ok(
       target.querySelector('[data-recipe-validation-issues]'),
-      null,
-      'no issue list when clear'
+      'the check list renders even when clear'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-rail-check]').getAttribute('data-satisfied'),
+      'true',
+      'the passing check reads satisfied'
     );
     railHarness.remount();
   });
 
-  it('lists the failing checks and deep-links to the Validation tab', async () => {
+  it('renders the full check list (passing and failing) and deep-links to the Validation tab', async () => {
     const selected = [];
     const target = await railHarness.mount(
       railProps({
@@ -3750,8 +3757,9 @@ describe('RecipeContextRail (mounted)', () => {
       'no All clear pill while an issue stands'
     );
     const rows = target.querySelectorAll('[data-recipe-rail-check]');
-    assert.equal(rows.length, 1, 'only the FAILING check is listed');
-    assert.equal(rows[0].getAttribute('data-recipe-rail-check'), 'hasResultGroup');
+    assert.equal(rows.length, 2, 'every check is listed (the positive-state list, §G2)');
+    const failing = target.querySelector('[data-recipe-rail-check="hasResultGroup"]');
+    assert.equal(failing.getAttribute('data-satisfied'), 'false', 'the failing check reads unsatisfied');
     target.querySelector('[data-recipe-open-validation]').click();
     assert.deepEqual(selected, ['validation'], 'the review button opens the Validation tab');
     railHarness.remount();

@@ -85,6 +85,8 @@
     justify-content: center;
     gap: var(--fab-space-chip);
     padding: var(--fab-space-chip) var(--fab-space-3);
+    /* A transparent border so the active tile's border adds no width jump. */
+    border: 1px solid transparent;
     border-radius: 7px;
     color: var(--fab-text-muted);
     font-weight: 500;
@@ -93,9 +95,12 @@
     cursor: pointer;
   }
 
+  /* Active option is a raised dark tile (issue 643 §G3), not a solid peach accent
+     fill — the accent fill out-shouted the green Save button on the editor rail. */
   .manager-segment.is-active {
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
+    border: 1px solid var(--fab-border-strong);
+    background: var(--fab-surface-active);
+    color: var(--fab-text);
     font-weight: 600;
   }
 

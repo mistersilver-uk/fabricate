@@ -230,10 +230,9 @@
   const warningIssues = $derived(
     (readiness?.issues || []).filter((issue) => issue.severity === 'warning')
   );
-  const failingChecks = $derived(
-    (readiness?.checks || []).filter((check) => check.satisfied === false)
-  );
   const allClear = $derived(criticalIssues.length === 0 && warningIssues.length === 0);
+  // The rail always renders the full check list (§G2), so read it directly.
+  const railChecks = $derived(Array.isArray(readiness?.checks) ? readiness.checks : []);
 
   const CHECK_LABELS = {
     hasName: ['CheckName', 'Has a name'],
@@ -257,12 +256,12 @@
 {#if visibilityEffect?.showAccess}
   <!-- RESTRICTED: who this recipe is granted to. Read-only — the Access tab is the
        canonical editor and this deep-links to it. -->
-  <section class="manager-inspector-card" data-recipe-section="access">
+  <section class="manager-recipe-rail-section" data-recipe-section="access">
     <!-- A bare card title, like every other card in this rail. NOT
          `.manager-inspector-title-row`: that is a `44px | 1fr` grid built for a
          medallion + copy pair, so a lone heading lands in the 44px column and wraps
          one word per line ("WHO / CAN / CRAFT / THIS"). -->
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Rail.AccessTitle', 'Who can craft this')}</h3>
+    <h3 class="manager-recipe-rail-label">{text('FABRICATE.Admin.Manager.Recipe.Rail.AccessTitle', 'Who can craft this')}</h3>
 
     {#if hasAccessGrants}
       {#if (accessPlayers || []).length > 0}
@@ -323,8 +322,8 @@
        editor: a recipe is ADDED to a book from the book's own editor, so there is no
        drop zone and no "Link another" here. Each row can still be removed (that is a
        removal from THIS recipe's membership, not authoring a new one). -->
-  <section class="manager-inspector-card" data-recipe-section="recipe-item">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Rail.AppearsIn', 'Appears in')}</h3>
+  <section class="manager-recipe-rail-section" data-recipe-section="recipe-item">
+    <h3 class="manager-recipe-rail-label">{text('FABRICATE.Admin.Manager.Recipe.Rail.AppearsIn', 'Appears in')}</h3>
     {#if linkedDefinitions.length > 0}
       <ul class="manager-recipe-item-links" data-recipe-item-links aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLinks', 'Linked recipe items')}>
         {#each linkedDefinitions as def (def.id)}
@@ -351,7 +350,10 @@
         {/each}
       </ul>
     {:else}
-      <p class="manager-muted" data-recipe-item-empty>{text('FABRICATE.Admin.Manager.Recipe.Rail.AppearsInEmpty', 'No book or scroll teaches this recipe yet.')}</p>
+      <div class="manager-recipe-rail-empty-card" data-recipe-item-empty>
+        <span class="manager-recipe-rail-empty-medallion" aria-hidden="true"><i class="fas fa-book"></i></span>
+        <span class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Rail.AppearsInEmpty', 'Not in any book or scroll yet.')}</span>
+      </div>
     {/if}
 
     <button type="button" class="manager-button" data-recipe-open-books onclick={() => onOpenBooksScrolls()}>
@@ -368,8 +370,8 @@
          constraints — never by resolutionMode alone. A system whose mode forbids
          multiple sets crafts one set into one result, so the toggle would offer no
          real choice and is hidden entirely. -->
-    <section class="manager-inspector-card" data-recipe-section="recipe-mode">
-      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.RecipeMode', 'Recipe mode')}</h3>
+    <section class="manager-recipe-rail-section" data-recipe-section="recipe-mode">
+      <h3 class="manager-recipe-rail-label">{text('FABRICATE.Admin.Manager.Recipe.RecipeMode', 'Recipe mode')}</h3>
       <SegmentedControl
         options={RECIPE_MODE_OPTIONS}
         value={complex ? 'complex' : 'simple'}
@@ -378,15 +380,12 @@
         optionDataAttr="data-recipe-mode-option"
         onChange={selectComplexity}
       />
-      <p class="manager-muted manager-environment-mode-hint">{complex
-        ? text('FABRICATE.Admin.Manager.Recipe.ComplexHint', 'Author multiple ingredient sets and result sets.')
-        : text('FABRICATE.Admin.Manager.Recipe.SimpleHint', 'One set of ingredients makes one result.')}</p>
     </section>
   {/if}
 
   {#if multiStepEnabled || isMultiStep}
-    <section class="manager-inspector-card" data-recipe-section="recipe-step-mode">
-      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
+    <section class="manager-recipe-rail-section" data-recipe-section="recipe-step-mode">
+      <h3 class="manager-recipe-rail-label">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
       <SegmentedControl
         options={STEP_MODE_OPTIONS}
         value={isMultiStep ? 'multi' : 'single'}
@@ -395,29 +394,35 @@
         optionDataAttr="data-recipe-step-mode-option"
         onChange={selectStepMode}
       />
-      <p class="manager-muted manager-environment-mode-hint">{isMultiStep
-        ? text('FABRICATE.Admin.Manager.Recipe.MultiStepHint', 'Author an ordered list of named steps in the editor.')
-        : text('FABRICATE.Admin.Manager.Recipe.SingleStepHint', 'The recipe is crafted in a single step.')}</p>
     </section>
   {/if}
 
-  <section class="manager-inspector-card" data-recipe-section="recipe-validation">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}</h3>
-    {#if allClear}
-      <span class="manager-chip is-active" data-recipe-validation-clear>
-        <i class="fas fa-circle-check" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.Rail.AllClear', 'All clear')}</span>
-      </span>
-    {:else}
-      <ul class="manager-recipe-rail-issues" data-recipe-validation-issues>
-        {#each failingChecks as check (check.id)}
-          <li class="manager-recipe-rail-issue" data-recipe-rail-check={check.id}>
-            <i class="fas fa-circle-xmark" aria-hidden="true"></i>
-            <span>{checkLabel(check.id)}</span>
-          </li>
-        {/each}
-      </ul>
-      <button type="button" class="manager-button" data-recipe-open-validation onclick={() => onSelectIssue('validation')}>
+  <section class="manager-recipe-rail-section" data-recipe-section="recipe-validation">
+    <div class="manager-recipe-rail-label-row">
+      <h3 class="manager-recipe-rail-label">{text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}</h3>
+      {#if allClear}
+        <span class="manager-chip is-active" data-recipe-validation-clear>
+          <i class="fas fa-circle-check" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Rail.AllClear', 'All clear')}</span>
+        </span>
+      {/if}
+    </div>
+    <!-- The POSITIVE-state list (§G2): the full check list always renders — passing
+         checks read green — not only the failing ones. -->
+    <ul class="manager-recipe-rail-checks" data-recipe-validation-issues>
+      {#each railChecks as check (check.id)}
+        <li
+          class={`manager-recipe-rail-check ${check.satisfied ? 'is-satisfied' : 'is-unsatisfied'}`}
+          data-recipe-rail-check={check.id}
+          data-satisfied={check.satisfied}
+        >
+          <i class={check.satisfied ? 'fas fa-circle-check' : 'fas fa-circle-xmark'} aria-hidden="true"></i>
+          <span>{checkLabel(check.id)}</span>
+        </li>
+      {/each}
+    </ul>
+    {#if !allClear}
+      <button type="button" class="manager-button is-ghost" data-recipe-open-validation onclick={() => onSelectIssue('validation')}>
         <i class="fas fa-list-check" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Rail.ReviewValidation', 'Review validation')}</span>
       </button>
@@ -426,6 +431,86 @@
 {/if}
 
 <style>
+  /* One continuous rail (§G1): bare sections with an uppercase micro-label over their
+     content, not five stacked `.manager-inspector-card` boxes. */
+  .manager-recipe-rail-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    padding-bottom: var(--fab-space-3);
+    border-bottom: 1px solid var(--fab-border);
+  }
+
+  .manager-recipe-rail-section:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .manager-recipe-rail-label {
+    margin: 0;
+    color: var(--fab-text-subtle);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .manager-recipe-rail-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+  }
+
+  .manager-recipe-rail-checks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .manager-recipe-rail-check {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-1) var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 7px;
+    font-size: 0.76rem;
+  }
+
+  .manager-recipe-rail-check.is-satisfied > i {
+    color: var(--fab-success);
+  }
+
+  .manager-recipe-rail-check.is-unsatisfied > i {
+    color: var(--fab-danger);
+  }
+
+  /* "Appears in" empty state: a bordered card with a book medallion (§G5). */
+  .manager-recipe-rail-empty-card {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+  }
+
+  .manager-recipe-rail-empty-medallion {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    color: var(--fab-text-subtle);
+    background: var(--fab-bg-3);
+  }
+
   .manager-recipe-access-list {
     display: flex;
     flex-direction: column;
