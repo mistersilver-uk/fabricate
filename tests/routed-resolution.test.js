@@ -389,3 +389,58 @@ describe('routed recipe resolution', () => {
     assert.equal(tiered.groups[0].id, 'mythic');
   });
 });
+
+describe('simple mode result resolution (issue 643)', () => {
+  const successGroup = { id: 'succ', results: [{ id: 'r1', componentId: 'good', quantity: 1 }] };
+  const failureGroup = {
+    id: 'fail',
+    role: 'failure',
+    results: [{ id: 'r2', componentId: 'bad', quantity: 1 }],
+  };
+
+  function simpleRecipe(resultGroups) {
+    return new Recipe({
+      id: 'simple-recipe',
+      name: 'Simple',
+      craftingSystemId: 'sys-routed',
+      ingredientSets: [
+        { id: 's1', ingredientGroups: [{ id: 'g', options: [{ componentId: 'ore', quantity: 1 }] }] },
+      ],
+      resultGroups,
+    });
+  }
+
+  function resolveSimple(recipe, checkResult) {
+    const service = buildService(buildSystem('simple'));
+    return service.resolveResultGroups({
+      recipe,
+      step: null,
+      ingredientSet: recipe.ingredientSets[0],
+      checkResult,
+    });
+  }
+
+  it('a check-less / passed simple craft produces the success group (never the failure group)', () => {
+    const recipe = simpleRecipe([successGroup, failureGroup]);
+    assert.equal(resolveSimple(recipe, null).groups[0].id, 'succ');
+    assert.equal(resolveSimple(recipe, { success: true }).groups[0].id, 'succ');
+  });
+
+  it('a FAILED simple check produces the reserved failure group', () => {
+    const recipe = simpleRecipe([successGroup, failureGroup]);
+    const failed = resolveSimple(recipe, { success: false });
+    assert.equal(failed.groups.length, 1);
+    assert.equal(failed.groups[0].id, 'fail');
+    assert.equal(failed.meta.disposition, 'fail');
+  });
+
+  it('a FAILED simple check with NO reserved failure group produces nothing', () => {
+    const recipe = simpleRecipe([successGroup]);
+    assert.deepEqual(resolveSimple(recipe, { success: false }).groups, []);
+  });
+
+  it('validates a simple recipe carrying a reserved failure group (one success group + optional failure)', () => {
+    const recipe = simpleRecipe([successGroup, failureGroup]);
+    assert.equal(recipe.validate().valid, true, recipe.validate().errors.join(', '));
+  });
+});

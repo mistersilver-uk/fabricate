@@ -35,6 +35,9 @@
     // the Results tab receives it through the wrapper (a tab prop that skips this
     // wrapper silently drops to its default and never renders).
     alchemySimple = false,
+    // A simple-resolution system with the check enabled also gets the reserved-failure
+    // two-slot result editor (issue 643). Threaded through this wrapper like alchemySimple.
+    simpleFailureSlot = false,
     saving = false,
     saveFailed = false,
     onPickImagePath = null,
@@ -351,6 +354,7 @@
           <RecipeResultsTab
             {recipe}
             {alchemySimple}
+            {simpleFailureSlot}
             {isMultiStep}
             {componentOptions}
             {routingProvider}

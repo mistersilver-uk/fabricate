@@ -1112,6 +1112,13 @@
   // Alchemy Simple mode drives the Results tab's fixed two-slot editor (success +
   // reserved failure result set).
   const recipeAlchemySimple = $derived(alchemyCheckMode === 'simple');
+  // A SIMPLE-resolution system with the crafting check enabled has a pass/fail outcome,
+  // so it too gets the reserved-failure two-slot result editor (issue 643): a failed
+  // check produces the reserved `role: 'failure'` group (or nothing).
+  const recipeSimpleWithCheck = $derived(
+    (selectedSystem?.resolutionMode || 'simple') === 'simple' &&
+      selectedSystem?.craftingCheck?.enabled === true
+  );
   // The routing basis is a property of the system MODE for the routed crafting
   // modes (routedByCheck → 'check', routedByIngredients → 'ingredientSet'). Alchemy
   // routes by the system-level check mode: tiered → 'check' (routed tier assignment),
@@ -5118,6 +5125,7 @@
         recipe={recipeDraft}
         canAddSet={recipeCanAddSet}
         alchemySimple={recipeAlchemySimple}
+        simpleFailureSlot={recipeSimpleWithCheck}
         progressive={recipeProgressive}
         saving={recipeEditSaving}
         saveFailed={recipeSaveFailed}

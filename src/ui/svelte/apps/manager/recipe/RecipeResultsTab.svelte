@@ -22,6 +22,9 @@
     recipe = null,
     // Alchemy Simple two-slot result editor (issue 554); forwarded to each section.
     alchemySimple = false,
+    // Simple resolution mode with the check enabled uses the SAME two-slot editor
+    // (success + reserved failure); single-step only (issue 643).
+    simpleFailureSlot = false,
     isMultiStep = false,
     componentOptions = [],
     // Result routing (routed systems). Provider + the system's outcome tiers feed
@@ -111,7 +114,7 @@
   {:else}
     <RecipeResultsSection
       {resultGroups}
-      {alchemySimple}
+      alchemySimple={alchemySimple || simpleFailureSlot}
       {componentOptions}
       {routingProvider}
       {progressive}

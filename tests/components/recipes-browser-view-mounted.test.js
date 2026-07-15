@@ -1151,7 +1151,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(produces[0].textContent, /×3/);
   });
 
-  it('alchemy: labels the two produce groups Success and Failure, never "Result Group N"', async () => {
+  it('alchemy: two outcome sections — Success and Failure — never "Result Group N"', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({
         id: 'r-alc',
@@ -1167,10 +1167,14 @@ describe('RecipeBrowserInspector (mounted)', () => {
       componentOptions: INSPECTOR_COMPONENTS
     });
 
-    const outcomes = [...root.querySelectorAll('[data-recipe-produces-outcome]')];
-    assert.deepEqual(outcomes.map((o) => o.textContent.trim()), ['Success', 'Failure']);
-    assert.ok(outcomes[0].classList.contains('is-success'));
-    assert.ok(outcomes[1].classList.contains('is-failure'));
+    const sections = [...root.querySelectorAll('[data-recipe-produces-outcome]')];
+    assert.deepEqual(sections.map((s) => s.dataset.recipeProducesOutcome), ['success', 'failure']);
+    const heads = sections.map((s) => s.querySelector('.manager-recipe-produces-outcome-head'));
+    assert.deepEqual(heads.map((h) => h.textContent.trim()), ['Success', 'Failure']);
+    assert.ok(heads[0].classList.contains('is-success'));
+    assert.ok(heads[1].classList.contains('is-failure'));
+    assert.match(sections[0].textContent, /Healing Potion/, 'success section shows the success item');
+    assert.match(sections[1].textContent, /Mountain Herb/, 'failure section shows the failure item');
     assert.doesNotMatch(
       root.querySelector('.manager-recipe-flow-list').textContent,
       /Result Group/,
@@ -1178,22 +1182,37 @@ describe('RecipeBrowserInspector (mounted)', () => {
     );
   });
 
-  it('alchemy: an unroled second group still reads as the Failure output (first group is Success)', async () => {
+  it('simple with check: Success + Failure sections, Failure reads "No results" when the reserved group is empty', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({
-        id: 'r-alc2',
-        resultGroups: [
-          { id: 'g1', name: 'Result Group 1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] },
-          { id: 'g2', name: 'Result Group 2', results: [{ id: 'b', componentId: 'cmp-herb', quantity: 1 }] }
-        ]
+        id: 'r-simple',
+        checkSummary: { kind: 'dc', dc: 16 },
+        resultGroups: [{ id: 'g-succ', name: 'Result Group 1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] }]
       }),
-      resolutionMode: 'alchemy',
+      resolutionMode: 'simple',
       recipeCount: 1,
       componentOptions: INSPECTOR_COMPONENTS
     });
-    assert.deepEqual(
-      [...root.querySelectorAll('[data-recipe-produces-outcome]')].map((o) => o.dataset.recipeProducesOutcome),
-      ['success', 'failure']
-    );
+
+    const sections = [...root.querySelectorAll('[data-recipe-produces-outcome]')];
+    assert.deepEqual(sections.map((s) => s.dataset.recipeProducesOutcome), ['success', 'failure']);
+    assert.match(sections[0].textContent, /Healing Potion/, 'success shows the produced item');
+    assert.ok(root.querySelector('[data-recipe-outcome-empty="failure"]'), 'failure shows a No-results state');
+    assert.match(sections[1].textContent, /No results/);
+  });
+
+  it('simple WITHOUT a check keeps the plain single-group produces (no Success/Failure split)', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-simple-nocheck',
+        checkSummary: { kind: 'none', dc: null },
+        resultGroups: [{ id: 'g1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] }]
+      }),
+      resolutionMode: 'simple',
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+    assert.equal(root.querySelector('[data-recipe-produces-outcome]'), null, 'no outcome sections without a check');
+    assert.match(root.querySelector('.manager-recipe-flow-list').textContent, /Healing Potion/);
   });
 });

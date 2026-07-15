@@ -718,6 +718,37 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('simple-with-check: the same two-slot result editor renders (success + reserved failure)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        simpleFailureSlot: true,
+        complex: false,
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: {
+          ...RECIPE,
+          resultGroups: [{ id: 'rg-ok', results: [{ componentId: 'cmp-herb', quantity: 1 }] }],
+        },
+        onUpdateRecipe: () => {},
+      })
+    );
+    clickTab(target, 'results');
+    await flushRender();
+
+    const view = target.querySelector('[data-recipe-result-alchemy-simple]');
+    assert.ok(view, 'a simple system with a check gets the two-slot success/failure editor');
+    assert.equal(
+      view.querySelectorAll('[data-recipe-set]').length,
+      2,
+      'exactly two result sets (success + reserved failure)'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-add="result-set"]'),
+      null,
+      'no "Add result set" in the two-slot view'
+    );
+    editHarness.remount();
+  });
+
   it('check mode: result sets assign outcome tiers, disabling tiers used elsewhere', async () => {
     const groups = [
       {

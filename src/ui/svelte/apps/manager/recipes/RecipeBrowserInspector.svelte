@@ -179,6 +179,14 @@
   // group is the failure output. So the inspector labels the produces "Success" /
   // "Failure" rather than an anonymous "Result Group N" (issue 643).
   const isAlchemy = $derived(resolutionMode === 'alchemy');
+  // A simple-resolution recipe with the crafting check enabled (a usable DC, so
+  // checkSummary is not 'none') is also a two-outcome recipe: Success + a reserved
+  // Failure. Both render as Success / Failure sections, Failure reading "No results" when
+  // the reserved group is empty (issue 643).
+  const isSimpleWithCheck = $derived(
+    resolutionMode === 'simple' && (selectedRecipe?.checkSummary?.kind ?? 'none') !== 'none'
+  );
+  const isTwoOutcome = $derived(isAlchemy || isSimpleWithCheck);
   const alchemySuccessGroupId = $derived(
     (() => {
       const groups = Array.isArray(selectedRecipe?.resultGroups) ? selectedRecipe.resultGroups : [];
@@ -304,6 +312,28 @@
   // Produces grouped by result group (routed-by-check only); flat list otherwise.
   const producedGroups = $derived(
     isRoutedByCheck ? groupProduceRowsByResultGroup(visibleProduceRows) : []
+  );
+
+  // Two-outcome (alchemy / simple-with-check): Success = the success group's items,
+  // Failure = everything else (the reserved failure group), each shown as a labeled
+  // section so an EMPTY failure reads "No results" instead of vanishing.
+  const twoOutcomeSections = $derived(
+    isTwoOutcome
+      ? [
+          {
+            key: 'success',
+            label: text('FABRICATE.Admin.Manager.Recipe.OutcomeSuccessLabel', 'Success'),
+            tone: 'is-success',
+            rows: visibleProduceRows.filter((row) => row.groupId === alchemySuccessGroupId),
+          },
+          {
+            key: 'failure',
+            label: text('FABRICATE.Admin.Manager.Recipe.OutcomeFailureLabel', 'Failure'),
+            tone: 'is-failure',
+            rows: visibleProduceRows.filter((row) => row.groupId !== alchemySuccessGroupId),
+          },
+        ]
+      : []
   );
 
   function selectRoutingSet(setId) {
@@ -538,16 +568,6 @@
             class="manager-recipe-flow-group manager-recipe-flow-dc"
             data-recipe-produces-dc={row.difficulty === null ? '' : String(row.difficulty)}
           >{progressiveDcLabel(row)}</span>
-        {:else if isAlchemy && showGroupPill}
-          <!-- Alchemy: the two outcomes are Success and Failure, so the pill names the
-               OUTCOME rather than an anonymous "Result Group N". -->
-          {@const success = row.groupId === alchemySuccessGroupId}
-          <span
-            class={`manager-recipe-flow-group ${success ? 'is-success' : 'is-failure'}`}
-            data-recipe-produces-outcome={success ? 'success' : 'failure'}
-          >{success
-              ? text('FABRICATE.Admin.Manager.Recipe.OutcomeSuccessLabel', 'Success')
-              : text('FABRICATE.Admin.Manager.Recipe.OutcomeFailureLabel', 'Failure')}</span>
         {:else if showGroupPill && row.groupName && !routedPairing}
           <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
                tiers are authored, so the NAME is the recipe's; the tone is not. -->
@@ -561,7 +581,26 @@
       </div>
     {/snippet}
     <div class="manager-recipe-flow-list">
-      {#if isRoutedByCheck && !isMultiStep}
+      {#if isTwoOutcome && !isMultiStep}
+        <!-- Alchemy / simple-with-check: two outcome sections, Success and Failure. The
+             failure section reads "No results" when the reserved group is empty rather
+             than disappearing. -->
+        {#each twoOutcomeSections as section (section.key)}
+          <div class="manager-recipe-produces-outcome" data-recipe-produces-outcome={section.key}>
+            <span class={`manager-recipe-flow-group manager-recipe-produces-outcome-head ${section.tone}`}>{section.label}</span>
+            {#if section.rows.length === 0}
+              <p class="manager-recipe-flow-empty" data-recipe-outcome-empty={section.key}>
+                <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.Recipe.OutcomeNoResults', 'No results')}</span>
+              </p>
+            {:else}
+              {#each section.rows as row (row.id)}
+                {@render produceRow(row, false)}
+              {/each}
+            {/if}
+          </div>
+        {/each}
+      {:else if isRoutedByCheck && !isMultiStep}
         <!-- Routed by check: group the produced items UNDER each result group as a
              FULL-WIDTH, COLLAPSIBLE outcome-tier section headed by the tier NAME (from the
              group's checkOutcomeIds), not an anonymous "Result Group N" pill. Sections
@@ -597,9 +636,10 @@
           {@render produceRow(row, true)}
         {/each}
       {/if}
-      {#if activeSuccessEmpty}
+      {#if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep)}
         <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that
-             makes nothing — true even when a failure group is listed above. -->
+             makes nothing — true even when a failure group is listed above. (Two-outcome
+             modes show a per-section "No results" instead, so skip the global note.) -->
         <p class="manager-recipe-flow-empty" data-recipe-produces-empty>
           <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.NoResults', 'No results — a successful craft makes nothing.')}</span>

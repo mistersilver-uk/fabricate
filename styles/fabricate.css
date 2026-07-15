@@ -4264,6 +4264,24 @@
   height: 26px;
 }
 
+/* Two-outcome Produces (alchemy / simple-with-check): a Success and a Failure section,
+   each headed by a toned pill; the failure section shows "No results" when empty
+   (issue 643). */
+.fabricate-manager .manager-recipe-produces-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fabricate-manager .manager-recipe-produces-outcome + .manager-recipe-produces-outcome {
+  margin-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-flow-group.manager-recipe-produces-outcome-head {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
 /* Routed-by-check Produces: items grouped under each result-group as a FULL-WIDTH,
    collapsible outcome-tier section. The header is a full-width bar (chevron · tier name ·
    count), not a pill, and starts collapsed so the panel opens compact (issue 643). */
