@@ -1335,6 +1335,12 @@
       recipeItemCount,
     })
   );
+  // The Crafting parent-group badge totals its visible sub-tabs (Recipes + Books &
+  // Scrolls where that surface applies), mirroring the gathering group's total, so
+  // the collapsed group count reflects everything inside it — not recipes alone.
+  const craftingNavCount = $derived(
+    craftingNavItems.reduce((sum, item) => sum + (item.count || 0), 0)
+  );
   const isCraftingRoute = $derived(isCraftingView(currentView));
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
   // The recipe whose access grant is open on the Access surface.
@@ -4682,7 +4688,7 @@
               >
                 <i class="fas fa-hammer" aria-hidden="true"></i>
                 <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
-                <span class="manager-nav-count">{$viewState.recipes?.length || 0}</span>
+                <span class="manager-nav-count">{craftingNavCount}</span>
               </button>
               <button
                 type="button"

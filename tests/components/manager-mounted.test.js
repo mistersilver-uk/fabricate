@@ -3996,7 +3996,8 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const recipesNav = craftingParent();
     assert.equal(recipesNav.disabled, false);
-    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '2');
+    // Parent total = 2 recipes + 2 books & scrolls items in the default fixture (issue 643).
+    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '4');
     for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
@@ -6241,7 +6242,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     const parent = target.querySelector('#manager-nav-crafting');
     assert.ok(parent, 'Crafting parent renders when experimental on');
     assert.equal(parent.getAttribute('aria-expanded'), 'false');
-    assert.equal(parent.querySelector('.manager-nav-count').textContent.trim(), '2');
+    // Parent total = 2 recipes + 2 books & scrolls items in the default fixture (issue 643).
+    assert.equal(parent.querySelector('.manager-nav-count').textContent.trim(), '4');
     const toggle = target.querySelector('#manager-nav-crafting + .manager-nav-toggle');
     assert.equal(toggle.getAttribute('aria-controls'), 'manager-crafting-submenu');
     assert.equal(toggle.getAttribute('aria-label'), 'Expand crafting menu');
@@ -6392,8 +6394,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assert.ok(target.querySelector('[data-books-scrolls]'), 'Books & Scrolls surface renders');
-    // The parent nav count reflects the recipes count (2 recipes in the fixture).
-    assert.equal(craftingParent().querySelector('.manager-nav-count').textContent.trim(), '2');
+    // The parent nav count totals the visible sub-tabs: 2 recipes + 2 books & scrolls
+    // items in the fixture (issue 643).
+    assert.equal(craftingParent().querySelector('.manager-nav-count').textContent.trim(), '4');
 
     // Both recipe items are listed with their own recipe-count + learning chips.
     const cards = Array.from(target.querySelectorAll('[data-books-scrolls-item]'));
@@ -9734,7 +9737,10 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const recipesNav = craftingParent();
     assert.equal(recipesNav.disabled, false);
-    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
+    // No recipes, but the fixture's 2 books & scrolls items still count toward the
+    // Crafting parent total; the setup guidance below is keyed on empty recipes, not
+    // this badge (issue 643).
+    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '2');
     for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);

@@ -3511,6 +3511,29 @@
   min-width: 0;
 }
 
+/* The overview selects (Category, Check tier, Minimum success tier) carry no select
+   class of their own, so without this they rendered Foundry core's default light
+   select chrome. Give them the Fabricate surface + the theme-appropriate native
+   chevron, matching the recipe-toolbar select treatment. The two-class-plus-element
+   selector (0,2,1) outranks Foundry core's aggressive `select` rules (issue 643). */
+.fabricate-manager .manager-recipe-field select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-field select:disabled {
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
+}
+
 /* Uppercase micro-label over an unwrapped field (prototype §5.1). */
 .fabricate-manager .manager-recipe-micro-label {
   color: var(--fab-text-subtle);
@@ -7473,6 +7496,15 @@
   min-width: 0;
 }
 
+/* A routed result-set head stacks a label over the chips + "Add outcome" row, so a
+   vertically centred delete button floats between the two lines. Bottom-align it so
+   the delete sits in line with the "Add outcome" button on the chips row (issue 643).
+   Single-line heads (a set-name input + icons) are unaffected — bottom-aligning equal
+   heights reads the same as centring. */
+.fabricate-manager .manager-recipe-ingredient-set-head:has(.manager-recipe-routing-assignment) {
+  align-items: flex-end;
+}
+
 /* A NAME input is set in the serif, exactly as the name it authors renders
    elsewhere (issue 643) — the set name here, the recipe name on the Overview tab. */
 .fabricate-manager .manager-recipe-ingredient-set-name {
@@ -7549,10 +7581,14 @@
   margin-left: auto;
 }
 
+/* Outcome routing chips are rounded-corner rectangles, not the default full-round
+   chip pill, so a routed outcome ("Flawed", "Standard") reads as a tag on the
+   result set rather than a status bubble (issue 643). */
 .fabricate-manager .manager-recipe-routing-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  border-radius: 6px;
 }
 
 .fabricate-manager .manager-recipe-routing-chip-remove {
