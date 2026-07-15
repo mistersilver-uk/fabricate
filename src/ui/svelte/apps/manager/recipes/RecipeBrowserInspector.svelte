@@ -35,7 +35,8 @@
   import {
     buildRecipeProduceRows,
     buildRecipeRequirementRows,
-    buildRecipeRoutingModel
+    buildRecipeRoutingModel,
+    groupProduceRowsByResultGroup
   } from '../../../../../utils/recipeBrowserModel.js';
 
   let {
@@ -165,6 +166,16 @@
   // no "Result Group 1" pill (there is exactly one group), no quantity (each is awarded
   // once), the component's DC instead, and repeats kept in place because order matters.
   const isProgressive = $derived(resolutionMode === 'progressive');
+  // Routed by check: each result group is routed to a check-outcome tier, so Produces is
+  // grouped UNDER each tier's group rather than dumped into one flat list with a pill per
+  // row. The group heading names the tier; its rows drop the redundant per-row pill.
+  const isRoutedByCheck = $derived(resolutionMode === 'routedByCheck');
+
+  function produceGroupLabel(group, index) {
+    return (
+      group.groupName || `${text('FABRICATE.Admin.Manager.Recipe.ResultSetLabel', 'Result set')} ${index + 1}`
+    );
+  }
 
   // The per-component progressive DC label ("DC 12"), or the unset-difficulty note.
   function progressiveDcLabel(row) {
@@ -204,6 +215,10 @@
       : produceRows
   );
   const successRows = $derived(visibleProduceRows.filter((row) => !row.failure));
+  // Produces grouped by result group (routed-by-check only); flat list otherwise.
+  const producedGroups = $derived(
+    isRoutedByCheck ? groupProduceRowsByResultGroup(visibleProduceRows) : []
+  );
 
   function selectRoutingSet(setId) {
     if (routingModel.sets.some((set) => set.id === setId)) selectedRoutingSetId = setId;
@@ -383,46 +398,63 @@
     {/if}
 
     <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}</p>
+    <!--
+      One produced row, TONED BY ROLE. `showGroupPill` is false when the row already sits
+      under a result-group heading (routed-by-check) or the group is otherwise identified
+      (progressive DC, routed-by-ingredients dropdown), so the pill is not doubled up.
+    -->
+    {#snippet produceRow(row, showGroupPill)}
+      <div
+        class={`manager-recipe-flow-row ${row.failure ? 'is-failure' : 'is-produced'}`}
+        data-recipe-produces={row.failure ? 'failure' : 'success'}
+      >
+        <span class="manager-recipe-flow-icon" aria-hidden="true">
+          {#if row.img}
+            <img src={row.img} alt="" />
+          {:else}
+            <i class="fas fa-cube"></i>
+          {/if}
+        </span>
+        <span class="manager-recipe-flow-name">{produceName(row)}</span>
+        {#if isProgressive}
+          <!-- Progressive: the component's DC (its ordered "cost"), not a redundant
+               single-group pill. -->
+          <span
+            class="manager-recipe-flow-group manager-recipe-flow-dc"
+            data-recipe-produces-dc={row.difficulty === null ? '' : String(row.difficulty)}
+          >{progressiveDcLabel(row)}</span>
+        {:else if showGroupPill && row.groupName && !routedPairing}
+          <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
+               tiers are authored, so the NAME is the recipe's; the tone is not. -->
+          <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}>{row.groupName}</span>
+        {/if}
+        {#if !isProgressive}
+          <!-- Progressive ignores quantity (each entry is awarded once), so a "×1" there
+               would read as if all results are produced together — omitted. -->
+          <span class="manager-recipe-flow-qty">×{row.quantity}</span>
+        {/if}
+      </div>
+    {/snippet}
     <div class="manager-recipe-flow-list">
-      <!--
-        Every produced row, TONED BY ROLE. A `role: 'failure'` group is the reserved
-        alchemy-Simple group — what a FAILED craft makes — and it exists only there; the
-        routed modes produce nothing at all on a failure, so no failure row is invented for
-        them. Filtering it out made an alchemy recipe's failure output invisible in the one
-        surface whose job is to say what a recipe makes.
-      -->
-      {#each visibleProduceRows as row (row.id)}
-        <div
-          class={`manager-recipe-flow-row ${row.failure ? 'is-failure' : 'is-produced'}`}
-          data-recipe-produces={row.failure ? 'failure' : 'success'}
-        >
-          <span class="manager-recipe-flow-icon" aria-hidden="true">
-            {#if row.img}
-              <img src={row.img} alt="" />
-            {:else}
-              <i class="fas fa-cube"></i>
-            {/if}
-          </span>
-          <span class="manager-recipe-flow-name">{produceName(row)}</span>
-          {#if isProgressive}
-            <!-- Progressive: the component's DC (its ordered "cost"), not a redundant
-                 single-group pill. -->
+      {#if isRoutedByCheck}
+        <!-- Routed by check: group the produced items UNDER each result group (the tier),
+             heading each with the group name, instead of one flat list of rows each wearing
+             a "Result Group N" pill. -->
+        {#each producedGroups as group, index (group.groupId)}
+          <div class="manager-recipe-produces-group" data-recipe-produces-group={group.groupId}>
             <span
-              class="manager-recipe-flow-group manager-recipe-flow-dc"
-              data-recipe-produces-dc={row.difficulty === null ? '' : String(row.difficulty)}
-            >{progressiveDcLabel(row)}</span>
-          {:else if row.groupName && !routedPairing}
-            <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
-                 tiers are authored, so the NAME is the recipe's; the tone is not. -->
-            <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}>{row.groupName}</span>
-          {/if}
-          {#if !isProgressive}
-            <!-- Progressive ignores quantity (each entry is awarded once), so a "×1" there
-                 would read as if all results are produced together — omitted. -->
-            <span class="manager-recipe-flow-qty">×{row.quantity}</span>
-          {/if}
-        </div>
-      {/each}
+              class={`manager-recipe-flow-group manager-recipe-produces-group-head ${group.failure ? 'is-failure' : 'is-success'}`}
+            >{produceGroupLabel(group, index)}</span>
+            {#each group.rows as row (row.id)}
+              {@render produceRow(row, false)}
+            {/each}
+          </div>
+        {/each}
+      {:else}
+        {#each visibleProduceRows as row (row.id)}
+          {@render produceRow(row, true)}
+        {/each}
+      {/if}
       {#if successRows.length === 0}
         <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that
              makes nothing — true even when a failure group is listed above. -->

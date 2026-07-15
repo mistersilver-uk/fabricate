@@ -7,6 +7,7 @@ import {
   buildRecipeProduceRows,
   buildRecipeRequirementRows,
   buildRecipeRoutingModel,
+  groupProduceRowsByResultGroup,
   deriveRecipeIo,
   deriveRecipeStatuses,
   describeActiveFilters,
@@ -543,6 +544,26 @@ describe('recipeBrowserModel — multi-step recipes', () => {
       essenceOptions: ESSENCES
     }).map((row) => row.id);
     assert.equal(new Set(ids).size, ids.length);
+  });
+});
+
+describe('groupProduceRowsByResultGroup', () => {
+  it('buckets rows by result group in first-seen order, carrying name + failure role', () => {
+    const grouped = groupProduceRowsByResultGroup([
+      { id: 'a', groupId: 'g1', groupName: 'Result Group 1', failure: false },
+      { id: 'b', groupId: 'g2', groupName: 'Result Group 2', failure: false },
+      { id: 'c', groupId: 'g1', groupName: 'Result Group 1', failure: false },
+      { id: 'd', groupId: 'g3', groupName: 'Botched', failure: true }
+    ]);
+    assert.deepEqual(grouped.map((g) => g.groupId), ['g1', 'g2', 'g3']);
+    assert.deepEqual(grouped[0].rows.map((r) => r.id), ['a', 'c']);
+    assert.equal(grouped[0].groupName, 'Result Group 1');
+    assert.equal(grouped[2].failure, true);
+  });
+
+  it('tolerates an empty / non-array input', () => {
+    assert.deepEqual(groupProduceRowsByResultGroup([]), []);
+    assert.deepEqual(groupProduceRowsByResultGroup(null), []);
   });
 });
 

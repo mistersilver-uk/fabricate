@@ -490,6 +490,33 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
 }
 
 /**
+ * Group produce rows by their result group, preserving first-seen order (issue 643). A
+ * routed-by-check recipe routes each result group to a check-outcome tier, so its
+ * inspector Produces list is grouped under each tier's group rather than dumped into one
+ * flat list. Each bucket carries the group's name and its `failure` role for toning.
+ *
+ * @param {object[]} rows produce rows from {@link buildRecipeProduceRows}.
+ * @returns {{groupId: string, groupName: string, failure: boolean, rows: object[]}[]}
+ */
+export function groupProduceRowsByResultGroup(rows) {
+  const order = [];
+  const byGroup = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!byGroup.has(row.groupId)) {
+      byGroup.set(row.groupId, {
+        groupId: row.groupId,
+        groupName: row.groupName || '',
+        failure: row.failure === true,
+        rows: [],
+      });
+      order.push(row.groupId);
+    }
+    byGroup.get(row.groupId).rows.push(row);
+  }
+  return order.map((id) => byGroup.get(id));
+}
+
+/**
  * The routed-by-ingredients pairing model for the library inspector (issue 643): the
  * recipe's ingredient sets and result groups, plus the set→group routing each set
  * carries (`IngredientSet.resultGroupId`). In this mode the chosen ingredient set

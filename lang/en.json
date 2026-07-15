@@ -1735,6 +1735,7 @@
           "DuplicateIngredientSet": "Duplicate set",
           "SetCopySuffix": "Copy",
           "SetLabel": "Set",
+          "ResultSetLabel": "Result set",
           "SelectIngredientSet": "Select ingredient set",
           "SetNamePlaceholder": "Set name",
           "SetEmptyHint": "Add a component or a tag requirement this set must satisfy.",

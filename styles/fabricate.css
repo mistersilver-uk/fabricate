@@ -4217,6 +4217,23 @@
   background: var(--fab-info-soft);
 }
 
+/* Routed-by-check Produces: items grouped under each result-group (tier). The heading is
+   the tier pill on its own line above its rows; groups are spaced apart (issue 643). */
+.fabricate-manager .manager-recipe-produces-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fabricate-manager .manager-recipe-produces-group + .manager-recipe-produces-group {
+  margin-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-flow-group.manager-recipe-produces-group-head {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
 /* Quantities are numerics: mono, tabular. */
 .fabricate-manager .manager-recipe-flow-qty {
   flex: 0 0 auto;

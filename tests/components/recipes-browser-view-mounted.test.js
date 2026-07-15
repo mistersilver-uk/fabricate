@@ -1036,4 +1036,47 @@ describe('RecipeBrowserInspector (mounted)', () => {
 
     assert.equal(root.querySelector('[data-recipe-produces-dc]').textContent.trim(), 'No difficulty');
   });
+
+  it('routed by check: groups the produces under each result group (tier), not one flat list', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-check',
+        checkSummary: { kind: 'dc', dc: 12 },
+        resultItemCount: 3,
+        resultGroupCount: 2,
+        resultGroups: [
+          {
+            id: 'g1',
+            name: 'Result Group 1',
+            results: [
+              { id: 'a', componentId: 'cmp-herb', quantity: 1 },
+              { id: 'b', componentId: 'cmp-potion', quantity: 2 }
+            ]
+          },
+          { id: 'g2', name: 'Result Group 2', results: [{ id: 'c', componentId: 'cmp-potion', quantity: 1 }] }
+        ]
+      }),
+      resolutionMode: 'routedByCheck',
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    // One section per result group, each headed by the group name.
+    const groups = [...root.querySelectorAll('[data-recipe-produces-group]')];
+    assert.equal(groups.length, 2, 'two result-group sections');
+    assert.deepEqual(
+      groups.map((g) => g.querySelector('.manager-recipe-produces-group-head').textContent.trim()),
+      ['Result Group 1', 'Result Group 2']
+    );
+    // The first group holds its two items; the items no longer carry a redundant row pill.
+    assert.equal(groups[0].querySelectorAll('[data-recipe-produces]').length, 2);
+    assert.equal(groups[1].querySelectorAll('[data-recipe-produces]').length, 1);
+    assert.equal(
+      groups[0].querySelector('[data-recipe-produces] .manager-recipe-flow-group'),
+      null,
+      'no per-row group pill inside a grouped section'
+    );
+    // Quantities still show (routed-by-check is not progressive).
+    assert.match(root.textContent, /×2/);
+  });
 });
