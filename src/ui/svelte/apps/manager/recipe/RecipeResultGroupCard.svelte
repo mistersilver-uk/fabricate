@@ -292,26 +292,6 @@
               <i class="fas fa-grip-vertical" aria-hidden="true"></i>
               <span class="manager-environment-comp-order">{index + 1}</span>
             </span>
-            <span class="manager-recipe-result-move" data-recipe-result-move>
-              <button
-                type="button"
-                class="manager-icon-button"
-                data-recipe-result-move-up
-                aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')} — ${componentNameFor(item)}`}
-                title={text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')}
-                disabled={index === 0}
-                onclick={() => moveItem(index, -1)}
-              ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
-              <button
-                type="button"
-                class="manager-icon-button"
-                data-recipe-result-move-down
-                aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')} — ${componentNameFor(item)}`}
-                title={text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')}
-                disabled={index === results.length - 1}
-                onclick={() => moveItem(index, 1)}
-              ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
-            </span>
             <RecipeResultItemRow
               {item}
               {componentOptions}
@@ -319,7 +299,32 @@
               {onOpenComponent}
               onChange={(nextItem) => updateItem(index, nextItem)}
               onRemove={() => removeItem(index)}
-            />
+            >
+              {#snippet reorderControls()}
+                <!-- Reorder lives to the RIGHT of the component's DC (issue 643): after
+                     the difficulty badge, before the remove control. -->
+                <span class="manager-recipe-result-move" data-recipe-result-move>
+                  <button
+                    type="button"
+                    class="manager-icon-button"
+                    data-recipe-result-move-up
+                    aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')} — ${componentNameFor(item)}`}
+                    title={text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')}
+                    disabled={index === 0}
+                    onclick={() => moveItem(index, -1)}
+                  ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
+                  <button
+                    type="button"
+                    class="manager-icon-button"
+                    data-recipe-result-move-down
+                    aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')} — ${componentNameFor(item)}`}
+                    title={text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')}
+                    disabled={index === results.length - 1}
+                    onclick={() => moveItem(index, 1)}
+                  ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                </span>
+              {/snippet}
+            </RecipeResultItemRow>
           </div>
         {:else}
           <RecipeResultItemRow

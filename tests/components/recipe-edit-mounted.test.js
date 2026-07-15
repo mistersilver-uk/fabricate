@@ -1590,6 +1590,23 @@ describe('RecipeEditView (mounted)', () => {
       /Move down .* Mountain Herb/,
       'the move button names the result it moves'
     );
+
+    // Layout (issue 643): the reorder controls sit to the RIGHT of the component's DC —
+    // inside the row's controls cluster, after the difficulty badge and before the remove
+    // control — not as a separate column on the left.
+    const row = rows[0];
+    const dc = row.querySelector('[data-recipe-result-difficulty]');
+    const move = row.querySelector('[data-recipe-result-move]');
+    const remove = row.querySelector('[data-recipe-remove="result-item"]');
+    assert.ok(move.closest('.manager-recipe-option-controls'), 'reorder lives in the row controls, right of the component');
+    assert.ok(
+      dc.compareDocumentPosition(move) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'reorder follows the difficulty badge'
+    );
+    assert.ok(
+      move.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the remove control follows the reorder controls'
+    );
     editHarness.remount();
   });
 

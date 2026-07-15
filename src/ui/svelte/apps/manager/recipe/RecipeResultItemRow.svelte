@@ -37,7 +37,12 @@
     onRemove = () => {},
     // Deep-link to the component editor's Difficulty card. The difficulty badge is
     // read-only here by design (see the note above).
-    onOpenComponent = () => {}
+    onOpenComponent = () => {},
+    // Optional reorder controls (progressive only): the parent's up/down buttons,
+    // rendered to the RIGHT of the difficulty badge — after the component's DC, before
+    // the remove control — so a stage reads left-to-right as handle · component · DC ·
+    // reorder · remove (issue 643). Absent (a flat row) in every other mode.
+    reorderControls = null
   } = $props();
 
   function text(key, fallback) {
@@ -138,6 +143,10 @@
         inputProps={{ 'data-recipe-option-quantity': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
         onChange={(value) => setQuantity(value)}
       />
+    {/if}
+
+    {#if reorderControls}
+      {@render reorderControls()}
     {/if}
 
     <!-- A subtle × (§C7), never a loud red fa-minus. -->

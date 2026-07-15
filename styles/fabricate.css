@@ -7673,7 +7673,10 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
-  padding: var(--fab-space-2);
+
+  /* A single compact stage row, not a tall bounding box (issue 643): reorder now sits on
+     the right by the DC, so the row hugs its one line of content. */
+  padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-04);
