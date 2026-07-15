@@ -1456,20 +1456,25 @@
   overflow-wrap: anywhere;
 }
 
-/* The page's single loudest action (Create recipe, Create system) reads at the title's
-   scale, not at the 34px of a row button. */
-.fabricate-manager .manager-header-actions .manager-button.is-primary {
+/* Header actions (Back, Delete, Save/Create) share one compact scale: taller than
+   a row button but well under the title, and a label a notch below body text so the
+   toolbar reads as chrome, not content. */
+.fabricate-manager .manager-header-actions .manager-button {
   min-height: 38px;
-  padding: 0 var(--fab-space-4);
-
-  /* Save is the loudest thing on screen (§F6): solid green, heavier weight. */
-  font-weight: 700;
   font-size: 0.78rem;
 }
 
-/* Ghost Back button (§F6): quiet, so the green Save wins the eye. */
+/* The page's single loudest action (Create recipe, Create system) keeps the heavier
+   weight and roomier padding so the green Save wins the eye (§F6). */
+.fabricate-manager .manager-header-actions .manager-button.is-primary {
+  padding: 0 var(--fab-space-4);
+  font-weight: 700;
+}
+
+/* Ghost Back button (§F6): quiet, but the design keeps a resting border so it reads
+   as a button before hover, not a bare label. */
 .fabricate-manager .manager-header-actions .manager-button.is-ghost {
-  border-color: transparent;
+  border-color: var(--fab-border);
   color: var(--fab-text-muted);
   background: transparent;
 }
