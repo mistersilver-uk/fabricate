@@ -1,0 +1,49 @@
+/*
+ * Minimal stand-in for FoundryVTT V13's core stylesheet (`/css/foundry2.css`),
+ * capturing ONLY the load-bearing cascade behaviour that affects font-size in the
+ * Fabricate manager. It is deliberately tiny and stable rather than a 466 KB vendored
+ * copy that drifts across Foundry releases.
+ *
+ * Reproduced faithfully (verified against a live Foundry V13 instance):
+ *   1. Core CSS lives entirely inside @layer, so any UNLAYERED module rule
+ *      (fabricate.css) wins regardless of specificity.
+ *   2. @layer reset sets `input, button, textarea, select { font: inherit }`, so a
+ *      control with no fabricate font-size inherits the app base — this is the "Foundry
+ *      default bleed" the audit hunts for.
+ *   3. The application base font-size is --font-size-14 = 0.875rem (14px), applied to
+ *      the app root; the html root stays at the 16px default (the rem anchor).
+ *
+ * A recipe-studio element whose computed font-size equals 14px is therefore Foundry
+ * bleed; anything else is fabricate-controlled.
+ */
+@layer reset, variables, elements, blocks, applications;
+
+@layer variables {
+  :root {
+    --font-size-14: 0.875rem;
+  }
+}
+
+@layer reset {
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer elements {
+  body {
+    font-size: var(--font-size-14);
+  }
+  h1 {
+    font-size: 2rem;
+  }
+}
+
+@layer applications {
+  .application {
+    font-size: var(--font-size-14);
+  }
+}

@@ -1466,7 +1466,9 @@
    toolbar reads as chrome, not content. */
 .fabricate-manager .manager-header-actions .manager-button {
   min-height: 38px;
-  font-size: 0.78rem;
+
+  /* 0.72rem (~11.5px) matches the prototype's header buttons (issue 643 audit). */
+  font-size: 0.72rem;
 }
 
 /* The page's single loudest action (Create recipe, Create system) keeps the heavier
@@ -1496,13 +1498,16 @@
 .fabricate-manager .manager-header-actions .manager-chip.is-warning {
   min-height: 38px;
   border-radius: 6px;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .fabricate-manager .manager-subtitle {
   margin: var(--fab-space-2xs) 0 0;
   color: var(--fab-mv2-text-muted);
-  font-size: 0.82rem;
+
+  /* 0.72rem (~11.5px) matches the prototype's subtitle scale; 0.82rem read ~2px hot
+     against the design (issue 643 font-size audit). */
+  font-size: 0.72rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -3514,6 +3519,16 @@
   flex-direction: column;
   gap: var(--fab-space-1);
   min-width: 0;
+}
+
+/* Recipe-studio help / hint / intro copy (the section intros, "crafter picks…", the
+   validation-row and result-set summaries) ran ~2.5px over the prototype's 10px body
+   scale at the global .manager-muted 0.78rem. Scope the reduction to the recipe editor
+   and browser views so other manager screens keep the larger secondary text
+   (issue 643 font-size audit). */
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-muted,
+.fabricate-manager[data-manager-view="recipes"] .manager-muted {
+  font-size: 0.64rem;
 }
 
 /* The overview selects (Category, Check tier, Minimum success tier) carry no select
@@ -7661,7 +7676,8 @@
 .fabricate-manager .manager-recipe-ingredient-set-add .manager-button,
 .fabricate-manager .manager-recipe-requirement-adds .manager-button,
 .fabricate-manager .manager-button.manager-recipe-add-full {
-  font-size: 0.78rem;
+  /* 0.7rem (~11.2px) matches the prototype's dashed add buttons (issue 643 audit). */
+  font-size: 0.7rem;
 }
 
 /* A requirement is a flat container by default (a single alternative reads as a
@@ -8399,6 +8415,10 @@
 
 .fabricate-manager .manager-nav-label {
   min-width: 0;
+
+  /* Without this the label inherited Foundry's 14px app base (bleed) — a rail label
+     stands 1.5px over the prototype's 12.5px. Pin it to the design (issue 643 audit). */
+  font-size: 0.78rem;
   overflow-wrap: anywhere;
 }
 
@@ -8418,9 +8438,10 @@
   color: var(--fab-text-subtle);
   font-family: var(--fab-font-mono);
 
-  /* Bumped a notch (issue 643): 0.62rem was too small to read at a glance. The active
-     subitem count below inherits this size and only re-tones, so it scales in step. */
-  font-size: 0.74rem;
+  /* Prototype scale is 10px (0.625rem); an earlier pass bumped this to 0.74rem for
+     readability, but the font-size audit realigned it to the design (issue 643). The
+     active subitem count below inherits this size and only re-tones, so it scales in step. */
+  font-size: 0.625rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   overflow-wrap: normal;
@@ -13219,8 +13240,8 @@
   background: none;
 
   /* A notch below body text so the tab strip reads as chrome, not content, matching
-     the prototype's compact tabs (issue 643). */
-  font-size: 0.82rem;
+     the prototype's compact tabs at ~12.5px (issue 643 font-size audit). */
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -13245,7 +13266,9 @@
   min-height: 18px;
   padding: 0 var(--fab-space-2xs);
   font-family: var(--fab-font-mono);
-  font-size: 0.66rem;
+
+  /* 0.56rem (~9px) matches the prototype's tab count badge (issue 643 audit). */
+  font-size: 0.56rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -13314,6 +13337,10 @@
 
 .fabricate-manager .manager-recipe-edit-heading-copy .manager-title {
   overflow: hidden;
+
+  /* The recipe editor title sits at the prototype's 20px, a notch under the browser
+     list heading's 22px global default (issue 643 audit). */
+  font-size: 1.25rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

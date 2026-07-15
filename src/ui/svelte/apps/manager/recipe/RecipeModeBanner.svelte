@@ -94,7 +94,8 @@
     align-items: baseline;
     gap: var(--fab-space-1);
     margin: 0;
-    font-size: 0.82rem;
+    /* 0.75rem (~12px) matches the prototype banner title (issue 643 font-size audit). */
+    font-size: 0.75rem;
   }
 
   .manager-recipe-mode-banner-title strong {
@@ -103,7 +104,8 @@
   }
 
   .manager-recipe-mode-banner-scope {
-    font-size: 0.72rem;
+    /* 0.64rem (~10px) matches the prototype's banner secondary text (issue 643 audit). */
+    font-size: 0.64rem;
     font-weight: 400;
   }
 
@@ -116,7 +118,8 @@
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    font-size: 0.72rem;
+    /* 0.64rem (~10px) matches the prototype banner description (issue 643 audit). */
+    font-size: 0.64rem;
     line-height: 1.45;
     white-space: normal;
   }
