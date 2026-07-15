@@ -43,7 +43,7 @@ const RAW_MODULES = [
   // before, and a missing raw module HANGS the suite (`# cancelled`) instead of
   // failing it.
   'src/ui/svelte/apps/manager/resolutionModeOptions.js',
-  // The context rail resolves the recipe's category label for its Category card.
+  // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
   ...SEARCHABLE_POPOVER_RAW_MODULES,

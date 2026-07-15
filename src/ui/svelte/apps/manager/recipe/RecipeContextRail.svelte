@@ -26,8 +26,8 @@
      OWNER) means the grant reaches the whole table — so the sub-line says "Shared
      with all players", never "Played by <one name>".
 
-  Below the mode-conditional section, in EVERY mode: category, recipe mode, step mode
-  and the validation mini-list.
+  Below the mode-conditional section, in EVERY mode: recipe mode, step mode and the
+  validation mini-list. (Category lives on the Overview tab, not the rail — issue 643.)
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
