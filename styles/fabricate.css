@@ -3661,7 +3661,19 @@
    the active-filter chips and the count. Category used to sit on row two, below the
    grouping and sorting controls that act on its result. */
 .fabricate-manager .manager-recipe-toolbar {
+  /* One control font for the whole bar (issue 643). The search input, both selects
+     and the sort-direction toggle all read at this size — matching the segmented
+     status/lock toggles (their component sets the same 0.72rem) — so the filters no
+     longer mix 14 / 12.48 / 11.52px. The small GROUP BY / SORT BY micro-labels are
+     deliberately smaller and keep their own size. */
+  --fab-recipe-control-font: 0.72rem;
+
   gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-toolbar .manager-search input,
+.fabricate-manager .manager-recipe-toolbar select {
+  font-size: var(--fab-recipe-control-font);
 }
 
 .fabricate-manager .manager-recipe-filter-row {
@@ -3792,12 +3804,8 @@
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   border-radius: 9px;
-  font-size: 0.78rem;
+  font-size: var(--fab-recipe-control-font);
   font-weight: 600;
-}
-
-.fabricate-manager .manager-button.manager-recipe-sort-direction i {
-  font-size: 0.82rem;
 }
 
 /* ---------------------------------------------------------------------------
