@@ -1,7 +1,28 @@
 import http from 'node:http';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { join, normalize, extname } from 'node:path';
 
 const FOUNDRY_ORIGIN = 'http://localhost:30000';
 const MODULE_PATH_PREFIX = '/modules/fabricate/';
+
+// Static content types for repo assets served in dev (fonts + preview images).
+// The fonts matter most: `styles/fabricate.css`'s `@font-face` rules resolve to
+// `/assets/fonts/*.woff2`, and without this the dev proxy forwards them to Foundry
+// (which has no such file), so every weight fails to download. Production copies
+// `assets/` into `dist/assets/`, so this is a dev-server gap only.
+const ASSET_CONTENT_TYPES = {
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.gif': 'image/gif'
+};
 
 /**
  * Vite plugin that proxies Foundry VTT and rewrites Fabricate module paths
@@ -11,15 +32,29 @@ export function fabricateDevProxy() {
   return {
     name: 'fabricate-foundry-proxy',
     configureServer(server) {
+      const root = server.config.root;
       // Pre-middleware: runs BEFORE Vite's internal middleware.
       // This is essential because Vite's SPA fallback would otherwise intercept
       // HTML requests looking for index.html (which doesn't exist) and 404.
       // Vite-owned paths (/@vite/, /src/, etc.) are passed through via next().
       server.middlewares.use((req, res, next) => {
-        // Rewrite Fabricate module paths to project-root-relative paths.
+        // Rewrite Fabricate module paths to project-root-relative paths. This also
+        // maps `/modules/fabricate/assets/...` onto `/assets/...`, so the asset
+        // branch below catches both the rewritten and the direct (`@font-face`
+        // relative-url) forms.
         const rewrittenModuleUrl = rewriteFabricateModuleUrl(req.url);
         if (rewrittenModuleUrl) {
           req.url = rewrittenModuleUrl;
+        }
+
+        // Serve repo static assets (fonts, preview images) straight from disk.
+        // Without this the `@font-face` `/assets/fonts/*.woff2` requests fall to
+        // the catch-all and get proxied to Foundry, which 404s them.
+        if (req.url?.startsWith('/assets/')) {
+          return serveRepoAsset(req, res, root, next);
+        }
+
+        if (rewrittenModuleUrl) {
           return next();
         }
 
@@ -65,6 +100,44 @@ export function rewriteFabricateModuleUrl(requestUrl) {
   }
 
   return `/${relativePath}${suffix}`;
+}
+
+/**
+ * Serve a file under the repo's `assets/` directory in dev. Falls through to the
+ * next middleware (ultimately a 404) when the file does not exist, and refuses any
+ * path that escapes the project root.
+ *
+ * @param {http.IncomingMessage} req
+ * @param {http.ServerResponse} res
+ * @param {string} root Vite project root (the repo root).
+ * @param {() => void} next
+ */
+export async function serveRepoAsset(req, res, root, next) {
+  const pathname = new URL(req.url || '/', FOUNDRY_ORIGIN).pathname;
+  const relative = normalize(decodeURIComponent(pathname)).replace(/^([/\\])+/, '');
+  const filePath = join(root, relative);
+
+  // Path-traversal guard: the resolved file must stay inside the project root.
+  if (!filePath.startsWith(join(root, 'assets'))) {
+    return next();
+  }
+
+  try {
+    const info = await stat(filePath);
+    if (!info.isFile()) return next();
+
+    const type = ASSET_CONTENT_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
+    res.writeHead(200, {
+      'content-type': type,
+      'content-length': info.size,
+      // Fonts/images are content-hashed by filename in prod; in dev keep them
+      // fresh so an edited asset is picked up on reload.
+      'cache-control': 'no-cache'
+    });
+    createReadStream(filePath).pipe(res);
+  } catch {
+    return next();
+  }
 }
 
 function proxyToFoundry(clientReq, clientRes) {
