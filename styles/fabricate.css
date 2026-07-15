@@ -4041,11 +4041,14 @@
   align-self: flex-start;
   align-items: center;
   gap: var(--fab-space-chip);
+  /* Extra breathing room below the pill: the container gap sets the row-to-row
+     spacing, this margin adds to it so the label sits further from the first row. */
+  margin-bottom: var(--fab-space-1);
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border-radius: 999px;
   background: var(--fab-accent-soft);
   color: var(--fab-accent);
-  font-size: 0.58rem;
+  font-size: 0.52rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
