@@ -13,7 +13,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
+  import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
   import {
     GENERAL_RECIPE_CATEGORY,
     getEffectiveRecipeCategories,
@@ -32,8 +32,6 @@
     enabled = true,
     saving = false,
     saveFailed = false,
-    isRecipeItemLinked = false,
-    linkedItemImage = '',
     onPickImagePath = null,
     onNameInput = () => {},
     onDescriptionInput = () => {},
@@ -71,8 +69,10 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // Resolve the generic item-bag (an unset recipe icon) to the alchemical blueprint
+  // default, so a recipe that never got a real icon shows the blueprint, not the bag.
   function recipeImage(value) {
-    return value || DEFAULT_RECIPE_IMAGE;
+    return resolveRecipeImage({ img: value });
   }
 
   // Category options: the system's custom list (or the neutral "general" fallback
@@ -100,29 +100,19 @@
 <section class="manager-recipe-tab manager-recipe-overview" data-recipe-tab="overview" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Overview', 'Overview')}>
   <div class="manager-recipe-overview-identity" data-recipe-section="identity">
     <div class="manager-recipe-overview-media">
-      {#if isRecipeItemLinked}
-        <span
-          class="manager-task-image-picker manager-recipe-overview-image is-recipe-item-linked"
-          data-recipe-item-locked-image
-          title={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImageTooltip', "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image.")}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImage', 'Image provided by the linked recipe item')}
-        >
-          <img src={linkedItemImage || recipeImage(img)} alt="" />
-          <i class="fas fa-lock" aria-hidden="true"></i>
-        </span>
-      {:else}
-        <button
-          type="button"
-          class="manager-task-image-picker manager-recipe-overview-image"
-          data-recipe-field="img"
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.ChooseImage', 'Choose recipe image')}
-          onclick={onChooseImage}
-          disabled={typeof onPickImagePath !== 'function' || saving}
-        >
-          <img src={recipeImage(img)} alt="" />
-          <i class="fas fa-pen" aria-hidden="true"></i>
-        </button>
-      {/if}
+      <!-- Always editable: a recipe can belong to many books & scrolls, so its image
+           no longer mirrors or locks to a single linked recipe item (issue 643). -->
+      <button
+        type="button"
+        class="manager-task-image-picker manager-recipe-overview-image"
+        data-recipe-field="img"
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.ChooseImage', 'Choose recipe image')}
+        onclick={onChooseImage}
+        disabled={typeof onPickImagePath !== 'function' || saving}
+      >
+        <img src={recipeImage(img)} alt="" />
+        <i class="fas fa-pen" aria-hidden="true"></i>
+      </button>
     </div>
     <div class="manager-recipe-overview-fields">
       <label class="manager-recipe-field" for="manager-recipe-edit-name">
@@ -193,11 +183,9 @@
     {/if}
   </div>
 
-  <!-- Two side-by-side status cards. "Locked" is OVERLOADED on this tab: it already
-       means "the image picker is locked because a recipe item is linked"
-       (data-recipe-item-locked-image). This card is a DIFFERENT concept — the recipe
-       stays visible to players, but only a GM can craft it — so it gets its own i18n
-       keys and its hooks stay out of the `…-locked-image` naming family. -->
+  <!-- Two side-by-side status cards. "Locked" here means the recipe stays visible to
+       players but only a GM can craft it (recipe.locked) — it is unrelated to the image
+       picker, which is always editable now that a recipe can belong to many books. -->
   <div class="manager-recipe-overview-status">
     <div class={`manager-recipe-status-card is-enabled ${enabled ? 'is-on' : 'is-off'}`} data-recipe-section="enabled-status">
       <span class="manager-recipe-status-icon" aria-hidden="true"><i class="fas fa-power-off"></i></span>

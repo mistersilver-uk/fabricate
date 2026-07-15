@@ -19,6 +19,9 @@ const RAW_MODULES = [
   // (the single low-layer source of truth), so the harness must copy that
   // module and its transitive model dependencies.
   'src/ui/svelte/util/recipeImageIcons.js',
+  // The Overview tab resolves the recipe image (bag → blueprint) through this
+  // standalone (dependency-free) resolver; a missing raw module HANGS the suite.
+  'src/ui/svelte/util/craftingImageDefaults.js',
   // Shared duration formatter consumed by the step accordion + duration editor.
   'src/ui/svelte/util/recipeDuration.js',
   // Shared currency label/icon helpers consumed by the ingredient option editor.
@@ -1055,47 +1058,43 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('locks the image picker to the linked recipe item image when recipeItemId is set', async () => {
+  it('keeps the image editable and independent of the recipe item even when recipeItemId is set', async () => {
+    // A recipe can belong to many books & scrolls, so its image no longer mirrors or
+    // locks to a linked recipe item (issue 643): the editable picker always renders and
+    // shows the recipe's OWN img, never a linked item image.
     const target = await editHarness.mount(
       identityProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri1' },
-        linkedItemImage: 'icons/consumables/potions/potion-tube-corked-blue.webp',
+        recipe: { ...RECIPE, recipeItemId: 'ri1', img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
         onPickImagePath: async () => 'icons/should-not-be-used.webp',
       })
     );
-    const locked = target.querySelector('[data-recipe-item-locked-image]');
-    assert.ok(locked, 'locked-image span renders when linked');
-    assert.ok(
-      locked.classList.contains('is-recipe-item-linked'),
-      'uses the recipe-specific locked class'
-    );
-    assert.ok(locked.querySelector('.fa-lock'), 'shows a lock icon');
     assert.equal(
-      target.querySelector('button[data-recipe-field="img"]'),
+      target.querySelector('[data-recipe-item-locked-image]'),
       null,
-      'no editable picker button when locked'
+      'no locked-image span when a recipe item is linked'
     );
-    const img = locked.querySelector('img');
+    const button = target.querySelector('button[data-recipe-field="img"]');
+    assert.ok(button, 'the editable picker button renders even when linked');
+    assert.ok(button.querySelector('.fa-pen'), 'shows the edit (pen) affordance, not a lock');
     assert.ok(
-      img.getAttribute('src').includes('potion-tube-corked-blue'),
-      'shows the linked item image'
+      button.querySelector('img').getAttribute('src').includes('potion-tube-corked-red'),
+      "shows the recipe's own image, not a linked recipe item image"
     );
-
-    // Regression: the locked image is fully controlled by the (staged) linkedItemImage
-    // prop, so staging a different recipe-item link updates the preview without a save.
     editHarness.remount();
-    const restaged = await editHarness.mount(
+  });
+
+  it('resolves the generic item-bag icon to the alchemical blueprint default', async () => {
+    // A recipe that never got a real icon carries Foundry's generic item-bag; the picker
+    // resolves that to the blueprint default rather than showing the bag (issue 643).
+    const target = await editHarness.mount(
       identityProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri2' },
-        linkedItemImage: 'icons/consumables/potions/potion-tube-corked-green.webp',
-        onPickImagePath: async () => 'icons/should-not-be-used.webp',
+        recipe: { ...RECIPE, img: 'icons/svg/item-bag.svg' },
+        onPickImagePath: async () => '',
       })
     );
-    const restagedImg = restaged.querySelector('[data-recipe-item-locked-image] img');
-    assert.ok(
-      restagedImg.getAttribute('src').includes('potion-tube-corked-green'),
-      'a staged link change swaps the locked preview image without a save'
-    );
+    const src = target.querySelector('button[data-recipe-field="img"] img').getAttribute('src');
+    assert.ok(src.includes('blueprint-recipe-alchemical'), 'the bag resolves to the alchemical blueprint');
+    assert.equal(src.includes('item-bag'), false, 'the generic bag is not shown');
     editHarness.remount();
   });
 

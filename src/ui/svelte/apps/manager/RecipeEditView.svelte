@@ -38,7 +38,6 @@
     saving = false,
     saveFailed = false,
     onPickImagePath = null,
-    linkedItemImage = '',
     currencyUnits = [],
     toolsLibrary = [],
     componentOptions = [],
@@ -189,11 +188,6 @@
     return (stepId) => onDeleteStep(stepId, context);
   }
 
-  // When a recipe item is linked, the identity image mirrors the linked item's
-  // image and the picker is locked — exactly like the environment editor locks
-  // its image to a linked scene.
-  const isRecipeItemLinked = $derived(Boolean(recipe?.recipeItemId));
-
   let activeTab = $state('overview');
   let lastRecipeId = $state(null);
 
@@ -277,8 +271,11 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // The recipe image is always editable: a recipe can belong to many books & scrolls
+  // (recipeIds[] is many-to-many), so it no longer mirrors or locks to a single linked
+  // recipe item's image.
   async function chooseImage() {
-    if (typeof onPickImagePath !== 'function' || isRecipeItemLinked) return;
+    if (typeof onPickImagePath !== 'function') return;
     const value = await onPickImagePath(img || DEFAULT_RECIPE_IMAGE);
     if (value) onUpdateRecipe({ img: value });
   }
@@ -317,8 +314,6 @@
             {enabled}
             {saving}
             {saveFailed}
-            {isRecipeItemLinked}
-            {linkedItemImage}
             {onPickImagePath}
             onNameInput={(value) => onUpdateRecipe({ name: value })}
             onDescriptionInput={(value) => onUpdateRecipe({ description: value })}

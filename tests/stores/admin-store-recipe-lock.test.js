@@ -135,7 +135,9 @@ describe('adminStore toggleRecipeLocked', () => {
     assert.equal(await store.toggleRecipeEnabled('r1', true), false, 'enable is gated');
     assert.equal(await store.toggleRecipeLocked('r1', true), true, 'lock is not');
 
-    assert.deepEqual(writes, [{ id: 'r1', updates: { locked: true }, options: { allowIncomplete: true } }]);
+    assert.deepEqual(writes, [
+      { id: 'r1', updates: { locked: true }, options: { allowIncomplete: true, notify: false } },
+    ]);
     assert.equal(notified.length, 1, 'only the refused enable notified');
   });
 

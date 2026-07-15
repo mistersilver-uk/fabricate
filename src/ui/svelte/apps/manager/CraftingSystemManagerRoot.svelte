@@ -19,7 +19,7 @@
     normalizeRecipeCategory
   } from '../../../../utils/recipeCategories.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
-  import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
+  import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
@@ -1190,17 +1190,6 @@
     && Boolean(recipeDraft?.name?.trim())
     && recipeEditSaving !== true);
   const recipeItemDefinitions = $derived(selectedSystem?.recipeItemDefinitions || []);
-  // Locked recipe-item image for the Overview tab: resolve from the STAGED draft's
-  // recipeItemId against the available definitions, so staging a link change updates
-  // the preview immediately (do not read the persisted selectedRecipe projection).
-  const recipeDraftLinkedItemImage = $derived(
-    (() => {
-      const linkedId = String(recipeDraft?.recipeItemId || '');
-      if (!linkedId) return '';
-      const def = recipeItemDefinitions.find((entry) => entry.id === linkedId);
-      return def?.img || '';
-    })()
-  );
   const componentForEdit = $derived(currentView === 'component-edit'
     ? itemCards.find(item => item.id === selectedComponentId) || null
     : null);
@@ -2423,7 +2412,9 @@
     recipeEditSaving = true;
     recipeSaveFailed = false;
     try {
-      const result = await store.updateRecipe?.(recipeDraft.id, recipeDraft, { allowIncomplete: true });
+      // notify:false — an editor save is the GM's own explicit action (the view
+      // returns to the browser on success), so a "Recipe updated" toast is noise.
+      const result = await store.updateRecipe?.(recipeDraft.id, recipeDraft, { allowIncomplete: true, notify: false });
       if (result === false) {
         recipeSaveFailed = true;
         return false;
@@ -4370,7 +4361,7 @@
              glyph-only avatar — a recipe HAS an img), its name, and the
              "<category> · <resolution mode>" subline. -->
         <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
-          <Medallion src={recipeDraft.img || DEFAULT_RECIPE_IMAGE} icon="fas fa-scroll" size={44} />
+          <Medallion src={resolveRecipeImage(recipeDraft)} icon="fas fa-scroll" size={44} />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={recipeDraft.name || ''}>{recipeDraft.name || viewTitle()}</h1>
             <p class="manager-subtitle" data-recipe-edit-subline>{viewSubtitle()}</p>
@@ -5095,7 +5086,6 @@
         saving={recipeEditSaving}
         saveFailed={recipeSaveFailed}
         onPickImagePath={services?.pickImagePath}
-        linkedItemImage={recipeDraftLinkedItemImage}
         currencyUnits={selectedCurrencyUnits}
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}

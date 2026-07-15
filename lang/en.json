@@ -1919,8 +1919,6 @@
           "MinSuccessTierNone": "No override (use rolled tier)",
           "MinSuccessTierHint": "Fail the craft outright when the roll lands below this tier.",
           "ChooseImage": "Choose recipe image",
-          "RecipeItemLockedImage": "Image provided by the linked recipe item",
-          "RecipeItemLockedImageTooltip": "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image.",
           "EnabledHint": "Available to players while on.",
           "DisabledHint": "Hidden from players while off.",
           "EnableBlockedHint": "Resolve the issues on the Validation tab before enabling.",

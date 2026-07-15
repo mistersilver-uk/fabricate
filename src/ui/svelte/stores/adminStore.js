@@ -7579,7 +7579,9 @@ export function createAdminStore(services) {
     const recipeManager = services.getRecipeManager();
 
     try {
-      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true });
+      // notify:false — the toggle is the GM's own explicit editor action with immediate
+      // visual feedback, so the "Recipe updated" toast is noise.
+      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true, notify: false });
       await refresh();
       return true;
     } catch (err) {
@@ -7617,7 +7619,9 @@ export function createAdminStore(services) {
     const recipeManager = services.getRecipeManager();
 
     try {
-      await recipeManager.updateRecipe(recipeId, { locked: locked === true }, { allowIncomplete: true });
+      // notify:false — same as the enabled toggle: an explicit editor action with
+      // immediate visual feedback needs no "Recipe updated" toast.
+      await recipeManager.updateRecipe(recipeId, { locked: locked === true }, { allowIncomplete: true, notify: false });
       await refresh();
       return true;
     } catch (err) {

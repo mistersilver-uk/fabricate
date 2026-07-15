@@ -9406,13 +9406,11 @@
    (muted) linked thumbnail and is locked — it can't be edited until the link
    is removed. */
 .fabricate-manager .manager-task-image-picker.is-scene-linked,
-.fabricate-manager .manager-task-image-picker.is-recipe-item-linked,
 .fabricate-manager .manager-task-image-picker.is-source-linked {
   cursor: default;
 }
 
 .fabricate-manager .manager-task-image-picker.is-scene-linked img,
-.fabricate-manager .manager-task-image-picker.is-recipe-item-linked img,
 .fabricate-manager .manager-task-image-picker.is-source-linked img {
   object-fit: cover;
   padding: 0;
@@ -9421,8 +9419,6 @@
 
 .fabricate-manager .manager-task-image-picker.is-scene-linked .fa-pen,
 .fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock,
-.fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-pen,
-.fabricate-manager .manager-task-image-picker.is-recipe-item-linked .fa-lock,
 .fabricate-manager .manager-task-image-picker.is-source-linked .fa-pen,
 .fabricate-manager .manager-task-image-picker.is-source-linked .fa-lock {
   color: var(--fab-mv2-text-muted);

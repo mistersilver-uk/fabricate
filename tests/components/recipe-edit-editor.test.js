@@ -650,12 +650,10 @@ describe('recipe-edit localization', () => {
     }
   });
 
-  it('adds the recipe-item locked-image strings mirroring the scene-locked phrasing', () => {
-    assert.equal(recipeLang.RecipeItemLockedImage, 'Image provided by the linked recipe item');
-    assert.equal(
-      recipeLang.RecipeItemLockedImageTooltip,
-      "This image comes from the linked recipe item and can't be edited. Unlink the recipe item to choose a custom image."
-    );
+  it('drops the recipe-item locked-image strings (the image is always editable now)', () => {
+    for (const absent of ['RecipeItemLockedImage', 'RecipeItemLockedImageTooltip']) {
+      assert.equal(absent in recipeLang, false, `${absent} must be removed`);
+    }
   });
 });
 
@@ -753,57 +751,51 @@ describe('recipe image helpers prefer the linked recipe-item image', () => {
   });
 });
 
-describe('RecipeEditView locks the image picker to the linked recipe item', () => {
-  it('derives the linked state and accepts the linkedItemImage prop', () => {
-    assert.ok(editSource.includes('isRecipeItemLinked = $derived(Boolean(recipe?.recipeItemId))'), 'derives the linked state');
-    assert.ok(/linkedItemImage\s*=\s*''/.test(editSource), 'accepts the linkedItemImage prop with a default');
+describe('RecipeEditView keeps the recipe image always editable', () => {
+  // A recipe can belong to many books & scrolls (recipeIds[] is many-to-many), so the
+  // image no longer mirrors or locks to a single linked recipe item (issue 643).
+  it('drops the linked-state derivation and the linkedItemImage prop', () => {
+    assert.equal(editSource.includes('isRecipeItemLinked'), false, 'no linked-state derivation');
+    assert.equal(editSource.includes('linkedItemImage'), false, 'no linkedItemImage prop');
   });
 
-  it('renders the locked is-recipe-item-linked span with a lock icon and locked-image marker', () => {
-    assert.ok(overviewSource.includes('{#if isRecipeItemLinked}'), 'branches on the linked state');
-    assert.ok(overviewSource.includes('is-recipe-item-linked'), 'uses the recipe-specific locked class');
-    assert.ok(overviewSource.includes('data-recipe-item-locked-image'), 'carries the locked-image marker attribute');
-    assert.ok(overviewSource.includes('fa-lock'), 'shows a lock icon when linked');
+  it('renders only the editable image picker button — no locked span, lock icon, or marker', () => {
+    assert.equal(overviewSource.includes('{#if isRecipeItemLinked}'), false, 'no linked-state branch');
+    assert.equal(overviewSource.includes('is-recipe-item-linked'), false, 'no recipe-item locked class');
+    assert.equal(overviewSource.includes('data-recipe-item-locked-image'), false, 'no locked-image marker');
+    assert.ok(overviewSource.includes('data-recipe-field="img"'), 'keeps the editable image picker button');
+    assert.ok(overviewSource.includes('onclick={onChooseImage}'), 'the picker button is clickable');
+  });
+
+  it('guards chooseImage only on the pick handler, never on a linked state', () => {
     assert.ok(
-      overviewSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImage')
-        && overviewSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemLockedImageTooltip'),
-      'uses the locked-image lang keys'
-    );
-    assert.ok(overviewSource.includes('src={linkedItemImage || recipeImage(img)}'), 'shows the linked item image when locked');
-  });
-
-  it('guards chooseImage on the linked state so the picker is not editable', () => {
-    assert.ok(
-      editSource.includes("if (typeof onPickImagePath !== 'function' || isRecipeItemLinked) return;"),
-      'chooseImage early-returns when the recipe item is linked'
-    );
-  });
-
-  it('does not persist the linked item image into the draft img', () => {
-    assert.equal(editSource.includes('img = linkedItemImage'), false, 'never writes the item image into the draft');
-  });
-
-  it('passes the STAGED-draft linked recipe-item image into the view from the root', () => {
-    // Regression: the locked Overview image must derive from the staged recipeDraft's
-    // recipeItemId resolved against recipeItemDefinitions, NOT the persisted
-    // selectedRecipe projection — so staging a link change updates the preview pre-save.
-    assert.ok(
-      rootSource.includes('linkedItemImage={recipeDraftLinkedItemImage}'),
-      'root passes the staged-draft-derived image as linkedItemImage'
+      editSource.includes("if (typeof onPickImagePath !== 'function') return;"),
+      'chooseImage early-returns only when there is no pick handler'
     );
     assert.equal(
-      rootSource.includes("linkedItemImage={selectedRecipe?.recipeItemImg"),
+      editSource.includes('isRecipeItemLinked) return'),
       false,
-      'root no longer reads the persisted selectedRecipe.recipeItemImg for the locked image'
+      'chooseImage no longer early-returns on a linked recipe item'
+    );
+  });
+
+  it('does not thread a linked recipe-item image through the root', () => {
+    assert.equal(rootSource.includes('linkedItemImage'), false, 'root passes no linkedItemImage prop');
+    assert.equal(rootSource.includes('recipeDraftLinkedItemImage'), false, 'root derives no locked image');
+  });
+
+  it('resolves the editor header + picker image through the shared bag→blueprint resolver', () => {
+    assert.ok(
+      rootSource.includes("import { resolveRecipeImage } from '../../util/craftingImageDefaults.js'"),
+      'root imports the shared resolver for the header medallion'
     );
     assert.ok(
-      /const recipeDraftLinkedItemImage = \$derived\(/.test(rootSource),
-      'root derives the locked image from a dedicated $derived'
+      rootSource.includes('src={resolveRecipeImage(recipeDraft)}'),
+      'the header medallion resolves the generic bag to the blueprint default'
     );
     assert.ok(
-      rootSource.includes('recipeDraft?.recipeItemId')
-        && rootSource.includes('recipeItemDefinitions.find('),
-      'the derivation resolves the staged recipeItemId against recipeItemDefinitions'
+      overviewSource.includes('resolveRecipeImage({ img: value })'),
+      'the overview picker resolves the generic bag to the blueprint default'
     );
   });
 });
@@ -857,19 +849,12 @@ describe('routed result-set head anchors the add-trigger to the right (issue 643
   });
 });
 
-describe('recipe locked-image picker reuses the scene-locked visuals', () => {
-  it('groups is-recipe-item-linked into the existing locked-picker rules (no duplicated declarations, no raw colours)', () => {
-    assert.ok(
-      css.includes('.manager-task-image-picker.is-recipe-item-linked'),
-      'recipe locked class is styled'
-    );
-    assert.ok(
-      /\.is-scene-linked,\n[ \t]*\.fabricate-manager \.manager-task-image-picker\.is-recipe-item-linked[\s,{]/.test(css),
-      'recipe locked class is comma-joined into the cursor rule alongside the scene class'
-    );
-    assert.ok(
-      css.includes('.manager-task-image-picker.is-recipe-item-linked .fa-lock'),
-      'recipe lock icon shares the muted colour rule'
+describe('recipe image picker no longer reuses the scene-locked visuals', () => {
+  it('drops the is-recipe-item-linked locked-picker rules (the recipe image is always editable)', () => {
+    assert.equal(
+      css.includes('is-recipe-item-linked'),
+      false,
+      'the recipe-item locked-picker class is removed from the stylesheet'
     );
   });
 });
