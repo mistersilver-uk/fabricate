@@ -7704,9 +7704,14 @@
   transform: none;
 }
 
+/* A progressive stage IS the outer reorderable card, so the item row inside it drops its
+   own border / fill / padding — no double box — and hugs one compact line (issue 643). */
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-ingredient-option-row {
   flex: 1 1 auto;
   min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
 }
 
 /* Two-button add row: "Add component" (popover) + "Add tag requirement". */
@@ -8000,12 +8005,14 @@
 }
 
 .fabricate-manager .manager-recipe-result-move .manager-icon-button {
-  width: 22px;
-  height: 16px;
+  /* Flatter + wider (issue 643): the two stacked chevrons keep the compact stage row low
+     rather than forcing its height, and read as a squat rocker rather than tall buttons. */
+  width: 30px;
+  height: 13px;
   min-width: 0;
   min-height: 0;
   padding: 0;
-  font-size: 0.6rem;
+  font-size: 0.58rem;
 }
 
 /* The READ-ONLY difficulty badge on a progressive result row. It deep-links to the
