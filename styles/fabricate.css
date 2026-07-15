@@ -6981,6 +6981,12 @@
 .fabricate-manager .manager-recipe-steps-row-head .manager-environment-comp-handle {
   flex: 0 0 auto;
   transform: none;
+
+  /* Lay the number badge to the LEFT of the drag grip (issue 643). The markup is
+     grip-then-number, so row-reverse renders the number first (left) and the grip
+     right; non-reorderable tabs have only the badge, so the direction is moot there. */
+  flex-direction: row-reverse;
+  align-items: center;
 }
 
 .fabricate-manager .manager-recipe-steps-row-head .manager-environment-comp-order {
