@@ -980,4 +980,60 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(produceRows.length, 2);
     assert.ok(root.querySelector('.manager-recipe-flow-group'), 'the group pill stays outside routed-by-ingredients');
   });
+
+  it('progressive: shows per-component DC (not a group pill or quantity) and keeps ordered repeats', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-prog',
+        checkSummary: { kind: 'progressive', dc: null },
+        resultItemCount: 3,
+        resultGroupCount: 1,
+        resultGroups: [
+          {
+            id: 'g1',
+            name: 'Result Group 1',
+            results: [
+              { id: 'a', componentId: 'cmp-herb', quantity: 1 },
+              { id: 'b', componentId: 'cmp-potion', quantity: 1 },
+              // The SAME component again, later in the order — it must appear twice.
+              { id: 'c', componentId: 'cmp-herb', quantity: 1 }
+            ]
+          }
+        ]
+      }),
+      resolutionMode: 'progressive',
+      recipeCount: 1,
+      componentOptions: [
+        { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp', difficulty: 8 },
+        { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp', difficulty: 14 }
+      ]
+    });
+
+    const rows = [...root.querySelectorAll('[data-recipe-produces]')];
+    assert.equal(rows.length, 3, 'a repeated component appears once per ordered entry');
+    // No redundant "Result Group 1" pill, and no "×1" quantity implying a bulk output.
+    assert.equal(root.querySelector('.manager-recipe-flow-group.is-success'), null, 'no group pill in progressive');
+    assert.equal(root.querySelector('.manager-recipe-flow-qty'), null, 'no quantity in progressive');
+
+    // Each row shows the component's DC, in authoring order (8, 14, 8 — the herb twice).
+    const dcs = [...root.querySelectorAll('[data-recipe-produces-dc]')].map((el) => el.textContent.trim());
+    assert.deepEqual(dcs, ['DC 8', 'DC 14', 'DC 8']);
+  });
+
+  it('progressive: an unset component difficulty reads as "No difficulty", not "DC "', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-prog2',
+        checkSummary: { kind: 'progressive', dc: null },
+        resultItemCount: 1,
+        resultGroupCount: 1,
+        resultGroups: [{ id: 'g1', name: 'Result Group 1', results: [{ id: 'a', componentId: 'cmp-herb', quantity: 1 }] }]
+      }),
+      resolutionMode: 'progressive',
+      recipeCount: 1,
+      componentOptions: [{ id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' }]
+    });
+
+    assert.equal(root.querySelector('[data-recipe-produces-dc]').textContent.trim(), 'No difficulty');
+  });
 });

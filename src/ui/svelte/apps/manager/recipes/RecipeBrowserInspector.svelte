@@ -159,6 +159,19 @@
     selectedRecipe ? buildRecipeRoutingModel(selectedRecipe) : { sets: [], groups: [] }
   );
   const isRoutedByIngredients = $derived(resolutionMode === 'routedByIngredients');
+  // Progressive awards its ONE result group's items in authoring ORDER, spending the
+  // check budget by each component's difficulty and awarding each entry once — so the
+  // list is an ordered priority queue, not a bulk output. The inspector reflects that:
+  // no "Result Group 1" pill (there is exactly one group), no quantity (each is awarded
+  // once), the component's DC instead, and repeats kept in place because order matters.
+  const isProgressive = $derived(resolutionMode === 'progressive');
+
+  // The per-component progressive DC label ("DC 12"), or the unset-difficulty note.
+  function progressiveDcLabel(row) {
+    return row.difficulty === null
+      ? text('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
+      : format('FABRICATE.Admin.Manager.Recipe.CheckDcValue', 'DC {dc}', { dc: row.difficulty });
+  }
   // Show the paired dropdowns only when the mode routes by ingredients AND there are
   // recipe-level ingredient sets to route; otherwise the flat lists render unchanged.
   const routedPairing = $derived(isRoutedByIngredients && routingModel.sets.length > 0);
@@ -391,12 +404,23 @@
             {/if}
           </span>
           <span class="manager-recipe-flow-name">{produceName(row)}</span>
-          {#if row.groupName && !routedPairing}
+          {#if isProgressive}
+            <!-- Progressive: the component's DC (its ordered "cost"), not a redundant
+                 single-group pill. -->
+            <span
+              class="manager-recipe-flow-group manager-recipe-flow-dc"
+              data-recipe-produces-dc={row.difficulty === null ? '' : String(row.difficulty)}
+            >{progressiveDcLabel(row)}</span>
+          {:else if row.groupName && !routedPairing}
             <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
                  tiers are authored, so the NAME is the recipe's; the tone is not. -->
             <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}>{row.groupName}</span>
           {/if}
-          <span class="manager-recipe-flow-qty">×{row.quantity}</span>
+          {#if !isProgressive}
+            <!-- Progressive ignores quantity (each entry is awarded once), so a "×1" there
+                 would read as if all results are produced together — omitted. -->
+            <span class="manager-recipe-flow-qty">×{row.quantity}</span>
+          {/if}
         </div>
       {/each}
       {#if successRows.length === 0}

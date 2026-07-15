@@ -426,6 +426,33 @@ describe('recipeBrowserModel — the inspector Produces list', () => {
     assert.deepEqual(buildRecipeProduceRows({ resultGroups: [] }, {}), []);
     assert.deepEqual(buildRecipeProduceRows({}, {}), []);
   });
+
+  it("carries each result component's difficulty (the progressive DC), null when unset", () => {
+    const recipe = {
+      resultGroups: [
+        {
+          id: 'g1',
+          name: 'Order',
+          results: [
+            { id: 'a', componentId: 'cmp-ring', quantity: 1 },
+            { id: 'b', componentId: 'cmp-ring', quantity: 1 },
+            { id: 'c', componentId: 'cmp-nodiff', quantity: 1 }
+          ]
+        }
+      ]
+    };
+    const produce = buildRecipeProduceRows(recipe, {
+      componentOptions: [
+        { id: 'cmp-ring', name: 'Ring', difficulty: 12 },
+        { id: 'cmp-nodiff', name: 'Plain' }
+      ]
+    });
+    // A component repeated in the ordered list appears once per entry (order matters).
+    assert.equal(produce.length, 3);
+    assert.equal(produce[0].difficulty, 12);
+    assert.equal(produce[1].difficulty, 12);
+    assert.equal(produce[2].difficulty, null);
+  });
 });
 
 describe('recipeBrowserModel — multi-step recipes', () => {

@@ -469,6 +469,12 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
           name: component?.name || '',
           img: component?.img || '',
           quantity: Number(result?.quantity) > 0 ? Number(result.quantity) : 1,
+          // The component's authored difficulty (its progressive "cost"/DC). Progressive
+          // awards results in order, spending the check budget by each component's
+          // difficulty, so the inspector shows this instead of a quantity in that mode.
+          difficulty: Number.isFinite(Number(component?.difficulty))
+            ? Number(component.difficulty)
+            : null,
           groupId,
           groupName: group?.name || '',
           // The reserved alchemy-Simple failure group: what a FAILED craft makes. It is

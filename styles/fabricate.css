@@ -4209,6 +4209,14 @@
   background: var(--fab-danger-soft);
 }
 
+/* Progressive per-component DC pill: info-toned like the editor's difficulty badge, and
+   unclamped so the short "DC 12" / "No difficulty" text is never ellipsised (issue 643). */
+.fabricate-manager .manager-recipe-flow-group.manager-recipe-flow-dc {
+  max-width: none;
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
+}
+
 /* Quantities are numerics: mono, tabular. */
 .fabricate-manager .manager-recipe-flow-qty {
   flex: 0 0 auto;
