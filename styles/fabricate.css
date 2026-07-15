@@ -13002,10 +13002,18 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* Simple mode renders a single chromeless ingredient/result set: no set-name
-   header or remove control, so it sits flush without the set list's spacing. */
+/* A single ingredient/result set renders CHROMELESS: complexity is emergent, so with
+   only one set there is no "Set 1" box to contain — no set-name header or remove
+   control, and its requirements sit directly on the tab background. Strip the card
+   chrome (border, radius, padding, fill) the multi-set card carries so no redundant
+   bounding box wraps the lone set, and it sits flush without the set list's spacing
+   (issue 643). */
 .fabricate-manager .manager-recipe-ingredient-set.is-chromeless {
   margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .fabricate-manager .manager-recipe-result-set-simple {
