@@ -26,8 +26,10 @@
      OWNER) means the grant reaches the whole table — so the sub-line says "Shared
      with all players", never "Played by <one name>".
 
-  Below the mode-conditional section, in EVERY mode: recipe mode, step mode and the
-  validation mini-list. (Category lives on the Overview tab, not the rail — issue 643.)
+  Below the mode-conditional section, in EVERY mode: step mode and the validation
+  mini-list. (Category lives on the Overview tab, not the rail — issue 643.) There is
+  no Simple/Complex toggle — recipe complexity is emergent from the ingredient-set
+  count, so it is authored on the Ingredients tab, not here.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -50,15 +52,9 @@
     accessCharacters = [],
     recipeItemDefinitions = [],
     multiStepEnabled = false,
-    complex = false,
-    multiSetAllowed = false,
-    // Alchemy recipes always have exactly one ingredient set and derive their result
-    // shape from the system-level alchemy.checkMode, so Simple/Complex never applies.
-    hideComplexToggle = false,
     // { checks, issues } from the pure readiness evaluator — the same one the
     // Validation tab renders, so the mini-list can never disagree with the tab.
     readiness = { checks: [], issues: [] },
-    onSetComplexity = () => {},
     onRemoveRecipeItem = () => {},
     onEnterMultiStep = () => {},
     onRevertToSingleStep = () => {},
@@ -173,7 +169,7 @@
   // Category authoring moved to the Overview tab (prototype §5.1); the rail no
   // longer carries a category control (issue 643 G-note).
 
-  // --- Step mode / recipe mode ---------------------------------------------------
+  // --- Step mode -----------------------------------------------------------------
   const isMultiStep = $derived((recipe?.steps?.length ?? 0) >= 1);
 
   const STEP_MODE_OPTIONS = [
@@ -191,21 +187,6 @@
     }
   ];
 
-  const RECIPE_MODE_OPTIONS = [
-    {
-      value: 'simple',
-      icon: 'fas fa-equals',
-      labelKey: 'FABRICATE.Admin.Manager.Recipe.SimpleMode',
-      fallback: 'Simple'
-    },
-    {
-      value: 'complex',
-      icon: 'fas fa-diagram-project',
-      labelKey: 'FABRICATE.Admin.Manager.Recipe.ComplexMode',
-      fallback: 'Complex'
-    }
-  ];
-
   function selectStepMode(next) {
     const multi = next === 'multi';
     if (multi === isMultiStep) return;
@@ -213,16 +194,10 @@
     else onRevertToSingleStep();
   }
 
-  // Complex is gated on the system's resolution mode (multiSetAllowed); a recipe that
-  // is already complex can always stay complex (and be inspected or reverted).
-  const complexAllowed = $derived(!hideComplexToggle && (multiSetAllowed || complex));
-
-  function selectComplexity(next) {
-    const wantComplex = next === 'complex';
-    if (wantComplex === complex) return;
-    if (wantComplex && !complexAllowed) return;
-    onSetComplexity(wantComplex);
-  }
+  // Recipe complexity is EMERGENT from structure now (issue 643): a recipe is
+  // multi-set purely by having more than one ingredient set, so the rail carries no
+  // Simple/Complex toggle. The "Add ingredient set" affordance on the Ingredients tab
+  // is the only promotion path.
 
   // --- Validation mini-list ------------------------------------------------------
   // Groups off the SAME pure evaluator the Validation tab renders. "All clear" is a
@@ -431,24 +406,6 @@
 {/if}
 
 {#if recipe}
-  {#if complexAllowed}
-    <!-- Multi-set authoring is gated by `Recipe.complex` PLUS the mode's structural
-         constraints — never by resolutionMode alone. A system whose mode forbids
-         multiple sets crafts one set into one result, so the toggle would offer no
-         real choice and is hidden entirely. -->
-    <section class="manager-recipe-rail-section" data-recipe-section="recipe-mode">
-      <h3 class="manager-recipe-rail-label">{text('FABRICATE.Admin.Manager.Recipe.RecipeMode', 'Recipe mode')}</h3>
-      <SegmentedControl
-        options={RECIPE_MODE_OPTIONS}
-        value={complex ? 'complex' : 'simple'}
-        groupName="manager-recipe-mode"
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.RecipeMode', 'Recipe mode')}
-        optionDataAttr="data-recipe-mode-option"
-        onChange={selectComplexity}
-      />
-    </section>
-  {/if}
-
   {#if multiStepEnabled || isMultiStep}
     <section class="manager-recipe-rail-section" data-recipe-section="recipe-step-mode">
       <h3 class="manager-recipe-rail-label">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>

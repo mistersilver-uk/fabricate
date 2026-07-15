@@ -1137,8 +1137,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders the single-step ingredient/results/tools sections on their tabs', async () => {
+    // An empty recipe in a multi-set-capable mode: complexity is emergent, so the
+    // single (empty) ingredient set renders chromeless with the "Add ingredient set"
+    // promotion affordance below it, and the single result group renders chromeless.
     const target = await editHarness.mount(
-      identityProps({ complex: true, toolsLibrary: TOOLS_LIBRARY })
+      identityProps({ canAddSet: true, toolsLibrary: TOOLS_LIBRARY })
     );
 
     clickTab(target, 'ingredients');
@@ -1147,19 +1150,21 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="ingredients"]'),
       'ingredients section renders'
     );
-    assert.match(target.textContent, /No ingredients yet/, 'ingredients empty text shown');
+    assert.ok(
+      target.querySelector('.manager-recipe-ingredient-set.is-chromeless'),
+      'the single set renders chromeless (no Set 1 box)'
+    );
     assert.ok(
       target.querySelector('[data-recipe-add="ingredient-set"]'),
-      'add ingredient set button shown'
+      'the Add ingredient set promotion button shows where the mode allows it'
     );
 
     clickTab(target, 'results');
     await flushRender();
     assert.ok(target.querySelector('[data-recipe-section="results"]'), 'results section renders');
-    assert.match(target.textContent, /No results yet/, 'results empty text shown');
     assert.ok(
-      target.querySelector('[data-recipe-add="result-set"]'),
-      'add result set button shown'
+      target.querySelector('[data-recipe-result-simple]'),
+      'the single result group renders chromeless'
     );
 
     clickTab(target, 'tools');
@@ -1227,30 +1232,51 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('shows full ingredient/result set scaffolding in Complex mode', async () => {
-    const target = await editHarness.mount(identityProps({ complex: true }));
+  it('shows full multi-set scaffolding once a recipe holds more than one set/group', async () => {
+    // Emergent complexity: chrome + add-affordances appear because the recipe already
+    // holds multiple sets/groups, not because of any stored Complex flag.
+    const target = await editHarness.mount(
+      identityProps({
+        canAddSet: true,
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [
+            { id: 'set-1', name: 'Alpha', ingredientGroups: [] },
+            { id: 'set-2', name: 'Beta', ingredientGroups: [] },
+          ],
+          resultGroups: [
+            { id: 'grp-1', name: 'Primary', results: [] },
+            { id: 'grp-2', name: 'Bonus', results: [] },
+          ],
+        },
+      })
+    );
     clickTab(target, 'ingredients');
     await flushRender();
     assert.ok(
+      target.querySelector('.manager-recipe-ingredient-set-or'),
+      'multiple sets get the OR chrome'
+    );
+    assert.ok(
       target.querySelector('[data-recipe-add="ingredient-set"]'),
-      'Add set button shown in Complex mode'
+      'Add ingredient set button shown for a multi-set recipe'
     );
 
     clickTab(target, 'results');
     await flushRender();
     assert.ok(
       target.querySelector('[data-recipe-add="result-set"]'),
-      'Add result set button shown in Complex mode'
+      'Add result set button shown for a multi-group recipe'
     );
     editHarness.remount();
   });
 
-  it('appends an ingredient set via onUpdateRecipe when + Add set is clicked', async () => {
+  it('appends an ingredient set via onUpdateRecipe when + Add ingredient set is clicked', async () => {
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
-        recipe: { ...RECIPE, complex: true, ingredientSets: [{ id: 'set-1' }] },
+        canAddSet: true,
+        recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1' }] },
         onUpdateRecipe: (patch) => patches.push(patch),
       })
     );
@@ -1328,12 +1354,13 @@ describe('RecipeEditView (mounted)', () => {
 
   it('appends a result set via onUpdateRecipe({ resultGroups }) when + Add result set is clicked', async () => {
     const patches = [];
+    // A routed system keeps chrome (and its Add result set button) even for a single
+    // group, because routed result groups carry a per-group routing head.
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
+        routingProvider: 'ingredientSet',
         recipe: {
           ...RECIPE,
-          complex: true,
           resultGroups: [{ id: 'grp-1', name: 'Primary', results: [] }],
         },
         onUpdateRecipe: (patch) => patches.push(patch),
@@ -1775,10 +1802,9 @@ describe('RecipeEditView (mounted)', () => {
     const updates = [];
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
+        canAddSet: true,
         recipe: {
           ...RECIPE,
-          complex: true,
           steps: [{ id: 'sa', name: 'Forge', ingredientSets: [{ id: 'pre' }] }],
         },
         onUpdateStep: (id, patch) => updates.push([id, patch]),
@@ -1804,10 +1830,16 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders a populated set as component + tag requirements, with images, an OR separator, and no group-name/match toggle', async () => {
+    // Two sets, so this set renders with chrome (a Set-N box + editable name). A single
+    // set would render chromeless (issue 643); the requirement rendering under test is
+    // identical either way, so a multi-set recipe keeps the name-field coverage too.
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
-        recipe: { ...RECIPE, complex: true, ingredientSets: [POPULATED_SET] },
+        canAddSet: true,
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [POPULATED_SET, { id: 'set-2', name: '', ingredientGroups: [] }],
+        },
         componentOptions: COMPONENT_OPTIONS,
         essenceOptions: ESSENCE_OPTIONS,
         itemTags: ITEM_TAGS,
@@ -2895,10 +2927,12 @@ describe('RecipeEditView (mounted)', () => {
 
   it('routes a per-step result add through onUpdateStep({ resultGroups }) for a multi-step recipe', async () => {
     const updates = [];
+    // A routed system keeps chrome + the Add result set affordance even for an empty
+    // step scope, so the GM can author the first routed result group.
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
-        recipe: { ...RECIPE, complex: true, steps: [{ id: 'sa', name: 'Forge' }] },
+        routingProvider: 'check',
+        recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge' }] },
         onUpdateStep: (id, patch) => updates.push([id, patch]),
       })
     );
@@ -2938,8 +2972,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('edits a result group name, preserving its id', async () => {
+    // Two groups, so the group renders with chrome (the free-text name field). A single
+    // non-routed group renders chromeless (issue 643), which has no name field.
     const { target, patches } = await mountResultGroups([
       { id: 'grp-1', name: 'Primary', results: [] },
+      { id: 'grp-2', name: 'Bonus', results: [] },
     ]);
     const nameInput = target.querySelector('[data-recipe-result-set-field="name"]');
     assert.equal(nameInput.value, 'Primary', 'the group name is editable and populated');
@@ -3138,11 +3175,15 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('shows the Add result set button in Complex mode', async () => {
-    const { target } = await mountResultGroups([]);
+  it('shows the Add result set button for a routed system (empty scope)', async () => {
+    // Routed modes need multiple result groups (one per outcome / ingredient set), so
+    // they keep the Add result set affordance even when no group exists yet.
+    const { target } = await mountResultGroups([], {
+      props: { routingProvider: 'check', routedOutcomeTierOptions: TIER_OPTIONS, routedOutcomeTiersDefined: true },
+    });
     assert.ok(
       target.querySelector('[data-recipe-add="result-set"]'),
-      'Add result set button shown in Complex mode'
+      'Add result set button shown for a routed result scope'
     );
     editHarness.remount();
   });
@@ -3631,76 +3672,32 @@ describe('RecipeContextRail (mounted)', () => {
     railHarness.remount();
   });
 
-  it('renders the recipe-mode control with Simple active when the system allows complex', async () => {
-    const target = await railHarness.mount(
-      railProps({ recipe: { ...RECIPE, steps: [] }, multiSetAllowed: true })
-    );
-    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
-    assert.ok(card, 'recipe-mode card renders when complex is an available choice');
-    assert.ok(
-      card.querySelector('[data-recipe-mode-option="simple"]').classList.contains('is-active'),
-      'Simple is active when complex is false'
-    );
-    railHarness.remount();
-  });
-
-  it('hides the recipe-mode section when the system forbids multiple sets and the recipe is not already complex', async () => {
-    const target = await railHarness.mount(railProps({ complex: false, multiSetAllowed: false }));
+  // The Simple/Complex toggle was removed (issue 643): recipe complexity is emergent
+  // from the ingredient-set count, authored via the Ingredients tab's "Add ingredient
+  // set" affordance, so the rail renders no recipe-mode control in any configuration.
+  it('renders NO recipe-mode control (complexity is emergent from structure)', async () => {
+    const single = await railHarness.mount(railProps({ recipe: { ...RECIPE, steps: [] } }));
     assert.equal(
-      target.querySelector('[data-recipe-section="recipe-mode"]'),
+      single.querySelector('[data-recipe-section="recipe-mode"]'),
       null,
-      'a simple-resolution system does not show the recipe-mode control at all'
-    );
-    railHarness.remount();
-  });
-
-  it('still shows the recipe-mode section for an already-complex recipe even when the system forbids multiple sets', async () => {
-    const target = await railHarness.mount(railProps({ complex: true, multiSetAllowed: false }));
-    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
-    assert.ok(card, 'an already-complex recipe keeps the control so it can be reverted');
-    assert.ok(
-      card.querySelector('[data-recipe-mode-option="complex"]').classList.contains('is-active'),
-      'Complex is active for an already-complex recipe'
-    );
-    railHarness.remount();
-  });
-
-  it('hides the recipe-mode section entirely for alchemy (hideComplexToggle)', async () => {
-    const target = await railHarness.mount(
-      railProps({ complex: false, multiSetAllowed: true, hideComplexToggle: true })
+      'no recipe-mode section for a single-set recipe'
     );
     assert.equal(
-      target.querySelector('[data-recipe-section="recipe-mode"]'),
+      single.querySelector('[data-recipe-mode-option]'),
       null,
-      'alchemy recipes always have exactly one ingredient set'
+      'no Simple/Complex segmented control'
     );
     railHarness.remount();
-  });
 
-  it('fires onSetComplexity(true) on Complex and onSetComplexity(false) on Simple', async () => {
-    const calls = [];
-    const target = await railHarness.mount(
-      railProps({
-        complex: false,
-        multiSetAllowed: true,
-        onSetComplexity: (next) => calls.push(next),
-      })
+    // Even a multi-set / multi-step recipe gets no toggle — there is nothing to toggle.
+    const multi = await railHarness.mount(
+      railProps({ recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] } })
     );
-    target.querySelector('[data-recipe-mode-option="complex"] input[type="radio"]').click();
-    await flushRender();
-    assert.deepEqual(calls, [true], 'choosing Complex requests complex mode');
-
-    railHarness.remount();
-    const target2 = await railHarness.mount(
-      railProps({
-        complex: true,
-        multiSetAllowed: true,
-        onSetComplexity: (next) => calls.push(next),
-      })
+    assert.equal(
+      multi.querySelector('[data-recipe-section="recipe-mode"]'),
+      null,
+      'no recipe-mode section for a multi-step recipe either'
     );
-    target2.querySelector('[data-recipe-mode-option="simple"] input[type="radio"]').click();
-    await flushRender();
-    assert.deepEqual(calls, [true, false], 'choosing Simple requests simple mode');
     railHarness.remount();
   });
 

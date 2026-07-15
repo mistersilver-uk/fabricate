@@ -1094,11 +1094,14 @@
       ? selectedSystem?.alchemy?.checkMode || 'none'
       : null
   );
-  // Alchemy ingredient sets are ALWAYS single (never Complex-routed); other modes
-  // read the recipe's own Complex flag. Result-group rendering is derived separately
-  // (checkMode for alchemy) so the two are no longer coupled through one flag.
-  const recipeComplex = $derived(
-    selectedSystem?.resolutionMode === 'alchemy' ? false : recipeDraft?.complex === true
+  // Recipe complexity is EMERGENT from structure now (issue 643): the editor renders
+  // multi-set chrome purely off the ingredient-set / result-group COUNT, so there is
+  // no `complex` prop threaded down any more. What the Ingredients tab still needs is
+  // whether the mode PERMITS more than one set — that gates the "Add ingredient set"
+  // promotion affordance. Multiple sets are allowed everywhere except the structurally
+  // 1×1 modes (simple/progressive) and alchemy (which forces a single set).
+  const recipeCanAddSet = $derived(
+    recipeMultiSetAllowed && selectedSystem?.resolutionMode !== 'alchemy'
   );
   // Alchemy Simple mode drives the Results tab's fixed two-slot editor (success +
   // reserved failure result set).
@@ -2512,26 +2515,6 @@
     return globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`;
   }
 
-  // Mint an id for a recipe sub-entity (ingredient set / result group). Mirrors the
-  // section cards' eager-id pattern; routing keys these by id.
-  function recipeEntityId() {
-    return globalThis.foundry?.utils?.randomID?.() || `id-${Math.random().toString(36).slice(2, 10)}`;
-  }
-
-  function ensureEntityId(entry) {
-    return entry && !entry.id ? { ...entry, id: recipeEntityId() } : entry;
-  }
-
-  // Backfill ids on a scope's ingredient sets / result groups. A Simple-mode
-  // placeholder can be staged id-less; switching to Complex routes by id, so heal
-  // any id-less entry up front (returns only the keys that exist on the scope).
-  function backfillScopeIds(scope) {
-    const out = {};
-    if (Array.isArray(scope?.ingredientSets)) out.ingredientSets = scope.ingredientSets.map(ensureEntityId);
-    if (Array.isArray(scope?.resultGroups)) out.resultGroups = scope.resultGroups.map(ensureEntityId);
-    return out;
-  }
-
   function handleEnterMultiStep() {
     if (!recipeDraft) return false;
     const seeded = {
@@ -2560,72 +2543,6 @@
     return true;
   }
 
-  // Switch a recipe between Simple and Complex. Going Complex is a pure flag flip.
-  // Going Simple may drop extra sets/results across every scope (recipe-level and
-  // each step), so when anything would be removed we warn first, then stage the trim.
-  async function handleSetRecipeComplexity(complex) {
-    if (!recipeDraft) return false;
-    if (complex === true) {
-      // Entering Complex exposes per-set/per-group routing, so heal any id-less
-      // Simple-authored entry now (across every scope) rather than waiting for save.
-      const complexSteps = Array.isArray(recipeDraft.steps) ? recipeDraft.steps : [];
-      const patch = { complex: true };
-      if (complexSteps.length > 0) {
-        patch.steps = complexSteps.map((step) => ({ ...step, ...backfillScopeIds(step) }));
-      } else {
-        Object.assign(patch, backfillScopeIds(recipeDraft));
-      }
-      // Alchemy no longer routes via a recipe-level provider (retired for the
-      // system-level `alchemy.checkMode`), so entering Complex seeds nothing on an
-      // alchemy recipe — and the alchemy editor never exposes the Complex toggle
-      // anyway (its shape is derived from `alchemy.checkMode`).
-      patchRecipeDraft(patch);
-      return true;
-    }
-
-    const scopeHasExtras = (scope) => {
-      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
-      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
-      return ingredientSets.length > 1 || resultGroups.length > 1;
-    };
-    const steps = Array.isArray(recipeDraft.steps) ? recipeDraft.steps : [];
-    // A multi-step recipe crafts from its steps (top-level sets are the single-step
-    // fallback), so only the scope we actually trim should drive the confirm.
-    const hasExtras = steps.length > 0 ? steps.some(scopeHasExtras) : scopeHasExtras(recipeDraft);
-
-    if (!hasExtras) {
-      patchRecipeDraft({ complex: false });
-      return true;
-    }
-
-    const name = String(recipeDraft.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
-    const perStep = steps.length > 0 ? localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimplePerStep') : '';
-    const confirmed = await store.confirmRecipeAction?.({
-      title: localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleTitle'),
-      content: localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleContent', { name, perStep })
-    });
-    if (!confirmed) return false;
-
-    const trimScope = (scope) => {
-      const ingredientSets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
-      const resultGroups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
-      return {
-        ingredientSets: ingredientSets.slice(0, 1),
-        resultGroups: resultGroups.slice(0, 1)
-      };
-    };
-
-    const patch = { complex: false };
-    if (steps.length > 0) {
-      patch.steps = steps.map((step) => ({ ...step, ...trimScope(step) }));
-    } else {
-      const trimmed = trimScope(recipeDraft);
-      patch.ingredientSets = trimmed.ingredientSets;
-      patch.resultGroups = trimmed.resultGroups;
-    }
-    patchRecipeDraft(patch);
-    return true;
-  }
 
   function currentSteps() {
     return Array.isArray(recipeDraft?.steps) ? [...recipeDraft.steps] : [];
@@ -5166,7 +5083,7 @@
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
         recipe={recipeDraft}
-        complex={recipeComplex}
+        canAddSet={recipeCanAddSet}
         alchemySimple={recipeAlchemySimple}
         progressive={recipeProgressive}
         saving={recipeEditSaving}
@@ -6845,11 +6762,7 @@
           accessCharacters={recipeAccessRoster.characters}
           {recipeItemDefinitions}
           multiStepEnabled={recipeMultiStepEnabled}
-          complex={recipeComplex}
-          multiSetAllowed={recipeMultiSetAllowed}
-          hideComplexToggle={selectedSystem?.resolutionMode === 'alchemy'}
           readiness={recipeRailReadiness}
-          onSetComplexity={handleSetRecipeComplexity}
           onRemoveRecipeItem={handleRemoveRecipeItem}
           onEnterMultiStep={handleEnterMultiStep}
           onRevertToSingleStep={handleRevertToSingleStep}

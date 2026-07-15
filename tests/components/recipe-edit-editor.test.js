@@ -228,10 +228,14 @@ describe('RecipeContextRail (issue 643 §4b)', () => {
     );
   });
 
-  it('renders Step mode and Recipe mode as real SegmentedControls and the validation mini-list', () => {
+  it('renders Step mode as a real SegmentedControl and the validation mini-list, with NO Recipe mode toggle', () => {
     assert.ok(railSource.includes("import SegmentedControl from '../SegmentedControl.svelte'"));
     assert.ok(railSource.includes("optionDataAttr=\"data-recipe-step-mode-option\""));
-    assert.ok(railSource.includes("optionDataAttr=\"data-recipe-mode-option\""));
+    // Recipe complexity is emergent from the ingredient-set count now (issue 643):
+    // the rail carries no Simple/Complex control at all.
+    assert.equal(railSource.includes('data-recipe-mode-option'), false, 'no Recipe mode segmented control');
+    assert.equal(railSource.includes('data-recipe-section="recipe-mode"'), false, 'no Recipe mode rail section');
+    assert.equal(railSource.includes('onSetComplexity'), false, 'the rail no longer wires a complexity setter');
     assert.ok(railSource.includes('data-recipe-validation-clear'), 'an All clear pill');
     assert.ok(railSource.includes('data-recipe-rail-check'), 'the failing-check list');
   });
@@ -392,14 +396,16 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       !rootSource.includes('chooseSeedProvider('),
       'root no longer seeds an alchemy resultSelection.provider'
     );
-    // The alchemy recipe editor hides the Simple/Complex toggle entirely.
+    // The Simple/Complex toggle is gone entirely (issue 643): complexity is emergent
+    // from structure, and alchemy already forced a single set, so there is no toggle
+    // to hide any more.
+    assert.equal(rootSource.includes('hideComplexToggle'), false, 'no hideComplexToggle prop threaded from the root');
+    assert.equal(railSource.includes('hideComplexToggle'), false, 'the rail declares no hideComplexToggle prop');
+    // Alchemy forbids adding ingredient sets; the emergent add-set affordance is gated
+    // on recipeCanAddSet, which excludes alchemy.
     assert.ok(
-      rootSource.includes("hideComplexToggle={selectedSystem?.resolutionMode === 'alchemy'}"),
-      'the context rail hides the Complex toggle for alchemy'
-    );
-    assert.ok(
-      railSource.includes('hideComplexToggle'),
-      'RecipeContextRail honours a hideComplexToggle prop'
+      rootSource.includes("recipeMultiSetAllowed && selectedSystem?.resolutionMode !== 'alchemy'"),
+      'recipeCanAddSet excludes alchemy from the add-ingredient-set affordance'
     );
   });
 
@@ -407,10 +413,10 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     // Keys exist with the expected English copy and HTML-preserving interpolation.
     assert.equal(recipeLang.RevertToSingleStepTitle, 'Switch to single-step?');
     assert.ok(recipeLang.RevertToSingleStepContent.includes('<strong>{name}</strong>'), 'revert content keeps the bold name placeholder');
-    assert.equal(recipeLang.SwitchToSimpleTitle, 'Switch to simple?');
-    assert.ok(recipeLang.SwitchToSimpleContent.includes('<strong>{name}</strong>'), 'switch-to-simple content keeps the bold name placeholder');
-    assert.ok(recipeLang.SwitchToSimpleContent.includes('result set{perStep}'), 'switch-to-simple content keeps the perStep placeholder');
-    assert.equal(recipeLang.SwitchToSimplePerStep, ' per step');
+    // The Simple/Complex toggle (and its Switch-to-simple confirm) is gone (issue 643):
+    // complexity is emergent, so those keys are retired.
+    assert.equal(recipeLang.SwitchToSimpleTitle, undefined, 'the retired switch-to-simple title key is removed');
+    assert.equal(recipeLang.SwitchToSimpleContent, undefined, 'the retired switch-to-simple content key is removed');
     assert.equal(recipeLang.DeleteStepTitle, 'Delete step?');
     assert.ok(recipeLang.DeleteStepContent.includes('<strong>{name}</strong>'), 'delete-step content keeps the bold name placeholder');
     assert.ok(recipeLang.DeleteStepContent.includes('{alsoDeleted}'), 'delete-step content keeps the alsoDeleted placeholder');
@@ -422,8 +428,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     // The handlers localize these keys rather than embedding hardcoded English.
     assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle')"), 'revert title localized');
     assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name })"), 'revert content localized with name');
-    assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleTitle')"), 'switch-to-simple title localized');
-    assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.SwitchToSimpleContent', { name, perStep })"), 'switch-to-simple content localized with name + perStep');
+    assert.equal(rootSource.includes('SwitchToSimple'), false, 'the retired switch-to-simple confirm is gone from the root');
     assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle')"), 'delete-step title localized');
     assert.ok(rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted })"), 'delete-step content localized with name + alsoDeleted');
 

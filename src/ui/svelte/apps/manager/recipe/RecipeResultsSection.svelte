@@ -26,7 +26,6 @@
 
   let {
     resultGroups = [],
-    complex = true,
     // Alchemy Simple mode (issue 554): render a FIXED two-slot view — a labeled
     // "On success" result set + a reserved, undeletable "On a failed check" set —
     // instead of the generic add/remove group list. Decoupled from `complex`.
@@ -101,11 +100,16 @@
     }));
   }
 
-  // Defensive: never let the simple (chromeless, single-group) render hide extra
-  // groups. Trimming to one group is the confirmed store path; if a recipe is
-  // somehow flagged simple while still holding >1 group, fall back to the full
-  // list so the first edit can't silently drop group[1..].
-  const effectiveComplex = $derived(complex || groups.length > 1);
+  // Result routing lives in the group HEAD (the "Produced on outcome" / "Produced by"
+  // assignment), which only renders when the group is chromed — so a routed system
+  // always needs chrome, even for a single group, or it would lose its routing control.
+  const isRouted = $derived(routingProvider === 'check' || routingProvider === 'ingredientSet');
+
+  // Rendering complexity is EMERGENT from structure (issue 643): multiple result
+  // groups get the set chrome; a single, NON-routed result group renders CHROMELESS
+  // (no "Set 1" box). Routed modes (check/ingredients) keep chrome regardless of count
+  // so their per-group routing head stays available. No stored Simple/Complex flag.
+  const effectiveComplex = $derived(groups.length > 1 || isRouted);
 
   // Simple mode shows exactly one chromeless group bound to the first group. If
   // none exists yet, synthesize an empty placeholder for editing.

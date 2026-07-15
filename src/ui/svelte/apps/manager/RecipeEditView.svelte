@@ -26,7 +26,11 @@
 
   let {
     recipe = null,
-    complex = false,
+    // Whether the system mode allows more than one ingredient set (issue 643).
+    // Threaded through this wrapper to the Ingredients tab so its single-set
+    // (chromeless) view can show the "Add ingredient set" promotion affordance —
+    // a tab prop that skips this wrapper silently drops to its default.
+    canAddSet = false,
     // Alchemy Simple two-slot result editor (issue 554). Declared+forwarded here so
     // the Results tab receives it through the wrapper (a tab prop that skips this
     // wrapper silently drops to its default and never renders).
@@ -337,7 +341,7 @@
         {:else if activeTab === 'ingredients'}
           <RecipeIngredientsTab
             {recipe}
-            {complex}
+            {canAddSet}
             {isMultiStep}
             {currencyUnits}
             {componentOptions}
@@ -351,7 +355,6 @@
         {:else if activeTab === 'results'}
           <RecipeResultsTab
             {recipe}
-            {complex}
             {alchemySimple}
             {isMultiStep}
             {componentOptions}

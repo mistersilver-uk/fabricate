@@ -20,12 +20,14 @@
 
   let {
     recipe = null,
-    complex = true,
     isMultiStep = false,
     currencyUnits = [],
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // Whether the system mode allows more than one ingredient set. Forwarded to each
+    // section to gate the "Add ingredient set" promotion affordance (issue 643).
+    canAddSet = false,
     // Hidden in routed check-mode recipes (routing is by check outcome, not set name).
     showSetName = true,
     // Drives the mode-adaptive heading + intro (§B5): 'ingredientSet' routing reads
@@ -81,7 +83,7 @@
           <RecipeIngredientsSection
             idPrefix={`step-${step.id}-`}
             ingredientSets={stepIngredientSets(step)}
-            {complex}
+            {canAddSet}
             {componentOptions}
             {essenceOptions}
             {itemTags}
@@ -95,7 +97,7 @@
   {:else}
     <RecipeIngredientsSection
       {ingredientSets}
-      {complex}
+      {canAddSet}
       {componentOptions}
       {essenceOptions}
       {itemTags}

@@ -3306,8 +3306,10 @@ async function main() {
 
         await csm.updateSystem(systemId, {
           // `routedByCheck` resolution allows multiple ingredient/result sets, so the
-          // recipe editor unlocks Complex mode (recipeMultiSetAllowed gates on a mode
-          // NOT in ['simple','progressive']). Under this system mode every recipe routes
+          // recipe editor shows the "Add ingredient set" promotion affordance
+          // (recipeCanAddSet gates on a mode NOT in ['simple','progressive'] and not
+          // alchemy). Complexity is emergent from the set/group count — there is no
+          // Simple/Complex toggle. Under this system mode every recipe routes
           // by the routed crafting-check outcome, and a single-result-group recipe is
           // produced on any non-failure outcome (the single-group exemption). The
           // authored `craftingCheck.routed.rollFormula` below means no missing-formula
@@ -4715,8 +4717,9 @@ async function main() {
 
         // Showcase Requirements → Ingredients tab: capture every requirement row type
         // (component, OR group, tag, currency cost), the faint dividers, and the tag
-        // layout. The recipe is authored complex, so the section renders the full set
-        // card list with one or more data-recipe-group cards.
+        // layout. The recipe has a SINGLE ingredient set, so it renders CHROMELESS
+        // (issue 643) — the requirement rows sit on the tab background with no "Set 1"
+        // box, above the full-width "Add ingredient set" promotion button.
         await openManagerRecipeEditor(page, 'Showcase Requirements');
         await page.locator('.fabricate-manager [data-recipe-tab-button="ingredients"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first().waitFor({ state: 'visible', timeout: 5_000 });

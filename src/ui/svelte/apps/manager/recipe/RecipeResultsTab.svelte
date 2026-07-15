@@ -20,7 +20,6 @@
 
   let {
     recipe = null,
-    complex = true,
     // Alchemy Simple two-slot result editor (issue 554); forwarded to each section.
     alchemySimple = false,
     isMultiStep = false,
@@ -94,7 +93,6 @@
           <RecipeResultsSection
             idPrefix={`step-${step.id}-`}
             resultGroups={stepResultGroups(step)}
-            {complex}
             {alchemySimple}
             {componentOptions}
             {routingProvider}
@@ -113,7 +111,6 @@
   {:else}
     <RecipeResultsSection
       {resultGroups}
-      {complex}
       {alchemySimple}
       {componentOptions}
       {routingProvider}
