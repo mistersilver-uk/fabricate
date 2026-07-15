@@ -1253,6 +1253,11 @@
   --fab-mv2-warning: var(--fab-warning);
   --fab-mv2-danger: var(--fab-danger);
 
+  /* One control-text scale shared by the recipe browser filter bar (search + selects)
+     and the recipe editor overview fields (name, flavour, selects), so both read at
+     the same size (issue 643). */
+  --fab-recipe-control-font: 0.72rem;
+
   position: relative;
   isolation: isolate;
   container-type: inline-size;
@@ -3525,6 +3530,7 @@
   border-radius: 9px;
   color: var(--fab-mv2-text);
   background: var(--fab-mv2-bg);
+  font-size: var(--fab-recipe-control-font);
   cursor: pointer;
 }
 
@@ -3545,12 +3551,13 @@
 
 .fabricate-manager .manager-recipe-name-input {
   font-family: var(--fab-font-serif);
-  font-size: 0.95rem;
+  font-size: var(--fab-recipe-control-font);
   font-weight: 600;
 }
 
 .fabricate-manager .manager-recipe-flavour-input {
   min-height: 68px;
+  font-size: var(--fab-recipe-control-font);
   resize: vertical;
 }
 
@@ -3706,13 +3713,11 @@
    the active-filter chips and the count. Category used to sit on row two, below the
    grouping and sorting controls that act on its result. */
 .fabricate-manager .manager-recipe-toolbar {
-  /* One control font for the whole bar (issue 643). The search input, both selects
-     and the sort-direction toggle all read at this size — matching the segmented
+  /* The whole bar reads at the shared --fab-recipe-control-font (issue 643): the
+     search input, both selects and the sort-direction toggle — matching the segmented
      status/lock toggles (their component sets the same 0.72rem) — so the filters no
      longer mix 14 / 12.48 / 11.52px. The small GROUP BY / SORT BY micro-labels are
      deliberately smaller and keep their own size. */
-  --fab-recipe-control-font: 0.72rem;
-
   gap: var(--fab-space-2);
 }
 
