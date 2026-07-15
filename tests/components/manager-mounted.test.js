@@ -4348,6 +4348,84 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // Issue 643: the browser's filter / sort / group / paginate state is lifted to the
+  // root so it survives the edit round-trip. Opening the editor unmounts the browser;
+  // without the lift it remounted at defaults, throwing away the view the GM left. The
+  // search term already persisted (it lives in the store); this proves the other controls
+  // now do too — open Edit from the ROW pencil, return, and find the same view.
+  it('preserves the recipe browser filters and sort across an edit round-trip', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    craftingParent().click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2, 'both recipes at the default filter');
+
+    // Filter to OFF (leaves only the disabled r2) and flip the sort to descending.
+    const offSegment = target.querySelector('[data-recipe-status-option="off"] input');
+    offSegment.checked = true;
+    offSegment.dispatchEvent(new Event('change', { bubbles: true }));
+    target.querySelector('[data-recipe-sort-direction]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('.manager-recipe-row')).map((row) => row.dataset.recipeId),
+      ['r2'],
+      'the OFF filter leaves only the disabled recipe',
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-sort-direction]').dataset.recipeSortDirection,
+      'desc',
+    );
+
+    // Open the editor from the ROW's own Edit pencil (the restored primary affordance).
+    target.querySelector('[data-recipe-id="r2"] [data-recipe-edit]').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-edit',
+      'the row Edit pencil opens the recipe-edit route',
+    );
+
+    // Return via Back to recipes.
+    const backButton = Array.from(
+      target.querySelectorAll('.manager-header-actions .manager-button'),
+    ).find((button) => button.textContent.includes('Back to recipes'));
+    assert.ok(backButton, 'the editor offers Back to recipes');
+    backButton.click();
+    await tick();
+    flushSync();
+
+    // The browser is back with the SAME filters and sort — not reset to defaults.
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.ok(
+      target.querySelector('[data-recipe-filter-chip="status"]'),
+      'the status filter survived the edit round-trip',
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('.manager-recipe-row')).map((row) => row.dataset.recipeId),
+      ['r2'],
+      'the OFF filter is still applied after returning from the editor',
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-sort-direction]').dataset.recipeSortDirection,
+      'desc',
+      'the descending sort survived the edit round-trip',
+    );
+  });
+
   it('creates a recipe from the recipes header and opens the recipe-edit route', async () => {
     const calls = [];
     target = document.createElement('div');

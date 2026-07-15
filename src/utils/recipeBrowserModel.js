@@ -38,6 +38,39 @@ export const RECIPE_LOCK_FILTERS = Object.freeze(['all', 'unlocked', 'locked']);
  */
 export const RECIPE_DEFAULT_PAGE_SIZE = 25;
 
+/**
+ * Build a fresh recipe-browser view-state object: the filter / sort / group /
+ * paginate controls that live above the pure list model (issue 643).
+ *
+ * The GM recipe library lifts this object up to the manager root so it SURVIVES the
+ * edit round-trip — opening the editor unmounts the browser, and remounting it with
+ * these reset to defaults threw away the page, filters, sort and grouping the GM left.
+ * The root holds one `$state(createRecipeBrowserState())` and threads it back in, so
+ * Save / Back return to the exact view. `collapsedCategories` is a `Set` (collapse is
+ * opt-IN: a category absent from the set is expanded). A fresh call is used on FIRST
+ * arrival (defaults) and by isolated mounted tests that don't lift the state — so this
+ * must always return a NEW object with a NEW Set, never a shared singleton.
+ *
+ * @returns {{
+ *   statusFilter: string, lockFilter: string, categoryFilter: string,
+ *   groupByCategory: boolean, sortKey: RecipeSortKey, sortDirection: SortDirection,
+ *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>
+ * }}
+ */
+export function createRecipeBrowserState() {
+  return {
+    statusFilter: 'all',
+    lockFilter: 'all',
+    categoryFilter: 'all',
+    groupByCategory: true,
+    sortKey: 'name',
+    sortDirection: 'asc',
+    pageIndex: 0,
+    pageSize: RECIPE_DEFAULT_PAGE_SIZE,
+    collapsedCategories: new Set(),
+  };
+}
+
 /** The reserved category key a recipe with no authored category falls back to. */
 const GENERAL_CATEGORY = 'general';
 

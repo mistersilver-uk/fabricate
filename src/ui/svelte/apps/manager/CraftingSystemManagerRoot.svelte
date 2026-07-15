@@ -18,6 +18,7 @@
     getRecipeCategoryLabel,
     normalizeRecipeCategory
   } from '../../../../utils/recipeCategories.js';
+  import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
@@ -102,6 +103,15 @@
   // context rail can show its validation summary only on the Validation tab (§G4).
   let recipeActiveTab = $state('overview');
   let recipeDraftBaseline = $state(null);
+  // The recipe browser's filter / sort / group / paginate view-state, lifted OUT of
+  // RecipesBrowserView so it survives the editor round-trip (issue 643). Opening the
+  // editor switches `currentView` to `recipe-edit`, which unmounts the browser; without
+  // this the browser remounted with every control reset to defaults, throwing away the
+  // page, filters, sort and grouping the GM left. `editRecipe()` never touches it, and
+  // `saveRecipeDraft()` / `backToRecipesBrowse()` only flip `activeView`, so on return
+  // the browser remounts against this intact object. Fresh open still starts at defaults
+  // (this is seeded once, on first mount).
+  let recipeBrowserState = $state(createRecipeBrowserState());
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
@@ -5245,8 +5255,10 @@
         selectedRecipeId={selectedRecipe?.id || ''}
         {showRecipeCategories}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        bind:browserState={recipeBrowserState}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}
+        onEditRecipe={(id) => editRecipe(id)}
         onToggleEnabled={(id, enabled, options) => toggleRecipeEnabled(id, enabled, options)}
         onToggleLocked={(id, locked) => store.toggleRecipeLocked?.(id, locked)}
       />

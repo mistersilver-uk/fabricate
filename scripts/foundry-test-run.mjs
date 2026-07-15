@@ -298,20 +298,15 @@ async function openManagerCraftingSection(page, subitemId, managerView) {
 // recipe's editor, waiting for the recipe-edit route. Consolidates the
 // "return then open recipe X" sequence the recipe-editor captures repeat.
 //
-// The Edit / Duplicate / Delete row actions moved to the inspector (issue 643): the
-// row no longer carries an Edit icon. So SELECT the recipe by clicking its identity
-// button, which drives the shell inspector, then click the inspector's Edit action.
+// Each recipe row carries its own Edit pencil again (issue 643), matching the Books &
+// Scrolls row edit affordance — the primary way a GM opens the editor. Click it directly
+// (Duplicate / Delete stay inspector-only), then wait for the recipe-edit route.
 async function openManagerRecipeEditor(page, recipeName) {
   await openManagerCraftingSection(page, 'recipes', 'recipes');
   await page
-    .locator(`.fabricate-manager .manager-recipe-row:has-text("${recipeName}") .manager-recipe-identity`)
+    .locator(`.fabricate-manager .manager-recipe-row:has-text("${recipeName}") [data-recipe-edit]`)
     .first()
     .click();
-  const editAction = page
-    .locator('.fabricate-manager .manager-recipe-browser-inspector [data-recipe-action="edit"]')
-    .first();
-  await editAction.waitFor({ state: 'visible', timeout: 5_000 });
-  await editAction.click();
   await page
     .locator('.fabricate-manager[data-manager-view="recipe-edit"]')
     .first()

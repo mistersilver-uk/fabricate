@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -371,10 +372,9 @@ describe('RecipesBrowserView lock and enable controls', () => {
       const row = root.querySelector(`[data-recipe-id="${id}"]`);
       assert.ok(row.querySelector('[data-recipe-lock]'), 'the lock control is present');
       assert.ok(row.querySelector('.manager-status-toggle'), 'the enable toggle is present');
-      // The Edit/Duplicate/Delete actions moved to the inspector (issue 643): the row no
-      // longer carries them.
+      // Duplicate / Delete stay inspector-only (issue 643): the row carries a single Edit
+      // pencil, not the old three-icon action group.
       assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');
-      assert.equal(row.querySelector('i.fa-edit'), null, 'the row carries no Edit icon');
     }
 
     root.querySelector('[data-recipe-id="r1"] [data-recipe-lock]').click();
@@ -382,6 +382,104 @@ describe('RecipesBrowserView lock and enable controls', () => {
     flushSync();
 
     assert.deepEqual(locks, [['r1', true], ['r2', false]], 'lock toggles both ways');
+  });
+
+  // The row's Edit pencil is restored (issue 643), styled like the Books & Scrolls row
+  // edit: a `.manager-icon-button` with a `fa-pen`, sitting after the enable toggle. It
+  // is the primary way to open the editor from the row.
+  it('renders a single Edit pencil per row that reports the recipe id', async () => {
+    const edits = [];
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', name: 'Acid Flask' }), makeRecipe({ id: 'r2', name: 'Bronze Ingot' })],
+      onEditRecipe: (id) => edits.push(id)
+    });
+
+    for (const id of ['r1', 'r2']) {
+      const editButton = root.querySelector(`[data-recipe-id="${id}"] [data-recipe-edit]`);
+      assert.ok(editButton, 'the row carries its own Edit pencil');
+      assert.ok(editButton.classList.contains('manager-icon-button'), 'styled like the Books & Scrolls row edit');
+      assert.ok(editButton.querySelector('i.fa-pen'), 'the Edit affordance is a pen, matching Books & Scrolls');
+    }
+
+    root.querySelector('[data-recipe-id="r2"] [data-recipe-edit]').click();
+    flushSync();
+    assert.deepEqual(edits, ['r2'], 'clicking the pencil opens the editor for that row');
+  });
+});
+
+describe('RecipesBrowserView column header (issue 643)', () => {
+  it('labels the row columns once, above the whole list', async () => {
+    const root = await browser.mount({
+      recipes: GROUPED,
+      recipeCategories: CATEGORIES,
+      showRecipeCategories: true
+    });
+
+    const head = root.querySelector('.manager-recipe-table-head');
+    assert.ok(head, 'the list carries a column header');
+    // One header for the whole list — NOT one per category group.
+    assert.equal(root.querySelectorAll('.manager-recipe-table-head').length, 1);
+    assert.match(head.textContent, /Recipe/);
+    assert.match(head.textContent, /Requirements/);
+    assert.match(head.textContent, /Check/);
+    assert.match(head.textContent, /Status/);
+    // The header is decorative chrome; the rows carry their own labels.
+    assert.equal(head.getAttribute('aria-hidden'), 'true');
+  });
+
+  it('renders no column header when the library is empty', async () => {
+    const root = await browser.mount({ recipes: [] });
+    assert.equal(root.querySelector('.manager-recipe-table-head'), null);
+  });
+});
+
+// The filter / sort / group / paginate view-state is lifted to the manager root so it
+// survives the edit round-trip (issue 643). The component reads and WRITES an external
+// `browserState` object when one is bound; the round-trip itself is proven end-to-end in
+// the mounted manager suite, but here we prove the seam: a bound object is mutated in
+// place (so the root sees the change) and seeds the controls (so a restored object
+// re-applies the GM's filters on remount).
+describe('RecipesBrowserView lifted browser state', () => {
+  it('writes control changes back into the bound browserState object', async () => {
+    // A plain object is not a Svelte `$state` proxy, so the write lands but does not
+    // reactively refilter the view here — the root passes a real proxy, and the live
+    // refilter + round-trip is proven end-to-end in the mounted manager suite. This
+    // proves the write REACHES the shared object rather than a hidden local copy.
+    const shared = createRecipeBrowserState();
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', name: 'On' }), makeRecipe({ id: 'r2', name: 'Off', enabled: false })],
+      browserState: shared
+    });
+
+    const off = root.querySelector('[data-recipe-status-option="off"] input');
+    off.checked = true;
+    off.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    assert.equal(shared.statusFilter, 'off', 'the control write lands on the bound object, not local state');
+
+    const direction = root.querySelector('[data-recipe-sort-direction]');
+    direction.click();
+    flushSync();
+    assert.equal(shared.sortDirection, 'desc', 'the sort direction write lands on the bound object too');
+  });
+
+  it('seeds its controls from a restored browserState object on mount', async () => {
+    const restored = createRecipeBrowserState();
+    restored.statusFilter = 'off';
+    restored.sortDirection = 'desc';
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', name: 'On' }), makeRecipe({ id: 'r2', name: 'Off', enabled: false })],
+      browserState: restored
+    });
+
+    // The status filter the GM left is re-applied without any interaction.
+    assert.deepEqual(rowIds(root), ['r2'], 'the restored status filter is applied on mount');
+    assert.equal(
+      root.querySelector('[data-recipe-sort-direction]').dataset.recipeSortDirection,
+      'desc',
+      'the restored sort direction is applied on mount'
+    );
   });
 
   it('claims a blocked enable through the store seam and flashes it in-window, dismissibly', async () => {

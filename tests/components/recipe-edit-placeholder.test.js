@@ -36,15 +36,17 @@ function inspectorActionBlock() {
   return inspectorSource.slice(start, end);
 }
 
-describe('recipe actions live on the inspector, not the row', () => {
-  it('strips the Edit/Duplicate/Delete actions and their props from the row', () => {
-    // The row no longer authors any of the three actions or their callbacks — they are
-    // the inspector's job now, so leaving the props on the row would be dead wiring.
-    assert.equal(browserSource.includes('onEditRecipe'), false, 'the row should not declare an onEditRecipe prop');
+describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspector-only', () => {
+  it('restores the row Edit pencil but keeps Duplicate/Delete off the row', () => {
+    // The row carries its own Edit pencil again (issue 643), matching the Books & Scrolls
+    // row edit — but Duplicate and Delete remain the inspector's job, so the row must not
+    // author those callbacks or the old three-icon action group.
+    assert.ok(browserSource.includes('onEditRecipe'), 'the row declares the onEditRecipe prop');
+    assert.ok(browserSource.includes('data-recipe-edit={recipe.id}'), 'the row renders its Edit pencil');
     assert.equal(browserSource.includes('onDuplicateRecipe'), false, 'the row should not declare an onDuplicateRecipe prop');
     assert.equal(browserSource.includes('onDeleteRecipe'), false, 'the row should not declare an onDeleteRecipe prop');
     assert.equal(browserSource.includes('manager-recipe-actions'), false, 'the row action group markup should be gone');
-    // The two controls the row KEEPS.
+    // The other two controls the row KEEPS.
     assert.ok(browserSource.includes('data-recipe-lock'), 'the row keeps the lock control');
     assert.ok(browserSource.includes('manager-status-toggle'), 'the row keeps the enable toggle');
   });
@@ -143,17 +145,16 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     assert.ok(rootSource.includes("activeView = 'recipe-edit'"), 'editRecipe should switch to the recipe-edit view');
   });
 
-  it('wires the inspector Edit action to the recipe-edit navigation', () => {
-    // The row's Edit quick-action was retired (issue 643); the recipe-edit route is now
-    // reached from the inspector's Edit button, so the root wires the inspector onEdit.
+  it('wires both the inspector and the row Edit actions to the recipe-edit navigation', () => {
+    // The recipe-edit route is reached from the inspector's Edit button AND from each
+    // row's restored Edit pencil (issue 643), so the root wires both to editRecipe.
     assert.ok(
       rootSource.includes('onEdit={() => editRecipe(selectedRecipe?.id)}'),
       'RecipeBrowserInspector should receive onEdit wired to editRecipe'
     );
-    assert.equal(
-      rootSource.includes('onEditRecipe'),
-      false,
-      'the retired row Edit quick-action prop should no longer be wired'
+    assert.ok(
+      rootSource.includes('onEditRecipe={(id) => editRecipe(id)}'),
+      'the row Edit pencil should be wired to editRecipe(id)'
     );
   });
 

@@ -2978,12 +2978,70 @@
    actually lives in — makes each step fire when the ROW is short of room, which is the
    only thing the ladder was ever about. */
 .fabricate-manager .manager-recipes-table {
+  /* The row's right cluster and the column header share ONE fixed template (issue
+     643), so the header labels line up with the cells beneath them AND the columns
+     line up row-to-row (each row cluster is its own grid, so `auto` columns would
+     drift per row — fixed widths are what make them agree). The collapse ladder
+     rewrites `--fab-recipe-cluster-cols` at each container breakpoint to drop a
+     column as its item is hidden. */
+  --fab-recipe-col-io: 112px;
+  --fab-recipe-col-check: 108px;
+  --fab-recipe-col-lock: 28px;
+  --fab-recipe-col-status: 40px;
+  --fab-recipe-col-edit: 28px;
+  --fab-recipe-cluster-cols: var(--fab-recipe-col-io) var(--fab-recipe-col-check)
+    var(--fab-recipe-col-lock) var(--fab-recipe-col-status) var(--fab-recipe-col-edit);
+
   container-type: inline-size;
   container-name: fabricate-recipes;
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
   min-width: 0;
+}
+
+/* The column header (issue 643): a shrinkable identity label plus the fixed control
+   cluster, mirroring `.manager-recipe-row`'s flex split. Its horizontal inset matches
+   the row's 1px border + 12px padding so the "Recipe" label sits over the row identity,
+   and its cluster shares the row cluster's grid template so each label sits over its
+   column. Uppercase micro-label styling matches the manager's other table heads. */
+.fabricate-manager .manager-recipe-table-head {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0 13px var(--fab-space-2xs);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-recipe-head-identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-head-cluster {
+  display: grid;
+  grid-template-columns: var(--fab-recipe-cluster-cols);
+  gap: var(--fab-space-3);
+  flex-shrink: 0;
+  place-items: center end;
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-recipe-head-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-head-cell.is-status {
+  justify-self: center;
 }
 
 .fabricate-manager .manager-recipe-group {
@@ -3125,12 +3183,23 @@
   opacity: 0.55;
 }
 
+/* The row's right cluster is a fixed grid sharing `--fab-recipe-cluster-cols` with the
+   column header, so every cell aligns to its header AND row-to-row (issue 643). Items
+   sit at the END of their fixed columns (`justify-items: end`) so a short check pill or
+   I/O readout keeps its content width against the right of its column rather than
+   stretching to fill it — the header labels are right-aligned to match. */
 .fabricate-manager .manager-recipe-cluster {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--fab-recipe-cluster-cols);
   flex-shrink: 0;
   gap: var(--fab-space-3);
-  align-items: center;
+  place-items: center end;
   margin-left: auto;
+}
+
+/* The enable switch centres in its column, matching the centred Status header. */
+.fabricate-manager .manager-recipe-cluster .manager-recipe-status {
+  justify-self: center;
 }
 
 /* The name row can carry THREE `white-space: nowrap` pills (Disabled + Locked + Can't
@@ -3259,6 +3328,20 @@
   border-color: var(--fab-accent-border);
   color: var(--fab-mv2-accent);
   background: var(--fab-accent-soft);
+}
+
+/* The row's Edit pencil (issue 643), matching the Books & Scrolls row edit affordance
+   but sized to the row's own 28px controls (the lock beside it) rather than the 34px
+   icon-button default, so the dense recipe cluster stays consistent. Quiet by default;
+   the base `.manager-icon-button:hover` supplies the hover border + fill. */
+.fabricate-manager .manager-recipe-edit {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 7px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  font-size: 0.68rem;
 }
 
 /*
@@ -11736,7 +11819,8 @@
     overflow: visible;
   }
 
-  .fabricate-manager .manager-table-head {
+  .fabricate-manager .manager-table-head,
+  .fabricate-manager .manager-recipe-table-head {
     display: none;
   }
 
@@ -16075,13 +16159,27 @@
 }
 
 @container fabricate-recipes (max-width: 600px) {
-  .fabricate-manager .manager-recipe-row .manager-recipe-io {
+  .fabricate-manager .manager-recipe-row .manager-recipe-io,
+  .fabricate-manager .manager-recipe-head-cell.is-io {
     display: none;
+  }
+
+  /* Drop the I/O column from the shared template so the cluster reflows tight rather
+     than reserving an empty grid track. */
+  .fabricate-manager .manager-recipes-table {
+    --fab-recipe-cluster-cols: var(--fab-recipe-col-check) var(--fab-recipe-col-lock)
+      var(--fab-recipe-col-status) var(--fab-recipe-col-edit);
   }
 }
 
 @container fabricate-recipes (max-width: 520px) {
-  .fabricate-manager .manager-recipe-row .manager-recipe-check {
+  .fabricate-manager .manager-recipe-row .manager-recipe-check,
+  .fabricate-manager .manager-recipe-head-cell.is-check {
     display: none;
+  }
+
+  .fabricate-manager .manager-recipes-table {
+    --fab-recipe-cluster-cols: var(--fab-recipe-col-lock) var(--fab-recipe-col-status)
+      var(--fab-recipe-col-edit);
   }
 }

@@ -565,10 +565,28 @@ describe('CraftingSystemManager source contract', () => {
       'class="manager-recipes-table"',
       'manager-recipe-row',
       'class="manager-recipe-identity"',
-      'manager-recipe-status'
+      'manager-recipe-status',
+      // The row's restored Edit pencil and the column header above the list (issue 643).
+      'data-recipe-edit={recipe.id}',
+      'class="manager-recipe-table-head"',
+      'FABRICATE.Admin.Manager.Recipe.Column.Recipe',
+      // The lifted browser view-state seam.
+      'browserState = $bindable(null)',
+      'createRecipeBrowserState'
     ]) {
       assert.ok(recipesBrowserSource.includes(snippet), `RecipesBrowserView should include ${snippet}`);
     }
+    // The row Edit pencil reuses the Books & Scrolls icon-button + pen idiom, and the
+    // filter/sort/paging state is lifted (no local $state for those controls remains).
+    assert.ok(
+      recipesBrowserSource.includes('class="manager-icon-button manager-recipe-edit"'),
+      'the row Edit affordance should be a manager-icon-button, matching Books & Scrolls'
+    );
+    assert.equal(
+      /let\s+statusFilter\s*=\s*\$state/.test(recipesBrowserSource),
+      false,
+      'the browser view-state must be lifted, not held as local component $state'
+    );
     assert.ok(
       recipesBrowserSource.includes('recipe.incomplete'),
       'RecipesBrowserView should render the derived Incomplete state'
@@ -1129,11 +1147,12 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes('function createRecipe('), 'createRecipe handler should be defined');
     assert.ok(!rootSource.includes('onclick={importRecipes}'), 'recipes header should not render import');
     assert.ok(!rootSource.includes('onclick={exportRecipes}'), 'recipes header should not render export');
-    // The recipe-edit route is reached from the INSPECTOR's Edit action now (issue 643):
-    // the row Edit quick-action was retired, so onEdit → editRecipe wiring must be present
-    // and the old onEditRecipe row prop must be gone.
+    // The recipe-edit route is reached BOTH from the inspector's Edit action and from
+    // each row's own Edit pencil, restored to match the Books & Scrolls row edit (issue
+    // 643): the inspector wires onEdit → editRecipe, and the row wires onEditRecipe →
+    // editRecipe(id).
     assert.ok(rootSource.includes('onEdit={() => editRecipe(selectedRecipe?.id)}'), 'inspector Edit should be wired to editRecipe');
-    assert.equal(rootSource.includes('onEditRecipe'), false, 'the retired row Edit quick-action prop should be gone');
+    assert.ok(rootSource.includes('onEditRecipe={(id) => editRecipe(id)}'), 'the row Edit pencil should be wired to editRecipe(id)');
     assert.ok(rootSource.includes('function editRecipe('), 'editRecipe navigation should be defined');
     assert.ok(rootSource.includes('function backToRecipesBrowse('), 'backToRecipesBrowse navigation should be defined');
     assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');

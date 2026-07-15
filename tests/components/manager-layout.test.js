@@ -554,10 +554,25 @@ test('manager recipes browser defines a non-overflowing card row', () => {
     false,
     'the retired recipe column grid should be gone, not merely unused'
   );
-  assert.equal(
-    css.includes('.fabricate-manager .manager-recipe-table-head'),
-    false,
-    'a card row has no column headers'
+  // A single column header sits above the whole list (issue 643). It mirrors the row's
+  // flex split (identity + cluster) and its cluster shares the row cluster's fixed
+  // template, so the labels line up with the cells beneath them.
+  const headBlock = blockFor('.fabricate-manager .manager-recipe-table-head');
+  assert.ok(headBlock.includes('display: flex;'), 'the column header mirrors the row flex split');
+  const headClusterBlock = blockFor('.fabricate-manager .manager-recipe-head-cluster');
+  assert.ok(
+    headClusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
+    'the header cluster shares the row cluster column template so the two align'
+  );
+  assert.ok(
+    clusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
+    'the row cluster consumes the same shared column template'
+  );
+  // The header hides at the stacked breakpoint, where a column header over a stack of
+  // cards means nothing — it rides the same rule as the other browsers' table heads.
+  assert.ok(
+    css.includes('.fabricate-manager .manager-table-head,\n  .fabricate-manager .manager-recipe-table-head {\n    display: none;'),
+    'the recipe column header hides at the stacked breakpoint alongside the shared table head'
   );
   assert.ok(rowBlock.includes('display: flex;'), 'the recipe row is a flex card');
   assert.ok(rowBlock.includes('min-width: 0;'), 'the recipe row may shrink inside the main column');

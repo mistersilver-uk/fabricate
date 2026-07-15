@@ -26,9 +26,9 @@
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import {
-    RECIPE_DEFAULT_PAGE_SIZE,
     RECIPE_SORT_KEYS,
     buildRecipeBrowserModel,
+    createRecipeBrowserState,
     deriveRecipeIo,
     deriveRecipeStatuses
   } from '../../../../utils/recipeBrowserModel.js';
@@ -42,9 +42,24 @@
     resolutionMode = 'simple',
     onSearchChange = () => {},
     onSelectRecipe = () => {},
+    onEditRecipe = () => {},
     onToggleEnabled = () => {},
-    onToggleLocked = () => {}
+    onToggleLocked = () => {},
+    // The filter / sort / group / paginate view-state (issue 643). The manager root
+    // LIFTS this up (a single `$state` object) and binds it here so it survives the
+    // editor round-trip: opening a recipe unmounts this browser, and remounting it
+    // with the controls reset to defaults threw away the page, filters, sort and
+    // grouping the GM left. When unbound — the isolated mounted tests — the local
+    // fallback below keeps every control reactive in-component.
+    browserState = $bindable(null)
   } = $props();
+
+  // svelte-ignore state_referenced_locally
+  let ownBrowserState = $state(createRecipeBrowserState());
+  // The active view-state: the root's lifted object when bound, else the local
+  // fallback. Both are `$state` proxies, so nested writes (`ui.statusFilter = …`)
+  // are reactive AND, when bound, propagate back to the root so the state persists.
+  const ui = $derived(browserState ?? ownBrowserState);
 
   // The blocked-enable flash. Enabling is GATED (an incomplete recipe is refused),
   // and this view CLAIMS the refusal message by handing the store an `onBlocked`
@@ -65,34 +80,23 @@
   // Defaults are load-bearing for the smoke harness: it waits for a VISIBLE row and
   // throws "Manager rendered no table rows" on zero. Groups start EXPANDED, the
   // status and lock filters start at `all`, and the page size exceeds the fixture
-  // recipe count.
-  let statusFilter = $state('all');
-  let lockFilter = $state('all');
-  let categoryFilter = $state('all');
-  let groupByCategory = $state(true);
-  let sortKey = $state('name');
-  let sortDirection = $state('asc');
-  let pageIndex = $state(0);
-  let pageSize = $state(RECIPE_DEFAULT_PAGE_SIZE);
-  // Collapse is opt-IN: a category absent from this set is expanded.
-  let collapsedCategories = $state(new Set());
-
+  // recipe count. Those defaults now live in `createRecipeBrowserState()`.
   const model = $derived(
     buildRecipeBrowserModel(recipes || [], {
-      status: statusFilter,
-      lock: lockFilter,
-      category: categoryFilter,
+      status: ui.statusFilter,
+      lock: ui.lockFilter,
+      category: ui.categoryFilter,
       search: recipeSearchTerm,
-      sortKey,
-      sortDirection,
-      pageIndex,
-      pageSize,
-      groupByCategory: groupByCategory && showRecipeCategories
+      sortKey: ui.sortKey,
+      sortDirection: ui.sortDirection,
+      pageIndex: ui.pageIndex,
+      pageSize: ui.pageSize,
+      groupByCategory: ui.groupByCategory && showRecipeCategories
     })
   );
 
   $effect(() => {
-    if (model.pageIndex !== pageIndex) pageIndex = model.pageIndex;
+    if (model.pageIndex !== ui.pageIndex) ui.pageIndex = model.pageIndex;
   });
 
   function text(key, fallback) {
@@ -146,16 +150,16 @@
   }
 
   function clearChip(chipId) {
-    if (chipId === 'status') statusFilter = 'all';
-    if (chipId === 'lock') lockFilter = 'all';
-    if (chipId === 'category') categoryFilter = 'all';
+    if (chipId === 'status') ui.statusFilter = 'all';
+    if (chipId === 'lock') ui.lockFilter = 'all';
+    if (chipId === 'category') ui.categoryFilter = 'all';
     if (chipId === 'search') onSearchChange('');
   }
 
   function clearFilters() {
-    statusFilter = 'all';
-    lockFilter = 'all';
-    categoryFilter = 'all';
+    ui.statusFilter = 'all';
+    ui.lockFilter = 'all';
+    ui.categoryFilter = 'all';
     onSearchChange('');
   }
 
@@ -185,14 +189,14 @@
   }
 
   function isExpanded(category) {
-    return !collapsedCategories.has(category);
+    return !ui.collapsedCategories.has(category);
   }
 
   function toggleGroup(category) {
-    const next = new Set(collapsedCategories);
+    const next = new Set(ui.collapsedCategories);
     if (next.has(category)) next.delete(category);
     else next.add(category);
-    collapsedCategories = next;
+    ui.collapsedCategories = next;
   }
 
   // The four row states, localized. `recipe.incomplete` is the derived authoring
@@ -304,21 +308,21 @@
       </label>
       <SegmentedControl
         options={statusOptions}
-        value={statusFilter}
+        value={ui.statusFilter}
         groupName="manager-recipe-status-filter"
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.StatusFilterLabel', 'Filter recipes by status')}
         dataAttr="data-recipe-status-filter"
         optionDataAttr="data-recipe-status-option"
-        onChange={(value) => { statusFilter = value; pageIndex = 0; }}
+        onChange={(value) => { ui.statusFilter = value; ui.pageIndex = 0; }}
       />
       <SegmentedControl
         options={lockOptions}
-        value={lockFilter}
+        value={ui.lockFilter}
         groupName="manager-recipe-lock-filter"
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.LockFilterLabel', 'Filter recipes by lock state')}
         dataAttr="data-recipe-lock-filter"
         optionDataAttr="data-recipe-lock-option"
-        onChange={(value) => { lockFilter = value; pageIndex = 0; }}
+        onChange={(value) => { ui.lockFilter = value; ui.pageIndex = 0; }}
       />
     </div>
 
@@ -337,8 +341,8 @@
         <select
           class="manager-recipe-category-filter"
           data-recipe-category-filter
-          value={categoryFilter}
-          onchange={(event) => { categoryFilter = event.currentTarget.value; pageIndex = 0; }}
+          value={ui.categoryFilter}
+          onchange={(event) => { ui.categoryFilter = event.currentTarget.value; ui.pageIndex = 0; }}
           aria-label={text('FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel', 'Filter recipes by category')}
         >
           <option value="all">{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option>
@@ -351,11 +355,11 @@
           <span class="manager-recipe-filter-label" id="manager-recipe-group-label">{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span>
           <button
             type="button"
-            class={`manager-status-toggle ${groupByCategory ? 'is-on' : 'is-off'}`}
+            class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
             data-recipe-group-toggle
-            aria-pressed={groupByCategory}
+            aria-pressed={ui.groupByCategory}
             aria-labelledby="manager-recipe-group-label"
-            onclick={() => groupByCategory = !groupByCategory}
+            onclick={() => ui.groupByCategory = !ui.groupByCategory}
           >
             <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
           </button>
@@ -364,7 +368,7 @@
       {/if}
       <div class="manager-recipe-filter-field">
         <span class="manager-recipe-filter-label">{text('FABRICATE.Admin.Manager.Recipe.SortBy', 'Sort by')}</span>
-        <select value={sortKey} data-recipe-sort onchange={(event) => sortKey = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}>
+        <select value={ui.sortKey} data-recipe-sort onchange={(event) => ui.sortKey = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}>
           {#each RECIPE_SORT_KEYS as key (key)}
             <option value={key}>{sortLabel(key)}</option>
           {/each}
@@ -372,12 +376,12 @@
         <button
           type="button"
           class="manager-button manager-recipe-sort-direction"
-          data-recipe-sort-direction={sortDirection}
+          data-recipe-sort-direction={ui.sortDirection}
           aria-label={text('FABRICATE.Admin.Manager.Recipe.ToggleSortDirection', 'Toggle sort direction')}
-          onclick={() => sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'}
+          onclick={() => ui.sortDirection = ui.sortDirection === 'asc' ? 'desc' : 'asc'}
         >
-          <i class={sortDirection === 'asc' ? 'fas fa-arrow-down-short-wide' : 'fas fa-arrow-down-wide-short'} aria-hidden="true"></i>
-          <span>{sortDirection === 'asc'
+          <i class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-short-wide' : 'fas fa-arrow-down-wide-short'} aria-hidden="true"></i>
+          <span>{ui.sortDirection === 'asc'
             ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
             : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span>
         </button>
@@ -458,8 +462,28 @@
       </div>
     {:else}
       <div class="manager-recipes-table">
+        <!--
+          The column header sits ABOVE the whole list (issue 643): below the filter bar
+          and above the first category group / first row. It labels the row's real
+          regions — the identity, then the right cluster's Requirements (the I/O readout),
+          Check pill and Status switch — and shares the cluster's fixed column template
+          with every row, so the labels line up with the cells beneath them. The lock and
+          edit are icon controls with no header. It is `aria-hidden` (the rows carry their
+          own labels) and hides at the stacked breakpoint, where a column header over a
+          stack of cards means nothing (see `.manager-recipe-table-head` in fabricate.css).
+        -->
+        <div class="manager-recipe-table-head" aria-hidden="true">
+          <span class="manager-recipe-head-identity">{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span>
+          <div class="manager-recipe-head-cluster">
+            <span class="manager-recipe-head-cell is-io">{text('FABRICATE.Admin.Manager.Recipe.Column.Requirements', 'Requirements')}</span>
+            <span class="manager-recipe-head-cell is-check">{text('FABRICATE.Admin.Manager.Recipe.Column.Check', 'Check')}</span>
+            <span class="manager-recipe-head-cell is-lock"></span>
+            <span class="manager-recipe-head-cell is-status">{text('FABRICATE.Admin.Manager.Recipe.Column.Status', 'Status')}</span>
+            <span class="manager-recipe-head-cell is-edit"></span>
+          </div>
+        </div>
         {#each model.groups as group (group.category || '__ungrouped')}
-          {@const grouped = groupByCategory && showRecipeCategories && !!group.category}
+          {@const grouped = ui.groupByCategory && showRecipeCategories && !!group.category}
           <div class="manager-recipe-group">
             {#if grouped}
               <CollapsibleGroupHeader
@@ -566,13 +590,22 @@
                       </span>
 
                       <!--
-                        Edit / Duplicate / Delete used to live here as three ghost icons,
-                        which turned every row into a toolbar and truncated every
-                        description. They now live ONLY in the inspector (issue 643), which
-                        already owns all three as full-width buttons — so no capability is
-                        lost. The row keeps just the lock toggle and the enable switch; a
-                        click on the identity selects the row and drives the inspector.
+                        The row's single Edit affordance (issue 643), styled to match the
+                        Books & Scrolls row edit pencil. Duplicate and Delete stay
+                        inspector-only — three ghost icons on every row turned it into a
+                        toolbar and truncated the description; a single edit pencil next to
+                        the enable switch is the row's primary action and does not.
                       -->
+                      <button
+                        type="button"
+                        class="manager-icon-button manager-recipe-edit"
+                        data-recipe-edit={recipe.id}
+                        aria-label={format('FABRICATE.Admin.Manager.Recipe.EditNamed', 'Edit {name}', { name: recipe.name })}
+                        title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}
+                        onclick={() => onEditRecipe(recipe.id)}
+                      >
+                        <i class="fas fa-pen" aria-hidden="true"></i>
+                      </button>
                     </div>
                   </li>
                 {/each}
@@ -586,10 +619,10 @@
 
   <Pagination
     totalCount={model.totalCount}
-    {pageSize}
+    pageSize={ui.pageSize}
     pageIndex={model.pageIndex}
     pageSizeOptions={[10, 25, 50]}
-    onPageChange={(next) => pageIndex = next}
-    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+    onPageChange={(next) => ui.pageIndex = next}
+    onPageSizeChange={(next) => { ui.pageSize = next; ui.pageIndex = 0; }}
   />
 </main>

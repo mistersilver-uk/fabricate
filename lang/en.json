@@ -1594,7 +1594,10 @@
           "EmptySearchTitle": "No recipes match your filters.",
           "CountRange": "{start}–{end} of {total}",
           "Column": {
-            "Recipe": "Recipe"
+            "Recipe": "Recipe",
+            "Requirements": "Requirements",
+            "Check": "Check",
+            "Status": "Status"
           },
           "Structure": "Structure",
           "Status": "Status",
