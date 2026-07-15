@@ -29,10 +29,16 @@
  */
 
 import { chromium } from 'playwright';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FABRICATE_THEME_IDS, FABRICATE_THEME_ATTRIBUTE, DEFAULT_FABRICATE_THEME } from '../src/ui/theme.js';
+import {
+  appendAllowedConsoleErrorPatterns,
+  classifyCapturedError,
+  computeSmokeSignal,
+  evaluateSmokeOutcome
+} from './lib/foundrySmokeSignal.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -74,8 +80,65 @@ const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
 
 /** @type {string[]} */
 const consoleErrors = [];
+/** Console/pageerror entries that matched an allowed waiver pattern and so did
+ *  NOT fail the run. Echoed to $GITHUB_STEP_SUMMARY for audit (issue #628). */
+/** @type {string[]} */
+const waivedConsoleErrors = [];
 /** @type {string[]} */
 const consoleLog = [];
+
+/**
+ * Read the extra console-error waiver patterns for this run.
+ *
+ * Accepts either the `--allowed-console-error-patterns <csv>` (or `=<csv>`) CLI
+ * flag — used on direct `node scripts/foundry-test-run.mjs` invocation and in
+ * tests — or the `FOUNDRY_ALLOWED_CONSOLE_ERROR_PATTERNS` env var, which is how
+ * the value reaches this script through `foundry-test.mjs` (the orchestrator
+ * forwards `process.env` but not extra argv) from `foundry-integration.yml`.
+ * These are APPENDED to the in-source `ignoredErrorPatterns` defaults, never a
+ * replacement; the value is empty when neither is set.
+ *
+ * @param {string[]} [argv=process.argv.slice(2)]
+ * @param {NodeJS.ProcessEnv} [env=process.env]
+ * @returns {string}
+ */
+function readAllowedConsoleErrorPatternsCsv(argv = process.argv.slice(2), env = process.env) {
+  const FLAG = '--allowed-console-error-patterns';
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === FLAG) return argv[i + 1] ?? '';
+    if (arg.startsWith(`${FLAG}=`)) return arg.slice(FLAG.length + 1);
+  }
+  return env.FOUNDRY_ALLOWED_CONSOLE_ERROR_PATTERNS ?? '';
+}
+
+const ALLOWED_CONSOLE_ERROR_PATTERNS_CSV = readAllowedConsoleErrorPatternsCsv();
+
+/**
+ * Echo every waived console error to $GITHUB_STEP_SUMMARY for audit. A waiver
+ * must never be silent: the CI log records which known-benign errors were
+ * admitted this run. Best-effort — a missing/unwritable summary file never
+ * fails the run, and nothing is written when no error was waived or the env
+ * var is unset (local runs).
+ *
+ * @param {string[]} waived
+ * @returns {Promise<void>}
+ */
+async function echoWaivedConsoleErrorsToStepSummary(waived) {
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (!summaryPath || waived.length === 0) return;
+  const lines = [
+    '### Smoke test — waived console errors',
+    '',
+    `${waived.length} console error(s) matched an allowed pattern and did NOT fail the run:`,
+    '',
+    ...waived.map(entry => `- \`${entry.replace(/`/g, "'")}\``),
+    ''
+  ];
+  try {
+    await appendFile(summaryPath, `${lines.join('\n')}\n`);
+  } catch { /* step summary is best-effort audit output */ }
+}
 
 // ── Screenshot counter ──────────────────────────────────────────────────────
 let screenshotCounter = 0;
@@ -2484,8 +2547,13 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
     const text = location ? `${msg.text()} (${location})` : msg.text();
     consoleLog.push(`[${msg.type()}] ${text}`);
     if (msg.type() === 'error') {
-      const isIgnored = ignoredErrorPatterns.some(p => p.test(text));
-      if (!isIgnored) {
+      // Route through the SHARED classifier (the same seam the pageerror handler
+      // below uses): a match against the waiver patterns (in-source defaults +
+      // any appended via --allowed-console-error-patterns) is recorded as waived
+      // for audit only; anything else enters the gating consoleErrors list.
+      if (classifyCapturedError(text, ignoredErrorPatterns).waived) {
+        waivedConsoleErrors.push(text);
+      } else {
         consoleErrors.push(text);
       }
     }
@@ -2494,8 +2562,14 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
   page.on('pageerror', err => {
     const entry = `[pageerror] ${err.message}`;
     consoleLog.push(entry);
-    const isIgnored = ignoredErrorPatterns.some(p => p.test(err.message));
-    if (!isIgnored) {
+    // pageerror waiving is a deliberate existing capability (the Foundry
+    // canvas-artefact default filters pageerror entries too); an appended
+    // pattern extends it, it does not remove it. Route through the SAME
+    // classifier as the console handler so pageerror stays waivable and a
+    // non-matching pageerror is never silently swallowed.
+    if (classifyCapturedError(err.message, ignoredErrorPatterns).waived) {
+      waivedConsoleErrors.push(`pageerror: ${err.message}`);
+    } else {
       consoleErrors.push(`pageerror: ${err.message}`);
     }
   });
@@ -2666,8 +2740,9 @@ async function main() {
   });
   const page = await context.newPage();
 
-  // Known non-Fabricate error patterns to ignore (keep narrow — real 404s should be caught)
-  const ignoredErrorPatterns = [
+  // Known non-Fabricate error patterns to ignore (keep narrow — real 404s should be caught).
+  // These in-source defaults stay in source, where their justification lives.
+  const ignoredErrorPatternDefaults = [
     /favicon/i,
     // Headless canvas-draw race: activating/redrawing a scene that gains new
     // placeables mid-capture (e.g. the issue-335 Manage-Interactables marker
@@ -2678,6 +2753,14 @@ async function main() {
     // product error — the scene draws correctly and the captures are unaffected.
     /reading 'OBJECTS'/
   ];
+
+  // APPEND any run-supplied patterns (--allowed-console-error-patterns / the
+  // FOUNDRY_ALLOWED_CONSOLE_ERROR_PATTERNS env var) to the defaults; the
+  // defaults always keep applying.
+  const ignoredErrorPatterns = appendAllowedConsoleErrorPatterns(
+    ignoredErrorPatternDefaults,
+    ALLOWED_CONSOLE_ERROR_PATTERNS_CSV
+  );
 
   attachConsoleCapture(page, ignoredErrorPatterns);
 
@@ -6499,15 +6582,16 @@ async function main() {
     } // end if (phaseBPassed)
 
     // ── Final: Check for step failures and runtime errors ──────────────────
-    const failedSteps = results.steps.filter(s => s.passed === false);
-    if (failedSteps.length > 0) {
-      const summary = failedSteps.map(s => `${s.step}: ${s.error || 'failed'}`).join('; ');
-      throw new Error(`${failedSteps.length} step(s) failed: ${summary}`);
-    }
-
-    if (consoleErrors.length > 0) {
+    // Step failures are evaluated FIRST and are NEVER waivable by any input; a
+    // non-waived console error throws only after steps are clean. Waived errors
+    // were filtered out at capture time, so an all-waived run reaches here with
+    // an empty consoleErrors and passes.
+    const outcome = evaluateSmokeOutcome({ steps: results.steps, consoleErrors });
+    if (outcome.reason === 'console-errors') {
       results.errors = consoleErrors;
-      throw new Error(`${consoleErrors.length} runtime console error(s) captured.`);
+    }
+    if (outcome.throws) {
+      throw new Error(outcome.message);
     }
 
     results.passed = true;
@@ -6617,6 +6701,15 @@ async function main() {
     endPhase();
 
     results.consoleErrors = consoleErrors;
+    // Split the smoke signal (issue #628): a gate can then ask "did a step fail,
+    // or did we merely capture noise?". Computed HERE in the finally block —
+    // beside results.consoleErrors — not in the try, so an early phase abort
+    // still populates them and a gate never reads undefined.
+    const { stepFailures, consoleErrorCount } = computeSmokeSignal(results);
+    results.stepFailures = stepFailures;
+    results.consoleErrorCount = consoleErrorCount;
+    results.waivedConsoleErrors = waivedConsoleErrors;
+    await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
     results.phaseTimings = phaseTimings;
     await browser.close();

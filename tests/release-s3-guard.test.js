@@ -9,9 +9,8 @@ import { fileURLToPath } from 'node:url';
 const { assertPublishSafety, fetchPublishState } = await import('../scripts/lib/publishGuard.js');
 // The comparator the guard's remedy is measured against — the same one that decides the refusal.
 const { foundryIsNewerVersion } = await import('../scripts/lib/semver.js');
-const { main, resolveChannelConfig, runCheckHeads, deriveS3Layout, s3StatusFromError } = await import(
-  '../scripts/release-s3.js'
-);
+const { main, resolveChannelConfig, runCheckHeads, deriveS3Layout, s3StatusFromError } =
+  await import('../scripts/release-s3.js');
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -25,7 +24,10 @@ const CONFIG = {
   testerGroups: ['closed-beta-2026'],
   channels: {
     beta: { testerGroups: ['closed-beta-2026'], testerSecretEnv: 'S3_TESTER_PATH_SECRET' },
-    'early-access': { testerGroups: ['patrons-2026'], testerSecretEnv: 'S3_EARLY_ACCESS_PATH_SECRET' },
+    'early-access': {
+      testerGroups: ['patrons-2026'],
+      testerSecretEnv: 'S3_EARLY_ACCESS_PATH_SECRET',
+    },
     public: { testerGroups: [] },
   },
 };
@@ -104,7 +106,10 @@ const safetyOf = ({ version, state, allowDowngrade = false, staged = [CHANNEL, T
 const remedyOf = (error) => /MINOR bump \(e\.g\. ([^)]+)\)/.exec(error)?.[1] ?? null;
 
 test('assertPublishSafety allows a target that has no head yet', () => {
-  const verdict = safetyOf({ version: '1.4.0-beta.1', state: [head(CHANNEL, null), head(TESTER, null)] });
+  const verdict = safetyOf({
+    version: '1.4.0-beta.1',
+    state: [head(CHANNEL, null), head(TESTER, null)],
+  });
   assert.equal(verdict.ok, true);
   assert.deepEqual(
     verdict.decisions.map((d) => d.decision),
@@ -115,18 +120,33 @@ test('assertPublishSafety allows a target that has no head yet', () => {
 test('assertPublishSafety branches on the ABSENT head before it reaches the comparator', () => {
   // A poisoned record: absent, but carrying a version that WOULD refuse if it were compared. The
   // only way this allows is if `present: false` is branched on before any comparison happens.
-  const poisoned = { label: TESTER.label, manifestKey: TESTER.manifestKey, present: false, head: '9.9.9' };
-  const verdict = safetyOf({ version: '1.4.0-beta.1', state: [head(CHANNEL, null), poisoned], staged: [TESTER] });
+  const poisoned = {
+    label: TESTER.label,
+    manifestKey: TESTER.manifestKey,
+    present: false,
+    head: '9.9.9',
+  };
+  const verdict = safetyOf({
+    version: '1.4.0-beta.1',
+    state: [head(CHANNEL, null), poisoned],
+    staged: [TESTER],
+  });
   assert.equal(verdict.ok, true);
   assert.equal(verdict.decisions[0].decision, 'allow-no-head');
   assert.equal(verdict.warnings.length, 0);
 });
 
 test('assertPublishSafety allows an older or equal head', () => {
-  const older = safetyOf({ version: '1.4.0-beta.2', state: [head(CHANNEL, '1.4.0-beta.1'), head(TESTER, '1.3.0')] });
+  const older = safetyOf({
+    version: '1.4.0-beta.2',
+    state: [head(CHANNEL, '1.4.0-beta.1'), head(TESTER, '1.3.0')],
+  });
   assert.equal(older.ok, true);
 
-  const equal = safetyOf({ version: '1.4.0-beta.1', state: [head(CHANNEL, '1.4.0-beta.1'), head(TESTER, '1.4.0-beta.1')] });
+  const equal = safetyOf({
+    version: '1.4.0-beta.1',
+    state: [head(CHANNEL, '1.4.0-beta.1'), head(TESTER, '1.4.0-beta.1')],
+  });
   assert.equal(equal.ok, true);
   assert.ok(equal.decisions.every((d) => d.decision === 'allow'));
 });
@@ -185,7 +205,11 @@ test('assertPublishSafety derives the remedy from the HEAD, not from the version
   // 1.4.1 refused by a 1.5.0 head. Bumping the VERSION's minor gives 1.5.0 — the head itself, which
   // the guard would then ALLOW (an equal head is not a backwards move), moving nothing and leaving
   // the cohort silent. The remedy must clear the head: 1.6.0.
-  const verdict = safetyOf({ version: '1.4.1', state: [head(CHANNEL, '1.5.0')], staged: [CHANNEL] });
+  const verdict = safetyOf({
+    version: '1.4.1',
+    state: [head(CHANNEL, '1.5.0')],
+    staged: [CHANNEL],
+  });
   assert.equal(verdict.ok, false);
   assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.6\.0\)/);
   assert.doesNotMatch(verdict.error, /e\.g\. 1\.5\.0\)/);
@@ -210,9 +234,26 @@ test('every remedy the guard prints is one Foundry would actually accept over th
   // edit to suggestMinorBump can quietly make the sentence false again. Both previous versions of
   // this function pass individual pinned examples and fail here.
   const corpus = [
-    '1.4.0', '1.4.1', '1.4.9', '1.4.10', '1.5.0', '1.5.1', '1.9.0', '1.10.0', '2.0.0', '2.1.0',
-    '1.4.0-beta.1', '1.4.9-beta.1', '1.4.9-beta.3', '1.4.10-beta.1', '1.5.0-beta.1',
-    '1.5.0-beta.7', '1.5.0-beta.10', '1.10.0-beta.1', '2.0.0-beta.1', '1.5.1-rc.2',
+    '1.4.0',
+    '1.4.1',
+    '1.4.9',
+    '1.4.10',
+    '1.5.0',
+    '1.5.1',
+    '1.9.0',
+    '1.10.0',
+    '2.0.0',
+    '2.1.0',
+    '1.4.0-beta.1',
+    '1.4.9-beta.1',
+    '1.4.9-beta.3',
+    '1.4.10-beta.1',
+    '1.5.0-beta.1',
+    '1.5.0-beta.7',
+    '1.5.0-beta.10',
+    '1.10.0-beta.1',
+    '2.0.0-beta.1',
+    '1.5.1-rc.2',
   ];
 
   let refused = 0;
@@ -234,7 +275,11 @@ test('every remedy the guard prints is one Foundry would actually accept over th
       );
       // And it must stay on the line it is rescuing: a prerelease version never gets a bare stable
       // remedy, which would strand a private channel at a stable head.
-      assert.equal(remedy.includes('-'), version.includes('-'), `remedy ${remedy} switched line from ${version}`);
+      assert.equal(
+        remedy.includes('-'),
+        version.includes('-'),
+        `remedy ${remedy} switched line from ${version}`
+      );
       cleared += 1;
     }
   }
@@ -245,13 +290,21 @@ test('every remedy the guard prints is one Foundry would actually accept over th
 
 test('assertPublishSafety records a comparator disagreement WITHOUT changing the verdict', () => {
   // SemVer says 1.5.0 supersedes 1.5.0-beta.7. Foundry says the opposite — and Foundry ships.
-  const refused = safetyOf({ version: '1.5.0', state: [head(CHANNEL, '1.5.0-beta.7')], staged: [CHANNEL] });
+  const refused = safetyOf({
+    version: '1.5.0',
+    state: [head(CHANNEL, '1.5.0-beta.7')],
+    staged: [CHANNEL],
+  });
   assert.equal(refused.ok, false, 'Foundry refuses even though SemVer would allow');
   assert.equal(refused.warnings.length, 1);
   assert.match(refused.warnings[0], /Foundry and SemVer disagree/);
 
   // …and the same disagreement in the other direction does not turn an allow into a refusal.
-  const allowed = safetyOf({ version: '1.5.0-beta.7', state: [head(CHANNEL, '1.5.0')], staged: [CHANNEL] });
+  const allowed = safetyOf({
+    version: '1.5.0-beta.7',
+    state: [head(CHANNEL, '1.5.0')],
+    staged: [CHANNEL],
+  });
   assert.equal(allowed.ok, true);
   assert.equal(allowed.warnings.length, 1);
   assert.equal(allowed.decisions[0].decision, 'allow');
@@ -323,7 +376,10 @@ test('s3StatusFromError keeps a denial a denial and a miss a miss', () => {
 
 test('fetchPublishState refuses a head manifest it cannot read', async () => {
   await assert.rejects(
-    fetchPublishState([CHANNEL], reader({ [BETA_CHANNEL_MANIFEST]: { status: 200, body: 'not json' } })),
+    fetchPublishState(
+      [CHANNEL],
+      reader({ [BETA_CHANNEL_MANIFEST]: { status: 200, body: 'not json' } })
+    ),
     /not valid JSON/
   );
   await assert.rejects(
@@ -352,6 +408,9 @@ async function makeHarness({ heads = {}, exists = () => false } = {}) {
 
   const puts = [];
   const gets = [];
+  // A tiny stateful S3: manifest writes are reflected so the post-publish read-back sees the
+  // version just published (a static getObject would read back the pre-publish head and fail).
+  const store = {};
   const calls = { build: 0, zip: 0 };
   // Patched by runWithBuild, so a test can hand main() a manifest the build should have refused.
   let manifestPatch = {};
@@ -380,9 +439,11 @@ async function makeHarness({ heads = {}, exists = () => false } = {}) {
       headObject: async (key) => exists(key),
       getObject: async (key) => {
         gets.push(key);
+        if (key in store) return { status: 200, body: store[key], etag: `etag-${key}` };
         return heads[key] ?? { status: 404, body: null };
       },
-      putObject: async ({ key }) => {
+      putObject: async ({ key, body }) => {
+        if (typeof body === 'string') store[key] = body;
         puts.push(key);
       },
     }),
@@ -415,7 +476,10 @@ test('main() performs ZERO PutObject calls when a target head is Foundry-newer',
     },
   });
 
-  await assert.rejects(harness.run('--version', '1.4.0-beta.1'), /already advertises 1\.5\.0-beta\.1/);
+  await assert.rejects(
+    harness.run('--version', '1.4.0-beta.1'),
+    /already advertises 1\.5\.0-beta\.1/
+  );
 
   assert.deepEqual(harness.puts, [], 'the guard must run BEFORE any object is written');
   // …and it got there the long way: the build ran, both targets were staged, and both heads were
@@ -518,15 +582,29 @@ test('main() --check-heads reads the heads and BUILDS NOTHING', async () => {
 });
 
 test('main() --check-heads fails when the guard would refuse', async () => {
-  const harness = await makeHarness({ heads: { [BETA_CHANNEL_MANIFEST]: manifestAt('1.5.0-beta.1') } });
-  await assert.rejects(harness.run('--version', '1.4.0-beta.1', '--check-heads'), /already advertises/);
+  const harness = await makeHarness({
+    heads: { [BETA_CHANNEL_MANIFEST]: manifestAt('1.5.0-beta.1') },
+  });
+  await assert.rejects(
+    harness.run('--version', '1.4.0-beta.1', '--check-heads'),
+    /already advertises/
+  );
 });
 
 test('main() refuses to publish a channel whose tester secret is unset', async () => {
   const harness = await makeHarness();
   await assert.rejects(
     main({
-      argv: ['node', 'release-s3.js', '--config', harness.configPath, '--version', '1.4.0', '--channel', 'early-access'],
+      argv: [
+        'node',
+        'release-s3.js',
+        '--config',
+        harness.configPath,
+        '--version',
+        '1.4.0',
+        '--channel',
+        'early-access',
+      ],
       // The BETA secret is set; early-access's own secret is not. It must refuse rather than reuse
       // the beta path.
       env: { S3_TESTER_PATH_SECRET: 'seg' },
@@ -551,7 +629,16 @@ test('main() refuses a channel that declares tester groups but no testerSecretEn
 
   await assert.rejects(
     main({
-      argv: ['node', 'release-s3.js', '--config', configPath, '--version', '1.5.0', '--channel', 'early-access'],
+      argv: [
+        'node',
+        'release-s3.js',
+        '--config',
+        configPath,
+        '--version',
+        '1.5.0',
+        '--channel',
+        'early-access',
+      ],
       env: { S3_TESTER_PATH_SECRET: 'seg', S3_EARLY_ACCESS_PATH_SECRET: 'ea-seg' },
       deps: { log: () => {} },
     }),

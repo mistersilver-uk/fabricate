@@ -78,6 +78,13 @@ jobs:
   release-s3:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Job-level (NOT workflow-level) so it survives being called as a reusable workflow, and
+    # per-channel so a beta publish and a public publish do not serialise needlessly. cancel-in-
+    # progress is false: a second push must QUEUE behind an in-flight publish, never cancel it
+    # mid-loop and leave a half-written (channel-manifest-but-not-tester) state behind.
+    concurrency:
+      group: release-s3-${{ inputs.channel }}
+      cancel-in-progress: false
     steps:
       # Tag validation runs AFTER checkout (it needs scripts/), not before it. The
       # validator is deliberately zero-dependency, so it runs on the runner's
@@ -117,21 +124,16 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: git checkout "$RELEASE_TAG"
 
-      - uses: actions/setup-node@v6
+      # Shared Node + npm ci + OIDC preamble. npm ci runs AFTER the tag checkout above so it installs
+      # the TAG's dependencies (which is why this workflow keeps its own checkout/tag steps rather
+      # than letting the composite own checkout). OIDC credentials are needed for a real publish AND
+      # for a `--check-heads` read; they are skipped only on a dry-run that is NOT also reading heads
+      # (the script imports no AWS SDK and reaches no bucket when `--dry-run` is set alone).
+      # aws-role/aws-region are forwarded because the composite cannot read vars.* itself.
+      - uses: ./.github/actions/release-setup
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Configure AWS credentials via OIDC
-        # Credentials are needed for a real publish AND for a `--check-heads` read. They are skipped
-        # only on a dry-run that is NOT also reading heads: the script imports no AWS SDK and reaches
-        # no bucket when `--dry-run` is set alone.
-        if: ${{ !inputs.dry_run || inputs.check_heads }}
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          enable-oidc: ${{ !inputs.dry_run || inputs.check_heads }}
+          aws-role: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Publish to S3
@@ -146,9 +148,15 @@ jobs:
           CHANNEL: ${{ inputs.channel }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # --source-sha is the tagged commit ACTUALLY being built, taken from the checked-out tree.
+          # It must NOT come from GITHUB_SHA: the "Checkout release tag" step above did
+          # `git checkout "$tag"`, so GITHUB_SHA still names the ref that triggered the run, not the
+          # commit whose bytes this zip carries. The provenance guard keys resume/overwrite on it.
+          SOURCE_SHA="$(git rev-parse HEAD)"
           node scripts/release-s3.js \
             --version "$VERSION" \
             --channel "$CHANNEL" \
+            --source-sha "$SOURCE_SHA" \
             ${{ inputs.check_heads == true && '--check-heads' || '' }} \
             ${{ inputs.dry_run == true && '--dry-run' || '' }} \
             ${{ inputs.overwrite == true && '--overwrite' || '' }}

@@ -38,7 +38,9 @@ Record the resolved roster in the delta block's `### Resolved Roster` section, s
 5. Author the OpenSpec delta in the issue's managed `openspec-delta` block (via `gh issue edit`) before any code changes happen.
 When appending to an existing issue, preserve the reporter's original text above the block and edit only inside the markers; rewrite the block **in place** on later iterations (never append a second block).
 If `gh` is unavailable, return the delta block in your output for the driver/user instead of guessing — there is no longer a versioned file to drop it in.
-6. Keep the delta concrete, using the block's sections (`### Proposal`, `### Design`, `### Tasks`, optional `### Spec Deltas`, `### Resolved Roster`, `### Verification & Acceptance`):
+6. Ground the delta in the ACTUAL files, not architectural assumptions: read and grep the real code and canonical specs the change touches before writing tasks, spec deltas, and the affected-file list.
+A plan built from an imagined structure produces fictional paths and tasks the implementer then has to discover are wrong; verify every cited file and symbol exists in the current tree, and confirm the delta's anchors (the pre-flight it replaces, the seam it extends) against the real code.
+Keep the delta concrete, using the block's sections (`### Proposal`, `### Design`, `### Tasks`, optional `### Spec Deltas`, `### Resolved Roster`, `### Verification & Acceptance`):
    - problem and scope
    - in-scope and out-of-scope notes
    - implementation/design decisions
@@ -82,6 +84,8 @@ They must not post verdicts (or other workflow notes) as GitHub issue or PR comm
 - Prefer one issue per PR.
 When a change unavoidably ships as a stack of dependent PRs (one branch based on another), expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`).
 Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`), force-push, and let CI re-run, before merging it.
+Parallel (not stacked) PRs need the same care for a different reason: when two independent branches off `main` touch the SAME file or reference each other's paths, GitHub's `mergeable` flag only checks for a TEXTUAL conflict — a clean auto-merge can still leave a semantic duplicate (two copies of a rewritten section) or a dangling reference (one PR deletes a file a doc in the other still cites by path, which then fails `validate:agents`).
+Plan the merge order, and rebase whichever merges second to reconcile the shared file rather than trusting `mergeable`.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
 - For quick-start docs work, route changes only to `docs/quickstart.md`.
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first and reserve `npm run test:foundry` for runtime-sensitive or reproducibility-focused validation.
