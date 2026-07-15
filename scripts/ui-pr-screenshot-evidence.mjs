@@ -205,13 +205,14 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-crafting-settings'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
-  // The recipe editor publishes SIX distinct frames (overview/identity, ingredients,
-  // validation tab, multi-step durations, tools, and the restricted-visibility
-  // context rail). `collect` emits ONE file per recipe id (it takes the first
-  // matching smoke label), so each frame needs its own recipe — a single recipe with
-  // six smoke labels would only ever publish the first (overview) frame and silently
-  // drop the rest. All six share the same `matches`, so any change to a recipe
-  // editor/inspector or recipe sub-component republishes them together.
+  // The recipe editor publishes TEN distinct frames (overview/identity, ingredients,
+  // validation tab, multi-step durations, the four Results-tab modes — routed-by-check,
+  // multi-step, progressive, alchemy — tools, and the restricted-visibility context
+  // rail). `collect` emits ONE file per recipe id (it takes the first matching smoke
+  // label), so each frame needs its own recipe — a single recipe with ten smoke labels
+  // would only ever publish the first (overview) frame and silently drop the rest. All
+  // ten share the same `matches`, so any change to a recipe editor/inspector or recipe
+  // sub-component republishes them together.
   {
     id: 'manager-recipe-edit-normal',
     label: 'Manager recipe editor — overview / identity',
@@ -234,6 +235,30 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-recipe-edit-multistep',
     label: 'Manager recipe editor — multi-step durations',
     smokeLabels: ['manager-recipe-edit-multistep'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-results',
+    label: 'Manager recipe editor — results (routed-by-check outcome sets)',
+    smokeLabels: ['manager-recipe-edit-results'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-results-multistep',
+    label: 'Manager recipe editor — results (per-step content, multi-step)',
+    smokeLabels: ['manager-recipe-edit-results-multistep'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-results-progressive',
+    label: 'Manager recipe editor — results (progressive ordered stages)',
+    smokeLabels: ['manager-recipe-edit-results-progressive'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-results-alchemy',
+    label: 'Manager recipe editor — results (alchemy two-slot success/reserved-failure)',
+    smokeLabels: ['manager-recipe-edit-results-alchemy'],
     matches: RECIPE_EDIT_MATCHES,
   },
   {

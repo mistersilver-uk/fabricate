@@ -247,6 +247,26 @@ async function openManagerRecipeEditor(page, recipeName) {
 }
 
 /**
+ * Open a recipe, switch to its Results tab, wait for a mode-specific content marker
+ * to be VISIBLE, and capture the frame. Extracted so every Results-tab capture (issue
+ * 643) reuses one open→click→wait→assert→screenshot span rather than repeating it —
+ * the smoke script's `scripts/*.mjs` duplication counts against the SonarCloud gate.
+ * `contentSelector` is scoped under the visible Results tab, so a still-hidden or
+ * empty tab never yields a green frame.
+ */
+async function captureRecipeResultsTab(page, recipeName, label, contentSelector) {
+  await openManagerRecipeEditor(page, recipeName);
+  await page.locator('.fabricate-manager [data-recipe-tab-button="results"]').first().click();
+  await page.locator('.fabricate-manager [data-recipe-tab="results"]').first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await page.locator(`.fabricate-manager [data-recipe-tab="results"] ${contentSelector}`).first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await assertManagerLayoutStable(page, label);
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, label);
+}
+
+/**
  * Capture the currently-open player Alchemy workbench under every Fabricate
  * theme, then restore the default theme. `applyManagerTheme` stamps the theme
  * attribute on the document element AND every `.fabricate` root — which includes
@@ -1698,7 +1718,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         chosenSetId: setBId
       },
       checkRouted: { recipeId: checkRoutedRecipe.id },
-      progressive: { recipeId: progressiveRecipe.id },
+      progressive: { recipeId: progressiveRecipe.id, systemId: progressiveSystemId, recipeName: 'Smoke Mold Brick' },
       gather: { environmentId: rcGatherEnvironment.id, taskId: rcGatherTaskId },
       hazard: { environmentId: hazardEnvironment.id, taskId: rcGatherTaskId }
     };
@@ -4632,6 +4652,76 @@ async function main() {
         await assertManagerLayoutStable(page, 'recipe edit multistep');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-multistep');
+
+        // Results-tab coverage (issue 643): the most mode-dependent tab previously had
+        // ZERO screenshot coverage — which is why the multi-step Results structural bug
+        // shipped unseen. Cover every resolution mode's Results shape.
+        //
+        // Routed-by-check: outcome-routed result sets (tier bands). In the same
+        // (Herbalist's Compendium) system as the Ingredients/Validation captures.
+        await captureRecipeResultsTab(
+          page,
+          'Routed Check Readiness',
+          'manager-recipe-edit-results',
+          '[data-recipe-result-set-id]'
+        );
+
+        // Multi-step: the per-step result content must be VISIBLE (the always-open
+        // step accordion) — this is the frame that proves the multi-step Results
+        // renders something (the C1 fix), not an empty tab.
+        await captureRecipeResultsTab(
+          page,
+          'Multi-Step Alloy',
+          'manager-recipe-edit-results-multistep',
+          '[data-recipe-section$="-results"]'
+        );
+
+        // Progressive: the ordered stage list + roll-budget info strip + read-only
+        // difficulty badge + keyboard move chevrons. In its own system, so switch to it
+        // through the existing selection helper (not a fresh open span) and restore the
+        // default system afterward. Guarded so a hiccup records a failed step.
+        if (executionFixtures?.progressive?.systemId) {
+          try {
+            await page.locator('.fabricate-manager .manager-scope-return').first().click();
+            await selectSmokeSystemInManager(page, executionFixtures.progressive.systemId);
+            await captureRecipeResultsTab(
+              page,
+              executionFixtures.progressive.recipeName,
+              'manager-recipe-edit-results-progressive',
+              '[data-recipe-result-row]'
+            );
+            results.steps.push({ step: 'recipe-edit-results-progressive', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'recipe-edit-results-progressive', passed: false, error: err.message });
+            process.stderr.write(`Progressive results capture failed: ${err.message}\n`);
+          } finally {
+            await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+            await selectSmokeSystemInManager(page, craftingSetup.systemId).catch(() => {});
+          }
+        }
+
+        // Alchemy: the two-slot result shape — a success set plus a reserved,
+        // undeletable "On a failed check" set. In its own alchemy system; same
+        // switch-and-restore guard as the progressive capture.
+        if (alchemyFixtures?.cauldronSystemId) {
+          try {
+            await page.locator('.fabricate-manager .manager-scope-return').first().click();
+            await selectSmokeSystemInManager(page, alchemyFixtures.cauldronSystemId);
+            await captureRecipeResultsTab(
+              page,
+              'Elixir of Vigor',
+              'manager-recipe-edit-results-alchemy',
+              '[data-recipe-result-set-static-label]'
+            );
+            results.steps.push({ step: 'recipe-edit-results-alchemy', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'recipe-edit-results-alchemy', passed: false, error: err.message });
+            process.stderr.write(`Alchemy results capture failed: ${err.message}\n`);
+          } finally {
+            await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+            await selectSmokeSystemInManager(page, craftingSetup.systemId).catch(() => {});
+          }
+        }
 
         // Warded Rite (restricted system) → the recipe editor's context rail renders
         // its ACCESS branch: players with access, characters with access, and each
