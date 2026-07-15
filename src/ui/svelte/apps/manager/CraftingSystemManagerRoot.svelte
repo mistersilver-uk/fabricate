@@ -2269,6 +2269,36 @@
     return runSelection();
   }
 
+  // A per-record editor/detail view is bound to ONE system's record, so switching the
+  // crafting system from the rail scope-select must return the GM to the corresponding
+  // studio BROWSER for the new system rather than stranding them in an editor for a
+  // record that does not exist under the new system (e.g. recipe-edit → recipes). Browser,
+  // list, and settings views are not listed and stay put — they simply reload for the new
+  // system, which is the desired behaviour.
+  const SCOPE_BROWSER_BY_VIEW = {
+    'recipe-edit': 'recipes',
+    'recipe-item-edit': 'books-scrolls',
+    'component-edit': 'components',
+    'essence-edit': 'essences',
+  };
+
+  function browserViewForScopeChange(view) {
+    return SCOPE_BROWSER_BY_VIEW[view] || view;
+  }
+
+  // Scope-select change: route to the corresponding browser for the new system, running
+  // the dirty-exit guard first (the different-system path in selectSystem skips it), so
+  // an unsaved editor still prompts before the switch.
+  function changeScopeSystem(systemId) {
+    if (!systemId) return;
+    const target = browserViewForScopeChange(currentView);
+    afterTruthyResult(confirmRouteExit(target), () => {
+      const selected = store.selectSystem?.(systemId);
+      const landed = isPromise(selected) ? selected.then((value) => value !== false) : selected !== false;
+      afterTruthyResult(landed, () => { activeView = target; });
+    });
+  }
+
   function selectSystemAndShowBrowser(systemId = selectedSystemId) {
     const selected = systemId ? selectSystem(systemId, 'systems') : confirmRouteExit('systems');
     afterTruthyResult(selected, () => { activeView = 'systems'; });
@@ -4620,7 +4650,7 @@
               data-manager-scope-select
               value={selectedSystem.id}
               aria-label={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-              onchange={(event) => selectSystem(event.currentTarget.value, currentView)}
+              onchange={(event) => changeScopeSystem(event.currentTarget.value)}
             >
               {#each $viewState.systems || [] as system (system.id)}
                 <option value={system.id}>{system.name}</option>

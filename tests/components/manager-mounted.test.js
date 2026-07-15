@@ -4742,6 +4742,66 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('changing the crafting system from the rail scope-select returns to the recipe browser', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
+
+    const scopeSelect = target.querySelector('[data-manager-scope-select]');
+    const current = scopeSelect.value;
+    const other = Array.from(scopeSelect.options)
+      .map((option) => option.value)
+      .find((value) => value !== current);
+    assert.ok(other, 'a second crafting system is available to switch to');
+
+    scopeSelect.value = other;
+    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipes',
+      'switching system from the recipe editor lands on the recipe browser, not a stale editor'
+    );
+    assert.ok(
+      calls.some((call) => call[0] === 'selectSystem' && call[1] === other),
+      'the new system was selected'
+    );
+  });
+
+  it('guards an unsaved recipe editor before a scope-select system switch (cancel keeps it open)', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'cancel' });
+    editRecipeName(target, 'Dirty Draft');
+    await tick();
+    flushSync();
+
+    const scopeSelect = target.querySelector('[data-manager-scope-select]');
+    const other = Array.from(scopeSelect.options)
+      .map((option) => option.value)
+      .find((value) => value !== scopeSelect.value);
+
+    scopeSelect.value = other;
+    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeDraft'),
+      'the discard dialog is consulted before switching system'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-edit',
+      'cancelling the discard keeps the editor open'
+    );
+    assert.ok(
+      !calls.some((call) => call[0] === 'selectSystem' && call[1] === other),
+      'the system is not switched when the discard is cancelled'
+    );
+  });
+
   it('routes to the components browser with filters, drop import, selected inspector, and actions', async () => {
     const calls = [];
     const dropped = [];
