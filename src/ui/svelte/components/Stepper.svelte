@@ -35,6 +35,10 @@
     // duration unit columns — the increment sits on TOP so the visual stacks the
     // way a spinner reads.
     orientation = 'horizontal',
+    // Extra attributes spread onto the underlying `<input>` (e.g. a test/marker
+    // `data-*` hook a caller relies on). Import-free: a plain object, so this leaf
+    // still carries no module dependency into the mount harnesses.
+    inputProps = {},
     onChange = () => {}
   } = $props();
 
@@ -100,6 +104,7 @@
       aria-label={ariaLabel || undefined}
       oninput={onInput}
       onblur={onBlur}
+      {...inputProps}
     />
     <button
       type="button"
@@ -134,6 +139,7 @@
       aria-label={ariaLabel || undefined}
       oninput={onInput}
       onblur={onBlur}
+      {...inputProps}
     />
     <button
       type="button"

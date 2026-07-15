@@ -1,18 +1,23 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  One alternative (an `Ingredient`) inside a requirement. Alternatives have no
-  id, so the parent keys them by index and owns the option list; this component
-  renders the matching control, the quantity, and the per-row controls that
-  append a new alternative (component or tag) to the requirement, emitting the
-  whole updated option via `onChange(nextOption)`.
+  One alternative (an `Ingredient`) inside a requirement. Alternatives have no id,
+  so the parent keys them by index and owns the option list; this component renders
+  the requirement ROW to the prototype anatomy (issue 643 §B1):
 
-  Each alternative reads its match type from `option.match.type` — a component
-  alternative shows the component's image + name as the picker trigger (click to
-  swap the component); a tag alternative shows tag chips + an "Add tag" picker +
-  an any/all toggle. Adding an ALTERNATIVE moved to the requirement's single "or…"
-  ("Accept instead") popover (issue 643); this row keeps only its own editing
-  controls — including the per-option `tagMatch` (any/all) control, which sits
-  exactly where the popover lands and is the highest-risk silent loss in the change.
+    [lead chip] [icon medallion / name] … [REQUIRED tag] [qty stepper] | [or…] [× remove]
+
+  The lead chip is a small type-tinted square (component → cubes, tag → tag, currency
+  → coins). A component alternative additionally shows the component's image as the
+  clickable picker medallion (swap the component) with its name beside it; a tag
+  alternative shows a summary "any #tag" name + a TAG pill, with the any/all control
+  and chip list as an editing detail below; a currency alternative shows an amount +
+  unit picker.
+
+  The quantity is the shared `Stepper` (horizontal) rather than a raw number input
+  (§B1); the remove control is a subtle `×` (`fa-xmark`), never a loud `fa-minus`
+  (§B1). The requirement-level "or…" popover is passed in as the `orControl` snippet
+  by the parent for a BARE (single-alternative) requirement, so it sits INLINE at the
+  row's right end; a multi-alternative box renders it at the box bottom instead.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -22,12 +27,19 @@
     findCurrencyUnit
   } from '../../../util/recipeCurrency.js';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
 
   let {
     option = {},
     componentOptions = [],
     itemTags = [],
     currencyUnits = [],
+    // Render the "REQUIRED" tag — set by the parent for a bare (single-alternative)
+    // requirement; box alternatives (inside "ANY ONE OF") never carry it.
+    showRequiredTag = false,
+    // The requirement's single "or…" popover, passed by the parent for a bare
+    // requirement so it renders inline at the row's right end.
+    orControl = null,
     onChange = () => {},
     onRemove = () => {},
     canRemove = true
@@ -49,6 +61,16 @@
     option?.match?.type === 'tags' && Array.isArray(option.match.tags) ? option.match.tags : []
   );
   const tagMatch = $derived(option?.match?.tagMatch === 'all' ? 'all' : 'any');
+
+  // The single-line tag summary shown beside the medallion: "any #reagent #rare".
+  const tagSummary = $derived.by(() => {
+    const word =
+      tagMatch === 'all'
+        ? text('FABRICATE.Admin.Manager.Recipe.TagMatchAllWord', 'all')
+        : text('FABRICATE.Admin.Manager.Recipe.TagMatchAnyWord', 'any');
+    if (tags.length === 0) return text('FABRICATE.Admin.Manager.Recipe.TagRowEmptyName', 'any tagged item');
+    return `${word} ${tags.map((tag) => `#${tag}`).join(' ')}`;
+  });
 
   const currencyUnitId = $derived(option?.match?.type === 'currency' ? option.match.unit || '' : '');
   const currencyAmount = $derived(
@@ -86,8 +108,8 @@
     onChange({ ...option, ...next });
   }
 
-  // Quantities are capped at 9999 (four digits) — more of a single component is
-  // not a meaningful recipe requirement, and it keeps the input narrow.
+  // Quantities are capped at 9999 (four digits) — more of a single component is not
+  // a meaningful recipe requirement, and it keeps the stepper narrow.
   function setQuantity(value) {
     const next = Number(value);
     emit({ quantity: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1 });
@@ -115,8 +137,8 @@
     emit({ match: { type: 'currency', unit: String(unitId || ''), amount: currencyAmount } });
   }
 
-  // Currency amounts share the four-digit cap with quantities and are stored on
-  // the match (not the option quantity), which stays the default 1.
+  // Currency amounts share the four-digit cap with quantities and are stored on the
+  // match (not the option quantity), which stays the default 1.
   function setCurrencyAmount(value) {
     const next = Number(value);
     emit({
@@ -127,9 +149,26 @@
       }
     });
   }
+
+  // Lead-chip tone + icon per match type (the small type-tinted square that opens
+  // the row, matching the prototype).
+  const leadTone = $derived(matchType === 'tags' ? 'tag' : matchType === 'currency' ? 'currency' : 'component');
+  const leadIcon = $derived(
+    matchType === 'tags' ? 'fas fa-tag' : matchType === 'currency' ? 'fa-solid fa-coins' : 'fas fa-cubes'
+  );
+
+  const removeLabel = $derived(
+    matchType === 'component'
+      ? text('FABRICATE.Admin.Manager.Recipe.RemoveComponent', 'Remove component')
+      : text('FABRICATE.Admin.Manager.Recipe.RemoveAlternative', 'Remove alternative')
+  );
 </script>
 
-<div class="manager-recipe-ingredient-option-row" data-recipe-option>
+<div class={`manager-recipe-ingredient-option-row is-${leadTone}`} data-recipe-option>
+  <span class={`manager-recipe-option-lead is-${leadTone}`} aria-hidden="true">
+    <i class={leadIcon}></i>
+  </span>
+
   <div class="manager-recipe-option-target">
     {#if matchType === 'component'}
       <div class="manager-recipe-option-component">
@@ -154,41 +193,8 @@
         {/if}
       </div>
     {:else if matchType === 'tags'}
-      <div class="manager-recipe-option-tags">
-        <div class="manager-recipe-option-tags-controls">
-          <div class="manager-recipe-tag-match-toggle" role="group" aria-label={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}>
-            <button
-              type="button"
-              class="manager-recipe-tag-match-option"
-              class:is-selected={tagMatch === 'any'}
-              data-recipe-tag-match="any"
-              aria-pressed={tagMatch === 'any'}
-              onclick={() => setTagMatch('any')}
-            >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any')}</button>
-            <button
-              type="button"
-              class="manager-recipe-tag-match-option"
-              class:is-selected={tagMatch === 'all'}
-              data-recipe-tag-match="all"
-              aria-pressed={tagMatch === 'all'}
-              onclick={() => setTagMatch('all')}
-            >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All')}</button>
-          </div>
-          <SearchablePopover
-            options={tagPickerOptions}
-            pickerClass="manager-recipe-tag-picker"
-            triggerClass="manager-button is-subtle manager-recipe-tag-trigger"
-            triggerIcon="fas fa-tag"
-            triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-            triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-            dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
-            searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
-            emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
-            onChoose={(tag) => addTag(tag)}
-          />
-        </div>
-      </div>
+      <span class="manager-recipe-option-tag-name" data-recipe-tag-summary>{tagSummary}</span>
+      <span class="manager-recipe-req-tag is-tag" data-recipe-req-tag="tag">{text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}</span>
     {:else}
       <div class="manager-recipe-option-currency" data-recipe-option-currency>
         <input
@@ -225,59 +231,98 @@
   </div>
 
   <div class="manager-recipe-option-controls">
+    {#if showRequiredTag}
+      <span class="manager-recipe-req-tag is-required" data-recipe-req-tag="required">{text('FABRICATE.Admin.Manager.Recipe.RequiredTag', 'Required')}</span>
+    {/if}
+
     {#if matchType !== 'currency'}
-      <input
-        type="number"
-        min="1"
-        max="9999"
-        class="manager-recipe-option-quantity"
-        data-recipe-option-quantity
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+      <Stepper
         value={quantity}
-        onchange={(e) => setQuantity(e.target.value)}
+        min={1}
+        max={9999}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
+        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
+        inputProps={{ 'data-recipe-option-quantity': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        onChange={(value) => setQuantity(value)}
       />
+    {/if}
+
+    {#if orControl}
+      <span class="manager-recipe-option-divider" aria-hidden="true"></span>
+      {@render orControl()}
     {/if}
 
     {#if canRemove}
       <button
         type="button"
-        class="manager-icon-button is-danger manager-recipe-option-remove"
+        class="manager-recipe-option-remove"
         data-recipe-remove="alternative"
-        aria-label={matchType === 'component'
-          ? text('FABRICATE.Admin.Manager.Recipe.RemoveComponent', 'Remove component')
-          : text('FABRICATE.Admin.Manager.Recipe.RemoveAlternative', 'Remove alternative')}
-        title={matchType === 'component'
-          ? text('FABRICATE.Admin.Manager.Recipe.RemoveComponent', 'Remove component')
-          : text('FABRICATE.Admin.Manager.Recipe.RemoveAlternative', 'Remove alternative')}
+        aria-label={removeLabel}
+        title={removeLabel}
         onclick={() => onRemove()}
-      ><i class="fas fa-minus" aria-hidden="true"></i></button>
+      ><i class="fas fa-xmark" aria-hidden="true"></i></button>
     {/if}
   </div>
 
   {#if matchType === 'tags'}
-    <!-- The chosen tags sit in a full-width bordered area on their own line below
-         the match controls/quantity row, so chips never compete for width with
-         the row-end controls. -->
-    <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
-      {#if tags.length > 0}
-        <ul class="manager-recipe-tag-chips">
-          {#each tags as tag (tag)}
-            <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
-              <span>{tag}</span>
-              <button
-                type="button"
-                class="manager-recipe-tag-remove"
-                data-recipe-remove="tag"
-                aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                onclick={() => removeTag(tag)}
-              ><i class="fas fa-times" aria-hidden="true"></i></button>
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <span class="manager-recipe-tags-empty manager-muted" data-recipe-tags-empty>{text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}</span>
-      {/if}
+    <!-- The tag editing detail: the any/all segmented control + Add tag picker, then
+         the chosen tags in a full-width bordered area (chips or "No tags set"). -->
+    <div class="manager-recipe-option-tags-detail">
+      <div class="manager-recipe-option-tags-controls">
+        <div class="manager-recipe-tag-match-toggle" role="group" aria-label={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}>
+          <button
+            type="button"
+            class="manager-recipe-tag-match-option"
+            class:is-selected={tagMatch === 'any'}
+            data-recipe-tag-match="any"
+            aria-pressed={tagMatch === 'any'}
+            onclick={() => setTagMatch('any')}
+          >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any')}</button>
+          <button
+            type="button"
+            class="manager-recipe-tag-match-option"
+            class:is-selected={tagMatch === 'all'}
+            data-recipe-tag-match="all"
+            aria-pressed={tagMatch === 'all'}
+            onclick={() => setTagMatch('all')}
+          >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All')}</button>
+        </div>
+        <SearchablePopover
+          options={tagPickerOptions}
+          pickerClass="manager-recipe-tag-picker"
+          triggerClass="manager-button is-subtle manager-recipe-tag-trigger"
+          triggerIcon="fas fa-tag"
+          triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+          triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+          dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+          searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
+          searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
+          emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
+          onChoose={(tag) => addTag(tag)}
+        />
+      </div>
+      <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
+        {#if tags.length > 0}
+          <ul class="manager-recipe-tag-chips">
+            {#each tags as tag (tag)}
+              <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
+                <span>{tag}</span>
+                <button
+                  type="button"
+                  class="manager-recipe-tag-remove"
+                  data-recipe-remove="tag"
+                  aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+                  title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+                  onclick={() => removeTag(tag)}
+                ><i class="fas fa-times" aria-hidden="true"></i></button>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <span class="manager-recipe-tags-empty manager-muted" data-recipe-tags-empty>{text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}</span>
+        {/if}
+      </div>
     </div>
   {/if}
 </div>

@@ -2325,27 +2325,30 @@ test('recipe tag list spans the full row width on its own line below the control
         <body>
           <main class="fabricate-manager">
             <div class="harness-row-width">
-              <div class="manager-recipe-ingredient-option-row" data-recipe-option>
+              <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option>
+                <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
                 <div class="manager-recipe-option-target">
-                  <div class="manager-recipe-option-tags">
-                    <div class="manager-recipe-option-tags-controls">
-                      <div class="manager-recipe-tag-match-toggle">
-                        <button type="button" class="manager-recipe-tag-match-option is-selected">Any</button>
-                        <button type="button" class="manager-recipe-tag-match-option">All</button>
-                      </div>
-                      <button type="button" class="manager-button is-subtle manager-recipe-tag-trigger"><i class="fas fa-tag"></i><span>Add tag</span></button>
-                    </div>
-                  </div>
+                  <span class="manager-recipe-option-tag-name">any #reagent #rare</span>
+                  <span class="manager-recipe-req-tag is-tag">Tag</span>
                 </div>
                 <div class="manager-recipe-option-controls">
                   <input type="number" class="manager-recipe-option-quantity" value="1">
-                  <button type="button" class="manager-icon-button is-danger manager-recipe-option-remove"><i class="fas fa-minus"></i></button>
+                  <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
                 </div>
-                <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
-                  <ul class="manager-recipe-tag-chips">
-                    <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
-                    <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
-                  </ul>
+                <div class="manager-recipe-option-tags-detail">
+                  <div class="manager-recipe-option-tags-controls">
+                    <div class="manager-recipe-tag-match-toggle">
+                      <button type="button" class="manager-recipe-tag-match-option is-selected">Any</button>
+                      <button type="button" class="manager-recipe-tag-match-option">All</button>
+                    </div>
+                    <button type="button" class="manager-button is-subtle manager-recipe-tag-trigger"><i class="fas fa-tag"></i><span>Add tag</span></button>
+                  </div>
+                  <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
+                    <ul class="manager-recipe-tag-chips">
+                      <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
+                      <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2359,17 +2362,27 @@ test('recipe tag list spans the full row width on its own line below the control
         const rect = document.querySelector(selector).getBoundingClientRect();
         return { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width };
       };
+      const row = document.querySelector('.manager-recipe-ingredient-option-row');
+      const style = getComputedStyle(row);
       return {
         row: rectFor('.manager-recipe-ingredient-option-row'),
+        rowPadding:
+          parseFloat(style.paddingLeft) +
+          parseFloat(style.paddingRight) +
+          parseFloat(style.borderLeftWidth) +
+          parseFloat(style.borderRightWidth),
         target: rectFor('.manager-recipe-option-target'),
         controls: rectFor('.manager-recipe-option-controls'),
+        detail: rectFor('.manager-recipe-option-tags-detail'),
         list: rectFor('.manager-recipe-option-tags-list')
       };
     });
 
+    // §B4: the tag detail (controls + chip list) wraps to its own full-width line below
+    // the main row; it fills the row's CONTENT box (row width minus its padding).
     assert.ok(
-      Math.abs(report.list.width - report.row.width) <= 1,
-      `tags list should fill the row width (list ${report.list.width} vs row ${report.row.width})`
+      Math.abs(report.detail.width - (report.row.width - report.rowPadding)) <= 1,
+      `tags detail should fill the row content width (detail ${report.detail.width} vs content ${report.row.width - report.rowPadding})`
     );
     assert.ok(
       report.list.top >= report.controls.bottom - 1 && report.list.top >= report.target.bottom - 1,

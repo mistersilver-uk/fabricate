@@ -103,12 +103,7 @@
   }
 </script>
 
-<section class="manager-task-core-card manager-recipe-section" data-recipe-section={`${idPrefix}ingredients`}>
-  <div class="manager-task-card-heading">
-    <div>
-      <h3>{text('FABRICATE.Admin.Manager.Recipe.IngredientsSection', 'Ingredients')}</h3>
-    </div>
-  </div>
+<section class="manager-recipe-ingredients-section" data-recipe-section={`${idPrefix}ingredients`}>
   {#if !effectiveComplex}
     <div class="manager-recipe-ingredient-set-simple">
       <RecipeIngredientSetCard
@@ -125,7 +120,7 @@
     <div class="manager-recipe-section-empty">
       <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.IngredientsEmpty', 'No ingredients yet')}</p>
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.IngredientsEmptyHint', 'Add a set of ingredients required to craft this recipe.')}</p>
-      <button type="button" class="manager-button" data-recipe-add="ingredient-set" onclick={() => addSet()}>
+      <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="ingredient-set" onclick={() => addSet()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add set')}</span>
       </button>
@@ -154,7 +149,7 @@
         </li>
       {/each}
     </ul>
-    <button type="button" class="manager-button" data-recipe-add="ingredient-set" onclick={() => addSet()}>
+    <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="ingredient-set" onclick={() => addSet()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add set')}</span>
     </button>

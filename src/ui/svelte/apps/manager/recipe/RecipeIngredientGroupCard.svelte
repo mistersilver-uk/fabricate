@@ -168,49 +168,81 @@
   }
 </script>
 
+{#snippet orMenu()}
+  <SearchablePopover
+    options={orMenuOptions}
+    optionGroups={orMenuGroups}
+    pickerClass="manager-recipe-or-picker"
+    triggerClass="manager-chip manager-recipe-or-trigger"
+    triggerIcon="fas fa-code-branch"
+    triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
+    triggerAriaLabel={orMenuLabel}
+    triggerTitle={text('FABRICATE.Admin.Manager.Recipe.OrTriggerHint', 'Accept another kind of ingredient in place of this one, or require an essence on the whole set.')}
+    dialogAriaLabel={orMenuLabel}
+    searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder', 'Search options...')}
+    searchAriaLabel={orMenuLabel}
+    emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+    showChevron={false}
+    minWidth={220}
+    maxWidth={300}
+    onChoose={(type) => appendAlternative(type)}
+  />
+{/snippet}
+
 <div
   class="manager-recipe-ingredient-requirement"
   class:has-alternatives={hasAlternatives}
   data-recipe-group
   data-recipe-group-id={group?.id || ''}
 >
-  <div class="manager-recipe-ingredient-requirement-options">
-    {#each options as option, index (index)}
-      {#if index > 0}
-        <div class="manager-recipe-ingredient-or-separator" aria-hidden="true">
-          <span>{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
-        </div>
-      {/if}
-      <RecipeIngredientOption
-        {option}
-        {componentOptions}
-        {itemTags}
-        {currencyUnits}
-        canRemove={true}
-        onChange={(nextOption) => updateOption(index, nextOption)}
-        onRemove={() => removeOption(index)}
-      />
-    {/each}
-  </div>
-
-  <div class="manager-recipe-requirement-adds">
-    <SearchablePopover
-      options={orMenuOptions}
-      optionGroups={orMenuGroups}
-      pickerClass="manager-recipe-or-picker"
-      triggerClass="manager-chip manager-recipe-or-trigger"
-      triggerIcon="fas fa-code-branch"
-      triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
-      triggerAriaLabel={orMenuLabel}
-      triggerTitle={text('FABRICATE.Admin.Manager.Recipe.OrTriggerHint', 'Accept another kind of ingredient in place of this one, or require an essence on the whole set.')}
-      dialogAriaLabel={orMenuLabel}
-      searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder', 'Search options...')}
-      searchAriaLabel={orMenuLabel}
-      emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
-      showChevron={false}
-      minWidth={220}
-      maxWidth={300}
-      onChoose={(type) => appendAlternative(type)}
-    />
-  </div>
+  {#if hasAlternatives}
+    <!-- ANY ONE OF box (§B2): an accent-bordered container with a header pill + hint;
+         the crafter picks any one of the alternatives inside. -->
+    <div class="manager-recipe-any-one-of-head">
+      <span class="manager-recipe-any-one-of-pill" data-recipe-any-one-of>
+        <i class="fas fa-code-branch" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AnyOneOf', 'Any one of')}</span>
+      </span>
+      <span class="manager-recipe-any-one-of-hint manager-muted">{text('FABRICATE.Admin.Manager.Recipe.AnyOneOfHint', 'crafter picks a component or a tagged item')}</span>
+    </div>
+    <div class="manager-recipe-ingredient-requirement-options">
+      {#each options as option, index (index)}
+        {#if index > 0}
+          <div class="manager-recipe-ingredient-or-separator" aria-hidden="true">
+            <span>{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
+          </div>
+        {/if}
+        <RecipeIngredientOption
+          {option}
+          {componentOptions}
+          {itemTags}
+          {currencyUnits}
+          canRemove={true}
+          onChange={(nextOption) => updateOption(index, nextOption)}
+          onRemove={() => removeOption(index)}
+        />
+      {/each}
+    </div>
+    <div class="manager-recipe-requirement-adds">
+      {@render orMenu()}
+    </div>
+  {:else}
+    <!-- Bare requirement (§B1): a single row with the "or…" popover inline at its
+         right end. -->
+    <div class="manager-recipe-ingredient-requirement-options">
+      {#each options as option, index (index)}
+        <RecipeIngredientOption
+          {option}
+          {componentOptions}
+          {itemTags}
+          {currencyUnits}
+          canRemove={true}
+          showRequiredTag={true}
+          orControl={orMenu}
+          onChange={(nextOption) => updateOption(index, nextOption)}
+          onRemove={() => removeOption(index)}
+        />
+      {/each}
+    </div>
+  {/if}
 </div>

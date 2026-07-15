@@ -57,6 +57,20 @@
     (componentOptions || []).map(item => ({ id: item.id, label: item.name, img: item.img }))
   );
 
+  // The set-level "Add essence requirement" picker offers essences the set does not
+  // already require (an essence is an AND requirement on the SET, so once every one
+  // is required the choice would be a no-op and is dropped).
+  const essencePickerOptions = $derived(
+    (essenceOptions || [])
+      .filter((essence) => !(essence.id in essences))
+      .map((essence) => ({ id: essence.id, label: essence.name, icon: essence.icon || 'fas fa-flask-vial' }))
+  );
+
+  function addNamedEssence(id) {
+    if (!id || id in essences) return;
+    updateEssences({ ...essences, [id]: 1 });
+  }
+
   function setName(name) {
     onChange({ ...set, name });
   }
@@ -182,13 +196,10 @@
   {#if groups.length === 0}
     <p class="manager-muted manager-recipe-ingredient-set-empty">{text('FABRICATE.Admin.Manager.Recipe.SetEmptyHint', 'Add a component or a tag requirement this set must satisfy.')}</p>
   {:else}
+    <!-- §B7: requirements stack with no invented "AND" hairline dividers — every
+         requirement in a set is AND'd, which the tab intro copy already states. -->
     <div class="manager-recipe-ingredient-set-groups">
       {#each groups as group, index (group?.id || index)}
-        {#if index > 0}
-          <div class="manager-recipe-ingredient-and-separator" aria-hidden="true">
-            <span>{text('FABRICATE.Admin.Manager.Recipe.And', 'AND')}</span>
-          </div>
-        {/if}
         <RecipeIngredientGroupCard
           {group}
           {componentOptions}
@@ -203,11 +214,19 @@
     </div>
   {/if}
 
+  {#if (essenceOptions || []).length > 0}
+    <RecipeEssenceRequirements
+      {essences}
+      {essenceOptions}
+      onChange={updateEssences}
+    />
+  {/if}
+
   <div class="manager-recipe-ingredient-set-add">
     <SearchablePopover
       options={componentPickerOptions}
       pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-      triggerClass="manager-button is-subtle manager-recipe-add-component-trigger"
+      triggerClass="manager-button is-dashed manager-recipe-add-component-trigger"
       triggerIcon="fas fa-cube"
       triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
       triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
@@ -221,17 +240,36 @@
     />
     <button
       type="button"
-      class="manager-button is-subtle"
+      class="manager-button is-dashed"
       data-recipe-add="tag-requirement"
       onclick={() => addTagRequirement()}
     >
       <i class="fas fa-tags" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
     </button>
+    {#if (essenceOptions || []).length > 0}
+      <!-- §B6: the missing set-level essence add. An essence is an AND requirement on
+           the SET; the picker offers only essences not already required. -->
+      <SearchablePopover
+        options={essencePickerOptions}
+        pickerClass="manager-recipe-essence-picker"
+        triggerClass="manager-button is-dashed manager-recipe-essence-trigger"
+        triggerIcon="fas fa-flask-vial"
+        triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}
+        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}
+        triggerAddMarker="essence-requirement"
+        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}
+        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
+        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
+        emptyHint={text('FABRICATE.Admin.Manager.Recipe.AllEssencesAdded', 'All essences added')}
+        showChevron={false}
+        onChoose={(id) => addNamedEssence(id)}
+      />
+    {/if}
     {#if (currencyUnits || []).length > 0}
       <button
         type="button"
-        class="manager-button is-subtle"
+        class="manager-button is-dashed"
         data-recipe-add="cost"
         onclick={() => addCurrencyRequirement()}
       >
@@ -240,12 +278,4 @@
       </button>
     {/if}
   </div>
-
-  {#if (essenceOptions || []).length > 0}
-    <RecipeEssenceRequirements
-      {essences}
-      {essenceOptions}
-      onChange={updateEssences}
-    />
-  {/if}
 </div>

@@ -1877,18 +1877,12 @@ describe('RecipeEditView (mounted)', () => {
       'tag match defaults to Any'
     );
 
-    // The two AND'd requirements are separated by a labelled "AND" divider that
-    // mirrors the within-group "OR" divider (same casing/markup, different label).
-    const andSeparators = set.querySelectorAll('.manager-recipe-ingredient-and-separator');
+    // §B7: the invented "AND" hairline dividers between requirements are gone — the
+    // prototype has none; the AND relationship lives in the tab intro copy.
     assert.equal(
-      andSeparators.length,
-      1,
-      'one AND divider sits between the two AND’d requirements'
-    );
-    assert.equal(
-      andSeparators[0].querySelector('span').textContent.trim(),
-      'AND',
-      'the AND divider reads "AND"'
+      set.querySelectorAll('.manager-recipe-ingredient-and-separator').length,
+      0,
+      'no AND divider is rendered between AND’d requirements'
     );
 
     // The per-set essence row renders.
@@ -2471,8 +2465,10 @@ describe('RecipeEditView (mounted)', () => {
       false,
       'no visible Quantity text label in the row'
     );
+    // §B1: the quantity is now the shared Stepper, whose typeable input commits on
+    // blur (re-asserting the clamped value), not on a `change` event.
     qty.value = '5';
-    qty.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    qty.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(patches.length, 1, 'editing the quantity patches the recipe');
     assert.equal(
       patches[0].ingredientSets[0].ingredientGroups[0].options[0].quantity,

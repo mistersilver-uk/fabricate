@@ -335,6 +335,7 @@
             {essenceOptions}
             {itemTags}
             {showSetName}
+            {routingProvider}
             onUpdateIngredientSets={updateIngredientSets}
             onDeleteStep={deleteStepFrom('ingredients')}
           />

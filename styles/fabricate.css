@@ -6986,7 +6986,8 @@
 }
 
 /* ── Rebuilt Results tab (issue 643 §C) ─────────────────────────────────────── */
-.fabricate-manager .manager-recipe-results-section {
+.fabricate-manager .manager-recipe-results-section,
+.fabricate-manager .manager-recipe-ingredients-section {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
@@ -7337,12 +7338,39 @@
   gap: var(--fab-space-2);
 }
 
+/* §B2: the ANY-ONE-OF (OR) container is an accent-bordered box with a header pill,
+   not a plain box with a left bar. */
 .fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives {
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-left: 3px solid var(--fab-mv2-accent);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-03);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 8px;
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-recipe-any-one-of-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin-bottom: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-any-one-of-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  padding: 2px var(--fab-space-2);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 999px;
+  color: var(--fab-accent);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-recipe-any-one-of-hint {
+  font-size: 0.74rem;
 }
 
 .fabricate-manager .manager-recipe-ingredient-requirement-options {
@@ -7351,19 +7379,99 @@
   gap: var(--fab-space-1);
 }
 
-/* An alternative is a single flat row: the match editor grows on the left, the
-   quantity + per-row add/remove controls cluster on the right. */
+/* A requirement row: lead chip + match editor grow on the left; the REQUIRED tag,
+   quantity stepper, "or…" and remove cluster on the right. The tag detail wraps to
+   its own full-width line below. */
 .fabricate-manager .manager-recipe-ingredient-option-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-surface-soft);
+}
+
+/* Inside an ANY-ONE-OF box the alternatives read as nested cards on the tinted
+   background. */
+.fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives .manager-recipe-ingredient-option-row {
+  background: var(--fab-mv2-bg);
+}
+
+/* The small type-tinted lead chip that opens each requirement row. */
+.fabricate-manager .manager-recipe-option-lead {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  font-size: 0.82rem;
+}
+
+.fabricate-manager .manager-recipe-option-lead.is-component {
+  color: var(--fab-success);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-recipe-option-lead.is-tag {
+  color: var(--fab-purple);
+  background: var(--fab-purple-soft);
+}
+
+.fabricate-manager .manager-recipe-option-lead.is-currency {
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-recipe-option-lead.is-essence {
+  color: var(--fab-info);
+  background: var(--fab-info-soft);
 }
 
 .fabricate-manager .manager-recipe-option-target {
   flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
   min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-option-tag-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The REQUIRED / TAG / ESSENCE type pill. */
+.fabricate-manager .manager-recipe-req-tag {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 2px var(--fab-space-chip);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 5px;
+  color: var(--fab-text-subtle);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-recipe-req-tag.is-tag {
+  color: var(--fab-purple);
+  border-color: var(--fab-purple-soft);
+}
+
+.fabricate-manager .manager-recipe-req-tag.is-essence {
+  color: var(--fab-info);
+  border-color: var(--fab-info-soft);
 }
 
 .fabricate-manager .manager-recipe-option-controls {
@@ -7371,6 +7479,23 @@
   flex: 0 0 auto;
   align-items: center;
   gap: var(--fab-space-2);
+}
+
+/* Vertical divider between the stepper and the inline "or…". */
+.fabricate-manager .manager-recipe-option-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 22px;
+  background: var(--fab-mv2-border);
+}
+
+/* The tag editing detail wraps to its own full-width line below the row. */
+.fabricate-manager .manager-recipe-option-tags-detail {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
 }
 
 .fabricate-manager .manager-recipe-tag-match-toggle {
@@ -7567,15 +7692,11 @@
   cursor: pointer;
 }
 
+/* §B1: the quantity is the shared horizontal Stepper; its input carries this class
+   alongside `.fab-stepper-input`, so only mono alignment is added here — the stepper
+   supplies the borderless chrome. */
 .fabricate-manager .manager-recipe-option-quantity {
-  flex: 0 0 auto;
-  width: 3.75rem;
-  height: 36px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-mv2-bg);
-  color: var(--fab-mv2-text);
+  font-family: var(--fab-font-mono);
 }
 
 .fabricate-manager .manager-recipe-option-currency {
@@ -7602,58 +7723,77 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-essence-quantity {
-  width: 100%;
+/* §B1: subtle × remove — never a loud red trash/minus button. */
+.fabricate-manager .manager-recipe-option-remove {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  cursor: pointer;
 }
 
-.fabricate-manager .manager-recipe-option-remove {
-  flex: 0 0 auto;
+.fabricate-manager .manager-recipe-option-remove:hover {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
 }
 
 .fabricate-manager .manager-button.is-subtle {
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-recipe-ingredient-essences {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding-top: var(--fab-space-2);
-  border-top: 1px solid var(--fab-mv2-border);
-}
-
-.fabricate-manager .manager-recipe-ingredient-essences-title {
-  margin: 0;
-  font-size: 0.82rem;
-}
-
+/* §B3: per-set essence requirement rows (essence-tinted requirement rows). */
 .fabricate-manager .manager-recipe-essence-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-1);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.fabricate-manager .manager-recipe-essence-row {
-  display: flex;
+.fabricate-manager .manager-recipe-essence-medallion {
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  color: var(--fab-info);
+  background: var(--fab-bg-3);
+  font-size: 0.82rem;
 }
 
-.fabricate-manager .manager-recipe-essence-label {
+.fabricate-manager .manager-recipe-essence-copy {
   flex: 1 1 auto;
   display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
+  flex-direction: column;
+  gap: 0;
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-essence-quantity-field {
-  flex: 0 0 auto;
-  width: 6rem;
+.fabricate-manager .manager-recipe-essence-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-essence-subline {
+  overflow: hidden;
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-recipe-visually-hidden {
