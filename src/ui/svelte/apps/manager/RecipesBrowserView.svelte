@@ -42,9 +42,6 @@
     resolutionMode = 'simple',
     onSearchChange = () => {},
     onSelectRecipe = () => {},
-    onEditRecipe = () => {},
-    onDuplicateRecipe = () => {},
-    onDeleteRecipe = () => {},
     onToggleEnabled = () => {},
     onToggleLocked = () => {}
   } = $props();
@@ -323,13 +320,20 @@
         optionDataAttr="data-recipe-lock-option"
         onChange={(value) => { lockFilter = value; pageIndex = 0; }}
       />
-      <!--
-        The category select is a FILTER and belongs with the other filters, on row one.
-        It used to be demoted to row two behind a sentence-case "Category" label, which
-        put a filter below the grouping and sorting controls that act on its result.
-        Bare here: the `aria-label` is its accessible name.
-      -->
+    </div>
+
+    <!--
+      Row two carries the category FILTER together with the two VIEW controls — how the
+      list is grouped, and how it is ordered — on a single tighter row (issue 643). The
+      category select used to sit on row one, where it wrapped below search/status/lock
+      and pushed the grouping and sorting controls onto a third line; keeping all three
+      here stops that unnecessary break. The view controls are separated from the filter
+      by a rule and each is titled by an uppercase micro-label that precedes its control
+      and never wraps ("Sort by" broke onto two lines in the flagship frame otherwise).
+    -->
+    <div class="manager-recipe-filter-row is-secondary">
       {#if showRecipeCategories}
+        <!-- Bare: the `aria-label` is the select's accessible name. -->
         <select
           class="manager-recipe-category-filter"
           data-recipe-category-filter
@@ -342,18 +346,7 @@
             <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
           {/each}
         </select>
-      {/if}
-    </div>
-
-    <!--
-      Row two is the two VIEW controls — how the list is grouped, and how it is ordered
-      — separated by a rule. Both are titled by an uppercase micro-label that precedes
-      its control (the grouping switch used to come BEFORE its own label) and never
-      wraps: "Sort by" broke onto two lines in the flagship frame, which is what a
-      `nowrap` micro-label exists to prevent.
-    -->
-    <div class="manager-recipe-filter-row is-secondary">
-      {#if showRecipeCategories}
+        <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
         <div class="manager-recipe-filter-field">
           <span class="manager-recipe-filter-label" id="manager-recipe-group-label">{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span>
           <button
@@ -573,26 +566,13 @@
                       </span>
 
                       <!--
-                        Three GHOST icons. Duplicate and Delete are kept (they are real
-                        capabilities), but their CHROME is not: three bordered buttons
-                        beside a bordered lock, a switch and a pill turned every row into
-                        a toolbar and truncated every description to ~28 characters. The
-                        border arrives on hover, where it is needed.
-
-                        `i.fa-edit` is FROZEN — the smoke harness opens the editor with
-                        `button:has(i.fa-edit)`.
+                        Edit / Duplicate / Delete used to live here as three ghost icons,
+                        which turned every row into a toolbar and truncated every
+                        description. They now live ONLY in the inspector (issue 643), which
+                        already owns all three as full-width buttons — so no capability is
+                        lost. The row keeps just the lock toggle and the enable switch; a
+                        click on the identity selects the row and drives the inspector.
                       -->
-                      <span class="manager-action-group manager-recipe-actions">
-                        <button type="button" class="manager-icon-button is-ghost" aria-label={format('FABRICATE.Admin.Manager.Recipe.EditNamed', 'Edit {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')} onclick={() => onEditRecipe(recipe.id)}>
-                          <i class="fas fa-edit" aria-hidden="true"></i>
-                        </button>
-                        <button type="button" class="manager-icon-button is-ghost" aria-label={format('FABRICATE.Admin.Manager.Recipe.DuplicateNamed', 'Duplicate {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')} onclick={() => onDuplicateRecipe(recipe.id)}>
-                          <i class="fas fa-copy" aria-hidden="true"></i>
-                        </button>
-                        <button type="button" class="manager-icon-button is-ghost is-danger" aria-label={format('FABRICATE.Admin.Manager.Recipe.DeleteNamed', 'Delete {name}', { name: recipe.name })} title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')} onclick={() => onDeleteRecipe(recipe.id)}>
-                          <i class="fas fa-trash" aria-hidden="true"></i>
-                        </button>
-                      </span>
                     </div>
                   </li>
                 {/each}

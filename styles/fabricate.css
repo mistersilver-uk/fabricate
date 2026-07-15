@@ -1221,6 +1221,24 @@
   font-family: var(--font-primary);
 }
 
+/*
+  The manager renders its own edge-to-edge chrome — a titlebar, a header and a
+  three-column body — so the Foundry window frame is the only frame it needs. Foundry's
+  default `.window-content` drew a SECOND rounded, bordered box inside the window around
+  that chrome (issue 643): redundant, since the window already frames it. Reset the
+  content area flush (like the player app's `.fabricate-app .window-content`) so only the
+  window frame delimits the manager, and the manager's own background fills the corners.
+*/
+.fabricate.crafting-system-manager .window-content {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .fabricate-manager {
   --fab-mv2-bg: var(--fab-bg-1);
   --fab-mv2-surface-1: var(--fab-bg-2);
@@ -1300,19 +1318,6 @@
   padding: var(--fab-space-2) var(--fab-space-4);
   border-bottom: 1px solid var(--fab-mv2-border);
   background: var(--fab-bg-0);
-}
-
-.fabricate-manager .manager-titlebar-icon {
-  flex: 0 0 auto;
-  color: var(--fab-mv2-accent);
-  font-size: 0.82rem;
-}
-
-.fabricate-manager .manager-titlebar-product {
-  flex: 0 0 auto;
-  color: var(--fab-mv2-text);
-  font-size: 0.8rem;
-  font-weight: 600;
 }
 
 .fabricate-manager .manager-titlebar-badge {
@@ -3116,11 +3121,6 @@
   background: var(--fab-mv2-surface-2);
 }
 
-.fabricate-manager .manager-recipes-table .manager-recipe-row .manager-action-group {
-  flex-wrap: nowrap;
-  gap: var(--fab-space-2xs);
-}
-
 .fabricate-manager .manager-recipe-row.is-off {
   opacity: 0.55;
 }
@@ -3181,7 +3181,10 @@
   display: flex;
   gap: var(--fab-space-chip);
   align-items: center;
-  font-size: 0.62rem;
+
+  /* Bumped a step (issue 643): the "N in · N out" readout was too small to read
+     comfortably next to the DC pill. */
+  font-size: 0.72rem;
   font-weight: 600;
 }
 
@@ -3195,7 +3198,9 @@
   gap: var(--fab-space-chip);
   align-items: center;
   color: var(--fab-text-subtle);
-  font-size: 0.56rem;
+
+  /* Bumped a step in lockstep with the counts above (issue 643). */
+  font-size: 0.64rem;
   font-weight: 400;
 }
 
@@ -3203,7 +3208,10 @@
   min-height: 0;
   padding: 3px var(--fab-space-1);
   gap: var(--fab-space-chip);
-  font-size: 0.6rem;
+
+  /* Bumped a step (issue 643): the "DC 16" check pill was too small to read. The DC
+     value keeps its mono face via the `is-mono` modifier on the row. */
+  font-size: 0.7rem;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3522,6 +3530,21 @@
   gap: var(--fab-space-1);
 }
 
+/* Both recipe-filter dropdowns (category + sort) wear the Fabricate select treatment —
+   themed surface, border, radius, text colour and the native dark chevron under
+   `color-scheme: dark` — rather than Foundry core's default light select chrome, which
+   they rendered with before (issue 643). The two-class-plus-element selector (0,2,1)
+   outranks Foundry core's aggressive `select` rules. */
+.fabricate-manager .manager-recipe-toolbar select {
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  cursor: pointer;
+}
+
 /* The bare category select. It carries no visible label — the `aria-label` is its
    accessible name — because a filter bar whose controls each announce themselves in
    sentence case reads as a form, not a bar. */
@@ -3529,8 +3552,6 @@
   flex: 0 0 auto;
   min-width: 0;
   max-width: 180px;
-  height: 34px;
-  border-radius: 9px;
   text-overflow: ellipsis;
 }
 
@@ -3674,10 +3695,11 @@
 }
 
 /*
-  The point of the inspector. `Edit recipe` is the accent-filled primary and the loudest
-  thing on the panel; Duplicate is its secondary; Delete is a ghost danger link below.
-  Before this there was NO Edit button at all and Delete was a visual peer of Duplicate —
-  so the panel's loudest action was destroying the recipe.
+  The point of the inspector: three full-width buttons stacked Duplicate -> Edit ->
+  Delete (issue 643). `Edit recipe` is the accent/peach primary and the loudest thing on
+  the panel; Duplicate is a dark secondary on the panel surface; Delete is a dark button
+  too, but toned with danger-red text and a subtly danger-tinted border — a real action,
+  not a plain text link, and never louder than Edit.
 */
 .fabricate-manager .manager-recipe-browser-inspector-actions {
   display: flex;
@@ -3687,10 +3709,13 @@
   min-width: 0;
 }
 
+/* Dark secondary: the panel surface, a subtle border, normal text. */
 .fabricate-manager .manager-recipe-browser-inspector-duplicate {
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   justify-content: center;
+  border-color: var(--fab-mv2-border);
+  background: var(--fab-mv2-surface-1);
 }
 
 .fabricate-manager .manager-recipe-browser-inspector-edit {
@@ -3710,27 +3735,22 @@
   background: var(--fab-accent-strong);
 }
 
+/* Dark danger button: the same surface as Duplicate, but danger-red text and a subtly
+   danger-tinted border so it reads as destructive without shouting louder than Edit. */
 .fabricate-manager .manager-recipe-browser-inspector-delete {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  gap: var(--fab-space-chip);
-  align-items: center;
-  justify-content: center;
   width: 100%;
-  min-height: 26px;
-  padding: 0;
-  border: 0;
+  min-height: 36px;
+  justify-content: center;
+  border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
-  background: transparent;
-  font-size: 0.68rem;
-  font-weight: 600;
-  cursor: pointer;
+  background: var(--fab-mv2-surface-1);
 }
 
-.fabricate-manager .manager-recipe-browser-inspector-delete:hover,
+.fabricate-manager .manager-recipe-browser-inspector-delete:not(:disabled):hover,
 .fabricate-manager .manager-recipe-browser-inspector-delete:focus-visible {
-  text-decoration: underline;
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
 }
 
 .fabricate-manager .manager-recipe-stat-grid {
@@ -4393,6 +4413,17 @@
 .fabricate-manager .manager-scope-return:focus-visible {
   color: var(--fab-mv2-text);
   background: var(--fab-surface-soft);
+}
+
+/* On the systems browser there is nowhere to return to, so the back link is faded and
+   inert — never a live control (issue 643). `pointer-events: none` stops hover/click,
+   and the muted colour + reduced opacity read it as unavailable. */
+.fabricate-manager .manager-scope-return.is-disabled {
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: default;
 }
 
 .fabricate-manager .manager-recipe-identity,
@@ -8082,7 +8113,10 @@
   min-width: 0;
   color: var(--fab-text-subtle);
   font-family: var(--fab-font-mono);
-  font-size: 0.62rem;
+
+  /* Bumped a notch (issue 643): 0.62rem was too small to read at a glance. The active
+     subitem count below inherits this size and only re-tones, so it scales in step. */
+  font-size: 0.74rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   overflow-wrap: normal;

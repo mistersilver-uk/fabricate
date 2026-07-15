@@ -336,10 +336,12 @@ async function openRecipeEditor(calls, storeOptions = {}) {
   craftingParent().click();
   await tick();
   flushSync();
-  // Edit is the first button of the row's ACTION GROUP. Scope to the group: the
-  // row's first `.manager-icon-button` overall is now the lock toggle (issue 643),
-  // which sits beside the action group, not inside it.
-  target.querySelector('[data-recipe-id="r1"] .manager-action-group .manager-icon-button').click();
+  // The Edit action moved to the inspector (issue 643): SELECT the row by clicking its
+  // identity, which drives the shell inspector, then click the inspector's Edit action.
+  target.querySelector('[data-recipe-id="r1"] .manager-recipe-identity').click();
+  await tick();
+  flushSync();
+  target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="edit"]').click();
   await tick();
   flushSync();
   return target;
@@ -4241,11 +4243,14 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
 
-    // Row actions are now Edit (1), Duplicate (2), Delete (3). Duplicate and Delete drive
-    // store callbacks and keep the row mounted; the Edit click is exercised separately below
-    // because it navigates away from the browser to the recipe-edit route.
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
+    // Duplicate and Delete moved to the inspector (issue 643): SELECT r2 by clicking its
+    // identity, then drive the inspector's Duplicate and Delete actions, which operate on
+    // the selected recipe. Both keep the browser mounted; Edit is exercised separately
+    // below because it navigates to the recipe-edit route.
+    target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
+    flushSync();
+    target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="duplicate"]').click();
+    target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="delete"]').click();
 
     assert.deepEqual(calls.slice(-2), [
       ['duplicateRecipe', 'r2'],
@@ -4294,14 +4299,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       'recipes header should not call exportRecipes'
     );
 
-    // The first button of the row's ACTION GROUP is Edit (fa-edit) and it navigates
-    // to the in-manager recipe-edit route rather than calling a service callback.
-    // The `fa-edit` icon class is frozen — the smoke harness clicks
-    // `button:has(i.fa-edit)` to open the editor.
+    // Edit moved to the inspector (issue 643): r2 is already selected above, so the
+    // inspector's Edit action navigates to the in-manager recipe-edit route rather than
+    // calling a service callback.
     const editButton = target.querySelector(
-      '[data-recipe-id="r2"] .manager-action-group .manager-icon-button'
+      '.manager-recipe-browser-inspector [data-recipe-action="edit"]'
     );
-    assert.ok(editButton.querySelector('.fa-edit'), 'first row action should be the Edit icon');
+    assert.ok(editButton.querySelector('.fa-pen'), 'the inspector Edit action carries the pen icon');
     editButton.click();
     await tick();
     flushSync();
@@ -4404,9 +4408,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    target
-      .querySelector('[data-recipe-id="r2"] .manager-action-group .manager-icon-button')
-      .click();
+    // Select r2, then open the editor from the inspector's Edit action (issue 643).
+    target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
+    await tick();
+    flushSync();
+    target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="edit"]').click();
     await tick();
     flushSync();
 

@@ -4297,8 +4297,12 @@
     text — hence max-width + ellipsis + title) and never a theme or product name.
   -->
   <div class="manager-titlebar" data-manager-titlebar aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}>
-    <i class="fas fa-layer-group manager-titlebar-icon" aria-hidden="true"></i>
-    <span class="manager-titlebar-product">{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</span>
+    <!--
+      The layer-group icon and "Crafting Systems" product label used to lead this
+      strip, but the Foundry window's own title bar already names the app — a second
+      copy inside the window was duplicated chrome (issue 643). The gold SYSTEM badge
+      is now the left-most element, and the resolution status stays right-aligned.
+    -->
     {#if selectedSystem}
       <span
         class="manager-titlebar-badge"
@@ -4698,9 +4702,17 @@
                 <option value={system.id}>{system.name}</option>
               {/each}
             </select>
+            <!--
+              The systems browser IS the destination this link returns to, so on that
+              view there is nowhere to go back to (issue 643): it renders faded and
+              inert (`disabled` + `aria-disabled` + `pointer-events: none`), and stays a
+              live control on every other view.
+            -->
             <button
               type="button"
-              class="manager-scope-return"
+              class={`manager-scope-return ${currentView === 'systems' ? 'is-disabled' : ''}`}
+              disabled={currentView === 'systems'}
+              aria-disabled={currentView === 'systems'}
               aria-label={text('FABRICATE.Admin.Manager.ReturnToSystemLibrary', 'Return to System Library')}
               title={text('FABRICATE.Admin.Manager.ReturnToSystemLibrary', 'Return to System Library')}
               onclick={backToSystemsBrowser}
@@ -5235,9 +5247,6 @@
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}
-        onEditRecipe={(id) => editRecipe(id)}
-        onDuplicateRecipe={(id) => duplicateRecipe(id)}
-        onDeleteRecipe={(id) => deleteRecipe(id)}
         onToggleEnabled={(id, enabled, options) => toggleRecipeEnabled(id, enabled, options)}
         onToggleLocked={(id, locked) => store.toggleRecipeLocked?.(id, locked)}
       />

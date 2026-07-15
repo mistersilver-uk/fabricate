@@ -7,12 +7,14 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+const inspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
 const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
+const inspectorSource = readFileSync(inspectorPath, 'utf8');
 const editSource = readFileSync(editPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
@@ -20,81 +22,85 @@ const css = readFileSync(cssPath, 'utf8');
 
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 
-// The three row actions (Edit / Duplicate / Delete). The row is a flex CARD now, so
-// the group is a plain `.manager-action-group` span inside the control cluster. The
-// lock toggle is a SIBLING of this group, never a member — which is exactly what
-// keeps the "not gated on recipe.locked" assertion below meaningful rather than
-// vacuous (issue 643: the lock control may reference `recipe.locked`; these three
-// buttons still may not).
-function actionGroupBlock() {
-  const start = browserSource.indexOf('class="manager-action-group manager-recipe-actions"');
-  assert.ok(start >= 0, 'recipe action group should be present');
-  const lastButton = browserSource.indexOf('fa-trash', start);
-  assert.ok(lastButton > start, 'recipe action group should contain the delete button');
-  const end = browserSource.indexOf('</span>', lastButton);
-  assert.ok(end > start, 'recipe action group should close before the row ends');
-  return browserSource.slice(start, end);
+// The three recipe actions (Duplicate / Edit / Delete) moved OFF the row and into the
+// inspector (issue 643): the row now carries only the lock toggle and the enable
+// switch, and a click on the identity selects the recipe to drive the inspector. So the
+// action block lives in the inspector source, ordered Duplicate -> Edit -> Delete.
+function inspectorActionBlock() {
+  const start = inspectorSource.indexOf('class="manager-recipe-browser-inspector-actions"');
+  assert.ok(start >= 0, 'inspector action group should be present');
+  const lastButton = inspectorSource.indexOf('fa-trash', start);
+  assert.ok(lastButton > start, 'inspector action group should contain the delete button');
+  const end = inspectorSource.indexOf('</div>', lastButton);
+  assert.ok(end > start, 'inspector action group should close before the panel ends');
+  return inspectorSource.slice(start, end);
 }
 
-describe('RecipesBrowserView Edit quick-action', () => {
-  it('declares an onEditRecipe prop', () => {
-    assert.ok(browserSource.includes('onEditRecipe = () => {}'), 'onEditRecipe prop should be declared');
+describe('recipe actions live on the inspector, not the row', () => {
+  it('strips the Edit/Duplicate/Delete actions and their props from the row', () => {
+    // The row no longer authors any of the three actions or their callbacks — they are
+    // the inspector's job now, so leaving the props on the row would be dead wiring.
+    assert.equal(browserSource.includes('onEditRecipe'), false, 'the row should not declare an onEditRecipe prop');
+    assert.equal(browserSource.includes('onDuplicateRecipe'), false, 'the row should not declare an onDuplicateRecipe prop');
+    assert.equal(browserSource.includes('onDeleteRecipe'), false, 'the row should not declare an onDeleteRecipe prop');
+    assert.equal(browserSource.includes('manager-recipe-actions'), false, 'the row action group markup should be gone');
+    // The two controls the row KEEPS.
+    assert.ok(browserSource.includes('data-recipe-lock'), 'the row keeps the lock control');
+    assert.ok(browserSource.includes('manager-status-toggle'), 'the row keeps the enable toggle');
   });
 
-  it('renders exactly three action buttons ordered Edit -> Duplicate -> Delete', () => {
-    const block = actionGroupBlock();
+  it('renders exactly three inspector action buttons ordered Duplicate -> Edit -> Delete', () => {
+    const block = inspectorActionBlock();
     const buttonCount = (block.match(/<button/g) || []).length;
-    assert.equal(buttonCount, 3, 'action group should contain exactly three buttons');
-    const editIdx = block.indexOf('fa-edit');
+    assert.equal(buttonCount, 3, 'inspector action group should contain exactly three buttons');
     const copyIdx = block.indexOf('fa-copy');
+    const penIdx = block.indexOf('fa-pen');
     const trashIdx = block.indexOf('fa-trash');
-    assert.ok(editIdx >= 0 && copyIdx >= 0 && trashIdx >= 0, 'all three icons should be present');
-    assert.ok(editIdx < copyIdx, 'Edit should come before Duplicate');
-    assert.ok(copyIdx < trashIdx, 'Duplicate should come before Delete');
+    assert.ok(copyIdx >= 0 && penIdx >= 0 && trashIdx >= 0, 'all three icons should be present');
+    assert.ok(copyIdx < penIdx, 'Duplicate should come before Edit');
+    assert.ok(penIdx < trashIdx, 'Edit should come before Delete');
   });
 
-  // The three buttons are CAPABILITIES and are kept. Their CHROME is not: three bordered
-  // buttons beside a bordered lock, a switch and a pill turned every row into a toolbar
-  // and truncated every description to ~28 characters. They are ghost icons — background
-  // on hover only — which is the whole point of preserving them without shouting them.
-  it('renders the three actions as ghost icons, not bordered buttons', () => {
-    const block = actionGroupBlock();
+  // The three inspector actions are FULL-WIDTH buttons, not ghost icons and not a plain
+  // text link: Duplicate is a dark secondary, Edit the accent primary, Delete a dark
+  // danger button (issue 643).
+  it('renders the three inspector actions as full-width buttons', () => {
+    const block = inspectorActionBlock();
     assert.equal(
-      (block.match(/manager-icon-button is-ghost/g) || []).length,
+      (block.match(/class="manager-button /g) || []).length,
       3,
-      'all three row actions are ghost icons'
+      'all three inspector actions are manager-button controls'
     );
-    const ghostBlock = css.slice(
-      css.indexOf('.fabricate-manager .manager-icon-button.is-ghost {'),
-      css.indexOf('}', css.indexOf('.fabricate-manager .manager-icon-button.is-ghost {'))
-    );
-    assert.ok(ghostBlock.includes('border-color: transparent;'), 'a ghost icon carries no resting border');
-    assert.ok(ghostBlock.includes('background: transparent;'), 'a ghost icon carries no resting fill');
-    assert.ok(ghostBlock.includes('width: 28px;'), 'a ghost icon is 28x28, not the 34px bordered button');
+    for (const selector of [
+      '.fabricate-manager .manager-recipe-browser-inspector-duplicate',
+      '.fabricate-manager .manager-recipe-browser-inspector-edit',
+      '.fabricate-manager .manager-recipe-browser-inspector-delete'
+    ]) {
+      const cssBlock = css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)));
+      assert.ok(cssBlock.includes('width: 100%;'), `${selector} should be full width`);
+    }
   });
 
-  it('wires the Edit button to onEditRecipe with localized aria-label and title', () => {
-    const block = actionGroupBlock();
-    assert.ok(block.includes('onEditRecipe(recipe.id)'), 'Edit button should call onEditRecipe');
-    assert.ok(block.includes('FABRICATE.Admin.Manager.Recipe.EditNamed'), 'Edit button uses the EditNamed aria-label key');
-    assert.ok(block.includes('FABRICATE.Admin.Manager.Recipe.Edit'), 'Edit button uses the Edit title key');
+  it('wires the inspector Edit button to onEdit with the localized label', () => {
+    const block = inspectorActionBlock();
+    assert.ok(block.includes('onEdit()'), 'Edit button should call onEdit');
+    assert.ok(block.includes('FABRICATE.Admin.Manager.Recipe.Edit'), 'Edit button uses the Edit label key');
   });
 
-  it('does not gate the Edit button on recipe.locked', () => {
-    const block = actionGroupBlock();
-    assert.equal(block.includes('recipe.locked'), false, 'action group must not gate buttons on recipe.locked');
-    assert.equal(/\{#if[^}]*locked/.test(block), false, 'no locked guard should wrap the action buttons');
+  it('does not gate the inspector actions on the recipe lock state', () => {
+    const block = inspectorActionBlock();
+    assert.equal(block.includes('.locked'), false, 'inspector actions must not gate on the recipe lock state');
+    assert.equal(/\{#if[^}]*locked/.test(block), false, 'no locked guard should wrap the inspector actions');
   });
 });
 
-describe('recipe-edit action group spacing', () => {
-  it('pins the recipe action group to a single non-wrapping row', () => {
-    const start = css.indexOf('.manager-recipe-row .manager-action-group {');
-    assert.ok(start >= 0, 'scoped recipe action-group rule should exist');
+describe('inspector action button layout', () => {
+  it('stacks the inspector actions in a single non-wrapping column', () => {
+    const start = css.indexOf('.fabricate-manager .manager-recipe-browser-inspector-actions {');
+    assert.ok(start >= 0, 'inspector actions rule should exist');
     const end = css.indexOf('}', start);
     const block = css.slice(start, end);
-    assert.ok(block.includes('flex-wrap: nowrap'), 'action group should not wrap');
-    assert.ok(block.includes('gap: var(--fab-space-2xs)'), 'ghost icons sit tight against each other');
+    assert.ok(block.includes('flex-direction: column'), 'the inspector actions stack vertically');
   });
 
   // The row is a card, not a column grid, so there is no fixed 118px actions column
@@ -137,8 +143,18 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     assert.ok(rootSource.includes("activeView = 'recipe-edit'"), 'editRecipe should switch to the recipe-edit view');
   });
 
-  it('passes onEditRecipe to RecipesBrowserView', () => {
-    assert.ok(rootSource.includes('onEditRecipe={(id) => editRecipe(id)}'), 'RecipesBrowserView should receive onEditRecipe');
+  it('wires the inspector Edit action to the recipe-edit navigation', () => {
+    // The row's Edit quick-action was retired (issue 643); the recipe-edit route is now
+    // reached from the inspector's Edit button, so the root wires the inspector onEdit.
+    assert.ok(
+      rootSource.includes('onEdit={() => editRecipe(selectedRecipe?.id)}'),
+      'RecipeBrowserInspector should receive onEdit wired to editRecipe'
+    );
+    assert.equal(
+      rootSource.includes('onEditRecipe'),
+      false,
+      'the retired row Edit quick-action prop should no longer be wired'
+    );
   });
 
   it('keeps the Crafting nav group active on the recipe-edit subroute', () => {

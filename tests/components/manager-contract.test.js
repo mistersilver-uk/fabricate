@@ -213,7 +213,6 @@ describe('CraftingSystemManager source contract', () => {
     for (const snippet of [
       'class="manager-titlebar"',
       'data-manager-titlebar',
-      'fas fa-layer-group manager-titlebar-icon',
       'class="manager-titlebar-badge"',
       'data-manager-titlebar-system',
       'title={selectedSystem.name}',
@@ -223,6 +222,19 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(rootSource.includes(snippet), `root titlebar should include ${snippet}`);
     }
+    // The layer-group icon and "Crafting Systems" product label are gone (issue 643):
+    // the Foundry window's own title bar already names the app, so a second copy inside
+    // the window was duplicated chrome. The gold badge is now the left-most element.
+    assert.equal(
+      rootSource.includes('manager-titlebar-icon'),
+      false,
+      'the duplicated titlebar app icon should be removed'
+    );
+    assert.equal(
+      rootSource.includes('manager-titlebar-product'),
+      false,
+      'the duplicated "Crafting Systems" titlebar label should be removed'
+    );
     assert.equal(
       /mythwright/i.test(rootSource),
       false,
@@ -881,7 +893,7 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.ok(
       recipeBrowserInspectorSource.includes('manager-recipe-browser-inspector-delete'),
-      'Delete is demoted to a ghost danger link, not a peer button'
+      'Delete is a dark danger button below Edit, not a peer of Duplicate'
     );
 
     // The reserved alchemy-Simple failure group is SHOWN (danger-toned), not filtered out —
@@ -1117,9 +1129,11 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes('function createRecipe('), 'createRecipe handler should be defined');
     assert.ok(!rootSource.includes('onclick={importRecipes}'), 'recipes header should not render import');
     assert.ok(!rootSource.includes('onclick={exportRecipes}'), 'recipes header should not render export');
-    // The row Edit action navigates to the in-manager recipe-edit route, so the
-    // editRecipe / backToRecipesBrowse / onEditRecipe wiring must be present.
-    assert.ok(rootSource.includes('onEditRecipe'), 'recipe edit prop should be wired to RecipesBrowserView');
+    // The recipe-edit route is reached from the INSPECTOR's Edit action now (issue 643):
+    // the row Edit quick-action was retired, so onEdit → editRecipe wiring must be present
+    // and the old onEditRecipe row prop must be gone.
+    assert.ok(rootSource.includes('onEdit={() => editRecipe(selectedRecipe?.id)}'), 'inspector Edit should be wired to editRecipe');
+    assert.equal(rootSource.includes('onEditRecipe'), false, 'the retired row Edit quick-action prop should be gone');
     assert.ok(rootSource.includes('function editRecipe('), 'editRecipe navigation should be defined');
     assert.ok(rootSource.includes('function backToRecipesBrowse('), 'backToRecipesBrowse navigation should be defined');
     assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');

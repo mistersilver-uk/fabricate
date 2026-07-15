@@ -2183,7 +2183,6 @@ test('collapsed manager rail hides the section label, the system card and the co
 test('the manager titlebar caps the selected system badge and keeps the status line on one line', () => {
   const rootBlock = blockFor('.fabricate-manager');
   const titlebarBlock = blockFor('.fabricate-manager .manager-titlebar');
-  const iconBlock = blockFor('.fabricate-manager .manager-titlebar-icon');
   const badgeBlock = blockFor('.fabricate-manager .manager-titlebar-badge');
   const statusBlock = blockFor('.fabricate-manager .manager-titlebar-status');
   const statusTextBlock = blockFor('.fabricate-manager .manager-titlebar-status-text');
@@ -2195,7 +2194,6 @@ test('the manager titlebar caps the selected system badge and keeps the status l
   );
   assert.ok(titlebarBlock.includes('display: flex;'), 'the titlebar should lay its identity strip out in one row');
   assert.ok(titlebarBlock.includes('min-width: 0;'), 'the titlebar must be allowed to shrink inside the manager grid');
-  assert.ok(iconBlock.includes('color: var(--fab-mv2-accent);'), 'the titlebar icon should read as the accent identity mark');
   // The badge carries the SELECTED SYSTEM's name — user-authored text of any length.
   assert.ok(badgeBlock.includes('background: var(--fab-badge-gold);'), 'the system badge should use the gold badge token');
   assert.ok(badgeBlock.includes('color: var(--fab-on-badge-gold);'), 'the system badge should use its paired on-gold text token');

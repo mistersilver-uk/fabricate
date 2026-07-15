@@ -297,16 +297,38 @@ async function openManagerCraftingSection(page, subitemId, managerView) {
 // Return to the recipes browser (via the Crafting group) and open the named
 // recipe's editor, waiting for the recipe-edit route. Consolidates the
 // "return then open recipe X" sequence the recipe-editor captures repeat.
+//
+// The Edit / Duplicate / Delete row actions moved to the inspector (issue 643): the
+// row no longer carries an Edit icon. So SELECT the recipe by clicking its identity
+// button, which drives the shell inspector, then click the inspector's Edit action.
 async function openManagerRecipeEditor(page, recipeName) {
   await openManagerCraftingSection(page, 'recipes', 'recipes');
   await page
-    .locator(`.fabricate-manager .manager-recipe-row:has-text("${recipeName}") button:has(i.fa-edit)`)
+    .locator(`.fabricate-manager .manager-recipe-row:has-text("${recipeName}") .manager-recipe-identity`)
     .first()
     .click();
+  const editAction = page
+    .locator('.fabricate-manager .manager-recipe-browser-inspector [data-recipe-action="edit"]')
+    .first();
+  await editAction.waitFor({ state: 'visible', timeout: 5_000 });
+  await editAction.click();
   await page
     .locator('.fabricate-manager[data-manager-view="recipe-edit"]')
     .first()
     .waitFor({ state: 'visible', timeout: 5_000 });
+}
+
+// The rail's "All crafting systems" back-link is INERT on the systems browser itself
+// (issue 643): there is nowhere to go back to, so it renders disabled. Click it only
+// when it is live; a disabled link means the manager is ALREADY at the system library
+// — which is the destination — so treat that as success rather than hanging on a dead
+// control. Returns whether a live click was issued, for callers that need to know.
+async function returnToSystemLibrary(page) {
+  const link = page.locator('.fabricate-manager .manager-scope-return').first();
+  if ((await link.count()) === 0) return false;
+  if (await link.isDisabled().catch(() => false)) return false;
+  await link.click();
+  return true;
 }
 
 /**
@@ -4362,7 +4384,7 @@ async function main() {
           throw new Error('Manager rail toggle did not re-expand the navigation rail.');
         }
 
-        await page.locator('.fabricate-manager .manager-scope-return').first().click();
+        await returnToSystemLibrary(page);
         await page.waitForTimeout(750);
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
@@ -4765,7 +4787,7 @@ async function main() {
         // default system afterward. Guarded so a hiccup records a failed step.
         if (executionFixtures?.progressive?.systemId) {
           try {
-            await page.locator('.fabricate-manager .manager-scope-return').first().click();
+            await returnToSystemLibrary(page);
             await selectSmokeSystemInManager(page, executionFixtures.progressive.systemId);
             await captureRecipeResultsTab(
               page,
@@ -4788,7 +4810,7 @@ async function main() {
         // switch-and-restore guard as the progressive capture.
         if (alchemyFixtures?.cauldronSystemId) {
           try {
-            await page.locator('.fabricate-manager .manager-scope-return').first().click();
+            await returnToSystemLibrary(page);
             await selectSmokeSystemInManager(page, alchemyFixtures.cauldronSystemId);
             await captureRecipeResultsTab(
               page,
@@ -4814,7 +4836,7 @@ async function main() {
         // hiccup records a failed step instead of aborting the rest of Phase D0, and
         // the system selection is restored either way.
         try {
-          await page.locator('.fabricate-manager .manager-scope-return').first().click();
+          await returnToSystemLibrary(page);
           await selectSmokeSystemInManager(page, craftingSetup.restrictedSystemId);
           await openManagerRecipeEditor(page, craftingSetup.restrictedRecipeName);
           await page.locator('.fabricate-manager [data-recipe-section="access"]').first()
@@ -5207,7 +5229,7 @@ async function main() {
         try {
           await setManagerWindowSize(page, { width: 1280, height: 900 });
           // Return to the system library, then select the broken system.
-          await page.locator('.fabricate-manager .manager-scope-return').first().click();
+          await returnToSystemLibrary(page);
           await page.waitForTimeout(400);
           await page.locator(`${managerSystemRowSelector(craftingSetup.blockedSystemId)} .manager-system-identity`)
             .first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -5299,7 +5321,7 @@ async function main() {
           process.stderr.write(`System overview capture failed: ${err.message}\n`);
         } finally {
           // Return to the smoke system so later phases see the expected selection.
-          await page.locator('.fabricate-manager .manager-scope-return').first().click().catch(() => {});
+          await returnToSystemLibrary(page).catch(() => {});
           await page.waitForTimeout(300);
           await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`)
             .first().click().catch(() => {});

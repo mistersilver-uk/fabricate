@@ -360,7 +360,7 @@ describe('RecipesBrowserView result count', () => {
 });
 
 describe('RecipesBrowserView lock and enable controls', () => {
-  it('never hides the lock, enable or edit controls, and toggles the lock in both directions', async () => {
+  it('never hides the lock or enable controls, and toggles the lock in both directions', async () => {
     const locks = [];
     const root = await browser.mount({
       recipes: [makeRecipe({ id: 'r1', locked: false }), makeRecipe({ id: 'r2', locked: true })],
@@ -371,7 +371,10 @@ describe('RecipesBrowserView lock and enable controls', () => {
       const row = root.querySelector(`[data-recipe-id="${id}"]`);
       assert.ok(row.querySelector('[data-recipe-lock]'), 'the lock control is present');
       assert.ok(row.querySelector('.manager-status-toggle'), 'the enable toggle is present');
-      assert.ok(row.querySelector('.manager-action-group i.fa-edit'), 'the edit action is present');
+      // The Edit/Duplicate/Delete actions moved to the inspector (issue 643): the row no
+      // longer carries them.
+      assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');
+      assert.equal(row.querySelector('i.fa-edit'), null, 'the row carries no Edit icon');
     }
 
     root.querySelector('[data-recipe-id="r1"] [data-recipe-lock]').click();

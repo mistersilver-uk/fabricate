@@ -331,10 +331,11 @@
     </div>
 
     <!--
-      The point of the inspector. `Edit recipe` is the accent-filled primary and the
-      loudest thing on the panel; Duplicate is its secondary; Delete is demoted to a ghost
-      danger link. Before this there was NO Edit button at all, and Delete sat as a visual
-      peer of Duplicate — so the panel's loudest action was destroying the recipe.
+      The point of the inspector: three full-width buttons (issue 643). `Edit recipe` is
+      the accent/peach primary and the loudest thing on the panel; Duplicate is a dark
+      secondary above it; Delete is a dark button below with danger-red text and a subtly
+      danger-tinted border — NOT a plain text link, so a GM never fires it by reflex, but
+      still clearly a real, full-width action rather than a demoted afterthought.
     -->
     <div class="manager-recipe-browser-inspector-actions">
       <button type="button" class="manager-button manager-recipe-browser-inspector-duplicate" data-recipe-action="duplicate" onclick={() => onDuplicate()}>
@@ -345,7 +346,7 @@
         <i class="fas fa-pen" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
       </button>
-      <button type="button" class="manager-recipe-browser-inspector-delete" data-recipe-action="delete" onclick={() => onDelete()}>
+      <button type="button" class="manager-button manager-recipe-browser-inspector-delete" data-recipe-action="delete" onclick={() => onDelete()}>
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
       </button>
