@@ -75,6 +75,10 @@
     // context rail deep-links into a tab of the editor it sits beside.
     requestedTab = '',
     requestedTabNonce = 0,
+    // Report the active tab up so the sibling context rail can react to it (the rail
+    // shows a validation summary only while the Validation tab is open — §G4). The
+    // tab state lives here; the rail is a sibling in the shell, so it is lifted out.
+    onActiveTabChange = () => {},
     onOpenCraftingSettings = () => {},
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
@@ -247,6 +251,11 @@
     if (nextRecipeId === lastRecipeId) return;
     activeTab = 'overview';
     lastRecipeId = nextRecipeId;
+  });
+
+  // Mirror the active tab out to the shell (which threads it to the context rail).
+  $effect(() => {
+    onActiveTabChange(activeTab);
   });
 
   // Honour an external tab request (the context rail's validation deep-link). Keyed

@@ -98,6 +98,9 @@
   // the editor it sits beside (the tab state lives inside RecipeEditView).
   let requestedRecipeTab = $state('');
   let requestedRecipeTabNonce = $state(0);
+  // The recipe editor's live active tab, lifted out of RecipeEditView so the sibling
+  // context rail can show its validation summary only on the Validation tab (§G4).
+  let recipeActiveTab = $state('overview');
   let recipeDraftBaseline = $state(null);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
@@ -5167,6 +5170,7 @@
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
         requestedTab={requestedRecipeTab}
         requestedTabNonce={requestedRecipeTabNonce}
+        onActiveTabChange={(tab) => { recipeActiveTab = tab; }}
         onOpenCraftingSettings={() => openCraftingSection('settings')}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
@@ -6814,6 +6818,7 @@
       {:else if currentView === 'recipe-edit'}
         <RecipeContextRail
           recipe={recipeDraft}
+          activeTab={recipeActiveTab}
           visibilityEffect={recipeRailEffect}
           accessPlayers={recipeAccessRoster.players}
           accessCharacters={recipeAccessRoster.characters}

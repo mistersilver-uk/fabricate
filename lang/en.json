@@ -1958,7 +1958,16 @@
             "AppearsInEmpty": "No book or scroll teaches this recipe yet.",
             "OpenBooksScrolls": "Open Books & Scrolls",
             "AllClear": "All clear",
-            "ReviewValidation": "Review validation"
+            "ReviewValidation": "Review validation",
+            "SummaryAllClear": "All clear",
+            "SummaryAllClearSub": "Every structural check passes. Ready to enable.",
+            "SummaryWarnings": "Enabled with warnings",
+            "SummaryWarningsSub": "Saves and enables — review the warnings when you can.",
+            "SummaryBlocked": "Cannot be enabled",
+            "SummaryBlockedSub": "Clear every blocking issue before this recipe can be enabled.",
+            "CountPassing": "Passing",
+            "CountWarnings": "Warnings",
+            "CountBlocking": "Blocking"
           },
           "OpenItem": "Open item",
           "UnlinkItem": "Unlink recipe item",

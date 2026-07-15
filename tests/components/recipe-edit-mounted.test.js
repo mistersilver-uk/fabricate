@@ -3760,6 +3760,95 @@ describe('RecipeContextRail (mounted)', () => {
     assert.deepEqual(selected, ['validation'], 'the review button opens the Validation tab');
     railHarness.remount();
   });
+
+  // --- the Validation-tab summary (§G4) ------------------------------------------
+  it('shows the validation summary + count table ONLY on the Validation tab', async () => {
+    const readiness = {
+      checks: [
+        { id: 'hasName', satisfied: true },
+        { id: 'hasResultGroup', satisfied: true },
+      ],
+      issues: [],
+    };
+    const off = await railHarness.mount(railProps({ readiness }));
+    assert.equal(
+      off.querySelector('[data-recipe-validation-summary]'),
+      null,
+      'no summary while another tab is active'
+    );
+    railHarness.remount();
+
+    const on = await railHarness.mount(railProps({ readiness, activeTab: 'validation' }));
+    assert.ok(on.querySelector('[data-recipe-validation-summary]'), 'the summary card renders on the Validation tab');
+    assert.ok(on.querySelector('[data-recipe-validation-counts]'), 'the count table renders');
+    railHarness.remount();
+  });
+
+  it('derives the summary status + Passing/Warnings/Blocking counts from the readiness output', async () => {
+    // All satisfied, no issues → All clear.
+    const clear = await railHarness.mount(
+      railProps({
+        activeTab: 'validation',
+        readiness: {
+          checks: [
+            { id: 'hasName', satisfied: true },
+            { id: 'hasResultGroup', satisfied: true },
+          ],
+          issues: [],
+        },
+      })
+    );
+    assert.equal(
+      clear.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
+      'clear',
+      'no issues reads as clear'
+    );
+    assert.equal(clear.querySelector('[data-recipe-count-passing]').textContent.trim(), '2', 'two satisfied checks pass');
+    assert.equal(clear.querySelector('[data-recipe-count-warnings]').textContent.trim(), '0');
+    assert.equal(clear.querySelector('[data-recipe-count-blocking]').textContent.trim(), '0');
+    railHarness.remount();
+
+    // A warning but no blocker → Enabled with warnings.
+    const warned = await railHarness.mount(
+      railProps({
+        activeTab: 'validation',
+        readiness: {
+          checks: [{ id: 'hasName', satisfied: true }],
+          issues: [{ id: 'unusedTag', severity: 'warning' }],
+        },
+      })
+    );
+    assert.equal(
+      warned.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
+      'warning',
+      'a warning with no blocker reads as warning'
+    );
+    assert.equal(warned.querySelector('[data-recipe-count-warnings]').textContent.trim(), '1');
+    assert.equal(warned.querySelector('[data-recipe-count-blocking]').textContent.trim(), '0');
+    railHarness.remount();
+
+    // A critical issue → Cannot be enabled (blocking wins over warnings).
+    const blocked = await railHarness.mount(
+      railProps({
+        activeTab: 'validation',
+        readiness: {
+          checks: [{ id: 'hasName', satisfied: false }],
+          issues: [
+            { id: 'noResultGroup', severity: 'critical' },
+            { id: 'unusedTag', severity: 'warning' },
+          ],
+        },
+      })
+    );
+    assert.equal(
+      blocked.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
+      'blocked',
+      'a critical issue reads as blocked, even alongside a warning'
+    );
+    assert.equal(blocked.querySelector('[data-recipe-count-passing]').textContent.trim(), '0', 'the unsatisfied check does not pass');
+    assert.equal(blocked.querySelector('[data-recipe-count-blocking]').textContent.trim(), '1');
+    railHarness.remount();
+  });
 });
 
 describe('RecipeStepsCard (mounted)', () => {

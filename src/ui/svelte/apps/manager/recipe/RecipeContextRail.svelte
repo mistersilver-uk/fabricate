@@ -36,6 +36,9 @@
 
   let {
     recipe = null,
+    // The recipe editor's live active tab. The rail adds a validation summary card +
+    // count table ONLY while the Validation tab is open (§G4).
+    activeTab = 'overview',
     // The system's craftingEffect matrix row ({ showAccess, showBooksScrolls, ... }).
     // NOT named `effect`: a variable of that name makes the compiler read `$effect(...)`
     // below as a store subscription (`$` + `effect`) and the component dies at mount.
@@ -234,6 +237,38 @@
   // The rail always renders the full check list (§G2), so read it directly.
   const railChecks = $derived(Array.isArray(readiness?.checks) ? readiness.checks : []);
 
+  // --- Validation summary (§G4) --------------------------------------------------
+  // Shown only on the Validation tab: a status medallion + a Passing/Warnings/Blocking
+  // count table, derived from the SAME readiness output the mini-list uses — never a
+  // second evaluator. Blocking = critical issues (they block enabling); passing = the
+  // satisfied structural checks.
+  const showValidationSummary = $derived(activeTab === 'validation');
+  const passingCount = $derived(railChecks.filter((check) => check.satisfied).length);
+  const warningCount = $derived(warningIssues.length);
+  const blockingCount = $derived(criticalIssues.length);
+  const summaryStatus = $derived(
+    blockingCount > 0 ? 'blocked' : warningCount > 0 ? 'warning' : 'clear'
+  );
+  const summaryMeta = $derived(
+    summaryStatus === 'blocked'
+      ? {
+          icon: 'fas fa-circle-xmark',
+          title: text('FABRICATE.Admin.Manager.Recipe.Rail.SummaryBlocked', 'Cannot be enabled'),
+          sub: text('FABRICATE.Admin.Manager.Recipe.Rail.SummaryBlockedSub', 'Clear every blocking issue before this recipe can be enabled.')
+        }
+      : summaryStatus === 'warning'
+        ? {
+            icon: 'fas fa-triangle-exclamation',
+            title: text('FABRICATE.Admin.Manager.Recipe.Rail.SummaryWarnings', 'Enabled with warnings'),
+            sub: text('FABRICATE.Admin.Manager.Recipe.Rail.SummaryWarningsSub', 'Saves and enables — review the warnings when you can.')
+          }
+        : {
+            icon: 'fas fa-circle-check',
+            title: text('FABRICATE.Admin.Manager.Recipe.Rail.SummaryAllClear', 'All clear'),
+            sub: text('FABRICATE.Admin.Manager.Recipe.Rail.SummaryAllClearSub', 'Every structural check passes. Ready to enable.')
+          }
+  );
+
   const CHECK_LABELS = {
     hasName: ['CheckName', 'Has a name'],
     hasIngredientSet: ['CheckIngredientSet', 'Every step has at least one ingredient set'],
@@ -252,6 +287,37 @@
     return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
   }
 </script>
+
+{#if recipe && showValidationSummary}
+  <!-- §G4: the Validation tab's rail summary — a status medallion + a
+       Passing/Warnings/Blocking count table, off the same readiness output. -->
+  <section class="manager-recipe-rail-section" data-recipe-section="validation-summary">
+    <div class={`manager-recipe-rail-summary is-${summaryStatus}`} data-recipe-validation-summary={summaryStatus}>
+      <span class="manager-recipe-rail-summary-medallion" aria-hidden="true">
+        <i class={summaryMeta.icon}></i>
+      </span>
+      <span class="manager-recipe-rail-summary-title">{summaryMeta.title}</span>
+      <span class="manager-recipe-rail-summary-sub manager-muted">{summaryMeta.sub}</span>
+    </div>
+    <ul class="manager-recipe-rail-counts" data-recipe-validation-counts>
+      <li class="manager-recipe-rail-count is-passing">
+        <i class="fas fa-circle-check" aria-hidden="true"></i>
+        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Rail.CountPassing', 'Passing')}</span>
+        <span class="manager-recipe-rail-count-value" data-recipe-count-passing>{passingCount}</span>
+      </li>
+      <li class="manager-recipe-rail-count is-warning">
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Rail.CountWarnings', 'Warnings')}</span>
+        <span class="manager-recipe-rail-count-value" data-recipe-count-warnings>{warningCount}</span>
+      </li>
+      <li class="manager-recipe-rail-count is-blocking">
+        <i class="fas fa-circle-xmark" aria-hidden="true"></i>
+        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Rail.CountBlocking', 'Blocking')}</span>
+        <span class="manager-recipe-rail-count-value" data-recipe-count-blocking>{blockingCount}</span>
+      </li>
+    </ul>
+  </section>
+{/if}
 
 {#if visibilityEffect?.showAccess}
   <!-- RESTRICTED: who this recipe is granted to. Read-only — the Access tab is the
@@ -460,6 +526,108 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-2);
+  }
+
+  /* §G4: the Validation-tab summary card (52px status medallion + title + sub-line). */
+  .manager-recipe-rail-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-4) var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  .manager-recipe-rail-summary-medallion {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: var(--fab-space-1);
+    border-radius: 13px;
+    font-size: 1.35rem;
+  }
+
+  .manager-recipe-rail-summary.is-clear .manager-recipe-rail-summary-medallion {
+    color: var(--fab-success);
+    background: var(--fab-success-soft);
+  }
+
+  .manager-recipe-rail-summary.is-warning .manager-recipe-rail-summary-medallion {
+    color: var(--fab-warning);
+    background: var(--fab-warning-soft);
+  }
+
+  .manager-recipe-rail-summary.is-blocked .manager-recipe-rail-summary-medallion {
+    color: var(--fab-danger);
+    background: var(--fab-danger-soft);
+  }
+
+  .manager-recipe-rail-summary.is-clear {
+    border-color: var(--fab-success-border);
+  }
+
+  .manager-recipe-rail-summary.is-warning {
+    border-color: var(--fab-warning-border);
+  }
+
+  .manager-recipe-rail-summary.is-blocked {
+    border-color: var(--fab-danger-border);
+  }
+
+  .manager-recipe-rail-summary-title {
+    font-family: var(--fab-font-serif);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .manager-recipe-rail-summary-sub {
+    font-size: 0.72rem;
+  }
+
+  /* The Passing / Warnings / Blocking count table (three mono counts). */
+  .manager-recipe-rail-counts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .manager-recipe-rail-count {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-1) var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 7px;
+    font-size: 0.78rem;
+  }
+
+  .manager-recipe-rail-count-label {
+    flex: 1 1 auto;
+  }
+
+  .manager-recipe-rail-count-value {
+    flex: 0 0 auto;
+    font-family: var(--fab-font-mono);
+    font-weight: 700;
+  }
+
+  .manager-recipe-rail-count.is-passing > i {
+    color: var(--fab-success);
+  }
+
+  .manager-recipe-rail-count.is-warning > i {
+    color: var(--fab-warning);
+  }
+
+  .manager-recipe-rail-count.is-blocking > i {
+    color: var(--fab-danger);
   }
 
   .manager-recipe-rail-checks {
