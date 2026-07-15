@@ -1277,6 +1277,61 @@
   font: inherit;
 }
 
+/*
+  PERMANENT baseline for free-text controls in the manager (issue 643).
+
+  Foundry core styles every `input`/`textarea` globally, so any manager text field
+  WITHOUT its own background/border painted Foundry's default cool-purple chrome —
+  a bleed we kept fixing one control at a time (search, selects, the recipe name and
+  flavour fields…). This rule themes them all at the source so a NEW field can never
+  bleed again: give it a class or not, it inherits the Fabricate surface by default.
+
+  Scope + specificity are deliberate:
+   - Text-entry types only. `checkbox`/`radio`/`range` are real controls (segmented
+     toggles, the visibility allow-list) and must keep their native/scoped rendering,
+     so they are excluded. `number` is excluded because every number input in the
+     manager is a Stepper whose look is owned by that component's scoped `<style>`;
+     `search` is excluded because every search field is a themed `.manager-search`
+     pill. Both would be clobbered by a blanket rule.
+   - Declared HERE, early, at `.fabricate-manager <element>[type]` (0,2,1) — enough to
+     beat Foundry core, low enough that any later per-control class rule overrides it
+     by source order. So the search pill, the steppers, etc. all still win.
+*/
+.fabricate-manager input[type="text"],
+.fabricate-manager input[type="url"],
+.fabricate-manager input[type="email"],
+.fabricate-manager input[type="tel"],
+.fabricate-manager input[type="password"],
+.fabricate-manager input:not([type]),
+.fabricate-manager textarea {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 34px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager textarea {
+  min-height: 68px;
+  padding: var(--fab-space-2);
+  line-height: 1.4;
+}
+
+.fabricate-manager input[type="text"]:disabled,
+.fabricate-manager input[type="url"]:disabled,
+.fabricate-manager input[type="email"]:disabled,
+.fabricate-manager input[type="tel"]:disabled,
+.fabricate-manager input[type="password"]:disabled,
+.fabricate-manager input:not([type]):disabled,
+.fabricate-manager textarea:disabled {
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
+}
+
 .fabricate-manager h1,
 .fabricate-manager h2,
 .fabricate-manager h3,
