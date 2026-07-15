@@ -7,6 +7,7 @@ import {
   buildRecipeProduceRows,
   buildRecipeRequirementRows,
   buildRecipeRoutingModel,
+  buildRecipeStepModel,
   groupProduceRowsByResultGroup,
   deriveRecipeIo,
   deriveRecipeStatuses,
@@ -544,6 +545,47 @@ describe('recipeBrowserModel — multi-step recipes', () => {
       essenceOptions: ESSENCES
     }).map((row) => row.id);
     assert.equal(new Set(ids).size, ids.length);
+  });
+});
+
+describe('buildRecipeStepModel', () => {
+  const COMPS = [
+    { id: 'cmp-herb', name: 'Mountain Herb' },
+    { id: 'cmp-potion', name: 'Healing Potion' }
+  ];
+  const TWO_STEP = {
+    steps: [
+      {
+        id: 's1',
+        name: 'Prepare',
+        ingredientSets: [{ id: 'set1', ingredientGroups: [{ id: 'ig1', options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+        resultGroups: [{ id: 'g1', name: 'Base', results: [{ id: 'r1', componentId: 'cmp-potion', quantity: 1 }] }]
+      },
+      {
+        id: 's2',
+        name: 'Finish',
+        ingredientSets: [{ id: 'set2', ingredientGroups: [{ id: 'ig2', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-potion' } }] }] }],
+        resultGroups: [{ id: 'g2', name: 'Final', results: [{ id: 'r2', componentId: 'cmp-herb', quantity: 3 }] }]
+      }
+    ]
+  };
+
+  it('returns per-step Requires/Produces for a multi-step recipe, in order', () => {
+    const steps = buildRecipeStepModel(TWO_STEP, { componentOptions: COMPS });
+    assert.equal(steps.length, 2);
+    assert.deepEqual(steps.map((s) => s.name), ['Prepare', 'Finish']);
+    // Step 1 requires the herb and produces the potion; step 2 the reverse.
+    assert.equal(steps[0].requirementRows[0].name, 'Mountain Herb');
+    assert.equal(steps[0].produceRows[0].name, 'Healing Potion');
+    assert.equal(steps[1].requirementRows[0].name, 'Healing Potion');
+    assert.equal(steps[1].produceRows[0].name, 'Mountain Herb');
+    assert.equal(steps[1].produceRows[0].quantity, 3);
+  });
+
+  it('returns [] for single-step or step-less recipes (they use the flat lists)', () => {
+    assert.deepEqual(buildRecipeStepModel({ steps: [{ id: 's1' }] }, {}), []);
+    assert.deepEqual(buildRecipeStepModel({}, {}), []);
+    assert.deepEqual(buildRecipeStepModel(null, {}), []);
   });
 });
 

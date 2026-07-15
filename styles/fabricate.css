@@ -4217,6 +4217,53 @@
   background: var(--fab-info-soft);
 }
 
+/* Multi-step recipe pager (issue 643): a full-width bar stepping through one step at a
+   time — prev/next flanking the step name and an (x / y) position hint. */
+.fabricate-manager .manager-recipe-step-pager {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2);
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-recipe-step-pager-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-recipe-step-pager-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--fab-mv2-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-step-pager-count {
+  color: var(--fab-text-subtle);
+  font-family: var(--fab-font-mono);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-icon-button.manager-recipe-step-nav {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+}
+
 /* Routed-by-check Produces: items grouped under each result-group as a FULL-WIDTH,
    collapsible outcome-tier section. The header is a full-width bar (chevron · tier name ·
    count), not a pill, and starts collapsed so the panel opens compact (issue 643). */

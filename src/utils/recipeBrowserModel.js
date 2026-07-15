@@ -493,6 +493,37 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
 }
 
 /**
+ * Per-step Requires/Produces for a MULTI-step recipe's inspector (issue 643). A
+ * multi-step recipe runs its steps in order, each with its own ingredient sets and result
+ * groups, so the inspector paginates one step at a time rather than flattening every
+ * step's requirements and results into two long lists. Each entry carries that step's
+ * requirement rows and produce rows, built the same way the flat lists are.
+ *
+ * Returns `[]` for a single- (or zero-) step recipe: those use the flat Requires/Produces
+ * lists, so there is nothing to paginate.
+ *
+ * @param {object} recipe a projected recipe row.
+ * @param {{componentOptions?: object[], essenceOptions?: object[]}} [rosters]
+ * @returns {{id: string, name: string, requirementRows: object[], produceRows: object[]}[]}
+ */
+export function buildRecipeStepModel(recipe, rosters = {}) {
+  const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+  if (steps.length <= 1) return [];
+  return steps.map((step, index) => {
+    const scoped = {
+      ingredientSets: Array.isArray(step?.ingredientSets) ? step.ingredientSets : [],
+      resultGroups: Array.isArray(step?.resultGroups) ? step.resultGroups : [],
+    };
+    return {
+      id: step?.id || `step-${index + 1}`,
+      name: step?.name || '',
+      requirementRows: buildRecipeRequirementRows(scoped, rosters),
+      produceRows: buildRecipeProduceRows(scoped, rosters),
+    };
+  });
+}
+
+/**
  * Group produce rows by their result group, preserving first-seen order (issue 643). A
  * routed-by-check recipe routes each result group to a check-outcome tier, so its
  * inspector Produces list is grouped under each tier's group rather than dumped into one

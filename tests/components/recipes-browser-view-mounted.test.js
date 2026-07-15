@@ -1099,4 +1099,55 @@ describe('RecipeBrowserInspector (mounted)', () => {
     );
     assert.match(tiers[0].textContent, /×2/, 'quantities still show (routed-by-check is not progressive)');
   });
+
+  it('multi-step: paginates one step at a time with its own Requires/Produces and an (x/y) hint', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-multi',
+        stepCount: 2,
+        steps: [
+          {
+            id: 's1',
+            name: 'Prepare',
+            ingredientSets: [{ id: 'set1', ingredientGroups: [{ id: 'ig1', options: [{ id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: [{ id: 'g1', name: 'Base', results: [{ id: 'r1', componentId: 'cmp-potion', quantity: 1 }] }]
+          },
+          {
+            id: 's2',
+            name: 'Finish',
+            ingredientSets: [{ id: 'set2', ingredientGroups: [{ id: 'ig2', options: [{ id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-potion' } }] }] }],
+            resultGroups: [{ id: 'g2', name: 'Final', results: [{ id: 'r2', componentId: 'cmp-herb', quantity: 3 }] }]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    // A pager with the step name and an (x / y) hint; only the FIRST step is shown.
+    const pager = root.querySelector('[data-recipe-step-pager]');
+    assert.ok(pager, 'the multi-step pager renders');
+    assert.equal(root.querySelector('[data-recipe-step-name]').textContent.trim(), 'Prepare');
+    assert.equal(root.querySelector('[data-recipe-step-count]').textContent.trim(), '1 / 2');
+    assert.match(root.textContent, /Mountain Herb/, 'step 1 requires the herb');
+    assert.doesNotMatch(
+      root.querySelector('.manager-recipe-flow-list').textContent,
+      /Healing Potion.*Healing Potion/s,
+      'only step 1 content is shown, not both steps flattened'
+    );
+
+    // Prev is disabled on the first step; Next advances to step 2.
+    assert.equal(root.querySelector('[data-recipe-step-prev]').disabled, true);
+    root.querySelector('[data-recipe-step-next]').click();
+    flushSync();
+
+    assert.equal(root.querySelector('[data-recipe-step-name]').textContent.trim(), 'Finish');
+    assert.equal(root.querySelector('[data-recipe-step-count]').textContent.trim(), '2 / 2');
+    assert.equal(root.querySelector('[data-recipe-step-next]').disabled, true, 'Next is disabled on the last step');
+    // Step 2 requires the potion and produces the herb (×3).
+    const produces = [...root.querySelectorAll('[data-recipe-produces]')];
+    assert.equal(produces.length, 1);
+    assert.match(produces[0].textContent, /Mountain Herb/);
+    assert.match(produces[0].textContent, /×3/);
+  });
 });

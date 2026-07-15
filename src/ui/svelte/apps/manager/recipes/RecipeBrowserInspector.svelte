@@ -36,6 +36,7 @@
     buildRecipeProduceRows,
     buildRecipeRequirementRows,
     buildRecipeRoutingModel,
+    buildRecipeStepModel,
     groupProduceRowsByResultGroup
   } from '../../../../../utils/recipeBrowserModel.js';
 
@@ -244,6 +245,51 @@
       : produceRows
   );
   const successRows = $derived(visibleProduceRows.filter((row) => !row.failure));
+
+  // Multi-step recipes paginate one step at a time: each step's own Requires / Produces,
+  // stepped through with prev/next and an (x / y) position hint (issue 643).
+  const stepModel = $derived(
+    selectedRecipe ? buildRecipeStepModel(selectedRecipe, { componentOptions, essenceOptions }) : []
+  );
+  const isMultiStep = $derived(stepModel.length > 1);
+
+  let currentStepIndex = $state(0);
+  // Re-seed to the first step whenever the inspected recipe (or its step count) changes,
+  // and clamp so a shorter recipe can never strand the pager past its last step.
+  $effect(() => {
+    const count = stepModel.length;
+    if (currentStepIndex > Math.max(0, count - 1)) currentStepIndex = 0;
+  });
+  $effect(() => {
+    void selectedRecipe?.id;
+    currentStepIndex = 0;
+  });
+
+  const currentStep = $derived(stepModel[currentStepIndex] || null);
+  const currentStepName = $derived(
+    currentStep?.name ||
+      `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${currentStepIndex + 1}`
+  );
+  const currentStepHasSuccess = $derived(
+    (currentStep?.produceRows || []).some((row) => !row.failure)
+  );
+
+  function goToStep(delta) {
+    const next = currentStepIndex + delta;
+    if (next >= 0 && next < stepModel.length) currentStepIndex = next;
+  }
+
+  // The Requires / Produces lists render the CURRENT step's rows in multi-step mode, and
+  // the recipe-level rows otherwise. The single-step refinements (routed-by-ingredients
+  // dropdown, routed-by-check tier accordion) key off recipe-level state that is empty
+  // for a multi-step recipe, so they fall through to the flat per-step list.
+  const activeRequirementRows = $derived(
+    isMultiStep ? currentStep?.requirementRows || [] : visibleRequirementRows
+  );
+  const activeProduceRows = $derived(
+    isMultiStep ? currentStep?.produceRows || [] : visibleProduceRows
+  );
+  const activeSuccessEmpty = $derived(isMultiStep ? !currentStepHasSuccess : successRows.length === 0);
   // Produces grouped by result group (routed-by-check only); flat list otherwise.
   const producedGroups = $derived(
     isRoutedByCheck ? groupProduceRowsByResultGroup(visibleProduceRows) : []
@@ -372,6 +418,35 @@
       </p>
     {/if}
 
+    {#if isMultiStep}
+      <!-- Multi-step: paginate one step at a time — the step's own Requires / Produces —
+           with prev/next, the step name, and an (x / y) position hint (issue 643). -->
+      <div class="manager-recipe-step-pager" data-recipe-step-pager>
+        <button
+          type="button"
+          class="manager-icon-button manager-recipe-step-nav"
+          data-recipe-step-prev
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
+          title={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
+          disabled={currentStepIndex === 0}
+          onclick={() => goToStep(-1)}
+        ><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+        <div class="manager-recipe-step-pager-copy">
+          <span class="manager-recipe-step-pager-name" data-recipe-step-name>{currentStepName}</span>
+          <span class="manager-recipe-step-pager-count" data-recipe-step-count>{currentStepIndex + 1} / {stepModel.length}</span>
+        </div>
+        <button
+          type="button"
+          class="manager-icon-button manager-recipe-step-nav"
+          data-recipe-step-next
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
+          title={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
+          disabled={currentStepIndex === stepModel.length - 1}
+          onclick={() => goToStep(1)}
+        ><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+      </div>
+    {/if}
+
     <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}</p>
     {#if routedPairing}
       <!-- Routed by ingredients: the chosen set is the route, so a dropdown picks which
@@ -401,11 +476,11 @@
         <span class="manager-recipe-flow-qty">{requirementQuantity(row)}</span>
       </div>
     {/snippet}
-    {#if visibleRequirementRows.length === 0}
+    {#if activeRequirementRows.length === 0}
       <p class="manager-muted" data-recipe-requires-empty>{text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}</p>
     {:else}
       <div class="manager-recipe-flow-list">
-        {#each visibleRequirementRows as req (req.id)}
+        {#each activeRequirementRows as req (req.id)}
           {#if req.type === 'anyOf'}
             <!-- A multi-option requirement is satisfied by ANY ONE of its members, so
                  they are drawn as EQUAL peers inside one bordered group — none promoted
@@ -465,7 +540,7 @@
       </div>
     {/snippet}
     <div class="manager-recipe-flow-list">
-      {#if isRoutedByCheck}
+      {#if isRoutedByCheck && !isMultiStep}
         <!-- Routed by check: group the produced items UNDER each result group as a
              FULL-WIDTH, COLLAPSIBLE outcome-tier section headed by the tier NAME (from the
              group's checkOutcomeIds), not an anonymous "Result Group N" pill. Sections
@@ -497,11 +572,11 @@
           </div>
         {/each}
       {:else}
-        {#each visibleProduceRows as row (row.id)}
+        {#each activeProduceRows as row (row.id)}
           {@render produceRow(row, true)}
         {/each}
       {/if}
-      {#if successRows.length === 0}
+      {#if activeSuccessEmpty}
         <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that
              makes nothing — true even when a failure group is listed above. -->
         <p class="manager-recipe-flow-empty" data-recipe-produces-empty>
