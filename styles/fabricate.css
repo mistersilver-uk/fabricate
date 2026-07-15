@@ -3040,8 +3040,26 @@
   white-space: nowrap;
 }
 
+/* Explicit column placement so the labels sit over the RIGHT cells. The cluster
+   template is `io check lock status edit` (5 tracks); with the empty lock header
+   removed, CHECK stays over the DC pill (track 2) and STATUS spans the lock +
+   enable-toggle pair (tracks 3–4), centred over them, so the lock reads as a
+   status control rather than drifting under CHECK. Edit stays over track 5. */
+.fabricate-manager .manager-recipe-head-cell.is-io {
+  grid-column: 1;
+}
+
+.fabricate-manager .manager-recipe-head-cell.is-check {
+  grid-column: 2;
+}
+
 .fabricate-manager .manager-recipe-head-cell.is-status {
+  grid-column: 3 / span 2;
   justify-self: center;
+}
+
+.fabricate-manager .manager-recipe-head-cell.is-edit {
+  grid-column: 5;
 }
 
 .fabricate-manager .manager-recipe-group {
@@ -3713,8 +3731,23 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-recipe-sort-direction {
+/* The direction toggle sat at the base `.manager-button` scale (16px/700, 6px
+   radius) — bold and boxy next to the compact 0.72rem segmented toggles and the
+   SORT BY micro-label, so it read as oversized. Chain `.manager-button` (0,3,0)
+   to beat the base rule declared later in the sheet, then bring it down to the
+   toolbar's compact scale and match the sort select's 9px radius / 34px height. */
+.fabricate-manager .manager-button.manager-recipe-sort-direction {
   gap: var(--fab-space-chip);
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--fab-space-2);
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-button.manager-recipe-sort-direction i {
+  font-size: 0.82rem;
 }
 
 /* ---------------------------------------------------------------------------
