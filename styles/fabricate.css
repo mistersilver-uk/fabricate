@@ -6956,6 +6956,28 @@
   color: var(--fab-mv2-text-muted);
 }
 
+/* Multi-step header number (issue 643): a larger rounded-square numeral badge — matching
+   the prototype — rather than the environment editor's bare pip, with the step name +
+   description copy beside it. Scoped to recipe steps so the environment comp handle is
+   untouched. On Overview the drag grip stays stacked above the badge. */
+.fabricate-manager .manager-recipe-steps-row-head .manager-environment-comp-handle {
+  flex: 0 0 auto;
+  transform: none;
+}
+
+.fabricate-manager .manager-recipe-steps-row-head .manager-environment-comp-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+}
+
 .fabricate-manager .manager-recipe-steps-requirements {
   display: flex;
   flex: 0 0 auto;
