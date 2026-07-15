@@ -284,18 +284,29 @@ async function pickPopoverOption(target, trigger, optionPattern) {
   await flushRender();
 }
 
-// Open a requirement's single "or..." popover.
+// Open a BARE row's single "or..." popover (bare rows keep the compact popover;
+// multi-alternative boxes use explicit dashed buttons instead — see pickOrOption).
 async function openOrMenu(target, groupId) {
   target.querySelector(`[data-recipe-group-id="${groupId}"] .manager-recipe-or-trigger`).click();
   await flushRender();
 }
 
-// Open the "or..." popover and choose the type carrying the given data-recipe-add
-// token. The popover portals out of the group subtree, so the option is resolved at
-// document level (as pickPopoverOption already does).
+// Choose the add-affordance carrying the given data-recipe-add token, handling both
+// shapes the requirement now takes (issue 643): a BARE single-alternative row keeps
+// the compact "or..." popover (portaled out of the group, so its option resolves at
+// document level, as pickPopoverOption does); a multi-alternative BOX renders the
+// four explicit dashed add-buttons inline in its `.manager-recipe-requirement-adds`
+// footer, clicked directly.
 async function pickOrOption(target, groupId, addToken) {
-  await openOrMenu(target, groupId);
-  document.querySelector(`[data-recipe-add="${addToken}"]`).click();
+  const group = target.querySelector(`[data-recipe-group-id="${groupId}"]`);
+  const trigger = group.querySelector('.manager-recipe-or-trigger');
+  if (trigger) {
+    trigger.click();
+    await flushRender();
+    document.querySelector(`[data-recipe-add="${addToken}"]`).click();
+  } else {
+    group.querySelector(`.manager-recipe-requirement-adds [data-recipe-add="${addToken}"]`).click();
+  }
   await flushRender();
 }
 
@@ -1253,9 +1264,14 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(target, 'ingredients');
     await flushRender();
-    assert.ok(
-      target.querySelector('.manager-recipe-ingredient-set-or'),
-      'multiple sets get the OR chrome'
+    const setOr = target.querySelector('.manager-recipe-ingredient-set-or');
+    assert.ok(setOr, 'multiple sets get the OR chrome');
+    // The between-set OR now wraps its label in a pill span, like the within-requirement
+    // OR, so both read as "[ — OR — ]" flanked breaks (issue 643).
+    assert.equal(
+      setOr.querySelector('span')?.textContent.trim(),
+      'OR',
+      'the set OR label sits in a pill span'
     );
     assert.ok(
       target.querySelector('[data-recipe-add="ingredient-set"]'),
@@ -2145,10 +2161,13 @@ describe('RecipeEditView (mounted)', () => {
       2,
       'both alternatives render'
     );
-    assert.ok(
-      req.querySelector('.manager-recipe-ingredient-or-separator'),
-      'the "— or —" separator renders between alternatives'
-    );
+    const separator = req.querySelector('.manager-recipe-ingredient-or-separator');
+    assert.ok(separator, 'the "— or —" separator renders between alternatives');
+    // The label is wrapped in its own span so the CSS can render it as a pill flanked
+    // by rules ("[ — OR — ]", issue 643), rather than as bare centred text.
+    const pill = separator.querySelector('span');
+    assert.ok(pill, 'the OR label is wrapped in a pill span');
+    assert.equal(pill.textContent.trim(), 'OR', 'the pill reads OR');
     editHarness.remount();
   });
 
@@ -2207,6 +2226,67 @@ describe('RecipeEditView (mounted)', () => {
         'option rows carry no add controls of their own'
       );
     }
+    editHarness.remount();
+  });
+
+  it('renders the multi-alternative box footer as four explicit dashed add-buttons', async () => {
+    // A box (2+ alternatives) drops the compact "or..." popover the bare rows keep and
+    // renders four explicit dashed add-buttons instead (issue 643), each preserving its
+    // data-recipe-add marker. Cost shows only with configured currency, essence only
+    // while the set can still take one.
+    const { target } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    const adds = target.querySelector(
+      '[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds'
+    );
+    assert.ok(adds, 'the box carries an add-button footer');
+    assert.equal(
+      adds.querySelector('.manager-recipe-or-trigger'),
+      null,
+      'the box has no compact "or..." popover'
+    );
+    const buttons = [...adds.querySelectorAll('button[data-recipe-add]')];
+    assert.deepEqual(
+      buttons.map((button) => button.getAttribute('data-recipe-add')),
+      ['alternative-component', 'alternative-tag', 'alternative-cost', 'alternative-essence'],
+      'four dashed add-buttons in order, each keeping its marker'
+    );
+    for (const button of buttons) {
+      assert.ok(button.classList.contains('is-dashed'), 'each add-button is dashed');
+    }
+    editHarness.remount();
+  });
+
+  it('drops the cost and essence box buttons when the system configures neither', async () => {
+    const { target } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
+    const adds = target.querySelector(
+      '[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds'
+    );
+    assert.deepEqual(
+      [...adds.querySelectorAll('button[data-recipe-add]')].map((button) =>
+        button.getAttribute('data-recipe-add')
+      ),
+      ['alternative-component', 'alternative-tag'],
+      'only component and tag buttons without currency units or system essences'
+    );
     editHarness.remount();
   });
 
@@ -2308,7 +2388,14 @@ describe('RecipeEditView (mounted)', () => {
     const dialog = document.querySelector('.manager-travel-popover[role="dialog"]');
     assert.equal(dialog.getAttribute('aria-label'), NEUTRAL);
     assert.equal(dialog.querySelector('[role="listbox"]').getAttribute('aria-label'), NEUTRAL);
-    assert.equal(dialog.querySelector('input[type="text"]').getAttribute('aria-label'), NEUTRAL);
+    // The row-level "or..." popover drops the search box entirely (issue 643): only a
+    // handful of fixed choices, and the search was squeezing the option wording. So
+    // there is no search field to name — the trigger + dialog carry the neutral name.
+    assert.equal(
+      dialog.querySelector('input[type="text"]'),
+      null,
+      'the search-less row popover renders no search input'
+    );
     editHarness.remount();
   });
 

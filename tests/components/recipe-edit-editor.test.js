@@ -231,6 +231,8 @@ describe('RecipeContextRail (issue 643 §4b)', () => {
   it('renders Step mode as a real SegmentedControl and the validation mini-list, with NO Recipe mode toggle', () => {
     assert.ok(railSource.includes("import SegmentedControl from '../SegmentedControl.svelte'"));
     assert.ok(railSource.includes("optionDataAttr=\"data-recipe-step-mode-option\""));
+    // The Step-mode control fills its rail track full-width (issue 643).
+    assert.ok(railSource.includes('fill={true}'), 'Step-mode SegmentedControl opts into fill');
     // Recipe complexity is emergent from the ingredient-set count now (issue 643):
     // the rail carries no Simple/Complex control at all.
     assert.equal(railSource.includes('data-recipe-mode-option'), false, 'no Recipe mode segmented control');
@@ -535,6 +537,24 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
     assert.ok(
       css.includes('.fabricate-manager[data-manager-view="recipe-edit"] .manager-main {'),
       'recipe-edit main grid rule retained'
+    );
+  });
+
+  it('scopes the context-rail background to the Recipe Studio views (matching the main panel)', () => {
+    // The shared inspector is one shade lighter (--fab-mv2-surface-2) than the main
+    // editor panel. In the Recipe Studio views only, the rail drops onto the SAME
+    // surface as the panel (--fab-mv2-surface-1); other screens keep their shade
+    // (issue 643).
+    assert.match(
+      css,
+      /\.fabricate-manager\[data-manager-view="recipe-edit"\]\s+\.manager-inspector,\s*\.fabricate-manager\[data-manager-view="recipes"\]\s+\.manager-inspector\s*\{\s*background:\s*var\(--fab-mv2-surface-1\);\s*\}/,
+      'recipe-edit + recipes inspector background override'
+    );
+    // The global inspector rule is untouched: still the lighter shared shade.
+    assert.match(
+      css,
+      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-mv2-surface-2\);/,
+      'the shared inspector keeps --fab-mv2-surface-2 on every other screen'
     );
   });
 

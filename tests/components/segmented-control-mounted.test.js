@@ -73,6 +73,26 @@ describe('SegmentedControl (mounted)', () => {
     assert.deepEqual(calls, []);
   });
 
+  it('adds the is-fill class to the track only when fill is set', async () => {
+    const plain = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
+    assert.equal(
+      plain.querySelector('.manager-segmented').classList.contains('is-fill'),
+      false,
+      'the default track hugs its content (no is-fill)'
+    );
+    harness.remount();
+    const filled = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      fill: true
+    });
+    assert.ok(
+      filled.querySelector('.manager-segmented.is-fill'),
+      'fill=true makes the track span its container full-width'
+    );
+  });
+
   it('stamps dataAttr and optionDataAttr hooks', async () => {
     const root = await harness.mount({
       options: OPTIONS,

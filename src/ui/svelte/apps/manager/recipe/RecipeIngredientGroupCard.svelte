@@ -7,9 +7,12 @@
   bare row (no box). The requirement emits a shallow-updated copy via
   `onChange(nextGroup)` and is dropped entirely via `onRemove()`.
 
-  The loose per-row and footer add-buttons are replaced by ONE "or…" popover per
-  requirement (issue 643). It offers what Fabricate can actually honour, under TWO
-  headings — because the four choices do not all mean the same thing:
+  The add-affordances diverge by shape (issue 643): a BARE single-alternative row
+  keeps ONE compact "or…" popover inline at its right end, while a multi-alternative
+  BOX carries FOUR explicit dashed add-buttons at its foot (Add component / tag /
+  cost / essence). Both drive the same append semantics. The popover offers what
+  Fabricate can actually honour, under TWO headings — because the four choices do
+  not all mean the same thing:
 
    - "Accept instead" — Component / Tag / Currency: the THREE real ingredient match
      types (`src/models/match/matchTypes.js`), each appended to THIS requirement as a
@@ -183,8 +186,10 @@
     searchAriaLabel={orMenuLabel}
     emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
     showChevron={false}
+    showSearch={false}
+    popoverClass="manager-recipe-or-popover"
     minWidth={220}
-    maxWidth={300}
+    maxWidth={340}
     onChoose={(type) => appendAlternative(type)}
   />
 {/snippet}
@@ -223,8 +228,54 @@
         />
       {/each}
     </div>
+    <!-- The multi-alternative box uses FOUR explicit dashed add-buttons (issue 643),
+         modelled on the set-level add row, instead of the compact "or…" popover the
+         bare rows keep. They reuse the same append semantics: component/tag append an
+         OR member to THIS requirement, cost appends a currency member, and essence is
+         an AND requirement that bubbles to the owning SET. Currency shows only when the
+         system configures units, essence only while the set can still take one, and the
+         `data-recipe-add` marker family is preserved on each button. -->
     <div class="manager-recipe-requirement-adds">
-      {@render orMenu()}
+      <button
+        type="button"
+        class="manager-button is-dashed"
+        data-recipe-add="alternative-component"
+        onclick={() => appendAlternative('component')}
+      >
+        <i class="fas fa-cube" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}</span>
+      </button>
+      <button
+        type="button"
+        class="manager-button is-dashed"
+        data-recipe-add="alternative-tag"
+        onclick={() => appendAlternative('tags')}
+      >
+        <i class="fas fa-tags" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
+      </button>
+      {#if (currencyUnits || []).length > 0}
+        <button
+          type="button"
+          class="manager-button is-dashed"
+          data-recipe-add="alternative-cost"
+          onclick={() => appendAlternative('currency')}
+        >
+          <i class="fa-solid fa-coins" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}</span>
+        </button>
+      {/if}
+      {#if (addableEssenceOptions || []).length > 0}
+        <button
+          type="button"
+          class="manager-button is-dashed"
+          data-recipe-add="alternative-essence"
+          onclick={() => appendAlternative('essence')}
+        >
+          <i class="fas fa-flask-vial" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}</span>
+        </button>
+      {/if}
     </div>
   {:else}
     <!-- Bare requirement (§B1): a single row with the "or…" popover inline at its

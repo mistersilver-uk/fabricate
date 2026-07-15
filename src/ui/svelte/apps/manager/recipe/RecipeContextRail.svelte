@@ -415,6 +415,7 @@
         groupName="manager-recipe-step-mode"
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}
         optionDataAttr="data-recipe-step-mode-option"
+        fill={true}
         onChange={selectStepMode}
       />
     </section>

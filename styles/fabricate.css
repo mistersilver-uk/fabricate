@@ -2050,6 +2050,14 @@
   min-height: 0;
 }
 
+/* Recipe Studio only: the context rail sits on the SAME surface as the main
+   editor panel (`--fab-mv2-surface-1`), one step darker than the shared inspector
+   shade used on every other manager screen. The border-left is kept (issue 643). */
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-inspector,
+.fabricate-manager[data-manager-view="recipes"] .manager-inspector {
+  background: var(--fab-mv2-surface-1);
+}
+
 .fabricate-manager .manager-character-modifier-card {
   display: flex;
   flex-direction: column;
@@ -7405,8 +7413,25 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* Flank the label with a faint rule so each alternative ("OR") or each AND'd
-   requirement reads as a visually separated unit. */
+/* The OR/AND label reads as a small pill so the divider looks like `[ — OR — ]`
+   rather than bare centred text (issue 643). */
+.fabricate-manager .manager-recipe-ingredient-set-or > span,
+.fabricate-manager .manager-recipe-ingredient-or-separator > span,
+.fabricate-manager .manager-recipe-ingredient-and-separator > span {
+  flex: 0 0 auto;
+  padding: 2px var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  background: var(--fab-bg-3);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+/* Flank the label with a faint rule so each alternative ("OR"), each AND'd
+   requirement, and each between-set ("OR") break reads as a separated unit. The
+   set-level OR now gets the same flanking rules as the within-requirement one. */
+.fabricate-manager .manager-recipe-ingredient-set-or::before,
+.fabricate-manager .manager-recipe-ingredient-set-or::after,
 .fabricate-manager .manager-recipe-ingredient-or-separator::before,
 .fabricate-manager .manager-recipe-ingredient-or-separator::after,
 .fabricate-manager .manager-recipe-ingredient-and-separator::before,
@@ -7571,6 +7596,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-2);
+}
+
+/* The recipe dashed add-buttons (set-level adds, the group-level alternative
+   adds, and the full-width "Add ingredient set") inherit the ambient ~1rem, which
+   out-sizes the sibling recipe controls. Pin them to the recipe-control scale.
+   Scoped to these recipe rows only — the global `.manager-button.is-dashed` on
+   other screens is untouched (issue 643). */
+.fabricate-manager .manager-recipe-ingredient-set-add .manager-button,
+.fabricate-manager .manager-recipe-requirement-adds .manager-button,
+.fabricate-manager .manager-button.manager-recipe-add-full {
+  font-size: 0.78rem;
 }
 
 /* A requirement is a flat container by default (a single alternative reads as a
@@ -15663,6 +15699,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The recipe row-level "or…" popover carries longer, full-sentence option labels
+   ("Add alternative tag requirement"). With no search box squeezing it, let those
+   labels wrap in full rather than truncate (issue 643). */
+.fabricate-manager .manager-recipe-or-popover .manager-travel-option-name {
+  overflow: visible;
+  white-space: normal;
 }
 
 .fabricate-manager .manager-travel-picker {

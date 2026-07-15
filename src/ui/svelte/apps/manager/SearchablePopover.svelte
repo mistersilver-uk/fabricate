@@ -38,6 +38,13 @@
                    controls without wrapping the button)
     triggerTitle — optional native `title` tooltip on the trigger button
                    (backward-compatible; omitted when empty)
+    showSearch   — render the search input (default true). A caller with only a
+                   handful of fixed options (the recipe row-level "or…" menu) drops
+                   it: `search` stays '' so `filteredOptions` and the autofocus
+                   `$effect` degrade gracefully to the full, unfiltered list.
+    popoverClass — optional extra class on the portaled popover element (the
+                   pickerClass lands on the trigger's root, which the portaled
+                   popover escapes, so a popover-scoped style needs its own hook)
     *AriaLabel / searchPlaceholder / emptyHint — localized strings
     onChoose(id) — called with the chosen option id
 -->
@@ -57,6 +64,8 @@
     triggerLabel = '',
     valueClass = '',
     showChevron = true,
+    showSearch = true,
+    popoverClass = '',
     triggerAddMarker = '',
     triggerTitle = '',
     triggerAriaLabel = '',
@@ -213,7 +222,7 @@
   {#if open}
     <div
       bind:this={popoverRoot}
-      class="manager-travel-popover"
+      class={`manager-travel-popover ${popoverClass}`}
       style={popoverStyle}
       role="dialog"
       tabindex="-1"
@@ -222,15 +231,17 @@
       onclick={stop}
       onkeydown={(event) => { if (event.key === 'Escape') { stop(event); close(); } }}
     >
-      <div class="manager-travel-popover-search">
-        <input
-          bind:this={searchInput}
-          bind:value={search}
-          type="text"
-          placeholder={searchPlaceholder}
-          aria-label={searchAriaLabel || undefined}
-        />
-      </div>
+      {#if showSearch}
+        <div class="manager-travel-popover-search">
+          <input
+            bind:this={searchInput}
+            bind:value={search}
+            type="text"
+            placeholder={searchPlaceholder}
+            aria-label={searchAriaLabel || undefined}
+          />
+        </div>
+      {/if}
       {#snippet optionRow(option)}
         <button
           type="button"

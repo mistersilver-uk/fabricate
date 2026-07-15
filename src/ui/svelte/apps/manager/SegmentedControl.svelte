@@ -19,6 +19,10 @@
      test/host hooks, e.g. 'data-when-spent-control').
    - optionDataAttr?: optional data-* attribute name stamped with each option's
      `value` on its segment (e.g. 'data-when-spent-option').
+   - fill?: when true the track spans its container full-width and the segments
+     share it equally (each `flex: 1 1 0`), rather than the default inline track
+     hugging its content. The recipe rail's Step-mode control opts in; the other
+     uses (whenSpent, learning scope) keep the default inline sizing.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -30,7 +34,8 @@
     groupName = '',
     ariaLabel = '',
     dataAttr = '',
-    optionDataAttr = ''
+    optionDataAttr = '',
+    fill = false
   } = $props();
 
   function text(key, fallback) {
@@ -45,7 +50,7 @@
 </script>
 
 <div
-  class="manager-segmented"
+  class={`manager-segmented ${fill ? 'is-fill' : ''}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...dataAttr ? { [dataAttr]: true } : {}}
@@ -77,6 +82,18 @@
     background: var(--fab-surface-soft);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
+  }
+
+  /* Full-width variant (issue 643): the track fills its container and the segments
+     share it equally, so a two-option control reads as one balanced bar rather than
+     two content-hugging tiles floating at the left. */
+  .manager-segmented.is-fill {
+    display: flex;
+    width: 100%;
+  }
+
+  .manager-segmented.is-fill .manager-segment {
+    flex: 1 1 0;
   }
 
   .manager-segment {
