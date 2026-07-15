@@ -1485,6 +1485,15 @@
   background: var(--fab-surface-soft);
 }
 
+/* The header "Unsaved" state chip sits in the button row, so it takes the button's
+   6px rounded-rectangle corners and compact header height rather than the default
+   full-round chip pill — it reads as part of the toolbar, not a floating tag (§F6). */
+.fabricate-manager .manager-header-actions .manager-chip.is-warning {
+  min-height: 38px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
 .fabricate-manager .manager-subtitle {
   margin: var(--fab-space-2xs) 0 0;
   color: var(--fab-mv2-text-muted);
@@ -13171,6 +13180,10 @@
   border-radius: 0;
   color: var(--fab-mv2-text-muted);
   background: none;
+
+  /* A notch below body text so the tab strip reads as chrome, not content, matching
+     the prototype's compact tabs (issue 643). */
+  font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -13185,10 +13198,17 @@
 }
 
 /* Editor tab badges are counts — issue counts, item counts — so they take the mono
-   face with tabular figures like every other numeric in the product (issue 643). */
+   face with tabular figures like every other numeric in the product (issue 643).
+   They sit a step smaller than the tab label, and a min-width wider than their height
+   (against the inherited chip min-height) keeps a single digit reading as a small
+   pill with centred text rather than a circle. */
 .fabricate-manager .manager-editor-tab-badge {
   margin-left: var(--fab-space-2xs);
+  min-width: 1.4rem;
+  min-height: 18px;
+  padding: 0 var(--fab-space-2xs);
   font-family: var(--fab-font-mono);
+  font-size: 0.66rem;
   font-variant-numeric: tabular-nums;
 }
 
