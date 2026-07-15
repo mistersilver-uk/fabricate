@@ -25,6 +25,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
 
   let {
     item = {},
@@ -124,15 +125,18 @@
     {/if}
 
     {#if !progressive}
-      <input
-        type="number"
-        min="1"
-        max="9999"
-        class="manager-recipe-option-quantity manager-recipe-result-quantity"
-        data-recipe-option-quantity
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+      <!-- The same shared Stepper the Ingredients rows use (−/value/+), not a bare
+           number input, so a produced quantity is edited identically to an ingredient
+           quantity. -->
+      <Stepper
         value={quantity}
-        onchange={(e) => setQuantity(e.target.value)}
+        min={1}
+        max={9999}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
+        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
+        inputProps={{ 'data-recipe-option-quantity': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        onChange={(value) => setQuantity(value)}
       />
     {/if}
 

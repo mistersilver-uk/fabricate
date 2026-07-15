@@ -3045,15 +3045,17 @@ describe('RecipeEditView (mounted)', () => {
     ]);
     const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
     assert.equal(input.value, '2', 'the quantity input reflects the item quantity');
+    // The result quantity is the shared Stepper (as in Ingredients); its typeable
+    // input commits on blur, not on a `change` event.
     input.value = '999999';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(
       patches.at(-1).resultGroups[0].results[0].quantity,
       9999,
       'over-cap input is capped to 9999'
     );
     input.value = '0';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(
       patches.at(-1).resultGroups[0].results[0].quantity,
       1,
@@ -3103,7 +3105,7 @@ describe('RecipeEditView (mounted)', () => {
     // A simple-mode edit preserves the existing group id/name.
     const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
     input.value = '4';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(
       patches.at(-1).resultGroups[0].id,
       'grp-1',
@@ -3193,9 +3195,10 @@ describe('RecipeEditView (mounted)', () => {
       }
     );
     // Edit the group's only item (a quantity change) — the lightest-touch edit path.
+    // The shared Stepper commits on blur, not on a `change` event.
     const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
     input.value = '5';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(
       patches.at(-1).resultGroups[0].id,
       'grp-1',

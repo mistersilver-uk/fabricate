@@ -4041,6 +4041,7 @@
   align-self: flex-start;
   align-items: center;
   gap: var(--fab-space-chip);
+
   /* Extra breathing room below the pill: the container gap sets the row-to-row
      spacing, this margin adds to it so the label sits further from the first row. */
   margin-bottom: var(--fab-space-1);
@@ -7298,12 +7299,6 @@
 .fabricate-manager .manager-recipe-result-remove:hover {
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
-}
-
-/* Mono, right-aligned result quantity (§C7). */
-.fabricate-manager .manager-recipe-result-quantity {
-  font-family: var(--fab-font-mono);
-  text-align: right;
 }
 
 /* Uppercase "DIFFICULTY" micro-label beside the read-only badge (§C4). */
