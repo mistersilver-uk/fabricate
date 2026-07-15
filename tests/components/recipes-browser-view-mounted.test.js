@@ -1037,7 +1037,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(root.querySelector('[data-recipe-produces-dc]').textContent.trim(), 'No difficulty');
   });
 
-  it('routed by check: groups the produces under each result group (tier), not one flat list', async () => {
+  it('routed by check: full-width collapsible outcome-tier sections named by tier, collapsed by default', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({
         id: 'r-check',
@@ -1048,35 +1048,55 @@ describe('RecipeBrowserInspector (mounted)', () => {
           {
             id: 'g1',
             name: 'Result Group 1',
+            checkOutcomeIds: ['t-std'],
             results: [
               { id: 'a', componentId: 'cmp-herb', quantity: 1 },
               { id: 'b', componentId: 'cmp-potion', quantity: 2 }
             ]
           },
-          { id: 'g2', name: 'Result Group 2', results: [{ id: 'c', componentId: 'cmp-potion', quantity: 1 }] }
+          {
+            id: 'g2',
+            name: 'Result Group 2',
+            checkOutcomeIds: ['t-master'],
+            results: [{ id: 'c', componentId: 'cmp-potion', quantity: 1 }]
+          }
         ]
       }),
       resolutionMode: 'routedByCheck',
+      outcomeTiers: [
+        { id: 't-std', name: 'Standard' },
+        { id: 't-master', name: 'Masterwork' }
+      ],
       recipeCount: 1,
       componentOptions: INSPECTOR_COMPONENTS
     });
 
-    // One section per result group, each headed by the group name.
-    const groups = [...root.querySelectorAll('[data-recipe-produces-group]')];
-    assert.equal(groups.length, 2, 'two result-group sections');
+    const tiers = [...root.querySelectorAll('[data-recipe-produces-group]')];
+    assert.equal(tiers.length, 2, 'two outcome-tier sections');
+    const heads = tiers.map((t) => t.querySelector('.manager-recipe-produces-tier-head'));
+    assert.ok(heads.every(Boolean), 'each section has a full-width header button');
+
+    // Named by the OUTCOME TIER (from checkOutcomeIds), not "Result Group N".
     assert.deepEqual(
-      groups.map((g) => g.querySelector('.manager-recipe-produces-group-head').textContent.trim()),
-      ['Result Group 1', 'Result Group 2']
+      heads.map((h) => h.querySelector('.manager-recipe-produces-tier-name').textContent.trim()),
+      ['Standard', 'Masterwork']
     );
-    // The first group holds its two items; the items no longer carry a redundant row pill.
-    assert.equal(groups[0].querySelectorAll('[data-recipe-produces]').length, 2);
-    assert.equal(groups[1].querySelectorAll('[data-recipe-produces]').length, 1);
+
+    // Collapsed by default: no produce rows are rendered until a tier is expanded.
+    assert.equal(root.querySelector('[data-recipe-produces]'), null, 'sections start collapsed');
+    assert.equal(heads[0].getAttribute('aria-expanded'), 'false');
+
+    // Expanding a tier reveals its rows (no per-row pill); other tiers stay collapsed.
+    heads[0].click();
+    flushSync();
+    assert.equal(heads[0].getAttribute('aria-expanded'), 'true');
+    assert.equal(tiers[0].querySelectorAll('[data-recipe-produces]').length, 2, 'the tier reveals its two items');
+    assert.equal(tiers[1].querySelectorAll('[data-recipe-produces]').length, 0, 'other tiers remain collapsed');
     assert.equal(
-      groups[0].querySelector('[data-recipe-produces] .manager-recipe-flow-group'),
+      tiers[0].querySelector('[data-recipe-produces] .manager-recipe-flow-group'),
       null,
-      'no per-row group pill inside a grouped section'
+      'no per-row group pill inside an expanded tier'
     );
-    // Quantities still show (routed-by-check is not progressive).
-    assert.match(root.textContent, /×2/);
+    assert.match(tiers[0].textContent, /×2/, 'quantities still show (routed-by-check is not progressive)');
   });
 });

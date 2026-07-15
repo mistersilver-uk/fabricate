@@ -4217,21 +4217,73 @@
   background: var(--fab-info-soft);
 }
 
-/* Routed-by-check Produces: items grouped under each result-group (tier). The heading is
-   the tier pill on its own line above its rows; groups are spaced apart (issue 643). */
-.fabricate-manager .manager-recipe-produces-group {
+/* Routed-by-check Produces: items grouped under each result-group as a FULL-WIDTH,
+   collapsible outcome-tier section. The header is a full-width bar (chevron · tier name ·
+   count), not a pill, and starts collapsed so the panel opens compact (issue 643). */
+.fabricate-manager .manager-recipe-produces-tier {
+  display: flex;
+  flex-direction: column;
+}
+
+.fabricate-manager .manager-recipe-produces-tier + .manager-recipe-produces-tier {
+  margin-top: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-recipe-produces-tier-head {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-produces-tier-head:hover {
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-recipe-produces-tier.is-failure .manager-recipe-produces-tier-head {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-recipe-produces-tier-head > i {
+  flex: 0 0 auto;
+  font-size: 0.6rem;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-recipe-produces-tier-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-recipe-produces-tier-count {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-family: var(--fab-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-recipe-produces-tier-body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.fabricate-manager .manager-recipe-produces-group + .manager-recipe-produces-group {
-  margin-top: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-recipe-flow-group.manager-recipe-produces-group-head {
-  align-self: flex-start;
-  max-width: 100%;
+  margin-top: 4px;
+  padding-left: var(--fab-space-2);
 }
 
 /* Quantities are numerics: mono, tabular. */

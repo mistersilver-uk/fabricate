@@ -120,6 +120,25 @@ export function routedSuccessTierOptions(routed) {
 }
 
 /**
+ * ALL outcome tiers (success AND failure) as `{id, name}`, in authored order. Unlike
+ * {@link routedSuccessTierOptions} this keeps failure tiers, because a result group may
+ * be routed to any tier and a consumer resolving a group's `checkOutcomeIds` to tier
+ * NAMES (e.g. the library inspector's routed-by-check headings) needs every tier's name.
+ *
+ * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @returns {Array<{id: string, name: string}>}
+ */
+export function routedOutcomeTierOptions(routed) {
+  if (!routed) return [];
+  const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+  return (Array.isArray(tiers) ? tiers : [])
+    .filter((tier) => tier?.id)
+    .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
+}
+
+/**
  * Does the routed check have ANY outcome tier defined (regardless of success)?
  * The active list is `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
  *

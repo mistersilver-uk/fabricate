@@ -47,6 +47,9 @@
     // routes to a result group, so the inspector pairs a set dropdown with a result-set
     // dropdown; every other mode renders the flat Requires / Produces lists.
     resolutionMode = '',
+    // ALL routed outcome tiers ({id, name}) for the system, used ONLY to resolve a
+    // routed-by-check result group's checkOutcomeIds to the tier NAME it produces on.
+    outcomeTiers = [],
     // The system's components and essences, used ONLY to resolve the names and images
     // of the ids the recipe references. The inspector reads; it never authors.
     componentOptions = [],
@@ -171,10 +174,36 @@
   // row. The group heading names the tier; its rows drop the redundant per-row pill.
   const isRoutedByCheck = $derived(resolutionMode === 'routedByCheck');
 
+  // id → outcome tier name, so a routed-by-check group heading can read as the TIER it
+  // produces on ("Standard", "Masterwork") rather than an anonymous "Result Group N".
+  const outcomeTierNameById = $derived(
+    new Map((Array.isArray(outcomeTiers) ? outcomeTiers : []).map((tier) => [tier.id, tier.name]))
+  );
+
+  // The heading for a routed-by-check result group: the NAME(S) of the outcome tier(s) it
+  // is routed to, falling back to the group's own name, then a positional label.
   function produceGroupLabel(group, index) {
+    const tierNames = (Array.isArray(group.checkOutcomeIds) ? group.checkOutcomeIds : [])
+      .map((id) => outcomeTierNameById.get(id))
+      .filter((name) => name && name.trim());
+    if (tierNames.length > 0) return tierNames.join(', ');
     return (
       group.groupName || `${text('FABRICATE.Admin.Manager.Recipe.ResultSetLabel', 'Result set')} ${index + 1}`
     );
+  }
+
+  // Routed-by-check tier sections are collapsible and start COLLAPSED (issue 643): a Set
+  // of expanded group ids, re-seeded empty whenever the inspected recipe changes.
+  let expandedTiers = $state(new Set());
+  $effect(() => {
+    void selectedRecipe?.id;
+    expandedTiers = new Set();
+  });
+  function toggleTier(groupId) {
+    const next = new Set(expandedTiers);
+    if (next.has(groupId)) next.delete(groupId);
+    else next.add(groupId);
+    expandedTiers = next;
   }
 
   // The per-component progressive DC label ("DC 12"), or the unset-difficulty note.
@@ -437,17 +466,34 @@
     {/snippet}
     <div class="manager-recipe-flow-list">
       {#if isRoutedByCheck}
-        <!-- Routed by check: group the produced items UNDER each result group (the tier),
-             heading each with the group name, instead of one flat list of rows each wearing
-             a "Result Group N" pill. -->
+        <!-- Routed by check: group the produced items UNDER each result group as a
+             FULL-WIDTH, COLLAPSIBLE outcome-tier section headed by the tier NAME (from the
+             group's checkOutcomeIds), not an anonymous "Result Group N" pill. Sections
+             start collapsed so the panel opens compact. -->
         {#each producedGroups as group, index (group.groupId)}
-          <div class="manager-recipe-produces-group" data-recipe-produces-group={group.groupId}>
-            <span
-              class={`manager-recipe-flow-group manager-recipe-produces-group-head ${group.failure ? 'is-failure' : 'is-success'}`}
-            >{produceGroupLabel(group, index)}</span>
-            {#each group.rows as row (row.id)}
-              {@render produceRow(row, false)}
-            {/each}
+          {@const expanded = expandedTiers.has(group.groupId)}
+          <div
+            class={`manager-recipe-produces-tier ${group.failure ? 'is-failure' : ''}`}
+            data-recipe-produces-group={group.groupId}
+          >
+            <button
+              type="button"
+              class="manager-recipe-produces-tier-head"
+              data-recipe-tier-toggle={group.groupId}
+              aria-expanded={expanded}
+              onclick={() => toggleTier(group.groupId)}
+            >
+              <i class={`fas ${expanded ? 'fa-chevron-down' : 'fa-chevron-right'}`} aria-hidden="true"></i>
+              <span class="manager-recipe-produces-tier-name">{produceGroupLabel(group, index)}</span>
+              <span class="manager-recipe-produces-tier-count">{group.rows.length}</span>
+            </button>
+            {#if expanded}
+              <div class="manager-recipe-produces-tier-body">
+                {#each group.rows as row (row.id)}
+                  {@render produceRow(row, false)}
+                {/each}
+              </div>
+            {/if}
           </div>
         {/each}
       {:else}

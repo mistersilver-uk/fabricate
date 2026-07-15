@@ -8,6 +8,7 @@
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
   import {
     routedSuccessTierOptions,
+    routedOutcomeTierOptions,
     routedHasOutcomeTiers,
     routedOutcomeTierCount,
     routedOutcomeTierNames,
@@ -486,6 +487,11 @@
   // excluded — a failed check produces no result set to route to.
   const recipeRoutedOutcomeTierOptions = $derived.by(() =>
     routedSuccessTierOptions(selectedSystem?.craftingCheck?.routed)
+  );
+  // ALL routed outcome tiers ({id, name}, success + failure) — the library inspector
+  // resolves a routed-by-check result group's checkOutcomeIds to these tier NAMES.
+  const recipeAllOutcomeTierOptions = $derived.by(() =>
+    routedOutcomeTierOptions(selectedSystem?.craftingCheck?.routed)
   );
   // Whether ANY outcome tier is defined (even failure-only). Lets the recipe
   // editor tell "no tiers authored" apart from "tiers exist but none is Success"
@@ -6632,6 +6638,7 @@
         <RecipeBrowserInspector
           {selectedRecipe}
           resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+          outcomeTiers={recipeAllOutcomeTierOptions}
           recipeCount={($viewState.recipes || []).length}
           componentCount={selectedCounts.components}
           componentOptions={selectedSystem?.managedItemOptions || []}

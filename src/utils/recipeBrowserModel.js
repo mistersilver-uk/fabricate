@@ -477,6 +477,9 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
             : null,
           groupId,
           groupName: group?.name || '',
+          // The check-outcome tiers this result group is routed to (routed-by-check). The
+          // inspector resolves these ids to tier NAMES for its grouped headings.
+          checkOutcomeIds: Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : [],
           // The reserved alchemy-Simple failure group: what a FAILED craft makes. It is
           // not a success output and must never be shown as one.
           failure: group?.role === 'failure',
@@ -506,6 +509,7 @@ export function groupProduceRowsByResultGroup(rows) {
       byGroup.set(row.groupId, {
         groupId: row.groupId,
         groupName: row.groupName || '',
+        checkOutcomeIds: Array.isArray(row.checkOutcomeIds) ? row.checkOutcomeIds : [],
         failure: row.failure === true,
         rows: [],
       });
