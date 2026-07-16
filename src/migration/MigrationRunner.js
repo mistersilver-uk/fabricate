@@ -30,6 +30,7 @@ import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
 import { migrateRenameSourceUuidFields } from './migrateRenameSourceUuidFields.js';
+import { migrateRetireProgressiveAllowPlayerReorder } from './migrateRetireProgressiveAllowPlayerReorder.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
@@ -293,6 +294,17 @@ const MIGRATIONS = [
       const { recipes, _essenceCollisionDisabledRecipes } = migrateEssencesToIngredientGroups(data);
       return { recipes, _essenceCollisionDisabledRecipes };
     },
+  },
+  {
+    version: '1.18.0',
+    label:
+      'Strip the retired system-level progressive allowPlayerReorder from the crafting, ' +
+      'salvage and gathering checks (the reorder permission now lives on the recipe and on salvage)',
+    // The last release before the flag was retired: a world downgraded to it still finds
+    // its own schema, since this migration only removes a key that release ignored.
+    // (1.17.0 is the essence-ingredient migration; this took 1.18.0 on rebase.)
+    downgradeTo: '1.17.0',
+    migrate: (data) => migrateRetireProgressiveAllowPlayerReorder(data.systems),
   },
   // Future migrations added here in version order
 ];
